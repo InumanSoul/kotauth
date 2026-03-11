@@ -13,104 +13,129 @@ import io.ktor.server.routing.*
 /**
  * Web adapter — HTTP routes for the auth module.
  *
- * Responsibility: parse the HTTP request → call the domain service → delegate to the view.
- * Nothing else. No business logic, no HTML generation, no SQL.
+ * All tenant-scoped endpoints are nested under `/t/{slug}/` (ADR-001).
+ * The slug is extracted from the path and forwarded to AuthService, which
+ * resolves the tenant and enforces its policies.
  *
- * This is the Ktor extension function pattern: install via `routing { authRoutes(service) }`.
- * Adding an admin module later = create adminRoutes() in its own file, same pattern.
+ * Responsibility: parse HTTP request → call domain service → delegate to view.
+ * Nothing else. No business logic, no HTML, no SQL.
  */
 fun Route.authRoutes(authService: AuthService) {
 
-    // ------------------------------------------------------------------
-    // Login
-    // ------------------------------------------------------------------
+    route("/t/{slug}") {
 
-    get("/login") {
-        val registered = call.request.queryParameters["registered"] == "true"
-        call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(success = registered))
-    }
+        // ------------------------------------------------------------------
+        // Login — browser UI
+        // ------------------------------------------------------------------
 
-    post("/login") {
-        val params = call.receiveParameters()
-        val username = params["username"]?.trim() ?: ""
-        val password = params["password"] ?: ""
-
-        when (val result = authService.login(username, password)) {
-            is AuthResult.Success -> call.respond(result.value)
-            is AuthResult.Failure -> call.respond(
-                HttpStatusCode.Unauthorized,
-                mapOf("error" to result.error.toMessage())
-            )
+        get("/login") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val registered = call.request.queryParameters["registered"] == "true"
+            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(tenantSlug = slug, success = registered))
         }
-    }
 
-    // ------------------------------------------------------------------
-    // Registration
-    // ------------------------------------------------------------------
+        post("/login") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val params = call.receiveParameters()
+            val username = params["username"]?.trim() ?: ""
+            val password = params["password"] ?: ""
 
-    get("/register") {
-        call.respondHtml(HttpStatusCode.OK, AuthView.registerPage())
-    }
-
-    post("/register") {
-        val params = call.receiveParameters()
-        val username = params["username"]?.trim() ?: ""
-        val email = params["email"]?.trim() ?: ""
-        val fullName = params["fullName"]?.trim() ?: ""
-        val password = params["password"] ?: ""
-        val confirmPassword = params["confirmPassword"] ?: ""
-
-        val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
-
-        when (val result = authService.register(username, email, fullName, password, confirmPassword)) {
-            is AuthResult.Success -> {
-                // Redirect to login with a success flag — avoids form resubmission on refresh
-                call.respondRedirect("/login?registered=true")
-            }
-            is AuthResult.Failure -> {
-                call.respondHtml(
-                    HttpStatusCode.UnprocessableEntity,
-                    AuthView.registerPage(error = result.error.toMessage(), prefill = prefill)
+            when (val result = authService.login(slug, username, password)) {
+                is AuthResult.Success -> call.respond(result.value)
+                is AuthResult.Failure -> call.respond(
+                    HttpStatusCode.Unauthorized,
+                    mapOf("error" to result.error.toMessage())
                 )
             }
         }
-    }
 
-    // ------------------------------------------------------------------
-    // OpenID Connect discovery + token endpoint (API consumers)
-    // ------------------------------------------------------------------
+        // ------------------------------------------------------------------
+        // Registration — browser UI
+        // ------------------------------------------------------------------
 
-    get("/.well-known/openid-configuration") {
-        val issuer = "https://kauth.example.com"
-        call.respond(
-            mapOf(
-                "issuer" to issuer,
-                "token_endpoint" to "$issuer/token",
-                "registration_endpoint" to "$issuer/register"
+        get("/register") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(tenantSlug = slug))
+        }
+
+        post("/register") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val params = call.receiveParameters()
+            val username = params["username"]?.trim() ?: ""
+            val email = params["email"]?.trim() ?: ""
+            val fullName = params["fullName"]?.trim() ?: ""
+            val password = params["password"] ?: ""
+            val confirmPassword = params["confirmPassword"] ?: ""
+
+            val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
+
+            when (val result = authService.register(slug, username, email, fullName, password, confirmPassword)) {
+                is AuthResult.Success -> {
+                    // Redirect to login with a success flag — prevents form resubmission on refresh
+                    call.respondRedirect("/t/$slug/login?registered=true")
+                }
+                is AuthResult.Failure -> {
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AuthView.registerPage(
+                            tenantSlug = slug,
+                            error = result.error.toMessage(),
+                            prefill = prefill
+                        )
+                    )
+                }
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // OpenID Connect — API consumers
+        // ------------------------------------------------------------------
+
+        get("/.well-known/openid-configuration") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            // Issuer URL will eventually come from the tenant record (Phase 2)
+            val issuer = "https://kauth.example.com/t/$slug"
+            call.respond(
+                mapOf(
+                    "issuer" to issuer,
+                    "token_endpoint" to "$issuer/protocol/openid-connect/token",
+                    "authorization_endpoint" to "$issuer/protocol/openid-connect/auth",
+                    "registration_endpoint" to "$issuer/register"
+                )
             )
-        )
-    }
+        }
 
-    post("/token") {
-        val params = call.receiveParameters()
-        val username = params["username"]?.trim() ?: ""
-        val password = params["password"] ?: ""
+        /*
+         * Token endpoint — accepts Resource Owner Password Credentials for now.
+         * This will be replaced by the full Authorization Code + PKCE flow in Phase 2.
+         */
+        post("/protocol/openid-connect/token") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val params = call.receiveParameters()
+            val username = params["username"]?.trim() ?: ""
+            val password = params["password"] ?: ""
 
-        when (val result = authService.login(username, password)) {
-            is AuthResult.Success -> call.respond(result.value)
-            is AuthResult.Failure -> call.respond(HttpStatusCode.Unauthorized)
+            when (val result = authService.login(slug, username, password)) {
+                is AuthResult.Success -> call.respond(result.value)
+                is AuthResult.Failure -> call.respond(
+                    HttpStatusCode.Unauthorized,
+                    mapOf("error" to "invalid_client", "error_description" to result.error.toMessage())
+                )
+            }
         }
     }
 }
 
 /**
- * Maps domain errors to user-facing messages.
+ * Maps domain errors to user-facing strings.
  * Lives in the web adapter — the domain doesn't know what words to show a browser user.
  */
 private fun AuthError.toMessage(): String = when (this) {
-    is AuthError.InvalidCredentials -> "Invalid username or password."
-    is AuthError.UserAlreadyExists -> "That username is already taken."
-    is AuthError.EmailAlreadyExists -> "An account with that email already exists."
-    is AuthError.WeakPassword -> "Password must be at least 8 characters."
-    is AuthError.ValidationError -> this.message
+    is AuthError.InvalidCredentials  -> "Invalid username or password."
+    is AuthError.TenantNotFound      -> "Tenant not found."
+    is AuthError.RegistrationDisabled -> "Registration is not enabled for this tenant."
+    is AuthError.UserAlreadyExists   -> "That username is already taken."
+    is AuthError.EmailAlreadyExists  -> "An account with that email already exists."
+    is AuthError.WeakPassword        -> "Password must be at least $minLength characters."
+    is AuthError.ValidationError     -> this.message
 }

@@ -1,6 +1,7 @@
 val ktor_version = "2.3.12"
 val exposed_version = "0.50.1"
 val logback_version = "1.4.14"
+val flyway_version = "9.22.3"
 
 plugins {
     kotlin("jvm") version "1.9.24"
@@ -27,11 +28,13 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation:$ktor_version")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
     implementation("io.ktor:ktor-server-html-builder:$ktor_version")
+    implementation("io.ktor:ktor-server-sessions:$ktor_version")
 
     implementation("org.jetbrains.exposed:exposed-core:$exposed_version")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposed_version")
 
     implementation("org.postgresql:postgresql:42.7.3")
+    implementation("org.flywaydb:flyway-core:$flyway_version")
     implementation("com.auth0:java-jwt:4.4.0")
     implementation("at.favre.lib:bcrypt:0.10.2")
 

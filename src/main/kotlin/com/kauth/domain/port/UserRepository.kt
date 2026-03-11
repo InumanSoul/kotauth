@@ -3,14 +3,13 @@ package com.kauth.domain.port
 import com.kauth.domain.model.User
 
 /**
- * Port (outbound) — defines WHAT the domain needs from persistence.
- * The domain doesn't care if this is PostgreSQL, MySQL, or an in-memory map.
- * The adapter layer provides the implementation.
+ * Port (outbound) — defines what the domain needs from user persistence.
+ * All queries are scoped by [tenantId] — there are no cross-tenant lookups.
  */
 interface UserRepository {
-    fun findByUsername(username: String): User?
-    fun findByEmail(email: String): User?
+    fun findByUsername(tenantId: Int, username: String): User?
+    fun findByEmail(tenantId: Int, email: String): User?
     fun save(user: User): User
-    fun existsByUsername(username: String): Boolean
-    fun existsByEmail(email: String): Boolean
+    fun existsByUsername(tenantId: Int, username: String): Boolean
+    fun existsByEmail(tenantId: Int, email: String): Boolean
 }

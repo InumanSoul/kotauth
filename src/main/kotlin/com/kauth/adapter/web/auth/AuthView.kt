@@ -154,10 +154,11 @@ object AuthView {
     // -------------------------------------------------------------------------
 
     /**
-     * @param error   Inline error message to display, or null for a clean form.
-     * @param success True when arriving from a successful registration — shows a success banner.
+     * @param tenantSlug The tenant slug — used to build form action URLs.
+     * @param error      Inline error message to display, or null for a clean form.
+     * @param success    True when arriving from a successful registration — shows a success banner.
      */
-    fun loginPage(error: String? = null, success: Boolean = false): HTML.() -> Unit = {
+    fun loginPage(tenantSlug: String, error: String? = null, success: Boolean = false): HTML.() -> Unit = {
         head {
             title { +"KotAuth | Sign In" }
             meta(charset = "UTF-8")
@@ -183,7 +184,7 @@ object AuthView {
                     div("alert alert-error") { +error }
                 }
 
-                form(action = "/login", encType = FormEncType.applicationXWwwFormUrlEncoded, method = FormMethod.post) {
+                form(action = "/t/$tenantSlug/login", encType = FormEncType.applicationXWwwFormUrlEncoded, method = FormMethod.post) {
                     div("field") {
                         label { htmlFor = "username"; +"Username" }
                         input(type = InputType.text, name = "username") {
@@ -207,7 +208,7 @@ object AuthView {
 
                 div("footer-link") {
                     +"Don't have an account? "
-                    a(href = "/register") { +"Create one" }
+                    a(href = "/t/$tenantSlug/register") { +"Create one" }
                 }
             }
         }
@@ -218,10 +219,12 @@ object AuthView {
     // -------------------------------------------------------------------------
 
     /**
+     * @param tenantSlug The tenant slug — used to build form action URLs.
      * @param error      Inline error message from AuthService, or null for a clean form.
      * @param prefill    Field values to preserve after a failed submission.
      */
     fun registerPage(
+        tenantSlug: String,
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill()
     ): HTML.() -> Unit = {
@@ -244,7 +247,7 @@ object AuthView {
                     div("alert alert-error") { +error }
                 }
 
-                form(action = "/register", encType = FormEncType.applicationXWwwFormUrlEncoded, method = FormMethod.post) {
+                form(action = "/t/$tenantSlug/register", encType = FormEncType.applicationXWwwFormUrlEncoded, method = FormMethod.post) {
                     div("field") {
                         label { htmlFor = "fullName"; +"Full Name" }
                         input(type = InputType.text, name = "fullName") {
@@ -299,7 +302,7 @@ object AuthView {
 
                 div("footer-link") {
                     +"Already have an account? "
-                    a(href = "/login") { +"Sign in" }
+                    a(href = "/t/$tenantSlug/login") { +"Sign in" }
                 }
             }
         }
