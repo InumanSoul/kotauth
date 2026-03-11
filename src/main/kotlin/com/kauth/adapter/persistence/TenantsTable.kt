@@ -3,9 +3,8 @@ package com.kauth.adapter.persistence
 import org.jetbrains.exposed.sql.Table
 
 /**
- * Exposed ORM mapping for the 'tenants' table created by V1 migration.
- * Read-only from the application's perspective at this stage —
- * tenant creation will be handled via the admin console in Phase 1.
+ * Exposed ORM mapping for the 'tenants' table (V1 + V3 migrations).
+ * Schema is Flyway-owned — no uniqueIndex() or constraint declarations here.
  */
 object TenantsTable : Table("tenants") {
     val id                           = integer("id").autoIncrement()
@@ -18,6 +17,19 @@ object TenantsTable : Table("tenants") {
     val emailVerificationRequired    = bool("email_verification_required").default(false)
     val passwordPolicyMinLength      = integer("password_policy_min_length").default(8)
     val passwordPolicyRequireSpecial = bool("password_policy_require_special").default(false)
+
+    // Theme columns — added by V3 migration, defaults match TenantTheme.DEFAULT
+    val themeAccentColor  = varchar("theme_accent_color",  30).default("#bb86fc")
+    val themeAccentHover  = varchar("theme_accent_hover",  30).default("#9965f4")
+    val themeBgDeep       = varchar("theme_bg_deep",       30).default("#0f0f13")
+    val themeBgCard       = varchar("theme_bg_card",       30).default("#1a1a24")
+    val themeBgInput      = varchar("theme_bg_input",      30).default("#252532")
+    val themeBorderColor  = varchar("theme_border_color",  30).default("#2e2e3e")
+    val themeBorderRadius = varchar("theme_border_radius", 20).default("8px")
+    val themeTextPrimary  = varchar("theme_text_primary",  30).default("#e8e8f0")
+    val themeTextMuted    = varchar("theme_text_muted",    30).default("#6b6b80")
+    val themeLogoUrl      = varchar("theme_logo_url",     500).nullable()
+    val themeFaviconUrl   = varchar("theme_favicon_url",  500).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

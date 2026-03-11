@@ -18,6 +18,7 @@ import io.ktor.server.auth.*
 import io.ktor.server.auth.jwt.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.http.content.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -104,13 +105,16 @@ fun Application.module() {
     // Routes
     // -------------------------------------------------------------------------
     routing {
+        // Serve static assets — CSS files from src/main/resources/static/
+        staticResources("/static", "static")
+
         // Root redirect — navigating to / takes you to the master tenant login
         get("/") {
             call.respondRedirect("/t/master/login", permanent = false)
         }
 
         // Public auth flows — one route block covers all tenants
-        authRoutes(authService)
+        authRoutes(authService, tenantRepository)
 
         // Admin console — session-auth managed internally by adminRoutes
         adminRoutes(authService, tenantRepository)

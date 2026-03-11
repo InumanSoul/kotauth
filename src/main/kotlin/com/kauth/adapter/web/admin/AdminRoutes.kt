@@ -116,7 +116,9 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
                     displayName = displayName,
                     issuerUrl = issuerUrl ?: "",
                     registrationEnabled = params["registrationEnabled"] == "true",
-                    emailVerificationRequired = params["emailVerificationRequired"] == "true"
+                    emailVerificationRequired = params["emailVerificationRequired"] == "true",
+                    themeAccentColor = params["themeAccentColor"]?.trim() ?: "#bb86fc",
+                    themeLogoUrl = params["themeLogoUrl"]?.trim() ?: ""
                 )
 
                 // Validation

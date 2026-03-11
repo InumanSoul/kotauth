@@ -1,0 +1,217 @@
+/*
+ * KotAuth — Auth Pages Base Stylesheet
+ *
+ * This file uses CSS custom properties exclusively — no hardcoded brand colors.
+ * All color tokens are injected by the server as a :root { } block in the <head>
+ * before this file is linked, making per-tenant theming a database concern, not
+ * a build concern.
+ *
+ * Token contract (set by TenantTheme.toCssVars()):
+ *   --accent        Primary brand / action color
+ *   --accent-hover  Slightly darker accent for hover states
+ *   --bg-deep       Page / body background
+ *   --bg-card       Card / panel surface
+ *   --bg-input      Form input background
+ *   --border        Border color
+ *   --radius        Border radius for cards and containers
+ *   --text          Primary text
+ *   --muted         Secondary / placeholder text
+ *
+ * Functional colors (error, success) are hardcoded — tenants should not
+ * accidentally make error feedback invisible.
+ */
+
+/* -------------------------------------------------------------------------
+   Reset
+   ------------------------------------------------------------------------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Page shell
+   ------------------------------------------------------------------------- */
+body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1.5rem;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* -------------------------------------------------------------------------
+   Brand header
+   ------------------------------------------------------------------------- */
+.brand {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.brand-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.brand-logo {
+    max-height: 48px;
+    max-width: 180px;
+    object-fit: contain;
+    margin-bottom: 0.5rem;
+}
+
+.brand-tagline {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.25rem;
+}
+
+/* -------------------------------------------------------------------------
+   Card
+   ------------------------------------------------------------------------- */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.card-title {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+}
+
+.card-subtitle {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 1.75rem;
+}
+
+/* -------------------------------------------------------------------------
+   Form elements
+   ------------------------------------------------------------------------- */
+.field {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--text);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus {
+    border-color: var(--accent);
+}
+
+input::placeholder {
+    color: var(--muted);
+}
+
+/* -------------------------------------------------------------------------
+   Button
+   ------------------------------------------------------------------------- */
+.btn {
+    width: 100%;
+    padding: 0.85rem;
+    background: var(--accent);
+    border: none;
+    border-radius: calc(var(--radius) - 2px);
+    color: #0f0f13;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    margin-top: 0.5rem;
+    letter-spacing: 0.02em;
+}
+
+.btn:hover {
+    background: var(--accent-hover);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+/* -------------------------------------------------------------------------
+   Alerts  — functional colors, NOT tenant-customizable
+   ------------------------------------------------------------------------- */
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.alert-error {
+    background: #2a1a1a;
+    border-color: #cf6679;
+    color: #ff8a9b;
+}
+
+.alert-success {
+    background: #1a2a1a;
+    border-color: #4caf50;
+    color: #81c784;
+}
+
+/* -------------------------------------------------------------------------
+   Footer link
+   ------------------------------------------------------------------------- */
+.footer-link {
+    text-align: center;
+    margin-top: 1.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.footer-link a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.footer-link a:hover {
+    text-decoration: underline;
+}
+
+/* -------------------------------------------------------------------------
+   Divider
+   ------------------------------------------------------------------------- */
+.divider {
+    height: 1px;
+    background: var(--border);
+    margin: 1.5rem 0;
+}

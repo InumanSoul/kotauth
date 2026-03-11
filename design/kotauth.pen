@@ -7,7 +7,7 @@
       "x": -64,
       "y": -1186,
       "name": "KotAuth Wireframes Header",
-      "width": 1820,
+      "width": 2753,
       "height": 48,
       "fill": "#e8e5e0",
       "padding": [
@@ -22,20 +22,10 @@
           "id": "yTdpS",
           "name": "htitle",
           "fill": "#3d405b",
-          "content": "KotAuth · Screen Wireframes · v0.1",
+          "content": "KotAuth · Screens · v0.1",
           "fontFamily": "Inter",
           "fontSize": 18,
           "fontWeight": "600"
-        },
-        {
-          "type": "text",
-          "id": "UJIzr",
-          "name": "hsub",
-          "fill": "#aaa",
-          "content": "Wireframe format — layout only, not final design",
-          "fontFamily": "Inter",
-          "fontSize": 13,
-          "fontWeight": "normal"
         }
       ]
     },
@@ -66,7 +56,6 @@
       "width": 1366,
       "height": 768,
       "fill": "$p:--background",
-      "cornerRadius": 8,
       "children": [
         {
           "id": "QhVbB",
@@ -75,15 +64,23 @@
           "height": "fill_container",
           "name": "sidebarCC",
           "descendants": {
+            "p:6xhgh": {
+              "cornerRadius": 0
+            },
+            "p:u7yK2": {
+              "cornerRadius": 0
+            },
             "p:nIojH": {
               "iconFontName": "shield-check",
               "fill": "$brand-accent"
             },
             "p:xFmFv": {
-              "content": "KotAuth"
+              "content": "KotAuth",
+              "fontFamily": "Inconsolata"
             },
             "p:f9xLx": {
-              "content": "Admin Console"
+              "content": "Admin Console",
+              "fontFamily": "Inconsolata"
             },
             "p:47U5w": {
               "children": [
@@ -93,6 +90,7 @@
                   "ref": "p:qCCo8",
                   "fill": "$brand-accent-subtle",
                   "name": "wsItemCC",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "building-2",
@@ -100,7 +98,8 @@
                     },
                     "p:0Ru22": {
                       "content": "Workspaces",
-                      "fill": "$brand-accent"
+                      "fill": "$brand-accent",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 },
@@ -109,22 +108,35 @@
                   "type": "ref",
                   "ref": "p:jBcUh",
                   "name": "setItemCC",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "settings-2"
                     },
                     "p:0Ru22": {
-                      "content": "Settings"
+                      "content": "Settings",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 }
               ]
             },
+            "p:q9yup": {
+              "cornerRadius": 0
+            },
+            "p:sODDz": {
+              "cornerRadius": 0
+            },
+            "p:sODDz/p:wVlpW": {
+              "fontFamily": "Inconsolata"
+            },
             "p:gJPjN": {
-              "content": "Administrator"
+              "content": "Administrator",
+              "fontFamily": "Inconsolata"
             },
             "p:9biS6": {
-              "content": "admin@kotauth.io"
+              "content": "admin@kotauth.io",
+              "fontFamily": "Inconsolata"
             }
           }
         },
@@ -136,6 +148,8 @@
           "height": "fill_container",
           "fill": "$p:--background",
           "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
           "children": [
             {
               "type": "frame",
@@ -163,7 +177,7 @@
                   "id": "4s0yu",
                   "fill": "$p:--foreground",
                   "content": "New OAuth2 Client",
-                  "fontFamily": "Inter",
+                  "fontFamily": "Inconsolata",
                   "fontSize": 15,
                   "fontWeight": "600"
                 },
@@ -179,9 +193,11 @@
                       "type": "ref",
                       "ref": "p:DpPVg",
                       "name": "tbAvtCC",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:wVlpW": {
-                          "content": "A"
+                          "content": "A",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -193,7 +209,7 @@
               "type": "frame",
               "id": "kxRPO",
               "name": "contentCC",
-              "width": "fill_container",
+              "width": 720,
               "height": "fill_container",
               "fill": "$p:--background",
               "layout": "vertical",
@@ -212,7 +228,7 @@
                       "id": "RFUjO",
                       "fill": "$p:--muted-foreground",
                       "content": "Workspaces",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -221,7 +237,7 @@
                       "id": "buDwM",
                       "fill": "$p:--border",
                       "content": "/",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -230,7 +246,7 @@
                       "id": "cWYkF",
                       "fill": "$p:--foreground",
                       "content": "New OAuth2 Client",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -248,7 +264,7 @@
                       "id": "UsNT5",
                       "fill": "$p:--foreground",
                       "content": "Create OAuth2 Client",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 20,
                       "fontWeight": "700"
                     },
@@ -257,7 +273,7 @@
                       "id": "2Z9jX",
                       "fill": "$p:--muted-foreground",
                       "content": "Register an application to authenticate with this tenant.",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -269,7 +285,6 @@
                   "name": "fCardCC",
                   "width": "fill_container",
                   "fill": "$p:--card",
-                  "cornerRadius": 10,
                   "stroke": {
                     "align": "inside",
                     "thickness": 1,
@@ -284,7 +299,7 @@
                       "id": "kKYIG",
                       "fill": "$p:--muted-foreground",
                       "content": "Client Identity",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 11,
                       "fontWeight": "600",
                       "letterSpacing": 1
@@ -296,8 +311,15 @@
                       "width": "fill_container",
                       "name": "inpCC1",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "my-client-app"
+                          "content": "my-client-app",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -308,8 +330,15 @@
                       "width": "fill_container",
                       "name": "inpCC2",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "My Application"
+                          "content": "My Application",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -318,7 +347,7 @@
                       "id": "u5zqe",
                       "fill": "$p:--muted-foreground",
                       "content": "Redirect URIs",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 11,
                       "fontWeight": "600",
                       "letterSpacing": 1
@@ -330,8 +359,15 @@
                       "width": "fill_container",
                       "name": "inpCC3",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "https://myapp.com/callback"
+                          "content": "https://myapp.com/callback",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -340,7 +376,7 @@
                       "id": "ucGZ2",
                       "fill": "$p:--muted-foreground",
                       "content": "Token Settings",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 11,
                       "fontWeight": "600",
                       "letterSpacing": 1
@@ -352,8 +388,15 @@
                       "width": "fill_container",
                       "name": "inpCC4",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "3600"
+                          "content": "3600",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -370,10 +413,12 @@
                           "ref": "p:VSnC2",
                           "fill": "$brand-accent",
                           "name": "submitCC",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:8tnXG": {
                               "content": "Create Client",
-                              "fill": "$brand-accent-fg"
+                              "fill": "$brand-accent-fg",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -382,9 +427,11 @@
                           "type": "ref",
                           "ref": "p:C10zH",
                           "name": "cancelCC",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:poRwU": {
-                              "content": "Cancel"
+                              "content": "Cancel",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         }
@@ -1410,7 +1457,6 @@
       "width": 1366,
       "height": 768,
       "fill": "$p:--background",
-      "cornerRadius": 8,
       "children": [
         {
           "id": "8xTQW",
@@ -1419,15 +1465,23 @@
           "height": "fill_container",
           "name": "sidebarD",
           "descendants": {
+            "p:6xhgh": {
+              "cornerRadius": 0
+            },
+            "p:u7yK2": {
+              "cornerRadius": 0
+            },
             "p:nIojH": {
               "iconFontName": "shield-check",
               "fill": "$brand-accent"
             },
             "p:xFmFv": {
-              "content": "KotAuth"
+              "content": "KotAuth",
+              "fontFamily": "Inconsolata"
             },
             "p:f9xLx": {
-              "content": "Admin Console"
+              "content": "Admin Console",
+              "fontFamily": "Inconsolata"
             },
             "p:47U5w": {
               "children": [
@@ -1437,6 +1491,7 @@
                   "ref": "p:qCCo8",
                   "fill": "$brand-accent-subtle",
                   "name": "wsItemD",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "building-2",
@@ -1444,7 +1499,8 @@
                     },
                     "p:0Ru22": {
                       "content": "Workspaces",
-                      "fill": "$brand-accent"
+                      "fill": "$brand-accent",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 },
@@ -1453,22 +1509,35 @@
                   "type": "ref",
                   "ref": "p:jBcUh",
                   "name": "setItemD",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "settings-2"
                     },
                     "p:0Ru22": {
-                      "content": "Settings"
+                      "content": "Settings",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 }
               ]
             },
+            "p:q9yup": {
+              "cornerRadius": 0
+            },
+            "p:sODDz": {
+              "cornerRadius": 0
+            },
+            "p:sODDz/p:wVlpW": {
+              "fontFamily": "Inconsolata"
+            },
             "p:gJPjN": {
-              "content": "Administrator"
+              "content": "Administrator",
+              "fontFamily": "Inconsolata"
             },
             "p:9biS6": {
-              "content": "admin@kotauth.io"
+              "content": "admin@kotauth.io",
+              "fontFamily": "Inconsolata"
             }
           }
         },
@@ -1508,7 +1577,7 @@
                   "name": "tbTitleD",
                   "fill": "$p:--foreground",
                   "content": "Dashboard",
-                  "fontFamily": "Inter",
+                  "fontFamily": "Inconsolata",
                   "fontSize": 15,
                   "fontWeight": "600"
                 },
@@ -1524,9 +1593,11 @@
                       "type": "ref",
                       "ref": "p:DpPVg",
                       "name": "tbAvtD",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:wVlpW": {
-                          "content": "A"
+                          "content": "A",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -1558,16 +1629,38 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "statD1",
+                      "cornerRadius": 0,
+                      "height": "fit_content",
+                      "flipX": false,
+                      "flipY": false,
+                      "x": 0,
+                      "y": 0,
+                      "textGrowth": "auto",
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Total Tenants"
+                          "content": "Total Tenants",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "3",
-                          "fill": "$brand-accent"
+                          "fill": "$brand-accent",
+                          "fontFamily": "Inconsolata",
+                          "fontStyle": "normal",
+                          "fontWeight": "700",
+                          "fontSize": 36
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -1577,16 +1670,32 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "statD2",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Active Tenants"
+                          "content": "Active Tenants",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "2",
-                          "fill": "$brand-accent"
+                          "fill": "$brand-accent",
+                          "fontFamily": "Inconsolata",
+                          "fontSize": 36,
+                          "fontStyle": "normal",
+                          "fontWeight": "700"
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -1596,16 +1705,32 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "statD3",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Registered Users"
+                          "content": "Registered Users",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "34",
-                          "fill": "$p:--foreground"
+                          "fill": "$p:--foreground",
+                          "fontFamily": "Inconsolata",
+                          "fontSize": 36,
+                          "fontStyle": "normal",
+                          "fontWeight": "700"
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -1625,7 +1750,7 @@
                       "name": "pgHD",
                       "fill": "$p:--foreground",
                       "content": "Platform Overview",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 20,
                       "fontWeight": "700"
                     }
@@ -1637,7 +1762,6 @@
                   "name": "wCard",
                   "width": "fill_container",
                   "fill": "$p:--card",
-                  "cornerRadius": 10,
                   "stroke": {
                     "align": "inside",
                     "thickness": 1,
@@ -1653,7 +1777,7 @@
                       "name": "wTitle",
                       "fill": "$p:--foreground",
                       "content": "Welcome back, Administrator",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 16,
                       "fontWeight": "600"
                     },
@@ -1666,7 +1790,7 @@
                       "width": "fill_container",
                       "content": "KotAuth is running normally. Create new tenants, manage OAuth2 clients, and configure system settings below.",
                       "lineHeight": 1.6,
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -1683,10 +1807,12 @@
                           "ref": "p:VSnC2",
                           "fill": "$brand-accent",
                           "name": "wBtn1",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:8tnXG": {
                               "content": "New Tenant",
-                              "fill": "$brand-accent-fg"
+                              "fill": "$brand-accent-fg",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -1695,9 +1821,11 @@
                           "type": "ref",
                           "ref": "p:C10zH",
                           "name": "wBtn2",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:poRwU": {
-                              "content": "System Settings"
+                              "content": "System Settings",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         }
@@ -1725,7 +1853,6 @@
       "width": 1366,
       "height": 768,
       "fill": "$p:--background",
-      "cornerRadius": 8,
       "children": [
         {
           "id": "t1HL2",
@@ -1740,15 +1867,23 @@
           "y": 0,
           "textGrowth": "auto",
           "descendants": {
+            "p:6xhgh": {
+              "cornerRadius": 0
+            },
+            "p:u7yK2": {
+              "cornerRadius": 0
+            },
             "p:nIojH": {
               "iconFontName": "shield-check",
               "fill": "$brand-accent"
             },
             "p:xFmFv": {
-              "content": "KotAuth"
+              "content": "KotAuth",
+              "fontFamily": "Inconsolata"
             },
             "p:f9xLx": {
-              "content": "Admin Console"
+              "content": "Admin Console",
+              "fontFamily": "Inconsolata"
             },
             "p:47U5w": {
               "children": [
@@ -1758,6 +1893,7 @@
                   "ref": "p:qCCo8",
                   "fill": "$brand-accent-subtle",
                   "name": "wsItem1",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "building-2",
@@ -1765,7 +1901,8 @@
                     },
                     "p:0Ru22": {
                       "content": "Workspaces",
-                      "fill": "$brand-accent"
+                      "fill": "$brand-accent",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 },
@@ -1774,22 +1911,35 @@
                   "type": "ref",
                   "ref": "p:jBcUh",
                   "name": "setItem1",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "settings-2"
                     },
                     "p:0Ru22": {
-                      "content": "Settings"
+                      "content": "Settings",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 }
               ]
             },
+            "p:q9yup": {
+              "cornerRadius": 0
+            },
+            "p:sODDz": {
+              "cornerRadius": 0
+            },
+            "p:sODDz/p:wVlpW": {
+              "fontFamily": "Inconsolata"
+            },
             "p:gJPjN": {
-              "content": "Administrator"
+              "content": "Administrator",
+              "fontFamily": "Inconsolata"
             },
             "p:9biS6": {
-              "content": "admin@kotauth.io"
+              "content": "admin@kotauth.io",
+              "fontFamily": "Inconsolata"
             }
           }
         },
@@ -1829,7 +1979,7 @@
                   "name": "tbTitle1",
                   "fill": "$p:--foreground",
                   "content": "Workspaces",
-                  "fontFamily": "Inter",
+                  "fontFamily": "Inconsolata",
                   "fontSize": 15,
                   "fontWeight": "600"
                 },
@@ -1841,25 +1991,15 @@
                   "alignItems": "center",
                   "children": [
                     {
-                      "id": "sMGf4",
-                      "type": "ref",
-                      "ref": "p:fEUdI",
-                      "width": 200,
-                      "name": "srchRef1",
-                      "descendants": {
-                        "p:SDRKn": {
-                          "content": "Search tenants..."
-                        }
-                      }
-                    },
-                    {
                       "id": "vropQ",
                       "type": "ref",
                       "ref": "p:DpPVg",
                       "name": "tbAvt1",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:wVlpW": {
-                          "content": "A"
+                          "content": "A",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -1891,16 +2031,32 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "stat1a",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Total Tenants"
+                          "content": "Total Tenants",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "3",
-                          "fill": "$brand-accent"
+                          "fill": "$brand-accent",
+                          "fontFamily": "Inconsolata",
+                          "fontSize": 36,
+                          "fontStyle": "normal",
+                          "fontWeight": "700"
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -1910,16 +2066,32 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "stat2a",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Registration Open"
+                          "content": "Registration Open",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "2",
-                          "fill": "$brand-accent"
+                          "fill": "$brand-accent",
+                          "fontFamily": "Inconsolata",
+                          "fontSize": 36,
+                          "fontStyle": "normal",
+                          "fontWeight": "700"
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -1929,16 +2101,32 @@
                       "ref": "p:fpgbn",
                       "width": "fill_container",
                       "name": "stat3a",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:XRwAR": {
-                          "content": "Master Tenant"
+                          "content": "Master Tenant",
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:frWPV": {
+                          "padding": [
+                            12,
+                            24
+                          ]
                         },
                         "p:ip4M9": {
                           "content": "1",
-                          "fill": "$p:--muted-foreground"
+                          "fill": "$p:--muted-foreground",
+                          "fontFamily": "Inconsolata",
+                          "fontSize": 36,
+                          "fontStyle": "normal",
+                          "fontWeight": "700"
                         },
                         "p:58bG0": {
-                          "enabled": false
+                          "enabled": false,
+                          "cornerRadius": 0
+                        },
+                        "p:58bG0/p:zHpCv": {
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -1965,7 +2153,7 @@
                           "name": "pgH2",
                           "fill": "$p:--foreground",
                           "content": "Tenants",
-                          "fontFamily": "Inter",
+                          "fontFamily": "Inconsolata",
                           "fontSize": 20,
                           "fontWeight": "700"
                         },
@@ -1975,7 +2163,7 @@
                           "name": "pgSub2",
                           "fill": "$p:--muted-foreground",
                           "content": "All authorization boundary tenants",
-                          "fontFamily": "Inter",
+                          "fontFamily": "Inconsolata",
                           "fontSize": 13,
                           "fontWeight": "normal"
                         }
@@ -1987,11 +2175,12 @@
                       "ref": "p:VSnC2",
                       "fill": "$brand-accent",
                       "name": "newBtn2",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:8tnXG": {
                           "content": "New Tenant",
                           "fill": "$brand-accent-fg",
-                          "fontFamily": "Inter"
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -2003,6 +2192,7 @@
                   "ref": "p:bG7YL",
                   "width": "fill_container",
                   "name": "tableCard2",
+                  "cornerRadius": 0,
                   "children": [
                     {
                       "id": "d3SZK",
@@ -2018,7 +2208,8 @@
                           "name": "hCol1",
                           "descendants": {
                             "p:RFS3h": {
-                              "content": "TENANT NAME"
+                              "content": "TENANT NAME",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -2030,7 +2221,8 @@
                           "name": "hCol2",
                           "descendants": {
                             "p:RFS3h": {
-                              "content": "SLUG / ISSUER"
+                              "content": "SLUG / ISSUER",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -2042,7 +2234,8 @@
                           "name": "hCol3",
                           "descendants": {
                             "p:RFS3h": {
-                              "content": "STATUS"
+                              "content": "STATUS",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -2054,7 +2247,8 @@
                           "name": "hCol4",
                           "descendants": {
                             "p:RFS3h": {
-                              "content": "ACTIONS"
+                              "content": "ACTIONS",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         }
@@ -2079,7 +2273,7 @@
                               "name": "tx1b",
                               "fill": "$p:--foreground",
                               "content": "Acme Corp",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 14,
                               "fontWeight": "600"
                             }
@@ -2098,7 +2292,7 @@
                               "name": "tx2b",
                               "fill": "$p:--muted-foreground",
                               "content": "/t/acme",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }
@@ -2116,7 +2310,6 @@
                               "id": "3mU2r",
                               "name": "badge1b",
                               "fill": "#052e16",
-                              "cornerRadius": 4,
                               "padding": [
                                 2,
                                 8
@@ -2129,7 +2322,7 @@
                                   "name": "tx3b",
                                   "fill": "#86efac",
                                   "content": "active",
-                                  "fontFamily": "Inter",
+                                  "fontFamily": "Inconsolata",
                                   "fontSize": 11,
                                   "fontWeight": "500"
                                 }
@@ -2150,7 +2343,7 @@
                               "name": "tx4b",
                               "fill": "$brand-accent",
                               "content": "View →",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "500"
                             }
@@ -2177,7 +2370,7 @@
                               "name": "tx1c",
                               "fill": "$p:--foreground",
                               "content": "Beta Labs",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 14,
                               "fontWeight": "600"
                             }
@@ -2196,7 +2389,7 @@
                               "name": "tx2c",
                               "fill": "$p:--muted-foreground",
                               "content": "/t/beta",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }
@@ -2214,7 +2407,6 @@
                               "id": "pmss2",
                               "name": "badge2b",
                               "fill": "#052e16",
-                              "cornerRadius": 4,
                               "padding": [
                                 2,
                                 8
@@ -2227,7 +2419,7 @@
                                   "name": "tx3c",
                                   "fill": "#86efac",
                                   "content": "active",
-                                  "fontFamily": "Inter",
+                                  "fontFamily": "Inconsolata",
                                   "fontSize": 11,
                                   "fontWeight": "500"
                                 }
@@ -2248,7 +2440,7 @@
                               "name": "tx4c",
                               "fill": "$brand-accent",
                               "content": "View →",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "500"
                             }
@@ -2275,7 +2467,7 @@
                               "name": "tx1d",
                               "fill": "$p:--foreground",
                               "content": "Master",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 14,
                               "fontWeight": "600"
                             }
@@ -2294,7 +2486,7 @@
                               "name": "tx2d",
                               "fill": "$p:--muted-foreground",
                               "content": "/t/master",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }
@@ -2312,7 +2504,6 @@
                               "id": "focVi",
                               "name": "badge3b",
                               "fill": "#1FBCFF18",
-                              "cornerRadius": 4,
                               "padding": [
                                 2,
                                 8
@@ -2325,7 +2516,7 @@
                                   "name": "tx3d",
                                   "fill": "$brand-accent",
                                   "content": "system",
-                                  "fontFamily": "Inter",
+                                  "fontFamily": "Inconsolata",
                                   "fontSize": 11,
                                   "fontWeight": "500"
                                 }
@@ -2346,7 +2537,7 @@
                               "name": "tx4d",
                               "fill": "$brand-accent",
                               "content": "View →",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "500"
                             }
@@ -2370,7 +2561,7 @@
                       "name": "footerLeft",
                       "fill": "$p:--muted-foreground",
                       "content": "Showing 3 of 3 tenants",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -2378,7 +2569,21 @@
                       "id": "eTrGJ",
                       "type": "ref",
                       "ref": "p:U5noB",
-                      "name": "pagination"
+                      "name": "pagination",
+                      "descendants": {
+                        "p:dL111": {
+                          "cornerRadius": 0
+                        },
+                        "p:dL111/p:ujxmL": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:mQBD7": {
+                          "cornerRadius": 0
+                        },
+                        "p:mQBD7/p:ujxmL": {
+                          "fontFamily": "Inconsolata"
+                        }
+                      }
                     }
                   ]
                 }
@@ -2402,7 +2607,6 @@
       "width": 1366,
       "height": 768,
       "fill": "$p:--background",
-      "cornerRadius": 8,
       "children": [
         {
           "id": "RCLbG",
@@ -2411,15 +2615,23 @@
           "height": "fill_container",
           "name": "sidebarCT",
           "descendants": {
+            "p:6xhgh": {
+              "cornerRadius": 0
+            },
+            "p:u7yK2": {
+              "cornerRadius": 0
+            },
             "p:nIojH": {
               "iconFontName": "shield-check",
               "fill": "$brand-accent"
             },
             "p:xFmFv": {
-              "content": "KotAuth"
+              "content": "KotAuth",
+              "fontFamily": "Inconsolata"
             },
             "p:f9xLx": {
-              "content": "Admin Console"
+              "content": "Admin Console",
+              "fontFamily": "Inconsolata"
             },
             "p:47U5w": {
               "children": [
@@ -2429,6 +2641,7 @@
                   "ref": "p:qCCo8",
                   "fill": "$brand-accent-subtle",
                   "name": "wsItemCT",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "building-2",
@@ -2436,7 +2649,8 @@
                     },
                     "p:0Ru22": {
                       "content": "Workspaces",
-                      "fill": "$brand-accent"
+                      "fill": "$brand-accent",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 },
@@ -2445,22 +2659,35 @@
                   "type": "ref",
                   "ref": "p:jBcUh",
                   "name": "setItemCT",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "settings-2"
                     },
                     "p:0Ru22": {
-                      "content": "Settings"
+                      "content": "Settings",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 }
               ]
             },
+            "p:q9yup": {
+              "cornerRadius": 0
+            },
+            "p:sODDz": {
+              "cornerRadius": 0
+            },
+            "p:sODDz/p:wVlpW": {
+              "fontFamily": "Inconsolata"
+            },
             "p:gJPjN": {
-              "content": "Administrator"
+              "content": "Administrator",
+              "fontFamily": "Inconsolata"
             },
             "p:9biS6": {
-              "content": "admin@kotauth.io"
+              "content": "admin@kotauth.io",
+              "fontFamily": "Inconsolata"
             }
           }
         },
@@ -2472,6 +2699,8 @@
           "height": "fill_container",
           "fill": "$p:--background",
           "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
           "children": [
             {
               "type": "frame",
@@ -2500,7 +2729,7 @@
                   "name": "tbTitleCT",
                   "fill": "$p:--foreground",
                   "content": "New Tenant",
-                  "fontFamily": "Inter",
+                  "fontFamily": "Inconsolata",
                   "fontSize": 15,
                   "fontWeight": "600"
                 },
@@ -2516,9 +2745,11 @@
                       "type": "ref",
                       "ref": "p:DpPVg",
                       "name": "tbAvtCT",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:wVlpW": {
-                          "content": "A"
+                          "content": "A",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -2530,7 +2761,7 @@
               "type": "frame",
               "id": "0Hn4x",
               "name": "contentCT",
-              "width": "fill_container",
+              "width": 720,
               "height": "fill_container",
               "fill": "$p:--background",
               "layout": "vertical",
@@ -2550,7 +2781,7 @@
                       "name": "bcLink",
                       "fill": "$p:--muted-foreground",
                       "content": "Workspaces",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -2560,7 +2791,7 @@
                       "name": "bcSep",
                       "fill": "$p:--border",
                       "content": "/",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -2570,7 +2801,7 @@
                       "name": "bcCur",
                       "fill": "$p:--foreground",
                       "content": "New Tenant",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -2589,7 +2820,7 @@
                       "name": "pgTitleCT",
                       "fill": "$p:--foreground",
                       "content": "Create Tenant",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 20,
                       "fontWeight": "700"
                     },
@@ -2599,7 +2830,7 @@
                       "name": "pgSubCT",
                       "fill": "$p:--muted-foreground",
                       "content": "An isolated authorization boundary — like a Keycloak realm.",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -2611,7 +2842,6 @@
                   "name": "fCard",
                   "width": "fill_container",
                   "fill": "$p:--card",
-                  "cornerRadius": 10,
                   "stroke": {
                     "align": "inside",
                     "thickness": 1,
@@ -2627,7 +2857,7 @@
                       "name": "fSec1",
                       "fill": "$p:--muted-foreground",
                       "content": "Identity",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 11,
                       "fontWeight": "600",
                       "letterSpacing": 1
@@ -2639,8 +2869,15 @@
                       "width": "fill_container",
                       "name": "inp1",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "my-app"
+                          "content": "my-app",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -2651,8 +2888,15 @@
                       "width": "fill_container",
                       "name": "inp2",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "My Application"
+                          "content": "My Application",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -2663,8 +2907,15 @@
                       "width": "fill_container",
                       "name": "inp3",
                       "descendants": {
+                        "p:BX0XX": {
+                          "fontFamily": "Inconsolata"
+                        },
+                        "p:i0Z3E": {
+                          "cornerRadius": 0
+                        },
                         "p:SDRKn": {
-                          "content": "https://auth.myapp.com (optional)"
+                          "content": "https://auth.myapp.com (optional)",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -2674,7 +2925,7 @@
                       "name": "fSec2",
                       "fill": "$p:--muted-foreground",
                       "content": "Registration Policy",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 11,
                       "fontWeight": "600",
                       "letterSpacing": 1
@@ -2683,13 +2934,29 @@
                       "id": "DUW6G",
                       "type": "ref",
                       "ref": "p:ovuDP",
-                      "name": "chk1"
+                      "name": "chk1",
+                      "descendants": {
+                        "p:kfU2y": {
+                          "cornerRadius": 0
+                        },
+                        "p:15v9d": {
+                          "fontFamily": "Inconsolata"
+                        }
+                      }
                     },
                     {
                       "id": "jsTHv",
                       "type": "ref",
                       "ref": "p:J7Uph",
-                      "name": "chk2"
+                      "name": "chk2",
+                      "descendants": {
+                        "p:kfU2y": {
+                          "cornerRadius": 0
+                        },
+                        "p:15v9d": {
+                          "fontFamily": "Inconsolata"
+                        }
+                      }
                     },
                     {
                       "type": "frame",
@@ -2704,10 +2971,12 @@
                           "ref": "p:VSnC2",
                           "fill": "$brand-accent",
                           "name": "submitBtnCT",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:8tnXG": {
                               "content": "Create Tenant",
-                              "fill": "$brand-accent-fg"
+                              "fill": "$brand-accent-fg",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         },
@@ -2716,9 +2985,11 @@
                           "type": "ref",
                           "ref": "p:C10zH",
                           "name": "cancelBtnCT",
+                          "cornerRadius": 0,
                           "descendants": {
                             "p:poRwU": {
-                              "content": "Cancel"
+                              "content": "Cancel",
+                              "fontFamily": "Inconsolata"
                             }
                           }
                         }
@@ -2746,7 +3017,6 @@
       "width": 1366,
       "height": 768,
       "fill": "$p:--background",
-      "cornerRadius": 8,
       "children": [
         {
           "id": "kWWA4",
@@ -2755,15 +3025,23 @@
           "height": "fill_container",
           "name": "sidebarTD",
           "descendants": {
+            "p:6xhgh": {
+              "cornerRadius": 0
+            },
+            "p:u7yK2": {
+              "cornerRadius": 0
+            },
             "p:nIojH": {
               "iconFontName": "shield-check",
               "fill": "$brand-accent"
             },
             "p:xFmFv": {
-              "content": "KotAuth"
+              "content": "KotAuth",
+              "fontFamily": "Inconsolata"
             },
             "p:f9xLx": {
-              "content": "Admin Console"
+              "content": "Admin Console",
+              "fontFamily": "Inconsolata"
             },
             "p:47U5w": {
               "children": [
@@ -2773,6 +3051,7 @@
                   "ref": "p:qCCo8",
                   "fill": "$brand-accent-subtle",
                   "name": "wsItemTD",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "building-2",
@@ -2780,7 +3059,8 @@
                     },
                     "p:0Ru22": {
                       "content": "Workspaces",
-                      "fill": "$brand-accent"
+                      "fill": "$brand-accent",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 },
@@ -2789,22 +3069,35 @@
                   "type": "ref",
                   "ref": "p:jBcUh",
                   "name": "setItemTD",
+                  "cornerRadius": 0,
                   "descendants": {
                     "p:r6B2W": {
                       "iconFontName": "settings-2"
                     },
                     "p:0Ru22": {
-                      "content": "Settings"
+                      "content": "Settings",
+                      "fontFamily": "Inconsolata"
                     }
                   }
                 }
               ]
             },
+            "p:q9yup": {
+              "cornerRadius": 0
+            },
+            "p:sODDz": {
+              "cornerRadius": 0
+            },
+            "p:sODDz/p:wVlpW": {
+              "fontFamily": "Inconsolata"
+            },
             "p:gJPjN": {
-              "content": "Administrator"
+              "content": "Administrator",
+              "fontFamily": "Inconsolata"
             },
             "p:9biS6": {
-              "content": "admin@kotauth.io"
+              "content": "admin@kotauth.io",
+              "fontFamily": "Inconsolata"
             }
           }
         },
@@ -2816,6 +3109,8 @@
           "height": "fill_container",
           "fill": "$p:--background",
           "layout": "vertical",
+          "justifyContent": "center",
+          "alignItems": "center",
           "children": [
             {
               "type": "frame",
@@ -2844,7 +3139,7 @@
                   "name": "tbTitleTD",
                   "fill": "$p:--foreground",
                   "content": "Acme Corp",
-                  "fontFamily": "Inter",
+                  "fontFamily": "Inconsolata",
                   "fontSize": 15,
                   "fontWeight": "600"
                 },
@@ -2860,9 +3155,11 @@
                       "type": "ref",
                       "ref": "p:C10zH",
                       "name": "openLoginBtn",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:poRwU": {
-                          "content": "Open Login ↗"
+                          "content": "Open Login ↗",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     },
@@ -2871,9 +3168,11 @@
                       "type": "ref",
                       "ref": "p:DpPVg",
                       "name": "tbAvtTD",
+                      "cornerRadius": 0,
                       "descendants": {
                         "p:wVlpW": {
-                          "content": "A"
+                          "content": "A",
+                          "fontFamily": "Inconsolata"
                         }
                       }
                     }
@@ -2885,7 +3184,7 @@
               "type": "frame",
               "id": "FhCn3",
               "name": "contentTD",
-              "width": "fill_container",
+              "width": 720,
               "height": "fill_container",
               "fill": "$p:--background",
               "layout": "vertical",
@@ -2905,7 +3204,7 @@
                       "name": "bcLinkTD",
                       "fill": "$p:--muted-foreground",
                       "content": "Workspaces",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -2915,7 +3214,7 @@
                       "name": "bcSepTD",
                       "fill": "$p:--border",
                       "content": "/",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     },
@@ -2925,7 +3224,7 @@
                       "name": "bcCurTD",
                       "fill": "$p:--foreground",
                       "content": "Acme Corp",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -2952,7 +3251,7 @@
                           "name": "pgTitleTD",
                           "fill": "$p:--foreground",
                           "content": "Acme Corp",
-                          "fontFamily": "Inter",
+                          "fontFamily": "Inconsolata",
                           "fontSize": 20,
                           "fontWeight": "700"
                         },
@@ -2961,7 +3260,6 @@
                           "id": "qU5r3",
                           "name": "pgBadgeTD",
                           "fill": "#052e16",
-                          "cornerRadius": 4,
                           "padding": [
                             2,
                             8
@@ -2973,7 +3271,7 @@
                               "id": "bsboZ",
                               "fill": "#86efac",
                               "content": "active",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 11,
                               "fontWeight": "500"
                             }
@@ -2989,7 +3287,6 @@
                   "name": "alertTD",
                   "width": "fill_container",
                   "fill": "#1c1003",
-                  "cornerRadius": 8,
                   "stroke": {
                     "align": "inside",
                     "thickness": 1,
@@ -3006,7 +3303,7 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "Tenant settings, client management, and user listing are coming in Phase 2.",
-                      "fontFamily": "Inter",
+                      "fontFamily": "Inconsolata",
                       "fontSize": 13,
                       "fontWeight": "normal"
                     }
@@ -3018,6 +3315,7 @@
                   "ref": "p:bG7YL",
                   "width": "fill_container",
                   "name": "detailCard",
+                  "cornerRadius": 0,
                   "children": [
                     {
                       "id": "NCrAe",
@@ -3037,7 +3335,7 @@
                               "id": "bauFu",
                               "fill": "$p:--muted-foreground",
                               "content": "Slug",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }
@@ -3055,7 +3353,7 @@
                               "id": "IHHmk",
                               "fill": "$p:--foreground",
                               "content": "acme",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "500"
                             }
@@ -3081,7 +3379,7 @@
                               "id": "3dz6S",
                               "fill": "$p:--muted-foreground",
                               "content": "Token TTL",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }
@@ -3099,7 +3397,7 @@
                               "id": "Zfiiv",
                               "fill": "$p:--foreground",
                               "content": "3600s",
-                              "fontFamily": "Inter",
+                              "fontFamily": "Inconsolata",
                               "fontSize": 13,
                               "fontWeight": "normal"
                             }

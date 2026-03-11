@@ -15,12 +15,13 @@ data class Tenant(
     val slug: String,
     val displayName: String,
     val issuerUrl: String?,
-    val tokenExpirySeconds: Long = 3600L,
-    val refreshTokenExpirySeconds: Long = 86400L,
-    val registrationEnabled: Boolean = true,
-    val emailVerificationRequired: Boolean = false,
-    val passwordPolicyMinLength: Int = 8,
-    val passwordPolicyRequireSpecial: Boolean = false
+    val tokenExpirySeconds: Long              = 3600L,
+    val refreshTokenExpirySeconds: Long       = 86400L,
+    val registrationEnabled: Boolean          = true,
+    val emailVerificationRequired: Boolean    = false,
+    val passwordPolicyMinLength: Int          = 8,
+    val passwordPolicyRequireSpecial: Boolean = false,
+    val theme: TenantTheme                    = TenantTheme.DEFAULT
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG

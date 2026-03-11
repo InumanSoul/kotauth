@@ -1,0 +1,564 @@
+/*
+ * KotAuth — Admin Console Stylesheet
+ *
+ * The admin console uses the master tenant's fixed theme — it is not
+ * user-customizable. The :root block is still injected by the server
+ * (using TenantTheme.DEFAULT) for consistency with the auth page approach,
+ * and to make future admin theming a zero-friction change.
+ *
+ * Token contract: identical to kotauth-auth.css.
+ * Additional admin-only token:
+ *   --bg-sidebar    Sidebar background (slightly deeper than --bg-deep)
+ */
+
+/* -------------------------------------------------------------------------
+   Reset & base
+   ------------------------------------------------------------------------- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--bg-deep);
+    color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* -------------------------------------------------------------------------
+   Form elements
+   ------------------------------------------------------------------------- */
+input, select, textarea {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+}
+
+input::placeholder, textarea::placeholder {
+    color: var(--muted);
+}
+
+label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--muted);
+    margin-bottom: 0.35rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.field {
+    margin-bottom: 1rem;
+}
+
+.field-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.3rem;
+}
+
+/* -------------------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------------------- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1.2rem;
+    background: var(--accent);
+    border: none;
+    border-radius: calc(var(--radius) - 2px);
+    color: #0f0f13;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    letter-spacing: 0.02em;
+    font-family: inherit;
+    text-decoration: none;
+}
+
+.btn:hover {
+    background: var(--accent-hover);
+    text-decoration: none;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+
+.btn-ghost:hover {
+    background: var(--bg-card);
+}
+
+.btn-danger {
+    background: #cf6679;
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #b54060;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.78rem;
+}
+
+/* -------------------------------------------------------------------------
+   Alerts — functional colors, NOT tenant-customizable
+   ------------------------------------------------------------------------- */
+.alert {
+    padding: 0.7rem 1rem;
+    border-radius: calc(var(--radius) - 2px);
+    font-size: 0.85rem;
+    margin-bottom: 1.25rem;
+    border-width: 1px;
+    border-style: solid;
+}
+
+.alert-error   { background: #2a1a1a; border-color: #cf6679; color: #ff8a9b; }
+.alert-success { background: #1a2a1a; border-color: #4caf50; color: #81c784; }
+.alert-warn    { background: #2a2214; border-color: #f0a500; color: #ffc947; }
+
+/* -------------------------------------------------------------------------
+   Badges
+   ------------------------------------------------------------------------- */
+.badge {
+    display: inline-block;
+    padding: 0.2rem 0.55rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.badge-green  { background: #1a3a1a; color: #81c784; border: 1px solid #2d5a2d; }
+.badge-red    { background: #3a1a1a; color: #f48fb1; border: 1px solid #5a2d2d; }
+.badge-purple { background: #2a1a3a; color: var(--accent); border: 1px solid #4a2d5a; }
+
+/* -------------------------------------------------------------------------
+   Shell layout
+   ------------------------------------------------------------------------- */
+.shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--bg-sidebar, #13131c);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 0;
+}
+
+.sidebar-brand {
+    padding: 0 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1rem;
+}
+
+.sidebar-brand-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.sidebar-brand-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+}
+
+.sidebar-section {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.25rem 0.25rem;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.55rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+}
+
+.nav-item:hover {
+    background: var(--bg-card);
+    color: var(--text);
+    text-decoration: none;
+}
+
+.nav-item.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background: rgba(187, 134, 252, 0.07);
+}
+
+.nav-item-icon {
+    width: 16px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.sidebar-spacer {
+    flex: 1;
+}
+
+/* Main content area */
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.75rem;
+    background: var(--bg-deep);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.topbar-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.topbar-user {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.content {
+    padding: 1.75rem;
+    flex: 1;
+}
+
+/* -------------------------------------------------------------------------
+   Page structure
+   ------------------------------------------------------------------------- */
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.page-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.page-subtitle {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+}
+
+.breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+}
+
+.breadcrumb a {
+    color: var(--muted);
+}
+
+.breadcrumb-sep {
+    color: var(--border);
+}
+
+.breadcrumb-current {
+    color: var(--text);
+}
+
+/* -------------------------------------------------------------------------
+   Cards
+   ------------------------------------------------------------------------- */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.card-body {
+    padding: 1.25rem 1.5rem;
+}
+
+/* -------------------------------------------------------------------------
+   Stat grid
+   ------------------------------------------------------------------------- */
+.stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.25rem;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-top: 0.25rem;
+}
+
+/* -------------------------------------------------------------------------
+   Table
+   ------------------------------------------------------------------------- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    text-align: left;
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+td {
+    padding: 0.85rem 1rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(46, 46, 62, 0.5);
+    color: var(--text);
+    vertical-align: middle;
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+tr:hover td {
+    background: rgba(187, 134, 252, 0.04);
+}
+
+.td-muted {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+.td-code {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+}
+
+/* -------------------------------------------------------------------------
+   Empty state
+   ------------------------------------------------------------------------- */
+.empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+}
+
+.empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.empty-state-text {
+    font-size: 0.9rem;
+}
+
+/* -------------------------------------------------------------------------
+   Form card
+   ------------------------------------------------------------------------- */
+.form-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    max-width: 560px;
+}
+
+.form-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 1.25rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.form-section-title:first-of-type {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.75rem;
+}
+
+.checkbox-row input[type=checkbox] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+}
+
+.checkbox-label {
+    font-size: 0.85rem;
+    color: var(--text);
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: normal;
+}
+
+.form-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+/* -------------------------------------------------------------------------
+   Admin login page (reuses auth card layout)
+   ------------------------------------------------------------------------- */
+.login-shell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+
+.brand {
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+.brand-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.brand-sub {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+}
+
+.login-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+    color: var(--text);
+}
+
+.card-subtitle {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+}
+
+.btn-full {
+    width: 100%;
+    justify-content: center;
+    padding: 0.8rem;
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+}

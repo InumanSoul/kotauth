@@ -1,6 +1,7 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.TenantRepository
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
@@ -58,6 +59,19 @@ class PostgresTenantRepository : TenantRepository {
         registrationEnabled          = this[TenantsTable.registrationEnabled],
         emailVerificationRequired    = this[TenantsTable.emailVerificationRequired],
         passwordPolicyMinLength      = this[TenantsTable.passwordPolicyMinLength],
-        passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial]
+        passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial],
+        theme = TenantTheme(
+            accentColor      = this[TenantsTable.themeAccentColor],
+            accentHoverColor = this[TenantsTable.themeAccentHover],
+            bgDeep           = this[TenantsTable.themeBgDeep],
+            bgCard           = this[TenantsTable.themeBgCard],
+            bgInput          = this[TenantsTable.themeBgInput],
+            borderColor      = this[TenantsTable.themeBorderColor],
+            borderRadius     = this[TenantsTable.themeBorderRadius],
+            textPrimary      = this[TenantsTable.themeTextPrimary],
+            textMuted        = this[TenantsTable.themeTextMuted],
+            logoUrl          = this[TenantsTable.themeLogoUrl],
+            faviconUrl       = this[TenantsTable.themeFaviconUrl]
+        )
     )
 }
