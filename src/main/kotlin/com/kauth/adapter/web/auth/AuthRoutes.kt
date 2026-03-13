@@ -130,8 +130,8 @@ fun Route.authRoutes(
                             }
                         }
                     } else {
-                        // Legacy direct login — issue tokens immediately and return JSON
-                        when (val tokenResult = authService.login(slug, username, password)) {
+                        // Direct login — issue tokens and persist a server-side session
+                        when (val tokenResult = authService.login(slug, username, password, ipAddress, userAgent)) {
                             is AuthResult.Success -> call.respond(tokenResult.value)
                             is AuthResult.Failure -> call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_credentials"))
                         }

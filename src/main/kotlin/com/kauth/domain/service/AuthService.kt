@@ -2,13 +2,17 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
+import java.security.MessageDigest
+import java.time.Instant
 
 /**
  * Application use cases for authentication — tenant-scoped.
@@ -19,7 +23,7 @@ import com.kauth.domain.port.UserRepository
  * indistinguishable from a wrong password — no slug enumeration leaks.
  *
  * Flow — login:
- *   slug → Tenant → find User by username in that tenant → verify password → tokens
+ *   slug → Tenant → find User by username in that tenant → verify password → tokens + session
  *
  * Flow — register:
  *   slug → Tenant → check policy → validate → hash password → save User
@@ -29,7 +33,8 @@ class AuthService(
     private val tenantRepository: TenantRepository,
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
-    private val auditLog: AuditLogPort
+    private val auditLog: AuditLogPort,
+    private val sessionRepository: SessionRepository
 ) {
 
     /**
@@ -101,12 +106,19 @@ class AuthService(
     }
 
     /**
-     * Authenticates a user and immediately issues a token set (legacy / direct flow).
-     * For OAuth2 Authorization Code Flow, use [authenticate] + OAuthService instead.
-     * Note: does NOT record audit events — callers should call [authenticate] first
-     * which records the LOGIN event. Used by admin console login and legacy direct-login.
+     * Authenticates a user, issues a token set, and persists a server-side session.
+     * Used for direct (non-OAuth) browser login and the admin console.
+     *
+     * For OAuth2 Authorization Code Flow, prefer [authenticate] + OAuthService
+     * which handles client validation, PKCE, and proper redirect handling.
      */
-    fun login(tenantSlug: String, username: String, rawPassword: String): AuthResult<TokenResponse> {
+    fun login(
+        tenantSlug: String,
+        username: String,
+        rawPassword: String,
+        ipAddress: String? = null,
+        userAgent: String? = null
+    ): AuthResult<TokenResponse> {
         val tenant = tenantRepository.findBySlug(tenantSlug)
             ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
@@ -125,12 +137,31 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        return AuthResult.Success(tokenPort.issueUserTokens(
+        val tokens = tokenPort.issueUserTokens(
             user   = user,
             tenant = tenant,
             client = null,
             scopes = listOf("openid")
+        )
+
+        // Persist a server-side session so the admin console sessions page
+        // shows activity for direct logins, not only OAuth flows.
+        sessionRepository.save(Session(
+            tenantId         = tenant.id,
+            userId           = user.id,
+            clientId         = null,
+            accessTokenHash  = sha256(tokens.access_token),
+            refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
+            scopes           = "openid",
+            ipAddress        = ipAddress,
+            userAgent        = userAgent,
+            expiresAt        = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+            refreshExpiresAt = tokens.refresh_token?.let {
+                Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+            }
         ))
+
+        return AuthResult.Success(tokens)
     }
 
     /**
@@ -177,14 +208,24 @@ class AuthService(
         }
 
         val newUser = User(
-            tenantId = tenant.id,
-            username = username.trim(),
-            email = email.trim().lowercase(),
-            fullName = fullName.trim(),
+            tenantId     = tenant.id,
+            username     = username.trim(),
+            email        = email.trim().lowercase(),
+            fullName     = fullName.trim(),
             passwordHash = passwordHasher.hash(rawPassword)
         )
 
         return AuthResult.Success(userRepository.save(newUser))
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private fun sha256(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val bytes  = digest.digest(input.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 }
 

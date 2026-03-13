@@ -120,7 +120,7 @@ fun main() {
     // -------------------------------------------------------------------------
     // Domain services
     // -------------------------------------------------------------------------
-    val authService = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher, auditLogAdapter)
+    val authService = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher, auditLogAdapter, sessionRepository)
     val oauthService = OAuthService(
         tenantRepository      = tenantRepository,
         userRepository        = userRepository,
