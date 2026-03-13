@@ -5907,7 +5907,7 @@
                 "p:Mode": "Dark"
               },
               "clip": true,
-              "width": 307.99999987925185,
+              "width": 1365.0000000000002,
               "height": 711.0741222366711,
               "fill": "$p:--sidebar",
               "children": [
@@ -10323,7 +10323,7 @@
                 "p:Mode": "Dark"
               },
               "clip": true,
-              "width": 307.9998350579948,
+              "width": 307.9999999999116,
               "height": "fill_container",
               "fill": "$p:--sidebar",
               "children": [

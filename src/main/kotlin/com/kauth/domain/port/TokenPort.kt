@@ -1,11 +1,50 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.AccessTokenClaims
+import com.kauth.domain.model.Application
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TokenResponse
+import com.kauth.domain.model.User
 
 /**
- * Port (outbound) — defines WHAT the domain needs from a token provider.
- * The domain doesn't know (or care) that this is JWT, PASETO, or anything else.
+ * Port (outbound) — defines what the domain needs from a token provider.
+ *
+ * Implementations handle the cryptographic details (RS256 signing, JWKS,
+ * key loading). The domain services work exclusively with this abstraction.
+ *
+ * Implemented by [JwtTokenAdapter].
  */
 interface TokenPort {
-    fun createTokenSet(username: String): TokenResponse
+
+    /**
+     * Issues a full token set (access + refresh + id_token if openid in scope)
+     * for a user authentication event.
+     */
+    fun issueUserTokens(
+        user: User,
+        tenant: Tenant,
+        client: Application?,
+        scopes: List<String>,
+        nonce: String? = null
+    ): TokenResponse
+
+    /**
+     * Issues a client credentials access token (no user context, no refresh token).
+     */
+    fun issueClientCredentialsToken(
+        tenant: Tenant,
+        client: Application,
+        scopes: List<String>
+    ): String
+
+    /**
+     * Decodes and verifies an access token's signature and expiry.
+     * Returns null if the token is invalid, expired, or signed by an unknown key.
+     */
+    fun decodeAccessToken(token: String): AccessTokenClaims?
+
+    /**
+     * Returns the JWKS (JSON Web Key Set) for a tenant's active signing keys.
+     */
+    fun getTenantJwks(tenantId: Int): List<Map<String, Any>>
 }

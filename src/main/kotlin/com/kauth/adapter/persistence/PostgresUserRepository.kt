@@ -13,6 +13,13 @@ import org.jetbrains.exposed.sql.transactions.transaction
  */
 class PostgresUserRepository : UserRepository {
 
+    override fun findById(id: Int): User? = transaction {
+        UsersTable.selectAll()
+            .where { UsersTable.id eq id }
+            .map { it.toUser() }
+            .singleOrNull()
+    }
+
     override fun findByUsername(tenantId: Int, username: String): User? = transaction {
         UsersTable.selectAll()
             .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
@@ -25,6 +32,30 @@ class PostgresUserRepository : UserRepository {
             .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
             .map { it.toUser() }
             .singleOrNull()
+    }
+
+    override fun findByTenantId(tenantId: Int, search: String?): List<User> = transaction {
+        val query = UsersTable.selectAll()
+            .where { UsersTable.tenantId eq tenantId }
+        if (!search.isNullOrBlank()) {
+            val term = "%${search.lowercase()}%"
+            query.andWhere {
+                (UsersTable.username.lowerCase() like term) or
+                (UsersTable.email.lowerCase()    like term) or
+                (UsersTable.fullName.lowerCase() like term)
+            }
+        }
+        query.orderBy(UsersTable.id).map { it.toUser() }
+    }
+
+    override fun update(user: User): User = transaction {
+        UsersTable.update({ UsersTable.id eq user.id!! }) {
+            it[email]        = user.email.lowercase()
+            it[fullName]     = user.fullName
+            it[emailVerified] = user.emailVerified
+            it[enabled]      = user.enabled
+        }
+        user
     }
 
     override fun save(user: User): User = transaction {

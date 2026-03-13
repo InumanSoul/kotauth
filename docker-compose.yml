@@ -24,7 +24,11 @@ services:
       DB_URL: jdbc:postgresql://db:5432/kotauth_db
       DB_USER: postgres
       DB_PASSWORD: password
-      JWT_SECRET: secret-key-12345
+      # REQUIRED: base URL used in OIDC tokens and discovery documents
+      # Change to your actual domain before deploying. Localhost is for local dev only.
+      KAUTH_BASE_URL: http://localhost:8080
+      # Legacy HS256 secret (no longer used for token signing — kept for config compat)
+      # JWT_SECRET: change-this-in-production
     depends_on:
       db:
         condition: service_healthy

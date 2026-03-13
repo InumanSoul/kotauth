@@ -2,9 +2,15 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.AuditEvent
+import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.model.User
 import kotlinx.html.*
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 /**
  * View layer for the admin console.
@@ -153,13 +159,28 @@ object AdminView {
                 div("shell-body") {
 
                     // Rail (88px icon nav)
+                    // When a workspace is selected, rail items navigate to workspace-scoped URLs.
+                    // Without a workspace, directory/security/logs fall back to the redirect stubs.
                     div("rail") {
                         a("/admin", classes = "rail-brand") { +"K" }
                         div("rail-nav") {
-                            railItem("/admin",            "apps",      activeRail, "apps")
-                            railItem("/admin/directory",  "directory", activeRail, "directory")
-                            railItem("/admin/security",   "security",  activeRail, "security")
-                            railItem("/admin/logs",       "logs",      activeRail, "logs")
+                            val ws = workspaceSlug
+                            railItem(
+                                if (ws != null) "/admin/workspaces/$ws" else "/admin",
+                                "apps", activeRail, "apps"
+                            )
+                            railItem(
+                                if (ws != null) "/admin/workspaces/$ws/users"    else "/admin/directory",
+                                "directory", activeRail, "directory"
+                            )
+                            railItem(
+                                if (ws != null) "/admin/workspaces/$ws/sessions" else "/admin/security",
+                                "security", activeRail, "security"
+                            )
+                            railItem(
+                                if (ws != null) "/admin/workspaces/$ws/logs"     else "/admin/logs",
+                                "logs", activeRail, "logs"
+                            )
                         }
                         div("rail-spacer") {}
                         div("rail-nav") {
@@ -171,7 +192,7 @@ object AdminView {
                     div("ctx-panel") {
                         div("ctx-nav") {
                             when (activeRail) {
-                                "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug, activeAppSection)
+                                "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
                                 "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
                                 "security"  -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
                                 "logs"      -> renderLogsCtxPanel(activeAppSection)
@@ -198,8 +219,7 @@ object AdminView {
     private fun DIV.renderAppsCtxPanel(
         workspaceSlug: String?,
         apps: List<Pair<String, String>>,
-        activeAppSlug: String?,
-        activeAppSection: String
+        activeAppSlug: String?
     ) {
         if (workspaceSlug == null) {
             // No workspace selected — guide the user
@@ -230,18 +250,6 @@ object AdminView {
                     span("ctx-item-label") { +appName }
                 }
             }
-        }
-
-        // Sub-sections — only when an app is drilled into
-        if (activeAppSlug != null) {
-            val base = "/admin/workspaces/$workspaceSlug/applications/$activeAppSlug"
-            span("ctx-section-title") { +"App sections" }
-            ctxLink("$base/overview",       "overview",       activeAppSection, "Overview")
-            ctxLink("$base/authentication", "authentication", activeAppSection, "Authentication")
-            ctxLink("$base/users",          "users",          activeAppSection, "Users")
-            ctxLink("$base/roles",          "roles",          activeAppSection, "Roles & permissions")
-            ctxLink("$base/tokens",         "tokens",         activeAppSection, "Tokens & sessions")
-            ctxLink("$base/webhooks",       "webhooks",       activeAppSection, "Webhooks")
         }
     }
 
@@ -817,7 +825,8 @@ object AdminView {
         application: Application,
         allWorkspaces: List<Pair<String, String>>,
         allApps: List<Application>,
-        loggedInAs: String
+        loggedInAs: String,
+        newSecret: String? = null
     ): HTML.() -> Unit = {
         val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
@@ -872,6 +881,15 @@ object AdminView {
                 }
             }
 
+            // New secret banner — shown once after regeneration
+            if (newSecret != null) {
+                div("alert alert-info") {
+                    style = "margin-top:1.5rem; max-width:640px;"
+                    p { style = "font-weight:600; margin-bottom:0.35rem;"; +"New Client Secret (copy now — shown once)" }
+                    p { span("td-code") { style = "font-size:0.9rem; word-break:break-all;"; +newSecret } }
+                }
+            }
+
             // Redirect URIs
             div("page-header") {
                 style = "margin-top:2rem;"
@@ -885,6 +903,34 @@ object AdminView {
                 } else {
                     application.redirectUris.forEach { uri ->
                         p { span("td-code") { +uri } }
+                    }
+                }
+            }
+
+            // Actions
+            div { style = "display:flex; gap:0.75rem; margin-top:2rem; flex-wrap:wrap;"
+                a(
+                    href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                    classes = "btn btn-sm"
+                ) { +"Edit Application" }
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/toggle",
+                    method  = FormMethod.post,
+                    classes = "inline-form"
+                ) {
+                    button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                        if (application.enabled) +"Disable" else +"Enable"
+                    }
+                }
+                if (application.accessType == AccessType.CONFIDENTIAL) {
+                    form(
+                        action  = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/regenerate-secret",
+                        method  = FormMethod.post,
+                        classes = "inline-form"
+                    ) {
+                        button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                            +"Regenerate Secret"
+                        }
                     }
                 }
             }
@@ -939,6 +985,830 @@ object AdminView {
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Workspace settings form
+    // -------------------------------------------------------------------------
+
+    fun workspaceSettingsPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Settings — ${workspace.displayName}",
+            activeRail    = "apps",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Settings" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Workspace Settings" }
+                    p("page-subtitle") { +"Configure tokens, policies, and branding for ${workspace.displayName}." }
+                }
+            }
+
+            if (saved) {
+                div("alert alert-success") { style = "max-width:640px;"; +"Settings saved." }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/settings",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Identity" }
+                    div("field") {
+                        label { htmlFor = "displayName"; +"Display Name" }
+                        input(type = InputType.text, name = "displayName") {
+                            id = "displayName"; required = true; value = workspace.displayName
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "issuerUrl"; +"Issuer URL (optional)" }
+                        input(type = InputType.url, name = "issuerUrl") {
+                            id = "issuerUrl"
+                            placeholder = "https://auth.example.com"
+                            value = workspace.issuerUrl ?: ""
+                        }
+                        p("field-hint") { +"The 'iss' claim in tokens. Defaults to /t/${workspace.slug} if blank." }
+                    }
+
+                    p("form-section-title") { +"Token Lifetimes" }
+                    div("field") {
+                        label { htmlFor = "tokenExpirySeconds"; +"Access Token TTL (seconds)" }
+                        input(type = InputType.number, name = "tokenExpirySeconds") {
+                            id = "tokenExpirySeconds"; required = true
+                            attributes["min"] = "60"
+                            value = workspace.tokenExpirySeconds.toString()
+                        }
+                        p("field-hint") { +"Minimum 60 seconds. Typical: 3600 (1 hour)." }
+                    }
+                    div("field") {
+                        label { htmlFor = "refreshTokenExpirySeconds"; +"Refresh Token TTL (seconds)" }
+                        input(type = InputType.number, name = "refreshTokenExpirySeconds") {
+                            id = "refreshTokenExpirySeconds"; required = true
+                            attributes["min"] = "60"
+                            value = workspace.refreshTokenExpirySeconds.toString()
+                        }
+                        p("field-hint") { +"Must be ≥ access token TTL. Typical: 86400 (1 day)." }
+                    }
+
+                    p("form-section-title") { +"Registration Policy" }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "registrationEnabled") {
+                            id = "registrationEnabled"
+                            if (workspace.registrationEnabled) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "registrationEnabled"; +"Allow public registration" }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "emailVerificationRequired") {
+                            id = "emailVerificationRequired"
+                            if (workspace.emailVerificationRequired) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "emailVerificationRequired"; +"Require email verification" }
+                    }
+
+                    p("form-section-title") { +"Password Policy" }
+                    div("field") {
+                        label { htmlFor = "passwordPolicyMinLength"; +"Minimum Length" }
+                        input(type = InputType.number, name = "passwordPolicyMinLength") {
+                            id = "passwordPolicyMinLength"; required = true
+                            attributes["min"] = "4"; attributes["max"] = "128"
+                            value = workspace.passwordPolicyMinLength.toString()
+                        }
+                        p("field-hint") { +"Between 4 and 128 characters." }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "passwordPolicyRequireSpecial") {
+                            id = "passwordPolicyRequireSpecial"
+                            if (workspace.passwordPolicyRequireSpecial) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") {
+                            htmlFor = "passwordPolicyRequireSpecial"
+                            +"Require at least one special character"
+                        }
+                    }
+
+                    p("form-section-title") { +"Branding" }
+                    div("field") {
+                        label { htmlFor = "themeAccentColor"; +"Accent Color" }
+                        input(type = InputType.color, name = "themeAccentColor") {
+                            id = "themeAccentColor"; value = workspace.theme.accentColor
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
+                        input(type = InputType.url, name = "themeLogoUrl") {
+                            id = "themeLogoUrl"
+                            placeholder = "https://cdn.example.com/logo.png"
+                            value = workspace.theme.logoUrl ?: ""
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
+                        input(type = InputType.url, name = "themeFaviconUrl") {
+                            id = "themeFaviconUrl"
+                            placeholder = "https://cdn.example.com/favicon.ico"
+                            value = workspace.theme.faviconUrl ?: ""
+                        }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
+                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Edit application form
+    // -------------------------------------------------------------------------
+
+    fun editApplicationPage(
+        workspace: Tenant,
+        application: Application,
+        allWorkspaces: List<Pair<String, String>>,
+        allApps: List<Application>,
+        loggedInAs: String,
+        error: String? = null
+    ): HTML.() -> Unit = {
+        val appPairs = allApps.map { it.clientId to it.name }
+        adminShell(
+            pageTitle        = "Edit ${application.name}",
+            activeRail       = "apps",
+            allWorkspaces    = allWorkspaces,
+            workspaceName    = workspace.displayName,
+            workspaceSlug    = workspace.slug,
+            apps             = appPairs,
+            activeAppSlug    = application.clientId,
+            activeAppSection = "overview",
+            loggedInAs       = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/applications/${application.clientId}") { +application.clientId }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Edit" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Edit Application" }
+                    p("page-subtitle") { +"Update settings for ${application.name}." }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Identity" }
+                    div("field") {
+                        label { +"Client ID" }
+                        input(type = InputType.text) {
+                            disabled = true; value = application.clientId
+                        }
+                        p("field-hint") { +"Client ID is immutable — it may appear in issued tokens." }
+                    }
+                    div("field") {
+                        label { htmlFor = "name"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "name"; required = true; value = application.name
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "description"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") {
+                            id = "description"
+                            placeholder = "Short description of this application"
+                            value = application.description ?: ""
+                        }
+                    }
+
+                    p("form-section-title") { +"Access" }
+                    div("field") {
+                        label { htmlFor = "accessType"; +"Access Type" }
+                        select {
+                            name = "accessType"; id = "accessType"
+                            option {
+                                value = "public"
+                                selected = (application.accessType == AccessType.PUBLIC)
+                                +"Public — browser / SPA / mobile (no secret)"
+                            }
+                            option {
+                                value = "confidential"
+                                selected = (application.accessType == AccessType.CONFIDENTIAL)
+                                +"Confidential — server-side app with a secret"
+                            }
+                            option {
+                                value = "bearer_only"
+                                selected = (application.accessType == AccessType.BEARER_ONLY)
+                                +"Bearer Only — resource server (validates tokens only)"
+                            }
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "redirectUris"; +"Redirect URIs" }
+                        textArea {
+                            name = "redirectUris"; id = "redirectUris"; rows = "4"
+                            attributes["placeholder"] =
+                                "https://app.example.com/callback\nhttps://localhost:3000/callback"
+                            +application.redirectUris.joinToString("\n")
+                        }
+                        p("field-hint") { +"One URI per line." }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Changes" }
+                        a(
+                            "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
+                            classes = "btn btn-ghost"
+                        ) { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // User list
+    // -------------------------------------------------------------------------
+
+    fun userListPage(
+        workspace: Tenant,
+        users: List<User>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        search: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Users — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "users",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Users" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Users" }
+                    p("page-subtitle") { +"${users.size} user${if (users.size != 1) "s" else ""} in this workspace" }
+                }
+                a(
+                    href = "/admin/workspaces/${workspace.slug}/users/new",
+                    classes = "btn btn-sm"
+                ) { +"+ New User" }
+            }
+
+            // Search bar
+            form(
+                action  = "/admin/workspaces/${workspace.slug}/users",
+                method  = FormMethod.get,
+                classes = "search-form"
+            ) {
+                div("search-row") {
+                    input(type = InputType.search, name = "q") {
+                        id = "q"; placeholder = "Search by username, email, or name…"
+                        value = search ?: ""
+                    }
+                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Search" }
+                    if (search != null) {
+                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost btn-sm") {
+                            +"Clear"
+                        }
+                    }
+                }
+            }
+
+            div("card") {
+                if (users.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"◷" }
+                        p("empty-state-text") {
+                            if (search != null) +"No users match \"$search\"."
+                            else +"No users yet."
+                        }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Username" }
+                                th { +"Full Name" }
+                                th { +"Email" }
+                                th { +"Status" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            users.forEach { user ->
+                                tr {
+                                    td { span("td-code") { +user.username } }
+                                    td { +user.fullName }
+                                    td { +user.email }
+                                    td {
+                                        if (user.enabled) span("badge badge-green") { +"Active" }
+                                        else span("badge badge-red") { +"Disabled" }
+                                    }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
+                                            classes = "btn btn-ghost btn-sm"
+                                        ) { +"Open →" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Create user form
+    // -------------------------------------------------------------------------
+
+    fun createUserPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        prefill: UserPrefill = UserPrefill()
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "New User — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "users",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/users") { +"Users" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New User" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create User" }
+                    p("page-subtitle") {
+                        +"Add a user to the "
+                        strong { +workspace.displayName }
+                        +" workspace. The account will be pre-verified."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/users",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("field") {
+                        label { htmlFor = "username"; +"Username" }
+                        input(type = InputType.text, name = "username") {
+                            id = "username"; required = true; value = prefill.username
+                            placeholder = "johndoe"
+                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                        }
+                        p("field-hint") { +"Letters, digits, dots, underscores, hyphens. Immutable after creation." }
+                    }
+                    div("field") {
+                        label { htmlFor = "email"; +"Email" }
+                        input(type = InputType.email, name = "email") {
+                            id = "email"; required = true; value = prefill.email
+                            placeholder = "john@example.com"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "fullName"; +"Full Name" }
+                        input(type = InputType.text, name = "fullName") {
+                            id = "fullName"; value = prefill.fullName
+                            placeholder = "John Doe"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "password"; +"Password" }
+                        input(type = InputType.password, name = "password") {
+                            id = "password"; required = true
+                            placeholder = "Minimum 4 characters"
+                        }
+                        p("field-hint") { +"Minimum 4 characters. The user can change it after login." }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create User" }
+                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost") { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // User detail / edit
+    // -------------------------------------------------------------------------
+
+    fun userDetailPage(
+        workspace: Tenant,
+        user: User,
+        sessions: List<Session>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        saved: Boolean = false,
+        editError: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "${user.username} — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "users",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/users") { +"Users" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +user.username }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +user.username }
+                    p { style = "margin-top:2px;"
+                        if (user.enabled) span("badge badge-green") { +"Active" }
+                        else span("badge badge-red") { +"Disabled" }
+                        if (!user.emailVerified) {
+                            span("badge badge-outline") {
+                                style = "margin-left:0.5rem; vertical-align:middle;"
+                                +"Email unverified"
+                            }
+                        }
+                    }
+                }
+                div { style = "display:flex; gap:0.5rem;"
+                    form(
+                        action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/toggle",
+                        method  = FormMethod.post,
+                        classes = "inline-form"
+                    ) {
+                        button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                            if (user.enabled) +"Disable User" else +"Enable User"
+                        }
+                    }
+                    form(
+                        action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/revoke-sessions",
+                        method  = FormMethod.post,
+                        classes = "inline-form"
+                    ) {
+                        button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                            +"Revoke All Sessions"
+                        }
+                    }
+                }
+            }
+
+            if (saved) {
+                div("alert alert-success") { style = "max-width:640px;"; +"Profile saved." }
+            }
+            if (editError != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +editError }
+            }
+
+            // Edit profile form
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Profile" }
+                    div("field") {
+                        label { +"Username" }
+                        input(type = InputType.text) {
+                            disabled = true; value = user.username
+                        }
+                        p("field-hint") { +"Username is immutable after creation." }
+                    }
+                    div("field") {
+                        label { htmlFor = "email"; +"Email" }
+                        input(type = InputType.email, name = "email") {
+                            id = "email"; required = true; value = user.email
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "fullName"; +"Full Name" }
+                        input(type = InputType.text, name = "fullName") {
+                            id = "fullName"; value = user.fullName; placeholder = "Full Name"
+                        }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Changes" }
+                    }
+                }
+            }
+
+            // Active sessions table
+            div("page-header") {
+                style = "margin-top:2rem;"
+                div {
+                    p("page-title") { style = "font-size:1rem;"; +"Active Sessions" }
+                    p("page-subtitle") { +"${sessions.size} active session${if (sessions.size != 1) "s" else ""}" }
+                }
+            }
+            div("card") {
+                if (sessions.isEmpty()) {
+                    div("empty-state") {
+                        p("empty-state-text") { +"No active sessions." }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Created" }; th { +"Expires" }; th { +"IP Address" }; th { +"" }
+                            }
+                        }
+                        tbody {
+                            sessions.forEach { s ->
+                                tr {
+                                    td { span("td-muted") { +s.createdAt.toDisplayString() } }
+                                    td { span("td-muted") { +s.expiresAt.toDisplayString() } }
+                                    td { span("td-code") { +(s.ipAddress ?: "—") } }
+                                    td {
+                                        form(
+                                            action  = "/admin/workspaces/${workspace.slug}/sessions/${s.id}/revoke",
+                                            method  = FormMethod.post,
+                                            classes = "inline-form"
+                                        ) {
+                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                                                +"Revoke"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Active sessions (workspace-wide)
+    // -------------------------------------------------------------------------
+
+    fun activeSessionsPage(
+        workspace: Tenant,
+        sessions: List<Session>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Sessions — ${workspace.displayName}",
+            activeRail    = "security",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "sessions",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Sessions" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Active Sessions" }
+                    p("page-subtitle") { +"${sessions.size} active session${if (sessions.size != 1) "s" else ""} in this workspace" }
+                }
+            }
+            div("card") {
+                if (sessions.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"⊘" }
+                        p("empty-state-text") { +"No active sessions." }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Session ID" }
+                                th { +"User" }
+                                th { +"Client" }
+                                th { +"IP Address" }
+                                th { +"Created" }
+                                th { +"Expires" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            sessions.forEach { s ->
+                                tr {
+                                    td { span("td-code") { +"#${s.id}" } }
+                                    td { span("td-muted") { +(s.userId?.toString() ?: "M2M") } }
+                                    td { span("td-muted") { +(s.clientId?.toString() ?: "—") } }
+                                    td { span("td-code") { +(s.ipAddress ?: "—") } }
+                                    td { span("td-muted") { +s.createdAt.toDisplayString() } }
+                                    td { span("td-muted") { +s.expiresAt.toDisplayString() } }
+                                    td {
+                                        form(
+                                            action  = "/admin/workspaces/${workspace.slug}/sessions/${s.id}/revoke",
+                                            method  = FormMethod.post,
+                                            classes = "inline-form"
+                                        ) {
+                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                                                +"Revoke"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Audit log
+    // -------------------------------------------------------------------------
+
+    fun auditLogPage(
+        workspace: Tenant,
+        events: List<AuditEvent>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        page: Int = 1,
+        totalPages: Int = 1,
+        eventTypeFilter: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Audit Log — ${workspace.displayName}",
+            activeRail    = "logs",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "events",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Audit Log" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Audit Log" }
+                    p("page-subtitle") { +"Security-relevant events for the ${workspace.displayName} workspace." }
+                }
+            }
+
+            // Filter bar
+            form(
+                action  = "/admin/workspaces/${workspace.slug}/logs",
+                method  = FormMethod.get,
+                classes = "search-form"
+            ) {
+                div("search-row") {
+                    select {
+                        name = "event"
+                        option {
+                            value = ""; selected = (eventTypeFilter == null)
+                            +"All events"
+                        }
+                        AuditEventType.entries.forEach { type ->
+                            option {
+                                value = type.name
+                                selected = (type.name == eventTypeFilter)
+                                +type.name.lowercase().replace('_', ' ')
+                            }
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Filter" }
+                    if (eventTypeFilter != null) {
+                        a("/admin/workspaces/${workspace.slug}/logs", classes = "btn btn-ghost btn-sm") {
+                            +"Clear"
+                        }
+                    }
+                }
+            }
+
+            div("card") {
+                if (events.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"⊘" }
+                        p("empty-state-text") { +"No events found." }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Time" }
+                                th { +"Event" }
+                                th { +"User" }
+                                th { +"Client" }
+                                th { +"IP" }
+                            }
+                        }
+                        tbody {
+                            events.forEach { e ->
+                                tr {
+                                    td { span("td-muted") { +e.createdAt.toDisplayString() } }
+                                    td { span("td-code") {
+                                        style = "font-size:0.75rem;"
+                                        +e.eventType.name
+                                    } }
+                                    td { span("td-muted") { +(e.userId?.toString() ?: "—") } }
+                                    td { span("td-muted") { +(e.clientId?.toString() ?: "—") } }
+                                    td { span("td-muted") { +(e.ipAddress ?: "—") } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Pagination
+            if (totalPages > 1) {
+                div("pagination") {
+                    style = "margin-top:1rem; display:flex; gap:0.5rem; align-items:center;"
+                    val baseUrl = "/admin/workspaces/${workspace.slug}/logs" +
+                        (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
+                    if (page > 1) {
+                        a("${baseUrl}page=${page - 1}", classes = "btn btn-ghost btn-sm") { +"← Prev" }
+                    }
+                    span { style = "font-size:0.85rem; color:var(--muted);"; +"Page $page of $totalPages" }
+                    if (page < totalPages) {
+                        a("${baseUrl}page=${page + 1}", classes = "btn btn-ghost btn-sm") { +"Next →" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private val TS_FMT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+
+    private fun java.time.Instant.toDisplayString(): String =
+        TS_FMT.format(this.atOffset(ZoneOffset.UTC))
 }
 
 /**
@@ -963,4 +1833,13 @@ data class ApplicationPrefill(
     val description: String = "",
     val accessType: String = "public",
     val redirectUris: String = ""   // newline-separated URIs
+)
+
+/**
+ * Holds create-user form values for prefill after a failed submission.
+ */
+data class UserPrefill(
+    val username: String = "",
+    val email: String = "",
+    val fullName: String = ""
 )

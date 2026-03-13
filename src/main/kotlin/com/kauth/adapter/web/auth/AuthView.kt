@@ -48,11 +48,29 @@ object AuthView {
      * @param error       Inline error message, or null for a clean form.
      * @param success     True when arriving from a successful registration.
      */
+    /**
+     * OAuth2 passthrough parameters — preserved across the login form submission
+     * so the authorization endpoint can issue a code and redirect after login.
+     */
+    data class OAuthParams(
+        val responseType: String? = null,
+        val clientId: String? = null,
+        val redirectUri: String? = null,
+        val scope: String? = null,
+        val state: String? = null,
+        val codeChallenge: String? = null,
+        val codeChallengeMethod: String? = null,
+        val nonce: String? = null
+    ) {
+        val isOAuthFlow: Boolean get() = !responseType.isNullOrBlank()
+    }
+
     fun loginPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
         error: String? = null,
-        success: Boolean = false
+        success: Boolean = false,
+        oauthParams: OAuthParams = OAuthParams()
     ): HTML.() -> Unit = {
         head { authHead("KotAuth | Sign In", theme) }
         body {
@@ -82,6 +100,18 @@ object AuthView {
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                     method = FormMethod.post
                 ) {
+                    // OAuth2 state — passed through hidden fields so the POST handler
+                    // can issue an authorization code and redirect after successful login
+                    if (oauthParams.isOAuthFlow) {
+                        oauthParams.responseType?.let { input(type = InputType.hidden, name = "response_type") { value = it } }
+                        oauthParams.clientId?.let { input(type = InputType.hidden, name = "oauth_client_id") { value = it } }
+                        oauthParams.redirectUri?.let { input(type = InputType.hidden, name = "redirect_uri") { value = it } }
+                        oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
+                        oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
+                        oauthParams.codeChallenge?.let { input(type = InputType.hidden, name = "code_challenge") { value = it } }
+                        oauthParams.codeChallengeMethod?.let { input(type = InputType.hidden, name = "code_challenge_method") { value = it } }
+                        oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
+                    }
                     div("field") {
                         label { htmlFor = "username"; +"Username" }
                         input(type = InputType.text, name = "username") {

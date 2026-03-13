@@ -7,6 +7,7 @@ import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 
 /**
  * Persistence adapter — implements TenantRepository using PostgreSQL + Exposed.
@@ -34,6 +35,34 @@ class PostgresTenantRepository : TenantRepository {
         TenantsTable.selectAll()
             .orderBy(TenantsTable.id)
             .map { it.toTenant() }
+    }
+
+    override fun findById(id: Int): Tenant? = transaction {
+        TenantsTable.selectAll()
+            .where { TenantsTable.id eq id }
+            .map { it.toTenant() }
+            .singleOrNull()
+    }
+
+    override fun update(tenant: Tenant): Tenant = transaction {
+        TenantsTable.update({ TenantsTable.id eq tenant.id }) {
+            it[displayName]                  = tenant.displayName
+            it[issuerUrl]                    = tenant.issuerUrl
+            it[tokenExpirySeconds]           = tenant.tokenExpirySeconds.toInt()
+            it[refreshTokenExpirySeconds]    = tenant.refreshTokenExpirySeconds.toInt()
+            it[registrationEnabled]          = tenant.registrationEnabled
+            it[emailVerificationRequired]    = tenant.emailVerificationRequired
+            it[passwordPolicyMinLength]      = tenant.passwordPolicyMinLength
+            it[passwordPolicyRequireSpecial] = tenant.passwordPolicyRequireSpecial
+            it[themeAccentColor]             = tenant.theme.accentColor
+            it[themeAccentHover]             = tenant.theme.accentHoverColor
+            it[themeLogoUrl]                 = tenant.theme.logoUrl
+            it[themeFaviconUrl]              = tenant.theme.faviconUrl
+        }
+        TenantsTable.selectAll()
+            .where { TenantsTable.id eq tenant.id }
+            .single()
+            .toTenant()
     }
 
     override fun create(slug: String, displayName: String, issuerUrl: String?): Tenant = transaction {

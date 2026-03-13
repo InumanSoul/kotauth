@@ -1,7 +1,10 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.AuditEvent
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
@@ -25,11 +28,83 @@ class AuthService(
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository,
     private val tokenPort: TokenPort,
-    private val passwordHasher: PasswordHasher
+    private val passwordHasher: PasswordHasher,
+    private val auditLog: AuditLogPort
 ) {
 
     /**
-     * Authenticates a user within the given tenant and returns a token set on success.
+     * Authenticates a user and returns the User domain object.
+     * Records LOGIN_SUCCESS or LOGIN_FAILED audit events.
+     * Does NOT issue tokens — use this when the caller needs to decide
+     * what to do after authentication (e.g. issue code vs issue tokens directly).
+     */
+    fun authenticate(
+        tenantSlug: String,
+        username: String,
+        rawPassword: String,
+        ipAddress: String? = null,
+        userAgent: String? = null
+    ): AuthResult<User> {
+        val tenant = tenantRepository.findBySlug(tenantSlug)
+            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+
+        if (username.isBlank() || rawPassword.isBlank()) {
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+
+        val user = userRepository.findByUsername(tenant.id, username)
+        if (user == null) {
+            auditLog.record(AuditEvent(
+                tenantId  = tenant.id,
+                userId    = null,
+                clientId  = null,
+                eventType = AuditEventType.LOGIN_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent
+            ))
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+
+        if (!user.enabled) {
+            auditLog.record(AuditEvent(
+                tenantId  = tenant.id,
+                userId    = user.id,
+                clientId  = null,
+                eventType = AuditEventType.LOGIN_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent
+            ))
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+
+        if (!passwordHasher.verify(rawPassword, user.passwordHash)) {
+            auditLog.record(AuditEvent(
+                tenantId  = tenant.id,
+                userId    = user.id,
+                clientId  = null,
+                eventType = AuditEventType.LOGIN_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent
+            ))
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+
+        auditLog.record(AuditEvent(
+            tenantId  = tenant.id,
+            userId    = user.id,
+            clientId  = null,
+            eventType = AuditEventType.LOGIN_SUCCESS,
+            ipAddress = ipAddress,
+            userAgent = userAgent
+        ))
+        return AuthResult.Success(user)
+    }
+
+    /**
+     * Authenticates a user and immediately issues a token set (legacy / direct flow).
+     * For OAuth2 Authorization Code Flow, use [authenticate] + OAuthService instead.
+     * Note: does NOT record audit events — callers should call [authenticate] first
+     * which records the LOGIN event. Used by admin console login and legacy direct-login.
      */
     fun login(tenantSlug: String, username: String, rawPassword: String): AuthResult<TokenResponse> {
         val tenant = tenantRepository.findBySlug(tenantSlug)
@@ -50,7 +125,12 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        return AuthResult.Success(tokenPort.createTokenSet(user.username))
+        return AuthResult.Success(tokenPort.issueUserTokens(
+            user   = user,
+            tenant = tenant,
+            client = null,
+            scopes = listOf("openid")
+        ))
     }
 
     /**

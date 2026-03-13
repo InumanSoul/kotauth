@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.port.ApplicationRepository
 import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
 
 /**
@@ -30,6 +31,28 @@ class PostgresApplicationRepository : ApplicationRepository {
             .singleOrNull() ?: return@transaction null
         val uris = urisForClientPk(row[ClientsTable.id])
         row.toApplication(uris)
+    }
+
+    override fun findById(id: Int): Application? = transaction {
+        val row = ClientsTable.selectAll()
+            .where { ClientsTable.id eq id }
+            .singleOrNull() ?: return@transaction null
+        val uris = urisForClientPk(row[ClientsTable.id])
+        row.toApplication(uris)
+    }
+
+    override fun findClientSecretHash(clientPk: Int): String? = transaction {
+        ClientsTable.selectAll()
+            .where { ClientsTable.id eq clientPk }
+            .map { it[ClientsTable.clientSecretHash] }
+            .singleOrNull()
+    }
+
+    override fun setClientSecretHash(clientPk: Int, secretHash: String) = transaction {
+        ClientsTable.update({ ClientsTable.id eq clientPk }) {
+            it[clientSecretHash] = secretHash
+        }
+        Unit
     }
 
     override fun existsByClientId(tenantId: Int, clientId: String): Boolean = transaction {
@@ -66,6 +89,37 @@ class PostgresApplicationRepository : ApplicationRepository {
         row.toApplication(uris)
     }
 
+    override fun update(
+        appId: Int,
+        name: String,
+        description: String?,
+        accessType: String,
+        redirectUris: List<String>
+    ): Application = transaction {
+        ClientsTable.update({ ClientsTable.id eq appId }) {
+            it[ClientsTable.name]        = name
+            it[ClientsTable.description] = description
+            it[ClientsTable.accessType]  = AccessType.fromValue(accessType)
+        }
+        // Replace all redirect URIs atomically
+        ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId }
+        if (redirectUris.isNotEmpty()) {
+            ClientRedirectUrisTable.batchInsert(redirectUris) { uri ->
+                this[ClientRedirectUrisTable.clientId] = appId
+                this[ClientRedirectUrisTable.uri]      = uri
+            }
+        }
+        val row  = ClientsTable.selectAll().where { ClientsTable.id eq appId }.single()
+        row.toApplication(urisForClientPk(appId))
+    }
+
+    override fun setEnabled(appId: Int, enabled: Boolean) = transaction {
+        ClientsTable.update({ ClientsTable.id eq appId }) {
+            it[ClientsTable.enabled] = enabled
+        }
+        Unit
+    }
+
     // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
@@ -76,13 +130,14 @@ class PostgresApplicationRepository : ApplicationRepository {
             .map { it[ClientRedirectUrisTable.uri] }
 
     private fun ResultRow.toApplication(uris: List<String> = emptyList()): Application = Application(
-        id           = this[ClientsTable.id],
-        tenantId     = this[ClientsTable.tenantId],
-        clientId     = this[ClientsTable.clientId],
-        name         = this[ClientsTable.name],
-        description  = this[ClientsTable.description],
-        accessType   = this[ClientsTable.accessType],
-        enabled      = this[ClientsTable.enabled],
-        redirectUris = uris
+        id                  = this[ClientsTable.id],
+        tenantId            = this[ClientsTable.tenantId],
+        clientId            = this[ClientsTable.clientId],
+        name                = this[ClientsTable.name],
+        description         = this[ClientsTable.description],
+        accessType          = this[ClientsTable.accessType],
+        enabled             = this[ClientsTable.enabled],
+        redirectUris        = uris,
+        tokenExpiryOverride = this[ClientsTable.tokenExpiryOverride]
     )
 }

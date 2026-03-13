@@ -7,9 +7,14 @@ import com.kauth.domain.model.User
  * All queries are scoped by [tenantId] — there are no cross-tenant lookups.
  */
 interface UserRepository {
+    fun findById(id: Int): User?
     fun findByUsername(tenantId: Int, username: String): User?
     fun findByEmail(tenantId: Int, email: String): User?
+    /** Returns all users in a tenant, optionally filtered by a search term (username/email/name prefix). */
+    fun findByTenantId(tenantId: Int, search: String? = null): List<User>
     fun save(user: User): User
+    /** Updates mutable profile fields (email, fullName, enabled). Username is immutable. */
+    fun update(user: User): User
     fun existsByUsername(tenantId: Int, username: String): Boolean
     fun existsByEmail(tenantId: Int, email: String): Boolean
 }

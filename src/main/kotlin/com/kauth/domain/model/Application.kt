@@ -19,7 +19,9 @@ data class Application(
     val description: String?,
     val accessType: AccessType,
     val enabled: Boolean,
-    val redirectUris: List<String> = emptyList()
+    val redirectUris: List<String> = emptyList(),
+    /** Per-client override for access token lifetime in seconds. Null means use tenant/server default. */
+    val tokenExpiryOverride: Int? = null
 )
 
 enum class AccessType(val value: String) {

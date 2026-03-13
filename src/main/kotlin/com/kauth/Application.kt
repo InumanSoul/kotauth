@@ -1,8 +1,11 @@
 package com.kauth
 
-import com.auth0.jwt.JWT
-import com.auth0.jwt.algorithms.Algorithm
 import com.kauth.adapter.persistence.PostgresApplicationRepository
+import com.kauth.adapter.persistence.PostgresAuditLogAdapter
+import com.kauth.adapter.persistence.PostgresAuditLogRepository
+import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
+import com.kauth.adapter.persistence.PostgresSessionRepository
+import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.token.BcryptPasswordHasher
@@ -11,56 +14,167 @@ import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.auth.authRoutes
+import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.DatabaseFactory
+import com.kauth.infrastructure.KeyProvisioningService
+import com.kauth.infrastructure.RateLimiter
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.jwt.*
 import io.ktor.server.engine.*
-import io.ktor.server.netty.*
-import io.ktor.server.http.content.*
 import io.ktor.server.html.*
+import io.ktor.server.http.content.*
+import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import kotlin.system.exitProcess
 
 /**
- * KotAuth — Composition Root
- *
- * This file's only job is to wire dependencies together and start the server.
- * No business logic, no HTML, no SQL. If you're reading this to understand
- * what the system DOES, start at AuthService. If you're reading it to understand
- * how the pieces connect, you're in the right place.
+ * KotAuth — Composition Root (Phase 2)
  *
  * Dependency flow (outermost → innermost):
  *   HTTP (Ktor routes)
- *     → AuthService (domain use cases)
- *       → UserRepository port    ← PostgresUserRepository
- *       → TenantRepository port  ← PostgresTenantRepository
- *       → TokenPort              ← JwtTokenAdapter
- *       → PasswordHasher port    ← BcryptPasswordHasher
+ *     → AuthService / OAuthService (domain use cases)
+ *       → Repository ports   ← Postgres adapters
+ *       → TokenPort          ← JwtTokenAdapter (RS256)
+ *       → PasswordHasher     ← BcryptPasswordHasher
+ *       → AuditLogPort       ← PostgresAuditLogAdapter
  *
- * Auth strategy:
- *   - Auth API (/t/{slug}/...)  → JWT tokens, stateless
- *   - Admin console (/admin/…)  → Cookie sessions, server-side (AdminSession)
+ * Startup sequence:
+ *   1. Validate environment (fail fast on bad config)
+ *   2. Run Flyway migrations
+ *   3. Provision RSA keys for any tenant that lacks one
+ *   4. Start Ktor server
  */
 fun main() {
+    // -------------------------------------------------------------------------
+    // Phase 0: Startup validation — fail fast on misconfigured environment
+    // -------------------------------------------------------------------------
+    val baseUrl = System.getenv("KAUTH_BASE_URL")
+    if (baseUrl.isNullOrBlank()) {
+        System.err.println("""
+            ┌──────────────────────────────────────────────────────────┐
+            │  FATAL: KAUTH_BASE_URL environment variable is not set.  │
+            │                                                          │
+            │  This is required to generate correct issuer URLs in     │
+            │  OIDC tokens and discovery documents.                    │
+            │                                                          │
+            │  Example: KAUTH_BASE_URL=https://auth.yourdomain.com     │
+            │  Local:   KAUTH_BASE_URL=http://localhost:8080           │
+            └──────────────────────────────────────────────────────────┘
+        """.trimIndent())
+        exitProcess(1)
+    }
+
+    val env = System.getenv("KAUTH_ENV") ?: "development"
+    if (env == "production") {
+        val legacySecret = System.getenv("JWT_SECRET")
+        if (!legacySecret.isNullOrBlank() && legacySecret == "secret-key-12345") {
+            System.err.println("FATAL: JWT_SECRET is set to the insecure default value in production mode. Refusing to start.")
+            exitProcess(1)
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Database + migrations
+    // -------------------------------------------------------------------------
     DatabaseFactory.init(
-        url = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
-        user = System.getenv("DB_USER") ?: "postgres",
+        url      = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/kauth_db",
+        user     = System.getenv("DB_USER")     ?: "postgres",
         password = System.getenv("DB_PASSWORD") ?: "password"
     )
 
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module)
-        .start(wait = true)
+    // -------------------------------------------------------------------------
+    // Repositories (constructed once, shared across all requests)
+    // -------------------------------------------------------------------------
+    val userRepository        = PostgresUserRepository()
+    val tenantRepository      = PostgresTenantRepository()
+    val applicationRepository = PostgresApplicationRepository()
+    val tenantKeyRepository   = PostgresTenantKeyRepository()
+    val sessionRepository     = PostgresSessionRepository()
+    val authCodeRepository    = PostgresAuthorizationCodeRepository()
+    val auditLogAdapter       = PostgresAuditLogAdapter()
+    val auditLogRepository    = PostgresAuditLogRepository()
+    val passwordHasher        = BcryptPasswordHasher()
+
+    // -------------------------------------------------------------------------
+    // RS256 key provisioning — ensure every tenant has a signing key
+    // -------------------------------------------------------------------------
+    val keyProvisioning = KeyProvisioningService(tenantRepository, tenantKeyRepository)
+    keyProvisioning.provisionMissingKeys()
+
+    // -------------------------------------------------------------------------
+    // Token adapter — RS256, per-tenant key pairs
+    // -------------------------------------------------------------------------
+    val tokenAdapter = JwtTokenAdapter(
+        baseUrl           = baseUrl,
+        tenantKeyRepository = tenantKeyRepository
+    )
+
+    // -------------------------------------------------------------------------
+    // Domain services
+    // -------------------------------------------------------------------------
+    val authService = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher, auditLogAdapter)
+    val oauthService = OAuthService(
+        tenantRepository      = tenantRepository,
+        userRepository        = userRepository,
+        applicationRepository = applicationRepository,
+        sessionRepository     = sessionRepository,
+        authCodeRepository    = authCodeRepository,
+        tokenPort             = tokenAdapter,
+        passwordHasher        = passwordHasher,
+        auditLog              = auditLogAdapter
+    )
+    val adminService = AdminService(
+        tenantRepository      = tenantRepository,
+        userRepository        = userRepository,
+        applicationRepository = applicationRepository,
+        passwordHasher        = passwordHasher,
+        auditLog              = auditLogAdapter
+    )
+
+    // -------------------------------------------------------------------------
+    // Rate limiters (Phase 0)
+    // -------------------------------------------------------------------------
+    val loginRateLimiter    = RateLimiter(maxRequests = 5,  windowSeconds = 60)   // 5 attempts / minute per IP
+    val registerRateLimiter = RateLimiter(maxRequests = 3,  windowSeconds = 300)  // 3 registrations / 5 min per IP
+
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+        module(
+            authService            = authService,
+            oauthService           = oauthService,
+            adminService           = adminService,
+            tenantRepository       = tenantRepository,
+            applicationRepository  = applicationRepository,
+            userRepository         = userRepository,
+            sessionRepository      = sessionRepository,
+            auditLogRepository     = auditLogRepository,
+            keyProvisioningService = keyProvisioning,
+            loginRateLimiter       = loginRateLimiter,
+            registerRateLimiter    = registerRateLimiter
+        )
+    }.start(wait = true)
 }
 
-fun Application.module() {
+fun Application.module(
+    authService            : AuthService,
+    oauthService           : OAuthService,
+    adminService           : AdminService,
+    tenantRepository       : com.kauth.domain.port.TenantRepository,
+    applicationRepository  : com.kauth.domain.port.ApplicationRepository,
+    userRepository         : com.kauth.domain.port.UserRepository,
+    sessionRepository      : com.kauth.domain.port.SessionRepository,
+    auditLogRepository     : com.kauth.domain.port.AuditLogRepository,
+    keyProvisioningService : KeyProvisioningService,
+    loginRateLimiter       : RateLimiter,
+    registerRateLimiter    : RateLimiter
+) {
     // -------------------------------------------------------------------------
     // Plugins
     // -------------------------------------------------------------------------
@@ -70,47 +184,12 @@ fun Application.module() {
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
             cookie.maxAgeInSeconds = 3600 * 8  // 8-hour admin session
-            // TODO (Phase 2): cookie.secure = true when TLS is in place
+            // TODO (Phase 3): cookie.secure = true once TLS is enforced
         }
     }
 
     // -------------------------------------------------------------------------
-    // JWT verification — inbound token validation for protected API routes
-    // -------------------------------------------------------------------------
-    val jwtIssuer = "https://kauth.example.com"
-    val jwtAudience = "kauth-clients"
-    val algorithm = Algorithm.HMAC256(System.getenv("JWT_SECRET") ?: "secret-key-12345")
-
-    install(Authentication) {
-        jwt("auth-jwt") {
-            verifier(
-                JWT.require(algorithm)
-                    .withAudience(jwtAudience)
-                    .withIssuer(jwtIssuer)
-                    .build()
-            )
-            validate { credential ->
-                if (credential.payload.getClaim("username").asString().isNotBlank())
-                    JWTPrincipal(credential.payload)
-                else null
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Dependency wiring
-    // -------------------------------------------------------------------------
-    val userRepository        = PostgresUserRepository()
-    val tenantRepository      = PostgresTenantRepository()
-    val applicationRepository = PostgresApplicationRepository()
-    val tokenAdapter          = JwtTokenAdapter(jwtIssuer, jwtAudience, algorithm)
-    val passwordHasher        = BcryptPasswordHasher()
-    val authService           = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher)
-
-    // -------------------------------------------------------------------------
-    // Error boundary — catches all unhandled exceptions before they become
-    // a blank HTTP 500. Admin routes render the full shell + a readable message
-    // so the user can see what went wrong and navigate away cleanly.
+    // Error boundary
     // -------------------------------------------------------------------------
     install(StatusPages) {
         exception<Throwable> { call, cause ->
@@ -132,7 +211,10 @@ fun Application.module() {
                     )
                 )
             } else {
-                call.respond(HttpStatusCode.InternalServerError, "Internal Server Error")
+                call.respond(HttpStatusCode.InternalServerError, mapOf(
+                    "error" to "server_error",
+                    "error_description" to "An unexpected error occurred"
+                ))
             }
         }
     }
@@ -141,26 +223,37 @@ fun Application.module() {
     // Routes
     // -------------------------------------------------------------------------
     routing {
-        // Serve static assets — CSS files from src/main/resources/static/
         staticResources("/static", "static")
 
-        // Root redirect — navigating to / takes you to the master tenant login
+        // Root → master tenant login
         get("/") {
             call.respondRedirect("/t/master/login", permanent = false)
         }
 
-        // Public auth flows — one route block covers all tenants
-        authRoutes(authService, tenantRepository)
-
-        // Admin console — session-auth managed internally by adminRoutes
-        adminRoutes(authService, tenantRepository, applicationRepository)
-
-        // JWT-protected API example — wire real API routes here in Phase 2
-        authenticate("auth-jwt") {
-            get("/api/me") {
-                val principal = call.principal<JWTPrincipal>()!!
-                call.respond(mapOf("username" to principal.payload.getClaim("username").asString()))
-            }
+        // Health check (Phase 5 will expand this)
+        get("/health") {
+            call.respond(mapOf("status" to "ok"))
         }
+
+        // All tenant auth + OIDC flows
+        authRoutes(
+            authService      = authService,
+            oauthService     = oauthService,
+            tenantRepository = tenantRepository,
+            loginRateLimiter    = loginRateLimiter,
+            registerRateLimiter = registerRateLimiter
+        )
+
+        // Admin console
+        adminRoutes(
+            authService            = authService,
+            adminService           = adminService,
+            tenantRepository       = tenantRepository,
+            applicationRepository  = applicationRepository,
+            userRepository         = userRepository,
+            sessionRepository      = sessionRepository,
+            auditLogRepository     = auditLogRepository,
+            keyProvisioningService = keyProvisioningService
+        )
     }
 }
