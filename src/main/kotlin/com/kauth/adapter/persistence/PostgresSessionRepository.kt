@@ -109,6 +109,47 @@ class PostgresSessionRepository : SessionRepository {
             .map { it.toSession() }
     }
 
+    override fun countActiveByUser(tenantId: Int, userId: Int): Int = transaction {
+        val now = OffsetDateTime.now()
+        SessionsTable.selectAll()
+            .where {
+                (SessionsTable.tenantId eq tenantId) and
+                (SessionsTable.userId eq userId) and
+                (SessionsTable.revokedAt.isNull()) and
+                (SessionsTable.expiresAt greater now)
+            }
+            .count()
+            .toInt()
+    }
+
+    override fun revokeOldestForUser(tenantId: Int, userId: Int, keepNewest: Int) = transaction {
+        val now = OffsetDateTime.now()
+        val ts  = now
+
+        // Find all active session IDs ordered oldest-first, skip the N newest
+        val allActive = SessionsTable
+            .select(SessionsTable.id)
+            .where {
+                (SessionsTable.tenantId eq tenantId) and
+                (SessionsTable.userId eq userId) and
+                (SessionsTable.revokedAt.isNull()) and
+                (SessionsTable.expiresAt greater now)
+            }
+            .orderBy(SessionsTable.createdAt, SortOrder.ASC)
+            .map { it[SessionsTable.id] }
+
+        val toRevoke = allActive.dropLast(keepNewest)
+        if (toRevoke.isNotEmpty()) {
+            SessionsTable.update({
+                (SessionsTable.id inList toRevoke) and
+                (SessionsTable.revokedAt.isNull())
+            }) {
+                it[SessionsTable.revokedAt] = ts
+            }
+        }
+        Unit
+    }
+
     // -------------------------------------------------------------------------
     // Mappers
     // -------------------------------------------------------------------------

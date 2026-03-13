@@ -31,4 +31,16 @@ interface SessionRepository {
 
     /** Returns all active (non-revoked, non-expired) sessions across all users in a tenant. */
     fun findActiveByTenant(tenantId: Int): List<Session>
+
+    /**
+     * Counts active (non-revoked, non-expired) sessions for a user within a tenant.
+     * Phase 3b: used to enforce [Tenant.maxConcurrentSessions].
+     */
+    fun countActiveByUser(tenantId: Int, userId: Int): Int
+
+    /**
+     * Revokes the oldest sessions for a user, keeping only [keepNewest] active.
+     * Phase 3b: called after login when the session count exceeds the tenant limit.
+     */
+    fun revokeOldestForUser(tenantId: Int, userId: Int, keepNewest: Int)
 }

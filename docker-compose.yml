@@ -17,6 +17,8 @@ services:
   app:
     build: .
     container_name: kotauth
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
@@ -26,9 +28,8 @@ services:
       DB_PASSWORD: password
       # REQUIRED: base URL used in OIDC tokens and discovery documents
       # Change to your actual domain before deploying. Localhost is for local dev only.
-      KAUTH_BASE_URL: http://localhost:8080
-      # Legacy HS256 secret (no longer used for token signing — kept for config compat)
-      # JWT_SECRET: change-this-in-production
+      KAUTH_BASE_URL: ${KAUTH_BASE_URL}
+      KAUTH_SECRET_KEY: ${KAUTH_SECRET_KEY}
     depends_on:
       db:
         condition: service_healthy

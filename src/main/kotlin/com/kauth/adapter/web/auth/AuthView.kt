@@ -135,6 +135,9 @@ object AuthView {
                 }
 
                 div("footer-link") {
+                    a(href = "/t/$tenantSlug/forgot-password") { +"Forgot password?" }
+                }
+                div("footer-link") {
                     +"Don't have an account? "
                     a(href = "/t/$tenantSlug/register") { +"Create one" }
                 }
@@ -236,6 +239,191 @@ object AuthView {
                 div("footer-link") {
                     +"Already have an account? "
                     a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Forgot password — request a reset link
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param sent  True after the form has been submitted — shows the generic
+     *              "if an account exists…" message to prevent email enumeration.
+     */
+    fun forgotPasswordPage(
+        tenantSlug : String,
+        theme      : TenantTheme = TenantTheme.DEFAULT,
+        error      : String? = null,
+        sent       : Boolean = false
+    ): HTML.() -> Unit = {
+        head { authHead("KotAuth | Forgot Password", theme) }
+        body {
+            div("brand") {
+                if (theme.logoUrl != null) {
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                } else {
+                    div("brand-name") { +"KotAuth" }
+                }
+                div("brand-tagline") { +"Modernized Identity & Access Management" }
+            }
+            div("card") {
+                h1("card-title") { +"Forgot password" }
+
+                if (sent) {
+                    p("card-subtitle") {
+                        +"If an account exists for that email address, you'll receive a reset link shortly. Check your spam folder if you don't see it."
+                    }
+                    div("footer-link") {
+                        a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                    }
+                } else {
+                    p("card-subtitle") { +"Enter your email address and we'll send you a link to reset your password." }
+
+                    if (error != null) {
+                        div("alert alert-error") { +error }
+                    }
+
+                    form(
+                        action = "/t/$tenantSlug/forgot-password",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post
+                    ) {
+                        div("field") {
+                            label { htmlFor = "email"; +"Email address" }
+                            input(type = InputType.email, name = "email") {
+                                id = "email"
+                                placeholder = "you@example.com"
+                                attributes["autocomplete"] = "email"
+                                required = true
+                                attributes["autofocus"] = "true"
+                            }
+                        }
+                        button(type = ButtonType.submit, classes = "btn") { +"Send reset link" }
+                    }
+
+                    div("footer-link") {
+                        a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Reset password — set a new password via token link
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param token    The raw token from the query parameter — passed as a hidden field.
+     * @param success  True after a successful password reset.
+     */
+    fun resetPasswordPage(
+        tenantSlug : String,
+        theme      : TenantTheme = TenantTheme.DEFAULT,
+        token      : String,
+        error      : String? = null,
+        success    : Boolean = false
+    ): HTML.() -> Unit = {
+        head { authHead("KotAuth | Reset Password", theme) }
+        body {
+            div("brand") {
+                if (theme.logoUrl != null) {
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                } else {
+                    div("brand-name") { +"KotAuth" }
+                }
+                div("brand-tagline") { +"Modernized Identity & Access Management" }
+            }
+            div("card") {
+                h1("card-title") { +"Reset password" }
+
+                if (success) {
+                    div("alert alert-success") {
+                        +"Password changed successfully."
+                    }
+                    div("footer-link") {
+                        a(href = "/t/$tenantSlug/login") { +"Sign in with your new password" }
+                    }
+                } else {
+                    p("card-subtitle") { +"Enter your new password below." }
+
+                    if (error != null) {
+                        div("alert alert-error") { +error }
+                    }
+
+                    form(
+                        action = "/t/$tenantSlug/reset-password",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post
+                    ) {
+                        input(type = InputType.hidden, name = "token") { value = token }
+
+                        div("field") {
+                            label { htmlFor = "new_password"; +"New password" }
+                            input(type = InputType.password, name = "new_password") {
+                                id = "new_password"
+                                placeholder = "Minimum 8 characters"
+                                attributes["autocomplete"] = "new-password"
+                                required = true
+                                attributes["autofocus"] = "true"
+                            }
+                        }
+                        div("field") {
+                            label { htmlFor = "confirm_password"; +"Confirm new password" }
+                            input(type = InputType.password, name = "confirm_password") {
+                                id = "confirm_password"
+                                placeholder = "Repeat your new password"
+                                attributes["autocomplete"] = "new-password"
+                                required = true
+                            }
+                        }
+                        button(type = ButtonType.submit, classes = "btn") { +"Change password" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Email verification — result page after clicking the verification link
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param success  True when verification succeeded, false on any error.
+     * @param message  Shown to the user — success confirmation or error reason.
+     */
+    fun verifyEmailPage(
+        tenantSlug : String,
+        theme      : TenantTheme = TenantTheme.DEFAULT,
+        success    : Boolean,
+        message    : String
+    ): HTML.() -> Unit = {
+        head { authHead("KotAuth | Email Verification", theme) }
+        body {
+            div("brand") {
+                if (theme.logoUrl != null) {
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                } else {
+                    div("brand-name") { +"KotAuth" }
+                }
+                div("brand-tagline") { +"Modernized Identity & Access Management" }
+            }
+            div("card") {
+                h1("card-title") { +"Email verification" }
+
+                if (success) {
+                    div("alert alert-success") { +message }
+                    div("footer-link") {
+                        a(href = "/t/$tenantSlug/login") { +"Sign in to your account" }
+                    }
+                } else {
+                    p("card-subtitle") { +"There was a problem with your verification link." }
+                    div("alert alert-error") { +message }
+                    div("footer-link") {
+                        a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                    }
                 }
             }
         }

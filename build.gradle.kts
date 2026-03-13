@@ -41,4 +41,7 @@ dependencies {
     implementation("at.favre.lib:bcrypt:0.10.2")
 
     implementation("ch.qos.logback:logback-classic:$logback_version")
+
+    // Phase 3b — SMTP email delivery (JavaMail, no wrapper libraries)
+    implementation("com.sun.mail:javax.mail:1.6.2")
 }

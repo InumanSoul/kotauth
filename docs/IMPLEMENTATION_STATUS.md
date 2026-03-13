@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
 > Last updated: 2026-03
-> Current version: 1.0.0-dev (Phase 3a complete)
+> Current version: 1.0.0-dev (Phase 3b complete)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -12,12 +12,16 @@ This document is the living record of what has been built, what compiles and run
 | Check | Status |
 |---|---|
 | Docker build (`gradle buildFatJar`) | ✅ Passing |
-| PostgreSQL schema (Flyway V1–V8) | ✅ Applied |
+| PostgreSQL schema (Flyway V1–V11) | ✅ Applied |
 | Admin console routes | ✅ All registered |
 | OIDC discovery + JWKS | ✅ Functional |
 | Authorization Code + PKCE flow | ✅ Functional |
 | Client Credentials flow | ✅ Functional |
 | Refresh token rotation | ✅ Functional |
+| Email verification flow | ✅ Functional |
+| Password reset flow | ✅ Functional |
+| User self-service portal | ✅ Functional |
+| Per-tenant SMTP config (admin console) | ✅ Functional |
 
 ---
 
@@ -180,16 +184,99 @@ New data class: `UserPrefill` — holds create-user form values for re-populatio
 
 ---
 
-### Phase 3b — User Self-Service & Email Flows ❌ Not started
+### Phase 3b — User Self-Service & Email Flows ✅ Complete
 
-The next milestone. Blocked on SMTP configuration.
+All user-facing email and self-service features are implemented.
 
-Key deliverables:
-- Email verification flow (token via email, verified flag set on click)
-- Password reset / forgot password (time-limited reset link)
-- User self-service portal: view/edit own profile, see own sessions, change password
-- SMTP configuration per tenant (stored in `tenants` table — column not yet added)
-- TOTP / MFA enrollment (Phase 3c or 4 depending on prioritization)
+#### Domain Layer
+
+| Component | File | What it does |
+|---|---|---|
+| `UserSelfServiceService` | `domain/service/UserSelfServiceService.kt` | Email verification, forgot password, profile update, password change, session listing and self-revocation. Returns `SelfServiceResult<T>`. |
+| `SelfServiceResult<T>` / `SelfServiceError` | same file | Discriminated union mirroring `AdminResult`. Error subtypes: `NotFound`, `Validation`, `Unauthorized`, `TokenExpired`, `TokenInvalid`, `SmtpNotConfigured`, `EmailDeliveryFailed`. |
+| `EmailVerificationToken` | `domain/model/EmailVerificationToken.kt` | Token model with `isValid`, `isExpired`, `isUsed` computed properties. 24-hour expiry. |
+| `PasswordResetToken` | `domain/model/PasswordResetToken.kt` | Token model with ip_address. 1-hour expiry. |
+| `EncryptionService` | `infrastructure/EncryptionService.kt` | AES-256-GCM symmetric encryption for SMTP passwords. Key derived via SHA-256 from `KAUTH_SECRET_KEY` env var. Returns `null` on decrypt failure — never throws. |
+
+#### Port Extensions
+
+| Port | New methods |
+|---|---|
+| `UserRepository` | `updatePassword(userId, passwordHash, changedAt): User`, `findByEmail(tenantId, email): User?` |
+| `SessionRepository` | `countActiveByUser(tenantId, userId): Int`, `revokeOldestForUser(tenantId, userId, keepNewest: Int)`, `findById(id): Session?` |
+| `EmailPort` *(new)* | `sendVerificationEmail(to, toName, verifyUrl, workspaceName, tenant)`, `sendPasswordResetEmail(to, toName, resetUrl, workspaceName, tenant)` |
+| `EmailVerificationTokenRepository` *(new)* | `create`, `findByTokenHash`, `markUsed(tokenId, usedAt)`, `deleteUnusedByUser(userId)` |
+| `PasswordResetTokenRepository` *(new)* | `create`, `findByTokenHash`, `markUsed(tokenId, usedAt)`, `deleteByUser(userId)` |
+
+#### Database Schema (Flyway V9–V11)
+
+| Migration | What it adds |
+|---|---|
+| `V9__user_lifecycle_config.sql` | SMTP columns on `tenants` (host, port, username, password, from_address, from_name, tls_enabled, enabled, max_concurrent_sessions); `last_password_change_at` on `users` |
+| `V10__email_verification_tokens.sql` | `email_verification_tokens` table with CASCADE deletes and index on `token_hash` |
+| `V11__password_reset_tokens.sql` | `password_reset_tokens` table with `ip_address` column and CASCADE deletes |
+
+#### Auth Routes (Phase 3b additions)
+
+All routes under `/t/{slug}/`:
+
+| Route | Method | Handler |
+|---|---|---|
+| `/forgot-password` | GET | Show forgot-password form |
+| `/forgot-password` | POST | Call `initiateForgotPassword`; always redirect to `?sent=true` (no enumeration) |
+| `/reset-password` | GET | Show reset form with token from query param |
+| `/reset-password` | POST | Call `confirmPasswordReset`; show success or inline error |
+| `/verify-email` | GET | Call `confirmEmailVerification`; show success or error page |
+
+Login page updated: "Forgot password?" link added above the register link.
+
+#### Self-Service Portal Routes
+
+All routes under `/t/{slug}/account/`:
+
+| Route | Method | Handler |
+|---|---|---|
+| `/login` | GET | Show portal login page |
+| `/login` | POST | Authenticate via `AuthService`, set `PortalSession` cookie |
+| `/logout` | POST | Clear portal cookie, redirect to login |
+| `/profile` | GET | Show profile page (guarded by `PortalSession`) |
+| `/profile` | POST | Call `updateProfile`; show success/error inline |
+| `/security` | GET | Show password change form + active sessions table |
+| `/change-password` | POST | Call `changePassword`; on success: clear cookie, redirect to login with message |
+| `/sessions/{sessionId}/revoke` | POST | Call `revokeSession`; redirect back to security page |
+
+#### Admin Routes (Phase 3b additions)
+
+| Route | Method | Handler |
+|---|---|---|
+| `/admin/workspaces/{slug}/settings/smtp` | GET | Show SMTP config form |
+| `/admin/workspaces/{slug}/settings/smtp` | POST | Call `AdminService.updateSmtpConfig` |
+| `/admin/workspaces/{slug}/users/{userId}/send-verification` | POST | Call `AdminService.resendVerificationEmail` |
+| `/admin/workspaces/{slug}/users/{userId}/admin-reset-password` | POST | Call `AdminService.adminResetUserPassword` (force-sets password, revokes all sessions) |
+
+#### Admin Console Updates
+
+- `userDetailPage`: new "Resend Verification Email" button (shown only when `!user.emailVerified && workspace.isSmtpReady`); new "Admin Password Reset" form section
+- `workspaceSettingsPage`: "SMTP Settings →" link in form actions
+- `smtpSettingsPage` (new): SMTP configuration form with enable toggle, server/auth/sender sections; blank password = keep existing
+
+#### Architectural Decisions (Phase 3b)
+
+**ADR-07: Portal Session — Cookie-Based (KISS, Phase 3b)**
+
+The self-service portal uses a Ktor cookie session (`PortalSession`) rather than requiring users to complete a full OAuth Authorization Code flow to access their own profile. This avoids circular dependency: the portal is part of the auth platform, not an external app. The session is HMAC-signed with a key derived from `KAUTH_SECRET_KEY`. Upgrade path: Phase 5 can replace the portal with a first-party OAuth client (the portal authenticates against its own tenant and uses access tokens, same as any other app). See `PortalSession.kt` for full decision doc.
+
+**ADR-08: Email Templates — Plain HTML, Workspace Name Only**
+
+Email templates use a minimal plain white layout with the workspace display name as header. No theme colors or tenant branding. Decision rationale: email client CSS support is unreliable; the workspace name provides sufficient context without risking broken renders in diverse mail clients.
+
+**ADR-09: Forgot Password Always Returns Success**
+
+`UserSelfServiceService.initiateForgotPassword` always returns `SelfServiceResult.Success` regardless of whether the email exists, the user is disabled, or SMTP is misconfigured. This is the only correct security posture — enumeration of registered emails is a meaningful information leak.
+
+**ADR-10: SMTP Password Encryption at Rest**
+
+SMTP passwords are encrypted with AES-256-GCM before storage (`EncryptionService`). The 256-bit key is derived deterministically from `KAUTH_SECRET_KEY` via SHA-256, so the key does not need to be stored separately. Ciphertext format: `base64url(iv).base64url(ciphertext+auth_tag)`. If `KAUTH_SECRET_KEY` is not set, SMTP is silently unavailable but the application starts normally.
 
 ---
 
@@ -249,15 +336,12 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 
 | Item | Where it appears | Why deferred |
 |---|---|---|
-| `cookie.secure = true` | `Application.kt` line ~163, TODO comment | Requires TLS termination — Phase 5 |
-| Email verification for public registration | `AuthService.register()` | Requires SMTP — Phase 3b |
-| Password reset | n/a | Requires SMTP — Phase 3b |
-| TOTP / MFA | n/a | Phase 3b/4 |
-| Roles & groups | n/a | Phase 3b |
-| Bulk user operations | n/a | Phase 3b |
-| User impersonation | n/a | Phase 3b, with strict audit logging |
-| Session revocation on password change | n/a | Phase 3b |
-| Concurrent session limits | n/a | Phase 3b |
+| `cookie.secure = true` | `Application.kt`, TODO comment | Requires TLS termination — Phase 5 |
+| Portal OAuth upgrade | `PortalSession.kt`, ADR-07 | Phase 5 — replace cookie session with first-party OAuth flow |
+| TOTP / MFA | n/a | Phase 3c or 4 |
+| Roles & groups | n/a | Phase 3c |
+| Bulk user operations | n/a | Future |
+| User impersonation | n/a | Future, requires strict audit logging |
 | Admin REST API | n/a | Phase 5 |
 | Prometheus metrics | n/a | Phase 5 |
 | Structured JSON logs | n/a | Phase 5 |

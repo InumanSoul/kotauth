@@ -194,6 +194,47 @@ fun Route.adminRoutes(
                         AdminView.workspaceSettingsPage(workspace, wsPairs, session.username, saved = saved))
                 }
 
+                // -------------------------------------------------------
+                // SMTP settings (Phase 3b)
+                // -------------------------------------------------------
+
+                get("/settings/smtp") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val saved     = call.request.queryParameters["saved"] == "true"
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.smtpSettingsPage(workspace, wsPairs, session.username, saved = saved))
+                }
+
+                post("/settings/smtp") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val params  = call.receiveParameters()
+                    when (val result = adminService.updateSmtpConfig(
+                        slug            = slug,
+                        smtpHost        = params["smtpHost"]?.trim()?.takeIf { it.isNotBlank() },
+                        smtpPort        = params["smtpPort"]?.toIntOrNull() ?: 587,
+                        smtpUsername    = params["smtpUsername"]?.trim()?.takeIf { it.isNotBlank() },
+                        smtpPassword    = params["smtpPassword"]?.takeIf { it.isNotBlank() },
+                        smtpFromAddress = params["smtpFromAddress"]?.trim()?.takeIf { it.isNotBlank() },
+                        smtpFromName    = params["smtpFromName"]?.trim()?.takeIf { it.isNotBlank() },
+                        smtpTlsEnabled  = params["smtpTlsEnabled"] == "true",
+                        smtpEnabled     = params["smtpEnabled"] == "true"
+                    )) {
+                        is AdminResult.Success ->
+                            call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=true")
+                        is AdminResult.Failure -> {
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                            call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                AdminView.smtpSettingsPage(workspace, wsPairs, session.username,
+                                    error = result.error.message))
+                        }
+                    }
+                }
+
                 post("/settings") {
                     val session = call.sessions.get<AdminSession>()!!
                     val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -451,6 +492,39 @@ fun Route.adminRoutes(
                             val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                             sessionRepository.revokeAllForUser(workspace.id, userId)
                             call.respondRedirect("/admin/workspaces/$slug/users/$userId")
+                        }
+
+                        // Phase 3b: resend email verification
+                        post("/send-verification") {
+                            val slug      = call.parameters["slug"]   ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val userId    = call.parameters["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val baseUrl   = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                            adminService.resendVerificationEmail(userId, workspace.id, baseUrl)
+                            call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                        }
+
+                        // Phase 3b: admin-force password reset
+                        post("/admin-reset-password") {
+                            val session   = call.sessions.get<AdminSession>()!!
+                            val slug      = call.parameters["slug"]   ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val userId    = call.parameters["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val user      = userRepository.findById(userId) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            if (user.tenantId != workspace.id) return@post call.respond(HttpStatusCode.NotFound)
+                            val params      = call.receiveParameters()
+                            val newPassword = params["new_password"] ?: ""
+                            when (val result = adminService.adminResetUserPassword(userId, workspace.id, newPassword)) {
+                                is AdminResult.Success ->
+                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                                is AdminResult.Failure -> {
+                                    val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
+                                    val wsPairs  = tenantRepository.findAll().map { it.slug to it.displayName }
+                                    call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                        AdminView.userDetailPage(workspace, user, sessions, wsPairs,
+                                            session.username, editError = result.error.message))
+                                }
+                            }
                         }
                     }
                 }

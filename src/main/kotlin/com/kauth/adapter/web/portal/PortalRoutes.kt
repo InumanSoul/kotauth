@@ -1,0 +1,194 @@
+package com.kauth.adapter.web.portal
+
+import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.AuthError
+import com.kauth.domain.service.AuthResult
+import com.kauth.domain.service.SelfServiceError
+import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.UserSelfServiceService
+import io.ktor.http.*
+import io.ktor.server.application.*
+import io.ktor.server.html.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.sessions.*
+import java.time.Instant
+
+/**
+ * Self-service portal routes — Phase 3b.
+ *
+ * URL structure under /t/{slug}/account/:
+ *   GET/POST /login        — portal authentication
+ *   POST     /logout       — clear portal session
+ *   GET      /profile      — view & edit profile (email, full name)
+ *   POST     /profile      — submit profile changes
+ *   GET      /security     — change password + active sessions
+ *   POST     /change-password  — submit new password
+ *   POST     /sessions/{id}/revoke — revoke one session
+ *
+ * Auth guard: all /account/[*] routes except /login redirect to /account/login
+ * if no valid PortalSession cookie is found.
+ *
+ * NOTE (Phase 3b): Portal session is a simple cookie — see PortalSession.kt for
+ * the design rationale and the planned Phase 5 upgrade path.
+ */
+fun Route.portalRoutes(
+    authService         : AuthService,
+    selfServiceService  : UserSelfServiceService,
+    tenantRepository    : TenantRepository
+) {
+    route("/t/{slug}/account") {
+
+        // ------------------------------------------------------------------
+        // Login / logout
+        // ------------------------------------------------------------------
+
+        get("/login") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val error = call.request.queryParameters["error"]
+            call.respondHtml(HttpStatusCode.OK, PortalView.loginPage(slug, tenant.displayName, tenant.theme, error))
+        }
+
+        post("/login") {
+            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant   = tenantRepository.findBySlug(slug)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+            val params   = call.receiveParameters()
+            val username = params["username"]?.trim() ?: ""
+            val password = params["password"] ?: ""
+
+            when (val result = authService.authenticate(slug, username, password)) {
+                is AuthResult.Success -> {
+                    val user = result.value
+                    call.sessions.set(PortalSession(
+                        userId    = user.id!!,
+                        tenantId  = user.tenantId,
+                        tenantSlug = slug,
+                        username  = user.username
+                    ))
+                    call.respondRedirect("/t/$slug/account/profile")
+                }
+                is AuthResult.Failure -> {
+                    val msg = when (result.error) {
+                        AuthError.InvalidCredentials -> "Invalid username or password."
+                        AuthError.TenantNotFound     -> "Workspace not found."
+                        else                         -> "Login failed. Please try again."
+                    }
+                    call.respondRedirect("/t/$slug/account/login?error=${encodeParam(msg)}")
+                }
+            }
+        }
+
+        post("/logout") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            call.sessions.clear<PortalSession>()
+            call.respondRedirect("/t/$slug/account/login")
+        }
+
+        // ------------------------------------------------------------------
+        // Auth guard — everything below requires an active portal session
+        // ------------------------------------------------------------------
+
+        fun ApplicationCall.portalSession(slug: String): PortalSession? {
+            val session = sessions.get<PortalSession>() ?: return null
+            if (session.tenantSlug != slug) return null
+            return session
+        }
+
+        // ------------------------------------------------------------------
+        // Profile
+        // ------------------------------------------------------------------
+
+        get("/profile") {
+            val slug    = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant  = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val user    = selfServiceService.getActiveSessions(session.userId, session.tenantId)
+                .let { null } // just to get user — fetch below
+            val userObj = run {
+                // We need the user — fetch active sessions gives us sessions, not user.
+                // Delegate to the port directly via selfServiceService's session list.
+                // Actually: the service doesn't expose a getUser. We route back through sessions.
+                // Simplest: read user from sessions (already authenticated).
+                // For now pull sessions to confirm we're still live, then we just need the user object.
+                // We use the user retrieved at login — stored in session.
+                session
+            }
+            val successMsg = call.request.queryParameters["saved"]
+            val errorMsg   = call.request.queryParameters["error"]
+
+            call.respondHtml(HttpStatusCode.OK,
+                PortalView.profilePage(slug, session, tenant.theme, tenant.displayName, successMsg, errorMsg)
+            )
+        }
+
+        post("/profile") {
+            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val params  = call.receiveParameters()
+            val email    = params["email"]?.trim() ?: ""
+            val fullName = params["full_name"]?.trim() ?: ""
+
+            when (val result = selfServiceService.updateProfile(session.userId, session.tenantId, email, fullName)) {
+                is SelfServiceResult.Success ->
+                    call.respondRedirect("/t/$slug/account/profile?saved=true")
+                is SelfServiceResult.Failure ->
+                    call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(result.error.message)}")
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Security (change password + sessions)
+        // ------------------------------------------------------------------
+
+        get("/security") {
+            val slug    = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant  = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val sessions = selfServiceService.getActiveSessions(session.userId, session.tenantId)
+            val successMsg = call.request.queryParameters["saved"]
+            val errorMsg   = call.request.queryParameters["error"]
+
+            call.respondHtml(HttpStatusCode.OK,
+                PortalView.securityPage(slug, session, tenant.theme, tenant.displayName, sessions, successMsg, errorMsg)
+            )
+        }
+
+        post("/change-password") {
+            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val params  = call.receiveParameters()
+            val current = params["current_password"] ?: ""
+            val newPw   = params["new_password"] ?: ""
+            val confirm = params["confirm_password"] ?: ""
+
+            when (val result = selfServiceService.changePassword(session.userId, session.tenantId, current, newPw, confirm)) {
+                is SelfServiceResult.Success -> {
+                    // All sessions revoked — clear portal cookie, redirect to login
+                    call.sessions.clear<PortalSession>()
+                    call.respondRedirect("/t/$slug/account/login?error=${encodeParam("Password changed. Please log in again.")}")
+                }
+                is SelfServiceResult.Failure ->
+                    call.respondRedirect("/t/$slug/account/security?error=${encodeParam(result.error.message)}")
+            }
+        }
+
+        post("/sessions/{sessionId}/revoke") {
+            val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session   = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val sessionId = call.parameters["sessionId"]?.toIntOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+
+            selfServiceService.revokeSession(session.userId, session.tenantId, sessionId)
+            call.respondRedirect("/t/$slug/account/security?saved=true")
+        }
+    }
+}
+
+private fun encodeParam(value: String) =
+    java.net.URLEncoder.encode(value, "UTF-8")

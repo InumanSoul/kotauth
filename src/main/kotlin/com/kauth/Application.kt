@@ -1,9 +1,12 @@
 package com.kauth
 
+import com.kauth.adapter.email.SmtpEmailAdapter
 import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
+import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
+import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
@@ -14,12 +17,17 @@ import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.auth.authRoutes
+import com.kauth.adapter.web.portal.PortalSession
+import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.DatabaseFactory
+import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.RateLimiter
+import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -81,6 +89,17 @@ fun main() {
         }
     }
 
+    // Phase 3b: KAUTH_SECRET_KEY — used for AES-256-GCM SMTP password encryption
+    // and portal session signing. Non-fatal: app starts without it, but SMTP
+    // config will be unavailable and portal sessions won't survive restarts.
+    if (!EncryptionService.isAvailable) {
+        System.err.println("""
+            [WARN] KAUTH_SECRET_KEY is not set.
+                   SMTP passwords cannot be stored and portal sessions are ephemeral.
+                   Set this env var to a random 32+ char string for production use.
+        """.trimIndent())
+    }
+
     // -------------------------------------------------------------------------
     // Database + migrations
     // -------------------------------------------------------------------------
@@ -102,6 +121,9 @@ fun main() {
     val auditLogAdapter       = PostgresAuditLogAdapter()
     val auditLogRepository    = PostgresAuditLogRepository()
     val passwordHasher        = BcryptPasswordHasher()
+    // Phase 3b: email verification + password reset token repositories
+    val evTokenRepository     = PostgresEmailVerificationTokenRepository()
+    val prTokenRepository     = PostgresPasswordResetTokenRepository()
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -120,7 +142,29 @@ fun main() {
     // -------------------------------------------------------------------------
     // Domain services
     // -------------------------------------------------------------------------
-    val authService = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher, auditLogAdapter, sessionRepository)
+
+    // Phase 3b: SMTP email adapter + self-service domain service
+    val emailAdapter = SmtpEmailAdapter()
+    val selfServiceService = UserSelfServiceService(
+        userRepository    = userRepository,
+        tenantRepository  = tenantRepository,
+        sessionRepository = sessionRepository,
+        passwordHasher    = passwordHasher,
+        auditLog          = auditLogAdapter,
+        evTokenRepo       = evTokenRepository,
+        prTokenRepo       = prTokenRepository,
+        emailPort         = emailAdapter
+    )
+
+    val authService = AuthService(
+        userRepository    = userRepository,
+        tenantRepository  = tenantRepository,
+        tokenPort         = tokenAdapter,
+        passwordHasher    = passwordHasher,
+        auditLog          = auditLogAdapter,
+        sessionRepository = sessionRepository,
+        selfServiceService = selfServiceService
+    )
     val oauthService = OAuthService(
         tenantRepository      = tenantRepository,
         userRepository        = userRepository,
@@ -136,7 +180,9 @@ fun main() {
         userRepository        = userRepository,
         applicationRepository = applicationRepository,
         passwordHasher        = passwordHasher,
-        auditLog              = auditLogAdapter
+        auditLog              = auditLogAdapter,
+        sessionRepository     = sessionRepository,
+        selfServiceService    = selfServiceService
     )
 
     // -------------------------------------------------------------------------
@@ -145,11 +191,24 @@ fun main() {
     val loginRateLimiter    = RateLimiter(maxRequests = 5,  windowSeconds = 60)   // 5 attempts / minute per IP
     val registerRateLimiter = RateLimiter(maxRequests = 3,  windowSeconds = 300)  // 3 registrations / 5 min per IP
 
+    // Phase 3b: portal session signing key — derived from KAUTH_SECRET_KEY for persistence
+    // across restarts. Random key is used as fallback (sessions are valid only until restart).
+    val portalSessionKey: ByteArray = run {
+        val secret = System.getenv("KAUTH_SECRET_KEY")
+        if (!secret.isNullOrBlank()) {
+            java.security.MessageDigest.getInstance("SHA-256")
+                .digest("portal-session:$secret".toByteArray(Charsets.UTF_8))
+        } else {
+            ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+        }
+    }
+
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         module(
             authService            = authService,
             oauthService           = oauthService,
             adminService           = adminService,
+            selfServiceService     = selfServiceService,
             tenantRepository       = tenantRepository,
             applicationRepository  = applicationRepository,
             userRepository         = userRepository,
@@ -157,7 +216,8 @@ fun main() {
             auditLogRepository     = auditLogRepository,
             keyProvisioningService = keyProvisioning,
             loginRateLimiter       = loginRateLimiter,
-            registerRateLimiter    = registerRateLimiter
+            registerRateLimiter    = registerRateLimiter,
+            portalSessionKey       = portalSessionKey
         )
     }.start(wait = true)
 }
@@ -166,6 +226,7 @@ fun Application.module(
     authService            : AuthService,
     oauthService           : OAuthService,
     adminService           : AdminService,
+    selfServiceService     : UserSelfServiceService,
     tenantRepository       : com.kauth.domain.port.TenantRepository,
     applicationRepository  : com.kauth.domain.port.ApplicationRepository,
     userRepository         : com.kauth.domain.port.UserRepository,
@@ -173,7 +234,8 @@ fun Application.module(
     auditLogRepository     : com.kauth.domain.port.AuditLogRepository,
     keyProvisioningService : KeyProvisioningService,
     loginRateLimiter       : RateLimiter,
-    registerRateLimiter    : RateLimiter
+    registerRateLimiter    : RateLimiter,
+    portalSessionKey       : ByteArray
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -184,7 +246,13 @@ fun Application.module(
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
             cookie.maxAgeInSeconds = 3600 * 8  // 8-hour admin session
-            // TODO (Phase 3): cookie.secure = true once TLS is enforced
+            // TODO (Phase 5): cookie.secure = true once TLS is enforced
+        }
+        // Phase 3b: self-service portal session — HMAC-signed with derived key
+        cookie<PortalSession>("KOTAUTH_PORTAL") {
+            cookie.httpOnly = true
+            cookie.maxAgeInSeconds = 3600 * 4  // 4-hour portal session
+            transform(SessionTransportTransformerMessageAuthentication(portalSessionKey))
         }
     }
 
@@ -235,13 +303,21 @@ fun Application.module(
             call.respond(mapOf("status" to "ok"))
         }
 
-        // All tenant auth + OIDC flows
+        // All tenant auth + OIDC flows (Phase 1–3b)
         authRoutes(
-            authService      = authService,
-            oauthService     = oauthService,
-            tenantRepository = tenantRepository,
+            authService         = authService,
+            oauthService        = oauthService,
+            tenantRepository    = tenantRepository,
             loginRateLimiter    = loginRateLimiter,
-            registerRateLimiter = registerRateLimiter
+            registerRateLimiter = registerRateLimiter,
+            selfServiceService  = selfServiceService
+        )
+
+        // Self-service portal — /t/{slug}/account/* (Phase 3b)
+        portalRoutes(
+            authService        = authService,
+            selfServiceService = selfServiceService,
+            tenantRepository   = tenantRepository
         )
 
         // Admin console

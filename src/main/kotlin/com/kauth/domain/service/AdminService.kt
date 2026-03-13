@@ -9,9 +9,11 @@ import com.kauth.domain.model.User
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import java.security.SecureRandom
+import java.time.Instant
 import java.util.Base64
 
 /**
@@ -29,7 +31,9 @@ class AdminService(
     private val userRepository        : UserRepository,
     private val applicationRepository : ApplicationRepository,
     private val passwordHasher        : PasswordHasher,
-    private val auditLog              : AuditLogPort
+    private val auditLog              : AuditLogPort,
+    private val sessionRepository     : SessionRepository,
+    private val selfServiceService    : UserSelfServiceService
 ) {
 
     // =========================================================================
@@ -321,6 +325,118 @@ class AdminService(
         ))
 
         return AdminResult.Success(secret)
+    }
+
+    // =========================================================================
+    // SMTP configuration (Phase 3b)
+    // =========================================================================
+
+    /**
+     * Updates SMTP configuration for a workspace.
+     * [smtpPassword] should be the raw (plaintext) value — the adapter layer
+     * encrypts it before persistence via [EncryptionService].
+     */
+    fun updateSmtpConfig(
+        slug            : String,
+        smtpHost        : String?,
+        smtpPort        : Int,
+        smtpUsername    : String?,
+        smtpPassword    : String?,
+        smtpFromAddress : String?,
+        smtpFromName    : String?,
+        smtpTlsEnabled  : Boolean,
+        smtpEnabled     : Boolean
+    ): AdminResult<Tenant> {
+        val tenant = tenantRepository.findBySlug(slug)
+            ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+
+        if (smtpEnabled) {
+            if (smtpHost.isNullOrBlank())
+                return AdminResult.Failure(AdminError.Validation("SMTP host is required when email delivery is enabled."))
+            if (smtpFromAddress.isNullOrBlank() || !smtpFromAddress.contains('@'))
+                return AdminResult.Failure(AdminError.Validation("A valid from address is required."))
+            if (smtpPort < 1 || smtpPort > 65535)
+                return AdminResult.Failure(AdminError.Validation("SMTP port must be between 1 and 65535."))
+        }
+
+        val updated = tenantRepository.update(tenant.copy(
+            smtpHost        = smtpHost?.trim()?.takeIf { it.isNotBlank() },
+            smtpPort        = smtpPort,
+            smtpUsername    = smtpUsername?.trim()?.takeIf { it.isNotBlank() },
+            smtpPassword    = smtpPassword?.takeIf { it.isNotBlank() } ?: tenant.smtpPassword,
+            smtpFromAddress = smtpFromAddress?.trim()?.takeIf { it.isNotBlank() },
+            smtpFromName    = smtpFromName?.trim()?.takeIf { it.isNotBlank() },
+            smtpTlsEnabled  = smtpTlsEnabled,
+            smtpEnabled     = smtpEnabled
+        ))
+
+        auditLog.record(AuditEvent(
+            tenantId  = tenant.id,
+            userId    = null,
+            clientId  = null,
+            eventType = AuditEventType.ADMIN_SMTP_UPDATED,
+            ipAddress = null,
+            userAgent = null,
+            details   = mapOf("slug" to slug, "smtpEnabled" to smtpEnabled.toString())
+        ))
+
+        return AdminResult.Success(updated)
+    }
+
+    // =========================================================================
+    // Admin-initiated password reset (Phase 3b)
+    // =========================================================================
+
+    /**
+     * Force-resets a user's password. Revokes all existing sessions.
+     * Unlike self-service reset, this does not require the current password.
+     * The new password must meet the tenant's password policy.
+     */
+    fun adminResetUserPassword(
+        userId      : Int,
+        tenantId    : Int,
+        newPassword : String
+    ): AdminResult<Unit> {
+        val tenant = tenantRepository.findById(tenantId)
+            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user = userRepository.findById(userId)
+            ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+
+        if (user.tenantId != tenantId)
+            return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
+        if (newPassword.length < 4)
+            return AdminResult.Failure(AdminError.Validation("Password must be at least 4 characters."))
+
+        val now = Instant.now()
+        userRepository.updatePassword(userId, passwordHasher.hash(newPassword), now)
+        sessionRepository.revokeAllForUser(tenantId, userId, now)
+
+        auditLog.record(AuditEvent(
+            tenantId  = tenantId,
+            userId    = userId,
+            clientId  = null,
+            eventType = AuditEventType.ADMIN_USER_PASSWORD_RESET,
+            ipAddress = null,
+            userAgent = null,
+            details   = mapOf("username" to user.username)
+        ))
+
+        return AdminResult.Success(Unit)
+    }
+
+    /**
+     * Triggers a verification email to be resent for the given user.
+     * Delegates to [UserSelfServiceService] to keep the email flow in one place.
+     */
+    fun resendVerificationEmail(
+        userId   : Int,
+        tenantId : Int,
+        baseUrl  : String
+    ): AdminResult<Unit> {
+        return when (val result = selfServiceService.initiateEmailVerification(userId, tenantId, baseUrl)) {
+            is SelfServiceResult.Success -> AdminResult.Success(Unit)
+            is SelfServiceResult.Failure -> AdminResult.Failure(AdminError.Validation(result.error.message))
+        }
     }
 }
 

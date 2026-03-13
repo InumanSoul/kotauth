@@ -184,7 +184,8 @@ object AdminView {
                         }
                         div("rail-spacer") {}
                         div("rail-nav") {
-                            railItem("/admin/settings", "settings", activeRail, "settings")
+                            val ws = workspaceSlug
+                            railItem("/admin/workspaces/$ws/settings", "settings", activeRail, "settings")
                         }
                     }
 
@@ -196,7 +197,7 @@ object AdminView {
                                 "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
                                 "security"  -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
                                 "logs"      -> renderLogsCtxPanel(activeAppSection)
-                                "settings"  -> renderSettingsCtxPanel(activeAppSection)
+                                "settings"  -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
                             }
                         }
                     }
@@ -275,11 +276,12 @@ object AdminView {
         ctxLink("/admin/logs/errors", "errors", activeSection, "Errors")
     }
 
-    private fun DIV.renderSettingsCtxPanel(activeSection: String) {
+    private fun DIV.renderSettingsCtxPanel(workspaceSlug: String?, activeSection: String) {
         span("ctx-section-title") { +"Settings" }
-        ctxLink("/admin/settings/general",  "general",  activeSection, "General")
-        ctxLink("/admin/settings/smtp",     "smtp",     activeSection, "SMTP")
-        ctxLink("/admin/settings/security", "security", activeSection, "Security policy")
+        val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
+        ctxLink("$base/general",  "general",  activeSection, "General")
+        ctxLink("$base/smtp",     "smtp",     activeSection, "SMTP")
+        ctxLink("$base/security", "security", activeSection, "Security policy")
     }
 
     // -------------------------------------------------------------------------
@@ -1136,6 +1138,7 @@ object AdminView {
                     div("form-actions") {
                         button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
                         a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                        a("/admin/workspaces/${workspace.slug}/settings/smtp", classes = "btn btn-ghost") { +"SMTP Settings →" }
                     }
                 }
             }
@@ -1494,7 +1497,7 @@ object AdminView {
                         }
                     }
                 }
-                div { style = "display:flex; gap:0.5rem;"
+                div { style = "display:flex; gap:0.5rem; flex-wrap:wrap;"
                     form(
                         action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/toggle",
                         method  = FormMethod.post,
@@ -1511,6 +1514,18 @@ object AdminView {
                     ) {
                         button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
                             +"Revoke All Sessions"
+                        }
+                    }
+                    // Phase 3b: resend verification email — only shown when unverified + SMTP ready
+                    if (!user.emailVerified && workspace.isSmtpReady) {
+                        form(
+                            action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/send-verification",
+                            method  = FormMethod.post,
+                            classes = "inline-form"
+                        ) {
+                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                                +"Resend Verification Email"
+                            }
                         }
                     }
                 }
@@ -1596,6 +1611,34 @@ object AdminView {
                                 }
                             }
                         }
+                    }
+                }
+            }
+
+            // Phase 3b: Admin password reset — force-set a new password, revokes all sessions
+            div("page-header") {
+                style = "margin-top:2rem;"
+                div {
+                    p("page-title") { style = "font-size:1rem;"; +"Admin Password Reset" }
+                    p("page-subtitle") { +"Force-set a new password. All active sessions will be revoked." }
+                }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/admin-reset-password",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("field") {
+                        label { htmlFor = "new_password"; +"New password" }
+                        input(type = InputType.password, name = "new_password") {
+                            id = "new_password"; required = true
+                            placeholder = "Minimum 4 characters"
+                            attributes["autocomplete"] = "new-password"
+                        }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Reset Password" }
                     }
                 }
             }
@@ -1795,6 +1838,144 @@ object AdminView {
                     span { style = "font-size:0.85rem; color:var(--muted);"; +"Page $page of $totalPages" }
                     if (page < totalPages) {
                         a("${baseUrl}page=${page + 1}", classes = "btn btn-ghost btn-sm") { +"Next →" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // SMTP settings (Phase 3b)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Per-workspace SMTP configuration page.
+     *
+     * Password field behaviour: when blank, the existing encrypted password is preserved.
+     * The hint communicates this to the operator so they don't accidentally clear it.
+     */
+    fun smtpSettingsPage(
+        workspace     : Tenant,
+        allWorkspaces : List<Pair<String, String>>,
+        loggedInAs    : String,
+        error         : String? = null,
+        saved         : Boolean = false
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "SMTP — ${workspace.displayName}",
+            activeRail    = "apps",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"SMTP" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"SMTP Settings" }
+                    p("page-subtitle") { +"Configure outbound email for ${workspace.displayName}. Used for verification and password reset emails." }
+                }
+            }
+
+            if (saved) {
+                div("alert alert-success") { style = "max-width:640px;"; +"SMTP settings saved." }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/settings/smtp",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "smtpEnabled") {
+                            id = "smtpEnabled"
+                            if (workspace.smtpEnabled) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "smtpEnabled"; +"Enable email delivery" }
+                    }
+
+                    p("form-section-title") { +"Server" }
+                    div("field") {
+                        label { htmlFor = "smtpHost"; +"Host" }
+                        input(type = InputType.text, name = "smtpHost") {
+                            id = "smtpHost"; placeholder = "smtp.example.com"
+                            value = workspace.smtpHost ?: ""
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "smtpPort"; +"Port" }
+                        input(type = InputType.number, name = "smtpPort") {
+                            id = "smtpPort"; placeholder = "587"
+                            attributes["min"] = "1"; attributes["max"] = "65535"
+                            value = workspace.smtpPort.toString()
+                        }
+                        p("field-hint") { +"Common ports: 25 (SMTP), 465 (SMTPS), 587 (STARTTLS)." }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "smtpTlsEnabled") {
+                            id = "smtpTlsEnabled"
+                            if (workspace.smtpTlsEnabled) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "smtpTlsEnabled"; +"Enable TLS / STARTTLS" }
+                    }
+
+                    p("form-section-title") { +"Authentication" }
+                    div("field") {
+                        label { htmlFor = "smtpUsername"; +"Username" }
+                        input(type = InputType.text, name = "smtpUsername") {
+                            id = "smtpUsername"; placeholder = "user@example.com"
+                            attributes["autocomplete"] = "off"
+                            value = workspace.smtpUsername ?: ""
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "smtpPassword"; +"Password" }
+                        input(type = InputType.password, name = "smtpPassword") {
+                            id = "smtpPassword"
+                            attributes["autocomplete"] = "new-password"
+                            // Never pre-fill — password is encrypted at rest
+                        }
+                        p("field-hint") {
+                            if (workspace.smtpPassword != null)
+                                +"A password is already set. Leave blank to keep the existing password."
+                            else
+                                +"Enter the SMTP password. It is stored encrypted."
+                        }
+                    }
+
+                    p("form-section-title") { +"Sender" }
+                    div("field") {
+                        label { htmlFor = "smtpFromAddress"; +"From address" }
+                        input(type = InputType.email, name = "smtpFromAddress") {
+                            id = "smtpFromAddress"; placeholder = "noreply@example.com"
+                            value = workspace.smtpFromAddress ?: ""
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "smtpFromName"; +"From name (optional)" }
+                        input(type = InputType.text, name = "smtpFromName") {
+                            id = "smtpFromName"; placeholder = "My App"
+                            value = workspace.smtpFromName ?: ""
+                        }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save SMTP Settings" }
+                        a("/admin/workspaces/${workspace.slug}/settings", classes = "btn btn-ghost") { +"Back to Settings" }
                     }
                 }
             }

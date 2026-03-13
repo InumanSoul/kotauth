@@ -3,6 +3,7 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.TenantRepository
+import com.kauth.infrastructure.EncryptionService
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -15,6 +16,10 @@ import org.jetbrains.exposed.sql.update
  * Tenant lookups are frequent (every auth request) and read-heavy.
  * A simple in-process cache keyed by slug would be a worthwhile optimisation
  * once traffic warrants it — the port interface makes that swap transparent.
+ *
+ * Phase 3b: SMTP password is encrypted/decrypted transparently using [EncryptionService].
+ * If [EncryptionService] is unavailable (KAUTH_SECRET_KEY not set), the password field
+ * is stored as null and SMTP config will not function.
  */
 class PostgresTenantRepository : TenantRepository {
 
@@ -45,6 +50,11 @@ class PostgresTenantRepository : TenantRepository {
     }
 
     override fun update(tenant: Tenant): Tenant = transaction {
+        // Encrypt SMTP password before persistence (only if it changed / is set)
+        val encryptedPassword: String? = tenant.smtpPassword?.let { raw ->
+            if (EncryptionService.isAvailable) EncryptionService.encrypt(raw) else null
+        }
+
         TenantsTable.update({ TenantsTable.id eq tenant.id }) {
             it[displayName]                  = tenant.displayName
             it[issuerUrl]                    = tenant.issuerUrl
@@ -58,6 +68,16 @@ class PostgresTenantRepository : TenantRepository {
             it[themeAccentHover]             = tenant.theme.accentHoverColor
             it[themeLogoUrl]                 = tenant.theme.logoUrl
             it[themeFaviconUrl]              = tenant.theme.faviconUrl
+            // Phase 3b SMTP fields
+            it[smtpHost]               = tenant.smtpHost
+            it[smtpPort]               = tenant.smtpPort
+            it[smtpUsername]           = tenant.smtpUsername
+            it[smtpPassword]           = encryptedPassword
+            it[smtpFromAddress]        = tenant.smtpFromAddress
+            it[smtpFromName]           = tenant.smtpFromName
+            it[smtpTlsEnabled]         = tenant.smtpTlsEnabled
+            it[smtpEnabled]            = tenant.smtpEnabled
+            it[maxConcurrentSessions]  = tenant.maxConcurrentSessions
         }
         TenantsTable.selectAll()
             .where { TenantsTable.id eq tenant.id }
@@ -78,29 +98,44 @@ class PostgresTenantRepository : TenantRepository {
             .toTenant()
     }
 
-    private fun ResultRow.toTenant(): Tenant = Tenant(
-        id                           = this[TenantsTable.id],
-        slug                         = this[TenantsTable.slug],
-        displayName                  = this[TenantsTable.displayName],
-        issuerUrl                    = this[TenantsTable.issuerUrl],
-        tokenExpirySeconds           = this[TenantsTable.tokenExpirySeconds].toLong(),
-        refreshTokenExpirySeconds    = this[TenantsTable.refreshTokenExpirySeconds].toLong(),
-        registrationEnabled          = this[TenantsTable.registrationEnabled],
-        emailVerificationRequired    = this[TenantsTable.emailVerificationRequired],
-        passwordPolicyMinLength      = this[TenantsTable.passwordPolicyMinLength],
-        passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial],
-        theme = TenantTheme(
-            accentColor      = this[TenantsTable.themeAccentColor],
-            accentHoverColor = this[TenantsTable.themeAccentHover],
-            bgDeep           = this[TenantsTable.themeBgDeep],
-            bgCard           = this[TenantsTable.themeBgCard],
-            bgInput          = this[TenantsTable.themeBgInput],
-            borderColor      = this[TenantsTable.themeBorderColor],
-            borderRadius     = this[TenantsTable.themeBorderRadius],
-            textPrimary      = this[TenantsTable.themeTextPrimary],
-            textMuted        = this[TenantsTable.themeTextMuted],
-            logoUrl          = this[TenantsTable.themeLogoUrl],
-            faviconUrl       = this[TenantsTable.themeFaviconUrl]
+    private fun ResultRow.toTenant(): Tenant {
+        // Decrypt SMTP password on read
+        val encryptedPw = this[TenantsTable.smtpPassword]
+        val decryptedPw = encryptedPw?.let { EncryptionService.decrypt(it) }
+
+        return Tenant(
+            id                           = this[TenantsTable.id],
+            slug                         = this[TenantsTable.slug],
+            displayName                  = this[TenantsTable.displayName],
+            issuerUrl                    = this[TenantsTable.issuerUrl],
+            tokenExpirySeconds           = this[TenantsTable.tokenExpirySeconds].toLong(),
+            refreshTokenExpirySeconds    = this[TenantsTable.refreshTokenExpirySeconds].toLong(),
+            registrationEnabled          = this[TenantsTable.registrationEnabled],
+            emailVerificationRequired    = this[TenantsTable.emailVerificationRequired],
+            passwordPolicyMinLength      = this[TenantsTable.passwordPolicyMinLength],
+            passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial],
+            theme = TenantTheme(
+                accentColor      = this[TenantsTable.themeAccentColor],
+                accentHoverColor = this[TenantsTable.themeAccentHover],
+                bgDeep           = this[TenantsTable.themeBgDeep],
+                bgCard           = this[TenantsTable.themeBgCard],
+                bgInput          = this[TenantsTable.themeBgInput],
+                borderColor      = this[TenantsTable.themeBorderColor],
+                borderRadius     = this[TenantsTable.themeBorderRadius],
+                textPrimary      = this[TenantsTable.themeTextPrimary],
+                textMuted        = this[TenantsTable.themeTextMuted],
+                logoUrl          = this[TenantsTable.themeLogoUrl],
+                faviconUrl       = this[TenantsTable.themeFaviconUrl]
+            ),
+            smtpHost               = this[TenantsTable.smtpHost],
+            smtpPort               = this[TenantsTable.smtpPort],
+            smtpUsername           = this[TenantsTable.smtpUsername],
+            smtpPassword           = decryptedPw,
+            smtpFromAddress        = this[TenantsTable.smtpFromAddress],
+            smtpFromName           = this[TenantsTable.smtpFromName],
+            smtpTlsEnabled         = this[TenantsTable.smtpTlsEnabled],
+            smtpEnabled            = this[TenantsTable.smtpEnabled],
+            maxConcurrentSessions  = this[TenantsTable.maxConcurrentSessions]
         )
-    )
+    }
 }

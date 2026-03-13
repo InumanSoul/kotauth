@@ -4,6 +4,9 @@ import com.kauth.domain.model.User
 import com.kauth.domain.port.UserRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
+import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 
 /**
  * Persistence adapter — implements the UserRepository port using PostgreSQL + Exposed.
@@ -50,12 +53,24 @@ class PostgresUserRepository : UserRepository {
 
     override fun update(user: User): User = transaction {
         UsersTable.update({ UsersTable.id eq user.id!! }) {
-            it[email]        = user.email.lowercase()
-            it[fullName]     = user.fullName
-            it[emailVerified] = user.emailVerified
-            it[enabled]      = user.enabled
+            it[email]             = user.email.lowercase()
+            it[fullName]          = user.fullName
+            it[emailVerified]     = user.emailVerified
+            it[enabled]           = user.enabled
         }
         user
+    }
+
+    override fun updatePassword(userId: Int, passwordHash: String, changedAt: Instant): User = transaction {
+        val ts = changedAt.toOffsetDateTime()
+        UsersTable.update({ UsersTable.id eq userId }) {
+            it[UsersTable.passwordHash]         = passwordHash
+            it[UsersTable.lastPasswordChangeAt] = ts
+        }
+        UsersTable.selectAll()
+            .where { UsersTable.id eq userId }
+            .single()
+            .toUser()
     }
 
     override fun save(user: User): User = transaction {
@@ -85,13 +100,17 @@ class PostgresUserRepository : UserRepository {
     }
 
     private fun ResultRow.toUser(): User = User(
-        id            = this[UsersTable.id],
-        tenantId      = this[UsersTable.tenantId],
-        username      = this[UsersTable.username],
-        email         = this[UsersTable.email],
-        passwordHash  = this[UsersTable.passwordHash],
-        fullName      = this[UsersTable.fullName],
-        emailVerified = this[UsersTable.emailVerified],
-        enabled       = this[UsersTable.enabled]
+        id                   = this[UsersTable.id],
+        tenantId             = this[UsersTable.tenantId],
+        username             = this[UsersTable.username],
+        email                = this[UsersTable.email],
+        passwordHash         = this[UsersTable.passwordHash],
+        fullName             = this[UsersTable.fullName],
+        emailVerified        = this[UsersTable.emailVerified],
+        enabled              = this[UsersTable.enabled],
+        lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant()
     )
+
+    private fun Instant.toOffsetDateTime(): OffsetDateTime =
+        OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

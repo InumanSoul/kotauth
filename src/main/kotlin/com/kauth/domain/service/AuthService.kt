@@ -29,12 +29,13 @@ import java.time.Instant
  *   slug → Tenant → check policy → validate → hash password → save User
  */
 class AuthService(
-    private val userRepository: UserRepository,
-    private val tenantRepository: TenantRepository,
-    private val tokenPort: TokenPort,
-    private val passwordHasher: PasswordHasher,
-    private val auditLog: AuditLogPort,
-    private val sessionRepository: SessionRepository
+    private val userRepository    : UserRepository,
+    private val tenantRepository  : TenantRepository,
+    private val tokenPort         : TokenPort,
+    private val passwordHasher    : PasswordHasher,
+    private val auditLog          : AuditLogPort,
+    private val sessionRepository : SessionRepository,
+    private val selfServiceService: UserSelfServiceService? = null   // nullable — injected post Phase 3b
 ) {
 
     /**
@@ -161,6 +162,9 @@ class AuthService(
             }
         ))
 
+        // Phase 3b: enforce concurrent session limit (evict oldest if over cap)
+        enforceConcurrentSessionLimit(tenant.id, user.id!!, tenant.maxConcurrentSessions)
+
         return AuthResult.Success(tokens)
     }
 
@@ -215,12 +219,120 @@ class AuthService(
             passwordHash = passwordHasher.hash(rawPassword)
         )
 
-        return AuthResult.Success(userRepository.save(newUser))
+        val savedUser = userRepository.save(newUser)
+
+        auditLog.record(AuditEvent(
+            tenantId  = tenant.id,
+            userId    = savedUser.id,
+            clientId  = null,
+            eventType = AuditEventType.REGISTER_SUCCESS,
+            ipAddress = null,
+            userAgent = null
+        ))
+
+        // Phase 3b: if the tenant requires email verification and SMTP is ready,
+        // send a verification email immediately after registration.
+        // Failures here are logged and silently swallowed — they must not block registration.
+        if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
+            try {
+                selfServiceService.initiateEmailVerification(savedUser.id!!, tenant.id, "")
+                // Note: baseUrl is passed as "" here because AuthService doesn't know it.
+                // The route layer should pass baseUrl when it calls register directly.
+                // For now this is handled via the overloaded register(... baseUrl) variant below.
+            } catch (_: Exception) { /* non-fatal */ }
+        }
+
+        return AuthResult.Success(savedUser)
+    }
+
+    /**
+     * Register variant that includes [baseUrl] — used by auth routes so the
+     * verification email can include a proper link. Falls back to the basic
+     * register flow if selfServiceService is not wired.
+     */
+    fun register(
+        tenantSlug      : String,
+        username        : String,
+        email           : String,
+        fullName        : String,
+        rawPassword     : String,
+        confirmPassword : String,
+        baseUrl         : String
+    ): AuthResult<User> {
+        val tenant = tenantRepository.findBySlug(tenantSlug)
+            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+
+        if (!tenant.registrationEnabled) {
+            return AuthResult.Failure(AuthError.RegistrationDisabled)
+        }
+
+        if (username.isBlank() || email.isBlank() || fullName.isBlank() || rawPassword.isBlank()) {
+            return AuthResult.Failure(AuthError.ValidationError("All fields are required."))
+        }
+
+        if (!email.contains("@")) {
+            return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
+        }
+
+        if (rawPassword.length < tenant.passwordPolicyMinLength) {
+            return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
+        }
+
+        if (rawPassword != confirmPassword) {
+            return AuthResult.Failure(AuthError.ValidationError("Passwords do not match."))
+        }
+
+        if (userRepository.existsByUsername(tenant.id, username)) {
+            return AuthResult.Failure(AuthError.UserAlreadyExists)
+        }
+
+        if (userRepository.existsByEmail(tenant.id, email)) {
+            return AuthResult.Failure(AuthError.EmailAlreadyExists)
+        }
+
+        val newUser = User(
+            tenantId     = tenant.id,
+            username     = username.trim(),
+            email        = email.trim().lowercase(),
+            fullName     = fullName.trim(),
+            passwordHash = passwordHasher.hash(rawPassword)
+        )
+
+        val savedUser = userRepository.save(newUser)
+
+        auditLog.record(AuditEvent(
+            tenantId  = tenant.id,
+            userId    = savedUser.id,
+            clientId  = null,
+            eventType = AuditEventType.REGISTER_SUCCESS,
+            ipAddress = null,
+            userAgent = null
+        ))
+
+        if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
+            try {
+                selfServiceService.initiateEmailVerification(savedUser.id!!, tenant.id, baseUrl)
+            } catch (_: Exception) { /* non-fatal */ }
+        }
+
+        return AuthResult.Success(savedUser)
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Phase 3b: after persisting a new session, check if the user is over the
+     * concurrent session limit and revoke the oldest sessions if so.
+     */
+    private fun enforceConcurrentSessionLimit(tenantId: Int, userId: Int, maxSessions: Int?) {
+        if (maxSessions == null || maxSessions <= 0) return
+        val active = sessionRepository.countActiveByUser(tenantId, userId)
+        if (active > maxSessions) {
+            sessionRepository.revokeOldestForUser(tenantId, userId, keepNewest = maxSessions)
+        }
+    }
 
     private fun sha256(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

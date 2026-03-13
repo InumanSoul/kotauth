@@ -9,6 +9,8 @@ import com.kauth.domain.service.IntrospectionResult
 import com.kauth.domain.service.OAuthError
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.model.User
 import com.kauth.infrastructure.RateLimiter
 import io.ktor.http.*
@@ -47,7 +49,8 @@ fun Route.authRoutes(
     oauthService: OAuthService,
     tenantRepository: TenantRepository,
     loginRateLimiter: RateLimiter,
-    registerRateLimiter: RateLimiter
+    registerRateLimiter: RateLimiter,
+    selfServiceService: UserSelfServiceService
 ) {
 
     route("/t/{slug}") {
@@ -179,6 +182,104 @@ fun Route.authRoutes(
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
                         AuthView.registerPage(slug, theme, error = result.error.toMessage(), prefill = prefill)
+                    )
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Forgot password — request a reset link
+        // ------------------------------------------------------------------
+
+        get("/forgot-password") {
+            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val sent  = call.request.queryParameters["sent"] == "true"
+            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, sent = sent))
+        }
+
+        post("/forgot-password") {
+            val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val params    = call.receiveParameters()
+            val email     = params["email"]?.trim() ?: ""
+            val ipAddress = call.request.local.remoteAddress
+            val baseUrl   = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+
+            // Rate-limit to prevent email flooding
+            val rateLimitKey = "forgot:$ipAddress"
+            if (!registerRateLimiter.isAllowed(rateLimitKey)) {
+                // Even on rate-limit, redirect to sent page — don't leak timing
+                return@post call.respondRedirect("/t/$slug/forgot-password?sent=true")
+            }
+
+            // Always fires and always redirects to the "sent" page — never reveals
+            // whether the email exists. Any SMTP errors are swallowed by the service.
+            selfServiceService.initiateForgotPassword(email, slug, baseUrl, ipAddress)
+            call.respondRedirect("/t/$slug/forgot-password?sent=true")
+        }
+
+        // ------------------------------------------------------------------
+        // Reset password — consume the token from the email link
+        // ------------------------------------------------------------------
+
+        get("/reset-password") {
+            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val token = call.request.queryParameters["token"] ?: ""
+
+            if (token.isBlank()) {
+                return@get call.respondRedirect("/t/$slug/forgot-password")
+            }
+            call.respondHtml(HttpStatusCode.OK, AuthView.resetPasswordPage(slug, theme, token = token))
+        }
+
+        post("/reset-password") {
+            val slug            = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val theme           = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val params          = call.receiveParameters()
+            val token           = params["token"] ?: ""
+            val newPassword     = params["new_password"] ?: ""
+            val confirmPassword = params["confirm_password"] ?: ""
+
+            when (val result = selfServiceService.confirmPasswordReset(token, newPassword, confirmPassword)) {
+                is SelfServiceResult.Success ->
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AuthView.resetPasswordPage(slug, theme, token = token, success = true)
+                    )
+                is SelfServiceResult.Failure ->
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AuthView.resetPasswordPage(slug, theme, token = token, error = result.error.message)
+                    )
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Email verification — clicked from the verification email link
+        // ------------------------------------------------------------------
+
+        get("/verify-email") {
+            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val token = call.request.queryParameters["token"] ?: ""
+
+            if (token.isBlank()) {
+                return@get call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AuthView.verifyEmailPage(slug, theme, success = false, message = "Verification link is missing or invalid.")
+                )
+            }
+
+            when (val result = selfServiceService.confirmEmailVerification(token)) {
+                is SelfServiceResult.Success ->
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AuthView.verifyEmailPage(slug, theme, success = true, message = "Your email address has been verified successfully.")
+                    )
+                is SelfServiceResult.Failure ->
+                    call.respondHtml(
+                        HttpStatusCode.BadRequest,
+                        AuthView.verifyEmailPage(slug, theme, success = false, message = result.error.message)
                     )
             }
         }

@@ -3,7 +3,7 @@ package com.kauth.adapter.persistence
 import org.jetbrains.exposed.sql.Table
 
 /**
- * Exposed ORM mapping for the 'tenants' table (V1 + V3 migrations).
+ * Exposed ORM mapping for the 'tenants' table (V1 + V3 + V9 migrations).
  * Schema is Flyway-owned — no uniqueIndex() or constraint declarations here.
  */
 object TenantsTable : Table("tenants") {
@@ -31,6 +31,18 @@ object TenantsTable : Table("tenants") {
     val themeTextMuted    = varchar("theme_text_muted",    30).default("#a1a1aa")
     val themeLogoUrl      = varchar("theme_logo_url",     500).nullable()
     val themeFaviconUrl   = varchar("theme_favicon_url",  500).nullable()
+
+    // SMTP columns — added by V9 migration (Phase 3b)
+    // smtp_password stores AES-256-GCM encrypted ciphertext (see EncryptionService)
+    val smtpHost               = varchar("smtp_host", 255).nullable()
+    val smtpPort               = integer("smtp_port").default(587)
+    val smtpUsername           = varchar("smtp_username", 255).nullable()
+    val smtpPassword           = text("smtp_password").nullable()
+    val smtpFromAddress        = varchar("smtp_from_address", 255).nullable()
+    val smtpFromName           = varchar("smtp_from_name", 255).nullable()
+    val smtpTlsEnabled         = bool("smtp_tls_enabled").default(true)
+    val smtpEnabled            = bool("smtp_enabled").default(false)
+    val maxConcurrentSessions  = integer("max_concurrent_sessions").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }
