@@ -1,7 +1,7 @@
 # KotAuth — Product Roadmap & Architecture Plan
 
-> Last updated: 2026-03
-> Status: Strategic planning document — pre-implementation
+> Last updated: 2026-03-13
+> Status: Phase 3 complete — moving to Phase 4 (Identity Federation)
 
 ---
 
@@ -186,56 +186,58 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 
 ---
 
-### Phase 3 — User Management Platform
+### Phase 3 — User Management Platform ✅ Complete
 *Goal: The admin console and user self-service that makes KotAuth a complete platform*
 
-**Admin console (complete):**
-- User search, filter, pagination
-- User detail: profile, roles, groups, sessions, audit log
-- Create/edit/disable/delete users
-- Force password reset
-- Impersonate user (audit-logged)
-- Bulk operations (disable group, export)
+**Admin console (Phase 3a ✅):**
+- ✅ User search, filter, pagination
+- ✅ User detail: profile, sessions, audit log
+- ✅ Create/edit/disable users
+- ✅ Force password reset (admin-initiated)
+- ❌ Impersonate user — deferred (future, requires strict audit logging)
+- ❌ Bulk operations — deferred (future)
 
-**User self-service portal:**
-- View/edit own profile
-- Change password (requires current password)
-- Active sessions — see and revoke
-- MFA enrollment and management
-- Account deletion request
+**User self-service portal (Phase 3b ✅):**
+- ✅ View/edit own profile
+- ✅ Change password (requires current password)
+- ✅ Active sessions — see and revoke
+- ✅ MFA enrollment and management (Phase 3c)
+- ❌ Account deletion request — deferred (future)
 
-**Roles & Permissions:**
-- Tenant roles (global to the tenant)
-- Client roles (scoped to a specific client)
-- Composite roles (a role that includes other roles — e.g., "admin" includes "editor" and "viewer")
-- Role assignment in admin console
+**Roles & Permissions (Phase 3c ✅):**
+- ✅ Tenant roles (global to the tenant)
+- ✅ Client roles (scoped to a specific client)
+- ✅ Composite roles with BFS cycle detection
+- ✅ Role assignment via admin API routes
+- ✅ JWT claims: `realm_access.roles` + `resource_access.{clientId}.roles` (Keycloak-compatible)
+- ✅ Effective role resolution: direct + group-inherited + composite expansion
 
-**Groups:**
-- User groups with role inheritance
-- Group hierarchy (nested groups)
-- Group-level attributes
+**Groups (Phase 3c ✅):**
+- ✅ User groups with role inheritance
+- ✅ Group hierarchy (nested groups via `parent_group_id`)
+- ✅ Group-level attributes (JSONB)
 
-**Password policies (configurable per tenant):**
-- Minimum length
-- Require uppercase / special characters / numbers
-- Password history (can't reuse last N passwords)
-- Expiry (force reset after N days)
-- Blacklist (common passwords)
+**Password policies (Phase 3c ✅, configurable per tenant):**
+- ✅ Minimum length
+- ✅ Require uppercase / special characters / numbers
+- ✅ Password history (can't reuse last N passwords, BCrypt-verified)
+- ⚠️ Expiry (column exists, enforcement deferred)
+- ✅ Blacklist (50 common passwords seeded, tenant-specific additions supported)
 
-**MFA:**
-- TOTP (Google Authenticator, Authy) — implement first, widest adoption
-- Recovery codes — mandatory alongside TOTP
-- WebAuthn / Passkeys — implement second, this is the modern standard
-- SMS OTP — optional and controversial (SIM swap risk); make it configurable per tenant
-- MFA policy per tenant: optional, required for all, required for admins only
+**MFA (Phase 3c ✅):**
+- ✅ TOTP (Google Authenticator, Authy) — RFC 6238, zero-dependency implementation
+- ✅ Recovery codes (8 codes, BCrypt-hashed, consumed on use)
+- ❌ WebAuthn / Passkeys — deferred to Phase 4 or 5 (`MfaMethod` enum is extensible)
+- ❌ SMS OTP — deferred (future, controversial due to SIM swap risk)
+- ✅ MFA policy per tenant: optional, required for all, required for admins (partial — admin check deferred)
 
-**Email flows:**
-- Email verification on registration
-- Password reset
-- MFA backup code delivery
-- Login notification (new device/location)
-- Account lockout notification
-- Configurable SMTP per tenant
+**Email flows (Phase 3b ✅):**
+- ✅ Email verification on registration
+- ✅ Password reset
+- ❌ MFA backup code delivery — deferred (codes shown at enrollment time only)
+- ❌ Login notification (new device/location) — deferred (future)
+- ❌ Account lockout notification — deferred (future)
+- ✅ Configurable SMTP per tenant (AES-256-GCM encrypted passwords)
 
 ---
 

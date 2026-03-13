@@ -1,9 +1,11 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
+import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -11,6 +13,7 @@ import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.RoleGroupService
 import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -47,12 +50,14 @@ import java.time.Instant
 fun Route.adminRoutes(
     authService           : AuthService,
     adminService          : AdminService,
+    roleGroupService      : RoleGroupService,
     tenantRepository      : TenantRepository,
     applicationRepository : ApplicationRepository,
     userRepository        : UserRepository,
     sessionRepository     : SessionRepository,
     auditLogRepository    : AuditLogRepository,
-    keyProvisioningService: KeyProvisioningService
+    keyProvisioningService: KeyProvisioningService,
+    mfaRepository         : MfaRepository? = null
 ) {
     route("/admin") {
 
@@ -247,8 +252,14 @@ fun Route.adminRoutes(
                         refreshTokenExpirySeconds = params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
                         registrationEnabled       = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
-                        passwordPolicyMinLength   = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
-                        passwordPolicyRequireSpecial = params["passwordPolicyRequireSpecial"] == "true",
+                        passwordPolicyMinLength        = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
+                        passwordPolicyRequireSpecial   = params["passwordPolicyRequireSpecial"] == "true",
+                        passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
+                        passwordPolicyRequireNumber    = params["passwordPolicyRequireNumber"] == "true",
+                        passwordPolicyHistoryCount     = params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: 0,
+                        passwordPolicyMaxAgeDays       = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
+                        passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
+                        mfaPolicy                      = params["mfaPolicy"]?.trim() ?: "optional",
                         themeAccentColor          = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
                         themeLogoUrl              = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
                         themeFaviconUrl           = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() }
@@ -448,9 +459,16 @@ fun Route.adminRoutes(
                             if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
                             val sessions  = sessionRepository.findActiveByUser(workspace.id, userId)
                             val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
-                            val saved     = call.request.queryParameters["saved"] == "true"
+                            val savedParam = call.request.queryParameters["saved"]
+                            val errorParam = call.request.queryParameters["error"]
+                            val successMsg = when (savedParam) {
+                                "true"             -> "Profile saved."
+                                "reset_email_sent" -> "Password reset email sent successfully."
+                                else               -> null
+                            }
                             call.respondHtml(HttpStatusCode.OK,
-                                AdminView.userDetailPage(workspace, user, sessions, wsPairs, session.username, saved = saved))
+                                AdminView.userDetailPage(workspace, user, sessions, wsPairs, session.username,
+                                    successMessage = successMsg, editError = errorParam))
                         }
 
                         post("/toggle") {
@@ -504,26 +522,17 @@ fun Route.adminRoutes(
                             call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
                         }
 
-                        // Phase 3b: admin-force password reset
-                        post("/admin-reset-password") {
-                            val session   = call.sessions.get<AdminSession>()!!
+                        // Phase 3c: send password-reset email instead of force-setting password
+                        post("/send-reset-email") {
                             val slug      = call.parameters["slug"]   ?: return@post call.respond(HttpStatusCode.BadRequest)
                             val userId    = call.parameters["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
                             val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-                            val user      = userRepository.findById(userId) ?: return@post call.respond(HttpStatusCode.NotFound)
-                            if (user.tenantId != workspace.id) return@post call.respond(HttpStatusCode.NotFound)
-                            val params      = call.receiveParameters()
-                            val newPassword = params["new_password"] ?: ""
-                            when (val result = adminService.adminResetUserPassword(userId, workspace.id, newPassword)) {
+                            val baseUrl   = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                            when (val result = adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                                 is AdminResult.Success ->
-                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
-                                is AdminResult.Failure -> {
-                                    val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
-                                    val wsPairs  = tenantRepository.findAll().map { it.slug to it.displayName }
-                                    call.respondHtml(HttpStatusCode.UnprocessableEntity,
-                                        AdminView.userDetailPage(workspace, user, sessions, wsPairs,
-                                            session.username, editError = result.error.message))
-                                }
+                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=reset_email_sent")
+                                is AdminResult.Failure ->
+                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?error=${java.net.URLEncoder.encode(result.error.message, "UTF-8")}")
                             }
                         }
                     }
@@ -571,6 +580,258 @@ fun Route.adminRoutes(
                             page = page, totalPages = ((total + pageSize - 1) / pageSize).toInt(),
                             eventTypeFilter = eventTypeStr))
                 }
+
+                // -------------------------------------------------------
+                // Roles (Phase 3c) — HTML pages
+                // -------------------------------------------------------
+
+                route("/roles") {
+
+                    get {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                        val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val roles     = roleGroupService.listRoles(workspace.id)
+                        val apps      = applicationRepository.findByTenantId(workspace.id)
+                        call.respondHtml(HttpStatusCode.OK,
+                            AdminView.rolesListPage(workspace, roles, apps, wsPairs, session.username))
+                    }
+
+                    post {
+                        val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                        val params    = call.receiveParameters()
+                        val name      = params["name"]?.trim() ?: ""
+                        val desc      = params["description"]?.trim()?.takeIf { it.isNotBlank() }
+                        val scopeStr  = params["scope"]?.trim() ?: "tenant"
+                        val clientId  = params["clientId"]?.toIntOrNull()
+
+                        when (val result = roleGroupService.createRole(
+                            tenantId    = workspace.id,
+                            name        = name,
+                            description = desc,
+                            scope       = RoleScope.fromValue(scopeStr),
+                            clientId    = clientId
+                        )) {
+                            is AdminResult.Success ->
+                                call.respondRedirect("/admin/workspaces/$slug/roles")
+                            is AdminResult.Failure -> {
+                                val session = call.sessions.get<AdminSession>()!!
+                                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                                val roles   = roleGroupService.listRoles(workspace.id)
+                                val apps    = applicationRepository.findByTenantId(workspace.id)
+                                call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                    AdminView.rolesListPage(workspace, roles, apps, wsPairs, session.username,
+                                        error = result.error.message))
+                            }
+                        }
+                    }
+
+                    route("/{roleId}") {
+
+                        get {
+                            val session   = call.sessions.get<AdminSession>()!!
+                            val slug      = call.parameters["slug"]   ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val roleId    = call.parameters["roleId"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                            val roles     = roleGroupService.listRoles(workspace.id)
+                            val role      = roles.find { it.id == roleId } ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val users     = userRepository.findByTenantId(workspace.id, null)
+                            call.respondHtml(HttpStatusCode.OK,
+                                AdminView.roleDetailPage(workspace, role, roles, users, wsPairs, session.username))
+                        }
+
+                        post("/edit") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val params   = call.receiveParameters()
+                            roleGroupService.updateRole(roleId, workspace.id,
+                                params["name"]?.trim() ?: "",
+                                params["description"]?.trim()?.takeIf { it.isNotBlank() })
+                            call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                        }
+
+                        post("/delete") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            roleGroupService.deleteRole(roleId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/roles")
+                        }
+
+                        post("/children") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val childId  = call.receiveParameters()["childRoleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.addChildRole(roleId, childId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                        }
+
+                        post("/remove-child") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val childId  = call.receiveParameters()["childRoleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.removeChildRole(roleId, childId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                        }
+
+                        post("/assign-user") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val userId   = call.receiveParameters()["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.assignRoleToUser(userId, roleId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                        }
+
+                        post("/unassign-user") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val roleId   = call.parameters["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val userId   = call.receiveParameters()["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.unassignRoleFromUser(userId, roleId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------
+                // Groups (Phase 3c) — HTML pages
+                // -------------------------------------------------------
+
+                route("/groups") {
+
+                    get {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                        val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val groups    = roleGroupService.listGroups(workspace.id)
+                        val roles     = roleGroupService.listRoles(workspace.id)
+                        call.respondHtml(HttpStatusCode.OK,
+                            AdminView.groupsListPage(workspace, groups, roles, wsPairs, session.username))
+                    }
+
+                    post {
+                        val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                        val params    = call.receiveParameters()
+                        val name      = params["name"]?.trim() ?: ""
+                        val desc      = params["description"]?.trim()?.takeIf { it.isNotBlank() }
+                        val parentId  = params["parentGroupId"]?.toIntOrNull()
+
+                        when (val result = roleGroupService.createGroup(workspace.id, name, desc, parentId)) {
+                            is AdminResult.Success ->
+                                call.respondRedirect("/admin/workspaces/$slug/groups")
+                            is AdminResult.Failure -> {
+                                val session = call.sessions.get<AdminSession>()!!
+                                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                                val groups  = roleGroupService.listGroups(workspace.id)
+                                val roles   = roleGroupService.listRoles(workspace.id)
+                                call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                    AdminView.groupsListPage(workspace, groups, roles, wsPairs, session.username,
+                                        error = result.error.message))
+                            }
+                        }
+                    }
+
+                    route("/{groupId}") {
+
+                        get {
+                            val session   = call.sessions.get<AdminSession>()!!
+                            val slug      = call.parameters["slug"]    ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val groupId   = call.parameters["groupId"]?.toIntOrNull() ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                            val groups    = roleGroupService.listGroups(workspace.id)
+                            val group     = groups.find { it.id == groupId } ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val roles     = roleGroupService.listRoles(workspace.id)
+                            val memberIds = roleGroupService.getUserIdsInGroup(groupId)
+                            val members   = memberIds.mapNotNull { userRepository.findById(it) }
+                            val users     = userRepository.findByTenantId(workspace.id, null)
+                            call.respondHtml(HttpStatusCode.OK,
+                                AdminView.groupDetailPage(workspace, group, groups, roles, members, users, wsPairs, session.username))
+                        }
+
+                        post("/edit") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val params   = call.receiveParameters()
+                            roleGroupService.updateGroup(groupId, workspace.id,
+                                name = params["name"]?.trim() ?: "",
+                                description = params["description"]?.trim()?.takeIf { it.isNotBlank() })
+                            call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                        }
+
+                        post("/delete") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            roleGroupService.deleteGroup(groupId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/groups")
+                        }
+
+                        post("/assign-role") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val roleId   = call.receiveParameters()["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.assignRoleToGroup(groupId, roleId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                        }
+
+                        post("/unassign-role") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val roleId   = call.receiveParameters()["roleId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.unassignRoleFromGroup(groupId, roleId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                        }
+
+                        post("/add-member") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val userId   = call.receiveParameters()["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.addUserToGroup(userId, groupId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                        }
+
+                        post("/remove-member") {
+                            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val groupId  = call.parameters["groupId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                            val userId   = call.receiveParameters()["userId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                            roleGroupService.removeUserFromGroup(userId, groupId, workspace.id)
+                            call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------
+                // MFA settings (Phase 3c) — HTML page
+                // -------------------------------------------------------
+
+                get("/mfa") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val users     = userRepository.findByTenantId(workspace.id, null)
+                    val mfaEnrolledCount = if (mfaRepository != null) {
+                        users.count { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
+                    } else 0
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.mfaSettingsPage(workspace, wsPairs, session.username,
+                            totalUsers = users.size, enrolledUsers = mfaEnrolledCount))
+                }
             }
         }
 
@@ -591,8 +852,8 @@ fun Route.adminRoutes(
         }
 
         get("/logs")     { call.respondRedirect("/admin") }
-        get("/security") { call.respond(HttpStatusCode.NotImplemented, "Security settings coming in Phase 3b.") }
-        get("/settings") { call.respond(HttpStatusCode.NotImplemented, "System settings coming in Phase 3b.") }
+        get("/security") { call.respondRedirect("/admin") }
+        get("/settings") { call.respondRedirect("/admin") }
         get("/clients")  { call.respondRedirect("/admin") }
         get("/users")    { call.respondRedirect("/admin/directory") }
     }

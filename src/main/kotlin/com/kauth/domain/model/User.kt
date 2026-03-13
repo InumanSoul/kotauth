@@ -22,5 +22,7 @@ data class User(
     val passwordHash: String,
     val emailVerified: Boolean         = false,
     val enabled: Boolean               = true,
-    val lastPasswordChangeAt: Instant? = null
+    val lastPasswordChangeAt: Instant? = null,
+    // Phase 3c: MFA — true once the user has a verified TOTP enrollment
+    val mfaEnabled: Boolean            = false
 )

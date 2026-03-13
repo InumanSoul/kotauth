@@ -4,6 +4,8 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.Group
+import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
@@ -267,7 +269,7 @@ object AdminView {
         val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
         ctxLink("$base/mfa",      "mfa",      activeSection, "MFA")
         ctxLink("$base/sessions", "sessions", activeSection, "Sessions")
-        ctxLink("$base/audit",    "audit",    activeSection, "Audit log")
+        ctxLink("$base/logs",     "audit",    activeSection, "Audit log")
     }
 
     private fun DIV.renderLogsCtxPanel(activeSection: String) {
@@ -279,7 +281,7 @@ object AdminView {
     private fun DIV.renderSettingsCtxPanel(workspaceSlug: String?, activeSection: String) {
         span("ctx-section-title") { +"Settings" }
         val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
-        ctxLink("$base/general",  "general",  activeSection, "General")
+        ctxLink("$base",  "general",  activeSection, "General")
         ctxLink("$base/smtp",     "smtp",     activeSection, "SMTP")
         ctxLink("$base/security", "security", activeSection, "Security policy")
     }
@@ -1001,7 +1003,7 @@ object AdminView {
     ): HTML.() -> Unit = {
         adminShell(
             pageTitle     = "Settings — ${workspace.displayName}",
-            activeRail    = "apps",
+            activeRail    = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
@@ -1105,10 +1107,61 @@ object AdminView {
                             if (workspace.passwordPolicyRequireSpecial) checked = true
                             attributes["value"] = "true"
                         }
-                        label("checkbox-label") {
-                            htmlFor = "passwordPolicyRequireSpecial"
-                            +"Require at least one special character"
+                        label("checkbox-label") { htmlFor = "passwordPolicyRequireSpecial"; +"Require special character (!@#\$%...)" }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "passwordPolicyRequireUppercase") {
+                            id = "passwordPolicyRequireUppercase"
+                            if (workspace.passwordPolicyRequireUppercase) checked = true
+                            attributes["value"] = "true"
                         }
+                        label("checkbox-label") { htmlFor = "passwordPolicyRequireUppercase"; +"Require uppercase letter" }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "passwordPolicyRequireNumber") {
+                            id = "passwordPolicyRequireNumber"
+                            if (workspace.passwordPolicyRequireNumber) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "passwordPolicyRequireNumber"; +"Require at least one number" }
+                    }
+                    div("checkbox-row") {
+                        input(type = InputType.checkBox, name = "passwordPolicyBlacklistEnabled") {
+                            id = "passwordPolicyBlacklistEnabled"
+                            if (workspace.passwordPolicyBlacklistEnabled) checked = true
+                            attributes["value"] = "true"
+                        }
+                        label("checkbox-label") { htmlFor = "passwordPolicyBlacklistEnabled"; +"Block common/breached passwords" }
+                    }
+                    div("field") {
+                        label { htmlFor = "passwordPolicyHistoryCount"; +"Password History" }
+                        input(type = InputType.number, name = "passwordPolicyHistoryCount") {
+                            id = "passwordPolicyHistoryCount"
+                            attributes["min"] = "0"; attributes["max"] = "24"
+                            value = workspace.passwordPolicyHistoryCount.toString()
+                        }
+                        p("field-hint") { +"Number of previous passwords to remember (0 = disabled, max 24)." }
+                    }
+                    div("field") {
+                        label { htmlFor = "passwordPolicyMaxAgeDays"; +"Password Expiry (days)" }
+                        input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
+                            id = "passwordPolicyMaxAgeDays"
+                            attributes["min"] = "0"; attributes["max"] = "365"
+                            value = workspace.passwordPolicyMaxAgeDays.toString()
+                        }
+                        p("field-hint") { +"Force password change after N days (0 = never expires)." }
+                    }
+
+                    p("form-section-title") { +"Multi-Factor Authentication" }
+                    div("field") {
+                        label { htmlFor = "mfaPolicy"; +"MFA Policy" }
+                        select {
+                            name = "mfaPolicy"; id = "mfaPolicy"
+                            option { value = "optional"; if (workspace.mfaPolicy == "optional") selected = true; +"Optional" }
+                            option { value = "required"; if (workspace.mfaPolicy == "required") selected = true; +"Required for all users" }
+                            option { value = "required_admins"; if (workspace.mfaPolicy == "required_admins") selected = true; +"Required for admins only" }
+                        }
+                        p("field-hint") { +"Controls whether users must enroll in TOTP-based MFA." }
                     }
 
                     p("form-section-title") { +"Branding" }
@@ -1462,7 +1515,7 @@ object AdminView {
         sessions: List<Session>,
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
-        saved: Boolean = false,
+        successMessage: String? = null,
         editError: String? = null
     ): HTML.() -> Unit = {
         adminShell(
@@ -1531,8 +1584,8 @@ object AdminView {
                 }
             }
 
-            if (saved) {
-                div("alert alert-success") { style = "max-width:640px;"; +"Profile saved." }
+            if (successMessage != null) {
+                div("alert alert-success") { style = "max-width:640px;"; +successMessage }
             }
             if (editError != null) {
                 div("alert alert-error") { style = "max-width:640px;"; +editError }
@@ -1615,30 +1668,35 @@ object AdminView {
                 }
             }
 
-            // Phase 3b: Admin password reset — force-set a new password, revokes all sessions
+            // Phase 3c: Password reset via email — sends a self-service reset link
             div("page-header") {
                 style = "margin-top:2rem;"
                 div {
-                    p("page-title") { style = "font-size:1rem;"; +"Admin Password Reset" }
-                    p("page-subtitle") { +"Force-set a new password. All active sessions will be revoked." }
+                    p("page-title") { style = "font-size:1rem;"; +"Password Reset" }
+                    p("page-subtitle") { +"Send a password reset email to the user. They will set their own new password." }
                 }
             }
             div("form-card") {
-                form(
-                    action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/admin-reset-password",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method  = FormMethod.post
-                ) {
-                    div("field") {
-                        label { htmlFor = "new_password"; +"New password" }
-                        input(type = InputType.password, name = "new_password") {
-                            id = "new_password"; required = true
-                            placeholder = "Minimum 4 characters"
-                            attributes["autocomplete"] = "new-password"
+                if (workspace.isSmtpReady) {
+                    form(
+                        action  = "/admin/workspaces/${workspace.slug}/users/${user.id}/send-reset-email",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method  = FormMethod.post
+                    ) {
+                        p { style = "color:var(--text-muted);font-size:0.875rem;margin-bottom:1rem;"
+                            +"A password reset link will be sent to "
+                            strong { +user.email }
+                            +". The link expires in 1 hour."
+                        }
+                        div("form-actions") {
+                            button(type = ButtonType.submit, classes = "btn") { +"Send Password Reset Email" }
                         }
                     }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Reset Password" }
+                } else {
+                    p { style = "color:var(--text-muted);font-size:0.875rem;"
+                        +"SMTP is not configured for this workspace. "
+                        a(href = "/admin/workspaces/${workspace.slug}/settings") { +"Configure SMTP" }
+                        +" to enable email-based password resets."
                     }
                 }
             }
@@ -1863,7 +1921,7 @@ object AdminView {
     ): HTML.() -> Unit = {
         adminShell(
             pageTitle     = "SMTP — ${workspace.displayName}",
-            activeRail    = "apps",
+            activeRail    = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
@@ -1977,6 +2035,616 @@ object AdminView {
                         button(type = ButtonType.submit, classes = "btn") { +"Save SMTP Settings" }
                         a("/admin/workspaces/${workspace.slug}/settings", classes = "btn btn-ghost") { +"Back to Settings" }
                     }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Roles list (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun rolesListPage(
+        workspace: Tenant,
+        roles: List<Role>,
+        apps: List<Application>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Roles — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "roles",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Roles" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Roles" }
+                    p("page-subtitle") { +"${roles.size} role${if (roles.size != 1) "s" else ""} in this workspace" }
+                }
+            }
+
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            // Create role form (inline)
+            div("form-card") {
+                style = "max-width:640px; margin-bottom:1.5rem;"
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/roles",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Create Role" }
+                    div("field") {
+                        label { htmlFor = "roleName"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "roleName"; required = true; placeholder = "e.g. admin, editor, viewer"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "roleDesc"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") { id = "roleDesc" }
+                    }
+                    div("field") {
+                        label { htmlFor = "roleScope"; +"Scope" }
+                        select {
+                            name = "scope"; id = "roleScope"
+                            option { value = "tenant"; +"Tenant (realm-level)" }
+                            option { value = "client"; +"Client (app-scoped)" }
+                        }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Create Role" }
+                    }
+                }
+            }
+
+            div("card") {
+                if (roles.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"◎" }
+                        p("empty-state-text") { +"No roles defined yet." }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Name" }
+                                th { +"Scope" }
+                                th { +"Description" }
+                                th { +"Composite" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            roles.forEach { role ->
+                                tr {
+                                    td { span("td-code") { +(role.name) } }
+                                    td { span("badge badge-${if (role.scope.value == "tenant") "green" else "blue"}") { +role.scope.value } }
+                                    td { +(role.description ?: "—") }
+                                    td { +(if (role.childRoleIds.isNotEmpty()) "${role.childRoleIds.size} children" else "—") }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${workspace.slug}/roles/${role.id}",
+                                            classes = "btn btn-ghost btn-sm"
+                                        ) { +"Open →" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Role detail (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun roleDetailPage(
+        workspace: Tenant,
+        role: Role,
+        allRoles: List<Role>,
+        allUsers: List<User>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "${role.name} — Roles",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "roles",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/roles") { +"Roles" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +role.name }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +role.name }
+                    p("page-subtitle") { +"${role.scope.value} role · ${role.description ?: "no description"}" }
+                }
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/delete",
+                    method = FormMethod.post,
+                    classes = "inline-form"
+                ) {
+                    button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                        attributes["onclick"] = "return confirm('Delete role ${role.name}?')"
+                        +"Delete"
+                    }
+                }
+            }
+
+            // Edit name/description
+            div("form-card") {
+                style = "max-width:640px; margin-bottom:1.5rem;"
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/edit",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Edit Role" }
+                    div("field") {
+                        label { htmlFor = "roleName"; +"Name" }
+                        input(type = InputType.text, name = "name") { id = "roleName"; required = true; value = role.name }
+                    }
+                    div("field") {
+                        label { htmlFor = "roleDesc"; +"Description" }
+                        input(type = InputType.text, name = "description") { id = "roleDesc"; value = role.description ?: "" }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
+                    }
+                }
+            }
+
+            // Composite children
+            div("card") {
+                style = "margin-bottom:1.5rem;"
+                p("form-section-title") { +"Composite Children" }
+                if (role.childRoleIds.isEmpty()) {
+                    p("td-muted") { style = "padding:0.75rem;"; +"No child roles." }
+                } else {
+                    table {
+                        thead { tr { th { +"Child Role" }; th { +"" } } }
+                        tbody {
+                            role.childRoleIds.forEach { childId ->
+                                val child = allRoles.find { it.id == childId }
+                                tr {
+                                    td { +(child?.name ?: "#$childId") }
+                                    td {
+                                        form(
+                                            action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/remove-child",
+                                            method = FormMethod.post, classes = "inline-form"
+                                        ) {
+                                            input(type = InputType.hidden, name = "childRoleId") { value = childId.toString() }
+                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") { +"Remove" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Add child form
+                val availableChildren = allRoles.filter { it.id != role.id && it.id !in role.childRoleIds }
+                if (availableChildren.isNotEmpty()) {
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/children",
+                        method = FormMethod.post, classes = "inline-form"
+                    ) {
+                        style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
+                        select {
+                            name = "childRoleId"
+                            availableChildren.forEach { r ->
+                                option { value = r.id.toString(); +r.name }
+                            }
+                        }
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Add Child" }
+                    }
+                }
+            }
+
+            // Assign user
+            div("card") {
+                p("form-section-title") { +"Assigned Users" }
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/assign-user",
+                    method = FormMethod.post, classes = "inline-form"
+                ) {
+                    style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
+                    select {
+                        name = "userId"
+                        allUsers.forEach { u ->
+                            option { value = u.id.toString(); +"${u.username} (${u.email})" }
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Assign" }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Groups list (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun groupsListPage(
+        workspace: Tenant,
+        groups: List<Group>,
+        roles: List<Role>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Groups — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "groups",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Groups" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Groups" }
+                    p("page-subtitle") { +"${groups.size} group${if (groups.size != 1) "s" else ""} in this workspace" }
+                }
+            }
+
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            // Create group form (inline)
+            div("form-card") {
+                style = "max-width:640px; margin-bottom:1.5rem;"
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/groups",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Create Group" }
+                    div("field") {
+                        label { htmlFor = "groupName"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "groupName"; required = true; placeholder = "e.g. engineering, marketing"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "groupDesc"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") { id = "groupDesc" }
+                    }
+                    if (groups.isNotEmpty()) {
+                        div("field") {
+                            label { htmlFor = "parentGroup"; +"Parent Group (optional)" }
+                            select {
+                                name = "parentGroupId"; id = "parentGroup"
+                                option { value = ""; +"— None (top-level) —" }
+                                groups.forEach { g ->
+                                    option { value = g.id.toString(); +g.name }
+                                }
+                            }
+                        }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Create Group" }
+                    }
+                }
+            }
+
+            div("card") {
+                if (groups.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"◫" }
+                        p("empty-state-text") { +"No groups defined yet." }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Name" }
+                                th { +"Parent" }
+                                th { +"Roles" }
+                                th { +"Description" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            groups.forEach { group ->
+                                val parent = groups.find { it.id == group.parentGroupId }
+                                val roleNames = group.roleIds.mapNotNull { rid -> roles.find { it.id == rid }?.name }
+                                tr {
+                                    td { span("td-code") { +group.name } }
+                                    td { +(parent?.name ?: "—") }
+                                    td { +(if (roleNames.isNotEmpty()) roleNames.joinToString(", ") else "—") }
+                                    td { +(group.description ?: "—") }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${workspace.slug}/groups/${group.id}",
+                                            classes = "btn btn-ghost btn-sm"
+                                        ) { +"Open →" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Group detail (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun groupDetailPage(
+        workspace: Tenant,
+        group: Group,
+        allGroups: List<Group>,
+        allRoles: List<Role>,
+        members: List<User>,
+        allUsers: List<User>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "${group.name} — Groups",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "groups",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/groups") { +"Groups" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +group.name }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +group.name }
+                    p("page-subtitle") {
+                        val parent = allGroups.find { it.id == group.parentGroupId }
+                        +(if (parent != null) "Child of ${parent.name}" else "Top-level group")
+                        +" · ${group.description ?: "no description"}"
+                    }
+                }
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/delete",
+                    method = FormMethod.post, classes = "inline-form"
+                ) {
+                    button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                        attributes["onclick"] = "return confirm('Delete group ${group.name}?')"
+                        +"Delete"
+                    }
+                }
+            }
+
+            // Edit name/description
+            div("form-card") {
+                style = "max-width:640px; margin-bottom:1.5rem;"
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/edit",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Edit Group" }
+                    div("field") {
+                        label { htmlFor = "gName"; +"Name" }
+                        input(type = InputType.text, name = "name") { id = "gName"; required = true; value = group.name }
+                    }
+                    div("field") {
+                        label { htmlFor = "gDesc"; +"Description" }
+                        input(type = InputType.text, name = "description") { id = "gDesc"; value = group.description ?: "" }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
+                    }
+                }
+            }
+
+            // Assigned roles
+            div("card") {
+                style = "margin-bottom:1.5rem;"
+                p("form-section-title") { +"Assigned Roles" }
+                if (group.roleIds.isEmpty()) {
+                    p("td-muted") { style = "padding:0.75rem;"; +"No roles assigned." }
+                } else {
+                    table {
+                        thead { tr { th { +"Role" }; th { +"Scope" }; th { +"" } } }
+                        tbody {
+                            group.roleIds.forEach { rid ->
+                                val r = allRoles.find { it.id == rid }
+                                tr {
+                                    td { +(r?.name ?: "#$rid") }
+                                    td { span("badge badge-green") { +(r?.scope?.value ?: "?") } }
+                                    td {
+                                        form(
+                                            action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/unassign-role",
+                                            method = FormMethod.post, classes = "inline-form"
+                                        ) {
+                                            input(type = InputType.hidden, name = "roleId") { value = rid.toString() }
+                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") { +"Remove" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                val availableRoles = allRoles.filter { it.id !in group.roleIds }
+                if (availableRoles.isNotEmpty()) {
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/assign-role",
+                        method = FormMethod.post, classes = "inline-form"
+                    ) {
+                        style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
+                        select {
+                            name = "roleId"
+                            availableRoles.forEach { r -> option { value = r.id.toString(); +r.name } }
+                        }
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Assign Role" }
+                    }
+                }
+            }
+
+            // Members
+            div("card") {
+                p("form-section-title") { +"Members (${members.size})" }
+                if (members.isEmpty()) {
+                    p("td-muted") { style = "padding:0.75rem;"; +"No members." }
+                } else {
+                    table {
+                        thead { tr { th { +"Username" }; th { +"Email" }; th { +"" } } }
+                        tbody {
+                            members.forEach { u ->
+                                tr {
+                                    td { span("td-code") { +u.username } }
+                                    td { +u.email }
+                                    td {
+                                        form(
+                                            action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/remove-member",
+                                            method = FormMethod.post, classes = "inline-form"
+                                        ) {
+                                            input(type = InputType.hidden, name = "userId") { value = u.id.toString() }
+                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") { +"Remove" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Add member
+                val nonMembers = allUsers.filter { u -> members.none { it.id == u.id } }
+                if (nonMembers.isNotEmpty()) {
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/add-member",
+                        method = FormMethod.post, classes = "inline-form"
+                    ) {
+                        style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
+                        select {
+                            name = "userId"
+                            nonMembers.forEach { u -> option { value = u.id.toString(); +"${u.username} (${u.email})" } }
+                        }
+                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Add Member" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MFA settings (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun mfaSettingsPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        totalUsers: Int = 0,
+        enrolledUsers: Int = 0
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "MFA — ${workspace.displayName}",
+            activeRail    = "security",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "mfa",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"MFA" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Multi-Factor Authentication" }
+                    p("page-subtitle") { +"TOTP-based MFA for ${workspace.displayName}." }
+                }
+            }
+
+            // Stats
+            div("card") {
+                style = "margin-bottom:1.5rem; padding:1.25rem;"
+                div {
+                    style = "display:flex; gap:2rem;"
+                    div {
+                        p("td-muted") { +"Current Policy" }
+                        p("page-title") {
+                            style = "font-size:1.1rem;"
+                            +when (workspace.mfaPolicy) {
+                                "required" -> "Required"
+                                "required_admins" -> "Required (admins)"
+                                else -> "Optional"
+                            }
+                        }
+                    }
+                    div {
+                        p("td-muted") { +"Enrolled Users" }
+                        p("page-title") { style = "font-size:1.1rem;"; +"$enrolledUsers / $totalUsers" }
+                    }
+                    div {
+                        p("td-muted") { +"Enrollment Rate" }
+                        p("page-title") {
+                            style = "font-size:1.1rem;"
+                            +if (totalUsers > 0) "${(enrolledUsers * 100 / totalUsers)}%" else "—"
+                        }
+                    }
+                }
+            }
+
+            div("form-card") {
+                style = "max-width:640px;"
+                p("form-section-title") { +"Configuration" }
+                p("td-muted") {
+                    style = "padding:0 0.75rem 1rem;"
+                    +"The MFA policy is managed in workspace settings. "
+                    +"Users enroll via their account portal at /t/${workspace.slug}/account/mfa/enroll."
+                }
+                div("form-actions") {
+                    a("/admin/workspaces/${workspace.slug}/settings", classes = "btn btn-sm") { +"Go to Workspace Settings" }
                 }
             }
         }

@@ -6,7 +6,11 @@ import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
+import com.kauth.adapter.persistence.PostgresGroupRepository
+import com.kauth.adapter.persistence.PostgresMfaRepository
+import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
+import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
@@ -22,6 +26,8 @@ import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.MfaService
+import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.EncryptionService
@@ -124,6 +130,10 @@ fun main() {
     // Phase 3b: email verification + password reset token repositories
     val evTokenRepository     = PostgresEmailVerificationTokenRepository()
     val prTokenRepository     = PostgresPasswordResetTokenRepository()
+    // Phase 3c: roles & groups
+    val roleRepository        = PostgresRoleRepository()
+    val groupRepository       = PostgresGroupRepository()
+    val passwordPolicyAdapter = PostgresPasswordPolicyAdapter(passwordHasher)
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -153,7 +163,8 @@ fun main() {
         auditLog          = auditLogAdapter,
         evTokenRepo       = evTokenRepository,
         prTokenRepo       = prTokenRepository,
-        emailPort         = emailAdapter
+        emailPort         = emailAdapter,
+        passwordPolicy    = passwordPolicyAdapter
     )
 
     val authService = AuthService(
@@ -163,7 +174,8 @@ fun main() {
         passwordHasher    = passwordHasher,
         auditLog          = auditLogAdapter,
         sessionRepository = sessionRepository,
-        selfServiceService = selfServiceService
+        selfServiceService = selfServiceService,
+        passwordPolicy    = passwordPolicyAdapter
     )
     val oauthService = OAuthService(
         tenantRepository      = tenantRepository,
@@ -173,7 +185,8 @@ fun main() {
         authCodeRepository    = authCodeRepository,
         tokenPort             = tokenAdapter,
         passwordHasher        = passwordHasher,
-        auditLog              = auditLogAdapter
+        auditLog              = auditLogAdapter,
+        roleRepository        = roleRepository
     )
     val adminService = AdminService(
         tenantRepository      = tenantRepository,
@@ -182,7 +195,25 @@ fun main() {
         passwordHasher        = passwordHasher,
         auditLog              = auditLogAdapter,
         sessionRepository     = sessionRepository,
-        selfServiceService    = selfServiceService
+        selfServiceService    = selfServiceService,
+        passwordPolicy        = passwordPolicyAdapter
+    )
+    val roleGroupService = RoleGroupService(
+        roleRepository        = roleRepository,
+        groupRepository       = groupRepository,
+        tenantRepository      = tenantRepository,
+        userRepository        = userRepository,
+        applicationRepository = applicationRepository,
+        auditLog              = auditLogAdapter
+    )
+    // Phase 3c: MFA / TOTP
+    val mfaRepository = PostgresMfaRepository()
+    val mfaService = MfaService(
+        mfaRepository    = mfaRepository,
+        userRepository   = userRepository,
+        tenantRepository = tenantRepository,
+        passwordHasher   = passwordHasher,
+        auditLog         = auditLogAdapter
     )
 
     // -------------------------------------------------------------------------
@@ -208,7 +239,10 @@ fun main() {
             authService            = authService,
             oauthService           = oauthService,
             adminService           = adminService,
+            roleGroupService       = roleGroupService,
             selfServiceService     = selfServiceService,
+            mfaService             = mfaService,
+            mfaRepository          = mfaRepository,
             tenantRepository       = tenantRepository,
             applicationRepository  = applicationRepository,
             userRepository         = userRepository,
@@ -226,13 +260,16 @@ fun Application.module(
     authService            : AuthService,
     oauthService           : OAuthService,
     adminService           : AdminService,
+    roleGroupService       : RoleGroupService,
     selfServiceService     : UserSelfServiceService,
+    mfaService             : MfaService,
     tenantRepository       : com.kauth.domain.port.TenantRepository,
     applicationRepository  : com.kauth.domain.port.ApplicationRepository,
     userRepository         : com.kauth.domain.port.UserRepository,
     sessionRepository      : com.kauth.domain.port.SessionRepository,
     auditLogRepository     : com.kauth.domain.port.AuditLogRepository,
     keyProvisioningService : KeyProvisioningService,
+    mfaRepository          : com.kauth.domain.port.MfaRepository,
     loginRateLimiter       : RateLimiter,
     registerRateLimiter    : RateLimiter,
     portalSessionKey       : ByteArray
@@ -310,26 +347,31 @@ fun Application.module(
             tenantRepository    = tenantRepository,
             loginRateLimiter    = loginRateLimiter,
             registerRateLimiter = registerRateLimiter,
-            selfServiceService  = selfServiceService
+            selfServiceService  = selfServiceService,
+            mfaService          = mfaService
         )
 
         // Self-service portal — /t/{slug}/account/* (Phase 3b)
         portalRoutes(
             authService        = authService,
             selfServiceService = selfServiceService,
-            tenantRepository   = tenantRepository
+            tenantRepository   = tenantRepository,
+            mfaService         = mfaService,
+            userRepository     = userRepository
         )
 
         // Admin console
         adminRoutes(
             authService            = authService,
             adminService           = adminService,
+            roleGroupService       = roleGroupService,
             tenantRepository       = tenantRepository,
             applicationRepository  = applicationRepository,
             userRepository         = userRepository,
             sessionRepository      = sessionRepository,
             auditLogRepository     = auditLogRepository,
-            keyProvisioningService = keyProvisioningService
+            keyProvisioningService = keyProvisioningService,
+            mfaRepository          = mfaRepository
         )
     }
 }

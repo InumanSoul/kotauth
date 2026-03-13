@@ -10,6 +10,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.EmailVerificationTokenRepository
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.PasswordResetTokenRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
@@ -47,7 +48,8 @@ class UserSelfServiceService(
     private val auditLog          : AuditLogPort,
     private val evTokenRepo       : EmailVerificationTokenRepository,
     private val prTokenRepo       : PasswordResetTokenRepository,
-    private val emailPort         : EmailPort
+    private val emailPort         : EmailPort,
+    private val passwordPolicy    : PasswordPolicyPort? = null  // Phase 3c
 ) {
 
     private val log = LoggerFactory.getLogger(UserSelfServiceService::class.java)
@@ -227,15 +229,35 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
 
         val tenant = tenantRepository.findById(token.tenantId)
-        if (tenant != null && newPassword.length < tenant.passwordPolicyMinLength)
-            return SelfServiceResult.Failure(SelfServiceError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters."
-            ))
+        if (tenant != null) {
+            val policyError = passwordPolicy?.validate(newPassword, tenant)
+            if (policyError != null) {
+                return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
+            } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
+                return SelfServiceResult.Failure(SelfServiceError.Validation(
+                    "Password must be at least ${tenant.passwordPolicyMinLength} characters."
+                ))
+            }
+            // Check password history
+            if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+                if (passwordPolicy.isInHistory(token.userId, token.tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
+                    return SelfServiceResult.Failure(SelfServiceError.Validation(
+                        "This password has been used recently. Please choose a different password."
+                    ))
+                }
+            }
+        }
 
         val now = Instant.now()
-        userRepository.updatePassword(token.userId, passwordHasher.hash(newPassword), now)
+        val hashedPassword = passwordHasher.hash(newPassword)
+        userRepository.updatePassword(token.userId, hashedPassword, now)
         sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
         prTokenRepo.markUsed(token.id!!, now)
+
+        // Record in password history
+        if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
+        }
 
         auditLog.record(AuditEvent(
             tenantId  = token.tenantId,
@@ -321,16 +343,36 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Current password is incorrect."))
         if (newPassword.isBlank())
             return SelfServiceResult.Failure(SelfServiceError.Validation("New password cannot be empty."))
-        if (newPassword.length < tenant.passwordPolicyMinLength)
-            return SelfServiceResult.Failure(SelfServiceError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters."
-            ))
         if (newPassword != confirmPassword)
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
 
+        // Enforce full password policy
+        val policyError = passwordPolicy?.validate(newPassword, tenant)
+        if (policyError != null) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
+        } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation(
+                "Password must be at least ${tenant.passwordPolicyMinLength} characters."
+            ))
+        }
+        // Check password history
+        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
+                return SelfServiceResult.Failure(SelfServiceError.Validation(
+                    "This password has been used recently. Please choose a different password."
+                ))
+            }
+        }
+
         val now = Instant.now()
-        userRepository.updatePassword(userId, passwordHasher.hash(newPassword), now)
+        val hashedPassword = passwordHasher.hash(newPassword)
+        userRepository.updatePassword(userId, hashedPassword, now)
         sessionRepository.revokeAllForUser(tenantId, userId, now)
+
+        // Record in password history
+        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(userId, tenantId, hashedPassword)
+        }
 
         auditLog.record(AuditEvent(
             tenantId  = tenantId,

@@ -17,6 +17,12 @@ object TenantsTable : Table("tenants") {
     val emailVerificationRequired    = bool("email_verification_required").default(false)
     val passwordPolicyMinLength      = integer("password_policy_min_length").default(8)
     val passwordPolicyRequireSpecial = bool("password_policy_require_special").default(false)
+    // Phase 3c: expanded password policy columns (V13 migration)
+    val passwordPolicyHistoryCount     = integer("password_policy_history_count").default(0)
+    val passwordPolicyMaxAgeDays       = integer("password_policy_max_age_days").default(0)
+    val passwordPolicyRequireUppercase = bool("password_policy_require_uppercase").default(false)
+    val passwordPolicyRequireNumber    = bool("password_policy_require_number").default(false)
+    val passwordPolicyBlacklistEnabled = bool("password_policy_blacklist_enabled").default(false)
 
     // Theme columns — added by V3 migration, defaults match TenantTheme.DEFAULT
     // Zinc-dark palette with brand cyan accent (#1FBCFF) — updated from legacy purple
@@ -43,6 +49,8 @@ object TenantsTable : Table("tenants") {
     val smtpTlsEnabled         = bool("smtp_tls_enabled").default(true)
     val smtpEnabled            = bool("smtp_enabled").default(false)
     val maxConcurrentSessions  = integer("max_concurrent_sessions").nullable()
+    // Phase 3c: MFA policy — 'optional', 'required', 'required_admins'
+    val mfaPolicy              = varchar("mfa_policy", 20).default("optional")
 
     override val primaryKey = PrimaryKey(id)
 }

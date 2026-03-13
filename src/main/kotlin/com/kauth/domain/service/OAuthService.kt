@@ -14,6 +14,7 @@ import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
+import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.UserRepository
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -45,7 +46,8 @@ class OAuthService(
     private val authCodeRepository: AuthorizationCodeRepository,
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
-    private val auditLog: AuditLogPort
+    private val auditLog: AuditLogPort,
+    private val roleRepository: RoleRepository? = null  // Phase 3c — nullable for backward compat
 ) {
 
     // -------------------------------------------------------------------------
@@ -212,12 +214,17 @@ class OAuthService(
         }
 
         val scopes = authCode.scopes.split(" ").filter { it.isNotBlank() }
+
+        // Phase 3c: resolve effective roles for the user
+        val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
+
         val tokenResponse = tokenPort.issueUserTokens(
             user = user,
             tenant = tenant,
             client = client,
             scopes = scopes,
-            nonce = authCode.nonce
+            nonce = authCode.nonce,
+            roles = effectiveRoles
         )
 
         // Persist session
@@ -369,11 +376,16 @@ class OAuthService(
         val client = session.clientId?.let { applicationRepository.findById(it) }
 
         val scopes = session.scopes.split(" ").filter { it.isNotBlank() }
+
+        // Phase 3c: resolve effective roles for refresh
+        val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
+
         val newTokens = tokenPort.issueUserTokens(
             user = user,
             tenant = tenant,
             client = client,
-            scopes = scopes
+            scopes = scopes,
+            roles = effectiveRoles
         )
 
         // Revoke old session, create new (rotation)

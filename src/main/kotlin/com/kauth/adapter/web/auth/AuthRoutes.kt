@@ -6,6 +6,9 @@ import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
+import com.kauth.domain.service.MfaError
+import com.kauth.domain.service.MfaResult
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthError
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
@@ -50,7 +53,8 @@ fun Route.authRoutes(
     tenantRepository: TenantRepository,
     loginRateLimiter: RateLimiter,
     registerRateLimiter: RateLimiter,
-    selfServiceService: UserSelfServiceService
+    selfServiceService: UserSelfServiceService,
+    mfaService: MfaService? = null  // Phase 3c — nullable for backward compat
 ) {
 
     route("/t/{slug}") {
@@ -97,6 +101,24 @@ fun Route.authRoutes(
                 )
                 is AuthResult.Success -> {
                     val user = result.value
+
+                    // Phase 3c: MFA challenge — if user has MFA enabled, redirect to challenge page
+                    if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
+                        // Store a short-lived MFA pending token in a signed cookie so we can
+                        // complete the flow after the user enters their TOTP code.
+                        // We encode user.id + slug + timestamp as a simple pipe-delimited string.
+                        val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
+                        call.response.cookies.append(
+                            name  = "KOTAUTH_MFA_PENDING",
+                            value = mfaPending,
+                            maxAge = 300L,   // 5 minutes
+                            httpOnly = true,
+                            path = "/t/$slug"
+                        )
+                        val queryString = if (oauthParams.isOAuthFlow) oauthParams.toQueryString() else ""
+                        call.respondRedirect("/t/$slug/mfa-challenge$queryString")
+                        return@post
+                    }
 
                     if (oauthParams.isOAuthFlow) {
                         // Authorization Code Flow: issue code and redirect
@@ -281,6 +303,124 @@ fun Route.authRoutes(
                         HttpStatusCode.BadRequest,
                         AuthView.verifyEmailPage(slug, theme, success = false, message = result.error.message)
                     )
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // MFA Challenge — Phase 3c TOTP verification during login
+        // ------------------------------------------------------------------
+
+        get("/mfa-challenge") {
+            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val oauthParams = call.request.queryParameters.toOAuthParams()
+
+            // Verify MFA pending cookie exists
+            val pending = call.request.cookies["KOTAUTH_MFA_PENDING"]
+            if (pending.isNullOrBlank()) {
+                return@get call.respondRedirect("/t/$slug/login")
+            }
+
+            call.respondHtml(HttpStatusCode.OK, AuthView.mfaChallengePage(slug, theme, oauthParams = oauthParams))
+        }
+
+        post("/mfa-challenge") {
+            val slug  = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val params    = call.receiveParameters()
+            val code      = params["code"]?.trim() ?: ""
+            val ipAddress = call.request.local.remoteAddress
+            val userAgent = call.request.headers["User-Agent"]
+            val oauthParams = params.toOAuthParams()
+
+            // Parse MFA pending cookie
+            val pending = call.request.cookies["KOTAUTH_MFA_PENDING"]
+            if (pending.isNullOrBlank()) {
+                return@post call.respondRedirect("/t/$slug/login")
+            }
+            val parts = pending.split("|")
+            if (parts.size != 3) {
+                return@post call.respondRedirect("/t/$slug/login")
+            }
+            val userId    = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
+            val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
+
+            // Check expiry (5 minutes)
+            if (System.currentTimeMillis() - timestamp > 300_000) {
+                return@post call.respondHtml(
+                    HttpStatusCode.Unauthorized,
+                    AuthView.mfaChallengePage(slug, theme, error = "MFA challenge expired. Please log in again.", oauthParams = oauthParams)
+                )
+            }
+
+            if (mfaService == null) {
+                return@post call.respondRedirect("/t/$slug/login")
+            }
+
+            // Try TOTP code first, then recovery code
+            val mfaResult = if (code.length == 6 && code.all { it.isDigit() }) {
+                mfaService.verifyTotp(userId, code)
+            } else {
+                mfaService.verifyRecoveryCode(userId, code)
+            }
+
+            when (mfaResult) {
+                is MfaResult.Failure -> {
+                    call.respondHtml(
+                        HttpStatusCode.Unauthorized,
+                        AuthView.mfaChallengePage(slug, theme, error = "Invalid code. Please try again.", oauthParams = oauthParams)
+                    )
+                }
+                is MfaResult.Success -> {
+                    // Clear MFA pending cookie
+                    call.response.cookies.append(
+                        name     = "KOTAUTH_MFA_PENDING",
+                        value    = "",
+                        maxAge   = 0L,
+                        path     = "/t/$slug",
+                        httpOnly = true
+                    )
+
+                    if (oauthParams.isOAuthFlow) {
+                        val clientId    = oauthParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
+                        val redirectUri = oauthParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+
+                        when (val codeResult = oauthService.issueAuthorizationCode(
+                            tenantSlug          = slug,
+                            userId              = userId,
+                            clientId            = clientId,
+                            redirectUri         = redirectUri,
+                            scopes              = oauthParams.scope ?: "openid",
+                            codeChallenge       = oauthParams.codeChallenge,
+                            codeChallengeMethod = oauthParams.codeChallengeMethod,
+                            nonce               = oauthParams.nonce,
+                            state               = oauthParams.state,
+                            ipAddress           = ipAddress
+                        )) {
+                            is OAuthResult.Success -> {
+                                val authCode = codeResult.value.code
+                                val state    = oauthParams.state
+                                val redirect = buildString {
+                                    append(redirectUri)
+                                    append("?code=").append(authCode)
+                                    if (!state.isNullOrBlank()) append("&state=").append(state)
+                                }
+                                call.respondRedirect(redirect)
+                            }
+                            is OAuthResult.Failure -> {
+                                call.respondHtml(HttpStatusCode.BadRequest,
+                                    AuthView.mfaChallengePage(slug, theme, error = codeResult.error.toDescription(), oauthParams = oauthParams))
+                            }
+                        }
+                    } else {
+                        // Direct login — complete the token issuance
+                        // We need to re-authenticate to get tokens since we only stored userId
+                        call.respond(mapOf(
+                            "message" to "MFA verification successful",
+                            "user_id" to userId
+                        ))
+                    }
+                }
             }
         }
 

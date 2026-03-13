@@ -7,6 +7,7 @@ import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
@@ -35,7 +36,8 @@ class AuthService(
     private val passwordHasher    : PasswordHasher,
     private val auditLog          : AuditLogPort,
     private val sessionRepository : SessionRepository,
-    private val selfServiceService: UserSelfServiceService? = null   // nullable — injected post Phase 3b
+    private val selfServiceService: UserSelfServiceService? = null,  // nullable — injected post Phase 3b
+    private val passwordPolicy    : PasswordPolicyPort? = null       // Phase 3c — nullable for backward compat
 ) {
 
     /**
@@ -195,7 +197,11 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        if (rawPassword.length < tenant.passwordPolicyMinLength) {
+        // Phase 3c: full password policy validation (falls back to basic length check)
+        val policyError = passwordPolicy?.validate(rawPassword, tenant)
+        if (policyError != null) {
+            return AuthResult.Failure(AuthError.ValidationError(policyError))
+        } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
             return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
         }
 
@@ -220,6 +226,11 @@ class AuthService(
         )
 
         val savedUser = userRepository.save(newUser)
+
+        // Phase 3c: record initial password in history
+        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
+        }
 
         auditLog.record(AuditEvent(
             tenantId  = tenant.id,
@@ -274,7 +285,11 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        if (rawPassword.length < tenant.passwordPolicyMinLength) {
+        // Phase 3c: full password policy validation (falls back to basic length check)
+        val policyError = passwordPolicy?.validate(rawPassword, tenant)
+        if (policyError != null) {
+            return AuthResult.Failure(AuthError.ValidationError(policyError))
+        } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
             return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
         }
 
@@ -299,6 +314,11 @@ class AuthService(
         )
 
         val savedUser = userRepository.save(newUser)
+
+        // Phase 3c: record initial password in history
+        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
+        }
 
         auditLog.record(AuditEvent(
             tenantId  = tenant.id,

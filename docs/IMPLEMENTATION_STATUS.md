@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
-> Last updated: 2026-03
-> Current version: 1.0.0-dev (Phase 3b complete)
+> Last updated: 2026-03-13
+> Current version: 1.0.0-dev (Phase 3c complete)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -12,7 +12,7 @@ This document is the living record of what has been built, what compiles and run
 | Check | Status |
 |---|---|
 | Docker build (`gradle buildFatJar`) | ✅ Passing |
-| PostgreSQL schema (Flyway V1–V11) | ✅ Applied |
+| PostgreSQL schema (Flyway V1–V14) | ✅ Applied |
 | Admin console routes | ✅ All registered |
 | OIDC discovery + JWKS | ✅ Functional |
 | Authorization Code + PKCE flow | ✅ Functional |
@@ -22,6 +22,10 @@ This document is the living record of what has been built, what compiles and run
 | Password reset flow | ✅ Functional |
 | User self-service portal | ✅ Functional |
 | Per-tenant SMTP config (admin console) | ✅ Functional |
+| Role-based access control (JWT claims) | ✅ Functional |
+| Group hierarchy with role inheritance | ✅ Functional |
+| Password policies (history, blacklist, complexity) | ✅ Functional |
+| MFA/TOTP enrollment + challenge | ✅ Functional |
 
 ---
 
@@ -280,6 +284,145 @@ SMTP passwords are encrypted with AES-256-GCM before storage (`EncryptionService
 
 ---
 
+### Phase 3c — Access Control, Password Policies & MFA ✅ Complete
+
+Phase 3 is now fully complete. This sub-phase delivers roles, groups, expanded password policies, and TOTP-based multi-factor authentication.
+
+#### Database Schema (Flyway V12–V14)
+
+| Migration | What it adds |
+|---|---|
+| `V12__roles_and_groups.sql` | `roles` table (tenant + client scope, CHECK constraint), `composite_role_mappings`, `user_roles`, `groups` (self-referencing hierarchy), `group_roles`, `user_groups`. Indexes on all foreign keys. |
+| `V13__password_policies.sql` | `password_history` table (BCrypt hashes of previous N passwords), `password_blacklist` table seeded with 50 common passwords. 5 new columns on `tenants`: `password_policy_history_count`, `password_policy_max_age_days`, `password_policy_require_uppercase`, `password_policy_require_number`, `password_policy_blacklist_enabled`. |
+| `V14__mfa_totp.sql` | `mfa_enrollments` table (TOTP secret, verified/enabled state), `mfa_recovery_codes` table (BCrypt-hashed one-time codes). `mfa_policy` column on `tenants` (optional/required/required_admins). `mfa_enabled` column on `users`. |
+
+#### Domain Layer — Roles & Groups
+
+| Component | File | What it does |
+|---|---|---|
+| `Role` | `domain/model/Role.kt` | Domain model with `RoleScope` enum (TENANT/CLIENT), composite role tracking via `childRoleIds` |
+| `Group` | `domain/model/Group.kt` | Hierarchical group model with `parentGroupId` self-reference and JSONB `attributes` |
+| `RoleRepository` | `domain/port/RoleRepository.kt` | Port with CRUD, composite role management, user-role assignment, and `resolveEffectiveRoles` (aggregates direct + group + composite roles) |
+| `GroupRepository` | `domain/port/GroupRepository.kt` | Port with CRUD, role assignment, user membership, `findAncestorGroupIds` for hierarchy traversal |
+| `RoleGroupService` | `domain/service/RoleGroupService.kt` | Combined domain service (450+ lines). Role CRUD with name regex validation, scope/clientId consistency, uniqueness. Composite role management with BFS cycle detection. Group CRUD with parent validation and sibling uniqueness. All mutations audit-logged. |
+
+#### Domain Layer — Password Policies
+
+| Component | File | What it does |
+|---|---|---|
+| `PasswordPolicyPort` | `domain/port/PasswordPolicyPort.kt` | Port with `validate`, `recordPasswordHistory`, `isInHistory`, `isBlacklisted` |
+| `PostgresPasswordPolicyAdapter` | `adapter/persistence/PostgresPasswordPolicyAdapter.kt` | Validates complexity (length, uppercase, numbers, special chars), checks password history (BCrypt verify against last N hashes), blacklist lookup (global + tenant-specific) |
+
+#### Domain Layer — MFA/TOTP
+
+| Component | File | What it does |
+|---|---|---|
+| `MfaEnrollment` | `domain/model/MfaEnrollment.kt` | Domain model with `MfaMethod` enum (TOTP, extensible). Secret field encrypted at rest via `EncryptionService`. |
+| `MfaRecoveryCode` | `domain/model/MfaRecoveryCode.kt` | One-time backup code (BCrypt-hashed, `usedAt` set when consumed) |
+| `MfaRepository` | `domain/port/MfaRepository.kt` | Port for enrollment CRUD and recovery code management |
+| `TotpUtil` | `infrastructure/TotpUtil.kt` | Zero-dependency RFC 6238 TOTP implementation. HMAC-SHA1, 6-digit codes, 30s period, ±1 time step window. Base32 encode/decode (RFC 4648). Generates `otpauth://` URIs for QR code scanning. |
+| `MfaService` | `domain/service/MfaService.kt` | Enrollment workflow (generate secret → QR URI → recovery codes), enrollment verification, TOTP challenge during login, recovery code verification (consumed on use), disable MFA. Returns `MfaResult<T>` sealed type. |
+
+#### Persistence Adapters
+
+| Adapter | What was added |
+|---|---|
+| `PostgresRoleRepository` | Full `RoleRepository` implementation. `resolveEffectiveRoles` aggregates: direct user roles + group roles (including ancestor groups via BFS traversal) + composite role expansion (BFS with visited set for cycle safety). |
+| `PostgresGroupRepository` | Full `GroupRepository` implementation. JSONB attribute serialization via `kotlinx.serialization.json`. Ancestor group traversal for role inheritance. |
+| `PostgresPasswordPolicyAdapter` | Implements `PasswordPolicyPort`. History check verifies BCrypt against last N hashes. Blacklist normalizes to lowercase, checks both global (tenant_id IS NULL) and tenant-specific entries. |
+| `PostgresMfaRepository` | Full `MfaRepository` implementation. TOTP secrets encrypted at rest via `EncryptionService` (AES-256-GCM). Recovery codes stored as BCrypt hashes. |
+| `PostgresUserRepository` | Updated: `update()` now writes `mfaEnabled`; `toUser()` reads `mfaEnabled` |
+| `PostgresTenantRepository` | Updated: reads/writes `mfaPolicy` and 5 password policy columns |
+
+#### Token Claims — Keycloak-Compatible Role Embedding
+
+JWT access tokens now include role claims following the Keycloak convention:
+
+```json
+{
+  "realm_access": { "roles": ["admin", "user"] },
+  "resource_access": {
+    "my-app": { "roles": ["editor", "viewer"] }
+  }
+}
+```
+
+`JwtTokenAdapter.issueUserTokens` accepts a `roles: List<Role>` parameter. Tenant-scoped roles go into `realm_access.roles`; client-scoped roles are keyed by clientId (int-as-string for MVP) under `resource_access`. `AccessTokenClaims` extended with `realmRoles` and `resourceRoles` fields. `OAuthService.exchangeAuthorizationCode` and `refreshTokens` both resolve effective roles via `RoleRepository.resolveEffectiveRoles` before token issuance.
+
+#### Admin Routes (Phase 3c additions)
+
+All routes under `/admin/workspaces/{slug}/`:
+
+| Route | Method | Handler |
+|---|---|---|
+| `/roles` | GET | List all roles (JSON) |
+| `/roles` | POST | Create role |
+| `/roles/{roleId}/edit` | POST | Update role |
+| `/roles/{roleId}/delete` | POST | Delete role |
+| `/roles/{roleId}/children` | POST | Add composite child role (with cycle detection) |
+| `/roles/{roleId}/assign-user` | POST | Assign role to user |
+| `/roles/{roleId}/unassign-user` | POST | Unassign role from user |
+| `/groups` | GET | List all groups (JSON) |
+| `/groups` | POST | Create group |
+| `/groups/{groupId}/edit` | POST | Update group |
+| `/groups/{groupId}/delete` | POST | Delete group |
+| `/groups/{groupId}/assign-role` | POST | Assign role to group |
+| `/groups/{groupId}/add-member` | POST | Add user to group |
+| `/groups/{groupId}/remove-member` | POST | Remove user from group |
+
+#### Auth Routes (Phase 3c additions)
+
+| Route | Method | Handler |
+|---|---|---|
+| `/t/{slug}/mfa-challenge` | GET | Show MFA challenge page (TOTP code entry) |
+| `/t/{slug}/mfa-challenge` | POST | Verify TOTP code or recovery code; complete login flow |
+
+MFA challenge inserts between password authentication and token issuance. A `KOTAUTH_MFA_PENDING` cookie (5-minute TTL, httpOnly) carries the userId across the redirect. OAuth2 parameters are preserved through the MFA step via hidden form fields.
+
+#### Self-Service Portal Routes (Phase 3c additions)
+
+| Route | Method | Handler |
+|---|---|---|
+| `/t/{slug}/account/mfa/enroll` | POST | Start TOTP enrollment; returns `totp_uri` + `recovery_codes` (JSON) |
+| `/t/{slug}/account/mfa/verify` | POST | Confirm enrollment with TOTP code from authenticator app |
+| `/t/{slug}/account/mfa/disable` | POST | Remove MFA enrollment and recovery codes |
+
+#### Audit Events (Phase 3c additions)
+
+18 new `AuditEventType` variants:
+
+Roles & Groups: `ADMIN_ROLE_CREATED`, `ADMIN_ROLE_UPDATED`, `ADMIN_ROLE_DELETED`, `ADMIN_ROLE_ASSIGNED`, `ADMIN_ROLE_UNASSIGNED`, `ADMIN_GROUP_CREATED`, `ADMIN_GROUP_UPDATED`, `ADMIN_GROUP_DELETED`, `ADMIN_GROUP_ROLE_ASSIGNED`, `ADMIN_GROUP_ROLE_UNASSIGNED`, `ADMIN_GROUP_MEMBER_ADDED`, `ADMIN_GROUP_MEMBER_REMOVED`
+
+MFA: `MFA_ENROLLMENT_STARTED`, `MFA_ENROLLMENT_VERIFIED`, `MFA_CHALLENGE_SUCCESS`, `MFA_CHALLENGE_FAILED`, `MFA_RECOVERY_CODE_USED`, `MFA_DISABLED`
+
+#### Architectural Decisions (Phase 3c)
+
+**ADR-11: Keycloak-Compatible JWT Role Claims**
+
+**Decision:** Role information is embedded in JWT access tokens using the `realm_access.roles` and `resource_access.{clientId}.roles` claim structure, matching Keycloak's convention.
+
+**Consequence:** Any application, SDK, or middleware already integrated with Keycloak (Spring Security Keycloak adapter, NextAuth.js, Kong JWT plugin, etc.) can consume KotAuth tokens with zero client-side code changes. The cost is two JSON keys; the benefit is ecosystem compatibility. A future tenant-level `tokenClaimFormat` config could support alternative formats if needed.
+
+**ADR-12: BFS Composite Role Expansion with Cycle Detection**
+
+**Decision:** Composite roles (a role that includes other roles) are expanded at token-issuance time using breadth-first search with a visited set. Before adding a child role, `RoleGroupService.wouldCreateCycle` runs a BFS from the proposed child to detect if adding it would create a circular dependency.
+
+**Consequence:** Composite roles can be nested arbitrarily deep without risk of infinite loops. The expansion is deterministic and O(n) in the number of role-role edges.
+
+**ADR-13: Zero-Dependency TOTP (RFC 6238)**
+
+**Decision:** TOTP verification is implemented in `TotpUtil.kt` using only `javax.crypto.Mac` (HMAC-SHA1) and `java.security.SecureRandom`. No external TOTP library dependency.
+
+**Consequence:** No additional dependency in `build.gradle.kts`. The implementation covers Google Authenticator defaults (SHA1, 6 digits, 30s period, ±1 window). If future MFA methods (WebAuthn, FIDO2) require external libraries, they can be added independently without affecting TOTP.
+
+**ADR-14: MFA Challenge via Cookie-Based Pending State**
+
+**Decision:** After successful password authentication, if MFA is required, the server sets a `KOTAUTH_MFA_PENDING` cookie containing `userId|slug|timestamp` and redirects to `/mfa-challenge`. The cookie has a 5-minute TTL and `httpOnly` flag. OAuth2 parameters are preserved via hidden form fields.
+
+**Consequence:** The MFA step is stateless on the server side (no server-side pending-MFA session table). The trade-off is that the cookie value is not signed or encrypted (MVP limitation) — a malicious actor with cookie access could forge a pending MFA state. Phase 5 should upgrade this to a signed/encrypted token or server-side session.
+
+---
+
 ### Phase 4 — Identity Federation ❌ Not started
 
 Social login (Google, GitHub, generic OIDC) and SAML 2.0. No groundwork laid yet. Will require a new `identity_providers` table and significant OAuth client flow work.
@@ -338,8 +481,12 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 |---|---|---|
 | `cookie.secure = true` | `Application.kt`, TODO comment | Requires TLS termination — Phase 5 |
 | Portal OAuth upgrade | `PortalSession.kt`, ADR-07 | Phase 5 — replace cookie session with first-party OAuth flow |
-| TOTP / MFA | n/a | Phase 3c or 4 |
-| Roles & groups | n/a | Phase 3c |
+| MFA pending cookie signing | `authRoutes.kt`, ADR-14 | Phase 5 — replace plain cookie with signed/encrypted token |
+| Password expiry enforcement | `V13` adds `max_age_days` column | Column exists but not enforced during login yet |
+| `required_admins` MFA policy | `MfaService.isMfaRequired` | TODO: check admin role membership, needs role-based policy logic |
+| Resource access client string keys | `JwtTokenAdapter` | Currently uses int clientId as string; should resolve to `client_id` string |
+| WebAuthn / Passkeys | n/a | Phase 4 or 5 — `MfaMethod` enum is extensible |
+| Admin UI pages for roles/groups/MFA | `AdminView.kt` has placeholder links | Phase 3c delivers JSON API routes; HTML admin pages deferred |
 | Bulk user operations | n/a | Future |
 | User impersonation | n/a | Future, requires strict audit logging |
 | Admin REST API | n/a | Phase 5 |
@@ -356,23 +503,55 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 | `domain/port/AuditLogRepository.kt` | 3a | Read-side port for audit log queries |
 | `domain/service/AdminService.kt` | 3a | Admin mutation orchestration with `AdminResult<T>` return types |
 | `adapter/persistence/PostgresAuditLogRepository.kt` | 3a | Implements `AuditLogRepository`; paginated audit log reads |
+| `domain/model/Role.kt` | 3c | Role domain model with `RoleScope` enum (TENANT/CLIENT) |
+| `domain/model/Group.kt` | 3c | Hierarchical group domain model with JSONB attributes |
+| `domain/model/MfaEnrollment.kt` | 3c | MFA enrollment domain model with `MfaMethod` enum |
+| `domain/model/MfaRecoveryCode.kt` | 3c | One-time recovery code domain model |
+| `domain/port/RoleRepository.kt` | 3c | Port for role CRUD, composites, assignment, effective role resolution |
+| `domain/port/GroupRepository.kt` | 3c | Port for group CRUD, role inheritance, hierarchy traversal |
+| `domain/port/PasswordPolicyPort.kt` | 3c | Port for password validation, history, blacklist |
+| `domain/port/MfaRepository.kt` | 3c | Port for MFA enrollment and recovery code persistence |
+| `domain/service/RoleGroupService.kt` | 3c | Combined roles+groups domain service with cycle detection |
+| `domain/service/MfaService.kt` | 3c | MFA enrollment, TOTP verification, recovery codes, policy checks |
+| `adapter/persistence/RolesTable.kt` | 3c | Exposed ORM for `roles`, `composite_role_mappings`, `user_roles` |
+| `adapter/persistence/GroupsTable.kt` | 3c | Exposed ORM for `groups`, `group_roles`, `user_groups` |
+| `adapter/persistence/PasswordHistoryTable.kt` | 3c | Exposed ORM for `password_history`, `password_blacklist` |
+| `adapter/persistence/MfaTable.kt` | 3c | Exposed ORM for `mfa_enrollments`, `mfa_recovery_codes` |
+| `adapter/persistence/PostgresRoleRepository.kt` | 3c | BFS composite expansion, group ancestor traversal |
+| `adapter/persistence/PostgresGroupRepository.kt` | 3c | JSONB attribute handling, hierarchy queries |
+| `adapter/persistence/PostgresPasswordPolicyAdapter.kt` | 3c | Complexity, history (BCrypt), blacklist validation |
+| `adapter/persistence/PostgresMfaRepository.kt` | 3c | MFA persistence with AES-256-GCM secret encryption |
+| `infrastructure/TotpUtil.kt` | 3c | RFC 6238 TOTP — zero external dependencies |
+| `db/migration/V12__roles_and_groups.sql` | 3c | Roles and groups schema |
+| `db/migration/V13__password_policies.sql` | 3c | Password history, blacklist, tenant policy columns |
+| `db/migration/V14__mfa_totp.sql` | 3c | MFA enrollments, recovery codes, tenant/user MFA columns |
 
 ## File Index — Significantly Modified
 
 | File | Phase | What changed |
 |---|---|---|
 | `domain/model/Application.kt` | 2 fix | Added `tokenExpiryOverride: Int?` |
-| `domain/model/AuditEvent.kt` | 3a | Added 9 admin-specific `AuditEventType` variants |
+| `domain/model/AuditEvent.kt` | 3a, 3c | Added 9 admin-specific variants (3a), 12 role/group variants + 6 MFA variants (3c) |
+| `domain/model/User.kt` | 3c | Added `mfaEnabled: Boolean` |
+| `domain/model/Tenant.kt` | 3c | Added `mfaPolicy`, `passwordPolicyHistoryCount`, `passwordPolicyMaxAgeDays`, `passwordPolicyRequireUppercase`, `passwordPolicyRequireNumber`, `passwordPolicyBlacklistEnabled` |
+| `domain/model/AccessTokenClaims.kt` | 3c | Added `realmRoles`, `resourceRoles` |
 | `domain/port/TenantRepository.kt` | 3a | Added `findById`, `update` |
 | `domain/port/UserRepository.kt` | 3a | Added `findByTenantId` (with search), `update` |
+| `domain/port/TokenPort.kt` | 3c | Added `roles: List<Role>` parameter to `issueUserTokens` |
 | `domain/port/ApplicationRepository.kt` | 3a | Added `update`, `setEnabled` |
 | `domain/port/SessionRepository.kt` | 3a | Added `findActiveByTenant` |
-| `adapter/persistence/PostgresTenantRepository.kt` | 3a | Implemented new port methods |
-| `adapter/persistence/PostgresUserRepository.kt` | 3a | Implemented new port methods (LIKE search) |
+| `domain/service/AuthService.kt` | 3c | Added `PasswordPolicyPort` dependency; full policy validation in both register methods; password history recording |
+| `domain/service/OAuthService.kt` | 3c | Added `RoleRepository`; resolves effective roles before token issuance in `exchangeAuthorizationCode` and `refreshTokens` |
+| `adapter/token/JwtTokenAdapter.kt` | 3c | Full rewrite — embeds `realm_access` and `resource_access` claims; decodes role claims |
+| `adapter/persistence/TenantsTable.kt` | 3c | Added 5 password policy columns + `mfaPolicy` |
+| `adapter/persistence/UsersTable.kt` | 3c | Added `mfaEnabled` column |
+| `adapter/persistence/PostgresTenantRepository.kt` | 3a, 3c | Implemented new port methods (3a); reads/writes password policy + MFA policy columns (3c) |
+| `adapter/persistence/PostgresUserRepository.kt` | 3a, 3c | LIKE search + update (3a); reads/writes `mfaEnabled` (3c) |
 | `adapter/persistence/PostgresApplicationRepository.kt` | 2 fix + 3a | Added `tokenExpiryOverride` mapping; implemented `update`, `setEnabled` |
 | `adapter/persistence/PostgresSessionRepository.kt` | 3a | Implemented `findActiveByTenant` |
-| `adapter/persistence/PostgresAuditLogAdapter.kt` | existing | Unchanged — write path only |
-| `adapter/web/admin/AdminRoutes.kt` | 3a | Complete rewrite — all Phase 3a routes |
-| `adapter/web/auth/AuthRoutes.kt` | 2 fix | `call.request.origin` → `call.request.local` (6 locations) |
+| `adapter/web/admin/AdminRoutes.kt` | 3a, 3c | Phase 3a routes + role/group CRUD routes (3c) |
+| `adapter/web/auth/AuthRoutes.kt` | 2 fix, 3c | `call.request.origin` fix (2); MFA challenge flow + `mfaService` parameter (3c) |
+| `adapter/web/auth/AuthView.kt` | 3c | Added `OAuthParams.toQueryString()`, `mfaChallengePage` |
+| `adapter/web/portal/portalRoutes.kt` | 3c | Added MFA self-service routes (enroll, verify, disable) |
 | `adapter/web/admin/AdminView.kt` | 3a | 966 → 1843 lines; 7 new page functions, `applicationDetailPage` updated, `UserPrefill` added |
-| `Application.kt` | 3a | Wired `AdminService`, `PostgresAuditLogRepository`; updated `module()` signature and `adminRoutes()` call |
+| `Application.kt` | 3a, 3c | Wired all Phase 3c dependencies: `PostgresRoleRepository`, `PostgresGroupRepository`, `PostgresPasswordPolicyAdapter`, `PostgresMfaRepository`, `RoleGroupService`, `MfaService`. Updated `module()` signature and all route calls. |

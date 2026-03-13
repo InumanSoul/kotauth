@@ -57,6 +57,7 @@ class PostgresUserRepository : UserRepository {
             it[fullName]          = user.fullName
             it[emailVerified]     = user.emailVerified
             it[enabled]           = user.enabled
+            it[mfaEnabled]        = user.mfaEnabled
         }
         user
     }
@@ -108,7 +109,8 @@ class PostgresUserRepository : UserRepository {
         fullName             = this[UsersTable.fullName],
         emailVerified        = this[UsersTable.emailVerified],
         enabled              = this[UsersTable.enabled],
-        lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant()
+        lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
+        mfaEnabled           = this[UsersTable.mfaEnabled]
     )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime =

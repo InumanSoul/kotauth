@@ -25,6 +25,12 @@ data class Tenant(
     val emailVerificationRequired: Boolean    = false,
     val passwordPolicyMinLength: Int          = 8,
     val passwordPolicyRequireSpecial: Boolean = false,
+    // Phase 3c: expanded password policy
+    val passwordPolicyHistoryCount: Int       = 0,   // 0 = disabled
+    val passwordPolicyMaxAgeDays: Int         = 0,   // 0 = never expires
+    val passwordPolicyRequireUppercase: Boolean = false,
+    val passwordPolicyRequireNumber: Boolean   = false,
+    val passwordPolicyBlacklistEnabled: Boolean = false,
     val theme: TenantTheme                    = TenantTheme.DEFAULT,
 
     // ---- SMTP (Phase 3b) ----
@@ -38,6 +44,11 @@ data class Tenant(
     val smtpFromName: String?    = null,
     val smtpTlsEnabled: Boolean  = true,
     val smtpEnabled: Boolean     = false,
+
+    // ---- MFA policy (Phase 3c) ----
+    // 'optional' = users can opt-in; 'required' = all users must enroll;
+    // 'required_admins' = only admin-role users must enroll
+    val mfaPolicy: String = "optional",
 
     // ---- Session policy (Phase 3b) ----
     val maxConcurrentSessions: Int? = null   // null = unlimited

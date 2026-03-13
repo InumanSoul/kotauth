@@ -21,6 +21,8 @@ object UsersTable : Table("users") {
     val enabled               = bool("enabled").default(true)
     // Phase 3b: set on every password change; used to revoke sessions
     val lastPasswordChangeAt  = timestampWithTimeZone("last_password_change_at").nullable()
+    // Phase 3c: MFA — set to true when user has a verified TOTP enrollment
+    val mfaEnabled            = bool("mfa_enabled").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }

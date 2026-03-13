@@ -236,6 +236,57 @@ object PortalView {
     }
 
     // =========================================================================
+    // MFA challenge — Phase 3c
+    // =========================================================================
+
+    fun mfaChallengePage(
+        slug          : String,
+        workspaceName : String,
+        theme         : TenantTheme,
+        error         : String? = null
+    ): HTML.() -> Unit = {
+        head { authPageHead("$workspaceName | Verify Identity", theme) }
+        body {
+            div("brand") {
+                div("brand-name") { +workspaceName }
+            }
+            div("card") {
+                h1("card-title") { +"Two-Factor Authentication" }
+                p("card-subtitle") { +"Enter the 6-digit code from your authenticator app" }
+
+                if (!error.isNullOrBlank()) {
+                    div("alert alert-error") { +error }
+                }
+
+                form(
+                    action  = "/t/$slug/account/mfa-challenge",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("field") {
+                        label { htmlFor = "code"; +"Verification code" }
+                        input(type = InputType.text, name = "code") {
+                            id = "code"
+                            placeholder = "000000"
+                            attributes["autocomplete"] = "one-time-code"
+                            attributes["inputmode"] = "numeric"
+                            attributes["pattern"] = "[0-9]*"
+                            maxLength = "6"
+                            required = true
+                            attributes["autofocus"] = "true"
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn") { +"Verify" }
+                }
+
+                div("footer-link") {
+                    a(href = "/t/$slug/account/login") { +"Back to login" }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
     // Shared <head> — login page (centered card, same as auth pages)
     // =========================================================================
 

@@ -9,6 +9,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -33,7 +34,8 @@ class AdminService(
     private val passwordHasher        : PasswordHasher,
     private val auditLog              : AuditLogPort,
     private val sessionRepository     : SessionRepository,
-    private val selfServiceService    : UserSelfServiceService
+    private val selfServiceService    : UserSelfServiceService,
+    private val passwordPolicy        : PasswordPolicyPort? = null  // Phase 3c
 ) {
 
     // =========================================================================
@@ -54,6 +56,12 @@ class AdminService(
         emailVerificationRequired : Boolean,
         passwordPolicyMinLength   : Int,
         passwordPolicyRequireSpecial: Boolean,
+        passwordPolicyRequireUppercase: Boolean = false,
+        passwordPolicyRequireNumber  : Boolean = false,
+        passwordPolicyHistoryCount   : Int = 0,
+        passwordPolicyMaxAgeDays     : Int = 0,
+        passwordPolicyBlacklistEnabled: Boolean = false,
+        mfaPolicy                 : String = "optional",
         themeAccentColor          : String,
         themeLogoUrl              : String?,
         themeFaviconUrl           : String?
@@ -69,6 +77,8 @@ class AdminService(
             return AdminResult.Failure(AdminError.Validation("Refresh token expiry must be ≥ access token expiry."))
         if (passwordPolicyMinLength < 4 || passwordPolicyMinLength > 128)
             return AdminResult.Failure(AdminError.Validation("Password minimum length must be between 4 and 128."))
+        if (mfaPolicy !in listOf("optional", "required", "required_admins"))
+            return AdminResult.Failure(AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'."))
 
         val updated = tenant.copy(
             displayName               = displayName.trim(),
@@ -78,7 +88,13 @@ class AdminService(
             registrationEnabled       = registrationEnabled,
             emailVerificationRequired = emailVerificationRequired,
             passwordPolicyMinLength   = passwordPolicyMinLength,
-            passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
+            passwordPolicyRequireSpecial    = passwordPolicyRequireSpecial,
+            passwordPolicyRequireUppercase  = passwordPolicyRequireUppercase,
+            passwordPolicyRequireNumber     = passwordPolicyRequireNumber,
+            passwordPolicyHistoryCount      = passwordPolicyHistoryCount.coerceIn(0, 24),
+            passwordPolicyMaxAgeDays        = passwordPolicyMaxAgeDays.coerceIn(0, 365),
+            passwordPolicyBlacklistEnabled  = passwordPolicyBlacklistEnabled,
+            mfaPolicy                       = mfaPolicy,
             theme = tenant.theme.copy(
                 accentColor = themeAccentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
                 logoUrl     = themeLogoUrl?.trim()?.takeIf { it.isNotBlank() },
@@ -106,9 +122,8 @@ class AdminService(
     // =========================================================================
 
     /**
-     * Creates a new user in the specified tenant. Unlike self-registration,
-     * the admin can set any password — no minimum length policy applies here
-     * beyond a hard floor of 4 characters.
+     * Creates a new user in the specified tenant.
+     * Password must meet the tenant's full password policy.
      */
     fun createUser(
         tenantId : Int,
@@ -117,28 +132,45 @@ class AdminService(
         fullName : String,
         password : String
     ): AdminResult<User> {
+        val tenant = tenantRepository.findById(tenantId)
+            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+
         if (username.isBlank())
             return AdminResult.Failure(AdminError.Validation("Username is required."))
         if (!username.matches(Regex("[a-zA-Z0-9._-]+")))
             return AdminResult.Failure(AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."))
         if (email.isBlank() || !email.contains('@'))
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
-        if (password.length < 4)
-            return AdminResult.Failure(AdminError.Validation("Password must be at least 4 characters."))
+
+        // Enforce full password policy
+        val policyError = passwordPolicy?.validate(password, tenant)
+        if (policyError != null) {
+            return AdminResult.Failure(AdminError.Validation(policyError))
+        } else if (passwordPolicy == null && password.length < tenant.passwordPolicyMinLength) {
+            return AdminResult.Failure(AdminError.Validation(
+                "Password must be at least ${tenant.passwordPolicyMinLength} characters."))
+        }
+
         if (userRepository.existsByUsername(tenantId, username))
             return AdminResult.Failure(AdminError.Conflict("Username '$username' is already taken."))
         if (userRepository.existsByEmail(tenantId, email))
             return AdminResult.Failure(AdminError.Conflict("Email '${email.lowercase()}' is already registered."))
 
+        val hashedPassword = passwordHasher.hash(password)
         val user = userRepository.save(User(
             tenantId     = tenantId,
             username     = username.trim(),
             email        = email.trim(),
             fullName     = fullName.trim(),
-            passwordHash = passwordHasher.hash(password),
+            passwordHash = hashedPassword,
             emailVerified = true,   // admin-created users are considered verified
             enabled      = true
         ))
+
+        // Record in password history
+        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(user.id!!, tenantId, hashedPassword)
+        }
 
         auditLog.record(AuditEvent(
             tenantId  = tenantId,
@@ -388,40 +420,41 @@ class AdminService(
     // =========================================================================
 
     /**
-     * Force-resets a user's password. Revokes all existing sessions.
-     * Unlike self-service reset, this does not require the current password.
-     * The new password must meet the tenant's password policy.
+     * Sends a password-reset email to the user, allowing them to set their
+     * own password via the standard self-service flow. Requires SMTP to be
+     * configured on the tenant.
      */
-    fun adminResetUserPassword(
-        userId      : Int,
-        tenantId    : Int,
-        newPassword : String
+    fun sendPasswordResetEmail(
+        userId   : Int,
+        tenantId : Int,
+        baseUrl  : String
     ): AdminResult<Unit> {
         val tenant = tenantRepository.findById(tenantId)
             ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
         val user = userRepository.findById(userId)
             ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
-
         if (user.tenantId != tenantId)
             return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
-        if (newPassword.length < 4)
-            return AdminResult.Failure(AdminError.Validation("Password must be at least 4 characters."))
+        if (!tenant.isSmtpReady)
+            return AdminResult.Failure(AdminError.Validation(
+                "SMTP is not configured for this workspace. Configure SMTP in Settings to use email-based password reset."))
 
-        val now = Instant.now()
-        userRepository.updatePassword(userId, passwordHasher.hash(newPassword), now)
-        sessionRepository.revokeAllForUser(tenantId, userId, now)
-
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.ADMIN_USER_PASSWORD_RESET,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("username" to user.username)
-        ))
-
-        return AdminResult.Success(Unit)
+        return when (val result = selfServiceService.initiateForgotPassword(user.email, tenant.slug, baseUrl, ipAddress = null)) {
+            is SelfServiceResult.Success -> {
+                auditLog.record(AuditEvent(
+                    tenantId  = tenantId,
+                    userId    = userId,
+                    clientId  = null,
+                    eventType = AuditEventType.ADMIN_USER_PASSWORD_RESET,
+                    ipAddress = null,
+                    userAgent = null,
+                    details   = mapOf("username" to user.username, "method" to "email")
+                ))
+                AdminResult.Success(Unit)
+            }
+            is SelfServiceResult.Failure ->
+                AdminResult.Failure(AdminError.Validation(result.error.message))
+        }
     }
 
     /**

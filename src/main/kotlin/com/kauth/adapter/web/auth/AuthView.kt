@@ -63,6 +63,20 @@ object AuthView {
         val nonce: String? = null
     ) {
         val isOAuthFlow: Boolean get() = !responseType.isNullOrBlank()
+
+        /** Serializes non-null OAuth params to a query string (with leading '?'). */
+        fun toQueryString(): String {
+            val parts = mutableListOf<String>()
+            responseType?.let        { parts += "response_type=$it" }
+            clientId?.let            { parts += "oauth_client_id=$it" }
+            redirectUri?.let         { parts += "redirect_uri=$it" }
+            scope?.let               { parts += "scope=$it" }
+            state?.let               { parts += "state=$it" }
+            codeChallenge?.let       { parts += "code_challenge=$it" }
+            codeChallengeMethod?.let { parts += "code_challenge_method=$it" }
+            nonce?.let               { parts += "nonce=$it" }
+            return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
+        }
     }
 
     fun loginPage(
@@ -424,6 +438,69 @@ object AuthView {
                     div("footer-link") {
                         a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
                     }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MFA Challenge page — Phase 3c
+    // -------------------------------------------------------------------------
+
+    fun mfaChallengePage(
+        tenantSlug: String,
+        theme: TenantTheme = TenantTheme.DEFAULT,
+        error: String? = null,
+        oauthParams: OAuthParams = OAuthParams()
+    ): HTML.() -> Unit = {
+        head { authHead("KotAuth | Two-Factor Authentication", theme) }
+        body {
+            div("brand") {
+                if (theme.logoUrl != null) {
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                } else {
+                    div("brand-name") { +"KotAuth" }
+                }
+                div("brand-tagline") { +"Two-factor authentication" }
+            }
+            div("card") {
+                h1("card-title") { +"Verify your identity" }
+                p("card-subtitle") { +"Enter the 6-digit code from your authenticator app, or a recovery code." }
+
+                if (error != null) {
+                    div("alert alert-error") { +error }
+                }
+
+                form(action = "/t/$tenantSlug/mfa-challenge", method = FormMethod.post) {
+                    // Preserve OAuth params through the MFA form submission
+                    if (oauthParams.isOAuthFlow) {
+                        oauthParams.responseType?.let { input(type = InputType.hidden, name = "response_type") { value = it } }
+                        oauthParams.clientId?.let { input(type = InputType.hidden, name = "oauth_client_id") { value = it } }
+                        oauthParams.redirectUri?.let { input(type = InputType.hidden, name = "redirect_uri") { value = it } }
+                        oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
+                        oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
+                        oauthParams.codeChallenge?.let { input(type = InputType.hidden, name = "code_challenge") { value = it } }
+                        oauthParams.codeChallengeMethod?.let { input(type = InputType.hidden, name = "code_challenge_method") { value = it } }
+                        oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
+                    }
+
+                    div("form-group") {
+                        label { htmlFor = "code"; +"Authentication code" }
+                        input(type = InputType.text, name = "code") {
+                            id = "code"
+                            placeholder = "Enter 6-digit code or recovery code"
+                            autoComplete = false
+                            autoFocus = true
+                            attributes["inputmode"] = "numeric"
+                            attributes["pattern"] = "[0-9a-fA-F]*"
+                        }
+                    }
+
+                    button(type = ButtonType.submit, classes = "btn-primary") { +"Verify" }
+                }
+
+                div("footer-link") {
+                    a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
                 }
             }
         }

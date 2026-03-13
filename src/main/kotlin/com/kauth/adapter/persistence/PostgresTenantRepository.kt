@@ -78,6 +78,14 @@ class PostgresTenantRepository : TenantRepository {
             it[smtpTlsEnabled]         = tenant.smtpTlsEnabled
             it[smtpEnabled]            = tenant.smtpEnabled
             it[maxConcurrentSessions]  = tenant.maxConcurrentSessions
+            // Phase 3c: expanded password policy
+            it[passwordPolicyHistoryCount]     = tenant.passwordPolicyHistoryCount
+            it[passwordPolicyMaxAgeDays]       = tenant.passwordPolicyMaxAgeDays
+            it[passwordPolicyRequireUppercase] = tenant.passwordPolicyRequireUppercase
+            it[passwordPolicyRequireNumber]    = tenant.passwordPolicyRequireNumber
+            it[passwordPolicyBlacklistEnabled] = tenant.passwordPolicyBlacklistEnabled
+            // Phase 3c: MFA policy
+            it[mfaPolicy]                      = tenant.mfaPolicy
         }
         TenantsTable.selectAll()
             .where { TenantsTable.id eq tenant.id }
@@ -114,6 +122,11 @@ class PostgresTenantRepository : TenantRepository {
             emailVerificationRequired    = this[TenantsTable.emailVerificationRequired],
             passwordPolicyMinLength      = this[TenantsTable.passwordPolicyMinLength],
             passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial],
+            passwordPolicyHistoryCount     = this[TenantsTable.passwordPolicyHistoryCount],
+            passwordPolicyMaxAgeDays       = this[TenantsTable.passwordPolicyMaxAgeDays],
+            passwordPolicyRequireUppercase = this[TenantsTable.passwordPolicyRequireUppercase],
+            passwordPolicyRequireNumber    = this[TenantsTable.passwordPolicyRequireNumber],
+            passwordPolicyBlacklistEnabled = this[TenantsTable.passwordPolicyBlacklistEnabled],
             theme = TenantTheme(
                 accentColor      = this[TenantsTable.themeAccentColor],
                 accentHoverColor = this[TenantsTable.themeAccentHover],
@@ -135,6 +148,7 @@ class PostgresTenantRepository : TenantRepository {
             smtpFromName           = this[TenantsTable.smtpFromName],
             smtpTlsEnabled         = this[TenantsTable.smtpTlsEnabled],
             smtpEnabled            = this[TenantsTable.smtpEnabled],
+            mfaPolicy              = this[TenantsTable.mfaPolicy],
             maxConcurrentSessions  = this[TenantsTable.maxConcurrentSessions]
         )
     }

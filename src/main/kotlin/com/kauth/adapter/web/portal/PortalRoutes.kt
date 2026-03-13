@@ -2,9 +2,13 @@ package com.kauth.adapter.web.portal
 
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
+import com.kauth.domain.service.MfaError
+import com.kauth.domain.service.MfaResult
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.SelfServiceError
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
@@ -38,7 +42,9 @@ import java.time.Instant
 fun Route.portalRoutes(
     authService         : AuthService,
     selfServiceService  : UserSelfServiceService,
-    tenantRepository    : TenantRepository
+    tenantRepository    : TenantRepository,
+    mfaService          : MfaService? = null,  // Phase 3c — nullable for backward compat
+    userRepository      : UserRepository? = null  // Phase 3c — needed for MFA challenge resolution
 ) {
     route("/t/{slug}/account") {
 
@@ -65,6 +71,21 @@ fun Route.portalRoutes(
             when (val result = authService.authenticate(slug, username, password)) {
                 is AuthResult.Success -> {
                     val user = result.value
+
+                    // Phase 3c: MFA challenge — if user has MFA enabled, redirect to challenge page
+                    if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
+                        val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
+                        call.response.cookies.append(
+                            name     = "KOTAUTH_PORTAL_MFA_PENDING",
+                            value    = mfaPending,
+                            maxAge   = 300L,   // 5 minutes
+                            httpOnly = true,
+                            path     = "/t/$slug/account"
+                        )
+                        call.respondRedirect("/t/$slug/account/mfa-challenge")
+                        return@post
+                    }
+
                     call.sessions.set(PortalSession(
                         userId    = user.id!!,
                         tenantId  = user.tenantId,
@@ -80,6 +101,89 @@ fun Route.portalRoutes(
                         else                         -> "Login failed. Please try again."
                     }
                     call.respondRedirect("/t/$slug/account/login?error=${encodeParam(msg)}")
+                }
+            }
+        }
+
+        // Phase 3c: MFA challenge page for portal login
+        get("/mfa-challenge") {
+            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+
+            val pending = call.request.cookies["KOTAUTH_PORTAL_MFA_PENDING"]
+            if (pending.isNullOrBlank()) {
+                return@get call.respondRedirect("/t/$slug/account/login")
+            }
+
+            val error = call.request.queryParameters["error"]
+            call.respondHtml(HttpStatusCode.OK,
+                PortalView.mfaChallengePage(slug, tenant.displayName, tenant.theme, error))
+        }
+
+        post("/mfa-challenge") {
+            val slug   = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+            val params = call.receiveParameters()
+            val code   = params["code"]?.trim() ?: ""
+
+            val pending = call.request.cookies["KOTAUTH_PORTAL_MFA_PENDING"]
+            if (pending.isNullOrBlank()) {
+                return@post call.respondRedirect("/t/$slug/account/login")
+            }
+
+            val parts = pending.split("|")
+            if (parts.size != 3) {
+                return@post call.respondRedirect("/t/$slug/account/login")
+            }
+            val userId    = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val pendSlug  = parts[1]
+            val timestamp = parts[2].toLongOrNull() ?: 0L
+
+            // Validate: slug must match and token must be < 5 minutes old
+            if (pendSlug != slug || System.currentTimeMillis() - timestamp > 300_000) {
+                call.response.cookies.append(
+                    name = "KOTAUTH_PORTAL_MFA_PENDING", value = "", maxAge = 0L,
+                    path = "/t/$slug/account", httpOnly = true
+                )
+                return@post call.respondRedirect("/t/$slug/account/login?error=${encodeParam("MFA session expired. Please log in again.")}")
+            }
+
+            if (mfaService == null) {
+                return@post call.respondRedirect("/t/$slug/account/login")
+            }
+
+            // Try TOTP code first, then recovery code
+            val mfaResult = if (code.length == 6 && code.all { it.isDigit() }) {
+                mfaService.verifyTotp(userId, code)
+            } else {
+                mfaService.verifyRecoveryCode(userId, code)
+            }
+
+            when (mfaResult) {
+                is MfaResult.Failure -> {
+                    call.respondRedirect("/t/$slug/account/mfa-challenge?error=${encodeParam("Invalid verification code. Please try again.")}")
+                }
+                is MfaResult.Success -> {
+                    // Clear MFA pending cookie
+                    call.response.cookies.append(
+                        name = "KOTAUTH_PORTAL_MFA_PENDING", value = "", maxAge = 0L,
+                        path = "/t/$slug/account", httpOnly = true
+                    )
+
+                    // Fetch user and create portal session
+                    val user = userRepository?.findById(userId)
+                    if (user == null) {
+                        return@post call.respondRedirect("/t/$slug/account/login?error=${encodeParam("User not found.")}")
+                    }
+                    call.sessions.set(PortalSession(
+                        userId     = user.id!!,
+                        tenantId   = user.tenantId,
+                        tenantSlug = slug,
+                        username   = user.username
+                    ))
+                    call.respondRedirect("/t/$slug/account/profile")
                 }
             }
         }
@@ -187,7 +291,67 @@ fun Route.portalRoutes(
             selfServiceService.revokeSession(session.userId, session.tenantId, sessionId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
         }
+
+        // ------------------------------------------------------------------
+        // MFA self-service — Phase 3c (JSON API, consumed by portal UI)
+        // ------------------------------------------------------------------
+
+        // POST /t/{slug}/account/mfa/enroll — start TOTP enrollment
+        post("/mfa/enroll") {
+            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
+
+            val tenant = tenantRepository.findById(session.tenantId)
+            val issuer = tenant?.displayName ?: "KotAuth"
+
+            when (val result = mfaService.beginEnrollment(session.userId, session.tenantId, issuer)) {
+                is MfaResult.Success -> call.respond(mapOf(
+                    "totp_uri"       to result.value.totpUri,
+                    "recovery_codes" to result.value.recoveryCodes
+                ))
+                is MfaResult.Failure -> call.respond(HttpStatusCode.Conflict, mapOf(
+                    "error" to result.error.toCode()
+                ))
+            }
+        }
+
+        // POST /t/{slug}/account/mfa/verify — confirm enrollment with TOTP code
+        post("/mfa/verify") {
+            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
+
+            val params = call.receiveParameters()
+            val code   = params["code"]?.trim() ?: ""
+
+            when (val result = mfaService.verifyEnrollment(session.userId, code)) {
+                is MfaResult.Success -> call.respond(mapOf("status" to "verified"))
+                is MfaResult.Failure -> call.respond(HttpStatusCode.BadRequest, mapOf(
+                    "error" to result.error.toCode()
+                ))
+            }
+        }
+
+        // POST /t/{slug}/account/mfa/disable — remove MFA enrollment
+        post("/mfa/disable") {
+            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
+
+            mfaService.disableMfa(session.userId, session.tenantId)
+            call.respond(mapOf("status" to "disabled"))
+        }
     }
+}
+
+private fun MfaError.toCode(): String = when (this) {
+    is MfaError.UserNotFound        -> "user_not_found"
+    is MfaError.TenantNotFound      -> "tenant_not_found"
+    is MfaError.AlreadyEnrolled     -> "already_enrolled"
+    is MfaError.NotEnrolled         -> "not_enrolled"
+    is MfaError.InvalidCode         -> "invalid_code"
+    is MfaError.NoRecoveryCodesLeft -> "no_recovery_codes"
 }
 
 private fun encodeParam(value: String) =
