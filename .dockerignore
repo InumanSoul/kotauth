@@ -1,0 +1,13 @@
+# Exclude local build outputs — Docker does its own Gradle build from source
+build/
+.gradle/
+
+# IDE and OS noise
+.idea/
+*.iml
+.DS_Store
+**/.DS_Store
+
+# Design files don't need to go into the image
+design/
+docs/

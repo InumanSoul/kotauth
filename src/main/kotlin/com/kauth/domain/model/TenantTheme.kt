@@ -84,5 +84,18 @@ data class TenantTheme(
             textPrimary      = "#0f172a",
             textMuted        = "#64748b"
         )
+        
+        // Same as LIGHT but with rounded corners, for tenants that want a softer look without changing colors.
+        val SIMPLE = TenantTheme(
+            accentColor      = "#212121",
+            accentHoverColor = "#000000",
+            bgDeep           = "#fafafa",
+            bgCard           = "#ffffff",
+            bgInput          = "#f1f5f9",
+            borderColor      = "#e2e8f0",
+            borderRadius     = "8px",
+            textPrimary      = "#0f172a",
+            textMuted        = "#64748b"
+        )
     }
 }

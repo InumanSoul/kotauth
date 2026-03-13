@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
@@ -32,7 +33,11 @@ import io.ktor.server.sessions.*
  * Authentication uses cookie sessions, NOT JWTs.
  * The admin console only accepts credentials from the master workspace (master tenant).
  */
-fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantRepository) {
+fun Route.adminRoutes(
+    authService: AuthService,
+    tenantRepository: TenantRepository,
+    applicationRepository: ApplicationRepository
+) {
 
     route("/admin") {
 
@@ -161,21 +166,144 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
                 call.respondRedirect("/admin?created=$slug")
             }
 
-            // Workspace detail
-            get("/{slug}") {
-                val session   = call.sessions.get<AdminSession>()!!
-                val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace = tenantRepository.findBySlug(slug)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
-                val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
-                call.respondHtml(
-                    HttpStatusCode.OK,
-                    AdminView.workspaceDetailPage(
-                        workspace     = workspace,
-                        allWorkspaces = wsPairs,
-                        loggedInAs    = session.username
+            // ------------------------------------------------------------------
+            // All workspace-scoped routes share a single /{slug} parent so Ktor
+            // builds one unambiguous tree node — avoids the conflict between a
+            // terminal GET "/{slug}" and a deeper route "/{slug}/applications".
+            // ------------------------------------------------------------------
+
+            route("/{slug}") {
+
+                // Workspace detail
+                get {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug)
+                        ?: return@get call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val apps      = applicationRepository.findByTenantId(workspace.id)
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.workspaceDetailPage(
+                            workspace     = workspace,
+                            allWorkspaces = wsPairs,
+                            apps          = apps,
+                            loggedInAs    = session.username
+                        )
                     )
-                )
+                }
+
+                // Applications
+                route("/applications") {
+
+                    // Create application form
+                    get("/new") {
+                        try {
+                            val session   = call.sessions.get<AdminSession>()!!
+                            val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace = tenantRepository.findBySlug(slug)
+                                ?: return@get call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
+                            val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                            call.respondHtml(
+                                HttpStatusCode.OK,
+                                AdminView.createApplicationPage(
+                                    workspace     = workspace,
+                                    allWorkspaces = wsPairs,
+                                    loggedInAs    = session.username
+                                )
+                            )
+                        }
+                        catch(e: Exception) {
+                            application.log.error("Error rendering create application page", e)
+                            call.respond(HttpStatusCode.InternalServerError, "Error: ${e.message}")
+                        }
+                    }
+
+                    // Create application handler
+                    post {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug)
+                            ?: return@post call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
+
+                        val params      = call.receiveParameters()
+                        val clientId    = params["clientId"]?.trim()?.lowercase() ?: ""
+                        val name        = params["name"]?.trim() ?: ""
+                        val description = params["description"]?.trim()?.takeIf { it.isNotBlank() }
+                        val accessType  = params["accessType"]?.trim() ?: "public"
+                        val redirectUris = params["redirectUris"]
+                            ?.lines()
+                            ?.map { it.trim() }
+                            ?.filter { it.isNotBlank() }
+                            ?: emptyList()
+
+                        val prefill = ApplicationPrefill(
+                            clientId     = clientId,
+                            name         = name,
+                            description  = description ?: "",
+                            accessType   = accessType,
+                            redirectUris = params["redirectUris"] ?: ""
+                        )
+
+                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+
+                        val error = when {
+                            clientId.isBlank()                                             -> "Client ID is required."
+                            !clientId.matches(Regex("[a-z0-9-]+"))                         -> "Client ID may only contain lowercase letters, numbers, and hyphens."
+                            applicationRepository.existsByClientId(workspace.id, clientId) -> "An application with client ID '$clientId' already exists in this workspace."
+                            name.isBlank()                                                 -> "Name is required."
+                            else                                                           -> null
+                        }
+
+                        if (error != null) {
+                            call.respondHtml(
+                                HttpStatusCode.UnprocessableEntity,
+                                AdminView.createApplicationPage(
+                                    workspace     = workspace,
+                                    allWorkspaces = wsPairs,
+                                    loggedInAs    = session.username,
+                                    error         = error,
+                                    prefill       = prefill
+                                )
+                            )
+                            return@post
+                        }
+
+                        applicationRepository.create(
+                            tenantId     = workspace.id,
+                            clientId     = clientId,
+                            name         = name,
+                            description  = description,
+                            accessType   = accessType,
+                            redirectUris = redirectUris
+                        )
+                        call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+                    }
+
+                    // Application detail — explicit /new must be registered before /{clientId}
+                    // so Ktor's constant-before-parameterized ordering applies cleanly.
+                    get("/{clientId}") {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val clientId  = call.parameters["clientId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug)
+                            ?: return@get call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
+                        val application = applicationRepository.findByClientId(workspace.id, clientId)
+                            ?: return@get call.respond(HttpStatusCode.NotFound, "Application '$clientId' not found in workspace '$slug'.")
+                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val allApps = applicationRepository.findByTenantId(workspace.id)
+                        call.respondHtml(
+                            HttpStatusCode.OK,
+                            AdminView.applicationDetailPage(
+                                workspace     = workspace,
+                                application   = application,
+                                allWorkspaces = wsPairs,
+                                allApps       = allApps,
+                                loggedInAs    = session.username
+                            )
+                        )
+                    }
+                }
             }
         }
 

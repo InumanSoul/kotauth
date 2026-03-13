@@ -2,11 +2,13 @@ package com.kauth
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
+import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.admin.AdminSession
+import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.domain.service.AuthService
@@ -19,7 +21,10 @@ import io.ktor.server.auth.jwt.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.http.content.*
+import io.ktor.server.html.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
@@ -95,11 +100,42 @@ fun Application.module() {
     // -------------------------------------------------------------------------
     // Dependency wiring
     // -------------------------------------------------------------------------
-    val userRepository = PostgresUserRepository()
-    val tenantRepository = PostgresTenantRepository()
-    val tokenAdapter = JwtTokenAdapter(jwtIssuer, jwtAudience, algorithm)
-    val passwordHasher = BcryptPasswordHasher()
-    val authService = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher)
+    val userRepository        = PostgresUserRepository()
+    val tenantRepository      = PostgresTenantRepository()
+    val applicationRepository = PostgresApplicationRepository()
+    val tokenAdapter          = JwtTokenAdapter(jwtIssuer, jwtAudience, algorithm)
+    val passwordHasher        = BcryptPasswordHasher()
+    val authService           = AuthService(userRepository, tenantRepository, tokenAdapter, passwordHasher)
+
+    // -------------------------------------------------------------------------
+    // Error boundary — catches all unhandled exceptions before they become
+    // a blank HTTP 500. Admin routes render the full shell + a readable message
+    // so the user can see what went wrong and navigate away cleanly.
+    // -------------------------------------------------------------------------
+    install(StatusPages) {
+        exception<Throwable> { call, cause ->
+            call.application.log.error("Unhandled exception at ${call.request.path()}", cause)
+            if (call.request.path().startsWith("/admin")) {
+                val session = call.sessions.get<AdminSession>()
+                val workspaces = try {
+                    tenantRepository.findAll().map { it.slug to it.displayName }
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                call.respondHtml(
+                    HttpStatusCode.InternalServerError,
+                    AdminView.adminErrorPage(
+                        message       = cause.message ?: "An unexpected error occurred.",
+                        exceptionType = cause::class.qualifiedName,
+                        allWorkspaces = workspaces,
+                        loggedInAs    = session?.username ?: "—"
+                    )
+                )
+            } else {
+                call.respond(HttpStatusCode.InternalServerError, "Internal Server Error")
+            }
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Routes
@@ -117,7 +153,7 @@ fun Application.module() {
         authRoutes(authService, tenantRepository)
 
         // Admin console — session-auth managed internally by adminRoutes
-        adminRoutes(authService, tenantRepository)
+        adminRoutes(authService, tenantRepository, applicationRepository)
 
         // JWT-protected API example — wire real API routes here in Phase 2
         authenticate("auth-jwt") {

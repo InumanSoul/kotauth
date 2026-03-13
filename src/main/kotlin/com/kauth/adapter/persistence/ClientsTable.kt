@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.AccessType
 import org.jetbrains.exposed.sql.Table
+import org.postgresql.util.PGobject
 
 /**
  * Exposed ORM mapping for the 'clients' and 'client_redirect_uris' tables
@@ -16,7 +18,12 @@ object ClientsTable : Table("clients") {
     val clientSecretHash   = varchar("client_secret_hash", 128).nullable()
     val name               = varchar("name", 100)
     val description        = text("description").nullable()
-    val accessType         = varchar("access_type", 20).default("public")
+    val accessType         = customEnumeration(
+        name   = "access_type",
+        sql    = "client_access_type",
+        fromDb = { AccessType.fromValue(it.toString()) },
+        toDb   = { PGobject().apply { type = "client_access_type"; value = it.value } }
+    )
     val tokenExpiryOverride = integer("token_expiry_override").nullable()
     val enabled            = bool("enabled").default(true)
 

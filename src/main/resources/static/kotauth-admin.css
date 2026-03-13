@@ -137,9 +137,10 @@ label {
     letter-spacing: 0.05em;
     border: 1px solid;
 }
-.badge-green { background: #052e16; color: #86efac; border-color: #166534; }
-.badge-red   { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
-.badge-blue  { background: rgba(31,188,255,.12); color: var(--accent); border-color: rgba(31,188,255,.3); }
+.badge-green   { background: #052e16; color: #86efac; border-color: #166534; }
+.badge-red     { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+.badge-blue    { background: rgba(31,188,255,.12); color: var(--accent); border-color: rgba(31,188,255,.3); }
+.badge-outline { background: transparent; color: var(--muted); border-color: var(--border); }
 
 /* =========================================================================
    Shell
@@ -420,6 +421,28 @@ label {
     user-select: none;
 }
 .topbar-avatar:hover { background: rgba(255,255,255,.1); }
+
+/* Logout button — icon-only ghost, red hover */
+.logout-form { display: inline-flex; align-items: center; margin: 0; padding: 0; }
+.btn-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    padding: 0;
+}
+.btn-logout:hover {
+    background: rgba(239,68,68,.12);
+    border-color: rgba(239,68,68,.25);
+    color: #f87171;
+}
 
 /* =========================================================================
    Shell body

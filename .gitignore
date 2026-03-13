@@ -19,6 +19,7 @@ out/
 *.war
 *.ear
 hs_err_pid*
+bin/
 
 # Secrets / Environment
 .env

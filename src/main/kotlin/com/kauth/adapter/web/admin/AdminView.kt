@@ -1,5 +1,7 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.AccessType
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -131,6 +133,18 @@ object AdminView {
                         div("topbar-avatar") {
                             attributes["title"] = "Signed in as $loggedInAs"
                             +(loggedInAs.firstOrNull()?.uppercaseChar()?.toString() ?: "A")
+                        }
+                        form(
+                            action  = "/admin/logout",
+                            method  = FormMethod.post,
+                            classes = "logout-form"
+                        ) {
+                            button(type = ButtonType.submit, classes = "btn-logout") {
+                                attributes["title"] = "Sign out"
+                                unsafe {
+                                    +"""<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
+                                }
+                            }
                         }
                     }
                 }
@@ -548,16 +562,18 @@ object AdminView {
     fun workspaceDetailPage(
         workspace: Tenant,
         allWorkspaces: List<Pair<String, String>>,
+        apps: List<Application> = emptyList(),
         loggedInAs: String
     ): HTML.() -> Unit = {
+        val appPairs = apps.map { it.clientId to it.name }
         adminShell(
-            pageTitle = workspace.displayName,
-            activeRail = "apps",
+            pageTitle     = workspace.displayName,
+            activeRail    = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
-            apps = emptyList(),       // placeholder until Application entity exists
-            loggedInAs = loggedInAs
+            apps          = appPairs,
+            loggedInAs    = loggedInAs
         ) {
             div("breadcrumb") {
                 a("/admin") { +"Workspaces" }
@@ -580,6 +596,10 @@ object AdminView {
                 div {
                     style = "display:flex; gap:0.5rem; align-items:center;"
                     a(
+                        href = "/admin/workspaces/${workspace.slug}/applications/new",
+                        classes = "btn btn-sm"
+                    ) { +"+ New Application" }
+                    a(
                         href = "/t/${workspace.slug}/login",
                         classes = "btn btn-ghost btn-sm"
                     ) {
@@ -588,9 +608,8 @@ object AdminView {
                     }
                 }
             }
-            div("alert alert-warn") {
-                +"Application management is coming in Phase 2. Use the context panel once apps exist to drill into authentication, users, roles, and more."
-            }
+
+            // Workspace settings card
             div("card card-body") {
                 style = "max-width:480px;"
                 table {
@@ -609,6 +628,266 @@ object AdminView {
                     }
                 }
             }
+
+            // Applications section
+            div("page-header") {
+                style = "margin-top:2rem;"
+                div {
+                    p("page-title") { style = "font-size:1rem;"; +"Applications" }
+                    p("page-subtitle") { +"OAuth2 / OIDC clients registered in this workspace" }
+                }
+            }
+            div("card") {
+                if (apps.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"⊡" }
+                        p("empty-state-text") { +"No applications yet." }
+                        p("empty-state-text") {
+                            style = "margin-top:0.5rem; font-size:0.8rem;"
+                            +"Use "
+                            strong { +"+ New Application" }
+                            +" above to register your first client."
+                        }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Client ID" }
+                                th { +"Name" }
+                                th { +"Type" }
+                                th { +"Status" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            apps.forEach { app ->
+                                tr {
+                                    td { span("td-code") { +app.clientId } }
+                                    td { +app.name }
+                                    td { span("badge badge-outline") { +app.accessType.label } }
+                                    td {
+                                        if (app.enabled) span("badge badge-green") { +"Active" }
+                                        else span("badge badge-red") { +"Disabled" }
+                                    }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${workspace.slug}/applications/${app.clientId}",
+                                            classes = "btn btn-ghost btn-sm"
+                                        ) { +"Open →" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Create application form
+    // -------------------------------------------------------------------------
+
+    fun createApplicationPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        prefill: ApplicationPrefill = ApplicationPrefill()
+    ): HTML.() -> Unit = {
+        val appPairs = emptyList<Pair<String, String>>()   // no apps yet when creating
+        adminShell(
+            pageTitle     = "New Application — ${workspace.displayName}",
+            activeRail    = "apps",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            apps          = appPairs,
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New Application" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create Application" }
+                    p("page-subtitle") {
+                        +"Register an OAuth2 / OIDC client in the "
+                        strong { +workspace.displayName }
+                        +" workspace."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { +error }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/applications",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    p("form-section-title") { +"Identity" }
+                    div("field") {
+                        label { htmlFor = "clientId"; +"Client ID" }
+                        input(type = InputType.text, name = "clientId") {
+                            id = "clientId"
+                            placeholder = "my-web-app"
+                            value = prefill.clientId
+                            required = true
+                            attributes["pattern"] = "[a-z0-9-]+"
+                        }
+                        p("field-hint") {
+                            +"Lowercase letters, numbers, hyphens. Unique within this workspace."
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "name"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "name"
+                            placeholder = "My Web App"
+                            value = prefill.name
+                            required = true
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "description"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") {
+                            id = "description"
+                            placeholder = "Short description of this application"
+                            value = prefill.description
+                        }
+                    }
+
+                    p("form-section-title") { +"Access" }
+                    div("field") {
+                        label { htmlFor = "accessType"; +"Access Type" }
+                        select {
+                            name = "accessType"
+                            id = "accessType"
+                            option {
+                                value = "public"
+                                selected = (prefill.accessType == "public")
+                                +"Public — browser / SPA / mobile (no secret)"
+                            }
+                            option {
+                                value = "confidential"
+                                selected = (prefill.accessType == "confidential")
+                                +"Confidential — server-side app with a secret"
+                            }
+                            option {
+                                value = "bearer_only"
+                                selected = (prefill.accessType == "bearer_only")
+                                +"Bearer Only — resource server (validates tokens only)"
+                            }
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "redirectUris"; +"Redirect URIs" }
+                        textArea {
+                            name = "redirectUris"
+                            id = "redirectUris"
+                            rows = "4"
+                            attributes["placeholder"] = "https://app.example.com/callback\nhttps://localhost:3000/callback"
+                            +prefill.redirectUris
+                        }
+                        p("field-hint") { +"One URI per line. Required for Public and Confidential types." }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create Application" }
+                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Application detail
+    // -------------------------------------------------------------------------
+
+    fun applicationDetailPage(
+        workspace: Tenant,
+        application: Application,
+        allWorkspaces: List<Pair<String, String>>,
+        allApps: List<Application>,
+        loggedInAs: String
+    ): HTML.() -> Unit = {
+        val appPairs = allApps.map { it.clientId to it.name }
+        adminShell(
+            pageTitle      = "${application.name} — ${workspace.displayName}",
+            activeRail     = "apps",
+            allWorkspaces  = allWorkspaces,
+            workspaceName  = workspace.displayName,
+            workspaceSlug  = workspace.slug,
+            apps           = appPairs,
+            activeAppSlug  = application.clientId,
+            activeAppSection = "overview",
+            loggedInAs     = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +application.clientId }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +application.name }
+                    p { style = "margin-top:2px;"
+                        span("td-code") { +application.clientId }
+                        span("badge badge-outline") {
+                            style = "margin-left:0.5rem; vertical-align:middle;"
+                            +application.accessType.label
+                        }
+                        if (!application.enabled) {
+                            span("badge badge-red") {
+                                style = "margin-left:0.5rem; vertical-align:middle;"
+                                +"Disabled"
+                            }
+                        }
+                    }
+                }
+            }
+
+            div("card card-body") {
+                style = "max-width:540px;"
+                table {
+                    style = "width:100%;"
+                    tbody {
+                        detailRow("Client ID",    application.clientId)
+                        detailRow("Name",         application.name)
+                        detailRow("Description",  application.description ?: "—")
+                        detailRow("Access Type",  application.accessType.label)
+                        detailRow("Status",       if (application.enabled) "Active" else "Disabled")
+                        detailRow("Workspace",    workspace.slug)
+                    }
+                }
+            }
+
+            // Redirect URIs
+            div("page-header") {
+                style = "margin-top:2rem;"
+                div {
+                    p("page-title") { style = "font-size:1rem;"; +"Redirect URIs" }
+                }
+            }
+            div("card card-body") {
+                if (application.redirectUris.isEmpty()) {
+                    p { style = "color:var(--muted); font-size:0.85rem;"; +"No redirect URIs configured." }
+                } else {
+                    application.redirectUris.forEach { uri ->
+                        p { span("td-code") { +uri } }
+                    }
+                }
+            }
         }
     }
 
@@ -616,6 +895,48 @@ object AdminView {
         tr {
             td { style = "color:var(--muted); width:200px; font-size:0.78rem;"; +label }
             td { style = "font-size:0.85rem;"; +value }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Error page — rendered by the StatusPages error boundary instead of
+    // a raw HTTP 500. Keeps the full admin shell so the user can navigate away.
+    // -------------------------------------------------------------------------
+
+    fun adminErrorPage(
+        message: String,
+        exceptionType: String? = null,
+        allWorkspaces: List<Pair<String, String>> = emptyList(),
+        loggedInAs: String = "—"
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "Error — KotAuth",
+            activeRail    = "apps",
+            allWorkspaces = allWorkspaces,
+            loggedInAs    = loggedInAs
+        ) {
+            div("page-header") {
+                div {
+                    p("page-title") { +"Something went wrong" }
+                    p("page-subtitle") { +"An unexpected error occurred processing your request." }
+                }
+            }
+            div("alert alert-error") {
+                style = "max-width:640px; margin-top:1.5rem;"
+                if (exceptionType != null) {
+                    p {
+                        style = "font-size:0.75rem; opacity:0.65; margin-bottom:0.35rem;"
+                        +exceptionType
+                    }
+                }
+                p {
+                    style = "font-family:monospace; font-size:0.85rem; word-break:break-word;"
+                    +message
+                }
+            }
+            div { style = "margin-top:1.5rem;"
+                a("/admin", classes = "btn btn-ghost") { +"← Back to dashboard" }
+            }
         }
     }
 }
@@ -631,4 +952,15 @@ data class WorkspacePrefill(
     val emailVerificationRequired: Boolean = false,
     val themeAccentColor: String = "#1FBCFF",
     val themeLogoUrl: String = ""
+)
+
+/**
+ * Holds create-application form values for prefill after a failed submission.
+ */
+data class ApplicationPrefill(
+    val clientId: String = "",
+    val name: String = "",
+    val description: String = "",
+    val accessType: String = "public",
+    val redirectUris: String = ""   // newline-separated URIs
 )
