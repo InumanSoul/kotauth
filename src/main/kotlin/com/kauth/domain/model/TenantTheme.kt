@@ -16,19 +16,19 @@ package com.kauth.domain.model
  * white-label their login page, not 60.
  */
 data class TenantTheme(
-    // Brand colors
-    val accentColor: String       = "#bb86fc",
-    val accentHoverColor: String  = "#9965f4",
-    // Surface colors
-    val bgDeep: String            = "#0f0f13",
-    val bgCard: String            = "#1a1a24",
-    val bgInput: String           = "#252532",
+    // Brand colors — Zinc-dark palette, brand cyan accent
+    val accentColor: String       = "#1FBCFF",
+    val accentHoverColor: String  = "#0ea5d9",
+    // Surface colors — shadcn Zinc-dark token set
+    val bgDeep: String            = "#09090b",
+    val bgCard: String            = "#18181b",
+    val bgInput: String           = "#27272a",
     // Structure
-    val borderColor: String       = "#2e2e3e",
+    val borderColor: String       = "#3f3f46",
     val borderRadius: String      = "8px",
     // Text
-    val textPrimary: String       = "#e8e8f0",
-    val textMuted: String         = "#6b6b80",
+    val textPrimary: String       = "#fafafa",
+    val textMuted: String         = "#a1a1aa",
     // Brand identity
     val logoUrl: String?          = null,
     val faviconUrl: String?       = null
@@ -55,18 +55,32 @@ data class TenantTheme(
     }
 
     companion object {
-        /** KotAuth default dark theme — also the master tenant default. */
-        val DEFAULT = TenantTheme()
+        /**
+         * KotAuth default dark theme — Zinc/dark palette matching the admin console design.
+         * Accent: brand cyan #1FBCFF (not purple — updated to match design system).
+         * Surfaces follow the shadcn Zinc-dark token set.
+         */
+        val DEFAULT = TenantTheme(
+            accentColor      = "#1FBCFF",
+            accentHoverColor = "#0ea5d9",
+            bgDeep           = "#09090b",
+            bgCard           = "#18181b",
+            bgInput          = "#27272a",
+            borderColor      = "#3f3f46",
+            borderRadius     = "0px",
+            textPrimary      = "#fafafa",
+            textMuted        = "#a1a1aa"
+        )
 
         /** A light theme preset for tenants that want a clean white login page. */
         val LIGHT = TenantTheme(
-            accentColor      = "#7c3aed",
-            accentHoverColor = "#6d28d9",
+            accentColor      = "#0ea5d9",
+            accentHoverColor = "#0284c7",
             bgDeep           = "#f8fafc",
             bgCard           = "#ffffff",
             bgInput          = "#f1f5f9",
             borderColor      = "#e2e8f0",
-            borderRadius     = "8px",
+            borderRadius     = "0px",
             textPrimary      = "#0f172a",
             textMuted        = "#64748b"
         )

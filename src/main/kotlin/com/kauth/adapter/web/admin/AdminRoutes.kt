@@ -15,14 +15,22 @@ import io.ktor.server.sessions.*
 /**
  * Admin console — browser-facing routes for platform administrators.
  *
- * Authentication uses cookie sessions, NOT JWTs.
- * JWTs are for API/OAuth consumers. Browser admin UIs use sessions because:
- *   - HttpOnly cookies can't be read by XSS
- *   - No token refresh logic in client JS needed
- *   - Logout is instant (server invalidates the session)
+ * URL structure:
+ *   /admin                              — workspace list (dashboard)
+ *   /admin/workspaces/new               — create workspace form
+ *   /admin/workspaces                   — POST create workspace
+ *   /admin/workspaces/{slug}            — workspace detail
+ *   /admin/workspaces/{slug}/applications/new  — create application (Phase 2)
+ *   /admin/directory                    — user directory (Phase 2)
+ *   /admin/security                     — security settings (Phase 2)
+ *   /admin/logs                         — audit logs (Phase 2)
+ *   /admin/settings                     — system settings (Phase 2)
  *
- * The admin console only accepts credentials from the master tenant.
- * A regular user on another tenant cannot authenticate here.
+ * Public-facing terminology: Workspace (= Tenant), Application (= Client).
+ * Internal domain model retains Tenant / Client — only the HTTP/HTML layer translates.
+ *
+ * Authentication uses cookie sessions, NOT JWTs.
+ * The admin console only accepts credentials from the master workspace (master tenant).
  */
 fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantRepository) {
 
@@ -45,7 +53,6 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
             val username = params["username"]?.trim() ?: ""
             val password = params["password"] ?: ""
 
-            // Authenticate against the master tenant only
             when (val result = authService.login(Tenant.MASTER_SLUG, username, password)) {
                 is AuthResult.Success -> {
                     call.sessions.set(AdminSession(username = username))
@@ -70,7 +77,6 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
         // ------------------------------------------------------------------
 
         intercept(ApplicationCallPipeline.Call) {
-            // /admin/login is handled above — only check session for other admin routes
             if (!call.request.uri.startsWith("/admin/login") && call.sessions.get<AdminSession>() == null) {
                 call.respondRedirect("/admin/login")
                 finish()
@@ -78,63 +84,75 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
         }
 
         // ------------------------------------------------------------------
-        // Dashboard — tenant list overview
+        // Dashboard — workspace list
         // ------------------------------------------------------------------
 
         get {
-            val session = call.sessions.get<AdminSession>()!!
-            val tenants = tenantRepository.findAll()
-            call.respondHtml(HttpStatusCode.OK, AdminView.dashboardPage(tenants, session.username))
+            val session    = call.sessions.get<AdminSession>()!!
+            val workspaces = tenantRepository.findAll()
+            call.respondHtml(HttpStatusCode.OK, AdminView.dashboardPage(workspaces, session.username))
         }
 
         // ------------------------------------------------------------------
-        // Tenants
+        // Workspaces (previously: /admin/tenants)
         // ------------------------------------------------------------------
 
-        route("/tenants") {
+        route("/workspaces") {
 
             get {
                 call.respondRedirect("/admin")
             }
 
-            // Create tenant form
+            // Create workspace form
             get("/new") {
-                val session = call.sessions.get<AdminSession>()!!
-                call.respondHtml(HttpStatusCode.OK, AdminView.createTenantPage(session.username))
+                val session   = call.sessions.get<AdminSession>()!!
+                val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.createWorkspacePage(
+                        loggedInAs    = session.username,
+                        allWorkspaces = wsPairs
+                    )
+                )
             }
 
-            // Create tenant handler
+            // Create workspace handler
             post {
-                val session = call.sessions.get<AdminSession>()!!
-                val params = call.receiveParameters()
+                val session     = call.sessions.get<AdminSession>()!!
+                val params      = call.receiveParameters()
                 val slug        = params["slug"]?.trim()?.lowercase() ?: ""
                 val displayName = params["displayName"]?.trim() ?: ""
                 val issuerUrl   = params["issuerUrl"]?.trim()?.takeIf { it.isNotBlank() }
 
-                val prefill = TenantPrefill(
-                    slug = slug,
-                    displayName = displayName,
-                    issuerUrl = issuerUrl ?: "",
-                    registrationEnabled = params["registrationEnabled"] == "true",
+                val prefill = WorkspacePrefill(
+                    slug                      = slug,
+                    displayName               = displayName,
+                    issuerUrl                 = issuerUrl ?: "",
+                    registrationEnabled       = params["registrationEnabled"] == "true",
                     emailVerificationRequired = params["emailVerificationRequired"] == "true",
-                    themeAccentColor = params["themeAccentColor"]?.trim() ?: "#bb86fc",
-                    themeLogoUrl = params["themeLogoUrl"]?.trim() ?: ""
+                    themeAccentColor          = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
+                    themeLogoUrl              = params["themeLogoUrl"]?.trim() ?: ""
                 )
 
-                // Validation
                 val error = when {
-                    slug.isBlank() -> "Slug is required."
-                    !slug.matches(Regex("[a-z0-9-]+")) -> "Slug may only contain lowercase letters, numbers, and hyphens."
-                    slug == Tenant.MASTER_SLUG -> "The slug 'master' is reserved."
-                    displayName.isBlank() -> "Display name is required."
-                    tenantRepository.existsBySlug(slug) -> "A tenant with slug '$slug' already exists."
-                    else -> null
+                    slug.isBlank()                      -> "Slug is required."
+                    !slug.matches(Regex("[a-z0-9-]+"))  -> "Slug may only contain lowercase letters, numbers, and hyphens."
+                    slug == Tenant.MASTER_SLUG          -> "The slug 'master' is reserved."
+                    displayName.isBlank()               -> "Display name is required."
+                    tenantRepository.existsBySlug(slug) -> "A workspace with slug '$slug' already exists."
+                    else                                -> null
                 }
 
                 if (error != null) {
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AdminView.createTenantPage(session.username, error = error, prefill = prefill)
+                        AdminView.createWorkspacePage(
+                            loggedInAs    = session.username,
+                            allWorkspaces = wsPairs,
+                            error         = error,
+                            prefill       = prefill
+                        )
                     )
                     return@post
                 }
@@ -143,28 +161,57 @@ fun Route.adminRoutes(authService: AuthService, tenantRepository: TenantReposito
                 call.respondRedirect("/admin?created=$slug")
             }
 
-            // Tenant detail
+            // Workspace detail
             get("/{slug}") {
-                val session = call.sessions.get<AdminSession>()!!
-                val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val tenant = tenantRepository.findBySlug(slug)
-                    ?: return@get call.respond(HttpStatusCode.NotFound, "Tenant '$slug' not found.")
-                call.respondHtml(HttpStatusCode.OK, AdminView.tenantDetailPage(tenant, session.username))
+                val session   = call.sessions.get<AdminSession>()!!
+                val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val workspace = tenantRepository.findBySlug(slug)
+                    ?: return@get call.respond(HttpStatusCode.NotFound, "Workspace '$slug' not found.")
+                val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.workspaceDetailPage(
+                        workspace     = workspace,
+                        allWorkspaces = wsPairs,
+                        loggedInAs    = session.username
+                    )
+                )
             }
         }
 
         // ------------------------------------------------------------------
-        // Stub routes — visible in sidebar, implemented in later phases
+        // Legacy redirect: /admin/tenants → /admin/workspaces
         // ------------------------------------------------------------------
 
-        get("/users") {
-            call.respond(HttpStatusCode.NotImplemented, "User management coming in Phase 2.")
+        get("/tenants") { call.respondRedirect("/admin/workspaces", permanent = true) }
+        get("/tenants/{slug}") {
+            val slug = call.parameters["slug"] ?: return@get call.respondRedirect("/admin/workspaces", permanent = true)
+            call.respondRedirect("/admin/workspaces/$slug", permanent = true)
         }
-        get("/clients") {
-            call.respond(HttpStatusCode.NotImplemented, "Client management coming in Phase 2.")
+
+        // ------------------------------------------------------------------
+        // Stub routes — implemented in later phases
+        // ------------------------------------------------------------------
+
+        get("/directory") {
+            call.respond(HttpStatusCode.NotImplemented, "User directory coming in Phase 2.")
+        }
+        get("/security") {
+            call.respond(HttpStatusCode.NotImplemented, "Security settings coming in Phase 2.")
+        }
+        get("/logs") {
+            call.respond(HttpStatusCode.NotImplemented, "Audit logs coming in Phase 2.")
         }
         get("/settings") {
             call.respond(HttpStatusCode.NotImplemented, "System settings coming in Phase 2.")
+        }
+
+        // Legacy redirect: /admin/clients → future /admin/workspaces/{slug}/applications
+        get("/clients") {
+            call.respondRedirect("/admin", permanent = false)
+        }
+        get("/users") {
+            call.respondRedirect("/admin/directory", permanent = false)
         }
     }
 }

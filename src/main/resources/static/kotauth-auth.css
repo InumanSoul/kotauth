@@ -147,7 +147,7 @@ input::placeholder {
     background: var(--accent);
     border: none;
     border-radius: calc(var(--radius) - 2px);
-    color: #0f0f13;
+    color: #09090b;
     font-size: 0.95rem;
     font-weight: 700;
     cursor: pointer;

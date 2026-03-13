@@ -19,15 +19,16 @@ object TenantsTable : Table("tenants") {
     val passwordPolicyRequireSpecial = bool("password_policy_require_special").default(false)
 
     // Theme columns — added by V3 migration, defaults match TenantTheme.DEFAULT
-    val themeAccentColor  = varchar("theme_accent_color",  30).default("#bb86fc")
-    val themeAccentHover  = varchar("theme_accent_hover",  30).default("#9965f4")
-    val themeBgDeep       = varchar("theme_bg_deep",       30).default("#0f0f13")
-    val themeBgCard       = varchar("theme_bg_card",       30).default("#1a1a24")
-    val themeBgInput      = varchar("theme_bg_input",      30).default("#252532")
-    val themeBorderColor  = varchar("theme_border_color",  30).default("#2e2e3e")
+    // Zinc-dark palette with brand cyan accent (#1FBCFF) — updated from legacy purple
+    val themeAccentColor  = varchar("theme_accent_color",  30).default("#1FBCFF")
+    val themeAccentHover  = varchar("theme_accent_hover",  30).default("#0ea5d9")
+    val themeBgDeep       = varchar("theme_bg_deep",       30).default("#09090b")
+    val themeBgCard       = varchar("theme_bg_card",       30).default("#18181b")
+    val themeBgInput      = varchar("theme_bg_input",      30).default("#27272a")
+    val themeBorderColor  = varchar("theme_border_color",  30).default("#3f3f46")
     val themeBorderRadius = varchar("theme_border_radius", 20).default("8px")
-    val themeTextPrimary  = varchar("theme_text_primary",  30).default("#e8e8f0")
-    val themeTextMuted    = varchar("theme_text_muted",    30).default("#6b6b80")
+    val themeTextPrimary  = varchar("theme_text_primary",  30).default("#fafafa")
+    val themeTextMuted    = varchar("theme_text_muted",    30).default("#a1a1aa")
     val themeLogoUrl      = varchar("theme_logo_url",     500).nullable()
     val themeFaviconUrl   = varchar("theme_favicon_url",  500).nullable()
 
