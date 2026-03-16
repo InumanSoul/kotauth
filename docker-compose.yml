@@ -33,3 +33,12 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      # /health/ready performs a DB ping + config validity check.
+      # Docker will not mark the container healthy until this returns 200,
+      # which means Flyway migrations and key provisioning have completed.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s

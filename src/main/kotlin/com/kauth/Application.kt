@@ -34,6 +34,7 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
+import com.kauth.adapter.web.healthRoutes
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -42,12 +43,15 @@ import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import org.slf4j.event.Level
 import kotlin.system.exitProcess
 
 /**
@@ -87,7 +91,55 @@ fun main() {
         exitProcess(1)
     }
 
+    // -------------------------------------------------------------------------
+    // HTTPS enforcement — gates Phase 4 identity federation requirements
+    // -------------------------------------------------------------------------
+    // OAuth2 providers (Google, GitHub, Microsoft) require HTTPS redirect URIs.
+    // Session cookies need secure transport. OIDC discovery documents must be
+    // served over HTTPS. None of this works safely over plain HTTP.
+    //
+    // TLS termination is handled by the reverse proxy (nginx, Caddy, etc.),
+    // not by Ktor — but we validate the configured base URL here at startup.
+    val isHttps      = baseUrl.startsWith("https://")
+    val isLocalhost  = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
+
     val env = System.getenv("KAUTH_ENV") ?: "development"
+
+    if (!isHttps) {
+        when {
+            env == "production" -> {
+                System.err.println("""
+                    ┌──────────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_BASE_URL must use HTTPS in production mode.        │
+                    │                                                                  │
+                    │  OAuth2 providers require HTTPS redirect URIs.                  │
+                    │  Session cookies require a secure transport layer.              │
+                    │  OIDC discovery documents must be served over HTTPS.            │
+                    │                                                                  │
+                    │  Set up TLS on your reverse proxy (nginx, Caddy, etc.) and      │
+                    │  update KAUTH_BASE_URL to use https://.                         │
+                    │                                                                  │
+                    │  Current value: $baseUrl
+                    └──────────────────────────────────────────────────────────────────┘
+                """.trimIndent())
+                exitProcess(1)
+            }
+            !isLocalhost -> {
+                System.err.println("""
+                    [WARN] KAUTH_BASE_URL is not HTTPS and does not appear to be localhost.
+                           Current value: $baseUrl
+                           This will break identity federation — OAuth2 providers (Google,
+                           GitHub, Microsoft) reject non-HTTPS redirect URIs.
+                           Ensure your reverse proxy handles TLS before exposing this to
+                           any public or staging environment.
+                """.trimIndent())
+            }
+            else -> {
+                System.err.println("[DEV]  KAUTH_BASE_URL is HTTP on localhost — acceptable for local development only.")
+            }
+        }
+    }
+
     if (env == "production") {
         val legacySecret = System.getenv("JWT_SECRET")
         if (!legacySecret.isNullOrBlank() && legacySecret == "secret-key-12345") {
@@ -296,6 +348,30 @@ fun Application.module(
     // -------------------------------------------------------------------------
     install(ContentNegotiation) { json() }
 
+    // Assign a unique ID to every request and echo it in the X-Request-Id response header.
+    // The ID flows into MDC so every log line emitted during a request automatically
+    // includes "requestId" — enabling trace reconstruction in any log aggregator.
+    install(CallId) {
+        generate { java.util.UUID.randomUUID().toString() }
+        replyToHeader(HttpHeaders.XRequestId)
+    }
+
+    // Structured access log: one INFO line per completed request with method, path,
+    // status, duration, and MDC fields (requestId, tenantSlug) baked in by the
+    // JSON encoder. Health check endpoints are excluded to avoid log noise.
+    install(CallLogging) {
+        level = Level.INFO
+        callIdMdc("requestId")
+        // Extract the tenant slug from /t/{slug}/... paths and put it in MDC
+        // so every log line within that request is automatically scoped.
+        mdc("tenantSlug") { call ->
+            val path = call.request.path()
+            if (path.startsWith("/t/")) path.split("/").getOrNull(2) else null
+        }
+        // Skip health probes — they're high-frequency and add no diagnostic value
+        filter { call -> !call.request.path().startsWith("/health") }
+    }
+
     install(Sessions) {
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
@@ -352,10 +428,8 @@ fun Application.module(
             call.respondRedirect("/t/master/login", permanent = false)
         }
 
-        // Health check (Phase 5 will expand this)
-        get("/health") {
-            call.respond(mapOf("status" to "ok"))
-        }
+        // Health probes — liveness (/health) + readiness (/health/ready)
+        healthRoutes(baseUrl)
 
         // All tenant auth + OIDC flows (Phase 1–3b)
         authRoutes(

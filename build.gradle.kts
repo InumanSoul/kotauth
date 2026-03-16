@@ -2,6 +2,7 @@ val ktor_version = "2.3.12"
 val exposed_version = "0.50.1"
 val logback_version = "1.4.14"
 val flyway_version = "9.22.3"
+val logstash_encoder_version = "7.4"
 
 plugins {
     kotlin("jvm") version "1.9.24"
@@ -30,6 +31,8 @@ dependencies {
     implementation("io.ktor:ktor-server-html-builder:$ktor_version")
     implementation("io.ktor:ktor-server-sessions:$ktor_version")
     implementation("io.ktor:ktor-server-status-pages:$ktor_version")
+    implementation("io.ktor:ktor-server-call-logging:$ktor_version")
+    implementation("io.ktor:ktor-server-call-id:$ktor_version")
 
     implementation("org.jetbrains.exposed:exposed-core:$exposed_version")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposed_version")
@@ -41,6 +44,7 @@ dependencies {
     implementation("at.favre.lib:bcrypt:0.10.2")
 
     implementation("ch.qos.logback:logback-classic:$logback_version")
+    implementation("net.logstash.logback:logstash-logback-encoder:$logstash_encoder_version")
 
     // Phase 3b — SMTP email delivery (JavaMail, no wrapper libraries)
     implementation("com.sun.mail:javax.mail:1.6.2")
