@@ -15,6 +15,7 @@ import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.infrastructure.KeyProvisioningService
+import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -48,16 +49,17 @@ import java.time.Instant
  *   /admin/workspaces/{slug}/logs                            — audit log
  */
 fun Route.adminRoutes(
-    authService           : AuthService,
-    adminService          : AdminService,
-    roleGroupService      : RoleGroupService,
-    tenantRepository      : TenantRepository,
-    applicationRepository : ApplicationRepository,
-    userRepository        : UserRepository,
-    sessionRepository     : SessionRepository,
-    auditLogRepository    : AuditLogRepository,
-    keyProvisioningService: KeyProvisioningService,
-    mfaRepository         : MfaRepository? = null
+    authService               : AuthService,
+    adminService              : AdminService,
+    roleGroupService          : RoleGroupService,
+    tenantRepository          : TenantRepository,
+    applicationRepository     : ApplicationRepository,
+    userRepository            : UserRepository,
+    sessionRepository         : SessionRepository,
+    auditLogRepository        : AuditLogRepository,
+    keyProvisioningService    : KeyProvisioningService,
+    mfaRepository             : MfaRepository? = null,
+    portalClientProvisioning  : PortalClientProvisioning? = null  // nullable for backward compat
 ) {
     route("/admin") {
 
@@ -165,6 +167,8 @@ fun Route.adminRoutes(
                 }
                 val newTenant = tenantRepository.create(slug, displayName, issuerUrl)
                 keyProvisioningService.provisionForTenant(newTenant)
+                // Provision portal client + redirect URI for the new tenant
+                portalClientProvisioning?.provisionRedirectUris()
                 call.respondRedirect("/admin/workspaces/$slug")
             }
 

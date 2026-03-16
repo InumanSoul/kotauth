@@ -1,17 +1,18 @@
 package com.kauth.adapter.web.portal
 
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AuthService
-import com.kauth.domain.service.AuthError
-import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
+import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.SelfServiceError
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -19,177 +20,182 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
-import java.time.Instant
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.add
 
 /**
- * Self-service portal routes — Phase 3b.
+ * Self-service portal routes — Phase 4 (OAuth-backed login).
  *
  * URL structure under /t/{slug}/account/:
- *   GET/POST /login        — portal authentication
- *   POST     /logout       — clear portal session
- *   GET      /profile      — view & edit profile (email, full name)
- *   POST     /profile      — submit profile changes
- *   GET      /security     — change password + active sessions
- *   POST     /change-password  — submit new password
- *   POST     /sessions/{id}/revoke — revoke one session
+ *   GET  /login            — initiates OAuth Authorization Code + PKCE flow
+ *   GET  /callback         — handles OAuth redirect, exchanges code for session
+ *   POST /logout           — clears portal session and end-session at auth server
+ *   GET  /profile          — view & edit profile (email, full name)
+ *   POST /profile          — submit profile changes
+ *   GET  /security         — change password + active sessions
+ *   POST /change-password  — submit new password
+ *   POST /sessions/{id}/revoke — revoke one session
+ *   GET  /mfa              — MFA management (enroll, disable)
+ *   POST /mfa/enroll|verify|disable — MFA operations
  *
- * Auth guard: all /account/[*] routes except /login redirect to /account/login
+ * Auth flow:
+ *   1. GET /login redirects to the standard /t/{slug}/protocol/openid-connect/auth
+ *      with PKCE (code_challenge/code_verifier). The verifier is stored in a
+ *      short-lived HMAC-signed cookie to prevent CSRF.
+ *   2. After login (+ MFA if required), the auth server redirects to /account/callback.
+ *   3. /callback exchanges the code + verifier for tokens, decodes the userId from
+ *      the access token's sub claim, and creates a PortalSession.
+ *
+ * MFA is handled by the standard auth flow (AuthRoutes.kt) — no duplicate MFA logic here.
+ * Password expiry is enforced by AuthService.authenticate() — portal login benefits automatically.
+ *
+ * Auth guard: all /account/{path} routes except /login and /callback redirect to /account/login
  * if no valid PortalSession cookie is found.
- *
- * NOTE (Phase 3b): Portal session is a simple cookie — see PortalSession.kt for
- * the design rationale and the planned Phase 5 upgrade path.
  */
 fun Route.portalRoutes(
-    authService         : AuthService,
-    selfServiceService  : UserSelfServiceService,
-    tenantRepository    : TenantRepository,
-    mfaService          : MfaService? = null,  // Phase 3c — nullable for backward compat
-    userRepository      : UserRepository? = null  // Phase 3c — needed for MFA challenge resolution
+    authService        : AuthService,
+    selfServiceService : UserSelfServiceService,
+    tenantRepository   : TenantRepository,
+    mfaService         : MfaService? = null,
+    userRepository     : UserRepository? = null,
+    oauthService       : OAuthService? = null,   // Phase 4: required for callback exchange
+    baseUrl            : String = ""             // Phase 4: base URL for redirect URI construction
 ) {
     route("/t/{slug}/account") {
 
         // ------------------------------------------------------------------
-        // Login / logout
+        // Login — redirect to standard OAuth auth endpoint (PKCE)
         // ------------------------------------------------------------------
 
         get("/login") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant = tenantRepository.findBySlug(slug)
-                ?: return@get call.respond(HttpStatusCode.NotFound)
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+
+            if (oauthService == null) {
+                // Fallback: show the old login page if OAuth service is not wired
+                val tenant = tenantRepository.findBySlug(slug)!!
+                val error  = call.request.queryParameters["error"]
+                return@get call.respondHtml(HttpStatusCode.OK,
+                    PortalView.loginPage(slug, tenant.displayName, tenant.theme, error))
+            }
+
+            // Generate PKCE verifier + challenge
+            val verifier  = generatePkceVerifier()
+            val challenge = generatePkceChallenge(verifier)
+
+            // Store the verifier in a short-lived signed cookie (5 min) to survive
+            // the round-trip through the auth server
+            val cookieVal = EncryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}")
+            call.response.cookies.append(
+                name     = "KOTAUTH_PORTAL_PKCE",
+                value    = cookieVal,
+                maxAge   = 300L,
+                httpOnly = true,
+                path     = "/t/$slug/account"
+            )
+
+            val redirectUri  = "$baseUrl/t/$slug/account/callback"
+            val authEndpoint = "/t/$slug/protocol/openid-connect/auth"
+            val authUrl = buildString {
+                append(authEndpoint)
+                append("?response_type=code")
+                append("&client_id=").append(PortalClientProvisioning.PORTAL_CLIENT_ID)
+                append("&redirect_uri=").append(java.net.URLEncoder.encode(redirectUri, "UTF-8"))
+                append("&scope=openid+profile+email")
+                append("&code_challenge=").append(challenge)
+                append("&code_challenge_method=S256")
+            }
+            call.respondRedirect(authUrl)
+        }
+
+        // ------------------------------------------------------------------
+        // OAuth callback — exchange code for tokens, create portal session
+        // ------------------------------------------------------------------
+
+        get("/callback") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val code  = call.request.queryParameters["code"]
             val error = call.request.queryParameters["error"]
-            call.respondHtml(HttpStatusCode.OK, PortalView.loginPage(slug, tenant.displayName, tenant.theme, error))
-        }
 
-        post("/login") {
-            val slug     = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant   = tenantRepository.findBySlug(slug)
-                ?: return@post call.respond(HttpStatusCode.NotFound)
-            val params   = call.receiveParameters()
-            val username = params["username"]?.trim() ?: ""
-            val password = params["password"] ?: ""
-
-            when (val result = authService.authenticate(slug, username, password)) {
-                is AuthResult.Success -> {
-                    val user = result.value
-
-                    // Phase 3c: MFA challenge — if user has MFA enabled, redirect to challenge page
-                    if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
-                        val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
-                        call.response.cookies.append(
-                            name     = "KOTAUTH_PORTAL_MFA_PENDING",
-                            value    = mfaPending,
-                            maxAge   = 300L,   // 5 minutes
-                            httpOnly = true,
-                            path     = "/t/$slug/account"
-                        )
-                        call.respondRedirect("/t/$slug/account/mfa-challenge")
-                        return@post
-                    }
-
-                    call.sessions.set(PortalSession(
-                        userId    = user.id!!,
-                        tenantId  = user.tenantId,
-                        tenantSlug = slug,
-                        username  = user.username
-                    ))
-                    call.respondRedirect("/t/$slug/account/profile")
-                }
-                is AuthResult.Failure -> {
-                    val msg = when (result.error) {
-                        AuthError.InvalidCredentials -> "Invalid username or password."
-                        AuthError.TenantNotFound     -> "Workspace not found."
-                        else                         -> "Login failed. Please try again."
-                    }
-                    call.respondRedirect("/t/$slug/account/login?error=${encodeParam(msg)}")
-                }
-            }
-        }
-
-        // Phase 3c: MFA challenge page for portal login
-        get("/mfa-challenge") {
-            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant = tenantRepository.findBySlug(slug)
-                ?: return@get call.respond(HttpStatusCode.NotFound)
-
-            val pending = call.request.cookies["KOTAUTH_PORTAL_MFA_PENDING"]
-            if (pending.isNullOrBlank()) {
-                return@get call.respondRedirect("/t/$slug/account/login")
+            if (oauthService == null || code.isNullOrBlank()) {
+                val desc = error ?: "Authentication failed. Please try again."
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam(desc)}")
             }
 
-            val error = call.request.queryParameters["error"]
-            call.respondHtml(HttpStatusCode.OK,
-                PortalView.mfaChallengePage(slug, tenant.displayName, tenant.theme, error))
-        }
-
-        post("/mfa-challenge") {
-            val slug   = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant = tenantRepository.findBySlug(slug)
-                ?: return@post call.respond(HttpStatusCode.NotFound)
-            val params = call.receiveParameters()
-            val code   = params["code"]?.trim() ?: ""
-
-            val pending = call.request.cookies["KOTAUTH_PORTAL_MFA_PENDING"]
-            if (pending.isNullOrBlank()) {
-                return@post call.respondRedirect("/t/$slug/account/login")
+            // Verify and extract PKCE verifier from signed cookie
+            val rawPkce = call.request.cookies["KOTAUTH_PORTAL_PKCE"]
+            if (rawPkce.isNullOrBlank()) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Session expired. Please try again.")}")
+            }
+            val pkcePayload = EncryptionService.verifyCookie(rawPkce)
+            if (pkcePayload == null) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Invalid session. Please try again.")}")
+            }
+            val pkceParts = pkcePayload.split("|")
+            if (pkceParts.size != 3 || pkceParts[1] != slug) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Session mismatch. Please try again.")}")
+            }
+            val verifier  = pkceParts[0]
+            val timestamp = pkceParts[2].toLongOrNull() ?: 0L
+            if (System.currentTimeMillis() - timestamp > 300_000) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Login session expired. Please try again.")}")
             }
 
-            val parts = pending.split("|")
-            if (parts.size != 3) {
-                return@post call.respondRedirect("/t/$slug/account/login")
-            }
-            val userId    = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/account/login")
-            val pendSlug  = parts[1]
-            val timestamp = parts[2].toLongOrNull() ?: 0L
+            // Clear the PKCE cookie — single-use
+            call.response.cookies.append(
+                name = "KOTAUTH_PORTAL_PKCE", value = "", maxAge = 0L,
+                path = "/t/$slug/account", httpOnly = true
+            )
 
-            // Validate: slug must match and token must be < 5 minutes old
-            if (pendSlug != slug || System.currentTimeMillis() - timestamp > 300_000) {
-                call.response.cookies.append(
-                    name = "KOTAUTH_PORTAL_MFA_PENDING", value = "", maxAge = 0L,
-                    path = "/t/$slug/account", httpOnly = true
-                )
-                return@post call.respondRedirect("/t/$slug/account/login?error=${encodeParam("MFA session expired. Please log in again.")}")
-            }
+            val redirectUri  = "$baseUrl/t/$slug/account/callback"
+            val ipAddress    = call.request.local.remoteAddress
+            val userAgent    = call.request.headers["User-Agent"]
 
-            if (mfaService == null) {
-                return@post call.respondRedirect("/t/$slug/account/login")
-            }
+            val tokenResult = oauthService.exchangeAuthorizationCode(
+                tenantSlug   = slug,
+                code         = code,
+                clientId     = PortalClientProvisioning.PORTAL_CLIENT_ID,
+                redirectUri  = redirectUri,
+                codeVerifier = verifier,
+                clientSecret = null,   // PUBLIC client — no secret
+                ipAddress    = ipAddress,
+                userAgent    = userAgent
+            )
 
-            // Try TOTP code first, then recovery code
-            val mfaResult = if (code.length == 6 && code.all { it.isDigit() }) {
-                mfaService.verifyTotp(userId, code)
-            } else {
-                mfaService.verifyRecoveryCode(userId, code)
+            if (tokenResult is OAuthResult.Failure) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Login failed: ${tokenResult.error}")}")
             }
 
-            when (mfaResult) {
-                is MfaResult.Failure -> {
-                    call.respondRedirect("/t/$slug/account/mfa-challenge?error=${encodeParam("Invalid verification code. Please try again.")}")
-                }
-                is MfaResult.Success -> {
-                    // Clear MFA pending cookie
-                    call.response.cookies.append(
-                        name = "KOTAUTH_PORTAL_MFA_PENDING", value = "", maxAge = 0L,
-                        path = "/t/$slug/account", httpOnly = true
-                    )
+            // Decode userId and username from the access token payload (base64 JWT claim)
+            val accessToken = (tokenResult as OAuthResult.Success).value.access_token
+            val claims = decodeJwtPayload(accessToken)
+            val userId   = claims["sub"]?.toIntOrNull()
+            val username = claims["preferred_username"] ?: ""
+            val tenantObj = tenantRepository.findBySlug(slug)
 
-                    // Fetch user and create portal session
-                    val user = userRepository?.findById(userId)
-                    if (user == null) {
-                        return@post call.respondRedirect("/t/$slug/account/login?error=${encodeParam("User not found.")}")
-                    }
-                    call.sessions.set(PortalSession(
-                        userId     = user.id!!,
-                        tenantId   = user.tenantId,
-                        tenantSlug = slug,
-                        username   = user.username
-                    ))
-                    call.respondRedirect("/t/$slug/account/profile")
-                }
+            if (userId == null || tenantObj == null) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Could not establish portal session.")}")
             }
+
+            call.sessions.set(PortalSession(
+                userId     = userId,
+                tenantId   = tenantObj.id,
+                tenantSlug = slug,
+                username   = username
+            ))
+            call.respondRedirect("/t/$slug/account/profile")
         }
 
         post("/logout") {
@@ -388,3 +394,61 @@ private fun MfaError.toCode(): String = when (this) {
 
 private fun encodeParam(value: String) =
     java.net.URLEncoder.encode(value, "UTF-8")
+
+// ============================================================================
+// PKCE helpers — RFC 7636
+// ============================================================================
+
+/**
+ * Generates a cryptographically random PKCE code_verifier.
+ * Length: 43 characters (spec allows 43–128). Base64url-encoded, no padding.
+ */
+private fun generatePkceVerifier(): String {
+    val bytes = ByteArray(32)
+    SecureRandom().nextBytes(bytes)
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+}
+
+/**
+ * Derives the PKCE code_challenge from the verifier using S256 method:
+ * code_challenge = BASE64URL(SHA256(ASCII(code_verifier)))
+ */
+private fun generatePkceChallenge(verifier: String): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
+}
+
+// ============================================================================
+// JWT payload decoder — extract claims from an access token without verification
+// (safe because we just issued the token ourselves in the callback flow)
+// ============================================================================
+
+/**
+ * Decodes the payload section of a JWT and returns its claims as a flat string map.
+ * This is NOT a security-sensitive verification — it is used only to read the sub
+ * and preferred_username claims from a token that was just issued by us.
+ *
+ * Only handles simple string/number claims. Complex nested objects are ignored.
+ * Returns an empty map on any parse failure.
+ */
+private fun decodeJwtPayload(jwt: String): Map<String, String> {
+    return try {
+        val parts = jwt.split(".")
+        if (parts.size < 2) return emptyMap()
+        val payload = String(Base64.getUrlDecoder().decode(
+            // JWT base64url payload may omit padding
+            parts[1].padEnd((parts[1].length + 3) / 4 * 4, '=')
+        ), Charsets.UTF_8)
+        // Minimal JSON parsing — extract "key":"value" and "key":number pairs
+        val result = mutableMapOf<String, String>()
+        val pattern = Regex("\"(\\w+)\"\\s*:\\s*(?:\"([^\"]*)\"|(\\d+))")
+        pattern.findAll(payload).forEach { match ->
+            val key   = match.groupValues[1]
+            val value = match.groupValues[2].ifEmpty { match.groupValues[3] }
+            if (value.isNotEmpty()) result[key] = value
+        }
+        result
+    } catch (_: Exception) {
+        emptyMap()
+    }
+}

@@ -32,6 +32,7 @@ import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
+import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.http.*
@@ -142,6 +143,18 @@ fun main() {
     keyProvisioning.provisionMissingKeys()
 
     // -------------------------------------------------------------------------
+    // Portal client provisioning — ensure every non-master tenant has the
+    // built-in 'kotauth-portal' PUBLIC client with the correct redirect URI.
+    // Run after key provisioning so tenant list is stable.
+    // -------------------------------------------------------------------------
+    val portalClientProvisioning = PortalClientProvisioning(
+        tenantRepository      = tenantRepository,
+        applicationRepository = applicationRepository,
+        baseUrl               = baseUrl
+    )
+    portalClientProvisioning.provisionRedirectUris()
+
+    // -------------------------------------------------------------------------
     // Token adapter — RS256, per-tenant key pairs
     // -------------------------------------------------------------------------
     val tokenAdapter = JwtTokenAdapter(
@@ -249,9 +262,11 @@ fun main() {
             sessionRepository      = sessionRepository,
             auditLogRepository     = auditLogRepository,
             keyProvisioningService = keyProvisioning,
-            loginRateLimiter       = loginRateLimiter,
-            registerRateLimiter    = registerRateLimiter,
-            portalSessionKey       = portalSessionKey
+            loginRateLimiter         = loginRateLimiter,
+            registerRateLimiter      = registerRateLimiter,
+            portalSessionKey         = portalSessionKey,
+            baseUrl                  = baseUrl,
+            portalClientProvisioning = portalClientProvisioning
         )
     }.start(wait = true)
 }
@@ -272,7 +287,9 @@ fun Application.module(
     mfaRepository          : com.kauth.domain.port.MfaRepository,
     loginRateLimiter       : RateLimiter,
     registerRateLimiter    : RateLimiter,
-    portalSessionKey       : ByteArray
+    portalSessionKey       : ByteArray,
+    baseUrl                : String,
+    portalClientProvisioning: PortalClientProvisioning
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -351,27 +368,30 @@ fun Application.module(
             mfaService          = mfaService
         )
 
-        // Self-service portal — /t/{slug}/account/* (Phase 3b)
+        // Self-service portal — /t/{slug}/account/* (Phase 4: OAuth-backed login)
         portalRoutes(
             authService        = authService,
             selfServiceService = selfServiceService,
             tenantRepository   = tenantRepository,
             mfaService         = mfaService,
-            userRepository     = userRepository
+            userRepository     = userRepository,
+            oauthService       = oauthService,
+            baseUrl            = baseUrl
         )
 
         // Admin console
         adminRoutes(
-            authService            = authService,
-            adminService           = adminService,
-            roleGroupService       = roleGroupService,
-            tenantRepository       = tenantRepository,
-            applicationRepository  = applicationRepository,
-            userRepository         = userRepository,
-            sessionRepository      = sessionRepository,
-            auditLogRepository     = auditLogRepository,
-            keyProvisioningService = keyProvisioningService,
-            mfaRepository          = mfaRepository
+            authService              = authService,
+            adminService             = adminService,
+            roleGroupService         = roleGroupService,
+            tenantRepository         = tenantRepository,
+            applicationRepository    = applicationRepository,
+            userRepository           = userRepository,
+            sessionRepository        = sessionRepository,
+            auditLogRepository       = auditLogRepository,
+            keyProvisioningService   = keyProvisioningService,
+            mfaRepository            = mfaRepository,
+            portalClientProvisioning = portalClientProvisioning
         )
     }
 }

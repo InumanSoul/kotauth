@@ -13,6 +13,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
 import java.security.MessageDigest
+import java.time.Duration
 import java.time.Instant
 
 /**
@@ -95,6 +96,25 @@ class AuthService(
                 userAgent = userAgent
             ))
             return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+
+        // Phase 3c: enforce password expiry if configured and the user has a recorded
+        // last-change timestamp. Users created before expiry was enabled (null timestamp)
+        // are not affected until they next change their password — prevents mass lockouts
+        // when an admin first activates the policy on an existing tenant.
+        if (tenant.passwordPolicyMaxAgeDays > 0 && user.lastPasswordChangeAt != null) {
+            val ageDays = Duration.between(user.lastPasswordChangeAt, Instant.now()).toDays()
+            if (ageDays >= tenant.passwordPolicyMaxAgeDays) {
+                auditLog.record(AuditEvent(
+                    tenantId  = tenant.id,
+                    userId    = user.id,
+                    clientId  = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent
+                ))
+                return AuthResult.Failure(AuthError.PasswordExpired)
+            }
         }
 
         auditLog.record(AuditEvent(
@@ -395,4 +415,12 @@ sealed class AuthError {
 
     /** Generic validation failure with a human-readable message. */
     data class ValidationError(val message: String) : AuthError()
+
+    /**
+     * The user's password has exceeded the tenant's [passwordPolicyMaxAgeDays] limit.
+     * The user must reset their password before they can log in.
+     * We surface this explicitly (rather than as InvalidCredentials) so the UI can
+     * direct the user to the forgot-password flow with an actionable message.
+     */
+    object PasswordExpired : AuthError()
 }

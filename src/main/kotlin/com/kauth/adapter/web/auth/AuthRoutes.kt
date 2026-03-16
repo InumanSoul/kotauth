@@ -15,6 +15,7 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.model.User
+import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.RateLimiter
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -95,22 +96,30 @@ fun Route.authRoutes(
             // Use authenticate() for both flows — it returns the User without issuing tokens
             val userAgent = call.request.headers["User-Agent"]
             when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent)) {
-                is AuthResult.Failure -> call.respondHtml(
-                    HttpStatusCode.Unauthorized,
-                    AuthView.loginPage(slug, theme, error = result.error.toMessage(), oauthParams = oauthParams)
-                )
+                is AuthResult.Failure -> {
+                    // Expired password gets a dedicated redirect so the user knows what to do
+                    if (result.error is AuthError.PasswordExpired) {
+                        call.respondRedirect("/t/$slug/forgot-password?reason=expired")
+                    } else {
+                        call.respondHtml(
+                            HttpStatusCode.Unauthorized,
+                            AuthView.loginPage(slug, theme, error = result.error.toMessage(), oauthParams = oauthParams)
+                        )
+                    }
+                }
                 is AuthResult.Success -> {
                     val user = result.value
 
                     // Phase 3c: MFA challenge — if user has MFA enabled, redirect to challenge page
                     if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
-                        // Store a short-lived MFA pending token in a signed cookie so we can
+                        // Store a short-lived MFA pending token in an HMAC-signed cookie so we can
                         // complete the flow after the user enters their TOTP code.
-                        // We encode user.id + slug + timestamp as a simple pipe-delimited string.
+                        // Signed with EncryptionService.signCookie() to prevent userId forgery
+                        // (an unsigned cookie lets any client claim they passed MFA as any user).
                         val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
                         call.response.cookies.append(
                             name  = "KOTAUTH_MFA_PENDING",
-                            value = mfaPending,
+                            value = EncryptionService.signCookie(mfaPending),
                             maxAge = 300L,   // 5 minutes
                             httpOnly = true,
                             path = "/t/$slug"
@@ -213,10 +222,15 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/forgot-password") {
-            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val sent  = call.request.queryParameters["sent"] == "true"
-            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, sent = sent))
+            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val theme  = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val sent   = call.request.queryParameters["sent"] == "true"
+            // reason=expired: shown when the user is redirected from login due to an expired password
+            val reason = call.request.queryParameters["reason"]
+            val errorMsg = if (reason == "expired")
+                "Your password has expired. Enter your email below to receive a reset link."
+            else null
+            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, error = errorMsg, sent = sent))
         }
 
         post("/forgot-password") {
@@ -315,9 +329,9 @@ fun Route.authRoutes(
             val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
-            // Verify MFA pending cookie exists
-            val pending = call.request.cookies["KOTAUTH_MFA_PENDING"]
-            if (pending.isNullOrBlank()) {
+            // Verify MFA pending cookie — must be present and signature must be valid
+            val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
+            if (rawPendingGet.isNullOrBlank() || EncryptionService.verifyCookie(rawPendingGet) == null) {
                 return@get call.respondRedirect("/t/$slug/login")
             }
 
@@ -333,9 +347,14 @@ fun Route.authRoutes(
             val userAgent = call.request.headers["User-Agent"]
             val oauthParams = params.toOAuthParams()
 
-            // Parse MFA pending cookie
-            val pending = call.request.cookies["KOTAUTH_MFA_PENDING"]
-            if (pending.isNullOrBlank()) {
+            // Verify and parse MFA pending cookie — signature check prevents forgery
+            val rawCookie = call.request.cookies["KOTAUTH_MFA_PENDING"]
+            if (rawCookie.isNullOrBlank()) {
+                return@post call.respondRedirect("/t/$slug/login")
+            }
+            val pending = EncryptionService.verifyCookie(rawCookie)
+            if (pending == null) {
+                // Signature invalid — tampered cookie, force re-login
                 return@post call.respondRedirect("/t/$slug/login")
             }
             val parts = pending.split("|")
@@ -775,4 +794,5 @@ private fun AuthError.toMessage(): String = when (this) {
     is AuthError.EmailAlreadyExists   -> "An account with that email already exists."
     is AuthError.WeakPassword         -> "Password must be at least $minLength characters."
     is AuthError.ValidationError      -> this.message
+    is AuthError.PasswordExpired      -> "Your password has expired. Please reset it."
 }

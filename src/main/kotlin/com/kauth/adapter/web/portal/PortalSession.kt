@@ -3,27 +3,34 @@ package com.kauth.adapter.web.portal
 import java.time.Instant
 
 /**
- * Self-service portal session — stored as an encrypted cookie per browser session.
+ * Self-service portal session — stored as an HMAC-signed cookie per browser session.
  *
- * DESIGN NOTE (Phase 3b):
- * The portal uses a simple cookie session rather than requiring the user to go through
- * the full OAuth Authorization Code flow to access their own profile page. This is a
- * deliberate KISS decision: the portal IS part of the auth platform, not an external app,
- * so the circular dependency of requiring OAuth to access account management is avoided.
+ * DESIGN NOTE (Phase 4):
+ * The portal now authenticates through the standard OAuth 2.0 Authorization Code + PKCE
+ * flow using the built-in 'kotauth-portal' PUBLIC client provisioned per tenant.
  *
- * The session is encrypted by Ktor's built-in session cookie encryption (configured in
- * Application.kt via SessionTransportTransformerMessageAuthentication).
+ * Login flow:
+ *   1. GET /t/{slug}/account/login → redirect to /t/{slug}/protocol/openid-connect/auth
+ *      (standard auth endpoint — handles password, MFA, email-verification checks)
+ *   2. User authenticates → auth endpoint redirects to /t/{slug}/account/callback?code=…
+ *   3. Portal callback exchanges the code (PKCE verifier included) for tokens
+ *   4. userId + username are decoded from the access token sub/preferred_username claims
+ *   5. PortalSession is set and the user is redirected to /account/profile
  *
- * FUTURE (Phase 5): Replace with an OAuth-based portal when the SDK/developer experience
- * phase introduces first-class portal clients and account management APIs.
+ * Benefits over the Phase 3b approach:
+ *   - Single authentication path (no parallel login code duplication)
+ *   - MFA, password-expiry, and all future auth checks happen in one place (AuthRoutes)
+ *   - Portal session is backed by a real OAuth token issuance
+ *   - The PKCE verifier is stored as a short-lived signed cookie, preventing CSRF
  *
- * Session TTL: 2 hours (configured in Application.kt cookie.maxAgeInSeconds).
- * The cookie is HttpOnly and tenant-scoped (cookie name includes slug).
+ * The session is HMAC-signed by SessionTransportTransformerMessageAuthentication (Application.kt).
+ * Session TTL: 4 hours (configured in Application.kt cookie.maxAgeInSeconds).
+ * The cookie is HttpOnly.
  */
 data class PortalSession(
-    val userId   : Int,
-    val tenantId : Int,
+    val userId    : Int,
+    val tenantId  : Int,
     val tenantSlug: String,
-    val username : String,
-    val createdAt: Long = Instant.now().epochSecond
+    val username  : String,
+    val createdAt : Long = Instant.now().epochSecond
 )

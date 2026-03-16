@@ -4,26 +4,28 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * AES-256-GCM symmetric encryption for sensitive configuration values.
+ * AES-256-GCM symmetric encryption + HMAC-SHA256 cookie signing.
  *
- * Used exclusively to encrypt SMTP passwords before they are stored in the
- * database. The raw password is never persisted — only the encrypted ciphertext.
+ * Used for:
+ *   1. Encrypting SMTP passwords at rest (AES-256-GCM).
+ *   2. Signing short-lived MFA pending cookies (HMAC-SHA256) — prevents userId
+ *      forgery that would let an attacker bypass the MFA challenge step.
  *
- * Key derivation: The 256-bit AES key is derived from [KAUTH_SECRET_KEY] env var
- * using SHA-256. This means the key is deterministic and does not need to be stored.
+ * Key derivation: Both keys are derived from [KAUTH_SECRET_KEY] env var using
+ * SHA-256 with a domain-specific prefix. This means keys are deterministic and
+ * do not need to be stored separately.
  *
- * Ciphertext format (all base64-encoded, separated by "."): iv.ciphertext
- *   - iv: 12-byte GCM nonce (randomly generated per encryption)
- *   - ciphertext: AES-256-GCM encrypted bytes (includes the 128-bit auth tag)
+ * If KAUTH_SECRET_KEY is not set, a random HMAC key is generated at startup
+ * (cookie signatures won't survive a restart, but they will always be valid
+ * within a session — the 5-minute TTL makes this acceptable).
  *
- * Phase 3b note: if KAUTH_SECRET_KEY is not set, encrypt/decrypt will throw.
- * The application will still start — SMTP config will simply be unavailable until
- * the env var is configured. This is intentional: forcing SMTP to be unconfigurable
- * without the key is safer than silently allowing plaintext storage.
+ * Cookie signing format: "{value}.{base64url(hmac)}"
+ * Verification strips the signature, recomputes it, and compares in constant time.
  */
 object EncryptionService {
 
@@ -39,6 +41,22 @@ object EncryptionService {
             // Derive a 256-bit key from the env var via SHA-256
             val keyBytes = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, KEY_ALGORITHM)
+        }
+    }
+
+    /**
+     * HMAC-SHA256 key for MFA pending cookie signing.
+     * Derived from KAUTH_SECRET_KEY with a domain prefix to isolate it from
+     * the AES key. Falls back to a random 32-byte key if the env var is not set
+     * (signatures valid only within a single process lifetime).
+     */
+    private val hmacKey: ByteArray by lazy {
+        val raw = System.getenv("KAUTH_SECRET_KEY")
+        if (!raw.isNullOrBlank()) {
+            MessageDigest.getInstance("SHA-256")
+                .digest("mfa-cookie-signing:$raw".toByteArray(Charsets.UTF_8))
+        } else {
+            ByteArray(32).also { SecureRandom().nextBytes(it) }
         }
     }
 
@@ -82,5 +100,43 @@ object EncryptionService {
         } catch (_: Exception) {
             null
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Cookie signing — MFA pending state protection (Phase 3c security fix)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Signs a cookie value with HMAC-SHA256.
+     * Returns a string in the format: "{value}.{base64url(hmac)}"
+     *
+     * The value portion is NOT encrypted — it is only authenticated.
+     * Use this for short-lived state tokens where confidentiality is not required
+     * but forgery prevention is critical (e.g. MFA pending cookies).
+     */
+    fun signCookie(value: String): String {
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(hmacKey, "HmacSHA256"))
+        val signature = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(mac.doFinal(value.toByteArray(Charsets.UTF_8)))
+        return "$value.$signature"
+    }
+
+    /**
+     * Verifies a cookie produced by [signCookie].
+     * Returns the original value if the signature is valid, null otherwise.
+     *
+     * Comparison is done in constant time to prevent timing side-channel attacks.
+     */
+    fun verifyCookie(signed: String): String? {
+        val lastDot = signed.lastIndexOf('.')
+        if (lastDot < 0) return null
+        val value    = signed.substring(0, lastDot)
+        val expected = signCookie(value)
+        // Constant-time comparison — do not short-circuit on first mismatch
+        if (signed.length != expected.length) return null
+        var diff = 0
+        for (i in signed.indices) diff = diff or (signed[i].code xor expected[i].code)
+        return if (diff == 0) value else null
     }
 }

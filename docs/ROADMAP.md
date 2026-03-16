@@ -1,7 +1,7 @@
 # KotAuth — Product Roadmap & Architecture Plan
 
-> Last updated: 2026-03-13
-> Status: Phase 3 complete — moving to Phase 4 (Identity Federation)
+> Last updated: 2026-03-16
+> Status: Phase 3 complete + security hardening sprint — Phase 4 (Identity Federation) next
 
 ---
 
@@ -39,8 +39,8 @@ Yes — unconditionally. The concept is universal across every serious IAM platf
 | **KotAuth** | **Tenant**     | **Client**       |
 
 This maps directly to OAuth 2.0 / OIDC:
-- A **Tenant** IS an Authorization Server — it has its own issuer URL, user directory, keys, token settings, and identity providers
-- A **Client** IS an OAuth 2.0 Client — it has a client_id, client_secret, redirect URIs, allowed scopes, and an access type (public vs confidential)
+- A **Tenant** IS an Authorization Server — it has its own issuer URL, user directory, keys, token settings, and identity providers. In the UI we call this Workspace
+- A **Client** IS an OAuth 2.0 Client — it has a client_id, client_secret, redirect URIs, allowed scopes, and an access type (public vs confidential). In the UI we call this Application
 
 **What this means for the current codebase:** the flat `users` table must become tenant-scoped. This is the single most important data model decision to make before building further. Every table you add from here will have `tenant_id` as a foreign key.
 
@@ -197,11 +197,12 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 - ❌ Impersonate user — deferred (future, requires strict audit logging)
 - ❌ Bulk operations — deferred (future)
 
-**User self-service portal (Phase 3b ✅):**
+**User self-service portal (Phase 3b ✅ / Phase 4 upgrade ✅):**
 - ✅ View/edit own profile
 - ✅ Change password (requires current password)
 - ✅ Active sessions — see and revoke
 - ✅ MFA enrollment and management (Phase 3c)
+- ✅ Portal login via standard OAuth Authorization Code + PKCE flow (built-in `kotauth-portal` PUBLIC client per tenant, PKCE verifier stored in HMAC-signed cookie)
 - ❌ Account deletion request — deferred (future)
 
 **Roles & Permissions (Phase 3c ✅):**
@@ -221,12 +222,13 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 - ✅ Minimum length
 - ✅ Require uppercase / special characters / numbers
 - ✅ Password history (can't reuse last N passwords, BCrypt-verified)
-- ⚠️ Expiry (column exists, enforcement deferred)
+- ✅ Expiry enforced at login — expired passwords redirect to forgot-password flow
 - ✅ Blacklist (50 common passwords seeded, tenant-specific additions supported)
 
 **MFA (Phase 3c ✅):**
 - ✅ TOTP (Google Authenticator, Authy) — RFC 6238, zero-dependency implementation
 - ✅ Recovery codes (8 codes, BCrypt-hashed, consumed on use)
+- ✅ MFA pending cookie HMAC-signed (HMAC-SHA256 via EncryptionService) — forgery prevented
 - ❌ WebAuthn / Passkeys — deferred to Phase 4 or 5 (`MfaMethod` enum is extensible)
 - ❌ SMS OTP — deferred (future, controversial due to SIM swap risk)
 - ✅ MFA policy per tenant: optional, required for all, required for admins (partial — admin check deferred)
