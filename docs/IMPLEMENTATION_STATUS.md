@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
-> Last updated: 2026-03-13
-> Current version: 1.0.0-dev (Phase 3c complete)
+> Last updated: 2026-03-16
+> Current version: 1.0.0-dev (Phase 3d complete)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -12,7 +12,7 @@ This document is the living record of what has been built, what compiles and run
 | Check | Status |
 |---|---|
 | Docker build (`gradle buildFatJar`) | ✅ Passing |
-| PostgreSQL schema (Flyway V1–V14) | ✅ Applied |
+| PostgreSQL schema (Flyway V1–V16) | ✅ Applied |
 | Admin console routes | ✅ All registered |
 | OIDC discovery + JWKS | ✅ Functional |
 | Authorization Code + PKCE flow | ✅ Functional |
@@ -21,6 +21,9 @@ This document is the living record of what has been built, what compiles and run
 | Email verification flow | ✅ Functional |
 | Password reset flow | ✅ Functional |
 | User self-service portal | ✅ Functional |
+| Portal OAuth login (kotauth-portal client, PKCE) | ✅ Functional |
+| Security settings page (password policy + MFA policy) | ✅ Functional |
+| Auth pages display workspace name (tenant-branded) | ✅ Functional |
 | Per-tenant SMTP config (admin console) | ✅ Functional |
 | Role-based access control (JWT claims) | ✅ Functional |
 | Group hierarchy with role inheritance | ✅ Functional |
@@ -423,6 +426,63 @@ MFA: `MFA_ENROLLMENT_STARTED`, `MFA_ENROLLMENT_VERIFIED`, `MFA_CHALLENGE_SUCCESS
 
 ---
 
+---
+
+### Phase 3d — Portal OAuth, Settings Hardening & Auth Branding ✅ Complete
+
+This sub-phase closes several gaps discovered after Phase 3c shipped: the self-service portal now authenticates via the same standard OAuth Authorization Code + PKCE flow as any external application, the admin settings page is split into logical sections, and all tenant-facing auth pages carry the tenant's display name rather than a hardcoded "KotAuth" string.
+
+#### Database Schema (Flyway V15–V16)
+
+| Migration | What it adds |
+|---|---|
+| `V15__portal_client.sql` | Seeds one `kotauth-portal` PUBLIC client row per tenant. Client is disabled for the master tenant (master users use the admin console, not the self-service portal). Redirect URIs are NOT set here — they depend on `KAUTH_BASE_URL` and are upserted at runtime by `PortalClientProvisioning`. |
+| `V16__default_roles.sql` | Seeds two tenant-scoped baseline roles (`admin`, `user`) for all existing tenants. Idempotent via `ON CONFLICT DO NOTHING`. New tenants created after this migration receive defaults via application logic. |
+
+#### Infrastructure — Portal Client Provisioning
+
+| Component | File | What it does |
+|---|---|---|
+| `PortalClientProvisioning` | `infrastructure/PortalClientProvisioning.kt` | Startup service called from `Application.kt` after Flyway runs. Iterates all non-master tenants; if the `kotauth-portal` client row is missing (tenant created after V15 ran), it creates it. If the redirect URI differs from the live `KAUTH_BASE_URL`, it updates. Fully idempotent — safe to run on every deployment. |
+
+**Why this is necessary:** V15 only seeds portal clients for tenants that exist at migration time. `PortalClientProvisioning` bridges the gap for tenants created afterward and also auto-corrects redirect URIs when `KAUTH_BASE_URL` changes between deployments.
+
+#### Admin Settings Page Split
+
+The workspace settings page was split into two logically separate pages to reduce cognitive load. Previously `/settings` held all 12+ fields on a single form.
+
+| Route | Method | Section |
+|---|---|---|
+| `/admin/workspaces/{slug}/settings` | GET/POST | General settings: Identity (display name, slug, registration, email verification), Token Lifetimes, Registration Policy, Branding (primary color, logo URL) |
+| `/admin/workspaces/{slug}/settings/security` | GET/POST | Security Policy: Password Policy (min length, uppercase, numbers, special chars, history count, max age, blacklist), MFA Policy (optional / required / required for admins) |
+
+Each POST handler reads only the fields it owns from the submitted form and preserves all other fields from the current workspace state — so saving general settings never overwrites security policy configuration, and vice versa.
+
+A "Security Policy →" ghost-button link in the general settings form actions navigates to the security page. Both pages highlight the correct sidenav item (`activeAppSection = "general"` vs `"security"`).
+
+#### Workspace Detail — Portal Quick-Access Button
+
+`workspaceDetailPage` now renders an "Open Portal ↗" button alongside the existing "Open Login ↗" button. The portal button links to `/t/{slug}/account/login`, which is the OAuth-initiated portal login endpoint.
+
+#### Auth Pages — Tenant Workspace Name
+
+All six auth page functions in `AuthView.kt` previously hardcoded the string `"KotAuth"` as the brand name displayed in the page header, title, and logo `alt` attribute.
+
+| Change | Detail |
+|---|---|
+| `AuthView.kt` — all 6 page functions | Added `workspaceName: String = "KotAuth"` parameter; replaced every `+"KotAuth"` and `"KotAuth | …"` occurrence with the dynamic value |
+| `AuthRoutes.kt` — all ~15 call sites | Updated all handlers to extract `val workspaceName = tenant?.displayName ?: "KotAuth"` and pass it as the third positional argument |
+
+Affected pages: `loginPage`, `registerPage`, `forgotPasswordPage`, `resetPasswordPage`, `verifyEmailPage`, `mfaChallengePage`.
+
+The OAuth authorization endpoint (`GET /protocol/openid-connect/auth`) is also updated — this is the entry point for portal logins and was the highest-priority call site.
+
+#### Build Fix — `continue` Inside Inline Lambda
+
+The initial implementation of `PortalClientProvisioning.provisionRedirectUris()` used `?: run { ...; continue }` to skip loop iterations. This triggers Kotlin's experimental `"break continue in inline lambdas"` feature flag. Fixed by replacing the `run {}` block with an explicit `if (portalClient == null) { ... } else if (...) { ... }` pattern — `continue` at the `for` loop level is standard Kotlin and requires no flags.
+
+---
+
 ### Phase 4 — Identity Federation ❌ Not started
 
 Social login (Google, GitHub, generic OIDC) and SAML 2.0. No groundwork laid yet. Will require a new `identity_providers` table and significant OAuth client flow work.
@@ -480,13 +540,14 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 | Item | Where it appears | Why deferred |
 |---|---|---|
 | `cookie.secure = true` | `Application.kt`, TODO comment | Requires TLS termination — Phase 5 |
-| Portal OAuth upgrade | `PortalSession.kt`, ADR-07 | Phase 5 — replace cookie session with first-party OAuth flow |
-| MFA pending cookie signing | `authRoutes.kt`, ADR-14 | Phase 5 — replace plain cookie with signed/encrypted token |
-| Password expiry enforcement | `V13` adds `max_age_days` column | Column exists but not enforced during login yet |
-| `required_admins` MFA policy | `MfaService.isMfaRequired` | TODO: check admin role membership, needs role-based policy logic |
-| Resource access client string keys | `JwtTokenAdapter` | Currently uses int clientId as string; should resolve to `client_id` string |
+| Portal `PortalSession` cookie → full OAuth session | `PortalSession.kt`, ADR-07 | The portal LOGIN now uses OAuth Authorization Code + PKCE (✅ done). The portal SESSION inside `/account/*` still uses an HMAC-signed `PortalSession` cookie. Replacing that with access tokens is a Phase 5 cleanup. |
+| MFA pending cookie signing | `AuthRoutes.kt`, ADR-14 | Cookie `KOTAUTH_MFA_PENDING` value is plain (userId\|slug\|timestamp). Should be encrypted or use a server-side pending session — Phase 5. |
+| Password expiry enforcement at login | `V13` adds `password_policy_max_age_days` column | Column exists and is saved via the security settings page, but the login path does not yet check expiry and redirect to forgot-password. |
+| `required_admins` MFA policy enforcement | `MfaService.isMfaRequired` | Policy value is saved and displayed in UI. Runtime enforcement (check whether the user holds the `admin` role before requiring MFA) is not yet implemented. |
+| Resource access client string keys in JWT | `JwtTokenAdapter` | `resource_access` keys currently use the integer PK as a string; should resolve to the human-readable `client_id` string. |
 | WebAuthn / Passkeys | n/a | Phase 4 or 5 — `MfaMethod` enum is extensible |
-| Admin UI pages for roles/groups/MFA | `AdminView.kt` has placeholder links | Phase 3c delivers JSON API routes; HTML admin pages deferred |
+| Admin UI pages for roles/groups | `AdminView.kt` has placeholder links | Phase 3c delivers JSON API routes; full HTML admin pages for role/group management are deferred |
+| Admin UI page for MFA management | `AdminView.kt` | Admin-initiated MFA reset/disable for a user — no HTML page yet |
 | Bulk user operations | n/a | Future |
 | User impersonation | n/a | Future, requires strict audit logging |
 | Admin REST API | n/a | Phase 5 |
@@ -525,6 +586,9 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 | `db/migration/V12__roles_and_groups.sql` | 3c | Roles and groups schema |
 | `db/migration/V13__password_policies.sql` | 3c | Password history, blacklist, tenant policy columns |
 | `db/migration/V14__mfa_totp.sql` | 3c | MFA enrollments, recovery codes, tenant/user MFA columns |
+| `infrastructure/PortalClientProvisioning.kt` | 3d | Startup service — ensures `kotauth-portal` client exists with correct redirect URI for every non-master tenant |
+| `db/migration/V15__portal_client.sql` | 3d | Seeds one `kotauth-portal` PUBLIC client row per tenant (redirect URIs set at runtime by `PortalClientProvisioning`) |
+| `db/migration/V16__default_roles.sql` | 3d | Seeds `admin` + `user` baseline roles for all existing tenants |
 
 ## File Index — Significantly Modified
 
@@ -549,9 +613,9 @@ Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured
 | `adapter/persistence/PostgresUserRepository.kt` | 3a, 3c | LIKE search + update (3a); reads/writes `mfaEnabled` (3c) |
 | `adapter/persistence/PostgresApplicationRepository.kt` | 2 fix + 3a | Added `tokenExpiryOverride` mapping; implemented `update`, `setEnabled` |
 | `adapter/persistence/PostgresSessionRepository.kt` | 3a | Implemented `findActiveByTenant` |
-| `adapter/web/admin/AdminRoutes.kt` | 3a, 3c | Phase 3a routes + role/group CRUD routes (3c) |
-| `adapter/web/auth/AuthRoutes.kt` | 2 fix, 3c | `call.request.origin` fix (2); MFA challenge flow + `mfaService` parameter (3c) |
-| `adapter/web/auth/AuthView.kt` | 3c | Added `OAuthParams.toQueryString()`, `mfaChallengePage` |
-| `adapter/web/portal/portalRoutes.kt` | 3c | Added MFA self-service routes (enroll, verify, disable) |
-| `adapter/web/admin/AdminView.kt` | 3a | 966 → 1843 lines; 7 new page functions, `applicationDetailPage` updated, `UserPrefill` added |
-| `Application.kt` | 3a, 3c | Wired all Phase 3c dependencies: `PostgresRoleRepository`, `PostgresGroupRepository`, `PostgresPasswordPolicyAdapter`, `PostgresMfaRepository`, `RoleGroupService`, `MfaService`. Updated `module()` signature and all route calls. |
+| `adapter/web/admin/AdminRoutes.kt` | 3a, 3c, 3d | Phase 3a routes + role/group CRUD (3c) + `/settings/security` GET/POST (3d); general settings POST no longer overwrites security fields |
+| `adapter/web/auth/AuthRoutes.kt` | 2 fix, 3c, 3d | `call.request.origin` fix (2); MFA challenge flow (3c); all ~15 call sites updated to extract and pass `workspaceName` (3d) |
+| `adapter/web/auth/AuthView.kt` | 3c, 3d | Added `OAuthParams.toQueryString()`, `mfaChallengePage` (3c); `workspaceName: String` parameter added to all 6 page functions, hardcoded "KotAuth" replaced throughout (3d) |
+| `adapter/web/portal/PortalRoutes.kt` | 3c | Added MFA self-service routes (enroll, verify, disable) |
+| `adapter/web/admin/AdminView.kt` | 3a, 3d | 966 → 1843 lines; 7 new page functions (3a); `workspaceSettingsPage` refactored (removed password/MFA policy sections), `securityPolicyPage` added, `workspaceDetailPage` adds "Open Portal ↗" button (3d) |
+| `Application.kt` | 3a, 3c, 3d | Wired Phase 3c dependencies (3c); `PortalClientProvisioning` instantiated and called at startup (3d) |

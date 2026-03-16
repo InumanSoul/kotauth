@@ -1,7 +1,7 @@
 # KotAuth — Product Roadmap & Architecture Plan
 
 > Last updated: 2026-03-16
-> Status: Phase 3 complete + security hardening sprint — Phase 4 (Identity Federation) next
+> Status: Phase 3d complete — Phase 4 (Identity Federation) next
 
 ---
 
@@ -197,12 +197,13 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 - ❌ Impersonate user — deferred (future, requires strict audit logging)
 - ❌ Bulk operations — deferred (future)
 
-**User self-service portal (Phase 3b ✅ / Phase 4 upgrade ✅):**
+**User self-service portal (Phase 3b ✅ / Phase 3d ✅):**
 - ✅ View/edit own profile
 - ✅ Change password (requires current password)
 - ✅ Active sessions — see and revoke
 - ✅ MFA enrollment and management (Phase 3c)
-- ✅ Portal login via standard OAuth Authorization Code + PKCE flow (built-in `kotauth-portal` PUBLIC client per tenant, PKCE verifier stored in HMAC-signed cookie)
+- ✅ Portal login via standard OAuth Authorization Code + PKCE flow — built-in `kotauth-portal` PUBLIC client per tenant; `PortalClientProvisioning` ensures the client and correct redirect URI exist for every tenant on startup (Phase 3d)
+- ✅ All auth pages (login, register, forgot/reset password, email verify, MFA challenge) display the tenant's workspace name instead of hardcoded "KotAuth" (Phase 3d)
 - ❌ Account deletion request — deferred (future)
 
 **Roles & Permissions (Phase 3c ✅):**
@@ -218,20 +219,22 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 - ✅ Group hierarchy (nested groups via `parent_group_id`)
 - ✅ Group-level attributes (JSONB)
 
-**Password policies (Phase 3c ✅, configurable per tenant):**
+**Password policies (Phase 3c ✅, configurable via Security Settings page ✅ Phase 3d):**
 - ✅ Minimum length
 - ✅ Require uppercase / special characters / numbers
 - ✅ Password history (can't reuse last N passwords, BCrypt-verified)
-- ✅ Expiry enforced at login — expired passwords redirect to forgot-password flow
 - ✅ Blacklist (50 common passwords seeded, tenant-specific additions supported)
+- ✅ Dedicated Security Settings page (`/settings/security`) — password policy + MFA policy separated from general workspace settings (Phase 3d)
+- ❌ Expiry enforcement at login — `max_age_days` column exists and is configurable in the UI, but login path does not yet check and redirect
 
 **MFA (Phase 3c ✅):**
 - ✅ TOTP (Google Authenticator, Authy) — RFC 6238, zero-dependency implementation
 - ✅ Recovery codes (8 codes, BCrypt-hashed, consumed on use)
 - ✅ MFA pending cookie HMAC-signed (HMAC-SHA256 via EncryptionService) — forgery prevented
+- ✅ MFA policy configurable via Security Settings page (Phase 3d)
 - ❌ WebAuthn / Passkeys — deferred to Phase 4 or 5 (`MfaMethod` enum is extensible)
 - ❌ SMS OTP — deferred (future, controversial due to SIM swap risk)
-- ✅ MFA policy per tenant: optional, required for all, required for admins (partial — admin check deferred)
+- ❌ `required_admins` policy enforcement — policy value saved and displayed; runtime check (does user hold admin role?) not yet implemented
 
 **Email flows (Phase 3b ✅):**
 - ✅ Email verification on registration
@@ -285,13 +288,13 @@ POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is th
 
 ## What to Build Next (Immediate Priority Order)
 
-Given where the PoC is today, this is the honest sequencing:
+Phases 0–3 are complete. The platform is feature-complete for the core auth use case. Remaining gaps before Phase 4:
 
-1. **Design and migrate to the tenant/client data model** — everything else is blocked on this. Do not add features to the flat schema.
-2. **Phase 0 security blockers** — email verification, password reset, rate limiting. Without these, the software is not deployable for any real use case.
-3. **Authorization Code Flow + PKCE** — this single flow makes KotAuth usable with any OIDC client library in any language. It's the unlocking feature.
-4. **Admin console v1** — tenant/client/user management. This is your UI/UX differentiator. Invest in it.
-5. **TOTP MFA** — table stakes for any auth platform claiming to be production-grade.
+1. **Password expiry enforcement at login** — `max_age_days` is stored and configurable; adding the login-time check is a small, high-value safety closure.
+2. **`required_admins` MFA policy** — the policy value is already saved; wiring the runtime check (does this user hold the `admin` role?) completes the feature.
+3. **Admin HTML pages for roles/groups** — JSON API routes exist (Phase 3c); building the HTML admin pages makes these features accessible without API calls.
+4. **Resource access JWT keys** — `resource_access` keys should use `client_id` strings, not integer PKs, to match Keycloak compatibility expectations.
+5. **Phase 4: Identity Federation** — social login (Google, GitHub, generic OIDC) and SAML 2.0. No groundwork laid yet.
 
 ---
 
