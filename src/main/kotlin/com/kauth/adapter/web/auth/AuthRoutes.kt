@@ -1,6 +1,9 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
@@ -13,6 +16,9 @@ import com.kauth.domain.service.OAuthError
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.SocialLoginError
+import com.kauth.domain.service.SocialLoginResult
+import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.model.User
 import com.kauth.infrastructure.EncryptionService
@@ -55,7 +61,11 @@ fun Route.authRoutes(
     loginRateLimiter: RateLimiter,
     registerRateLimiter: RateLimiter,
     selfServiceService: UserSelfServiceService,
-    mfaService: MfaService? = null  // Phase 3c — nullable for backward compat
+    mfaService: MfaService? = null,                           // Phase 3c — nullable for backward compat
+    roleRepository: RoleRepository? = null,                   // Phase 1 fix — required_admins MFA check
+    socialLoginService: SocialLoginService? = null,           // Phase 2 — Social Login
+    identityProviderRepository: IdentityProviderRepository? = null,  // Phase 2 — load enabled providers
+    baseUrl: String = ""                                      // Phase 2 — needed for callback URI
 ) {
 
     route("/t/{slug}") {
@@ -74,7 +84,19 @@ fun Route.authRoutes(
             // Preserve OAuth2 params from authorization endpoint redirect
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, theme, workspaceName, success = registered, oauthParams = oauthParams))
+            // Phase 2: load enabled social providers for this tenant
+            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else emptyList()
+
+            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(
+                tenantSlug       = slug,
+                theme            = theme,
+                workspaceName    = workspaceName,
+                success          = registered,
+                oauthParams      = oauthParams,
+                enabledProviders = enabledProviders
+            ))
         }
 
         post("/login") {
@@ -114,7 +136,36 @@ fun Route.authRoutes(
                 is AuthResult.Success -> {
                     val user = result.value
 
-                    // Phase 3c: MFA challenge — if user has MFA enabled, redirect to challenge page
+                    // Phase 1 fix: enforce MFA enrollment requirement before the challenge check.
+                    // If the tenant policy mandates MFA for this user (via "required" or
+                    // "required_admins") and the user hasn't enrolled yet, block login with a
+                    // clear error directing them to the user portal for enrollment.
+                    if (mfaService != null && tenant != null) {
+                        val mfaPolicy = tenant.mfaPolicy
+                        if (mfaPolicy != "optional") {
+                            // Resolve effective roles only when the policy actually needs them —
+                            // avoids an unnecessary DB query for the "required" (all-users) case.
+                            val userRoles = if (mfaPolicy == "required_admins" && roleRepository != null) {
+                                roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
+                            } else emptyList()
+
+                            if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) && !mfaService.shouldChallengeMfa(user.id!!)) {
+                                return@post call.respondHtml(
+                                    HttpStatusCode.Forbidden,
+                                    AuthView.loginPage(
+                                        tenantSlug    = slug,
+                                        theme         = theme,
+                                        workspaceName = workspaceName,
+                                        error         = "Multi-factor authentication is required for your account. " +
+                                                        "Please sign in to the user portal and enable MFA under Security settings.",
+                                        oauthParams   = oauthParams
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Phase 3c: MFA challenge — if user has MFA enrolled, redirect to challenge page
                     if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
                         // Store a short-lived MFA pending token in an HMAC-signed cookie so we can
                         // complete the flow after the user enters their TOTP code.
@@ -496,6 +547,192 @@ fun Route.authRoutes(
         }
 
         // ==================================================================
+        // Social Login — Phase 2
+        //
+        // GET  /auth/social/{provider}/redirect  — initiate OAuth2 flow
+        // GET  /auth/social/{provider}/callback  — receive code from provider
+        //
+        // CSRF protection: state parameter is HMAC-signed via EncryptionService.signCookie().
+        // Format: "{provider}|{slug}|{nonce}|{oauthParamsBase64}"
+        // On callback, signature is verified before processing the code.
+        // ==================================================================
+
+        get("/auth/social/{provider}/redirect") {
+            val slug     = call.parameters["slug"]     ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val provider = SocialProvider.fromValueOrNull(provName)
+                ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
+
+            if (socialLoginService == null) {
+                return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
+            }
+
+            val oauthParams = call.request.queryParameters.toOAuthParams()
+
+            // Build CSRF state: sign provider|slug|nonce|oauthParamsBase64
+            val nonce           = java.util.UUID.randomUUID().toString()
+            val oauthParamsB64  = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
+            val statePayload    = "${provider.value}|$slug|$nonce|$oauthParamsB64"
+            val signedState     = EncryptionService.signCookie(statePayload)
+
+            when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
+                is SocialLoginResult.Success -> call.respondRedirect(result.value)
+                is SocialLoginResult.Failure -> {
+                    val tenant        = tenantRepository.findBySlug(slug)
+                    val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+                    val workspaceName = tenant?.displayName ?: "KotAuth"
+                    call.respondHtml(
+                        HttpStatusCode.BadRequest,
+                        AuthView.loginPage(
+                            tenantSlug    = slug,
+                            theme         = theme,
+                            workspaceName = workspaceName,
+                            error         = result.error.toMessage()
+                        )
+                    )
+                }
+            }
+        }
+
+        get("/auth/social/{provider}/callback") {
+            val slug     = call.parameters["slug"]     ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val provider = SocialProvider.fromValueOrNull(provName)
+                ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
+
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+
+            if (socialLoginService == null) {
+                return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
+            }
+
+            val code  = call.request.queryParameters["code"]
+            val state = call.request.queryParameters["state"]
+            val error = call.request.queryParameters["error"]
+
+            // Provider-returned error (e.g. user denied access)
+            if (!error.isNullOrBlank()) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AuthView.loginPage(
+                        tenantSlug    = slug,
+                        theme         = theme,
+                        workspaceName = workspaceName,
+                        error         = "Login with ${provider.displayName} was cancelled or failed."
+                    )
+                )
+                return@get
+            }
+
+            if (code.isNullOrBlank() || state.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "missing_code_or_state"))
+                return@get
+            }
+
+            // Verify CSRF state signature
+            val verifiedPayload = EncryptionService.verifyCookie(state)
+            if (verifiedPayload == null) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AuthView.loginPage(
+                        tenantSlug    = slug,
+                        theme         = theme,
+                        workspaceName = workspaceName,
+                        error         = "Invalid or expired state parameter. Please try signing in again."
+                    )
+                )
+                return@get
+            }
+
+            // Parse state: {provider}|{slug}|{nonce}|{oauthParamsBase64}
+            val parts = verifiedPayload.split("|")
+            if (parts.size < 4 || parts[0] != provider.value || parts[1] != slug) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AuthView.loginPage(
+                        tenantSlug    = slug,
+                        theme         = theme,
+                        workspaceName = workspaceName,
+                        error         = "State mismatch. Please try signing in again."
+                    )
+                )
+                return@get
+            }
+
+            // Recover the original OAuth params (if any) from the state
+            val oauthParamsRaw = try {
+                String(java.util.Base64.getUrlDecoder().decode(parts[3]), Charsets.UTF_8)
+            } catch (_: Exception) { "" }
+            // Parse them back into OAuthParams
+            val restoredParams = parseQueryStringToOAuthParams(oauthParamsRaw)
+
+            val ipAddress = call.request.local.remoteAddress
+            val userAgent = call.request.headers["User-Agent"]
+
+            when (val result = socialLoginService.handleCallback(
+                tenantSlug = slug,
+                provider   = provider,
+                code       = code,
+                baseUrl    = baseUrl,
+                ipAddress  = ipAddress,
+                userAgent  = userAgent
+            )) {
+                is SocialLoginResult.Failure -> {
+                    call.respondHtml(
+                        HttpStatusCode.BadRequest,
+                        AuthView.loginPage(
+                            tenantSlug    = slug,
+                            theme         = theme,
+                            workspaceName = workspaceName,
+                            error         = result.error.toMessage()
+                        )
+                    )
+                }
+                is SocialLoginResult.Success -> {
+                    val loginSuccess = result.value
+                    if (restoredParams.isOAuthFlow) {
+                        // Authorization Code Flow — issue code and redirect
+                        val clientId    = restoredParams.clientId ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val redirectUri = restoredParams.redirectUri ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        when (val codeResult = oauthService.issueAuthorizationCode(
+                            tenantSlug          = slug,
+                            userId              = loginSuccess.user.id!!,
+                            clientId            = clientId,
+                            redirectUri         = redirectUri,
+                            scopes              = restoredParams.scope ?: "openid",
+                            codeChallenge       = restoredParams.codeChallenge,
+                            codeChallengeMethod = restoredParams.codeChallengeMethod,
+                            nonce               = restoredParams.nonce,
+                            state               = restoredParams.state,
+                            ipAddress           = ipAddress
+                        )) {
+                            is OAuthResult.Success -> {
+                                val authCode   = codeResult.value.code
+                                val stateParam = restoredParams.state
+                                val redirect   = buildString {
+                                    append(redirectUri)
+                                    append("?code=").append(authCode)
+                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
+                                }
+                                call.respondRedirect(redirect)
+                            }
+                            is OAuthResult.Failure -> call.respondHtml(
+                                HttpStatusCode.BadRequest,
+                                AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription())
+                            )
+                        }
+                    } else {
+                        // Direct flow — return tokens as JSON
+                        call.respond(loginSuccess.tokens)
+                    }
+                }
+            }
+        }
+
+        // ==================================================================
         // JWKS — public keys for offline token verification
         // ==================================================================
 
@@ -815,4 +1052,40 @@ private fun AuthError.toMessage(): String = when (this) {
     is AuthError.WeakPassword         -> "Password must be at least $minLength characters."
     is AuthError.ValidationError      -> this.message
     is AuthError.PasswordExpired      -> "Your password has expired. Please reset it."
+}
+
+private fun SocialLoginError.toMessage(): String = when (this) {
+    is SocialLoginError.TenantNotFound        -> "Tenant not found."
+    is SocialLoginError.ProviderNotConfigured -> "Social login with this provider is not configured for this tenant."
+    is SocialLoginError.EmailNotProvided      -> "Your social account did not provide an email address. Please use username/password login or grant email access."
+    is SocialLoginError.UserDisabled          -> "Your account has been disabled."
+    is SocialLoginError.AccountCreationFailed -> "Failed to create an account. Please try again or contact support."
+    is SocialLoginError.ProviderError         -> "An error occurred communicating with the identity provider. Please try again."
+    is SocialLoginError.InternalError         -> "An internal error occurred. Please try again."
+}
+
+/**
+ * Parses a query string (without the leading '?') back into [AuthView.OAuthParams].
+ * Used during the social callback to restore the original OAuth2 parameters from state.
+ */
+private fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
+    if (qs.isBlank()) return AuthView.OAuthParams()
+    val map = qs.split("&").mapNotNull {
+        val idx = it.indexOf('=')
+        if (idx < 0) null else {
+            val k = java.net.URLDecoder.decode(it.substring(0, idx), "UTF-8")
+            val v = java.net.URLDecoder.decode(it.substring(idx + 1), "UTF-8")
+            k to v
+        }
+    }.toMap()
+    return AuthView.OAuthParams(
+        responseType        = map["response_type"],
+        clientId            = map["oauth_client_id"] ?: map["client_id"],
+        redirectUri         = map["redirect_uri"],
+        scope               = map["scope"],
+        state               = map["state"],
+        codeChallenge       = map["code_challenge"],
+        codeChallengeMethod = map["code_challenge_method"],
+        nonce               = map["nonce"]
+    )
 }

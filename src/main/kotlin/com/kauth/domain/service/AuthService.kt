@@ -160,6 +160,17 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
+        // Enforce password expiry — mirrors the check in authenticate() so that login() is
+        // self-contained regardless of whether the caller invoked authenticate() first.
+        // Users without a recorded lastPasswordChangeAt are not affected (prevents mass lockouts
+        // when an admin first activates the policy on an existing tenant).
+        if (tenant.passwordPolicyMaxAgeDays > 0 && user.lastPasswordChangeAt != null) {
+            val ageDays = Duration.between(user.lastPasswordChangeAt, Instant.now()).toDays()
+            if (ageDays >= tenant.passwordPolicyMaxAgeDays) {
+                return AuthResult.Failure(AuthError.PasswordExpired)
+            }
+        }
+
         val tokens = tokenPort.issueUserTokens(
             user   = user,
             tenant = tenant,

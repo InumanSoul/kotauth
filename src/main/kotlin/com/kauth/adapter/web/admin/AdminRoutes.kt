@@ -1,10 +1,13 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
+import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
@@ -14,6 +17,7 @@ import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
@@ -49,17 +53,18 @@ import java.time.Instant
  *   /admin/workspaces/{slug}/logs                            — audit log
  */
 fun Route.adminRoutes(
-    authService               : AuthService,
-    adminService              : AdminService,
-    roleGroupService          : RoleGroupService,
-    tenantRepository          : TenantRepository,
-    applicationRepository     : ApplicationRepository,
-    userRepository            : UserRepository,
-    sessionRepository         : SessionRepository,
-    auditLogRepository        : AuditLogRepository,
-    keyProvisioningService    : KeyProvisioningService,
-    mfaRepository             : MfaRepository? = null,
-    portalClientProvisioning  : PortalClientProvisioning? = null  // nullable for backward compat
+    authService                  : AuthService,
+    adminService                 : AdminService,
+    roleGroupService             : RoleGroupService,
+    tenantRepository             : TenantRepository,
+    applicationRepository        : ApplicationRepository,
+    userRepository               : UserRepository,
+    sessionRepository            : SessionRepository,
+    auditLogRepository           : AuditLogRepository,
+    keyProvisioningService       : KeyProvisioningService,
+    mfaRepository                : MfaRepository? = null,
+    portalClientProvisioning     : PortalClientProvisioning? = null,
+    identityProviderRepository   : IdentityProviderRepository? = null   // Phase 2 — Social Login
 ) {
     route("/admin") {
 
@@ -251,6 +256,118 @@ fun Route.adminRoutes(
                                     error = result.error.message))
                         }
                     }
+                }
+
+                // ----------------------------------------------------------
+                // Identity Providers — Phase 2 (Social Login)
+                // ----------------------------------------------------------
+
+                get("/settings/identity-providers") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
+                    val editParam = call.request.queryParameters["edit"]
+                    val editProvider = editParam?.let { SocialProvider.fromValueOrNull(it) }
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.identityProvidersPage(
+                            workspace     = workspace,
+                            providers     = providers,
+                            allWorkspaces = wsPairs,
+                            loggedInAs    = session.username,
+                            editProvider  = editProvider
+                        ))
+                }
+
+                post("/settings/identity-providers/{provider}") {
+                    val session  = call.sessions.get<AdminSession>()!!
+                    val slug     = call.parameters["slug"]     ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val provider = SocialProvider.fromValueOrNull(provName)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, "Unsupported provider: $provName")
+
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val params    = call.receiveParameters()
+
+                    val newClientId = params["clientId"]?.trim() ?: ""
+                    val newSecret   = params["clientSecret"]?.takeIf { it.isNotBlank() }
+                    val enabled     = params["enabled"] == "true"
+
+                    if (newClientId.isBlank()) {
+                        val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
+                        return@post call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                            AdminView.identityProvidersPage(
+                                workspace     = workspace,
+                                providers     = providers,
+                                allWorkspaces = wsPairs,
+                                loggedInAs    = session.username,
+                                editProvider  = provider,
+                                error         = "Client ID is required."
+                            ))
+                    }
+
+                    val idpRepo = identityProviderRepository ?: return@post call.respond(
+                        HttpStatusCode.NotImplemented, "Identity provider repository not configured"
+                    )
+
+                    if (!EncryptionService.isAvailable && newSecret != null) {
+                        val providers = idpRepo.findAllByTenant(workspace.id)
+                        return@post call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                            AdminView.identityProvidersPage(
+                                workspace     = workspace,
+                                providers     = providers,
+                                allWorkspaces = wsPairs,
+                                loggedInAs    = session.username,
+                                editProvider  = provider,
+                                error         = "KAUTH_SECRET_KEY must be set to store provider credentials securely."
+                            ))
+                    }
+
+                    val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
+                    if (existing == null) {
+                        // New provider
+                        if (newSecret.isNullOrBlank()) {
+                            val providers = idpRepo.findAllByTenant(workspace.id)
+                            return@post call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                AdminView.identityProvidersPage(
+                                    workspace     = workspace,
+                                    providers     = providers,
+                                    allWorkspaces = wsPairs,
+                                    loggedInAs    = session.username,
+                                    editProvider  = provider,
+                                    error         = "Client Secret is required when adding a new provider."
+                                ))
+                        }
+                        idpRepo.save(IdentityProvider(
+                            tenantId     = workspace.id,
+                            provider     = provider,
+                            clientId     = newClientId,
+                            clientSecret = newSecret,
+                            enabled      = enabled
+                        ))
+                    } else {
+                        // Update existing — preserve secret if not changed
+                        val secretToUse = newSecret ?: existing.clientSecret
+                        idpRepo.update(existing.copy(
+                            clientId     = newClientId,
+                            clientSecret = secretToUse,
+                            enabled      = enabled
+                        ))
+                    }
+
+                    call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers?saved=true")
+                }
+
+                post("/settings/identity-providers/{provider}/delete") {
+                    val slug     = call.parameters["slug"]     ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val provider = SocialProvider.fromValueOrNull(provName)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    identityProviderRepository?.delete(workspace.id, provider)
+                    call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers")
                 }
 
                 post("/settings") {

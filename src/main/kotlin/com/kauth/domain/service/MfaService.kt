@@ -5,6 +5,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
+import com.kauth.domain.model.Role
 import com.kauth.domain.model.User
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.MfaRepository
@@ -293,12 +294,23 @@ class MfaService(
     /**
      * Checks whether MFA is required for a given user based on the tenant's policy.
      * Returns true if the user must complete MFA enrollment before login can succeed.
+     *
+     * @param user            The user attempting to log in.
+     * @param tenantMfaPolicy The tenant's configured MFA policy ("optional", "required",
+     *                        "required_admins").
+     * @param userRoles       The user's effective roles (direct + group-inherited). Only
+     *                        consulted when policy is "required_admins". Pass an empty list
+     *                        if roles are not available — the policy will not block login in
+     *                        that case (conservative fail-open for the required_admins check).
      */
-    fun isMfaRequired(user: User, tenantMfaPolicy: String): Boolean {
+    fun isMfaRequired(user: User, tenantMfaPolicy: String, userRoles: List<Role> = emptyList()): Boolean {
         return when (tenantMfaPolicy) {
             "required"        -> true
-            "required_admins" -> false  // TODO: check admin role membership
-            else              -> false  // "optional"
+            // Only users holding the built-in "admin" role are required to enroll MFA.
+            // Effective roles (direct assignments + group inheritance + composite expansion)
+            // must be passed by the caller — MfaService has no repository access.
+            "required_admins" -> userRoles.any { it.name == "admin" }
+            else              -> false  // "optional" — users may self-enroll via the portal
         }
     }
 

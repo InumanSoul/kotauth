@@ -5,8 +5,10 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
@@ -281,9 +283,10 @@ object AdminView {
     private fun DIV.renderSettingsCtxPanel(workspaceSlug: String?, activeSection: String) {
         span("ctx-section-title") { +"Settings" }
         val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
-        ctxLink("$base",  "general",  activeSection, "General")
-        ctxLink("$base/smtp",     "smtp",     activeSection, "SMTP")
-        ctxLink("$base/security", "security", activeSection, "Security policy")
+        ctxLink("$base",                       "general",            activeSection, "General")
+        ctxLink("$base/smtp",                  "smtp",               activeSection, "SMTP")
+        ctxLink("$base/security",              "security",           activeSection, "Security policy")
+        ctxLink("$base/identity-providers",    "identity-providers", activeSection, "Identity Providers")
     }
 
     // -------------------------------------------------------------------------
@@ -2839,6 +2842,189 @@ object AdminView {
 
     private fun java.time.Instant.toDisplayString(): String =
         TS_FMT.format(this.atOffset(ZoneOffset.UTC))
+
+    // -------------------------------------------------------------------------
+    // Identity Providers settings page — Phase 2 (Social Login)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Displays the Identity Providers configuration page for a tenant.
+     * Shows a list of supported providers (Google, GitHub) with their current
+     * configuration status and a form to add/update each provider.
+     *
+     * @param workspace     The tenant being configured.
+     * @param providers     Currently configured providers for this tenant.
+     * @param allWorkspaces Sidebar workspace list.
+     * @param loggedInAs    Currently logged-in admin username.
+     * @param editProvider  If set, expand the inline edit form for this provider.
+     * @param error         Error message from a failed save attempt.
+     * @param saved         True after a successful save.
+     */
+    fun identityProvidersPage(
+        workspace     : Tenant,
+        providers     : List<IdentityProvider>,
+        allWorkspaces : List<Pair<String, String>>,
+        loggedInAs    : String,
+        editProvider  : SocialProvider? = null,
+        error         : String? = null,
+        saved         : Boolean = false
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle        = "Identity Providers — ${workspace.displayName}",
+            activeRail       = "settings",
+            allWorkspaces    = allWorkspaces,
+            workspaceName    = workspace.displayName,
+            workspaceSlug    = workspace.slug,
+            loggedInAs       = loggedInAs,
+            activeAppSection = "identity-providers"
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Identity Providers" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Identity Providers" }
+                    p("page-subtitle") {
+                        +"Configure social login providers for ${workspace.displayName}. "
+                        +"Users can sign in with their Google or GitHub accounts."
+                    }
+                }
+            }
+
+            if (saved) {
+                div("alert alert-success") {
+                    style = "max-width:640px;"
+                    +"Identity provider settings saved."
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            val providerMap = providers.associateBy { it.provider }
+
+            for (prov in SocialProvider.entries) {
+                val existing    = providerMap[prov]
+                val isConfigured = existing != null
+                val isEditing    = editProvider == prov
+
+                div("form-card") {
+                    style = "max-width:640px; margin-bottom:1.5rem;"
+                    div {
+                        style = "display:flex; align-items:center; gap:1rem; margin-bottom:1rem;"
+                        p("form-section-title") {
+                            style = "margin:0;"
+                            +prov.displayName
+                        }
+                        if (isConfigured) {
+                            val enabledBadge = if (existing!!.enabled) "badge-success" else "badge-neutral"
+                            val enabledText  = if (existing.enabled) "Enabled" else "Disabled"
+                            span("badge $enabledBadge") { +enabledText }
+                        } else {
+                            span("badge badge-neutral") { +"Not configured" }
+                        }
+                    }
+
+                    p("field-hint") {
+                        style = "margin-bottom:1rem;"
+                        when (prov) {
+                            SocialProvider.GOOGLE -> {
+                                +"Create credentials in "
+                                a(href = "https://console.cloud.google.com/apis/credentials", target = "_blank") { +"Google Cloud Console" }
+                                +". Set the authorized redirect URI to: "
+                                code { +"${workspace.issuerUrl ?: "https://your-domain.com"}/t/${workspace.slug}/auth/social/google/callback" }
+                            }
+                            SocialProvider.GITHUB -> {
+                                +"Register an OAuth App in "
+                                a(href = "https://github.com/settings/developers", target = "_blank") { +"GitHub Developer Settings" }
+                                +". Set the callback URL to: "
+                                code { +"${workspace.issuerUrl ?: "https://your-domain.com"}/t/${workspace.slug}/auth/social/github/callback" }
+                            }
+                        }
+                    }
+
+                    if (isEditing || !isConfigured) {
+                        // Show the inline edit form
+                        form(
+                            action  = "/admin/workspaces/${workspace.slug}/settings/identity-providers/${prov.value}",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method  = FormMethod.post
+                        ) {
+                            div("field") {
+                                label { htmlFor = "${prov.value}_clientId"; +"Client ID" }
+                                input(type = InputType.text, name = "clientId") {
+                                    id          = "${prov.value}_clientId"
+                                    placeholder = "Enter ${prov.displayName} client ID"
+                                    required    = true
+                                    value       = existing?.clientId ?: ""
+                                    attributes["autocomplete"] = "off"
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "${prov.value}_clientSecret"; +"Client Secret" }
+                                input(type = InputType.password, name = "clientSecret") {
+                                    id          = "${prov.value}_clientSecret"
+                                    attributes["autocomplete"] = "new-password"
+                                    // Never pre-fill — secret is encrypted at rest
+                                }
+                                p("field-hint") {
+                                    if (isConfigured)
+                                        +"A secret is already set. Leave blank to keep the existing secret."
+                                    else
+                                        +"Enter the OAuth2 client secret. It is stored encrypted."
+                                }
+                            }
+                            div("checkbox-row") {
+                                input(type = InputType.checkBox, name = "enabled") {
+                                    id = "${prov.value}_enabled"
+                                    attributes["value"] = "true"
+                                    if (existing?.enabled != false) checked = true
+                                }
+                                label("checkbox-label") {
+                                    htmlFor = "${prov.value}_enabled"
+                                    +"Enable ${prov.displayName} login"
+                                }
+                            }
+                            div {
+                                style = "display:flex; gap:0.75rem; margin-top:1.25rem;"
+                                button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
+                                if (isConfigured) {
+                                    a(
+                                        href    = "/admin/workspaces/${workspace.slug}/settings/identity-providers",
+                                        classes = "btn btn-ghost btn-sm"
+                                    ) { +"Cancel" }
+                                }
+                            }
+                        }
+                    } else {
+                        // Collapsed view with edit + delete actions
+                        div {
+                            style = "display:flex; gap:0.75rem;"
+                            a(
+                                href    = "/admin/workspaces/${workspace.slug}/settings/identity-providers?edit=${prov.value}",
+                                classes = "btn btn-ghost btn-sm"
+                            ) { +"Edit" }
+                            form(
+                                action  = "/admin/workspaces/${workspace.slug}/settings/identity-providers/${prov.value}/delete",
+                                method  = FormMethod.post
+                            ) {
+                                button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm btn-danger") {
+                                    attributes["onclick"] = "return confirm('Remove ${prov.displayName} login configuration?')"
+                                    +"Remove"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /**

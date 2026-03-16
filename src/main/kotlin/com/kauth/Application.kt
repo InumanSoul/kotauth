@@ -7,14 +7,18 @@ import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
 import com.kauth.adapter.persistence.PostgresGroupRepository
+import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
 import com.kauth.adapter.persistence.PostgresMfaRepository
 import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
+import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
+import com.kauth.adapter.social.GitHubOAuthAdapter
+import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.admin.AdminSession
@@ -23,11 +27,13 @@ import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.EncryptionService
@@ -187,6 +193,9 @@ fun main() {
     val roleRepository        = PostgresRoleRepository()
     val groupRepository       = PostgresGroupRepository()
     val passwordPolicyAdapter = PostgresPasswordPolicyAdapter(passwordHasher)
+    // Phase 2: Social Login repositories
+    val identityProviderRepository = PostgresIdentityProviderRepository()
+    val socialAccountRepository    = PostgresSocialAccountRepository()
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -281,6 +290,22 @@ fun main() {
         auditLog         = auditLogAdapter
     )
 
+    // Phase 2: Social Login service — wires provider HTTP adapters
+    val socialLoginService = SocialLoginService(
+        identityProviderRepository = identityProviderRepository,
+        socialAccountRepository    = socialAccountRepository,
+        userRepository             = userRepository,
+        tenantRepository           = tenantRepository,
+        sessionRepository          = sessionRepository,
+        tokenPort                  = tokenAdapter,
+        passwordHasher             = passwordHasher,
+        auditLog                   = auditLogAdapter,
+        providerAdapters           = mapOf(
+            SocialProvider.GOOGLE to GoogleOAuthAdapter(),
+            SocialProvider.GITHUB to GitHubOAuthAdapter()
+        )
+    )
+
     // -------------------------------------------------------------------------
     // Rate limiters (Phase 0)
     // -------------------------------------------------------------------------
@@ -301,47 +326,53 @@ fun main() {
 
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         module(
-            authService            = authService,
-            oauthService           = oauthService,
-            adminService           = adminService,
-            roleGroupService       = roleGroupService,
-            selfServiceService     = selfServiceService,
-            mfaService             = mfaService,
-            mfaRepository          = mfaRepository,
-            tenantRepository       = tenantRepository,
-            applicationRepository  = applicationRepository,
-            userRepository         = userRepository,
-            sessionRepository      = sessionRepository,
-            auditLogRepository     = auditLogRepository,
-            keyProvisioningService = keyProvisioning,
-            loginRateLimiter         = loginRateLimiter,
-            registerRateLimiter      = registerRateLimiter,
-            portalSessionKey         = portalSessionKey,
-            baseUrl                  = baseUrl,
-            portalClientProvisioning = portalClientProvisioning
+            authService                = authService,
+            oauthService               = oauthService,
+            adminService               = adminService,
+            roleGroupService           = roleGroupService,
+            selfServiceService         = selfServiceService,
+            mfaService                 = mfaService,
+            mfaRepository              = mfaRepository,
+            roleRepository             = roleRepository,
+            tenantRepository           = tenantRepository,
+            applicationRepository      = applicationRepository,
+            userRepository             = userRepository,
+            sessionRepository          = sessionRepository,
+            auditLogRepository         = auditLogRepository,
+            keyProvisioningService     = keyProvisioning,
+            loginRateLimiter           = loginRateLimiter,
+            registerRateLimiter        = registerRateLimiter,
+            portalSessionKey           = portalSessionKey,
+            baseUrl                    = baseUrl,
+            portalClientProvisioning   = portalClientProvisioning,
+            socialLoginService         = socialLoginService,
+            identityProviderRepository = identityProviderRepository
         )
     }.start(wait = true)
 }
 
 fun Application.module(
-    authService            : AuthService,
-    oauthService           : OAuthService,
-    adminService           : AdminService,
-    roleGroupService       : RoleGroupService,
-    selfServiceService     : UserSelfServiceService,
-    mfaService             : MfaService,
-    tenantRepository       : com.kauth.domain.port.TenantRepository,
-    applicationRepository  : com.kauth.domain.port.ApplicationRepository,
-    userRepository         : com.kauth.domain.port.UserRepository,
-    sessionRepository      : com.kauth.domain.port.SessionRepository,
-    auditLogRepository     : com.kauth.domain.port.AuditLogRepository,
-    keyProvisioningService : KeyProvisioningService,
-    mfaRepository          : com.kauth.domain.port.MfaRepository,
-    loginRateLimiter       : RateLimiter,
-    registerRateLimiter    : RateLimiter,
-    portalSessionKey       : ByteArray,
-    baseUrl                : String,
-    portalClientProvisioning: PortalClientProvisioning
+    authService                : AuthService,
+    oauthService               : OAuthService,
+    adminService               : AdminService,
+    roleGroupService           : RoleGroupService,
+    selfServiceService         : UserSelfServiceService,
+    mfaService                 : MfaService,
+    tenantRepository           : com.kauth.domain.port.TenantRepository,
+    applicationRepository      : com.kauth.domain.port.ApplicationRepository,
+    userRepository             : com.kauth.domain.port.UserRepository,
+    sessionRepository          : com.kauth.domain.port.SessionRepository,
+    auditLogRepository         : com.kauth.domain.port.AuditLogRepository,
+    keyProvisioningService     : KeyProvisioningService,
+    mfaRepository              : com.kauth.domain.port.MfaRepository,
+    roleRepository             : com.kauth.domain.port.RoleRepository,
+    loginRateLimiter           : RateLimiter,
+    registerRateLimiter        : RateLimiter,
+    portalSessionKey           : ByteArray,
+    baseUrl                    : String,
+    portalClientProvisioning   : PortalClientProvisioning,
+    socialLoginService         : SocialLoginService? = null,                            // Phase 2
+    identityProviderRepository : com.kauth.domain.port.IdentityProviderRepository? = null  // Phase 2
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -431,15 +462,19 @@ fun Application.module(
         // Health probes — liveness (/health) + readiness (/health/ready)
         healthRoutes(baseUrl)
 
-        // All tenant auth + OIDC flows (Phase 1–3b)
+        // All tenant auth + OIDC flows (Phase 1–2)
         authRoutes(
-            authService         = authService,
-            oauthService        = oauthService,
-            tenantRepository    = tenantRepository,
-            loginRateLimiter    = loginRateLimiter,
-            registerRateLimiter = registerRateLimiter,
-            selfServiceService  = selfServiceService,
-            mfaService          = mfaService
+            authService                = authService,
+            oauthService               = oauthService,
+            tenantRepository           = tenantRepository,
+            loginRateLimiter           = loginRateLimiter,
+            registerRateLimiter        = registerRateLimiter,
+            selfServiceService         = selfServiceService,
+            mfaService                 = mfaService,
+            roleRepository             = roleRepository,
+            socialLoginService         = socialLoginService,
+            identityProviderRepository = identityProviderRepository,
+            baseUrl                    = baseUrl
         )
 
         // Self-service portal — /t/{slug}/account/* (Phase 4: OAuth-backed login)
@@ -455,17 +490,18 @@ fun Application.module(
 
         // Admin console
         adminRoutes(
-            authService              = authService,
-            adminService             = adminService,
-            roleGroupService         = roleGroupService,
-            tenantRepository         = tenantRepository,
-            applicationRepository    = applicationRepository,
-            userRepository           = userRepository,
-            sessionRepository        = sessionRepository,
-            auditLogRepository       = auditLogRepository,
-            keyProvisioningService   = keyProvisioningService,
-            mfaRepository            = mfaRepository,
-            portalClientProvisioning = portalClientProvisioning
+            authService                = authService,
+            adminService               = adminService,
+            roleGroupService           = roleGroupService,
+            tenantRepository           = tenantRepository,
+            applicationRepository      = applicationRepository,
+            userRepository             = userRepository,
+            sessionRepository          = sessionRepository,
+            auditLogRepository         = auditLogRepository,
+            keyProvisioningService     = keyProvisioningService,
+            mfaRepository              = mfaRepository,
+            portalClientProvisioning   = portalClientProvisioning,
+            identityProviderRepository = identityProviderRepository
         )
     }
 }

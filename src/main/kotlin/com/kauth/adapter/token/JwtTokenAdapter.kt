@@ -90,19 +90,25 @@ class JwtTokenAdapter(
             accessTokenBuilder.withClaim("realm_access", mapOf("roles" to tenantRoles))
         }
 
-        // Embed resource_access (client-scoped roles, keyed by clientId string)
+        // Embed resource_access (client-scoped roles, keyed by the client's string clientId).
+        // Roles carry the integer FK (clientId: Int?) from the DB. We resolve the human-readable
+        // string identifier by matching against the Application passed to this call.
+        // In Authorization Code Flow the user authenticates against exactly one client, so the
+        // client param covers all CLIENT-scoped roles in the resolved list.
         if (clientRolesMap.isNotEmpty()) {
             val resourceAccess = mutableMapOf<String, Map<String, List<String>>>()
             for ((_, clientRoles) in clientRolesMap) {
-                // All roles in this group share the same clientId
-                val appClientId = clientRoles.firstOrNull()?.clientId ?: continue
-                // We need the client's string clientId, not the int PK.
-                // For now, we use the int as string; the caller should resolve this.
-                // But the roles already carry the clientId FK — we embed as int-string.
-                // A better approach: the caller passes an Application lookup.
-                // For MVP, we embed as "client_<id>". The admin routes resolve proper names.
+                val appClientIdInt = clientRoles.firstOrNull()?.clientId ?: continue
+                // Prefer the string clientId from the Application domain object.
+                // Falls back to the integer-as-string only if the role belongs to a different
+                // client than the one being issued tokens for (edge case in multi-app tenants).
+                val stringClientId = if (client != null && client.id == appClientIdInt) {
+                    client.clientId
+                } else {
+                    appClientIdInt.toString()
+                }
                 val roleNames = clientRoles.map { it.name }
-                resourceAccess[appClientId.toString()] = mapOf("roles" to roleNames)
+                resourceAccess[stringClientId] = mapOf("roles" to roleNames)
             }
             if (resourceAccess.isNotEmpty()) {
                 accessTokenBuilder.withClaim("resource_access", resourceAccess as Map<String, *>)
