@@ -44,4 +44,18 @@ dependencies {
 
     // Phase 3b — SMTP email delivery (JavaMail, no wrapper libraries)
     implementation("com.sun.mail:javax.mail:1.6.2")
+
+    // ---- Test dependencies ----
+    // Ktor in-memory test engine — full routing + serialisation, no real server or DB
+    testImplementation("io.ktor:ktor-server-test-host:$ktor_version")
+    // Kotlin test assertions + JUnit 5 runner
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    // MockK — Kotlin-native mocking (HTTP integration tests only)
+    testImplementation("io.mockk:mockk:1.13.10")
+    // JUnit 5 engine
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
