@@ -20,6 +20,10 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import java.time.Instant
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
 
 /**
  * Self-service portal routes — Phase 3b.
@@ -293,6 +297,32 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
+        // MFA management page — Phase 3c
+        // ------------------------------------------------------------------
+
+        get("/mfa") {
+            val slug       = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session    = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant     = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val mfaEnabled = mfaService?.shouldChallengeMfa(session.userId) ?: false
+            val successMsg = call.request.queryParameters["success"]
+            val errorMsg   = call.request.queryParameters["error"]
+
+            call.respondHtml(
+                HttpStatusCode.OK,
+                PortalView.mfaPage(
+                    slug          = slug,
+                    session       = session,
+                    theme         = tenant.theme,
+                    workspaceName = tenant.displayName,
+                    mfaEnabled    = mfaEnabled,
+                    successMsg    = successMsg,
+                    errorMsg      = errorMsg
+                )
+            )
+        }
+
+        // ------------------------------------------------------------------
         // MFA self-service — Phase 3c (JSON API, consumed by portal UI)
         // ------------------------------------------------------------------
 
@@ -306,13 +336,15 @@ fun Route.portalRoutes(
             val issuer = tenant?.displayName ?: "KotAuth"
 
             when (val result = mfaService.beginEnrollment(session.userId, session.tenantId, issuer)) {
-                is MfaResult.Success -> call.respond(mapOf(
-                    "totp_uri"       to result.value.totpUri,
-                    "recovery_codes" to result.value.recoveryCodes
-                ))
-                is MfaResult.Failure -> call.respond(HttpStatusCode.Conflict, mapOf(
-                    "error" to result.error.toCode()
-                ))
+                is MfaResult.Success -> call.respond(buildJsonObject {
+                    put("totp_uri", result.value.totpUri)
+                    putJsonArray("recovery_codes") {
+                        result.value.recoveryCodes.forEach { add(it) }
+                    }
+                })
+                is MfaResult.Failure -> call.respond(HttpStatusCode.Conflict, buildJsonObject {
+                    put("error", result.error.toCode())
+                })
             }
         }
 

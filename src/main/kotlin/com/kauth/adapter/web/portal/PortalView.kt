@@ -252,7 +252,7 @@ object PortalView {
             }
             div("card") {
                 h1("card-title") { +"Two-Factor Authentication" }
-                p("card-subtitle") { +"Enter the 6-digit code from your authenticator app" }
+                p("card-subtitle") { id = "challenge-subtitle"; +"Enter the 6-digit code from your authenticator app" }
 
                 if (!error.isNullOrBlank()) {
                     div("alert alert-error") { +error }
@@ -264,7 +264,7 @@ object PortalView {
                     method  = FormMethod.post
                 ) {
                     div("field") {
-                        label { htmlFor = "code"; +"Verification code" }
+                        label { htmlFor = "code"; id = "code-label"; +"Verification code" }
                         input(type = InputType.text, name = "code") {
                             id = "code"
                             placeholder = "000000"
@@ -280,7 +280,512 @@ object PortalView {
                 }
 
                 div("footer-link") {
+                    a(href = "#") {
+                        id = "recovery-toggle"
+                        attributes["onclick"] = "toggleRecoveryMode(); return false;"
+                        +"Use a recovery code instead"
+                    }
+                }
+
+                div("footer-link") {
                     a(href = "/t/$slug/account/login") { +"Back to login" }
+                }
+            }
+
+            script {
+                unsafe {
+                    raw("""
+                        var _recoveryMode = false;
+                        function toggleRecoveryMode() {
+                            _recoveryMode = !_recoveryMode;
+                            var input    = document.getElementById('code');
+                            var label    = document.getElementById('code-label');
+                            var subtitle = document.getElementById('challenge-subtitle');
+                            var toggle   = document.getElementById('recovery-toggle');
+                            if (_recoveryMode) {
+                                label.textContent    = 'Recovery code';
+                                subtitle.textContent = 'Enter one of the 8-character recovery codes you saved during setup';
+                                toggle.textContent   = 'Use authenticator app instead';
+                                input.placeholder    = 'e.g. a1b2c3d4';
+                                input.removeAttribute('inputmode');
+                                input.removeAttribute('pattern');
+                                input.removeAttribute('maxlength');
+                            } else {
+                                label.textContent    = 'Verification code';
+                                subtitle.textContent = 'Enter the 6-digit code from your authenticator app';
+                                toggle.textContent   = 'Use a recovery code instead';
+                                input.placeholder    = '000000';
+                                input.setAttribute('inputmode', 'numeric');
+                                input.setAttribute('pattern', '[0-9]*');
+                                input.setAttribute('maxlength', '6');
+                            }
+                            input.value = '';
+                            input.focus();
+                        }
+                    """.trimIndent())
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // MFA management page — Phase 3c
+    //   mfaEnabled = false  →  setup flow (QR + recovery codes + verification)
+    //   mfaEnabled = true   →  active state + disable option
+    // =========================================================================
+
+    fun mfaPage(
+        slug          : String,
+        session       : PortalSession,
+        theme         : TenantTheme,
+        workspaceName : String,
+        mfaEnabled    : Boolean,
+        successMsg    : String? = null,
+        errorMsg      : String? = null
+    ): HTML.() -> Unit = {
+        head {
+            portalPageHead("Two-Factor Auth — $workspaceName", theme)
+            // QR code renderer — only loaded on this page, only needed during setup
+            if (!mfaEnabled) {
+                script(src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js") {}
+            }
+            style {
+                unsafe {
+                    raw("""
+                        /* ── MFA status badge ──────────────────────────────── */
+                        .mfa-status-row {
+                            display: flex;
+                            align-items: center;
+                            gap: 12px;
+                            margin-bottom: 20px;
+                        }
+                        .mfa-status-row p { margin: 0; color: var(--muted); font-size: 14px; }
+                        .mfa-badge {
+                            display: inline-flex;
+                            align-items: center;
+                            gap: 6px;
+                            padding: 3px 10px;
+                            border-radius: 999px;
+                            font-size: 12px;
+                            font-weight: 600;
+                            white-space: nowrap;
+                            flex-shrink: 0;
+                        }
+                        .mfa-badge.active {
+                            background: rgba(34,197,94,.12);
+                            color: #4ade80;
+                            border: 1px solid rgba(34,197,94,.25);
+                        }
+                        .mfa-badge.active::before {
+                            content: '';
+                            display: inline-block;
+                            width: 6px; height: 6px;
+                            border-radius: 50%;
+                            background: #4ade80;
+                        }
+                        .mfa-badge.inactive {
+                            background: rgba(148,163,184,.08);
+                            color: var(--muted);
+                            border: 1px solid var(--border);
+                        }
+                        /* ── Step headings ─────────────────────────────────── */
+                        .mfa-step-heading {
+                            font-size: 14px;
+                            font-weight: 600;
+                            color: var(--text);
+                            margin: 0 0 6px 0;
+                        }
+                        /* ── QR container ──────────────────────────────────── */
+                        .qr-container {
+                            display: inline-block;
+                            padding: 12px;
+                            background: #ffffff;
+                            border-radius: var(--radius);
+                            border: 1px solid var(--border);
+                            margin: 12px 0 8px;
+                            line-height: 0;
+                        }
+                        /* ── Manual setup key ──────────────────────────────── */
+                        .mfa-secret-key {
+                            font-family: monospace;
+                            font-size: 13px;
+                            background: var(--bg-input);
+                            border: 1px solid var(--border);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                            letter-spacing: .08em;
+                            color: var(--text);
+                            word-break: break-all;
+                            user-select: all;
+                        }
+                        /* ── Recovery codes grid ───────────────────────────── */
+                        .recovery-codes-grid {
+                            display: grid;
+                            grid-template-columns: repeat(4, 1fr);
+                            gap: 8px;
+                            margin: 12px 0 10px;
+                            max-width: 440px;
+                        }
+                        .recovery-code {
+                            font-family: monospace;
+                            font-size: 13px;
+                            background: var(--bg-input);
+                            border: 1px solid var(--border);
+                            border-radius: var(--radius);
+                            padding: 8px 6px;
+                            text-align: center;
+                            color: var(--text);
+                            letter-spacing: .06em;
+                        }
+                        /* ── "I've saved" checkbox ─────────────────────────── */
+                        .mfa-confirm-label {
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                            font-size: 13px;
+                            color: var(--text);
+                            cursor: pointer;
+                            margin: 14px 0 0;
+                        }
+                        .mfa-confirm-label input[type=checkbox] {
+                            width: 15px; height: 15px;
+                            flex-shrink: 0;
+                            cursor: pointer;
+                            accent-color: var(--accent);
+                        }
+                        /* ── Action row (disable confirm) ──────────────────── */
+                        .mfa-action-row {
+                            display: flex;
+                            gap: 10px;
+                            margin-top: 16px;
+                            align-items: center;
+                            flex-wrap: wrap;
+                        }
+                        /* ── Warning alert ─────────────────────────────────── */
+                        .alert-warning {
+                            background: rgba(234,179,8,.08);
+                            border: 1px solid rgba(234,179,8,.25);
+                            color: #fbbf24;
+                            padding: 10px 14px;
+                            border-radius: var(--radius);
+                            font-size: 13px;
+                            margin: 12px 0 0;
+                        }
+                        /* ── Buttons ───────────────────────────────────────── */
+                        .btn-danger {
+                            background: #dc2626;
+                            color: #fff;
+                            border: none;
+                            padding: 0.65rem 1.25rem;
+                            border-radius: var(--radius);
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-family: inherit;
+                            font-weight: 500;
+                            transition: background .15s;
+                        }
+                        .btn-danger:hover    { background: #b91c1c; }
+                        .btn-danger:disabled { opacity: .55; cursor: not-allowed; }
+                        .btn-danger-outline {
+                            background: transparent;
+                            color: #f87171;
+                            border: 1px solid rgba(220,38,38,.6);
+                            padding: 0.65rem 1.25rem;
+                            border-radius: var(--radius);
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-family: inherit;
+                            font-weight: 500;
+                            transition: background .15s;
+                        }
+                        .btn-danger-outline:hover { background: rgba(220,38,38,.08); }
+                        .btn-outline {
+                            background: transparent;
+                            color: var(--text);
+                            border: 1px solid var(--border);
+                            padding: 0.65rem 1.25rem;
+                            border-radius: var(--radius);
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-family: inherit;
+                            font-weight: 500;
+                            transition: background .15s;
+                        }
+                        .btn-outline:hover    { background: var(--bg-input); }
+                        .btn-outline:disabled { opacity: .55; cursor: not-allowed; }
+                        /* ── Secondary spacing helper ──────────────────────── */
+                        .mfa-hint-row { margin-top: 6px; }
+                    """.trimIndent())
+                }
+            }
+        }
+        body {
+            portalShell(slug, workspaceName, session.username, "mfa") {
+
+                h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
+
+                if (successMsg != null)
+                    div(classes = "alert alert-success") { +"Authenticator set up successfully. Your account is now protected with two-factor authentication." }
+                if (!errorMsg.isNullOrBlank())
+                    div(classes = "alert alert-error") { +errorMsg }
+
+                if (mfaEnabled) {
+                    // ── Active state ──────────────────────────────────────────────
+                    div(classes = "mfa-status-row") {
+                        span(classes = "mfa-badge active") { +"Active" }
+                        p { +"Two-factor authentication is protecting your account." }
+                    }
+                    p { +"When you sign in you'll be asked for a 6-digit code from your authenticator app." }
+                    p(classes = "form-hint mfa-hint-row") {
+                        +("Recovery codes were displayed once when you set up two-factor authentication. " +
+                        "To generate new codes, remove and re-enable two-factor authentication.")
+                    }
+
+                    hr(classes = "portal-divider")
+
+                    div { id = "disable-btn-row"
+                        button(classes = "btn-danger-outline") {
+                            attributes["onclick"] = """
+                                document.getElementById('disable-confirm').style.display='block';
+                                document.getElementById('disable-btn-row').style.display='none';
+                            """.trimIndent()
+                            +"Remove authenticator"
+                        }
+                    }
+                    div { id = "disable-confirm"
+                        style = "display:none"
+                        div(classes = "alert-warning") {
+                            +("This will remove your authenticator app and disable two-factor authentication. " +
+                            "Your account will only be protected by your password.")
+                        }
+                        div(classes = "mfa-action-row") {
+                            button(classes = "btn-danger") {
+                                id = "disable-btn"
+                                attributes["onclick"] = "disableMfa('$slug')"
+                                +"Yes, remove authenticator"
+                            }
+                            button(classes = "btn-outline") {
+                                attributes["onclick"] = """
+                                    document.getElementById('disable-confirm').style.display='none';
+                                    document.getElementById('disable-btn-row').style.display='block';
+                                """.trimIndent()
+                                +"Cancel"
+                            }
+                        }
+                    }
+
+                } else {
+                    // ── Setup state ───────────────────────────────────────────────
+                    div(classes = "mfa-status-row") {
+                        span(classes = "mfa-badge inactive") { +"Not configured" }
+                        p { +"Add an extra layer of security to your account." }
+                    }
+
+                    // Step 1 — intro
+                    div { id = "mfa-step-1"
+                        p {
+                            +"You'll need an authenticator app such as "
+                            strong { +"Google Authenticator" }
+                            +", "
+                            strong { +"Authy" }
+                            +", or "
+                            strong { +"1Password" }
+                            +" to get started."
+                        }
+                        p(classes = "form-hint") {
+                            style = "margin-bottom: 20px;"
+                            +"Once enabled, you'll need your phone to sign in. Make sure you save the recovery codes somewhere safe."
+                        }
+                        button(classes = "btn") {
+                            id = "start-btn"
+                            attributes["onclick"] = "startEnrollment('$slug')"
+                            +"Set up authenticator"
+                        }
+                        div(classes = "alert alert-error") {
+                            id = "enroll-error"
+                            style = "display:none;margin-top:14px"
+                        }
+                    }
+
+                    // Step 2 — QR code + recovery codes + verification
+                    div { id = "mfa-step-2"
+                        style = "display:none"
+
+                        p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
+                        p(classes = "form-hint") { +"Open your authenticator app and scan the QR code below to add your account." }
+                        div(classes = "qr-container") { id = "qr-code" }
+                        p(classes = "form-hint") {
+                            +"Can't scan? Enter this key manually: "
+                            span(classes = "mfa-secret-key") { id = "setup-key" }
+                        }
+
+                        hr(classes = "portal-divider")
+
+                        p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
+                        p { +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once." }
+                        div(classes = "alert-warning") { +"Save these codes now — they won't be shown again after you leave this page." }
+                        div(classes = "recovery-codes-grid") { id = "recovery-codes" }
+                        button(classes = "btn-outline") {
+                            id = "copy-codes-btn"
+                            style = "margin-bottom: 4px;"
+                            attributes["onclick"] = "copyCodes()"
+                            +"Copy codes"
+                        }
+
+                        label(classes = "mfa-confirm-label") {
+                            input(type = InputType.checkBox) {
+                                id = "codes-saved"
+                                attributes["onchange"] = "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                            }
+                            +" I've saved my recovery codes in a safe place"
+                        }
+
+                        // Step 2b — verification (gated behind the checkbox)
+                        div { id = "mfa-step-2b"
+                            style = "display:none"
+                            hr(classes = "portal-divider")
+                            p(classes = "mfa-step-heading") { +"3. Verify your setup" }
+                            p { +"Enter the 6-digit code shown in your authenticator app to confirm everything is working." }
+                            div("field") {
+                                label { htmlFor = "totp-code"; +"Verification code" }
+                                input(type = InputType.text, name = "code") {
+                                    id = "totp-code"
+                                    placeholder = "000000"
+                                    attributes["inputmode"] = "numeric"
+                                    attributes["pattern"] = "[0-9]*"
+                                    maxLength = "6"
+                                    attributes["autocomplete"] = "one-time-code"
+                                }
+                            }
+                            div(classes = "alert alert-error") {
+                                id = "verify-error"
+                                style = "display:none"
+                            }
+                            button(classes = "btn") {
+                                id = "verify-btn"
+                                attributes["onclick"] = "verifyEnrollment('$slug')"
+                                +"Confirm setup"
+                            }
+                        }
+                    }
+                }
+
+                // ── JavaScript ────────────────────────────────────────────────────
+                script {
+                    unsafe {
+                        raw("""
+                            async function startEnrollment(slug) {
+                                var btn   = document.getElementById('start-btn');
+                                var errEl = document.getElementById('enroll-error');
+                                btn.disabled    = true;
+                                btn.textContent = 'Setting up\u2026';
+                                errEl.style.display = 'none';
+                                try {
+                                    var res  = await fetch('/t/' + slug + '/account/mfa/enroll', { method: 'POST' });
+                                    var data = await res.json();
+                                    if (!res.ok) {
+                                        errEl.textContent   = data.error === 'already_enrolled'
+                                            ? 'An authenticator is already configured. Refresh the page.'
+                                            : 'Failed to start setup. Please try again.';
+                                        errEl.style.display = 'block';
+                                        btn.disabled        = false;
+                                        btn.textContent     = 'Set up authenticator';
+                                        return;
+                                    }
+                                    document.getElementById('mfa-step-1').style.display = 'none';
+                                    document.getElementById('mfa-step-2').style.display = 'block';
+                                    new QRCode(document.getElementById('qr-code'), {
+                                        text: data.totp_uri, width: 200, height: 200,
+                                        colorDark: '#000000', colorLight: '#ffffff',
+                                        correctLevel: QRCode.CorrectLevel.M
+                                    });
+                                    var m = data.totp_uri.match(/secret=([A-Z2-7]+)/i);
+                                    if (m) document.getElementById('setup-key').textContent = m[1];
+                                    window._codes = data.recovery_codes;
+                                    var grid = document.getElementById('recovery-codes');
+                                    grid.innerHTML = '';
+                                    data.recovery_codes.forEach(function(c) {
+                                        var s = document.createElement('span');
+                                        s.className = 'recovery-code';
+                                        s.textContent = c;
+                                        grid.appendChild(s);
+                                    });
+                                } catch (e) {
+                                    errEl.textContent   = 'Network error. Please check your connection and try again.';
+                                    errEl.style.display = 'block';
+                                    btn.disabled        = false;
+                                    btn.textContent     = 'Set up authenticator';
+                                }
+                            }
+
+                            async function verifyEnrollment(slug) {
+                                var code  = document.getElementById('totp-code').value.trim();
+                                var errEl = document.getElementById('verify-error');
+                                var btn   = document.getElementById('verify-btn');
+                                errEl.style.display = 'none';
+                                if (!/^\d{6}${'$'}/.test(code)) {
+                                    errEl.textContent   = 'Please enter the 6-digit code from your authenticator app.';
+                                    errEl.style.display = 'block';
+                                    return;
+                                }
+                                btn.disabled    = true;
+                                btn.textContent = 'Verifying\u2026';
+                                try {
+                                    var body = new URLSearchParams({ code: code });
+                                    var res  = await fetch('/t/' + slug + '/account/mfa/verify', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                                        body: body
+                                    });
+                                    var data = await res.json();
+                                    if (res.ok) {
+                                        window.location.href = '/t/' + slug + '/account/mfa?success=true';
+                                    } else {
+                                        errEl.textContent   = data.error === 'invalid_code'
+                                            ? 'Incorrect code. Check your device clock is accurate and try again.'
+                                            : 'Verification failed. Please try again.';
+                                        errEl.style.display = 'block';
+                                        btn.disabled        = false;
+                                        btn.textContent     = 'Confirm setup';
+                                    }
+                                } catch (e) {
+                                    errEl.textContent   = 'Network error. Please try again.';
+                                    errEl.style.display = 'block';
+                                    btn.disabled        = false;
+                                    btn.textContent     = 'Confirm setup';
+                                }
+                            }
+
+                            async function disableMfa(slug) {
+                                var btn = document.getElementById('disable-btn');
+                                btn.disabled    = true;
+                                btn.textContent = 'Removing\u2026';
+                                try {
+                                    var res = await fetch('/t/' + slug + '/account/mfa/disable', { method: 'POST' });
+                                    if (res.ok) {
+                                        window.location.reload();
+                                    } else {
+                                        btn.disabled    = false;
+                                        btn.textContent = 'Yes, remove authenticator';
+                                        alert('Failed to remove authenticator. Please try again.');
+                                    }
+                                } catch (e) {
+                                    btn.disabled    = false;
+                                    btn.textContent = 'Yes, remove authenticator';
+                                    alert('Network error. Please try again.');
+                                }
+                            }
+
+                            function copyCodes() {
+                                if (!window._codes) return;
+                                navigator.clipboard.writeText(window._codes.join('\n')).then(function() {
+                                    var btn = document.getElementById('copy-codes-btn');
+                                    btn.textContent = 'Copied!';
+                                    setTimeout(function() { btn.textContent = 'Copy codes'; }, 2000);
+                                });
+                            }
+                        """.trimIndent())
+                    }
                 }
             }
         }
@@ -515,6 +1020,10 @@ object PortalView {
                         href    = "/t/$slug/account/security",
                         classes = "portal-nav-link${if (activePage == "security") " active" else ""}"
                     ) { +"Security" }
+                    a(
+                        href    = "/t/$slug/account/mfa",
+                        classes = "portal-nav-link${if (activePage == "mfa") " active" else ""}"
+                    ) { +"Two-Factor Auth" }
                 }
                 div(classes = "portal-nav-footer") {
                     form(action = "/t/$slug/account/logout", method = FormMethod.post) {
