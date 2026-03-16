@@ -12,7 +12,7 @@ object GroupsTable : Table("groups") {
     val name          = varchar("name", 100)
     val description   = varchar("description", 500).nullable()
     val parentGroupId = (integer("parent_group_id") references GroupsTable.id).nullable()
-    val attributes    = text("attributes").default("{}")
+    val attributes    = jsonb("attributes").default("{}")   // JSONB — see JsonbColumnType
     val createdAt     = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

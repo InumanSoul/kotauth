@@ -65,19 +65,23 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/login") {
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val registered = call.request.queryParameters["registered"] == "true"
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val registered    = call.request.queryParameters["registered"] == "true"
 
             // Preserve OAuth2 params from authorization endpoint redirect
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, theme, success = registered, oauthParams = oauthParams))
+            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, theme, workspaceName, success = registered, oauthParams = oauthParams))
         }
 
         post("/login") {
-            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
             val params = call.receiveParameters()
             val username = params["username"]?.trim() ?: ""
             val password = params["password"] ?: ""
@@ -89,7 +93,7 @@ fun Route.authRoutes(
             if (!loginRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.loginPage(slug, theme, error = "Too many login attempts. Please wait a moment and try again.", oauthParams = oauthParams)
+                    AuthView.loginPage(slug, theme, workspaceName, error = "Too many login attempts. Please wait a moment and try again.", oauthParams = oauthParams)
                 )
             }
 
@@ -103,7 +107,7 @@ fun Route.authRoutes(
                     } else {
                         call.respondHtml(
                             HttpStatusCode.Unauthorized,
-                            AuthView.loginPage(slug, theme, error = result.error.toMessage(), oauthParams = oauthParams)
+                            AuthView.loginPage(slug, theme, workspaceName, error = result.error.toMessage(), oauthParams = oauthParams)
                         )
                     }
                 }
@@ -159,7 +163,7 @@ fun Route.authRoutes(
                             is OAuthResult.Failure -> {
                                 call.respondHtml(
                                     HttpStatusCode.BadRequest,
-                                    AuthView.loginPage(slug, theme, error = codeResult.error.toDescription(), oauthParams = oauthParams)
+                                    AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams)
                                 )
                             }
                         }
@@ -179,22 +183,26 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/register") {
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(slug, theme))
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(slug, theme, workspaceName))
         }
 
         post("/register") {
-            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val ipAddress = call.request.local.remoteAddress
+            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val ipAddress     = call.request.local.remoteAddress
 
             // Rate limiting on registration
             val rateLimitKey = "register:$ipAddress"
             if (!registerRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.registerPage(slug, theme, error = "Too many registration attempts. Please wait a moment.")
+                    AuthView.registerPage(slug, theme, workspaceName, error = "Too many registration attempts. Please wait a moment.")
                 )
             }
 
@@ -212,7 +220,7 @@ fun Route.authRoutes(
                 is AuthResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AuthView.registerPage(slug, theme, error = result.error.toMessage(), prefill = prefill)
+                        AuthView.registerPage(slug, theme, workspaceName, error = result.error.toMessage(), prefill = prefill)
                     )
             }
         }
@@ -222,15 +230,17 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/forgot-password") {
-            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme  = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val sent   = call.request.queryParameters["sent"] == "true"
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val sent          = call.request.queryParameters["sent"] == "true"
             // reason=expired: shown when the user is redirected from login due to an expired password
             val reason = call.request.queryParameters["reason"]
             val errorMsg = if (reason == "expired")
                 "Your password has expired. Enter your email below to receive a reset link."
             else null
-            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, error = errorMsg, sent = sent))
+            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, workspaceName, error = errorMsg, sent = sent))
         }
 
         post("/forgot-password") {
@@ -258,19 +268,23 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/reset-password") {
-            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val token = call.request.queryParameters["token"] ?: ""
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val token         = call.request.queryParameters["token"] ?: ""
 
             if (token.isBlank()) {
                 return@get call.respondRedirect("/t/$slug/forgot-password")
             }
-            call.respondHtml(HttpStatusCode.OK, AuthView.resetPasswordPage(slug, theme, token = token))
+            call.respondHtml(HttpStatusCode.OK, AuthView.resetPasswordPage(slug, theme, workspaceName, token = token))
         }
 
         post("/reset-password") {
             val slug            = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val theme           = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val tenant          = tenantRepository.findBySlug(slug)
+            val theme           = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName   = tenant?.displayName ?: "KotAuth"
             val params          = call.receiveParameters()
             val token           = params["token"] ?: ""
             val newPassword     = params["new_password"] ?: ""
@@ -280,12 +294,12 @@ fun Route.authRoutes(
                 is SelfServiceResult.Success ->
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AuthView.resetPasswordPage(slug, theme, token = token, success = true)
+                        AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, success = true)
                     )
                 is SelfServiceResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AuthView.resetPasswordPage(slug, theme, token = token, error = result.error.message)
+                        AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, error = result.error.message)
                     )
             }
         }
@@ -295,14 +309,16 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/verify-email") {
-            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val token = call.request.queryParameters["token"] ?: ""
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val token         = call.request.queryParameters["token"] ?: ""
 
             if (token.isBlank()) {
                 return@get call.respondHtml(
                     HttpStatusCode.BadRequest,
-                    AuthView.verifyEmailPage(slug, theme, success = false, message = "Verification link is missing or invalid.")
+                    AuthView.verifyEmailPage(slug, theme, workspaceName, success = false, message = "Verification link is missing or invalid.")
                 )
             }
 
@@ -310,12 +326,12 @@ fun Route.authRoutes(
                 is SelfServiceResult.Success ->
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AuthView.verifyEmailPage(slug, theme, success = true, message = "Your email address has been verified successfully.")
+                        AuthView.verifyEmailPage(slug, theme, workspaceName, success = true, message = "Your email address has been verified successfully.")
                     )
                 is SelfServiceResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
-                        AuthView.verifyEmailPage(slug, theme, success = false, message = result.error.message)
+                        AuthView.verifyEmailPage(slug, theme, workspaceName, success = false, message = result.error.message)
                     )
             }
         }
@@ -325,9 +341,11 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/mfa-challenge") {
-            val slug  = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
-            val oauthParams = call.request.queryParameters.toOAuthParams()
+            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val oauthParams   = call.request.queryParameters.toOAuthParams()
 
             // Verify MFA pending cookie — must be present and signature must be valid
             val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
@@ -335,12 +353,14 @@ fun Route.authRoutes(
                 return@get call.respondRedirect("/t/$slug/login")
             }
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.mfaChallengePage(slug, theme, oauthParams = oauthParams))
+            call.respondHtml(HttpStatusCode.OK, AuthView.mfaChallengePage(slug, theme, workspaceName, oauthParams = oauthParams))
         }
 
         post("/mfa-challenge") {
-            val slug  = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val theme = tenantRepository.findBySlug(slug)?.theme ?: TenantTheme.DEFAULT
+            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant        = tenantRepository.findBySlug(slug)
+            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
             val params    = call.receiveParameters()
             val code      = params["code"]?.trim() ?: ""
             val ipAddress = call.request.local.remoteAddress
@@ -368,7 +388,7 @@ fun Route.authRoutes(
             if (System.currentTimeMillis() - timestamp > 300_000) {
                 return@post call.respondHtml(
                     HttpStatusCode.Unauthorized,
-                    AuthView.mfaChallengePage(slug, theme, error = "MFA challenge expired. Please log in again.", oauthParams = oauthParams)
+                    AuthView.mfaChallengePage(slug, theme, workspaceName, error = "MFA challenge expired. Please log in again.", oauthParams = oauthParams)
                 )
             }
 
@@ -387,7 +407,7 @@ fun Route.authRoutes(
                 is MfaResult.Failure -> {
                     call.respondHtml(
                         HttpStatusCode.Unauthorized,
-                        AuthView.mfaChallengePage(slug, theme, error = "Invalid code. Please try again.", oauthParams = oauthParams)
+                        AuthView.mfaChallengePage(slug, theme, workspaceName, error = "Invalid code. Please try again.", oauthParams = oauthParams)
                     )
                 }
                 is MfaResult.Success -> {
@@ -428,7 +448,7 @@ fun Route.authRoutes(
                             }
                             is OAuthResult.Failure -> {
                                 call.respondHtml(HttpStatusCode.BadRequest,
-                                    AuthView.mfaChallengePage(slug, theme, error = codeResult.error.toDescription(), oauthParams = oauthParams))
+                                    AuthView.mfaChallengePage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams))
                             }
                         }
                     } else {
@@ -540,7 +560,7 @@ fun Route.authRoutes(
                 nonce               = nonce
             )
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, tenant.theme, oauthParams = oauthParams))
+            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, tenant.theme, tenant.displayName, oauthParams = oauthParams))
         }
 
         // ==================================================================

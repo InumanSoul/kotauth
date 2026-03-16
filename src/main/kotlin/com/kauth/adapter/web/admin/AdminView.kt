@@ -618,6 +618,13 @@ object AdminView {
                         attributes["target"] = "_blank"
                         +"Open Login ↗"
                     }
+                    a(
+                        href = "/t/${workspace.slug}/account/login",
+                        classes = "btn btn-ghost btn-sm"
+                    ) {
+                        attributes["target"] = "_blank"
+                        +"Open Portal ↗"
+                    }
                 }
             }
 
@@ -1002,12 +1009,13 @@ object AdminView {
         saved: Boolean = false
     ): HTML.() -> Unit = {
         adminShell(
-            pageTitle     = "Settings — ${workspace.displayName}",
-            activeRail    = "settings",
-            allWorkspaces = allWorkspaces,
-            workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
-            loggedInAs    = loggedInAs
+            pageTitle        = "Settings — ${workspace.displayName}",
+            activeRail       = "settings",
+            activeAppSection = "general",
+            allWorkspaces    = allWorkspaces,
+            workspaceName    = workspace.displayName,
+            workspaceSlug    = workspace.slug,
+            loggedInAs       = loggedInAs
         ) {
             div("breadcrumb") {
                 a("/admin") { +"Workspaces" }
@@ -1091,6 +1099,90 @@ object AdminView {
                         label("checkbox-label") { htmlFor = "emailVerificationRequired"; +"Require email verification" }
                     }
 
+                    p("form-section-title") { +"Branding" }
+                    div("field") {
+                        label { htmlFor = "themeAccentColor"; +"Accent Color" }
+                        input(type = InputType.color, name = "themeAccentColor") {
+                            id = "themeAccentColor"; value = workspace.theme.accentColor
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
+                        input(type = InputType.url, name = "themeLogoUrl") {
+                            id = "themeLogoUrl"
+                            placeholder = "https://cdn.example.com/logo.png"
+                            value = workspace.theme.logoUrl ?: ""
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
+                        input(type = InputType.url, name = "themeFaviconUrl") {
+                            id = "themeFaviconUrl"
+                            placeholder = "https://cdn.example.com/favicon.ico"
+                            value = workspace.theme.faviconUrl ?: ""
+                        }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
+                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                        a("/admin/workspaces/${workspace.slug}/settings/smtp", classes = "btn btn-ghost") { +"SMTP →" }
+                        a("/admin/workspaces/${workspace.slug}/settings/security", classes = "btn btn-ghost") { +"Security Policy →" }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Security policy page  (/settings/security)
+    // -------------------------------------------------------------------------
+
+    fun securityPolicyPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle        = "Security Policy — ${workspace.displayName}",
+            activeRail       = "settings",
+            activeAppSection = "security",
+            allWorkspaces    = allWorkspaces,
+            workspaceName    = workspace.displayName,
+            workspaceSlug    = workspace.slug,
+            loggedInAs       = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Security Policy" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Security Policy" }
+                    p("page-subtitle") { +"Configure password rules and MFA requirements for ${workspace.displayName}." }
+                }
+            }
+
+            if (saved) {
+                div("alert alert-success") { style = "max-width:640px;"; +"Security policy saved." }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/settings/security",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
                     p("form-section-title") { +"Password Policy" }
                     div("field") {
                         label { htmlFor = "passwordPolicyMinLength"; +"Minimum Length" }
@@ -1164,34 +1256,9 @@ object AdminView {
                         p("field-hint") { +"Controls whether users must enroll in TOTP-based MFA." }
                     }
 
-                    p("form-section-title") { +"Branding" }
-                    div("field") {
-                        label { htmlFor = "themeAccentColor"; +"Accent Color" }
-                        input(type = InputType.color, name = "themeAccentColor") {
-                            id = "themeAccentColor"; value = workspace.theme.accentColor
-                        }
-                    }
-                    div("field") {
-                        label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
-                        input(type = InputType.url, name = "themeLogoUrl") {
-                            id = "themeLogoUrl"
-                            placeholder = "https://cdn.example.com/logo.png"
-                            value = workspace.theme.logoUrl ?: ""
-                        }
-                    }
-                    div("field") {
-                        label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
-                        input(type = InputType.url, name = "themeFaviconUrl") {
-                            id = "themeFaviconUrl"
-                            placeholder = "https://cdn.example.com/favicon.ico"
-                            value = workspace.theme.faviconUrl ?: ""
-                        }
-                    }
-
                     div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
-                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
-                        a("/admin/workspaces/${workspace.slug}/settings/smtp", classes = "btn btn-ghost") { +"SMTP Settings →" }
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Security Policy" }
+                        a("/admin/workspaces/${workspace.slug}/settings", classes = "btn btn-ghost") { +"← General Settings" }
                     }
                 }
             }
@@ -1925,7 +1992,8 @@ object AdminView {
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
-            loggedInAs    = loggedInAs
+            loggedInAs    = loggedInAs,
+            activeAppSection = "smtp"
         ) {
             div("breadcrumb") {
                 a("/admin") { +"Workspaces" }
@@ -2047,10 +2115,8 @@ object AdminView {
     fun rolesListPage(
         workspace: Tenant,
         roles: List<Role>,
-        apps: List<Application>,
         allWorkspaces: List<Pair<String, String>>,
-        loggedInAs: String,
-        error: String? = null
+        loggedInAs: String
     ): HTML.() -> Unit = {
         adminShell(
             pageTitle     = "Roles — ${workspace.displayName}",
@@ -2073,43 +2139,10 @@ object AdminView {
                     p("page-title") { +"Roles" }
                     p("page-subtitle") { +"${roles.size} role${if (roles.size != 1) "s" else ""} in this workspace" }
                 }
-            }
-
-            if (error != null) {
-                div("alert alert-error") { style = "max-width:640px;"; +error }
-            }
-
-            // Create role form (inline)
-            div("form-card") {
-                style = "max-width:640px; margin-bottom:1.5rem;"
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/roles",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post
-                ) {
-                    p("form-section-title") { +"Create Role" }
-                    div("field") {
-                        label { htmlFor = "roleName"; +"Name" }
-                        input(type = InputType.text, name = "name") {
-                            id = "roleName"; required = true; placeholder = "e.g. admin, editor, viewer"
-                        }
-                    }
-                    div("field") {
-                        label { htmlFor = "roleDesc"; +"Description (optional)" }
-                        input(type = InputType.text, name = "description") { id = "roleDesc" }
-                    }
-                    div("field") {
-                        label { htmlFor = "roleScope"; +"Scope" }
-                        select {
-                            name = "scope"; id = "roleScope"
-                            option { value = "tenant"; +"Tenant (realm-level)" }
-                            option { value = "client"; +"Client (app-scoped)" }
-                        }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Create Role" }
-                    }
-                }
+                a(
+                    href    = "/admin/workspaces/${workspace.slug}/roles/create",
+                    classes = "btn"
+                ) { +"+ Create Role" }
             }
 
             div("card") {
@@ -2133,7 +2166,12 @@ object AdminView {
                             roles.forEach { role ->
                                 tr {
                                     td { span("td-code") { +(role.name) } }
-                                    td { span("badge badge-${if (role.scope.value == "tenant") "green" else "blue"}") { +role.scope.value } }
+                                    td {
+                                        val isWorkspace = role.scope.value == "tenant"
+                                        span("badge badge-${if (isWorkspace) "green" else "blue"}") {
+                                            +(if (isWorkspace) "workspace" else "application")
+                                        }
+                                    }
                                     td { +(role.description ?: "—") }
                                     td { +(if (role.childRoleIds.isNotEmpty()) "${role.childRoleIds.size} children" else "—") }
                                     td {
@@ -2145,6 +2183,106 @@ object AdminView {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Create role page (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun createRolePage(
+        workspace: Tenant,
+        apps: List<Application>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "New Role — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "roles",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/roles") { +"Roles" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New Role" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create Role" }
+                    p("page-subtitle") {
+                        +"Add a role to the "
+                        strong { +workspace.displayName }
+                        +" workspace."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/roles",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("field") {
+                        label { htmlFor = "roleName"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "roleName"; required = true
+                            placeholder = "e.g. admin, editor, viewer"
+                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                        }
+                        p("field-hint") { +"Letters, digits, dots, underscores, hyphens only." }
+                    }
+                    div("field") {
+                        label { htmlFor = "roleDesc"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") {
+                            id = "roleDesc"; placeholder = "Short description of what this role grants"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "roleScope"; +"Scope" }
+                        select {
+                            name = "scope"; id = "roleScope"
+                            attributes["onchange"] = "document.getElementById('appField').style.display=this.value==='client'?'block':'none'"
+                            option { value = "tenant"; +"Workspace (realm-level)" }
+                            option { value = "client"; +"Application (app-scoped)" }
+                        }
+                        p("field-hint") { +"Workspace roles apply across the entire workspace. Application roles are scoped to a specific app." }
+                    }
+                    div("field") {
+                        id = "appField"; style = "display:none;"
+                        label { htmlFor = "clientId"; +"Application" }
+                        if (apps.isEmpty()) {
+                            p("field-hint") { +"No applications in this workspace yet. Create one first." }
+                        } else {
+                            select {
+                                name = "clientId"; id = "clientId"
+                                option { value = ""; +"— select application —" }
+                                apps.forEach { app ->
+                                    option {
+                                        value = app.id.toString()
+                                        +app.name
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create Role" }
+                        a("/admin/workspaces/${workspace.slug}/roles", classes = "btn btn-ghost") { +"Cancel" }
                     }
                 }
             }
@@ -2297,8 +2435,7 @@ object AdminView {
         groups: List<Group>,
         roles: List<Role>,
         allWorkspaces: List<Pair<String, String>>,
-        loggedInAs: String,
-        error: String? = null
+        loggedInAs: String
     ): HTML.() -> Unit = {
         adminShell(
             pageTitle     = "Groups — ${workspace.displayName}",
@@ -2321,47 +2458,10 @@ object AdminView {
                     p("page-title") { +"Groups" }
                     p("page-subtitle") { +"${groups.size} group${if (groups.size != 1) "s" else ""} in this workspace" }
                 }
-            }
-
-            if (error != null) {
-                div("alert alert-error") { style = "max-width:640px;"; +error }
-            }
-
-            // Create group form (inline)
-            div("form-card") {
-                style = "max-width:640px; margin-bottom:1.5rem;"
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/groups",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post
-                ) {
-                    p("form-section-title") { +"Create Group" }
-                    div("field") {
-                        label { htmlFor = "groupName"; +"Name" }
-                        input(type = InputType.text, name = "name") {
-                            id = "groupName"; required = true; placeholder = "e.g. engineering, marketing"
-                        }
-                    }
-                    div("field") {
-                        label { htmlFor = "groupDesc"; +"Description (optional)" }
-                        input(type = InputType.text, name = "description") { id = "groupDesc" }
-                    }
-                    if (groups.isNotEmpty()) {
-                        div("field") {
-                            label { htmlFor = "parentGroup"; +"Parent Group (optional)" }
-                            select {
-                                name = "parentGroupId"; id = "parentGroup"
-                                option { value = ""; +"— None (top-level) —" }
-                                groups.forEach { g ->
-                                    option { value = g.id.toString(); +g.name }
-                                }
-                            }
-                        }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Create Group" }
-                    }
-                }
+                a(
+                    href    = "/admin/workspaces/${workspace.slug}/groups/create",
+                    classes = "btn"
+                ) { +"+ Create Group" }
             }
 
             div("card") {
@@ -2383,7 +2483,7 @@ object AdminView {
                         }
                         tbody {
                             groups.forEach { group ->
-                                val parent = groups.find { it.id == group.parentGroupId }
+                                val parent    = groups.find { it.id == group.parentGroupId }
                                 val roleNames = group.roleIds.mapNotNull { rid -> roles.find { it.id == rid }?.name }
                                 tr {
                                     td { span("td-code") { +group.name } }
@@ -2392,13 +2492,94 @@ object AdminView {
                                     td { +(group.description ?: "—") }
                                     td {
                                         a(
-                                            href = "/admin/workspaces/${workspace.slug}/groups/${group.id}",
+                                            href    = "/admin/workspaces/${workspace.slug}/groups/${group.id}",
                                             classes = "btn btn-ghost btn-sm"
                                         ) { +"Open →" }
                                     }
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Create group page (Phase 3c)
+    // -------------------------------------------------------------------------
+
+    fun createGroupPage(
+        workspace: Tenant,
+        groups: List<Group>,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle     = "New Group — ${workspace.displayName}",
+            activeRail    = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "groups",
+            loggedInAs    = loggedInAs
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/groups") { +"Groups" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New Group" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create Group" }
+                    p("page-subtitle") {
+                        +"Add a group to the "
+                        strong { +workspace.displayName }
+                        +" workspace."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:640px;"; +error }
+            }
+            div("form-card") {
+                form(
+                    action  = "/admin/workspaces/${workspace.slug}/groups",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    div("field") {
+                        label { htmlFor = "groupName"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "groupName"; required = true
+                            placeholder = "e.g. engineering, marketing, ops"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "groupDesc"; +"Description (optional)" }
+                        input(type = InputType.text, name = "description") {
+                            id = "groupDesc"; placeholder = "What this group represents"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "parentGroup"; +"Parent Group (optional)" }
+                        select {
+                            name = "parentGroupId"; id = "parentGroup"
+                            option { value = ""; +"— None (top-level) —" }
+                            groups.forEach { g ->
+                                option { value = g.id.toString(); +g.name }
+                            }
+                        }
+                        p("field-hint") { +"Nested groups inherit the roles assigned to their parent." }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create Group" }
+                        a("/admin/workspaces/${workspace.slug}/groups", classes = "btn btn-ghost") { +"Cancel" }
                     }
                 }
             }

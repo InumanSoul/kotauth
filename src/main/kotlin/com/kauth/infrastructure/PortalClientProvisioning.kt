@@ -37,12 +37,23 @@ class PortalClientProvisioning(
         for (tenant in tenants) {
             if (tenant.isMaster) continue
 
+            val callbackUri  = "$baseUrl/t/${tenant.slug}/account/callback"
             val portalClient = applicationRepository.findByClientId(tenant.id, PORTAL_CLIENT_ID)
-                ?: continue  // V15 not yet applied — skip gracefully
 
-            val callbackUri = "$baseUrl/t/${tenant.slug}/account/callback"
-            // Only update when the URI has actually changed to avoid unnecessary writes
-            if (portalClient.redirectUris != listOf(callbackUri)) {
+            if (portalClient == null) {
+                // Workspace was created after V15 ran — the migration only seeds existing
+                // tenants, so new tenants have no portal client row yet. Create it now
+                // with the correct redirect URI already set.
+                applicationRepository.create(
+                    tenantId     = tenant.id,
+                    clientId     = PORTAL_CLIENT_ID,
+                    name         = "KotAuth Self-Service Portal",
+                    description  = "Built-in client for the tenant self-service portal (profile, password, MFA)",
+                    accessType   = "public",
+                    redirectUris = listOf(callbackUri)
+                )
+            } else if (portalClient.redirectUris != listOf(callbackUri)) {
+                // Only update when the URI has actually changed to avoid unnecessary writes
                 applicationRepository.update(
                     appId        = portalClient.id,
                     name         = portalClient.name,

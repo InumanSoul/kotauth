@@ -169,6 +169,15 @@ fun Route.adminRoutes(
                 keyProvisioningService.provisionForTenant(newTenant)
                 // Provision portal client + redirect URI for the new tenant
                 portalClientProvisioning?.provisionRedirectUris()
+                // Seed the two default tenant-scoped roles every workspace needs.
+                // 'admin' and 'user' are the minimal meaningful defaults — operators
+                // can extend, rename, or delete them via the roles UI.
+                roleGroupService.createRole(newTenant.id, "admin",
+                    "Full administrative access within this workspace",
+                    RoleScope.TENANT, null)
+                roleGroupService.createRole(newTenant.id, "user",
+                    "Standard authenticated user — default role for self-registrations",
+                    RoleScope.TENANT, null)
                 call.respondRedirect("/admin/workspaces/$slug")
             }
 
@@ -245,9 +254,10 @@ fun Route.adminRoutes(
                 }
 
                 post("/settings") {
-                    val session = call.sessions.get<AdminSession>()!!
-                    val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-                    val params  = call.receiveParameters()
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val params    = call.receiveParameters()
                     when (val result = adminService.updateWorkspaceSettings(
                         slug                      = slug,
                         displayName               = params["displayName"]?.trim() ?: "",
@@ -256,6 +266,59 @@ fun Route.adminRoutes(
                         refreshTokenExpirySeconds = params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
                         registrationEnabled       = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
+                        // Security fields not on this form — preserve existing values
+                        passwordPolicyMinLength        = workspace.passwordPolicyMinLength,
+                        passwordPolicyRequireSpecial   = workspace.passwordPolicyRequireSpecial,
+                        passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
+                        passwordPolicyRequireNumber    = workspace.passwordPolicyRequireNumber,
+                        passwordPolicyHistoryCount     = workspace.passwordPolicyHistoryCount,
+                        passwordPolicyMaxAgeDays       = workspace.passwordPolicyMaxAgeDays,
+                        passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
+                        mfaPolicy                      = workspace.mfaPolicy,
+                        themeAccentColor          = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
+                        themeLogoUrl              = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                        themeFaviconUrl           = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() }
+                    )) {
+                        is AdminResult.Success ->
+                            call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
+                        is AdminResult.Failure -> {
+                            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                            call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                AdminView.workspaceSettingsPage(workspace, wsPairs, session.username,
+                                    error = result.error.message))
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------
+                // Security policy settings  (/settings/security)
+                // -------------------------------------------------------
+
+                get("/settings/security") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val saved     = call.request.queryParameters["saved"] == "true"
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.securityPolicyPage(workspace, wsPairs, session.username, saved = saved))
+                }
+
+                post("/settings/security") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val params    = call.receiveParameters()
+                    when (val result = adminService.updateWorkspaceSettings(
+                        slug                      = slug,
+                        // General fields not on this form — preserve existing values
+                        displayName               = workspace.displayName,
+                        issuerUrl                 = workspace.issuerUrl,
+                        tokenExpirySeconds        = workspace.tokenExpirySeconds,
+                        refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
+                        registrationEnabled       = workspace.registrationEnabled,
+                        emailVerificationRequired = workspace.emailVerificationRequired,
+                        // Security fields from the form
                         passwordPolicyMinLength        = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
                         passwordPolicyRequireSpecial   = params["passwordPolicyRequireSpecial"] == "true",
                         passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
@@ -264,17 +327,17 @@ fun Route.adminRoutes(
                         passwordPolicyMaxAgeDays       = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
                         passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
                         mfaPolicy                      = params["mfaPolicy"]?.trim() ?: "optional",
-                        themeAccentColor          = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
-                        themeLogoUrl              = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
-                        themeFaviconUrl           = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() }
+                        // Theme fields not on this form — preserve existing values
+                        themeAccentColor          = workspace.theme.accentColor,
+                        themeLogoUrl              = workspace.theme.logoUrl,
+                        themeFaviconUrl           = workspace.theme.faviconUrl
                     )) {
                         is AdminResult.Success ->
-                            call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
+                            call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
                         is AdminResult.Failure -> {
-                            val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-                            val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                             call.respondHtml(HttpStatusCode.UnprocessableEntity,
-                                AdminView.workspaceSettingsPage(workspace, wsPairs, session.username,
+                                AdminView.securityPolicyPage(workspace, wsPairs, session.username,
                                     error = result.error.message))
                         }
                     }
@@ -597,9 +660,19 @@ fun Route.adminRoutes(
                         val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                         val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
                         val roles     = roleGroupService.listRoles(workspace.id)
+                        call.respondHtml(HttpStatusCode.OK,
+                            AdminView.rolesListPage(workspace, roles, wsPairs, session.username))
+                    }
+
+                    // Separate create page — keeps the list clean
+                    get("/create") {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                        val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
                         val apps      = applicationRepository.findByTenantId(workspace.id)
                         call.respondHtml(HttpStatusCode.OK,
-                            AdminView.rolesListPage(workspace, roles, apps, wsPairs, session.username))
+                            AdminView.createRolePage(workspace, apps, wsPairs, session.username))
                     }
 
                     post {
@@ -623,10 +696,9 @@ fun Route.adminRoutes(
                             is AdminResult.Failure -> {
                                 val session = call.sessions.get<AdminSession>()!!
                                 val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
-                                val roles   = roleGroupService.listRoles(workspace.id)
                                 val apps    = applicationRepository.findByTenantId(workspace.id)
                                 call.respondHtml(HttpStatusCode.UnprocessableEntity,
-                                    AdminView.rolesListPage(workspace, roles, apps, wsPairs, session.username,
+                                    AdminView.createRolePage(workspace, apps, wsPairs, session.username,
                                         error = result.error.message))
                             }
                         }
@@ -721,6 +793,17 @@ fun Route.adminRoutes(
                             AdminView.groupsListPage(workspace, groups, roles, wsPairs, session.username))
                     }
 
+                    // Separate create page — keeps the list clean
+                    get("/create") {
+                        val session   = call.sessions.get<AdminSession>()!!
+                        val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                        val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val groups    = roleGroupService.listGroups(workspace.id)
+                        call.respondHtml(HttpStatusCode.OK,
+                            AdminView.createGroupPage(workspace, groups, wsPairs, session.username))
+                    }
+
                     post {
                         val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                         val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -736,9 +819,8 @@ fun Route.adminRoutes(
                                 val session = call.sessions.get<AdminSession>()!!
                                 val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                                 val groups  = roleGroupService.listGroups(workspace.id)
-                                val roles   = roleGroupService.listRoles(workspace.id)
                                 call.respondHtml(HttpStatusCode.UnprocessableEntity,
-                                    AdminView.groupsListPage(workspace, groups, roles, wsPairs, session.username,
+                                    AdminView.createGroupPage(workspace, groups, wsPairs, session.username,
                                         error = result.error.message))
                             }
                         }

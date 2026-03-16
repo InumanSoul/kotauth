@@ -82,17 +82,18 @@ object AuthView {
     fun loginPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
+        workspaceName: String = "KotAuth",
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams()
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Sign In", theme) }
+        head { authHead("$workspaceName | Sign In", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Modernized Identity & Access Management" }
             }
@@ -172,16 +173,17 @@ object AuthView {
     fun registerPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
+        workspaceName: String = "KotAuth",
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill()
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Create Account", theme) }
+        head { authHead("$workspaceName | Create Account", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Modernized Identity & Access Management" }
             }
@@ -267,18 +269,19 @@ object AuthView {
      *              "if an account exists…" message to prevent email enumeration.
      */
     fun forgotPasswordPage(
-        tenantSlug : String,
-        theme      : TenantTheme = TenantTheme.DEFAULT,
-        error      : String? = null,
-        sent       : Boolean = false
+        tenantSlug    : String,
+        theme         : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName : String = "KotAuth",
+        error         : String? = null,
+        sent          : Boolean = false
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Forgot Password", theme) }
+        head { authHead("$workspaceName | Forgot Password", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Modernized Identity & Access Management" }
             }
@@ -334,19 +337,20 @@ object AuthView {
      * @param success  True after a successful password reset.
      */
     fun resetPasswordPage(
-        tenantSlug : String,
-        theme      : TenantTheme = TenantTheme.DEFAULT,
-        token      : String,
-        error      : String? = null,
-        success    : Boolean = false
+        tenantSlug    : String,
+        theme         : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName : String = "KotAuth",
+        token         : String,
+        error         : String? = null,
+        success       : Boolean = false
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Reset Password", theme) }
+        head { authHead("$workspaceName | Reset Password", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Modernized Identity & Access Management" }
             }
@@ -409,18 +413,19 @@ object AuthView {
      * @param message  Shown to the user — success confirmation or error reason.
      */
     fun verifyEmailPage(
-        tenantSlug : String,
-        theme      : TenantTheme = TenantTheme.DEFAULT,
-        success    : Boolean,
-        message    : String
+        tenantSlug    : String,
+        theme         : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName : String = "KotAuth",
+        success       : Boolean,
+        message       : String
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Email Verification", theme) }
+        head { authHead("$workspaceName | Email Verification", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Modernized Identity & Access Management" }
             }
@@ -448,18 +453,19 @@ object AuthView {
     // -------------------------------------------------------------------------
 
     fun mfaChallengePage(
-        tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        error: String? = null,
-        oauthParams: OAuthParams = OAuthParams()
+        tenantSlug    : String,
+        theme         : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName : String = "KotAuth",
+        error         : String? = null,
+        oauthParams   : OAuthParams = OAuthParams()
     ): HTML.() -> Unit = {
-        head { authHead("KotAuth | Two-Factor Authentication", theme) }
+        head { authHead("$workspaceName | Two-Factor Authentication", theme) }
         body {
             div("brand") {
                 if (theme.logoUrl != null) {
-                    img(src = theme.logoUrl, classes = "brand-logo", alt = "Logo")
+                    img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
                 } else {
-                    div("brand-name") { +"KotAuth" }
+                    div("brand-name") { +workspaceName }
                 }
                 div("brand-tagline") { +"Two-factor authentication" }
             }
