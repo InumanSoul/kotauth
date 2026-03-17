@@ -25,11 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # QEMU enables cross-compilation for non-native platforms (arm64 on amd64 runners).
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      # Buildx is required for multi-platform builds and GHA layer caching.
+      # Buildx is required for GHA layer caching.
+      # arm64 dropped for now — QEMU emulation makes JVM builds 20–40 min.
+      # Re-add linux/arm64 once native arm64 runners are in use.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -87,12 +85,11 @@ jobs:
 
       # Build once, push to all registries.
       # GHA cache keeps layer rebuilds fast across workflow runs.
-      # Platforms: amd64 (standard servers/CI) + arm64 (Apple Silicon dev machines, AWS Graviton).
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
