@@ -1,0 +1,754 @@
+openapi: 3.1.0
+info:
+  title: KotAuth REST API
+  version: 1.0.0
+  description: |
+    Machine-to-machine REST API for managing KotAuth identity platform resources.
+
+    ## Authentication
+
+    All endpoints require an API key passed as a Bearer token:
+    ```
+    Authorization: Bearer kauth_<tenantSlug>_<key>
+    ```
+
+    API keys are created and managed in the KotAuth Admin Console under
+    **Settings → API Keys** for each workspace.
+
+    ## Scopes
+
+    Each API key is issued with a set of scopes that control which operations it
+    may perform. Attempting a request without the required scope returns `403 Forbidden`.
+
+    | Scope                | Description                                  |
+    |----------------------|----------------------------------------------|
+    | `users:read`         | List and retrieve users                      |
+    | `users:write`        | Create, update, disable users; assign roles  |
+    | `roles:read`         | List and retrieve roles                      |
+    | `roles:write`        | Create, update, delete roles                 |
+    | `groups:read`        | List and retrieve groups                     |
+    | `groups:write`       | Create, update, delete groups; manage members|
+    | `applications:read`  | List and retrieve applications               |
+    | `applications:write` | Update and disable applications              |
+    | `sessions:read`      | List active sessions                         |
+    | `sessions:write`     | Revoke sessions                              |
+    | `audit_logs:read`    | Read audit log events                        |
+
+    ## Errors
+
+    All errors follow [RFC 7807 Problem Details](https://www.rfc-editor.org/rfc/rfc7807)
+    with `Content-Type: application/problem+json`.
+
+    ```json
+    {
+      "type": "https://kotauth.dev/errors/422",
+      "title": "Validation Error",
+      "status": 422,
+      "detail": "Username may only contain letters, digits, dots, underscores, and hyphens."
+    }
+    ```
+
+servers:
+  - url: "{baseUrl}/t/{tenantSlug}/api/v1"
+    description: KotAuth REST API v1
+    variables:
+      baseUrl:
+        default: "http://localhost:8080"
+        description: Base URL of your KotAuth instance (e.g. https://auth.yourdomain.com)
+      tenantSlug:
+        default: "master"
+        description: The slug of the workspace (tenant) to operate on
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: KotAuth API Key (kauth_<slug>_<random>)
+
+  schemas:
+    # ---- Common ----
+    ApiMeta:
+      type: object
+      properties:
+        total:  { type: integer, description: "Total number of items in result set" }
+        offset: { type: integer, description: "Current pagination offset" }
+        limit:  { type: integer, description: "Current page size" }
+
+    ProblemDetail:
+      type: object
+      properties:
+        type:   { type: string, format: uri }
+        title:  { type: string }
+        status: { type: integer }
+        detail: { type: string }
+
+    # ---- Users ----
+    UserDto:
+      type: object
+      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled]
+      properties:
+        id:            { type: integer }
+        username:      { type: string }
+        email:         { type: string, format: email }
+        fullName:      { type: string }
+        emailVerified: { type: boolean }
+        enabled:       { type: boolean }
+        mfaEnabled:    { type: boolean }
+
+    CreateUserRequest:
+      type: object
+      required: [username, email, fullName, password]
+      properties:
+        username: { type: string, pattern: "^[a-zA-Z0-9._-]+$" }
+        email:    { type: string, format: email }
+        fullName: { type: string }
+        password: { type: string, minLength: 4 }
+
+    UpdateUserRequest:
+      type: object
+      required: [email, fullName]
+      properties:
+        email:    { type: string, format: email }
+        fullName: { type: string }
+
+    # ---- Roles ----
+    RoleDto:
+      type: object
+      required: [id, name, scope, tenantId]
+      properties:
+        id:          { type: integer }
+        name:        { type: string }
+        description: { type: string, nullable: true }
+        scope:       { type: string, enum: [TENANT, CLIENT] }
+        tenantId:    { type: integer }
+
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string, pattern: "^[a-zA-Z0-9._-]+$" }
+        description: { type: string }
+        scope:       { type: string, enum: [tenant, client], default: tenant }
+
+    UpdateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string }
+        description: { type: string, nullable: true }
+
+    # ---- Groups ----
+    GroupDto:
+      type: object
+      required: [id, name, tenantId]
+      properties:
+        id:            { type: integer }
+        name:          { type: string }
+        description:   { type: string, nullable: true }
+        parentGroupId: { type: integer, nullable: true }
+        tenantId:      { type: integer }
+
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:          { type: string }
+        description:   { type: string }
+        parentGroupId: { type: integer, nullable: true }
+
+    UpdateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string }
+        description: { type: string, nullable: true }
+
+    # ---- Applications ----
+    ApplicationDto:
+      type: object
+      required: [id, clientId, name, accessType, enabled, redirectUris]
+      properties:
+        id:           { type: integer }
+        clientId:     { type: string }
+        name:         { type: string }
+        description:  { type: string, nullable: true }
+        accessType:   { type: string, enum: [public, confidential] }
+        enabled:      { type: boolean }
+        redirectUris: { type: array, items: { type: string, format: uri } }
+
+    UpdateApplicationRequest:
+      type: object
+      required: [name, accessType, redirectUris]
+      properties:
+        name:         { type: string }
+        description:  { type: string, nullable: true }
+        accessType:   { type: string, enum: [public, confidential] }
+        redirectUris: { type: array, items: { type: string, format: uri } }
+
+    # ---- Sessions ----
+    SessionDto:
+      type: object
+      required: [id, userId, scopes, createdAt, expiresAt]
+      properties:
+        id:        { type: integer }
+        userId:    { type: integer }
+        clientId:  { type: integer, nullable: true }
+        scopes:    { type: string }
+        ipAddress: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+
+    # ---- Audit Logs ----
+    AuditEventDto:
+      type: object
+      required: [eventType, createdAt]
+      properties:
+        eventType: { type: string }
+        userId:    { type: integer, nullable: true }
+        clientId:  { type: integer, nullable: true }
+        ipAddress: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        details:
+          type: object
+          additionalProperties: { type: string }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid API key
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
+    Forbidden:
+      description: Insufficient scope
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
+    NotFound:
+      description: Resource not found
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
+    ValidationError:
+      description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+paths:
+  # ==========================================================================
+  # Users
+  # ==========================================================================
+  /users:
+    get:
+      operationId: listUsers
+      summary: List users
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+          description: Filter by username, email, or full name prefix
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/UserDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createUser
+      summary: Create a user
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateUserRequest" }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Username or email already in use
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /users/{userId}:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getUser
+      summary: Get a user by ID
+      tags: [Users]
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateUser
+      summary: Update a user's profile
+      tags: [Users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateUserRequest" }
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: disableUser
+      summary: Disable a user account
+      tags: [Users]
+      description: Soft-disables the user. They cannot log in but their data is preserved.
+      responses:
+        "204": { description: User disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/roles/{roleId}:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: roleId
+        required: true
+        schema: { type: integer }
+
+    post:
+      operationId: assignRoleToUser
+      summary: Assign a role to a user
+      tags: [Users]
+      responses:
+        "204": { description: Role assigned }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: unassignRoleFromUser
+      summary: Remove a role from a user
+      tags: [Users]
+      responses:
+        "204": { description: Role removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Roles
+  # ==========================================================================
+  /roles:
+    get:
+      operationId: listRoles
+      summary: List roles
+      tags: [Roles]
+      responses:
+        "200":
+          description: Role list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/RoleDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createRole
+      summary: Create a role
+      tags: [Roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateRoleRequest" }
+      responses:
+        "201":
+          description: Role created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Role name already exists in this scope
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /roles/{roleId}:
+    parameters:
+      - in: path
+        name: roleId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getRole
+      summary: Get a role by ID
+      tags: [Roles]
+      responses:
+        "200":
+          description: Role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateRole
+      summary: Update a role
+      tags: [Roles]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateRoleRequest" }
+      responses:
+        "200":
+          description: Updated role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RoleDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deleteRole
+      summary: Delete a role
+      tags: [Roles]
+      responses:
+        "204": { description: Role deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Groups
+  # ==========================================================================
+  /groups:
+    get:
+      operationId: listGroups
+      summary: List groups
+      tags: [Groups]
+      responses:
+        "200":
+          description: Group list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/GroupDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createGroup
+      summary: Create a group
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGroupRequest" }
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /groups/{groupId}:
+    parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getGroup
+      summary: Get a group by ID
+      tags: [Groups]
+      responses:
+        "200":
+          description: Group
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateGroup
+      summary: Update a group
+      tags: [Groups]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateGroupRequest" }
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/GroupDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deleteGroup
+      summary: Delete a group
+      tags: [Groups]
+      responses:
+        "204": { description: Group deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /groups/{groupId}/members/{userId}:
+    parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+
+    post:
+      operationId: addGroupMember
+      summary: Add a user to a group
+      tags: [Groups]
+      responses:
+        "204": { description: Member added }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    delete:
+      operationId: removeGroupMember
+      summary: Remove a user from a group
+      tags: [Groups]
+      responses:
+        "204": { description: Member removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Applications
+  # ==========================================================================
+  /applications:
+    get:
+      operationId: listApplications
+      summary: List applications (OAuth clients)
+      tags: [Applications]
+      responses:
+        "200":
+          description: Application list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ApplicationDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /applications/{appId}:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getApplication
+      summary: Get an application by ID
+      tags: [Applications]
+      responses:
+        "200":
+          description: Application
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApplicationDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateApplication
+      summary: Update an application
+      tags: [Applications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateApplicationRequest" }
+      responses:
+        "200":
+          description: Updated application
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApplicationDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: disableApplication
+      summary: Disable an application
+      tags: [Applications]
+      description: Soft-disables the application. Existing tokens remain valid until they expire.
+      responses:
+        "204": { description: Application disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Sessions
+  # ==========================================================================
+  /sessions:
+    get:
+      operationId: listSessions
+      summary: List active sessions
+      tags: [Sessions]
+      responses:
+        "200":
+          description: Active session list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/SessionDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /sessions/{sessionId}:
+    parameters:
+      - in: path
+        name: sessionId
+        required: true
+        schema: { type: integer }
+
+    delete:
+      operationId: revokeSession
+      summary: Revoke a session
+      tags: [Sessions]
+      responses:
+        "204": { description: Session revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Audit Logs
+  # ==========================================================================
+  /audit-logs:
+    get:
+      operationId: listAuditLogs
+      summary: List audit log events
+      tags: [Audit Logs]
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: offset
+          schema: { type: integer, default: 0 }
+        - in: query
+          name: eventType
+          schema:
+            type: string
+            description: Filter by AuditEventType enum value (e.g. LOGIN_SUCCESS, ADMIN_USER_CREATED)
+        - in: query
+          name: userId
+          schema: { type: integer }
+          description: Filter by user ID
+      responses:
+        "200":
+          description: Audit event list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/AuditEventDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+tags:
+  - name: Users
+    description: User lifecycle management
+  - name: Roles
+    description: Role-based access control
+  - name: Groups
+    description: User group hierarchy
+  - name: Applications
+    description: OAuth 2.0 client applications
+  - name: Sessions
+    description: Active user sessions
+  - name: Audit Logs
+    description: Security event audit trail

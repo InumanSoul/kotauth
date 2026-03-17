@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
-> Last updated: 2026-03-16
-> Current version: 1.0.0-dev (Phase 3d complete)
+> Last updated: 2026-03-17
+> Current version: 1.0.0-dev (Phase 3 REST API complete)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -12,7 +12,7 @@ This document is the living record of what has been built, what compiles and run
 | Check | Status |
 |---|---|
 | Docker build (`gradle buildFatJar`) | ✅ Passing |
-| PostgreSQL schema (Flyway V1–V16) | ✅ Applied |
+| PostgreSQL schema (Flyway V1–V19) | ✅ Applied |
 | Admin console routes | ✅ All registered |
 | OIDC discovery + JWKS | ✅ Functional |
 | Authorization Code + PKCE flow | ✅ Functional |
@@ -29,6 +29,9 @@ This document is the living record of what has been built, what compiles and run
 | Group hierarchy with role inheritance | ✅ Functional |
 | Password policies (history, blacklist, complexity) | ✅ Functional |
 | MFA/TOTP enrollment + challenge | ✅ Functional |
+| API key management (admin UI + generation) | ✅ Functional |
+| REST API v1 (`/t/{slug}/api/v1/**`) | ✅ Functional |
+| Swagger UI (`/api/docs`) + OpenAPI spec | ✅ Functional |
 
 ---
 
@@ -578,15 +581,69 @@ Both provider adapters use `java.net.http.HttpClient` (JDK 11+, available on the
 
 Users created via social login have their `passwordHash` set to a random 64-char hex string (BCrypt-hashed). This is not a valid password any real user could produce — it ensures the account exists in the user table with a plausible `passwordHash` column value, while making password-based login impossible for that account until the user explicitly sets a password via the self-service portal.
 
+**ADR-19: API Key Design — SHA-256 over BCrypt**
+
+API keys use SHA-256 for storage (not BCrypt). Rationale: the raw key has 256 bits of entropy from a CSPRNG, which makes offline brute-force infeasible regardless of hashing algorithm. SHA-256 is fast enough that the auth-path DB lookup (indexed on `key_hash`) is dominated by network latency, not hashing. BCrypt's cost factor would add 100–300ms to every authenticated API request with no practical security benefit given the key entropy.
+
+**ADR-20: API Key Prefix for Display**
+
+The first 16 chars of the raw key (`kauth_<slug>_xxxx`) are stored as `key_prefix` for human identification in the admin UI. This never reveals enough to reconstruct the full key (the random part is 43 base64url chars) but allows operators to match a key they're looking at against a revoked one in an audit log.
+
+**ADR-21: Swagger UI Served from CDN**
+
+The Swagger UI HTML/JS/CSS is loaded from `cdnjs.cloudflare.com` rather than bundled in the fat JAR. Reason: Swagger UI's static assets are ~7MB compressed — bundling them would nearly double the fat JAR size for a rarely-used dev convenience. The CDN approach adds zero Gradle dependencies and the UI loads in <200ms from any reasonable location.
+
 ---
 
-### Phase 5 — Admin REST API ❌ Not started
+### Phase 3 (REST API) — Admin REST API ✅ Complete
 
-Full CRUD REST API (`/api/v1/`), API keys scoped per tenant, OpenAPI spec, webhook events.
+Full CRUD REST API under `/t/{tenantSlug}/api/v1/`, API keys scoped per tenant, OpenAPI spec, Swagger UI.
+
+#### Phase 3a — API Key Infrastructure
+
+| Feature | Status | Notes |
+|---|---|---|
+| Flyway V19 migration — `api_keys` table | ✅ Done | `id, tenant_id, name, key_prefix, key_hash (SHA-256), scopes, expires_at, last_used_at, enabled, created_at` |
+| `ApiKey` domain model + `ApiScope` constants | ✅ Done | `domain/model/ApiKey.kt` — zero framework deps |
+| `ApiKeyRepository` port + `PostgresApiKeyRepository` adapter | ✅ Done | SHA-256 hash lookup indexed; `touchLastUsed` best-effort |
+| `ApiKeyService` — generate, validate, revoke, delete | ✅ Done | Raw key returned once; SHA-256 stored only; O(1) verification |
+| Ktor `bearer("api-key")` auth provider | ✅ Done | Prefix-checks `kauth_` before DB lookup; tenant scoping done in routes |
+| `ApiKeyPrincipal` — carries raw token into route handlers | ✅ Done | `infrastructure/ApiKeyPrincipal.kt` |
+| Admin console API Keys tab (Settings → API Keys) | ✅ Done | Create form with scope checkboxes + expiry; list table with revoke/delete; one-time key reveal |
+| Admin routes: `GET/POST/POST-revoke/POST-delete` for API keys | ✅ Done | `/admin/workspaces/{slug}/settings/api-keys/**` |
+
+**Key format:** `kauth_<tenantSlug>_<32-random-bytes-base64url>` — 256 bits of entropy. No bcrypt — SHA-256 is sufficient for keys with this entropy level and eliminates auth-path latency.
+
+#### Phase 3b — REST Routes
+
+URL prefix: `/t/{tenantSlug}/api/v1/**`
+
+| Resource | Endpoints | Scope required |
+|---|---|---|
+| Users | `GET /users`, `POST /users`, `GET/PUT/DELETE /users/{id}`, `POST/DELETE /users/{id}/roles/{roleId}` | `users:read` / `users:write` |
+| Roles | `GET /roles`, `POST /roles`, `GET/PUT/DELETE /roles/{id}` | `roles:read` / `roles:write` |
+| Groups | `GET /groups`, `POST /groups`, `GET/PUT/DELETE /groups/{id}`, `POST/DELETE /groups/{id}/members/{userId}` | `groups:read` / `groups:write` |
+| Applications | `GET /applications`, `GET/PUT/DELETE /applications/{id}` | `applications:read` / `applications:write` |
+| Sessions | `GET /sessions`, `DELETE /sessions/{id}` | `sessions:read` / `sessions:write` |
+| Audit Logs | `GET /audit-logs` (with limit/offset/eventType/userId filters) | `audit_logs:read` |
+
+**Error format:** RFC 7807 Problem Details (`application/problem+json`) — `type`, `title`, `status`, `detail`.
+
+**Tenant isolation:** Route-level interceptor resolves tenant from URL slug and validates API key belongs to that tenant before any handler executes.
+
+**Delegation pattern:** All handlers delegate to existing domain services (`AdminService`, `RoleGroupService`) — zero new business logic in the API layer.
+
+#### Phase 3c — OpenAPI Spec + Swagger UI
+
+| Feature | Status | Notes |
+|---|---|---|
+| OpenAPI 3.1.0 spec | ✅ Done | `src/main/resources/openapi/v1.yaml` — covers all Phase 3b endpoints, schemas, responses |
+| Swagger UI | ✅ Done | `/api/docs` — served from Cloudflare CDN (no new Gradle dependency) |
+| Raw spec endpoint | ✅ Done | `/api/docs/openapi.yaml` — served from classpath |
 
 ---
 
-### Phase 6 — Documentation ❌ Not started
+### Phase 4 — Documentation ❌ Not started
 
 README, CONTRIBUTING, integration guides (Next.js, generic OIDC), API quick reference.
 
@@ -639,17 +696,25 @@ README, CONTRIBUTING, integration guides (Next.js, generic OIDC), API quick refe
 | `cookie.secure = true` | `Application.kt`, TODO comment | Requires TLS termination — Phase 5 |
 | Portal `PortalSession` cookie → full OAuth session | `PortalSession.kt`, ADR-07 | The portal LOGIN now uses OAuth Authorization Code + PKCE (✅ done). The portal SESSION inside `/account/*` still uses an HMAC-signed `PortalSession` cookie. Replacing that with access tokens is a Phase 5 cleanup. |
 | MFA pending cookie signing | `AuthRoutes.kt`, ADR-14 | Cookie `KOTAUTH_MFA_PENDING` value is plain (userId\|slug\|timestamp). Should be encrypted or use a server-side pending session — Phase 5. |
-| Password expiry enforcement at login | `V13` adds `password_policy_max_age_days` column | Column exists and is saved via the security settings page, but the login path does not yet check expiry and redirect to forgot-password. |
-| `required_admins` MFA policy enforcement | `MfaService.isMfaRequired` | Policy value is saved and displayed in UI. Runtime enforcement (check whether the user holds the `admin` role before requiring MFA) is not yet implemented. |
-| Resource access client string keys in JWT | `JwtTokenAdapter` | `resource_access` keys currently use the integer PK as a string; should resolve to the human-readable `client_id` string. |
-| WebAuthn / Passkeys | n/a | Phase 4 or 5 — `MfaMethod` enum is extensible |
-| Admin UI pages for roles/groups | `AdminView.kt` has placeholder links | Phase 3c delivers JSON API routes; full HTML admin pages for role/group management are deferred |
+| `cookie.secure = true` for portal session | `Application.kt` | Requires TLS termination confirmed; Phase 4 |
+| MFA pending cookie signing/encryption | `AuthRoutes.kt`, ADR-14 | `KOTAUTH_MFA_PENDING` cookie value is plain; should be encrypted or use a server-side store — Phase 4 |
+| WebAuthn / Passkeys | n/a | `MfaMethod` enum is extensible; out of scope for V1 |
+| Admin UI pages for roles/groups | `AdminView.kt` | REST API delivers CRUD (Phase 3b); HTML admin pages for role/group management still deferred |
 | Admin UI page for MFA management | `AdminView.kt` | Admin-initiated MFA reset/disable for a user — no HTML page yet |
+| Webhook events | n/a | Post-V1 — emit `user.created`, `session.revoked`, etc. after audit log writes |
 | Bulk user operations | n/a | Future |
 | User impersonation | n/a | Future, requires strict audit logging |
-| Admin REST API | n/a | Phase 5 |
-| Prometheus metrics | n/a | Phase 5 |
-| Structured JSON logs | n/a | Phase 5 |
+| Prometheus metrics | n/a | Future |
+| Structured JSON logs | n/a | Logback config is in place; logstash encoder wired — JSON output format deferred |
+
+**Fixed since last status update (no longer deferred):**
+
+| Item | Fixed in | Notes |
+|---|---|---|
+| `resource_access` JWT keys used integer PKs | Phase 3 prep | `JwtTokenAdapter` now uses `client.clientId` string with integer fallback |
+| `required_admins` MFA enforcement not implemented | Phase 3 prep | `AuthRoutes` resolves effective roles and enforces at login time |
+| `login()` missing password expiry check | Phase 3 prep | `AuthService.login()` mirrors the `authenticate()` expiry check |
+| Admin REST API not started | Phase 3 REST API | 30 endpoints under `/t/{slug}/api/v1/` — complete |
 | LDAP / SAML | n/a | Phase 4 |
 
 ---

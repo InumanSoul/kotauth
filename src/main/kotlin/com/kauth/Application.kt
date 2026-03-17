@@ -1,6 +1,7 @@
 package com.kauth
 
 import com.kauth.adapter.email.SmtpEmailAdapter
+import com.kauth.adapter.persistence.PostgresApiKeyRepository
 import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
@@ -29,18 +30,22 @@ import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
+import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.healthRoutes
+import io.ktor.server.auth.*
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -196,6 +201,8 @@ fun main() {
     // Phase 2: Social Login repositories
     val identityProviderRepository = PostgresIdentityProviderRepository()
     val socialAccountRepository    = PostgresSocialAccountRepository()
+    // Phase 3a: API keys
+    val apiKeyRepository           = PostgresApiKeyRepository()
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -290,6 +297,12 @@ fun main() {
         auditLog         = auditLogAdapter
     )
 
+    // Phase 3a: API key service
+    val apiKeyService = ApiKeyService(
+        apiKeyRepository = apiKeyRepository,
+        tenantRepository = tenantRepository
+    )
+
     // Phase 2: Social Login service — wires provider HTTP adapters
     val socialLoginService = SocialLoginService(
         identityProviderRepository = identityProviderRepository,
@@ -334,6 +347,7 @@ fun main() {
             mfaService                 = mfaService,
             mfaRepository              = mfaRepository,
             roleRepository             = roleRepository,
+            groupRepository            = groupRepository,
             tenantRepository           = tenantRepository,
             applicationRepository      = applicationRepository,
             userRepository             = userRepository,
@@ -346,7 +360,9 @@ fun main() {
             baseUrl                    = baseUrl,
             portalClientProvisioning   = portalClientProvisioning,
             socialLoginService         = socialLoginService,
-            identityProviderRepository = identityProviderRepository
+            identityProviderRepository = identityProviderRepository,
+            apiKeyService              = apiKeyService,
+            apiKeyRepository           = apiKeyRepository
         )
     }.start(wait = true)
 }
@@ -366,13 +382,16 @@ fun Application.module(
     keyProvisioningService     : KeyProvisioningService,
     mfaRepository              : com.kauth.domain.port.MfaRepository,
     roleRepository             : com.kauth.domain.port.RoleRepository,
+    groupRepository            : com.kauth.domain.port.GroupRepository,
     loginRateLimiter           : RateLimiter,
     registerRateLimiter        : RateLimiter,
     portalSessionKey           : ByteArray,
     baseUrl                    : String,
     portalClientProvisioning   : PortalClientProvisioning,
     socialLoginService         : SocialLoginService? = null,                            // Phase 2
-    identityProviderRepository : com.kauth.domain.port.IdentityProviderRepository? = null  // Phase 2
+    identityProviderRepository : com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
+    apiKeyService              : ApiKeyService? = null,                                 // Phase 3a
+    apiKeyRepository           : com.kauth.domain.port.ApiKeyRepository? = null         // Phase 3a
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -401,6 +420,33 @@ fun Application.module(
         }
         // Skip health probes — they're high-frequency and add no diagnostic value
         filter { call -> !call.request.path().startsWith("/health") }
+    }
+
+    // -------------------------------------------------------------------------
+    // API key authentication (Phase 3a)
+    // Bearer token scheme: Authorization: Bearer kauth_<slug>_<random>
+    // Tenant context is extracted from the URL path parameter {tenantSlug} by
+    // the route itself and used to scope key lookup.
+    // -------------------------------------------------------------------------
+    install(Authentication) {
+        bearer("api-key") {
+            // Realm is informational only — returned in WWW-Authenticate on 401
+            realm = "KotAuth REST API"
+            // Actual validation happens inside apiRoutes — this provider just
+            // extracts the raw token and makes it available via principal.
+            // A BearerTokenPrincipal is set if the token is non-blank;
+            // the route handler calls apiKeyService.validate() with tenant context.
+            authenticate { tokenCredential ->
+                // Defer real validation to the route (tenant not available here).
+                // Return a simple principal carrying the raw token; routes will
+                // call apiKeyService.validate(rawToken, tenantId) themselves.
+                if (tokenCredential.token.startsWith("kauth_")) {
+                    ApiKeyPrincipal(rawToken = tokenCredential.token)
+                } else {
+                    null  // Reject anything that doesn't look like our key format
+                }
+            }
+        }
     }
 
     install(Sessions) {
@@ -488,6 +534,22 @@ fun Application.module(
             baseUrl            = baseUrl
         )
 
+        // REST API v1 — /t/{tenantSlug}/api/v1/** (Phase 3b)
+        if (apiKeyService != null) {
+            apiRoutes(
+                apiKeyService     = apiKeyService,
+                tenantRepository  = tenantRepository,
+                userRepository    = userRepository,
+                roleRepository    = roleRepository,
+                groupRepository   = groupRepository,
+                applicationRepository = applicationRepository,
+                sessionRepository = sessionRepository,
+                auditLogRepository = auditLogRepository,
+                roleGroupService  = roleGroupService,
+                adminService      = adminService
+            )
+        }
+
         // Admin console
         adminRoutes(
             authService                = authService,
@@ -501,7 +563,8 @@ fun Application.module(
             keyProvisioningService     = keyProvisioningService,
             mfaRepository              = mfaRepository,
             portalClientProvisioning   = portalClientProvisioning,
-            identityProviderRepository = identityProviderRepository
+            identityProviderRepository = identityProviderRepository,
+            apiKeyService              = apiKeyService
         )
     }
 }

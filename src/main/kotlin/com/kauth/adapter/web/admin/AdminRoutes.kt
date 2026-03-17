@@ -64,7 +64,8 @@ fun Route.adminRoutes(
     keyProvisioningService       : KeyProvisioningService,
     mfaRepository                : MfaRepository? = null,
     portalClientProvisioning     : PortalClientProvisioning? = null,
-    identityProviderRepository   : IdentityProviderRepository? = null   // Phase 2 — Social Login
+    identityProviderRepository   : IdentityProviderRepository? = null,  // Phase 2 — Social Login
+    apiKeyService                : com.kauth.domain.service.ApiKeyService? = null  // Phase 3a — REST API keys
 ) {
     route("/admin") {
 
@@ -1034,6 +1035,69 @@ fun Route.adminRoutes(
                     call.respondHtml(HttpStatusCode.OK,
                         AdminView.mfaSettingsPage(workspace, wsPairs, session.username,
                             totalUsers = users.size, enrolledUsers = mfaEnrolledCount))
+                }
+
+                // -------------------------------------------------------
+                // API Keys (Phase 3a) — machine-to-machine REST API auth
+                // -------------------------------------------------------
+
+                get("/settings/api-keys") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val keys      = apiKeyService?.listForTenant(workspace.id) ?: emptyList()
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.apiKeysPage(workspace, keys, wsPairs, session.username))
+                }
+
+                post("/settings/api-keys") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val svc       = apiKeyService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
+
+                    val params    = call.receiveParameters()
+                    val name      = params["name"]?.trim() ?: ""
+                    val scopes    = params.getAll("scopes") ?: emptyList()
+                    val expiresAt = params["expiresAt"]?.takeIf { it.isNotBlank() }?.let {
+                        runCatching {
+                            java.time.LocalDate.parse(it)
+                                .atStartOfDay(java.time.ZoneId.of("UTC")).toInstant()
+                        }.getOrNull()
+                    }
+
+                    when (val result = svc.create(workspace.id, name, scopes, expiresAt)) {
+                        is com.kauth.domain.service.ApiKeyResult.Success -> {
+                            val keys = svc.listForTenant(workspace.id)
+                            call.respondHtml(HttpStatusCode.OK,
+                                AdminView.apiKeysPage(workspace, keys, wsPairs, session.username,
+                                    newKeyRaw = result.value.rawKey))
+                        }
+                        is com.kauth.domain.service.ApiKeyResult.Failure -> {
+                            val keys = svc.listForTenant(workspace.id)
+                            call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                AdminView.apiKeysPage(workspace, keys, wsPairs, session.username,
+                                    error = result.error.message))
+                        }
+                    }
+                }
+
+                post("/settings/api-keys/{keyId}/revoke") {
+                    val slug      = call.parameters["slug"]  ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val keyId     = call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    apiKeyService?.revoke(keyId, workspace.id)
+                    call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+                }
+
+                post("/settings/api-keys/{keyId}/delete") {
+                    val slug      = call.parameters["slug"]  ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val keyId     = call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    apiKeyService?.delete(keyId, workspace.id)
+                    call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
                 }
             }
         }

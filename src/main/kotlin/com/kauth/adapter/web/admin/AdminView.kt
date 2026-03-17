@@ -1,6 +1,8 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.AccessType
+import com.kauth.domain.model.ApiKey
+import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
@@ -290,6 +292,7 @@ object AdminView {
         ctxLink("$base/smtp",                  "smtp",               activeSection, "SMTP")
         ctxLink("$base/security",              "security",           activeSection, "Security policy")
         ctxLink("$base/identity-providers",    "identity-providers", activeSection, "Identity Providers")
+        ctxLink("$base/api-keys",              "api-keys",           activeSection, "API Keys")
     }
 
     // -------------------------------------------------------------------------
@@ -3023,6 +3026,191 @@ object AdminView {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // API Keys settings (Phase 3a)
+    // -------------------------------------------------------------------------
+
+    fun apiKeysPage(
+        workspace     : Tenant,
+        apiKeys       : List<ApiKey>,
+        allWorkspaces : List<Pair<String, String>>,
+        loggedInAs    : String,
+        newKeyRaw     : String? = null,  // one-time plaintext shown after creation
+        error         : String? = null,
+        scopes        : List<String> = ApiScope.ALL
+    ): HTML.() -> Unit = {
+        adminShell(
+            pageTitle        = "API Keys — ${workspace.displayName}",
+            activeRail       = "settings",
+            allWorkspaces    = allWorkspaces,
+            workspaceName    = workspace.displayName,
+            workspaceSlug    = workspace.slug,
+            loggedInAs       = loggedInAs,
+            activeAppSection = "api-keys"
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"API Keys" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"API Keys" }
+                    p("page-subtitle") { +"Machine-to-machine authentication for the REST API. Keys are shown once on creation." }
+                }
+            }
+
+            // One-time key reveal
+            if (newKeyRaw != null) {
+                div("alert alert-success") {
+                    style = "max-width:720px; margin-bottom:1.5rem;"
+                    p { style = "font-weight:600; margin-bottom:0.5rem;"; +"API key created — copy it now. You will not see it again." }
+                    div {
+                        style = "font-family:monospace; background:var(--color-bg-secondary); padding:0.75rem 1rem; border-radius:6px; word-break:break-all; font-size:0.875rem;"
+                        +newKeyRaw
+                    }
+                }
+            }
+
+            if (error != null) {
+                div("alert alert-error") { style = "max-width:720px;"; +error }
+            }
+
+            // Existing keys table
+            div("card") {
+                style = "max-width:900px; margin-bottom:2rem;"
+                if (apiKeys.isEmpty()) {
+                    p("td-muted") { style = "padding:1rem;"; +"No API keys yet. Create one below." }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Name" }
+                                th { +"Prefix" }
+                                th { +"Scopes" }
+                                th { +"Last used" }
+                                th { +"Expires" }
+                                th { +"Status" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            apiKeys.forEach { key ->
+                                tr {
+                                    td { span("td-code") { +key.name } }
+                                    td { span("td-code") { +"${key.keyPrefix}…" } }
+                                    td {
+                                        style = "font-size:0.78rem; color:var(--color-text-muted);"
+                                        +key.scopes.joinToString(", ")
+                                    }
+                                    td {
+                                        span("td-muted") {
+                                            +( key.lastUsedAt?.let {
+                                                java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy")
+                                                    .withZone(java.time.ZoneId.of("UTC"))
+                                                    .format(it)
+                                            } ?: "Never" )
+                                        }
+                                    }
+                                    td {
+                                        span("td-muted") {
+                                            +( key.expiresAt?.let {
+                                                java.time.format.DateTimeFormatter.ofPattern("MMM d, yyyy")
+                                                    .withZone(java.time.ZoneId.of("UTC"))
+                                                    .format(it)
+                                            } ?: "Never" )
+                                        }
+                                    }
+                                    td {
+                                        span(if (key.enabled) "badge badge-active" else "badge badge-disabled") {
+                                            +(if (key.enabled) "Active" else "Revoked")
+                                        }
+                                    }
+                                    td {
+                                        if (key.enabled) {
+                                            form(
+                                                action = "/admin/workspaces/${workspace.slug}/settings/api-keys/${key.id}/revoke",
+                                                method = FormMethod.post, classes = "inline-form"
+                                            ) {
+                                                button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm btn-danger") {
+                                                    attributes["onclick"] = "return confirm('Revoke this API key? This cannot be undone.')"
+                                                    +"Revoke"
+                                                }
+                                            }
+                                        } else {
+                                            form(
+                                                action = "/admin/workspaces/${workspace.slug}/settings/api-keys/${key.id}/delete",
+                                                method = FormMethod.post, classes = "inline-form"
+                                            ) {
+                                                button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                                                    attributes["onclick"] = "return confirm('Delete this key?')"
+                                                    +"Delete"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Create new key form
+            div("form-card") {
+                style = "max-width:640px;"
+                p("form-section-title") { +"Create New API Key" }
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/settings/api-keys",
+                    method = FormMethod.post,
+                    encType = FormEncType.applicationXWwwFormUrlEncoded
+                ) {
+                    div("field") {
+                        label { htmlFor = "keyName"; +"Name" }
+                        input(type = InputType.text, name = "name") {
+                            id = "keyName"
+                            placeholder = "e.g. CI/CD pipeline"
+                            required = true
+                            maxLength = "128"
+                        }
+                        p("field-hint") { +"A descriptive label to identify this key." }
+                    }
+                    div("field") {
+                        label { +"Scopes" }
+                        p("field-hint") { style = "margin-bottom:0.5rem;"; +"Select the permissions this key will have." }
+                        div {
+                            style = "display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;"
+                            ApiScope.ALL.forEach { scope ->
+                                label {
+                                    style = "display:flex; align-items:center; gap:0.5rem; font-size:0.875rem; font-weight:400;"
+                                    input(type = InputType.checkBox, name = "scopes") {
+                                        value = scope
+                                        checked = true
+                                    }
+                                    span("td-code") { style = "font-size:0.8rem;"; +scope }
+                                }
+                            }
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "expiresAt"; +"Expiry (optional)" }
+                        input(type = InputType.date, name = "expiresAt") {
+                            id = "expiresAt"
+                        }
+                        p("field-hint") { +"Leave blank for keys that never expire." }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn-primary") { +"Create API Key" }
                     }
                 }
             }
