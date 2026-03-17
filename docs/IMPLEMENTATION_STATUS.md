@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
 > Last updated: 2026-03-17
-> Current version: 1.0.0-dev (Phase 3 REST API complete)
+> Current version: 1.0.0-dev (Phase 4 Webhooks complete — Phase 5 Documentation next)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -12,7 +12,7 @@ This document is the living record of what has been built, what compiles and run
 | Check | Status |
 |---|---|
 | Docker build (`gradle buildFatJar`) | ✅ Passing |
-| PostgreSQL schema (Flyway V1–V19) | ✅ Applied |
+| PostgreSQL schema (Flyway V1–V21) | ✅ Applied |
 | Admin console routes | ✅ All registered |
 | OIDC discovery + JWKS | ✅ Functional |
 | Authorization Code + PKCE flow | ✅ Functional |
@@ -32,6 +32,8 @@ This document is the living record of what has been built, what compiles and run
 | API key management (admin UI + generation) | ✅ Functional |
 | REST API v1 (`/t/{slug}/api/v1/**`) | ✅ Functional |
 | Swagger UI (`/api/docs`) + OpenAPI spec | ✅ Functional |
+| Webhook endpoints (admin UI + delivery) | ✅ Functional |
+| Webhook event fan-out (async, HMAC-signed) | ✅ Functional |
 
 ---
 
@@ -643,9 +645,59 @@ URL prefix: `/t/{tenantSlug}/api/v1/**`
 
 ---
 
-### Phase 4 — Documentation ❌ Not started
+### Phase 4 — Webhooks ✅ Complete
 
-README, CONTRIBUTING, integration guides (Next.js, generic OIDC), API quick reference.
+Async HTTP event notifications for integrations. Fan-out is wired directly into the audit log adapter for transparent, zero-friction delivery across all auth flows.
+
+#### Implementation
+
+| Component | File | Details |
+|---|---|---|
+| Flyway V20 — `webhook_endpoints` | `V20__webhook_endpoints.sql` | `id, tenant_id, url, secret, events TEXT, description, enabled, created_at` |
+| Flyway V21 — `webhook_deliveries` | `V21__webhook_deliveries.sql` | `id, endpoint_id, event_type, payload JSONB, status VARCHAR(16), attempts, last_attempt_at, response_status, created_at` |
+| `WebhookEndpoint` + `WebhookDelivery` models | `domain/model/Webhook.kt` | Zero framework deps; event subscription as `Set<String>`. `WebhookDeliveryStatus` enum with `fromValue()`. `WebhookEvent` constants. |
+| `WebhookEndpointRepository` port | `domain/port/WebhookEndpointRepository.kt` | CRUD + `findEnabledByTenantAndEvent(tenantId, eventType)` for efficient fan-out lookup |
+| `WebhookDeliveryRepository` port | `domain/port/WebhookDeliveryRepository.kt` | Write + status-update; `findByTenantId` for admin overview |
+| `PostgresWebhookEndpointRepository` | `adapter/persistence/PostgresWebhookEndpointRepository.kt` | Exposed table + repository impl; event filter done in-process after DB fetch |
+| `PostgresWebhookDeliveryRepository` | `adapter/persistence/PostgresWebhookDeliveryRepository.kt` | `jsonb()` column type for payload; JOIN to endpoint table for tenant-scoped queries |
+| `WebhookService` | `domain/service/WebhookService.kt` | `dispatch()` fans out to all enabled/subscribed endpoints; async `CoroutineScope(Dispatchers.IO)`; 3-attempt exponential backoff (immediate → 5 min → 30 min); HMAC-SHA256 signing (`X-KotAuth-Signature: sha256=<hex>`); `createEndpoint()` / CRUD |
+| `WebhookResult` | `domain/service/WebhookService.kt` | `Success(endpoint, plaintextSecret)` / `Failure(error)` sealed class |
+| Audit log hook | `adapter/persistence/PostgresAuditLogAdapter.kt` | `WebhookService` injected; dispatches webhook event after every `record()` call. `AuditEventType → WebhookEvent` mapping. Fire-and-forget — exceptions never surface. |
+| Admin UI — Webhooks tab | `adapter/web/admin/AdminRoutes.kt` | `GET/POST /settings/webhooks`, `POST /settings/webhooks/{id}/toggle`, `POST /settings/webhooks/{id}/delete` |
+| Admin UI — Webhooks view | `adapter/web/admin/AdminView.kt` | `webhooksPage()` — endpoint table, create form with event checkboxes, recent delivery history table |
+| Settings nav | `adapter/web/admin/AdminView.kt` | "Webhooks" link added to `renderSettingsCtxPanel()` |
+| CSS — badge variants | `static/kotauth-admin.css` | Added `badge-active`, `badge-disabled`, `badge-neutral`, `badge-error`, `badge-pending` semantic aliases |
+| Wiring | `Application.kt` | `webhookService` constructed before `auditLogAdapter`; passed to `adminRoutes()` |
+
+#### Supported events
+
+`user.created`, `user.updated`, `user.deleted`, `login.success`, `login.failed`, `password.reset`, `mfa.enrolled`, `session.revoked`
+
+#### Payload envelope
+
+```json
+{
+  "event": "user.created",
+  "timestamp": "2026-03-17T12:00:00Z",
+  "data": { "userId": 42, "ipAddress": "1.2.3.4" }
+}
+```
+
+Signature verification: `X-KotAuth-Signature: sha256=HMAC-SHA256(secret, rawBody)`
+
+---
+
+### Phase 5 — Documentation ❌ Not started
+
+Written after the feature surface is stable (post-Phase 4).
+
+| File | Content |
+|---|---|
+| `README.md` | Project overview, Docker quickstart, env variable reference |
+| `CONTRIBUTING.md` | Local dev setup, test instructions, branch conventions, PR process |
+| `docs/integration/NEXTJS.md` | Full Next.js App Router + Auth.js OIDC integration example |
+| `docs/integration/GENERIC_OIDC.md` | Generic integration pattern (any OIDC-compatible client library) |
+| `docs/API.md` | REST API quick reference; points to Swagger UI for full interactive spec |
 
 ---
 
@@ -701,7 +753,7 @@ README, CONTRIBUTING, integration guides (Next.js, generic OIDC), API quick refe
 | WebAuthn / Passkeys | n/a | `MfaMethod` enum is extensible; out of scope for V1 |
 | Admin UI pages for roles/groups | `AdminView.kt` | REST API delivers CRUD (Phase 3b); HTML admin pages for role/group management still deferred |
 | Admin UI page for MFA management | `AdminView.kt` | Admin-initiated MFA reset/disable for a user — no HTML page yet |
-| Webhook events | n/a | Post-V1 — emit `user.created`, `session.revoked`, etc. after audit log writes |
+| Webhook retry sweep (missed deliveries) | `WebhookService` | `findPending()` port exists; periodic background sweep not yet wired — post-V1 |
 | Bulk user operations | n/a | Future |
 | User impersonation | n/a | Future, requires strict audit logging |
 | Prometheus metrics | n/a | Future |

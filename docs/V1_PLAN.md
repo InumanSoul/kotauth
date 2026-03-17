@@ -1,6 +1,6 @@
 # KotAuth V1 Implementation Plan
 
-**Status:** In Progress — Phase 2 complete, Phase 3 next
+**Status:** In Progress — Phase 4 complete, Phase 5 (Documentation) next
 **Started:** 2026-03-16
 **Target:** First public release
 
@@ -127,10 +127,9 @@ a tenant policy option later.
 
 ---
 
-## Phase 3 — Admin REST API
+## Phase 3 — Admin REST API ✅ Complete
 
 > Enables programmatic integration. Required for CI/CD provisioning and external tooling.
-> **Status:** Planned — ready to implement after social provider review.
 
 ### 3a — API Key Infrastructure
 
@@ -241,7 +240,7 @@ Written **after** 3b routes stabilize — not before. Writing spec first causes 
 
 ---
 
-## Phase 4 — Webhooks
+## Phase 4 — Webhooks ✅ Complete
 
 > Async event notifications for integrations. Builds on Phase 3 patterns.
 
@@ -289,10 +288,10 @@ Written **after** 3b routes stabilize — not before. Writing spec first causes 
 ```
 Phase 1  (1.1 + 1.2 + 1.3)  ✅ → Correctness fixes
 Phase 2                       ✅ → Social login (Google + GitHub)
-Phase 3a                         → API key infrastructure — prerequisite for REST + webhooks
-Phase 3b                         → REST routes — full CRUD via API
-Phase 3c                         → OpenAPI spec — written after routes are stable
-Phase 4                          → Webhooks — builds on Phase 3 patterns
+Phase 3a                      ✅ → API key infrastructure
+Phase 3b                      ✅ → REST routes — full CRUD via API
+Phase 3c                      ✅ → OpenAPI spec + Swagger UI
+Phase 4                       ✅ → Webhooks — builds on Phase 3 patterns
 Phase 5                          → Documentation — written against final feature surface
 ```
 

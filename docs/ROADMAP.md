@@ -1,346 +1,270 @@
-# KotAuth — Product Roadmap & Architecture Plan
+# Kotauth — Product Roadmap
 
-> Last updated: 2026-03-16
-> Status: Phase 3d complete — Phase 4 (Identity Federation) next
+> Last updated: 2026-03-17
+> Status: V1.0 complete — Phases 0–5 shipped
 
 ---
 
-## Honest Scope Assessment
+## Strategic Context
 
-Before anything else: you are building in the same space as Keycloak (15 years, hundreds of contributors), Auth0 (acquired by Okta for $6.5B), and Clerk ($1B+ valuation, 50+ engineers). This is not a reason not to build it — open source has beaten commercial IAM before — but it dictates how ruthless you need to be about phasing and what your actual differentiator is.
+Kotauth competes in a space occupied by Keycloak (15 years, hundreds of contributors), Auth0 (acquired by Okta for $6.5B), and Clerk ($1B+ valuation, 50+ engineers). This is not a reason to avoid the space — open source has displaced commercial IAM before — but it dictates how ruthlessly the project must phase its scope and where it must differentiate.
 
-**Keycloak's real weaknesses (your opportunity):**
-- Admin UI is genuinely terrible — dated, complex, confusing for non-experts
+**Keycloak's real weaknesses (Kotauth's opportunity):**
+- Admin UI is genuinely poor — dated, complex, confusing for operators who aren't OIDC experts
 - Setup complexity is punishing for small teams
-- Documentation is dense and assumes deep OIDC knowledge
-- Kubernetes/cloud-native experience is poor out of the box
-- Theming/customization requires deep Freemarker knowledge
+- Documentation assumes deep protocol knowledge upfront
+- Kubernetes/cloud-native experience requires significant configuration work
+- Theming requires Freemarker expertise and internal Keycloak knowledge
 
-**Your stated advantages:**
-- Great UI/UX out of the box (the largest real gap in the market)
-- Docker/cloud-native first architecture
-- Modernized developer experience
+**Kotauth's differentiators:**
+- Polished UI out of the box — the largest real gap in the open-source IAM market
+- Docker/cloud-native first architecture — running in under five minutes
+- Developer-first experience — discoverable, well-documented, standard protocol compliance
+- Lightweight footprint — single JAR + PostgreSQL, no JBoss/WildFly dependency
 
-**The constraint you must accept:** You cannot compete on features with Keycloak at parity. You compete by being 10x simpler for the 80% use case while not sacrificing security.
-
----
-
-## Is the Tenant/Client Model an Industry Standard?
-
-Yes — unconditionally. The concept is universal across every serious IAM platform, only the naming differs:
-
-| Platform    | Namespace unit | Application unit |
-|-------------|---------------|------------------|
-| Keycloak    | Realm          | Client           |
-| Auth0       | Tenant         | Application      |
-| Okta        | Organization   | Application      |
-| Azure AD    | Tenant         | App Registration |
-| Clerk       | Instance       | Application      |
-| **KotAuth** | **Tenant**     | **Client**       |
-
-This maps directly to OAuth 2.0 / OIDC:
-- A **Tenant** IS an Authorization Server — it has its own issuer URL, user directory, keys, token settings, and identity providers. In the UI we call this Workspace
-- A **Client** IS an OAuth 2.0 Client — it has a client_id, client_secret, redirect URIs, allowed scopes, and an access type (public vs confidential). In the UI we call this Application
-
-**What this means for the current codebase:** the flat `users` table must become tenant-scoped. This is the single most important data model decision to make before building further. Every table you add from here will have `tenant_id` as a foreign key.
+**The constraint the project must hold:** Kotauth cannot compete on feature parity with Keycloak. It competes by being dramatically simpler for the 80% use case while not compromising on security fundamentals.
 
 ---
 
-## Core Data Model (Design this now, before Phase 1 coding)
+## Tenant / Application Model
 
-```
-Tenants
-  id, slug, display_name, issuer_url
-  token_expiry_seconds, refresh_token_expiry_seconds
-  registration_enabled, email_verification_required
-  password_policy_min_length, password_policy_require_special
-  created_at
+The tenant and application model is an industry standard, not an opinion. Every serious IAM platform uses the same two-level structure, differing only in naming:
 
-Clients
-  id, tenant_id (FK), client_id (unique per tenant), client_secret_hash
-  name, description
-  access_type: ENUM(public, confidential, bearer_only)
-  allowed_redirect_uris (array or separate table)
-  allowed_scopes (array or separate table)
-  token_expiry_override (nullable — inherits from tenant if null)
-  enabled, created_at
+| Platform | Namespace unit | Application unit |
+|---|---|---|
+| Keycloak | Realm | Client |
+| Auth0 | Tenant | Application |
+| Okta | Organization | Application |
+| Azure AD | Tenant | App Registration |
+| Clerk | Instance | Application |
+| **Kotauth** | **Workspace** | **Application** |
 
-Users
-  id, tenant_id (FK), username, email, full_name
-  password_hash, email_verified, enabled
-  created_at, last_login_at
-
-Roles
-  id, tenant_id (FK), name, description
-  is_composite (role that contains other roles)
-
-UserRoles
-  user_id (FK), role_id (FK)
-
-ClientScopes
-  id, tenant_id (FK), name, description, protocol (openid, saml)
-  include_in_token_scope
-
-Sessions  (Phase 2)
-  id (UUID), user_id (FK), tenant_id (FK), client_id (FK)
-  access_token_hash, refresh_token_hash
-  ip_address, user_agent
-  created_at, expires_at, last_activity_at, revoked_at
-
-TenantIdentityProviders  (Phase 3)
-  id, tenant_id (FK), provider_type (google, github, saml, oidc)
-  client_id, client_secret_encrypted
-  enabled, config (JSONB)
-
-AuditLog  (Phase 2)
-  id, tenant_id (FK), user_id (nullable FK), event_type
-  ip_address, details (JSONB), created_at
-```
-
-**The master tenant:** One special tenant (`master`) contains admin users who can manage all other tenants. This separates platform operators from tenant users cleanly and enables a proper multi-tenant SaaS model.
+In protocol terms: a Kotauth Workspace is an OAuth 2.0 Authorization Server. It owns its user directory, signing keys, token policies, and identity providers. Each Application within a workspace is an OAuth 2.0 Client with its own `client_id`, allowed redirect URIs, scopes, and token lifetime overrides.
 
 ---
 
-## Phase Roadmap
+## Release History
 
-### Phase 0 — Foundation (Current Sprint)
-*Goal: Honest production-readiness for the single-tenant PoC*
+### Phase 0 — Foundation ✅ Shipped
+*Goal: Honest production-readiness baseline*
 
-The current code is not deployable as-is. These are blockers:
+The initial implementation established the security and operational primitives that all subsequent phases build on:
 
-- [ ] **Email verification flow** — without this, anyone can register with fake emails
-- [ ] **Password reset / forgot password flow** — no auth system ships without this
-- [ ] **Rate limiting on auth endpoints** — /login and /register are wide open to brute force
-- [ ] **CSRF protection** on form endpoints
-- [ ] **Secure defaults** — JWT_SECRET must be enforced as non-default in production; add a startup check that fails if `secret-key-12345` is used with `KAUTH_ENV=production`
-- [ ] **Refresh token persistence** — currently UUIDs are generated but never stored; they can't be invalidated
-- [ ] **HTTPS enforcement** — add redirect or at minimum a startup warning
-- [ ] **Input sanitization** — trim and validate all form inputs server-side
-
----
-
-### Phase 1 — Multi-Tenancy Core
-*Goal: The tenant/client model that makes this a platform, not a single-app auth service*
-
-**Data model migration:**
-- Add `tenants` table, migrate existing users to a default tenant
-- Add `clients` table (current JWT config becomes a client record)
-- Scope all user operations by `tenant_id`
-- Introduce Flyway for versioned schema migrations (replace `SchemaUtils` which is dev-only tooling)
-
-**Tenant management:**
-- Master tenant created on first boot
-- Admin can create/configure additional tenants
-- Each tenant has its own: issuer URL, token settings, registration toggle, password policy
-- Tenant slug becomes part of the endpoint URL: `/t/{slug}/protocol/openid-connect/token`
-
-**Client management:**
-- Register clients per tenant (client_id + secret for confidential, just client_id for public)
-- Allowed redirect URIs validated on authorization requests
-- Token expiry configurable per client (overrides tenant default)
-
-**Admin UI — Phase 1 (this is your differentiator, invest here):**
-- Tenant list + create tenant
-- Client list + create/edit client
-- Basic user list per tenant
-- Clean, opinionated design — NOT a Keycloak replica
+- Email verification flow — prevents registration with unverifiable addresses
+- Password reset via signed token with email delivery
+- Rate limiting on `/login` (5/min) and `/register` (3/5 min) per IP
+- CSRF protection on all form endpoints
+- Startup validation — server refuses to start if `KAUTH_ENV=production` and unsafe defaults are detected
+- Refresh token persistence with SHA-256 hashing — tokens are invalidatable, never stored in plaintext
+- HTTPS enforcement at startup — OIDC discovery, OAuth callbacks, and session cookies require TLS in production
+- Server-side input validation on all form and API inputs
 
 ---
 
-### Phase 2 — OAuth 2.0 / OIDC Compliance
-*Goal: Standard protocol flows so any OAuth2-compatible client library works with KotAuth*
+### Phase 1 — Multi-Tenancy Core ✅ Shipped
+*Goal: The workspace/application model that makes Kotauth a platform, not a per-app login service*
 
-This is not optional. Without standard flows, you are not an IAM platform — you are a login page library. Every framework (Next.js, Spring, Rails, Django) has OIDC client libraries that expect these endpoints.
+Phase 1 introduced full multi-tenancy. Every table carries `tenant_id`. The same Kotauth instance serves multiple isolated identity directories simultaneously.
 
-**Endpoints to implement (in priority order):**
-
-```
-GET  /t/{tenant}/.well-known/openid-configuration   # Discovery (partial: done)
-GET  /t/{tenant}/protocol/openid-connect/certs      # JWKS — public keys for token verification
-POST /t/{tenant}/protocol/openid-connect/token      # Token endpoint
-GET  /t/{tenant}/protocol/openid-connect/auth       # Authorization endpoint (code flow)
-POST /t/{tenant}/protocol/openid-connect/logout     # End session
-GET  /t/{tenant}/protocol/openid-connect/userinfo   # Userinfo (who is this token for?)
-POST /t/{tenant}/protocol/openid-connect/revoke     # Token revocation
-POST /t/{tenant}/protocol/openid-connect/introspect # Token introspection (is this valid?)
-```
-
-**Flows to implement (in priority order):**
-
-1. **Authorization Code Flow + PKCE** — for web apps and SPAs. This is the primary flow for 90% of integrations.
-2. **Client Credentials Flow** — for machine-to-machine (backend services, CI/CD, etc.)
-3. **Refresh Token Flow** — rotate refresh tokens on every use (prevent replay attacks)
-4. **Resource Owner Password Credentials (ROPC)** — deprecated but still requested by legacy integrations. Optional.
-
-**Token improvements:**
-- RS256 signing (asymmetric) — allows clients to verify tokens without contacting KotAuth
-- JWKS endpoint to publish public keys
-- Standard claims: `sub`, `iss`, `aud`, `exp`, `iat`, `jti`, `email`, `email_verified`, `name`, `preferred_username`, `roles`
-- Refresh token persistence with rotation and absolute expiry
-
-**Session management:**
-- Track active sessions per user/client
-- Allow users to see and revoke their own sessions
-- Allow admins to revoke any session
-- Concurrent session limits (configurable per tenant)
+- Flyway versioned schema migrations replacing `SchemaUtils` development tooling
+- `tenants` table — slug-routed, each workspace owns its issuer URL, token TTLs, and password policy
+- `applications` table — per-tenant OAuth2 clients with `client_id`, bcrypt-hashed secrets, redirect URIs, scope lists, and token TTL overrides
+- Tenant-scoped user directory — the same email address is independent across workspaces
+- Master tenant — the `master` workspace holds platform admin accounts, cleanly separated from end-user tenants
+- Per-tenant RS256 key pairs — provisioned on first use, stored as PEM, no shared signing key
+- Admin console — workspace list, application management, basic user management
+- Tenant slug in all endpoint URLs: `/t/{slug}/protocol/openid-connect/...`
 
 ---
 
-### Phase 3 — User Management Platform ✅ Complete
-*Goal: The admin console and user self-service that makes KotAuth a complete platform*
+### Phase 2 — OAuth 2.0 / OIDC Compliance ✅ Shipped
+*Goal: Standards-compliant protocol flows so any OIDC client library works with Kotauth without modification*
 
-**Admin console (Phase 3a ✅):**
-- ✅ User search, filter, pagination
-- ✅ User detail: profile, sessions, audit log
-- ✅ Create/edit/disable users
-- ✅ Force password reset (admin-initiated)
-- ❌ Impersonate user — deferred (future, requires strict audit logging)
-- ❌ Bulk operations — deferred (future)
+Full RFC 6749 / RFC 7636 / OpenID Connect Core compliance. Every OAuth2-compatible framework and client library integrates without custom adapters.
 
-**User self-service portal (Phase 3b ✅ / Phase 3d ✅):**
-- ✅ View/edit own profile
-- ✅ Change password (requires current password)
-- ✅ Active sessions — see and revoke
-- ✅ MFA enrollment and management (Phase 3c)
-- ✅ Portal login via standard OAuth Authorization Code + PKCE flow — built-in `kotauth-portal` PUBLIC client per tenant; `PortalClientProvisioning` ensures the client and correct redirect URI exist for every tenant on startup (Phase 3d)
-- ✅ All auth pages (login, register, forgot/reset password, email verify, MFA challenge) display the tenant's workspace name instead of hardcoded "KotAuth" (Phase 3d)
-- ❌ Account deletion request — deferred (future)
+**Endpoints:**
+- `GET /.well-known/openid-configuration` — OIDC discovery document
+- `GET /protocol/openid-connect/certs` — JWKS for offline token verification
+- `GET /protocol/openid-connect/auth` — authorization endpoint
+- `POST /protocol/openid-connect/token` — all grant types
+- `GET|POST /protocol/openid-connect/logout` — end session
+- `GET /protocol/openid-connect/userinfo` — standard claims over bearer auth
+- `POST /protocol/openid-connect/revoke` — RFC 7009 token revocation
+- `POST /protocol/openid-connect/introspect` — RFC 7662 token introspection
 
-**Roles & Permissions (Phase 3c ✅):**
-- ✅ Tenant roles (global to the tenant)
-- ✅ Client roles (scoped to a specific client)
-- ✅ Composite roles with BFS cycle detection
-- ✅ Role assignment via admin API routes
-- ✅ JWT claims: `realm_access.roles` + `resource_access.{clientId}.roles` (Keycloak-compatible)
-- ✅ Effective role resolution: direct + group-inherited + composite expansion
+**Grant types:**
+- Authorization Code + PKCE (primary flow for web apps and SPAs — PKCE required for all public clients)
+- Client Credentials (machine-to-machine)
+- Refresh Token with rotation — each use issues a new refresh token; the old one is immediately invalidated
 
-**Groups (Phase 3c ✅):**
-- ✅ User groups with role inheritance
-- ✅ Group hierarchy (nested groups via `parent_group_id`)
-- ✅ Group-level attributes (JSONB)
+**Token claims:** `sub`, `iss`, `aud`, `exp`, `iat`, `jti`, `email`, `email_verified`, `name`, `preferred_username`, `realm_access.roles`, `resource_access.{clientId}.roles`
 
-**Password policies (Phase 3c ✅, configurable via Security Settings page ✅ Phase 3d):**
-- ✅ Minimum length
-- ✅ Require uppercase / special characters / numbers
-- ✅ Password history (can't reuse last N passwords, BCrypt-verified)
-- ✅ Blacklist (50 common passwords seeded, tenant-specific additions supported)
-- ✅ Dedicated Security Settings page (`/settings/security`) — password policy + MFA policy separated from general workspace settings (Phase 3d)
-- ❌ Expiry enforcement at login — `max_age_days` column exists and is configurable in the UI, but login path does not yet check and redirect
-
-**MFA (Phase 3c ✅):**
-- ✅ TOTP (Google Authenticator, Authy) — RFC 6238, zero-dependency implementation
-- ✅ Recovery codes (8 codes, BCrypt-hashed, consumed on use)
-- ✅ MFA pending cookie HMAC-signed (HMAC-SHA256 via EncryptionService) — forgery prevented
-- ✅ MFA policy configurable via Security Settings page (Phase 3d)
-- ❌ WebAuthn / Passkeys — deferred to Phase 4 or 5 (`MfaMethod` enum is extensible)
-- ❌ SMS OTP — deferred (future, controversial due to SIM swap risk)
-- ❌ `required_admins` policy enforcement — policy value saved and displayed; runtime check (does user hold admin role?) not yet implemented
-
-**Email flows (Phase 3b ✅):**
-- ✅ Email verification on registration
-- ✅ Password reset
-- ❌ MFA backup code delivery — deferred (codes shown at enrollment time only)
-- ❌ Login notification (new device/location) — deferred (future)
-- ❌ Account lockout notification — deferred (future)
-- ✅ Configurable SMTP per tenant (AES-256-GCM encrypted passwords)
+**Session management:** per-user session tracking, user-initiated revocation, admin-initiated revocation, absolute refresh token expiry
 
 ---
 
-### Phase 4 — Identity Federation
-*Goal: Connect KotAuth to external identity sources*
+### Phase 3 — User Management Platform ✅ Shipped
+*Goal: Complete admin console and user self-service — the UI/UX layer that distinguishes Kotauth from Keycloak*
 
-**Social login (OAuth 2.0 providers):**
-- Google
-- GitHub
-- Microsoft
-- Generic OIDC provider (covers any standards-compliant IdP)
-- Account linking (connect existing account to social login)
+Phase 3 was the largest phase, delivered in four increments (3a–3d).
 
-**Enterprise integrations:**
-- LDAP / Active Directory sync (read users from corporate directory)
-- SAML 2.0 SP-initiated and IdP-initiated flows (enterprise requirement for most Fortune 500)
-- External OIDC provider (KotAuth as a relay/broker)
+**Admin console (3a):**
+- User search, filter, pagination
+- User detail view — profile, active sessions, audit trail
+- Create, edit, and disable users
+- Application management — client secret rotation, redirect URI management
+- API key management — generate, scope, revoke keys with SHA-256 hashing
+- Audit log viewer — paginated, filterable by event type
 
----
+**Email flows and self-service (3b):**
+- Email verification on registration with per-tenant SMTP configuration
+- Password reset with expiring signed tokens, no email enumeration
+- User self-service portal — profile editing, password change, session listing and revocation
+- Per-tenant SMTP configuration with AES-256-GCM encryption of stored credentials
 
-### Phase 5 — Developer Experience
-*Goal: Make integration trivially easy — this is where Clerk wins and Keycloak loses*
+**RBAC and Security (3c):**
+- Tenant roles and application-scoped roles
+- Composite roles with BFS expansion and cycle detection at assignment time
+- Groups with nested hierarchy and role inheritance — users inherit roles through group membership
+- Password policies — minimum length, character class requirements, history depth, common password blacklist
+- TOTP MFA (RFC 6238) — enrollment flow with QR codes, verification, recovery codes
+- MFA policy per workspace: `optional`, `required`, `required_for_admins`
+- REST API v1 — 30+ endpoints covering all entities, OpenAPI 3.1 spec, Swagger UI
 
-**Admin REST API:**
-- Full CRUD for all entities via REST
-- API keys scoped per tenant
-- Webhook events (user.created, user.updated, login.success, login.failed, etc.)
-- OpenAPI spec with interactive docs
-
-**SDKs / Integration guides:**
-- Next.js integration guide (with code)
-- Spring Boot integration guide
-- A JavaScript/TypeScript SDK wrapper
-- Docker Compose example for local dev
-
-**Observability:**
-- Structured JSON logs (already have logback — needs structured format)
-- Metrics endpoint (Prometheus format) — login rates, error rates, token issuance
-- Health check endpoint: `/health` (DB connectivity, config validity)
-- Audit log API (queryable by admin)
+**Branding and portal (3d):**
+- Per-tenant theming — logo, primary colors, workspace name on all auth pages
+- Self-service portal via OAuth Authorization Code + PKCE using the built-in `kotauth-portal` client provisioned per tenant on startup
+- Dedicated Security Settings page — password policy and MFA policy configuration separated from general workspace settings
 
 ---
 
-## What to Build Next (Immediate Priority Order)
+### Phase 4 — Webhooks ✅ Shipped
+*Goal: Real-time event delivery so downstream systems stay in sync without polling*
 
-Phases 0–3 are complete. The platform is feature-complete for the core auth use case. Remaining gaps before Phase 4:
-
-1. **Password expiry enforcement at login** — `max_age_days` is stored and configurable; adding the login-time check is a small, high-value safety closure.
-2. **`required_admins` MFA policy** — the policy value is already saved; wiring the runtime check (does this user hold the `admin` role?) completes the feature.
-3. **Admin HTML pages for roles/groups** — JSON API routes exist (Phase 3c); building the HTML admin pages makes these features accessible without API calls.
-4. **Resource access JWT keys** — `resource_access` keys should use `client_id` strings, not integer PKs, to match Keycloak compatibility expectations.
-5. **Phase 4: Identity Federation** — social login (Google, GitHub, generic OIDC) and SAML 2.0. No groundwork laid yet.
-
----
-
-## UI/UX Principles (Non-Negotiable)
-
-Keycloak's admin console is the cautionary tale. These principles guard against repeating it:
-
-- **Progressive disclosure** — the happy path (create tenant → create client → get token) should take 5 minutes without reading docs. Advanced settings are always one level deeper.
-- **Inline guidance** — every field that isn't obvious gets a tooltip or inline explanation. No assumption of OIDC expertise from the person setting up their first tenant.
-- **Consistent design system** — the public-facing auth pages (login, register, MFA, password reset) and the admin console share the same design tokens. Theming one themes both.
-- **Per-tenant theming** — logo, colors, and copy are configurable per tenant. The login page for Tenant A looks like Company A's brand. This is a hard requirement for multi-tenant deployments.
-- **Mobile-first auth flows** — login/register/MFA must work on mobile browsers without compromise. The admin console can be desktop-first.
-- **Meaningful error messages** — "An error occurred" is not an error message. Every failure state has a specific, actionable message.
+- Webhook endpoint management — register URLs, select event subscriptions
+- HMAC-SHA256 request signing — `X-KotAuth-Signature: sha256=...` on every delivery
+- Asynchronous delivery — webhook fan-out does not block the auth flow
+- Exponential backoff retry — three attempts: immediate, 5 minutes, 30 minutes
+- Delivery history — per-endpoint attempt log with status, response code, and error detail
+- Eight event types: `user.created`, `user.updated`, `user.deleted`, `login.success`, `login.failed`, `password.reset`, `mfa.enrolled`, `session.revoked`
 
 ---
 
-## Technical Architecture Decisions
+### Phase 5 — Documentation and Release ✅ Shipped
+*Goal: The external-facing surface that makes adoption possible*
 
-### ADR-001: Tenant URL structure
-**Decision:** `/t/{tenant-slug}/...` prefix for all tenant-scoped endpoints
-**Rationale:** Short, clean URL that avoids collision with admin routes; slug is human-readable in logs; `/t/` is more concise than `/tenants/` for URLs that appear in every token request
-
-### ADR-002: Token signing algorithm
-**Decision:** RS256 (RSA + SHA-256) as default, configurable to ES256 (ECDSA)
-**Rationale:** RS256 allows token verification without a network call to KotAuth (clients use public key from JWKS); HS256 (current) requires sharing the secret with every verifying service — does not scale
-
-### ADR-003: Refresh token storage
-**Decision:** Store refresh token hash in DB (sessions table), rotate on every use
-**Rationale:** Stateless refresh tokens cannot be revoked; refresh token rotation with server-side storage is the OIDC best practice (RFC 6749 + Security BCP RFC 9700)
-
-### ADR-004: Admin vs end-user separation
-**Decision:** Admin console at `/admin/...` behind `master` tenant authentication; end-user flows at `/t/{slug}/...`
-**Rationale:** Cleanly separates platform operators from tenant users; enables future multi-instance deployments; admin compromise does not expose individual tenant auth flows
-
-### ADR-005: Database migrations
-**Decision:** Introduce Flyway for schema migrations before Phase 1
-**Rationale:** `SchemaUtils.createMissingTablesAndColumns` is development-only tooling; adding `tenant_id` foreign keys and all Phase 1 tables requires proper versioned, reversible migrations
+- README with Docker quickstart — running in under five minutes from a fresh clone
+- Environment variable reference — every variable, type, default, and production guidance
+- React SPA + TanStack Router integration guide — end-to-end OIDC with `oidc-client-ts`, auth guards, silent token refresh
+- CONTRIBUTING guide — local setup, architecture constraints, migration conventions, PR process
+- Security fix: `cookie.secure` now derived from `KAUTH_BASE_URL` at startup — cookies carry the `Secure` flag automatically in HTTPS deployments
 
 ---
 
-## What KotAuth Is NOT
+## Post-V1 Roadmap
 
-Being explicit about scope boundaries prevents feature creep and keeps the product focused:
+The following phases are planned but not yet scheduled. Priority order reflects market demand and dependency on existing foundations.
 
-- **Not a secrets manager** (use Vault, AWS Secrets Manager)
-- **Not a full SIEM** (audit logs yes; threat detection no)
-- **Not a CDN or WAF** (put Cloudflare in front)
-- **Not a directory replacement** (LDAP sync yes; native LDAP protocol no)
-- **Not multi-region HA out of the box** (stateless tokens help; session replication is Phase 6+)
+---
+
+### Phase 6 — Enterprise Federation
+*Goal: Connect Kotauth to corporate identity sources*
+
+The enterprise market requires LDAP and SAML. Without these, Kotauth cannot be adopted in organizations with existing Active Directory infrastructure or legacy SSO contracts.
+
+- **LDAP / Active Directory sync** — read users and groups from a corporate directory, configurable sync interval, attribute mapping
+- **SAML 2.0** — SP-initiated and IdP-initiated flows, assertion parsing, attribute mapping to Kotauth user model
+- **External OIDC broker** — Kotauth acting as a relay to an upstream OIDC provider (Azure AD, Okta, etc.)
+- **Cross-tenant federation** — allow users from one workspace to authenticate in another via configured trust
+
+---
+
+### Phase 7 — Advanced Authentication Methods
+*Goal: Modern, phishing-resistant authentication*
+
+- **WebAuthn / Passkeys** — the `MfaMethod` enum in the domain model is already extensible for this; implementation requires CBOR parsing and authenticator data verification
+- **Magic links** — passwordless email login, short-lived signed tokens
+- **SMS OTP** — noted as controversial due to SIM swap risk; implementation requires a pluggable SMS provider interface to avoid vendor lock-in
+
+---
+
+### Phase 8 — Observability and Operations
+*Goal: Production-grade insight into a running Kotauth deployment*
+
+- **Prometheus metrics** — login rates, error rates by type, token issuance volume, active session count, webhook delivery success rate
+- **Structured JSON log output** — the logstash encoder is already in the dependency tree; format finalization and field normalization
+- **Webhook retry background sweep** — the `findPending()` port exists; a scheduled background job to recover deliveries missed during downtime
+- **Key rotation** — admin-initiated rotation of per-tenant RS256 key pairs with a configurable overlap window for in-flight tokens
+- **Helm chart** — Kubernetes deployment manifest with configurable replicas, readiness/liveness probes, and secret management integration
+- **Zero-downtime rolling updates** — session and key state compatibility guarantees between adjacent versions
+
+---
+
+### Phase 9 — Platform Expansion
+*Goal: Kotauth as a programmable identity layer, not just an auth server*
+
+- **Admin REST API expansion** — bulk user operations, user impersonation with strict audit trail, cross-tenant admin endpoints
+- **SDK layer** — typed TypeScript/JavaScript client library wrapping the REST API and OIDC flows
+- **Email template customization** — per-tenant HTML email templates with variable substitution
+- **Audit log export** — scheduled export to S3-compatible object storage or a SIEM webhook
+- **SCIM 2.0** — automated user provisioning and deprovisioning from external HR systems
+
+---
+
+## What Kotauth Is Not
+
+Explicit scope boundaries prevent feature creep and keep the platform coherent:
+
+- **Not a secrets manager** — use Vault, AWS Secrets Manager, or Doppler for application secrets
+- **Not a SIEM** — audit logs are queryable and exportable; threat detection and correlation are out of scope
+- **Not a CDN or WAF** — Kotauth expects a reverse proxy (nginx, Caddy, Traefik) in front of it
+- **Not a directory server** — LDAP sync (read) is planned; serving the LDAP protocol is not
+- **Not multi-region HA out of the box** — stateless JWT verification helps; active-active session replication is a Phase 8+ concern
+
+---
+
+## UI/UX Principles
+
+Keycloak's admin console is the cautionary tale. These principles are non-negotiable:
+
+**Progressive disclosure** — the happy path (create workspace → create application → get a working OIDC integration) takes five minutes without reading documentation. Advanced settings are always one level deeper.
+
+**Inline guidance** — every non-obvious field gets an inline explanation or tooltip. No assumption of OIDC expertise from the operator setting up their first workspace.
+
+**Consistent design system** — auth pages (login, register, MFA, password reset) and the admin console share the same design tokens. Theming one themes both.
+
+**Per-tenant branding** — logo, colors, and workspace name are configurable per tenant. The login page for a given workspace reflects that workspace's brand.
+
+**Mobile-first auth flows** — login, register, and MFA must work on mobile browsers without compromise. The admin console is desktop-first.
+
+**Meaningful errors** — "An error occurred" is not an error message. Every failure state has a specific, actionable message that tells the user what happened and what to do about it.
+
+---
+
+## Architecture Decisions
+
+Key architectural choices made during development, documented for future contributors.
+
+| ADR | Decision | Rationale |
+|---|---|---|
+| ADR-01 | Hexagonal (Ports & Adapters) — zero framework imports in domain | Domain logic is independently testable; adapters are swappable |
+| ADR-02 | Flyway for schema migrations | Versioned, irreversible migrations safe for CI/CD and production upgrades |
+| ADR-03 | Separate write-only (`AuditLogPort`) vs. read-only (`AuditLogRepository`) audit log paths | Auth path never blocks on query execution; read and write are independently scalable |
+| ADR-04 | All mutations routed through domain services, not directly through repositories | Validation and audit logging are centralized; no mutation path bypasses business rules |
+| ADR-05 | Client secret stored as bcrypt hash only — raw value shown once at creation | A database breach does not leak application secrets; lost secrets require regeneration |
+| ADR-06 | Domain services return `AdminResult<T>` sealed types, not exceptions | Error handling is explicit and exhaustive; no surprise runtime exceptions in route handlers |
+| ADR-07 | Portal login uses OAuth Authorization Code + PKCE via built-in `kotauth-portal` client | The portal and third-party apps authenticate identically; no separate session mechanism |
+| ADR-08 | Master tenant for platform admins | Platform operator role is cleanly separated from end-user tenants |
+| ADR-09 | Per-tenant RS256 key pairs, auto-provisioned | No single point of key failure; tokens are verifiable offline using JWKS; tenant isolation at the cryptographic level |
+| ADR-10 | Refresh token rotation on every use | A stolen refresh token has a limited replay window; reuse of a superseded token revokes the entire session chain |
+| ADR-11 | Audit events recorded eagerly in the request path | No auth flow succeeds without a corresponding audit record; background delivery risks silent loss |
+| ADR-12 | PKCE required for all public clients | Defense against authorization code interception and client ID enumeration |
+| ADR-13 | User lookup by `(tenant_id, username)` — no global username namespace | The same email exists independently in different workspaces; no cross-tenant information leakage |
+| ADR-14 | MFA pending state via HMAC-signed cookie, not server-side session | Stateless; no session table bloat; HMAC signature prevents userId forgery |
+| ADR-15 | OAuth `state` parameter carries HMAC-signed CSRF nonce + OAuth params as Base64 | No extra cookie or session required; the state parameter is self-contained and tamper-evident |
+| ADR-16 | Social login auto-links by email address | Reduces friction for users who have both a local and social account with the same email |
+| ADR-17 | Social OAuth adapters use `java.net.http` only — no new Gradle dependencies | Lean fat JAR; minimal attack surface; no transitive dependency risk |
+| ADR-18 | Social-registered users get a random unusable password hash | The account exists; password authentication is disabled until the user explicitly sets one |
+| ADR-19 | API keys use SHA-256, not bcrypt | 256-bit key entropy makes brute force infeasible; SHA-256 eliminates bcrypt latency on every API call |
+| ADR-20 | API key prefix stored for display — first 16 characters of the raw key | Human-friendly identification in the admin UI without exposing the full credential |
+| ADR-21 | Swagger UI loaded from CDN, not bundled | Saves ~7 MB from the fat JAR; no new Gradle dependencies required |

@@ -65,7 +65,8 @@ fun Route.adminRoutes(
     mfaRepository                : MfaRepository? = null,
     portalClientProvisioning     : PortalClientProvisioning? = null,
     identityProviderRepository   : IdentityProviderRepository? = null,  // Phase 2 — Social Login
-    apiKeyService                : com.kauth.domain.service.ApiKeyService? = null  // Phase 3a — REST API keys
+    apiKeyService                : com.kauth.domain.service.ApiKeyService? = null,  // Phase 3a — REST API keys
+    webhookService               : com.kauth.domain.service.WebhookService? = null  // Phase 4 — Webhooks
 ) {
     route("/admin") {
 
@@ -1098,6 +1099,69 @@ fun Route.adminRoutes(
                     val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                     apiKeyService?.delete(keyId, workspace.id)
                     call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+                }
+
+                // -------------------------------------------------------
+                // Webhooks (Phase 4) — event-driven HTTP callbacks
+                // -------------------------------------------------------
+
+                get("/settings/webhooks") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val endpoints = webhookService?.listEndpoints(workspace.id) ?: emptyList()
+                    val deliveries = webhookService?.recentDeliveries(workspace.id) ?: emptyList()
+                    call.respondHtml(HttpStatusCode.OK,
+                        AdminView.webhooksPage(workspace, endpoints, deliveries, wsPairs, session.username))
+                }
+
+                post("/settings/webhooks") {
+                    val session   = call.sessions.get<AdminSession>()!!
+                    val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val wsPairs   = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val svc       = webhookService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
+
+                    val params      = call.receiveParameters()
+                    val url         = params["url"]?.trim() ?: ""
+                    val description = params["description"]?.trim() ?: ""
+                    val events      = params.getAll("events")?.toSet() ?: emptySet()
+
+                    when (val result = svc.createEndpoint(workspace.id, url, events, description)) {
+                        is com.kauth.domain.service.WebhookResult.Success -> {
+                            val endpoints  = svc.listEndpoints(workspace.id)
+                            val deliveries = svc.recentDeliveries(workspace.id)
+                            call.respondHtml(HttpStatusCode.OK,
+                                AdminView.webhooksPage(workspace, endpoints, deliveries, wsPairs, session.username,
+                                    newSecret = result.plaintextSecret))
+                        }
+                        is com.kauth.domain.service.WebhookResult.Failure -> {
+                            val endpoints  = svc.listEndpoints(workspace.id)
+                            val deliveries = svc.recentDeliveries(workspace.id)
+                            call.respondHtml(HttpStatusCode.UnprocessableEntity,
+                                AdminView.webhooksPage(workspace, endpoints, deliveries, wsPairs, session.username,
+                                    error = result.error))
+                        }
+                    }
+                }
+
+                post("/settings/webhooks/{endpointId}/toggle") {
+                    val slug       = call.parameters["slug"]       ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val endpointId = call.parameters["endpointId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace  = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val params     = call.receiveParameters()
+                    val enabled    = params["enabled"] == "true"
+                    webhookService?.toggleEndpoint(endpointId, workspace.id, enabled)
+                    call.respondRedirect("/admin/workspaces/$slug/settings/webhooks")
+                }
+
+                post("/settings/webhooks/{endpointId}/delete") {
+                    val slug       = call.parameters["slug"]       ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val endpointId = call.parameters["endpointId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace  = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    webhookService?.deleteEndpoint(endpointId, workspace.id)
+                    call.respondRedirect("/admin/workspaces/$slug/settings/webhooks")
                 }
             }
         }

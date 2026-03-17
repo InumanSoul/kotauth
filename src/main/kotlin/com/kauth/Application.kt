@@ -18,6 +18,8 @@ import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
+import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
+import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
 import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
@@ -37,6 +39,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.EncryptionService
@@ -188,7 +191,6 @@ fun main() {
     val tenantKeyRepository   = PostgresTenantKeyRepository()
     val sessionRepository     = PostgresSessionRepository()
     val authCodeRepository    = PostgresAuthorizationCodeRepository()
-    val auditLogAdapter       = PostgresAuditLogAdapter()
     val auditLogRepository    = PostgresAuditLogRepository()
     val passwordHasher        = BcryptPasswordHasher()
     // Phase 3b: email verification + password reset token repositories
@@ -203,6 +205,9 @@ fun main() {
     val socialAccountRepository    = PostgresSocialAccountRepository()
     // Phase 3a: API keys
     val apiKeyRepository           = PostgresApiKeyRepository()
+    // Phase 4: Webhooks — instantiated before auditLogAdapter so the adapter can fan out events
+    val webhookEndpointRepository  = PostgresWebhookEndpointRepository()
+    val webhookDeliveryRepository  = PostgresWebhookDeliveryRepository()
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -229,6 +234,16 @@ fun main() {
         baseUrl           = baseUrl,
         tenantKeyRepository = tenantKeyRepository
     )
+
+    // -------------------------------------------------------------------------
+    // Phase 4: Webhook service + audit adapter (order matters — webhook service
+    // must exist before the audit adapter so the adapter can fan out events)
+    // -------------------------------------------------------------------------
+    val webhookService  = WebhookService(
+        endpointRepository = webhookEndpointRepository,
+        deliveryRepository = webhookDeliveryRepository
+    )
+    val auditLogAdapter = PostgresAuditLogAdapter(webhookService = webhookService)
 
     // -------------------------------------------------------------------------
     // Domain services
@@ -362,7 +377,8 @@ fun main() {
             socialLoginService         = socialLoginService,
             identityProviderRepository = identityProviderRepository,
             apiKeyService              = apiKeyService,
-            apiKeyRepository           = apiKeyRepository
+            apiKeyRepository           = apiKeyRepository,
+            webhookService             = webhookService
         )
     }.start(wait = true)
 }
@@ -391,7 +407,8 @@ fun Application.module(
     socialLoginService         : SocialLoginService? = null,                            // Phase 2
     identityProviderRepository : com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
     apiKeyService              : ApiKeyService? = null,                                 // Phase 3a
-    apiKeyRepository           : com.kauth.domain.port.ApiKeyRepository? = null         // Phase 3a
+    apiKeyRepository           : com.kauth.domain.port.ApiKeyRepository? = null,        // Phase 3a
+    webhookService             : WebhookService? = null                                 // Phase 4
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -450,14 +467,19 @@ fun Application.module(
     }
 
     install(Sessions) {
+        // Secure flag is derived from the configured base URL — if the server is
+        // behind HTTPS (the only valid production configuration) cookies are marked
+        // Secure so browsers never transmit them over plain HTTP.
+        val secureCookies = baseUrl.startsWith("https://")
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
+            cookie.secure   = secureCookies
             cookie.maxAgeInSeconds = 3600 * 8  // 8-hour admin session
-            // TODO (Phase 5): cookie.secure = true once TLS is enforced
         }
         // Phase 3b: self-service portal session — HMAC-signed with derived key
         cookie<PortalSession>("KOTAUTH_PORTAL") {
             cookie.httpOnly = true
+            cookie.secure   = secureCookies
             cookie.maxAgeInSeconds = 3600 * 4  // 4-hour portal session
             transform(SessionTransportTransformerMessageAuthentication(portalSessionKey))
         }
@@ -564,7 +586,8 @@ fun Application.module(
             mfaRepository              = mfaRepository,
             portalClientProvisioning   = portalClientProvisioning,
             identityProviderRepository = identityProviderRepository,
-            apiKeyService              = apiKeyService
+            apiKeyService              = apiKeyService,
+            webhookService             = webhookService
         )
     }
 }

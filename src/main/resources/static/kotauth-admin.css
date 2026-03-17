@@ -137,10 +137,16 @@ label {
     letter-spacing: 0.05em;
     border: 1px solid;
 }
-.badge-green   { background: #052e16; color: #86efac; border-color: #166534; }
-.badge-red     { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
-.badge-blue    { background: rgba(31,188,255,.12); color: var(--accent); border-color: rgba(31,188,255,.3); }
-.badge-outline { background: transparent; color: var(--muted); border-color: var(--border); }
+.badge-green    { background: #052e16; color: #86efac; border-color: #166534; }
+.badge-red      { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+.badge-blue     { background: rgba(31,188,255,.12); color: var(--accent); border-color: rgba(31,188,255,.3); }
+.badge-outline  { background: transparent; color: var(--muted); border-color: var(--border); }
+/* Semantic aliases used across Phase 3–4 UI pages */
+.badge-active   { background: #052e16; color: #86efac; border-color: #166534; }
+.badge-disabled { background: transparent; color: var(--muted); border-color: var(--border); }
+.badge-neutral  { background: transparent; color: var(--muted); border-color: var(--border); }
+.badge-error    { background: #450a0a; color: #fca5a5; border-color: #7f1d1d; }
+.badge-pending  { background: rgba(31,188,255,.12); color: var(--accent); border-color: rgba(31,188,255,.3); }
 
 /* =========================================================================
    Shell
