@@ -54,6 +54,6 @@ class FakeSessionRepository : SessionRepository {
         val active = store.values
             .filter { it.tenantId == tenantId && it.userId == userId && it.isActive }
             .sortedBy { it.createdAt }
-        active.dropLast(keepNewest).forEach { revoke(it.id!!) }
+        active.dropLast(keepNewest).forEach { revoke(it.id!!, Instant.now()) }
     }
 }
