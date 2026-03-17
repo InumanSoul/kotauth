@@ -47,6 +47,10 @@ object AdminView {
         title { +"KotAuth — $pageTitle" }
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
+        // Favicon
+        link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
+        link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
+        link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
         style { unsafe { +theme.toCssVars() } }
         link(rel = "stylesheet", href = "/static/kotauth-admin.css")
         style {
@@ -136,9 +140,8 @@ object AdminView {
 
                     // Right: new workspace + profile avatar
                     div("topbar-right") {
-                        a("/admin/workspaces/new", classes = "btn-new-ws") {
-                            span("btn-new-ws-icon") { +"+" }
-                            span("btn-new-ws-label") { +"New Workspace" }
+                        a("/admin/workspaces/new", classes = "btn btn-primary btn-sm") {
+                            span() { +"New Workspace" }
                         }
                         div("topbar-avatar") {
                             attributes["title"] = "Signed in as $loggedInAs"

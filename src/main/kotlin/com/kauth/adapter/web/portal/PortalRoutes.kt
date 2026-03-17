@@ -195,7 +195,25 @@ fun Route.portalRoutes(
                 tenantSlug = slug,
                 username   = username
             ))
-            call.respondRedirect("/t/$slug/account/profile")
+
+            // If the tenant requires MFA but this user hasn't enrolled yet, redirect
+            // directly to the MFA setup page with a prominent notice instead of landing
+            // on the profile page. The standard login flow normally blocks these users
+            // outright, but for portal logins we bypass that gate (in AuthRoutes) and
+            // handle it here as a softer, guided redirect.
+            val mfaSetupNeeded = mfaService != null &&
+                tenantObj.mfaPolicy != "optional" &&
+                !mfaService.shouldChallengeMfa(userId)
+
+            if (mfaSetupNeeded) {
+                val notice = encodeParam(
+                    "⚠\uFE0F Multi-factor authentication is required for your account. " +
+                    "Please set up an authenticator app below to keep your account secure."
+                )
+                call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
+            } else {
+                call.respondRedirect("/t/$slug/account/profile")
+            }
         }
 
         post("/logout") {
@@ -313,6 +331,8 @@ fun Route.portalRoutes(
             val mfaEnabled = mfaService?.shouldChallengeMfa(session.userId) ?: false
             val successMsg = call.request.queryParameters["success"]
             val errorMsg   = call.request.queryParameters["error"]
+            // notice = shown when the user was redirected here because MFA setup is required
+            val noticeMsg  = call.request.queryParameters["notice"]
 
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -323,7 +343,8 @@ fun Route.portalRoutes(
                     workspaceName = tenant.displayName,
                     mfaEnabled    = mfaEnabled,
                     successMsg    = successMsg,
-                    errorMsg      = errorMsg
+                    errorMsg      = errorMsg,
+                    noticeMsg     = noticeMsg
                 )
             )
         }

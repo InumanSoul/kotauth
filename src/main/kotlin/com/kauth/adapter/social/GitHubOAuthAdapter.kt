@@ -129,8 +129,14 @@ class GitHubOAuthAdapter : SocialProviderPort {
         val id = userObj["id"]?.jsonPrimitive?.content
             ?: throw RuntimeException("GitHub user response missing 'id'")
 
-        val publicEmail = userObj["email"]?.jsonPrimitive?.content?.ifBlank { null }
-        val name        = userObj["name"]?.jsonPrimitive?.content?.ifBlank { null }
+        // GitHub returns `"email": null` (JSON null) for users with a private email.
+        // In kotlinx.serialization, JsonNull.content == "null" (the string), which is
+        // NOT blank — so we must explicitly reject the "null" string to avoid propagating
+        // it as a real email address into the registration form.
+        val publicEmail = userObj["email"]?.jsonPrimitive?.content
+            ?.let { if (it == "null") null else it.ifBlank { null } }
+        val name        = userObj["name"]?.jsonPrimitive?.content
+            ?.let { if (it == "null") null else it.ifBlank { null } }
             ?: userObj["login"]?.jsonPrimitive?.content
         val avatarUrl   = userObj["avatar_url"]?.jsonPrimitive?.content
 

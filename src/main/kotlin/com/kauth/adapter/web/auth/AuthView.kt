@@ -27,9 +27,13 @@ object AuthView {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
 
-        // Favicon — uses tenant's custom favicon if set, otherwise default
-        theme.faviconUrl?.let { url ->
-            link(rel = "icon", href = url)
+        // Favicon — tenant custom URL takes precedence; fallback to bundled static assets
+        if (theme.faviconUrl != null) {
+            link(rel = "icon", href = theme.faviconUrl)
+        } else {
+            link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
         }
 
         // 1. Inject theme variables first — base CSS reads from these
@@ -216,11 +220,12 @@ object AuthView {
      * @param prefill     Field values to preserve after a failed submission.
      */
     fun registerPage(
-        tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
-        error: String? = null,
-        prefill: RegisterPrefill = RegisterPrefill()
+        tenantSlug       : String,
+        theme            : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName    : String = "KotAuth",
+        error            : String? = null,
+        prefill          : RegisterPrefill = RegisterPrefill(),
+        enabledProviders : List<SocialProvider> = emptyList()
     ): HTML.() -> Unit = {
         head { authHead("$workspaceName | Create Account", theme) }
         body {
@@ -300,6 +305,26 @@ object AuthView {
                 div("footer-link") {
                     +"Already have an account? "
                     a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                }
+
+                // Social login buttons — same providers as the login page.
+                // Clicking one initiates the OAuth flow; if the account doesn't exist
+                // yet the callback redirects to complete-registration automatically.
+                if (enabledProviders.isNotEmpty()) {
+                    div("social-divider") {
+                        span { +"or sign up with" }
+                    }
+                    div("social-buttons") {
+                        for (prov in enabledProviders) {
+                            a(
+                                href    = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
+                                classes = "btn btn-social btn-social-${prov.value}"
+                            ) {
+                                span("social-icon") {}
+                                +prov.displayName
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -488,6 +513,91 @@ object AuthView {
                     div("footer-link") {
                         a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
                     }
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Social registration completion page
+    // -------------------------------------------------------------------------
+
+    /**
+     * Shown when a social login arrives but no existing account matches the provider identity
+     * or email. The user confirms (or adjusts) their username before the account is created.
+     *
+     * @param prefillUsername  Derived from the provider email prefix — user can change it.
+     * @param prefillFullName  From the provider profile name — user can change it.
+     * @param email            From the provider — read-only (cannot be changed here).
+     * @param providerName     Display name of the provider (e.g. "Google").
+     */
+    fun socialRegistrationPage(
+        tenantSlug      : String,
+        theme           : TenantTheme = TenantTheme.DEFAULT,
+        workspaceName   : String = "KotAuth",
+        providerName    : String,
+        email           : String,
+        prefillUsername : String = "",
+        prefillFullName : String = "",
+        error           : String? = null
+    ): HTML.() -> Unit = {
+        head { authHead("$workspaceName | Create Account", theme) }
+        body {
+            div("brand") {
+                div("brand-name") { +workspaceName }
+                div("brand-tagline") { +"Modernized Identity & Access Management" }
+            }
+            div("card") {
+                h1("card-title") { +"One last step" }
+                p("card-subtitle") {
+                    +"You're signing in with $providerName. Choose a username to complete your account."
+                }
+
+                if (error != null) {
+                    div("alert alert-error") { +error }
+                }
+
+                form(
+                    action  = "complete-registration",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method  = FormMethod.post
+                ) {
+                    // Email is read-only — it comes from the provider and is shown for context
+                    div("field") {
+                        label { htmlFor = "email_display"; +"Email (from $providerName)" }
+                        input(type = InputType.email, name = "email_display") {
+                            id       = "email_display"
+                            value    = email
+                            disabled = true
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "full_name"; +"Full Name" }
+                        input(type = InputType.text, name = "full_name") {
+                            id          = "full_name"
+                            placeholder = "Your display name"
+                            value       = prefillFullName
+                            attributes["autocomplete"] = "name"
+                        }
+                    }
+                    div("field") {
+                        label { htmlFor = "username"; +"Username" }
+                        input(type = InputType.text, name = "username") {
+                            id          = "username"
+                            placeholder = "letters, numbers, underscores"
+                            value       = prefillUsername
+                            attributes["autocomplete"] = "username"
+                            attributes["autofocus"]    = "true"
+                            attributes["pattern"]      = "[a-zA-Z0-9_]+"
+                            required = true
+                        }
+                    }
+                    button(type = ButtonType.submit, classes = "btn") { +"Create account" }
+                }
+
+                div("footer-link") {
+                    +"Already have an account? "
+                    a(href = "/t/$tenantSlug/login") { +"Sign in" }
                 }
             }
         }

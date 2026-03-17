@@ -1,6 +1,6 @@
 # KotAuth V1 Implementation Plan
 
-**Status:** In Progress
+**Status:** In Progress — Phase 2 complete, Phase 3 next
 **Started:** 2026-03-16
 **Target:** First public release
 
@@ -66,7 +66,7 @@ before `login()`. However `login()` is not standalone-correct — any future cal
 
 ---
 
-## Phase 2 — Social Login (Google + GitHub)
+## Phase 2 — Social Login (Google + GitHub) ✅ Complete
 
 > Highest adoption impact. Two providers first; generic OIDC support follows once these are stable.
 
@@ -130,76 +130,87 @@ a tenant policy option later.
 ## Phase 3 — Admin REST API
 
 > Enables programmatic integration. Required for CI/CD provisioning and external tooling.
+> **Status:** Planned — ready to implement after social provider review.
 
 ### 3a — API Key Infrastructure
 
+**Why first:** All REST routes and webhook delivery depend on this. Nothing in 3b or 4 starts until keys work.
+
 **Database V19** `api_keys`:
-`(id, tenant_id, name VARCHAR, key_prefix VARCHAR(8), key_hash VARCHAR, scopes TEXT[], expires_at TIMESTAMP nullable, last_used_at TIMESTAMP, enabled BOOL, created_at TIMESTAMP)`
+```sql
+id, tenant_id, name VARCHAR, key_prefix VARCHAR(8), key_hash VARCHAR,
+scopes TEXT[], expires_at TIMESTAMPTZ nullable,
+last_used_at TIMESTAMPTZ, enabled BOOL, created_at TIMESTAMPTZ
+```
 
-**Key format:** `kauth_<tenantSlug>_<random-32-bytes-base64url>`
-The plaintext key is returned **once** at creation and never stored. Only the SHA-256 hash is
-persisted. The `key_prefix` (first 8 chars) is stored for display purposes without compromising
-the full key.
+**Key format:** `kauth_<tenantSlug>_<32-random-bytes-base64url>` — recognizable, tenant-identifiable from the prefix alone.
 
-**Domain:** `ApiKey` model, `ApiKeyRepository` port, `ApiKeyService` (generate, revoke, validate).
+The plaintext key is returned **once** at creation and never stored. Only the SHA-256 hash is persisted. The `key_prefix` (first 8 chars after the slug segment) is stored for display without compromising the full key. Same pattern as client secrets.
 
-**Ktor Auth:** A new `apiKeyAuth` auth scheme that looks up and validates the key hash, resolves
-the tenant scope, and populates the Ktor `Principal` for downstream route handlers.
+**Domain:** `ApiKey` model, `ApiKeyRepository` port, `ApiKeyService` (generate, validate, revoke).
 
-**Admin UI:** New **API Keys** tab in workspace settings. Lists active keys (prefix + name, no
-full key), create with name + optional expiry + scope selection, revoke.
+Scopes are strings (`users:read`, `users:write`, `roles:read`, etc.). Validated at the route level only — domain layer does not enumerate scopes, keeping it framework-agnostic.
+
+**Ktor auth:** New `apiKey` authentication provider — reads `Authorization: Bearer kauth_...`, SHA-256 hashes it, looks it up in DB, checks enabled + expiry + tenant scope, populates a `TenantPrincipal` for downstream handlers. Slots into Ktor's existing `install(Authentication)` block.
+
+**Admin UI:** New **API Keys** tab in workspace settings. Lists active keys by name + prefix (never full key). Create form: name + optional expiry + scope checkboxes. Revoke button per key.
 
 ---
 
 ### 3b — REST Routes (`/api/v1/`)
 
-All routes return JSON. All require API key auth. All are scoped to the tenant embedded in the key.
+All routes return JSON. All require API key auth. All are scoped to the tenant embedded in the key. All mutations delegate to existing domain services — zero business logic in routes.
 
 **Users**
-- `GET    /api/v1/users` — paginated list (cursor-based), filterable by email/username
-- `POST   /api/v1/users` — create user
-- `GET    /api/v1/users/{id}` — get user with role/group membership
-- `PUT    /api/v1/users/{id}` — update user fields
-- `DELETE /api/v1/users/{id}` — delete user
-- `POST   /api/v1/users/{id}/roles` — assign role
-- `DELETE /api/v1/users/{id}/roles/{roleId}` — unassign role
+```
+GET    /api/v1/users                         paginated (cursor), ?q= search
+POST   /api/v1/users                         create user
+GET    /api/v1/users/{id}                    user + role + group membership
+PUT    /api/v1/users/{id}                    update profile fields
+DELETE /api/v1/users/{id}                    delete user
+POST   /api/v1/users/{id}/roles/{roleId}     assign role
+DELETE /api/v1/users/{id}/roles/{roleId}     unassign role
+```
 
 **Roles**
-- `GET    /api/v1/roles` — list roles
-- `POST   /api/v1/roles` — create role
-- `GET    /api/v1/roles/{id}` — get role with members
-- `PUT    /api/v1/roles/{id}` — update role
-- `DELETE /api/v1/roles/{id}` — delete role
+```
+GET    /api/v1/roles                         list roles
+POST   /api/v1/roles                         create role
+PUT    /api/v1/roles/{id}                    update role
+DELETE /api/v1/roles/{id}                    delete role
+```
 
 **Groups**
-- `GET    /api/v1/groups` — list groups
-- `POST   /api/v1/groups` — create group
-- `GET    /api/v1/groups/{id}` — get group with members and roles
-- `PUT    /api/v1/groups/{id}` — update group
-- `DELETE /api/v1/groups/{id}` — delete group
+```
+GET    /api/v1/groups                        list groups
+POST   /api/v1/groups                        create group
+PUT    /api/v1/groups/{id}                   update group
+DELETE /api/v1/groups/{id}                   delete group
+POST   /api/v1/groups/{id}/members/{userId}  add member
+DELETE /api/v1/groups/{id}/members/{userId}  remove member
+```
 
 **Applications**
-- `GET    /api/v1/applications` — list applications
-- `POST   /api/v1/applications` — create application
-- `GET    /api/v1/applications/{id}` — get application
-- `PUT    /api/v1/applications/{id}` — update application
-- `DELETE /api/v1/applications/{id}` — delete application
-
-**Sessions**
-- `GET    /api/v1/sessions` — list active sessions (paginated)
-- `DELETE /api/v1/sessions/{id}` — revoke session
-
-**Audit Logs**
-- `GET    /api/v1/audit-logs` — paginated audit log (read-only)
-
-**Response format:** Consistent JSON envelope:
-```json
-{
-  "data": { ... },
-  "meta": { "cursor": "...", "hasMore": true, "total": 42 }
-}
 ```
-Errors follow RFC 7807 Problem Details:
+GET    /api/v1/applications                  list applications
+POST   /api/v1/applications                  create application
+PUT    /api/v1/applications/{id}             update application
+DELETE /api/v1/applications/{id}             delete application
+```
+
+**Sessions & Audit**
+```
+GET    /api/v1/sessions                      active sessions (paginated)
+DELETE /api/v1/sessions/{id}                 revoke session
+GET    /api/v1/audit-logs                    paginated audit log (read-only)
+```
+
+**Response envelope** (consistent across all routes):
+```json
+{ "data": { ... }, "meta": { "cursor": "...", "hasMore": true } }
+```
+
+**Errors** follow RFC 7807 Problem Details:
 ```json
 {
   "type": "https://kotauth.dev/errors/not-found",
@@ -209,20 +220,24 @@ Errors follow RFC 7807 Problem Details:
 }
 ```
 
-**Pagination:** Cursor-based using `(created_at, id)` composite to avoid offset drift.
+**Pagination:** Cursor-based on `(created_at, id)` composite. Avoids offset drift on live data — critical for audit logs and sessions.
 
-**Important:** All routes delegate to existing domain services. No business logic duplication.
+**Scope gates at route level, not service level.** `AdminService` is reused directly for mutations. Scope validation (`users:write` required for POST/PUT/DELETE on `/users`) is enforced in a route-level middleware interceptor, not duplicated into the domain.
+
+**Intentionally excluded from V1:**
+- Bulk user operations (complexity high, demand low — post-V1)
+- Per-user session listing via nested route (covered by `GET /api/v1/sessions?userId=`)
+- Group attribute management via REST (admin UI handles it; post-V1 for API)
 
 ---
 
 ### 3c — OpenAPI Spec + Swagger UI
 
-- Spec written in YAML at `src/main/resources/openapi/v1.yaml`
-- Swagger UI served at `/api/docs` via Ktor's `ktor-server-swagger` plugin
-- Covers all Phase 3b endpoints, authentication (API key Bearer), request/response schemas,
-  pagination, error codes
+Written **after** 3b routes stabilize — not before. Writing spec first causes drift when implementation details change.
 
-Written **after** Phase 3b routes are stable to avoid spec drift.
+- Spec: `src/main/resources/openapi/v1.yaml`
+- Swagger UI served at `/api/docs` via Ktor's `ktor-server-swagger` plugin (no new dependency)
+- Covers all 3b endpoints, API key Bearer auth, request/response schemas, pagination, RFC 7807 errors
 
 ---
 
@@ -272,16 +287,14 @@ Written **after** Phase 3b routes are stable to avoid spec drift.
 ## Execution Order
 
 ```
-Phase 1  (1.1 + 1.2 + 1.3)  → Correctness fixes — no new features, unblocks everything
-Phase 2                       → Social login — highest adoption impact, self-contained
-Phase 3a                      → API key infrastructure — prerequisite for REST + webhooks
-Phase 3b                      → REST routes — full CRUD via API
-Phase 3c                      → OpenAPI spec — written after routes are stable
-Phase 4                       → Webhooks — builds on Phase 3 patterns
-Phase 5                       → Documentation — written against final feature surface
+Phase 1  (1.1 + 1.2 + 1.3)  ✅ → Correctness fixes
+Phase 2                       ✅ → Social login (Google + GitHub)
+Phase 3a                         → API key infrastructure — prerequisite for REST + webhooks
+Phase 3b                         → REST routes — full CRUD via API
+Phase 3c                         → OpenAPI spec — written after routes are stable
+Phase 4                          → Webhooks — builds on Phase 3 patterns
+Phase 5                          → Documentation — written against final feature surface
 ```
-
-Phases 3 and 2 are independent and could be parallelized with multiple contributors.
 
 ---
 

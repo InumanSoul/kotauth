@@ -341,7 +341,8 @@ object PortalView {
         workspaceName : String,
         mfaEnabled    : Boolean,
         successMsg    : String? = null,
-        errorMsg      : String? = null
+        errorMsg      : String? = null,
+        noticeMsg     : String? = null   // prominent banner used when MFA setup is required
     ): HTML.() -> Unit = {
         head {
             portalPageHead("Two-Factor Auth — $workspaceName", theme)
@@ -523,6 +524,14 @@ object PortalView {
             portalShell(slug, workspaceName, session.username, "mfa") {
 
                 h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
+
+                // Prominent notice — shown when the user is redirected here because MFA
+                // enrollment is required by the tenant policy but not yet configured.
+                if (!noticeMsg.isNullOrBlank())
+                    div(classes = "alert alert-warning") {
+                        style = "font-size:14px; padding:12px 16px;"
+                        +noticeMsg
+                    }
 
                 if (successMsg != null)
                     div(classes = "alert alert-success") { +"Authenticator set up successfully. Your account is now protected with two-factor authentication." }
@@ -803,6 +812,14 @@ object PortalView {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
+        // Favicon
+        if (theme.faviconUrl != null) {
+            link(rel = "icon", href = theme.faviconUrl)
+        } else {
+            link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
+        }
         // Theme vars first — stylesheet reads from these
         style { unsafe { +theme.toCssVars() } }
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
@@ -820,6 +837,14 @@ object PortalView {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
+        // Favicon
+        if (theme.faviconUrl != null) {
+            link(rel = "icon", href = theme.faviconUrl)
+        } else {
+            link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
+            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
+        }
         // Theme vars first — both auth.css and portal inline CSS read from these
         style { unsafe { +theme.toCssVars() } }
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")

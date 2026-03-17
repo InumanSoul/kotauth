@@ -483,15 +483,112 @@ The initial implementation of `PortalClientProvisioning.provisionRedirectUris()`
 
 ---
 
-### Phase 4 — Identity Federation ❌ Not started
+### Phase 4 — Identity Federation (Social Login) ✅ Complete
 
-Social login (Google, GitHub, generic OIDC) and SAML 2.0. No groundwork laid yet. Will require a new `identity_providers` table and significant OAuth client flow work.
+Google and GitHub OAuth2 social login is fully implemented and wired. The foundation is in place for adding a third generic OIDC provider without new patterns.
+
+#### Database Schema (Flyway V17–V18)
+
+| Migration | What it adds |
+|---|---|
+| `V17__identity_providers.sql` | Per-tenant OAuth2 provider config: `(id, tenant_id, provider VARCHAR(32), client_id, client_secret_encrypted, enabled, created_at, updated_at)`. Unique on `(tenant_id, provider)`. `client_secret` AES-256-GCM encrypted at rest via `EncryptionService`. |
+| `V18__social_accounts.sql` | Bridge table linking provider identity to local user: `(id, user_id FK, tenant_id FK, provider, provider_user_id, provider_email, provider_name, avatar_url, linked_at)`. Two UNIQUE constraints: `(provider, provider_user_id)` prevents double-linking a provider account; `(tenant_id, user_id, provider)` prevents one user having multiple links per provider. Indexes on `user_id` and `(tenant_id, provider, provider_user_id)`. |
+
+#### Domain Layer
+
+| Component | File | What it does |
+|---|---|---|
+| `SocialProvider` | `domain/model/IdentityProvider.kt` | Enum with `GOOGLE("google", "Google")` and `GITHUB("github", "GitHub")`; `fromValue()` and `fromValueOrNull()` companion methods |
+| `IdentityProvider` | `domain/model/IdentityProvider.kt` | Domain model with `clientSecret` as plaintext at runtime (decrypted on load from DB) |
+| `SocialAccount` | `domain/model/SocialAccount.kt` | Links `userId`, `tenantId`, `provider`, `providerUserId`, `providerEmail`, `providerName`, `avatarUrl`, `linkedAt` |
+| `SocialProviderPort` | `domain/port/SocialProviderPort.kt` | Interface: `provider: SocialProvider`, `exchangeCodeForProfile(code, redirectUri, clientId, clientSecret): SocialUserProfile`, `buildAuthorizationUrl(clientId, redirectUri, state, scopes): String`. Data classes: `SocialTokenResponse`, `SocialUserProfile(providerUserId, email, name, emailVerified, avatarUrl)` |
+| `IdentityProviderRepository` | `domain/port/IdentityProviderRepository.kt` | Port: `findEnabledByTenant`, `findAllByTenant`, `findByTenantAndProvider`, `save`, `update`, `delete` |
+| `SocialAccountRepository` | `domain/port/SocialAccountRepository.kt` | Port: `findByProviderIdentity`, `findByUserId`, `save`, `delete` |
+| `SocialLoginService` | `domain/service/SocialLoginService.kt` | Orchestrates the full OAuth callback flow. Three-step account resolution: (1) existing social_account link → reuse user; (2) email match in same tenant → auto-link; (3) new user → create with random unusable password hash. Issues tokens and records audit events. Returns `SocialLoginResult<T>` sealed type (`SocialLoginSuccess`, `SocialLoginError`). |
+
+#### Provider Adapters
+
+| Adapter | File | Notes |
+|---|---|---|
+| `GoogleOAuthAdapter` | `adapter/social/GoogleOAuthAdapter.kt` | Authorization: `accounts.google.com/o/oauth2/v2/auth`. Token: `oauth2.googleapis.com/token`. Profile: `openidconnect.googleapis.com/v1/userinfo`. Scopes: `openid email profile`. Adds `access_type=online&prompt=select_account`. |
+| `GitHubOAuthAdapter` | `adapter/social/GitHubOAuthAdapter.kt` | Authorization: `github.com/login/oauth/authorize`. Token: `github.com/login/oauth/access_token`. Profile: `api.github.com/user`. Scopes: `read:user user:email`. Falls back to `api.github.com/user/emails` for users with private email. Accept header: `application/vnd.github+json`. |
+
+Both adapters use `java.net.http.HttpClient` (JDK 11+, no new Gradle dependency) and `kotlinx.serialization.json` (already on classpath via Ktor) for JSON parsing. Internal helpers `toQueryString()`, `toFormBody()`, `urlEncode()` are package-private within `adapter/social/`.
+
+#### Persistence Adapters
+
+| Adapter | File | Notes |
+|---|---|---|
+| `PostgresIdentityProviderRepository` | `adapter/persistence/PostgresIdentityProviderRepository.kt` | Encrypts `clientSecret` via `EncryptionService.encrypt()` on write; decrypts on read. Returns `null` (skips row) if decryption fails — no crash on bad key. Uses `OffsetDateTime.now(ZoneOffset.UTC)` for writes, `.toInstant()` for reads (consistent with all existing adapters). |
+| `PostgresSocialAccountRepository` | `adapter/persistence/PostgresSocialAccountRepository.kt` | Uses `OffsetDateTime.now(ZoneOffset.UTC)` for `linkedAt` write; `.toInstant()` on read. |
+
+Exposed ORM tables: `IdentityProvidersTable.kt`, `SocialAccountsTable.kt` — both use `timestampWithTimeZone` (maps to `OffsetDateTime`) matching the `TIMESTAMPTZ` schema columns and all existing table definitions.
+
+#### Auth Routes (Phase 4 additions)
+
+| Route | Method | Handler |
+|---|---|---|
+| `/t/{slug}/auth/social/{provider}/redirect` | GET | Loads IDP config; constructs HMAC-signed state = `EncryptionService.signCookie("${provider}|${slug}|${nonce}|${oauthParamsB64}")`; redirects to provider authorization URL. OAuth params encoded as Base64 in state — no extra cookie or server-side session needed. |
+| `/t/{slug}/auth/social/{provider}/callback` | GET | Verifies HMAC state signature; decodes OAuth params from state; calls `SocialLoginService.handleCallback()`; supports both full OAuth2 Code Flow (issues auth code → redirect to client) and direct flow (returns JSON tokens). |
+
+`GET /t/{slug}/login` updated to load enabled providers via `IdentityProviderRepository.findEnabledByTenant()` and pass them to `AuthView.loginPage(enabledProviders = ...)`.
+
+Added helpers in `AuthRoutes.kt`: `SocialLoginError.toMessage()` extension function; `parseQueryStringToOAuthParams(qs)` to restore OAuth params from the state's Base64 segment.
+
+#### Admin Routes (Phase 4 additions)
+
+| Route | Method | Handler |
+|---|---|---|
+| `/admin/workspaces/{slug}/settings/identity-providers` | GET | Lists all providers with current config status; supports `?edit={provider}` for inline form. |
+| `/admin/workspaces/{slug}/settings/identity-providers/{provider}` | POST | Creates or updates IDP config. Validates clientId non-empty; checks `EncryptionService.isAvailable` before saving secret. Preserves existing encrypted secret if the form secret field is left blank. |
+| `/admin/workspaces/{slug}/settings/identity-providers/{provider}/delete` | POST | Deletes provider config row. |
+
+#### Admin & Auth Views (Phase 4 additions)
+
+- `AdminView.kt`: `identityProvidersPage()` — lists all `SocialProvider.entries`; shows configure/edit/delete per provider; displays callback URI per provider for easy copy-paste into Google/GitHub consoles; inline edit form with clientId/clientSecret/enabled fields; confirm dialog for delete.
+- `AdminView.kt`: `renderSettingsCtxPanel()` — added `"identity-providers"` link in the settings sidebar.
+- `AuthView.kt`: `loginPage()` — new `enabledProviders: List<SocialProvider>` parameter; renders `social-divider` + `social-buttons` below footer links; Google uses inline multicolor SVG logo; GitHub uses inline monochrome SVG.
+
+#### Auth & Admin CSS (Phase 4 additions)
+
+New classes added to `kotauth-auth.css`:
+
+| Class | Purpose |
+|---|---|
+| `.social-divider` | "or continue with" separator; `::before`/`::after` pseudo-elements draw full-width horizontal rules |
+| `.social-buttons` | Flex column with `gap: 0.6rem` |
+| `.btn-social` | Ghost button style — `transparent` background, `1px solid var(--border)`, full width, hover brings `var(--bg-input)` fill. Overrides `.btn` defaults (`margin-top: 0`, `letter-spacing: normal`). |
+| `.social-icon` | Inline SVG container — `display: flex; align-items: center; line-height: 0` prevents phantom vertical space from inline SVG |
+
+#### Architectural Decisions (Phase 4)
+
+**ADR-15: CSRF State Without Extra Cookies**
+
+The OAuth `state` parameter carries the CSRF nonce AND all OAuth authorization params encoded as Base64, signed with `EncryptionService.signCookie()` (HMAC-SHA256). No server-side session or extra cookie is required to thread OAuth params through the social login flow. If the HMAC doesn't verify on callback, the request is rejected with `400 Bad Request`.
+
+**ADR-16: Email-Based Account Auto-Linking**
+
+When a social login arrives and no existing `social_accounts` row matches, the service checks for a user with the same email in the same tenant. If found, the social account is linked automatically without a confirmation step. Rationale: same email within the same tenant nearly always means the same person, and a confirmation step creates friction for the most common case. A tenant-level policy toggle is the right future upgrade path if stricter confirmation is required.
+
+**ADR-17: No New Gradle Dependencies for Provider HTTP**
+
+Both provider adapters use `java.net.http.HttpClient` (JDK 11+, available on the Java 17 runtime) for outbound HTTP and `kotlinx.serialization.json` (already on the classpath via Ktor) for JSON parsing. Zero new Gradle entries — keeps the fat JAR lean and the dependency surface minimal.
+
+**ADR-18: New Social Users Get an Unusable Password Hash**
+
+Users created via social login have their `passwordHash` set to a random 64-char hex string (BCrypt-hashed). This is not a valid password any real user could produce — it ensures the account exists in the user table with a plausible `passwordHash` column value, while making password-based login impossible for that account until the user explicitly sets a password via the self-service portal.
 
 ---
 
-### Phase 5 — Developer Experience ❌ Not started
+### Phase 5 — Admin REST API ❌ Not started
 
-Admin REST API, webhooks, SDK/integration guides, Prometheus metrics, structured JSON logging.
+Full CRUD REST API (`/api/v1/`), API keys scoped per tenant, OpenAPI spec, webhook events.
+
+---
+
+### Phase 6 — Documentation ❌ Not started
+
+README, CONTRIBUTING, integration guides (Next.js, generic OIDC), API quick reference.
 
 ---
 

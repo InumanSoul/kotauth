@@ -17,11 +17,13 @@ import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.SocialLoginError
+import com.kauth.domain.service.SocialLoginNeedsRegistration
 import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.model.User
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -104,6 +106,9 @@ fun Route.authRoutes(
             val tenant        = tenantRepository.findBySlug(slug)
             val theme         = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
+            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else emptyList()
             val params = call.receiveParameters()
             val username = params["username"]?.trim() ?: ""
             val password = params["password"] ?: ""
@@ -115,7 +120,7 @@ fun Route.authRoutes(
             if (!loginRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.loginPage(slug, theme, workspaceName, error = "Too many login attempts. Please wait a moment and try again.", oauthParams = oauthParams)
+                    AuthView.loginPage(slug, theme, workspaceName, error = "Too many login attempts. Please wait a moment and try again.", oauthParams = oauthParams, enabledProviders = enabledProviders)
                 )
             }
 
@@ -129,7 +134,7 @@ fun Route.authRoutes(
                     } else {
                         call.respondHtml(
                             HttpStatusCode.Unauthorized,
-                            AuthView.loginPage(slug, theme, workspaceName, error = result.error.toMessage(), oauthParams = oauthParams)
+                            AuthView.loginPage(slug, theme, workspaceName, error = result.error.toMessage(), oauthParams = oauthParams, enabledProviders = enabledProviders)
                         )
                     }
                 }
@@ -140,7 +145,14 @@ fun Route.authRoutes(
                     // If the tenant policy mandates MFA for this user (via "required" or
                     // "required_admins") and the user hasn't enrolled yet, block login with a
                     // clear error directing them to the user portal for enrollment.
-                    if (mfaService != null && tenant != null) {
+                    //
+                    // Exception: portal PKCE logins (client_id = kotauth-portal) are allowed
+                    // through even when MFA isn't enrolled yet. The portal callback will detect
+                    // the gap and redirect the user directly to the MFA setup page with a
+                    // prominent notice, so they can enroll from within the portal itself.
+                    val isPortalLogin = oauthParams.isOAuthFlow &&
+                        oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
+                    if (mfaService != null && tenant != null && !isPortalLogin) {
                         val mfaPolicy = tenant.mfaPolicy
                         if (mfaPolicy != "optional") {
                             // Resolve effective roles only when the policy actually needs them —
@@ -153,12 +165,13 @@ fun Route.authRoutes(
                                 return@post call.respondHtml(
                                     HttpStatusCode.Forbidden,
                                     AuthView.loginPage(
-                                        tenantSlug    = slug,
-                                        theme         = theme,
-                                        workspaceName = workspaceName,
-                                        error         = "Multi-factor authentication is required for your account. " +
-                                                        "Please sign in to the user portal and enable MFA under Security settings.",
-                                        oauthParams   = oauthParams
+                                        tenantSlug       = slug,
+                                        theme            = theme,
+                                        workspaceName    = workspaceName,
+                                        error            = "Multi-factor authentication is required for your account. " +
+                                                           "Please sign in to the user portal and enable MFA under Security settings.",
+                                        oauthParams      = oauthParams,
+                                        enabledProviders = enabledProviders
                                     )
                                 )
                             }
@@ -214,7 +227,7 @@ fun Route.authRoutes(
                             is OAuthResult.Failure -> {
                                 call.respondHtml(
                                     HttpStatusCode.BadRequest,
-                                    AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams)
+                                    AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams, enabledProviders = enabledProviders)
                                 )
                             }
                         }
@@ -234,26 +247,34 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/register") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
-            val workspaceName = tenant?.displayName ?: "KotAuth"
-            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(slug, theme, workspaceName))
+            val slug             = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant           = tenantRepository.findBySlug(slug)
+            val theme            = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName    = tenant?.displayName ?: "KotAuth"
+            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else emptyList()
+            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(slug, theme, workspaceName, enabledProviders = enabledProviders))
         }
 
         post("/register") {
-            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
-            val workspaceName = tenant?.displayName ?: "KotAuth"
-            val ipAddress     = call.request.local.remoteAddress
+            val slug             = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant           = tenantRepository.findBySlug(slug)
+            val theme            = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName    = tenant?.displayName ?: "KotAuth"
+            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else emptyList()
+            val ipAddress        = call.request.local.remoteAddress
 
             // Rate limiting on registration
             val rateLimitKey = "register:$ipAddress"
             if (!registerRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.registerPage(slug, theme, workspaceName, error = "Too many registration attempts. Please wait a moment.")
+                    AuthView.registerPage(slug, theme, workspaceName,
+                        error            = "Too many registration attempts. Please wait a moment.",
+                        enabledProviders = enabledProviders)
                 )
             }
 
@@ -271,7 +292,10 @@ fun Route.authRoutes(
                 is AuthResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AuthView.registerPage(slug, theme, workspaceName, error = result.error.toMessage(), prefill = prefill)
+                        AuthView.registerPage(slug, theme, workspaceName,
+                            error            = result.error.toMessage(),
+                            prefill          = prefill,
+                            enabledProviders = enabledProviders)
                     )
             }
         }
@@ -582,16 +606,26 @@ fun Route.authRoutes(
                     val tenant        = tenantRepository.findBySlug(slug)
                     val theme         = tenant?.theme ?: TenantTheme.DEFAULT
                     val workspaceName = tenant?.displayName ?: "KotAuth"
+                    val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                    } else emptyList()
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
                         AuthView.loginPage(
-                            tenantSlug    = slug,
-                            theme         = theme,
-                            workspaceName = workspaceName,
-                            error         = result.error.toMessage()
+                            tenantSlug       = slug,
+                            theme            = theme,
+                            workspaceName    = workspaceName,
+                            error            = result.error.toMessage(),
+                            enabledProviders = enabledProviders
                         )
                     )
                 }
+                // buildRedirectUrl never returns NeedsRegistration — that is a callback-only
+                // result. This branch satisfies the exhaustive-when requirement.
+                is SocialLoginResult.NeedsRegistration -> call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "internal_error")
+                )
             }
         }
 
@@ -604,6 +638,9 @@ fun Route.authRoutes(
             val tenant        = tenantRepository.findBySlug(slug)
             val theme         = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
+            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else emptyList()
 
             if (socialLoginService == null) {
                 return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
@@ -618,10 +655,11 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug    = slug,
-                        theme         = theme,
-                        workspaceName = workspaceName,
-                        error         = "Login with ${provider.displayName} was cancelled or failed."
+                        tenantSlug       = slug,
+                        theme            = theme,
+                        workspaceName    = workspaceName,
+                        error            = "Login with ${provider.displayName} was cancelled or failed.",
+                        enabledProviders = enabledProviders
                     )
                 )
                 return@get
@@ -638,10 +676,11 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug    = slug,
-                        theme         = theme,
-                        workspaceName = workspaceName,
-                        error         = "Invalid or expired state parameter. Please try signing in again."
+                        tenantSlug       = slug,
+                        theme            = theme,
+                        workspaceName    = workspaceName,
+                        error            = "Invalid or expired state parameter. Please try signing in again.",
+                        enabledProviders = enabledProviders
                     )
                 )
                 return@get
@@ -653,10 +692,11 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug    = slug,
-                        theme         = theme,
-                        workspaceName = workspaceName,
-                        error         = "State mismatch. Please try signing in again."
+                        tenantSlug       = slug,
+                        theme            = theme,
+                        workspaceName    = workspaceName,
+                        error            = "State mismatch. Please try signing in again.",
+                        enabledProviders = enabledProviders
                     )
                 )
                 return@get
@@ -684,12 +724,29 @@ fun Route.authRoutes(
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
                         AuthView.loginPage(
-                            tenantSlug    = slug,
-                            theme         = theme,
-                            workspaceName = workspaceName,
-                            error         = result.error.toMessage()
+                            tenantSlug       = slug,
+                            theme            = theme,
+                            workspaceName    = workspaceName,
+                            error            = result.error.toMessage(),
+                            enabledProviders = enabledProviders
                         )
                     )
+                }
+                is SocialLoginResult.NeedsRegistration -> {
+                    // No existing account — store provider profile in a short-lived signed cookie
+                    // and redirect to the registration completion page.
+                    val pending = result.data
+                    val cookieVal = EncryptionService.signCookie(
+                        buildSocialPendingPayload(pending, slug, oauthParamsRaw)
+                    )
+                    call.response.cookies.append(
+                        name     = "KOTAUTH_SOCIAL_PENDING",
+                        value    = cookieVal,
+                        maxAge   = 600L,
+                        httpOnly = true,
+                        path     = "/t/$slug/auth/social"
+                    )
+                    call.respondRedirect("/t/$slug/auth/social/complete-registration")
                 }
                 is SocialLoginResult.Success -> {
                     val loginSuccess = result.value
@@ -721,12 +778,184 @@ fun Route.authRoutes(
                             }
                             is OAuthResult.Failure -> call.respondHtml(
                                 HttpStatusCode.BadRequest,
-                                AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription())
+                                AuthView.loginPage(
+                                    tenantSlug       = slug,
+                                    theme            = theme,
+                                    workspaceName    = workspaceName,
+                                    error            = codeResult.error.toDescription(),
+                                    enabledProviders = enabledProviders
+                                )
                             )
                         }
                     } else {
                         // Direct flow — return tokens as JSON
                         call.respond(loginSuccess.tokens)
+                    }
+                }
+            }
+        }
+
+        // ==================================================================
+        // Social Registration Completion
+        //
+        // GET  /auth/social/complete-registration  — show username choice form
+        // POST /auth/social/complete-registration  — create account + log in
+        //
+        // The provider profile is carried in a short-lived HMAC-signed cookie
+        // (KOTAUTH_SOCIAL_PENDING, 10 min TTL) set by the callback handler when
+        // NeedsRegistration is returned. No server-side session needed.
+        // ==================================================================
+
+        get("/auth/social/complete-registration") {
+            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val theme  = tenant.theme
+            val workspaceName = tenant.displayName
+
+            val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
+            val pending   = parseSocialPendingCookie(rawCookie)
+
+            if (pending == null) {
+                // Cookie missing, expired, or tampered — send back to login
+                return@get call.respondRedirect("/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}")
+            }
+
+            val suggestedUsername = pending.email
+                .substringBefore("@")
+                .replace(Regex("[^a-zA-Z0-9_]"), "")
+                .lowercase()
+                .take(32)
+                .ifBlank { "user" }
+
+            call.respondHtml(HttpStatusCode.OK, AuthView.socialRegistrationPage(
+                tenantSlug      = slug,
+                theme           = theme,
+                workspaceName   = workspaceName,
+                providerName    = pending.provider.displayName,
+                email           = pending.email,
+                prefillUsername = suggestedUsername,
+                prefillFullName = pending.name ?: ""
+            ))
+        }
+
+        post("/auth/social/complete-registration") {
+            val slug   = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val theme  = tenant.theme
+            val workspaceName = tenant.displayName
+
+            val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
+            val pending   = parseSocialPendingCookie(rawCookie)
+
+            if (pending == null) {
+                return@post call.respondRedirect("/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}")
+            }
+
+            if (socialLoginService == null) {
+                return@post call.respond(HttpStatusCode.NotImplemented)
+            }
+
+            val params        = call.receiveParameters()
+            val chosenUsername = params["username"]?.trim() ?: ""
+            val chosenFullName = params["full_name"]?.trim()
+
+            val ipAddress = call.request.local.remoteAddress
+            val userAgent = call.request.headers["User-Agent"]
+
+            when (val result = socialLoginService.completeSocialRegistration(
+                tenantSlug     = slug,
+                provider       = pending.provider,
+                providerUserId = pending.providerUserId,
+                email          = pending.email,
+                providerName   = chosenFullName?.ifBlank { null } ?: pending.name,
+                avatarUrl      = pending.avatarUrl,
+                emailVerified  = pending.emailVerified,
+                chosenUsername = chosenUsername,
+                ipAddress      = ipAddress,
+                userAgent      = userAgent
+            )) {
+                is SocialLoginResult.Failure -> {
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AuthView.socialRegistrationPage(
+                            tenantSlug      = slug,
+                            theme           = theme,
+                            workspaceName   = workspaceName,
+                            providerName    = pending.provider.displayName,
+                            email           = pending.email,
+                            prefillUsername = chosenUsername,
+                            prefillFullName = chosenFullName ?: pending.name ?: "",
+                            error           = result.error.toMessage()
+                        )
+                    )
+                }
+                is SocialLoginResult.NeedsRegistration -> {
+                    // Should not happen from completeSocialRegistration — treat as internal error
+                    call.respondHtml(
+                        HttpStatusCode.InternalServerError,
+                        AuthView.socialRegistrationPage(
+                            tenantSlug    = slug,
+                            theme         = theme,
+                            workspaceName = workspaceName,
+                            providerName  = pending.provider.displayName,
+                            email         = pending.email,
+                            error         = "An unexpected error occurred. Please try again."
+                        )
+                    )
+                }
+                is SocialLoginResult.Success -> {
+                    // Clear the pending cookie — single-use
+                    call.response.cookies.append(
+                        name     = "KOTAUTH_SOCIAL_PENDING",
+                        value    = "",
+                        maxAge   = 0L,
+                        httpOnly = true,
+                        path     = "/t/$slug/auth/social"
+                    )
+                    val loginSuccess = result.value
+                    val restoredParams = parseQueryStringToOAuthParams(pending.oauthParamsRaw)
+
+                    if (restoredParams.isOAuthFlow) {
+                        val clientId    = restoredParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        val redirectUri = restoredParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        when (val codeResult = oauthService.issueAuthorizationCode(
+                            tenantSlug          = slug,
+                            userId              = loginSuccess.user.id!!,
+                            clientId            = clientId,
+                            redirectUri         = redirectUri,
+                            scopes              = restoredParams.scope ?: "openid",
+                            codeChallenge       = restoredParams.codeChallenge,
+                            codeChallengeMethod = restoredParams.codeChallengeMethod,
+                            nonce               = restoredParams.nonce,
+                            state               = restoredParams.state,
+                            ipAddress           = ipAddress
+                        )) {
+                            is OAuthResult.Success -> {
+                                val authCode   = codeResult.value.code
+                                val stateParam = restoredParams.state
+                                val redirect   = buildString {
+                                    append(redirectUri)
+                                    append("?code=").append(authCode)
+                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
+                                }
+                                call.respondRedirect(redirect)
+                            }
+                            is OAuthResult.Failure -> call.respondHtml(
+                                HttpStatusCode.BadRequest,
+                                AuthView.socialRegistrationPage(
+                                    tenantSlug    = slug,
+                                    theme         = theme,
+                                    workspaceName = workspaceName,
+                                    providerName  = pending.provider.displayName,
+                                    email         = pending.email,
+                                    error         = codeResult.error.toDescription()
+                                )
+                            )
+                        }
+                    } else {
+                        // No OAuth flow context (direct browser visit to login page) —
+                        // redirect to portal login which will re-initiate a fresh PKCE flow.
+                        call.respondRedirect("/t/$slug/account/login")
                     }
                 }
             }
@@ -797,7 +1026,16 @@ fun Route.authRoutes(
                 nonce               = nonce
             )
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(slug, tenant.theme, tenant.displayName, oauthParams = oauthParams))
+            val enabledProviders = identityProviderRepository
+                ?.findEnabledByTenant(tenant.id)?.map { it.provider } ?: emptyList()
+
+            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(
+                tenantSlug       = slug,
+                theme            = tenant.theme,
+                workspaceName    = tenant.displayName,
+                oauthParams      = oauthParams,
+                enabledProviders = enabledProviders
+            ))
         }
 
         // ==================================================================
@@ -1060,17 +1298,118 @@ private fun SocialLoginError.toMessage(): String = when (this) {
     is SocialLoginError.EmailNotProvided      -> "Your social account did not provide an email address. Please use username/password login or grant email access."
     is SocialLoginError.UserDisabled          -> "Your account has been disabled."
     is SocialLoginError.AccountCreationFailed -> "Failed to create an account. Please try again or contact support."
+    is SocialLoginError.RegistrationDisabled  -> "Account registration is not enabled for this workspace."
+    is SocialLoginError.UsernameConflict      -> "That username is already taken. Please choose a different one."
+    is SocialLoginError.InvalidUsername       -> this.reason
     is SocialLoginError.ProviderError         -> "An error occurred communicating with the identity provider. Please try again."
     is SocialLoginError.InternalError         -> "An internal error occurred. Please try again."
 }
 
+// ============================================================================
+// Social pending registration cookie helpers
+// ============================================================================
+
 /**
- * Parses a query string (without the leading '?') back into [AuthView.OAuthParams].
+ * Parsed contents of the KOTAUTH_SOCIAL_PENDING cookie.
+ * Holds everything needed to complete a social registration across the
+ * GET → POST round-trip, without touching server-side state.
+ */
+private data class SocialPendingData(
+    val provider       : com.kauth.domain.model.SocialProvider,
+    val slug           : String,
+    val providerUserId : String,
+    val email          : String,
+    val name           : String?,
+    val avatarUrl      : String?,
+    val emailVerified  : Boolean,
+    val oauthParamsRaw : String   // raw query string, empty string when no OAuth context
+)
+
+/**
+ * Encodes a [SocialLoginNeedsRegistration] into the HMAC-signed cookie payload.
+ * Format (pipe-separated, variable fields are base64url-encoded):
+ *   provider | slug | providerUserId_b64 | email_b64 | name_b64 | avatarUrl_b64 | emailVerified | oauthParamsRaw_b64 | timestamp
+ */
+private fun buildSocialPendingPayload(
+    data           : SocialLoginNeedsRegistration,
+    slug           : String,
+    oauthParamsRaw : String
+): String {
+    val enc = java.util.Base64.getUrlEncoder().withoutPadding()
+    fun String?.b64() = enc.encodeToString((this ?: "").toByteArray(Charsets.UTF_8))
+    return listOf(
+        data.provider.value,
+        slug,
+        data.providerUserId.b64(),
+        data.email.b64(),
+        data.name.b64(),
+        data.avatarUrl.b64(),
+        data.emailVerified.toString(),
+        oauthParamsRaw.b64(),
+        System.currentTimeMillis().toString()
+    ).joinToString("|")
+}
+
+/**
+ * Verifies and parses the KOTAUTH_SOCIAL_PENDING cookie.
+ * Returns null if the cookie is missing, invalid, tampered, or expired (> 10 min).
+ */
+private fun parseSocialPendingCookie(rawCookie: String?): SocialPendingData? {
+    if (rawCookie.isNullOrBlank()) return null
+    val payload = EncryptionService.verifyCookie(rawCookie) ?: return null
+    val parts   = payload.split("|")
+    if (parts.size < 9) return null
+
+    val timestamp = parts[8].toLongOrNull() ?: return null
+    if (System.currentTimeMillis() - timestamp > 600_000) return null  // 10-minute TTL
+
+    return try {
+        val dec      = java.util.Base64.getUrlDecoder()
+        fun decode(s: String) = String(dec.decode(s), Charsets.UTF_8)
+
+        val provider       = com.kauth.domain.model.SocialProvider.fromValueOrNull(parts[0]) ?: return null
+        val slug           = parts[1]
+        val providerUserId = decode(parts[2])
+        val email          = decode(parts[3])
+        val name           = decode(parts[4]).ifBlank { null }
+        val avatarUrl      = decode(parts[5]).ifBlank { null }
+        val emailVerified  = parts[6].toBooleanStrictOrNull() ?: false
+        val oauthParamsRaw = decode(parts[7])
+
+        if (email.isBlank() || providerUserId.isBlank()) return null
+
+        SocialPendingData(
+            provider       = provider,
+            slug           = slug,
+            providerUserId = providerUserId,
+            email          = email,
+            name           = name,
+            avatarUrl      = avatarUrl,
+            emailVerified  = emailVerified,
+            oauthParamsRaw = oauthParamsRaw
+        )
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun encodeParam(value: String) =
+    java.net.URLEncoder.encode(value, "UTF-8")
+
+/**
+ * Parses a query string (with or without a leading '?') back into [AuthView.OAuthParams].
  * Used during the social callback to restore the original OAuth2 parameters from state.
+ *
+ * NOTE: OAuthParams.toQueryString() includes a leading '?' when non-empty. This function
+ * strips it so the first parameter key is not parsed as "?response_type" instead of
+ * "response_type" — which would cause isOAuthFlow to return false and silently break the
+ * portal social login redirect-back-to-callback path.
  */
 private fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
     if (qs.isBlank()) return AuthView.OAuthParams()
-    val map = qs.split("&").mapNotNull {
+    val normalized = if (qs.startsWith("?")) qs.substring(1) else qs
+    if (normalized.isBlank()) return AuthView.OAuthParams()
+    val map = normalized.split("&").mapNotNull {
         val idx = it.indexOf('=')
         if (idx < 0) null else {
             val k = java.net.URLDecoder.decode(it.substring(0, idx), "UTF-8")

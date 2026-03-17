@@ -226,8 +226,8 @@ label {
 
 /* Animated chevron */
 .ws-chevron-icon {
-    width: 16px;
-    height: 16px;
+    width: 13px;
+    height: 13px;
     position: relative;
     flex-shrink: 0;
     transition: transform 0.2s ease;
@@ -369,40 +369,6 @@ label {
     flex-shrink: 0;
 }
 
-/* New Workspace button in topbar */
-.btn-new-ws {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    height: 32px;
-    background: rgba(31,188,255,.12);
-    border: 1px solid rgba(31,188,255,.3);
-    border-radius: 6px;
-    color: var(--accent);
-    font-size: 0.76rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
-    text-decoration: none;
-    white-space: nowrap;
-    font-family: inherit;
-}
-.btn-new-ws:hover {
-    background: rgba(31,188,255,.2);
-    border-color: rgba(31,188,255,.5);
-    text-decoration: none;
-}
-.btn-new-ws:active { transform: scale(0.97); }
-
-.btn-new-ws-icon {
-    font-size: 1rem;
-    font-weight: 300;
-    line-height: 1;
-    color: var(--accent);
-}
-.btn-new-ws-label { font-size: 0.76rem; }
-
 /* Profile avatar */
 .topbar-avatar {
     width: 32px;
@@ -455,16 +421,15 @@ label {
 }
 
 /* =========================================================================
-   Rail — 88px icon navigation
+   Rail — 80px icon navigation
    ========================================================================= */
 .rail {
-    width: 88px;
+    width: 80px;
     flex-shrink: 0;
     background: var(--bg-deep);
     border-right: 1px solid rgba(255,255,255,.08);
     display: flex;
     flex-direction: column;
-    padding: 14px 10px;
     gap: 10px;
 }
 
@@ -481,6 +446,8 @@ label {
     flex-shrink: 0;
 }
 
+.rail-brand:hover { text-decoration: none; }
+
 .rail-nav { display: flex; flex-direction: column; gap: 3px; }
 
 .rail-item {
@@ -495,7 +462,6 @@ label {
     color: var(--muted);
     text-decoration: none;
     transition: background 0.12s, color 0.12s;
-    border: 1px solid transparent;
 }
 .rail-item:hover {
     background: rgba(255,255,255,.05);
@@ -504,7 +470,6 @@ label {
 }
 .rail-item.active {
     background: rgba(31,188,255,.1);
-    border-color: rgba(31,188,255,.25);
     color: var(--accent);
 }
 
