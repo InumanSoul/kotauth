@@ -17,6 +17,13 @@ import com.kauth.domain.port.TokenPort
  */
 class FakeTokenPort : TokenPort {
 
+    // Counter ensures each call produces unique access/refresh tokens — required
+    // for rotation tests where replaying the old token must fail because the new
+    // session has a different refresh token hash.
+    private var callCount = 0
+
+    fun reset() { callCount = 0 }
+
     override fun issueUserTokens(
         user   : User,
         tenant : Tenant,
@@ -24,15 +31,18 @@ class FakeTokenPort : TokenPort {
         scopes : List<String>,
         nonce  : String?,
         roles  : List<Role>
-    ): TokenResponse = TokenResponse(
-        access_token      = "fake.access.${user.username}",
-        token_type        = "Bearer",
-        expires_in        = tenant.tokenExpirySeconds,
-        refresh_token     = "fake.refresh.${user.username}",
-        refresh_expires_in = tenant.refreshTokenExpirySeconds,
-        id_token          = if ("openid" in scopes) "fake.id.${user.username}" else null,
-        scope             = scopes.joinToString(" ")
-    )
+    ): TokenResponse {
+        val n = ++callCount
+        return TokenResponse(
+            access_token       = "fake.access.${user.username}.$n",
+            token_type         = "Bearer",
+            expires_in         = tenant.tokenExpirySeconds,
+            refresh_token      = "fake.refresh.${user.username}.$n",
+            refresh_expires_in = tenant.refreshTokenExpirySeconds,
+            id_token           = if ("openid" in scopes) "fake.id.${user.username}.$n" else null,
+            scope              = scopes.joinToString(" ")
+        )
+    }
 
     override fun issueClientCredentialsToken(
         tenant : Tenant,

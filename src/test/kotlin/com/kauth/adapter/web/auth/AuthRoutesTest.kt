@@ -242,7 +242,10 @@ class AuthRoutesTest {
             }
         }
 
-        val response = client.get("/t/acme/mfa-challenge")
+        // Must not follow redirects — the route redirects to /login which returns 200 HTML.
+        // We want to assert on the 302 itself, not the final destination.
+        val noFollow = createClient { followRedirects = false }
+        val response = noFollow.get("/t/acme/mfa-challenge")
 
         assertEquals(HttpStatusCode.Found, response.status)
         val location = response.headers["Location"] ?: ""
@@ -268,8 +271,11 @@ class AuthRoutesTest {
             }
         }
 
+        // Must not follow redirects — same reason as above.
+        val noFollow = createClient { followRedirects = false }
+
         // Forge a cookie without a valid HMAC — value without signature
-        val response = client.get("/t/acme/mfa-challenge") {
+        val response = noFollow.get("/t/acme/mfa-challenge") {
             header("Cookie", "KOTAUTH_MFA_PENDING=10|acme|${System.currentTimeMillis()}.INVALIDSIG")
         }
 
