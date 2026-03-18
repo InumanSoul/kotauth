@@ -13,7 +13,6 @@ import com.kauth.domain.model.Tenant
  * Email failures must never block the auth hot path (login/register).
  */
 interface EmailPort {
-
     /**
      * Sends an email verification link to the user's address.
      * [verifyUrl] contains the full URL with the raw token as a query parameter.
@@ -23,7 +22,7 @@ interface EmailPort {
         toName: String,
         verifyUrl: String,
         workspaceName: String,
-        tenant: Tenant
+        tenant: Tenant,
     )
 
     /**
@@ -35,6 +34,6 @@ interface EmailPort {
         toName: String,
         resetUrl: String,
         workspaceName: String,
-        tenant: Tenant
+        tenant: Tenant,
     )
 }

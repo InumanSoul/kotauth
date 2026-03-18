@@ -26,12 +26,12 @@ data class AuthorizationCode(
     val redirectUri: String,
     val scopes: String = "openid",
     val codeChallenge: String? = null,
-    val codeChallengeMethod: String? = null,    // "S256" or null
+    val codeChallengeMethod: String? = null, // "S256" or null
     val nonce: String? = null,
     val state: String? = null,
     val expiresAt: Instant,
     val usedAt: Instant? = null,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isUsed: Boolean get() = usedAt != null

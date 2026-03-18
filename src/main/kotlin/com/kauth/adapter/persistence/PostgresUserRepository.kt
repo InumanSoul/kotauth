@@ -15,104 +15,140 @@ import java.time.ZoneOffset
  * allows cross-tenant access — the constraint is structural, not convention.
  */
 class PostgresUserRepository : UserRepository {
+    override fun findById(id: Int): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { UsersTable.id eq id }
+                .map { it.toUser() }
+                .singleOrNull()
+        }
 
-    override fun findById(id: Int): User? = transaction {
-        UsersTable.selectAll()
-            .where { UsersTable.id eq id }
-            .map { it.toUser() }
-            .singleOrNull()
-    }
+    override fun findByUsername(
+        tenantId: Int,
+        username: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
+                .map { it.toUser() }
+                .singleOrNull()
+        }
 
-    override fun findByUsername(tenantId: Int, username: String): User? = transaction {
-        UsersTable.selectAll()
-            .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
-            .map { it.toUser() }
-            .singleOrNull()
-    }
+    override fun findByEmail(
+        tenantId: Int,
+        email: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
+                .map { it.toUser() }
+                .singleOrNull()
+        }
 
-    override fun findByEmail(tenantId: Int, email: String): User? = transaction {
-        UsersTable.selectAll()
-            .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
-            .map { it.toUser() }
-            .singleOrNull()
-    }
-
-    override fun findByTenantId(tenantId: Int, search: String?): List<User> = transaction {
-        val query = UsersTable.selectAll()
-            .where { UsersTable.tenantId eq tenantId }
-        if (!search.isNullOrBlank()) {
-            val term = "%${search.lowercase()}%"
-            query.andWhere {
-                (UsersTable.username.lowerCase() like term) or
-                (UsersTable.email.lowerCase()    like term) or
-                (UsersTable.fullName.lowerCase() like term)
+    override fun findByTenantId(
+        tenantId: Int,
+        search: String?,
+    ): List<User> =
+        transaction {
+            val query =
+                UsersTable
+                    .selectAll()
+                    .where { UsersTable.tenantId eq tenantId }
+            if (!search.isNullOrBlank()) {
+                val term = "%${search.lowercase()}%"
+                query.andWhere {
+                    (UsersTable.username.lowerCase() like term) or
+                        (UsersTable.email.lowerCase() like term) or
+                        (UsersTable.fullName.lowerCase() like term)
+                }
             }
+            query.orderBy(UsersTable.id).map { it.toUser() }
         }
-        query.orderBy(UsersTable.id).map { it.toUser() }
-    }
 
-    override fun update(user: User): User = transaction {
-        UsersTable.update({ UsersTable.id eq user.id!! }) {
-            it[email]             = user.email.lowercase()
-            it[fullName]          = user.fullName
-            it[emailVerified]     = user.emailVerified
-            it[enabled]           = user.enabled
-            it[mfaEnabled]        = user.mfaEnabled
+    override fun update(user: User): User =
+        transaction {
+            UsersTable.update({ UsersTable.id eq user.id!! }) {
+                it[email] = user.email.lowercase()
+                it[fullName] = user.fullName
+                it[emailVerified] = user.emailVerified
+                it[enabled] = user.enabled
+                it[mfaEnabled] = user.mfaEnabled
+            }
+            user
         }
-        user
-    }
 
-    override fun updatePassword(userId: Int, passwordHash: String, changedAt: Instant): User = transaction {
-        val ts = changedAt.toOffsetDateTime()
-        UsersTable.update({ UsersTable.id eq userId }) {
-            it[UsersTable.passwordHash]         = passwordHash
-            it[UsersTable.lastPasswordChangeAt] = ts
+    override fun updatePassword(
+        userId: Int,
+        passwordHash: String,
+        changedAt: Instant,
+    ): User =
+        transaction {
+            val ts = changedAt.toOffsetDateTime()
+            UsersTable.update({ UsersTable.id eq userId }) {
+                it[UsersTable.passwordHash] = passwordHash
+                it[UsersTable.lastPasswordChangeAt] = ts
+            }
+            UsersTable
+                .selectAll()
+                .where { UsersTable.id eq userId }
+                .single()
+                .toUser()
         }
-        UsersTable.selectAll()
-            .where { UsersTable.id eq userId }
-            .single()
-            .toUser()
-    }
 
-    override fun save(user: User): User = transaction {
-        val insertedId = UsersTable.insert {
-            it[tenantId]     = user.tenantId
-            it[username]     = user.username
-            it[email]        = user.email.lowercase()
-            it[passwordHash] = user.passwordHash
-            it[fullName]     = user.fullName
-            it[emailVerified] = user.emailVerified
-            it[enabled]      = user.enabled
-        } get UsersTable.id
+    override fun save(user: User): User =
+        transaction {
+            val insertedId =
+                UsersTable.insert {
+                    it[tenantId] = user.tenantId
+                    it[username] = user.username
+                    it[email] = user.email.lowercase()
+                    it[passwordHash] = user.passwordHash
+                    it[fullName] = user.fullName
+                    it[emailVerified] = user.emailVerified
+                    it[enabled] = user.enabled
+                } get UsersTable.id
 
-        user.copy(id = insertedId)
-    }
+            user.copy(id = insertedId)
+        }
 
-    override fun existsByUsername(tenantId: Int, username: String): Boolean = transaction {
-        UsersTable.selectAll()
-            .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
-            .count() > 0
-    }
+    override fun existsByUsername(
+        tenantId: Int,
+        username: String,
+    ): Boolean =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
+                .count() > 0
+        }
 
-    override fun existsByEmail(tenantId: Int, email: String): Boolean = transaction {
-        UsersTable.selectAll()
-            .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
-            .count() > 0
-    }
+    override fun existsByEmail(
+        tenantId: Int,
+        email: String,
+    ): Boolean =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
+                .count() > 0
+        }
 
-    private fun ResultRow.toUser(): User = User(
-        id                   = this[UsersTable.id],
-        tenantId             = this[UsersTable.tenantId],
-        username             = this[UsersTable.username],
-        email                = this[UsersTable.email],
-        passwordHash         = this[UsersTable.passwordHash],
-        fullName             = this[UsersTable.fullName],
-        emailVerified        = this[UsersTable.emailVerified],
-        enabled              = this[UsersTable.enabled],
-        lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
-        mfaEnabled           = this[UsersTable.mfaEnabled]
-    )
+    private fun ResultRow.toUser(): User =
+        User(
+            id = this[UsersTable.id],
+            tenantId = this[UsersTable.tenantId],
+            username = this[UsersTable.username],
+            email = this[UsersTable.email],
+            passwordHash = this[UsersTable.passwordHash],
+            fullName = this[UsersTable.fullName],
+            emailVerified = this[UsersTable.emailVerified],
+            enabled = this[UsersTable.enabled],
+            lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
+            mfaEnabled = this[UsersTable.mfaEnabled],
+        )
 
-    private fun Instant.toOffsetDateTime(): OffsetDateTime =
-        OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+    private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

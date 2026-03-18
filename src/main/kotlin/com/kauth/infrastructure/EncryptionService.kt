@@ -28,16 +28,16 @@ import javax.crypto.spec.SecretKeySpec
  * Verification strips the signature, recomputes it, and compares in constant time.
  */
 object EncryptionService {
-
-    private const val ALGORITHM     = "AES/GCM/NoPadding"
+    private const val ALGORITHM = "AES/GCM/NoPadding"
     private const val KEY_ALGORITHM = "AES"
     private const val GCM_IV_LENGTH = 12
-    private const val GCM_TAG_BITS  = 128
+    private const val GCM_TAG_BITS = 128
 
     private val secretKey: SecretKeySpec? by lazy {
         val raw = System.getenv("KAUTH_SECRET_KEY")
-        if (raw.isNullOrBlank()) null
-        else {
+        if (raw.isNullOrBlank()) {
+            null
+        } else {
             // Derive a 256-bit key from the env var via SHA-256
             val keyBytes = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, KEY_ALGORITHM)
@@ -53,7 +53,8 @@ object EncryptionService {
     private val hmacKey: ByteArray by lazy {
         val raw = System.getenv("KAUTH_SECRET_KEY")
         if (!raw.isNullOrBlank()) {
-            MessageDigest.getInstance("SHA-256")
+            MessageDigest
+                .getInstance("SHA-256")
                 .digest("mfa-cookie-signing:$raw".toByteArray(Charsets.UTF_8))
         } else {
             ByteArray(32).also { SecureRandom().nextBytes(it) }
@@ -68,9 +69,10 @@ object EncryptionService {
      * Throws [IllegalStateException] if KAUTH_SECRET_KEY is not set.
      */
     fun encrypt(plaintext: String): String {
-        val key = secretKey ?: error(
-            "KAUTH_SECRET_KEY env var is not set. Cannot encrypt SMTP password."
-        )
+        val key =
+            secretKey ?: error(
+                "KAUTH_SECRET_KEY env var is not set. Cannot encrypt SMTP password.",
+            )
 
         val iv = ByteArray(GCM_IV_LENGTH).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance(ALGORITHM)
@@ -88,10 +90,10 @@ object EncryptionService {
     fun decrypt(encrypted: String): String? {
         val key = secretKey ?: return null
         return try {
-            val parts      = encrypted.split(".")
+            val parts = encrypted.split(".")
             if (parts.size != 2) return null
-            val dec        = Base64.getUrlDecoder()
-            val iv         = dec.decode(parts[0])
+            val dec = Base64.getUrlDecoder()
+            val iv = dec.decode(parts[0])
             val ciphertext = dec.decode(parts[1])
 
             val cipher = Cipher.getInstance(ALGORITHM)
@@ -117,8 +119,11 @@ object EncryptionService {
     fun signCookie(value: String): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(hmacKey, "HmacSHA256"))
-        val signature = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(mac.doFinal(value.toByteArray(Charsets.UTF_8)))
+        val signature =
+            Base64
+                .getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(mac.doFinal(value.toByteArray(Charsets.UTF_8)))
         return "$value.$signature"
     }
 
@@ -131,7 +136,7 @@ object EncryptionService {
     fun verifyCookie(signed: String): String? {
         val lastDot = signed.lastIndexOf('.')
         if (lastDot < 0) return null
-        val value    = signed.substring(0, lastDot)
+        val value = signed.substring(0, lastDot)
         val expected = signCookie(value)
         // Constant-time comparison — do not short-circuit on first mismatch
         if (signed.length != expected.length) return null

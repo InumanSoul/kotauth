@@ -17,5 +17,5 @@ data class MfaRecoveryCode(
     val tenantId: Int,
     val codeHash: String,
     val usedAt: Instant? = null,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 )

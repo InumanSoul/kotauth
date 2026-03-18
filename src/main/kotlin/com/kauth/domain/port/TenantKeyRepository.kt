@@ -17,5 +17,8 @@ interface TenantKeyRepository {
     fun save(key: TenantKey): TenantKey
 
     /** Disables a specific key (soft rotation — does not delete). */
-    fun disable(tenantId: Int, keyId: String)
+    fun disable(
+        tenantId: Int,
+        keyId: String,
+    )
 }

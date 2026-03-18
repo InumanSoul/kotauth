@@ -23,18 +23,21 @@ data class MfaEnrollment(
     val verified: Boolean = false,
     val enabled: Boolean = true,
     val createdAt: Instant = Instant.now(),
-    val verifiedAt: Instant? = null
+    val verifiedAt: Instant? = null,
 )
 
 /**
  * Supported MFA methods — extensible without migration.
  */
-enum class MfaMethod(val value: String) {
-    TOTP("totp");
+enum class MfaMethod(
+    val value: String,
+) {
+    TOTP("totp"),
+    ;
+
     // Future: WEBAUTHN("webauthn"), SMS("sms")
 
     companion object {
-        fun fromValue(value: String): MfaMethod =
-            entries.firstOrNull { it.value == value } ?: TOTP
+        fun fromValue(value: String): MfaMethod = entries.firstOrNull { it.value == value } ?: TOTP
     }
 }

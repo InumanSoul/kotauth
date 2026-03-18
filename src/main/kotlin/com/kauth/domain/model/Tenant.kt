@@ -19,39 +19,36 @@ data class Tenant(
     val slug: String,
     val displayName: String,
     val issuerUrl: String?,
-    val tokenExpirySeconds: Long              = 3600L,
-    val refreshTokenExpirySeconds: Long       = 86400L,
-    val registrationEnabled: Boolean          = true,
-    val emailVerificationRequired: Boolean    = false,
-    val passwordPolicyMinLength: Int          = 8,
+    val tokenExpirySeconds: Long = 3600L,
+    val refreshTokenExpirySeconds: Long = 86400L,
+    val registrationEnabled: Boolean = true,
+    val emailVerificationRequired: Boolean = false,
+    val passwordPolicyMinLength: Int = 8,
     val passwordPolicyRequireSpecial: Boolean = false,
     // Phase 3c: expanded password policy
-    val passwordPolicyHistoryCount: Int       = 0,   // 0 = disabled
-    val passwordPolicyMaxAgeDays: Int         = 0,   // 0 = never expires
+    val passwordPolicyHistoryCount: Int = 0, // 0 = disabled
+    val passwordPolicyMaxAgeDays: Int = 0, // 0 = never expires
     val passwordPolicyRequireUppercase: Boolean = false,
-    val passwordPolicyRequireNumber: Boolean   = false,
+    val passwordPolicyRequireNumber: Boolean = false,
     val passwordPolicyBlacklistEnabled: Boolean = false,
-    val theme: TenantTheme                    = TenantTheme.DEFAULT,
-
+    val theme: TenantTheme = TenantTheme.DEFAULT,
     // ---- SMTP (Phase 3b) ----
     // smtp_password is stored AES-256-GCM encrypted in the DB (see EncryptionService).
     // This field holds the decrypted value at runtime — never persist the raw password.
-    val smtpHost: String?        = null,
-    val smtpPort: Int            = 587,
-    val smtpUsername: String?    = null,
-    val smtpPassword: String?    = null,
+    val smtpHost: String? = null,
+    val smtpPort: Int = 587,
+    val smtpUsername: String? = null,
+    val smtpPassword: String? = null,
     val smtpFromAddress: String? = null,
-    val smtpFromName: String?    = null,
-    val smtpTlsEnabled: Boolean  = true,
-    val smtpEnabled: Boolean     = false,
-
+    val smtpFromName: String? = null,
+    val smtpTlsEnabled: Boolean = true,
+    val smtpEnabled: Boolean = false,
     // ---- MFA policy (Phase 3c) ----
     // 'optional' = users can opt-in; 'required' = all users must enroll;
     // 'required_admins' = only admin-role users must enroll
     val mfaPolicy: String = "optional",
-
     // ---- Session policy (Phase 3b) ----
-    val maxConcurrentSessions: Int? = null   // null = unlimited
+    val maxConcurrentSessions: Int? = null, // null = unlimited
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG

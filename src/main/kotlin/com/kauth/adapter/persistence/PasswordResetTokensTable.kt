@@ -8,12 +8,12 @@ import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
  * Schema is Flyway-owned — no constraint declarations here.
  */
 object PasswordResetTokensTable : Table("password_reset_tokens") {
-    val id        = integer("id").autoIncrement()
-    val userId    = integer("user_id")   references UsersTable.id
-    val tenantId  = integer("tenant_id") references TenantsTable.id
+    val id = integer("id").autoIncrement()
+    val userId = integer("user_id") references UsersTable.id
+    val tenantId = integer("tenant_id") references TenantsTable.id
     val tokenHash = varchar("token_hash", 64)
     val expiresAt = timestampWithTimeZone("expires_at")
-    val usedAt    = timestampWithTimeZone("used_at").nullable()
+    val usedAt = timestampWithTimeZone("used_at").nullable()
     val ipAddress = varchar("ip_address", 45).nullable()
     val createdAt = timestampWithTimeZone("created_at")
 

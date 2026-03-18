@@ -12,7 +12,7 @@ import io.ktor.server.auth.*
  */
 data class ApiKeyPrincipal(
     /** The raw Bearer token extracted from the Authorization header. */
-    val rawToken    : String,
+    val rawToken: String,
     /** Populated by the route after successful tenant-scoped validation. */
-    val resolvedKey : ApiKey? = null
+    val resolvedKey: ApiKey? = null,
 ) : Principal

@@ -24,10 +24,13 @@ import java.time.ZoneOffset
  *   - Blacklist (common passwords)
  */
 class PostgresPasswordPolicyAdapter(
-    private val passwordHasher: PasswordHasher
+    private val passwordHasher: PasswordHasher,
 ) : PasswordPolicyPort {
-
-    override fun validate(rawPassword: String, tenant: Tenant, userId: Int?): String? {
+    override fun validate(
+        rawPassword: String,
+        tenant: Tenant,
+        userId: Int?,
+    ): String? {
         // Length check
         if (rawPassword.length < tenant.passwordPolicyMinLength) {
             return "Password must be at least ${tenant.passwordPolicyMinLength} characters."
@@ -60,38 +63,54 @@ class PostgresPasswordPolicyAdapter(
             }
         }
 
-        return null  // valid
+        return null // valid
     }
 
-    override fun recordPasswordHistory(userId: Int, tenantId: Int, passwordHash: String): Unit = transaction {
-        PasswordHistoryTable.insert {
-            it[this.userId]       = userId
-            it[this.tenantId]     = tenantId
-            it[this.passwordHash] = passwordHash
-            it[this.createdAt]    = OffsetDateTime.now(ZoneOffset.UTC)
+    override fun recordPasswordHistory(
+        userId: Int,
+        tenantId: Int,
+        passwordHash: String,
+    ): Unit =
+        transaction {
+            PasswordHistoryTable.insert {
+                it[this.userId] = userId
+                it[this.tenantId] = tenantId
+                it[this.passwordHash] = passwordHash
+                it[this.createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
+            }
         }
-    }
 
-    override fun isInHistory(userId: Int, tenantId: Int, rawPassword: String, historyCount: Int): Boolean = transaction {
-        val recentHashes = PasswordHistoryTable.selectAll()
-            .where {
-                (PasswordHistoryTable.userId eq userId) and
-                (PasswordHistoryTable.tenantId eq tenantId)
-            }
-            .orderBy(PasswordHistoryTable.createdAt, SortOrder.DESC)
-            .limit(historyCount)
-            .map { it[PasswordHistoryTable.passwordHash] }
+    override fun isInHistory(
+        userId: Int,
+        tenantId: Int,
+        rawPassword: String,
+        historyCount: Int,
+    ): Boolean =
+        transaction {
+            val recentHashes =
+                PasswordHistoryTable
+                    .selectAll()
+                    .where {
+                        (PasswordHistoryTable.userId eq userId) and
+                            (PasswordHistoryTable.tenantId eq tenantId)
+                    }.orderBy(PasswordHistoryTable.createdAt, SortOrder.DESC)
+                    .limit(historyCount)
+                    .map { it[PasswordHistoryTable.passwordHash] }
 
-        recentHashes.any { passwordHasher.verify(rawPassword, it) }
-    }
+            recentHashes.any { passwordHasher.verify(rawPassword, it) }
+        }
 
-    override fun isBlacklisted(rawPassword: String, tenantId: Int): Boolean = transaction {
-        val normalised = rawPassword.lowercase()
-        PasswordBlacklistTable.selectAll()
-            .where {
-                (PasswordBlacklistTable.password eq normalised) and
-                (PasswordBlacklistTable.tenantId.isNull() or (PasswordBlacklistTable.tenantId eq tenantId))
-            }
-            .count() > 0
-    }
+    override fun isBlacklisted(
+        rawPassword: String,
+        tenantId: Int,
+    ): Boolean =
+        transaction {
+            val normalised = rawPassword.lowercase()
+            PasswordBlacklistTable
+                .selectAll()
+                .where {
+                    (PasswordBlacklistTable.password eq normalised) and
+                        (PasswordBlacklistTable.tenantId.isNull() or (PasswordBlacklistTable.tenantId eq tenantId))
+                }.count() > 0
+        }
 }

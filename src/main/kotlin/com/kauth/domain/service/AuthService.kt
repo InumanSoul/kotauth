@@ -31,16 +31,15 @@ import java.time.Instant
  *   slug → Tenant → check policy → validate → hash password → save User
  */
 class AuthService(
-    private val userRepository    : UserRepository,
-    private val tenantRepository  : TenantRepository,
-    private val tokenPort         : TokenPort,
-    private val passwordHasher    : PasswordHasher,
-    private val auditLog          : AuditLogPort,
-    private val sessionRepository : SessionRepository,
-    private val selfServiceService: UserSelfServiceService? = null,  // nullable — injected post Phase 3b
-    private val passwordPolicy    : PasswordPolicyPort? = null       // Phase 3c — nullable for backward compat
+    private val userRepository: UserRepository,
+    private val tenantRepository: TenantRepository,
+    private val tokenPort: TokenPort,
+    private val passwordHasher: PasswordHasher,
+    private val auditLog: AuditLogPort,
+    private val sessionRepository: SessionRepository,
+    private val selfServiceService: UserSelfServiceService? = null, // nullable — injected post Phase 3b
+    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c — nullable for backward compat
 ) {
-
     /**
      * Authenticates a user and returns the User domain object.
      * Records LOGIN_SUCCESS or LOGIN_FAILED audit events.
@@ -52,10 +51,11 @@ class AuthService(
         username: String,
         rawPassword: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): AuthResult<User> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
         if (username.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
@@ -63,38 +63,44 @@ class AuthService(
 
         val user = userRepository.findByUsername(tenant.id, username)
         if (user == null) {
-            auditLog.record(AuditEvent(
-                tenantId  = tenant.id,
-                userId    = null,
-                clientId  = null,
-                eventType = AuditEventType.LOGIN_FAILED,
-                ipAddress = ipAddress,
-                userAgent = userAgent
-            ))
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                ),
+            )
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
         if (!user.enabled) {
-            auditLog.record(AuditEvent(
-                tenantId  = tenant.id,
-                userId    = user.id,
-                clientId  = null,
-                eventType = AuditEventType.LOGIN_FAILED,
-                ipAddress = ipAddress,
-                userAgent = userAgent
-            ))
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                ),
+            )
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
         if (!passwordHasher.verify(rawPassword, user.passwordHash)) {
-            auditLog.record(AuditEvent(
-                tenantId  = tenant.id,
-                userId    = user.id,
-                clientId  = null,
-                eventType = AuditEventType.LOGIN_FAILED,
-                ipAddress = ipAddress,
-                userAgent = userAgent
-            ))
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                ),
+            )
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
@@ -105,26 +111,30 @@ class AuthService(
         if (tenant.passwordPolicyMaxAgeDays > 0 && user.lastPasswordChangeAt != null) {
             val ageDays = Duration.between(user.lastPasswordChangeAt, Instant.now()).toDays()
             if (ageDays >= tenant.passwordPolicyMaxAgeDays) {
-                auditLog.record(AuditEvent(
-                    tenantId  = tenant.id,
-                    userId    = user.id,
-                    clientId  = null,
-                    eventType = AuditEventType.LOGIN_FAILED,
-                    ipAddress = ipAddress,
-                    userAgent = userAgent
-                ))
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = user.id,
+                        clientId = null,
+                        eventType = AuditEventType.LOGIN_FAILED,
+                        ipAddress = ipAddress,
+                        userAgent = userAgent,
+                    ),
+                )
                 return AuthResult.Failure(AuthError.PasswordExpired)
             }
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = user.id,
-            clientId  = null,
-            eventType = AuditEventType.LOGIN_SUCCESS,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = null,
+                eventType = AuditEventType.LOGIN_SUCCESS,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
         return AuthResult.Success(user)
     }
 
@@ -140,17 +150,19 @@ class AuthService(
         username: String,
         rawPassword: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): AuthResult<TokenResponse> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
         if (username.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        val user = userRepository.findByUsername(tenant.id, username)
-            ?: return AuthResult.Failure(AuthError.InvalidCredentials)
+        val user =
+            userRepository.findByUsername(tenant.id, username)
+                ?: return AuthResult.Failure(AuthError.InvalidCredentials)
 
         if (!user.enabled) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
@@ -171,29 +183,33 @@ class AuthService(
             }
         }
 
-        val tokens = tokenPort.issueUserTokens(
-            user   = user,
-            tenant = tenant,
-            client = null,
-            scopes = listOf("openid")
-        )
+        val tokens =
+            tokenPort.issueUserTokens(
+                user = user,
+                tenant = tenant,
+                client = null,
+                scopes = listOf("openid"),
+            )
 
         // Persist a server-side session so the admin console sessions page
         // shows activity for direct logins, not only OAuth flows.
-        sessionRepository.save(Session(
-            tenantId         = tenant.id,
-            userId           = user.id,
-            clientId         = null,
-            accessTokenHash  = sha256(tokens.access_token),
-            refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
-            scopes           = "openid",
-            ipAddress        = ipAddress,
-            userAgent        = userAgent,
-            expiresAt        = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-            refreshExpiresAt = tokens.refresh_token?.let {
-                Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-            }
-        ))
+        sessionRepository.save(
+            Session(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = null,
+                accessTokenHash = sha256(tokens.access_token),
+                refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
+                scopes = "openid",
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                refreshExpiresAt =
+                    tokens.refresh_token?.let {
+                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                    },
+            ),
+        )
 
         // Phase 3b: enforce concurrent session limit (evict oldest if over cap)
         enforceConcurrentSessionLimit(tenant.id, user.id!!, tenant.maxConcurrentSessions)
@@ -211,10 +227,11 @@ class AuthService(
         email: String,
         fullName: String,
         rawPassword: String,
-        confirmPassword: String
+        confirmPassword: String,
     ): AuthResult<User> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
         if (!tenant.registrationEnabled) {
             return AuthResult.Failure(AuthError.RegistrationDisabled)
@@ -248,13 +265,14 @@ class AuthService(
             return AuthResult.Failure(AuthError.EmailAlreadyExists)
         }
 
-        val newUser = User(
-            tenantId     = tenant.id,
-            username     = username.trim(),
-            email        = email.trim().lowercase(),
-            fullName     = fullName.trim(),
-            passwordHash = passwordHasher.hash(rawPassword)
-        )
+        val newUser =
+            User(
+                tenantId = tenant.id,
+                username = username.trim(),
+                email = email.trim().lowercase(),
+                fullName = fullName.trim(),
+                passwordHash = passwordHasher.hash(rawPassword),
+            )
 
         val savedUser = userRepository.save(newUser)
 
@@ -263,14 +281,16 @@ class AuthService(
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = savedUser.id,
-            clientId  = null,
-            eventType = AuditEventType.REGISTER_SUCCESS,
-            ipAddress = null,
-            userAgent = null
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = savedUser.id,
+                clientId = null,
+                eventType = AuditEventType.REGISTER_SUCCESS,
+                ipAddress = null,
+                userAgent = null,
+            ),
+        )
 
         // Phase 3b: if the tenant requires email verification and SMTP is ready,
         // send a verification email immediately after registration.
@@ -281,7 +301,9 @@ class AuthService(
                 // Note: baseUrl is passed as "" here because AuthService doesn't know it.
                 // The route layer should pass baseUrl when it calls register directly.
                 // For now this is handled via the overloaded register(... baseUrl) variant below.
-            } catch (_: Exception) { /* non-fatal */ }
+            } catch (_: Exception) {
+                // non-fatal
+            }
         }
 
         return AuthResult.Success(savedUser)
@@ -293,16 +315,17 @@ class AuthService(
      * register flow if selfServiceService is not wired.
      */
     fun register(
-        tenantSlug      : String,
-        username        : String,
-        email           : String,
-        fullName        : String,
-        rawPassword     : String,
-        confirmPassword : String,
-        baseUrl         : String
+        tenantSlug: String,
+        username: String,
+        email: String,
+        fullName: String,
+        rawPassword: String,
+        confirmPassword: String,
+        baseUrl: String,
     ): AuthResult<User> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return AuthResult.Failure(AuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
         if (!tenant.registrationEnabled) {
             return AuthResult.Failure(AuthError.RegistrationDisabled)
@@ -336,13 +359,14 @@ class AuthService(
             return AuthResult.Failure(AuthError.EmailAlreadyExists)
         }
 
-        val newUser = User(
-            tenantId     = tenant.id,
-            username     = username.trim(),
-            email        = email.trim().lowercase(),
-            fullName     = fullName.trim(),
-            passwordHash = passwordHasher.hash(rawPassword)
-        )
+        val newUser =
+            User(
+                tenantId = tenant.id,
+                username = username.trim(),
+                email = email.trim().lowercase(),
+                fullName = fullName.trim(),
+                passwordHash = passwordHasher.hash(rawPassword),
+            )
 
         val savedUser = userRepository.save(newUser)
 
@@ -351,19 +375,23 @@ class AuthService(
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = savedUser.id,
-            clientId  = null,
-            eventType = AuditEventType.REGISTER_SUCCESS,
-            ipAddress = null,
-            userAgent = null
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = savedUser.id,
+                clientId = null,
+                eventType = AuditEventType.REGISTER_SUCCESS,
+                ipAddress = null,
+                userAgent = null,
+            ),
+        )
 
         if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
             try {
                 selfServiceService.initiateEmailVerification(savedUser.id!!, tenant.id, baseUrl)
-            } catch (_: Exception) { /* non-fatal */ }
+            } catch (_: Exception) {
+                // non-fatal
+            }
         }
 
         return AuthResult.Success(savedUser)
@@ -377,7 +405,11 @@ class AuthService(
      * Phase 3b: after persisting a new session, check if the user is over the
      * concurrent session limit and revoke the oldest sessions if so.
      */
-    private fun enforceConcurrentSessionLimit(tenantId: Int, userId: Int, maxSessions: Int?) {
+    private fun enforceConcurrentSessionLimit(
+        tenantId: Int,
+        userId: Int,
+        maxSessions: Int?,
+    ) {
         if (maxSessions == null || maxSessions <= 0) return
         val active = sessionRepository.countActiveByUser(tenantId, userId)
         if (active > maxSessions) {
@@ -387,7 +419,7 @@ class AuthService(
 
     private fun sha256(input: String): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        val bytes  = digest.digest(input.toByteArray(Charsets.UTF_8))
+        val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
     }
 }
@@ -397,8 +429,13 @@ class AuthService(
  * Avoids exception-based flow control across layer boundaries.
  */
 sealed class AuthResult<out T> {
-    data class Success<T>(val value: T) : AuthResult<T>()
-    data class Failure(val error: AuthError) : AuthResult<Nothing>()
+    data class Success<T>(
+        val value: T,
+    ) : AuthResult<T>()
+
+    data class Failure(
+        val error: AuthError,
+    ) : AuthResult<Nothing>()
 }
 
 /**
@@ -422,10 +459,14 @@ sealed class AuthError {
     object EmailAlreadyExists : AuthError()
 
     /** Password doesn't meet the tenant's minimum length policy. */
-    data class WeakPassword(val minLength: Int) : AuthError()
+    data class WeakPassword(
+        val minLength: Int,
+    ) : AuthError()
 
     /** Generic validation failure with a human-readable message. */
-    data class ValidationError(val message: String) : AuthError()
+    data class ValidationError(
+        val message: String,
+    ) : AuthError()
 
     /**
      * The user's password has exceeded the tenant's [passwordPolicyMaxAgeDays] limit.

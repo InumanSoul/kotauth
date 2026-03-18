@@ -22,11 +22,11 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class RateLimiter(
     val maxRequests: Int,
-    val windowSeconds: Long
+    val windowSeconds: Long,
 ) {
     private data class Bucket(
         val timestamps: ArrayDeque<Long> = ArrayDeque(),
-        val hitCount: AtomicInteger = AtomicInteger(0)
+        val hitCount: AtomicInteger = AtomicInteger(0),
     )
 
     private val buckets = ConcurrentHashMap<String, Bucket>()

@@ -8,7 +8,6 @@ import com.kauth.domain.port.TenantRepository
  * Thread-safety is not a concern here — tests run single-threaded.
  */
 class FakeTenantRepository : TenantRepository {
-
     private val store = mutableMapOf<Int, Tenant>()
     private var nextId = 1
 
@@ -18,7 +17,10 @@ class FakeTenantRepository : TenantRepository {
         return t
     }
 
-    fun clear() { store.clear(); nextId = 1 }
+    fun clear() {
+        store.clear()
+        nextId = 1
+    }
 
     override fun findBySlug(slug: String) = store.values.find { it.slug == slug }
 
@@ -28,7 +30,11 @@ class FakeTenantRepository : TenantRepository {
 
     override fun findAll(): List<Tenant> = store.values.toList()
 
-    override fun create(slug: String, displayName: String, issuerUrl: String?): Tenant {
+    override fun create(
+        slug: String,
+        displayName: String,
+        issuerUrl: String?,
+    ): Tenant {
         val t = Tenant(id = nextId++, slug = slug, displayName = displayName, issuerUrl = issuerUrl)
         store[t.id] = t
         return t

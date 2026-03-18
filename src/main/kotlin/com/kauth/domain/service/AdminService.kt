@@ -1,8 +1,8 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
-import com.kauth.domain.model.Application
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
@@ -14,7 +14,6 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import java.security.SecureRandom
-import java.time.Instant
 import java.util.Base64
 
 /**
@@ -28,16 +27,15 @@ import java.util.Base64
  * without exceptions, keeping the web adapter free of try/catch noise.
  */
 class AdminService(
-    private val tenantRepository      : TenantRepository,
-    private val userRepository        : UserRepository,
-    private val applicationRepository : ApplicationRepository,
-    private val passwordHasher        : PasswordHasher,
-    private val auditLog              : AuditLogPort,
-    private val sessionRepository     : SessionRepository,
-    private val selfServiceService    : UserSelfServiceService,
-    private val passwordPolicy        : PasswordPolicyPort? = null  // Phase 3c
+    private val tenantRepository: TenantRepository,
+    private val userRepository: UserRepository,
+    private val applicationRepository: ApplicationRepository,
+    private val passwordHasher: PasswordHasher,
+    private val auditLog: AuditLogPort,
+    private val sessionRepository: SessionRepository,
+    private val selfServiceService: UserSelfServiceService,
+    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c
 ) {
-
     // =========================================================================
     // Workspace settings
     // =========================================================================
@@ -47,72 +45,84 @@ class AdminService(
      * Returns [AdminResult.Failure] with a user-visible message on validation errors.
      */
     fun updateWorkspaceSettings(
-        slug                      : String,
-        displayName               : String,
-        issuerUrl                 : String?,
-        tokenExpirySeconds        : Long,
-        refreshTokenExpirySeconds : Long,
-        registrationEnabled       : Boolean,
-        emailVerificationRequired : Boolean,
-        passwordPolicyMinLength   : Int,
+        slug: String,
+        displayName: String,
+        issuerUrl: String?,
+        tokenExpirySeconds: Long,
+        refreshTokenExpirySeconds: Long,
+        registrationEnabled: Boolean,
+        emailVerificationRequired: Boolean,
+        passwordPolicyMinLength: Int,
         passwordPolicyRequireSpecial: Boolean,
         passwordPolicyRequireUppercase: Boolean = false,
-        passwordPolicyRequireNumber  : Boolean = false,
-        passwordPolicyHistoryCount   : Int = 0,
-        passwordPolicyMaxAgeDays     : Int = 0,
+        passwordPolicyRequireNumber: Boolean = false,
+        passwordPolicyHistoryCount: Int = 0,
+        passwordPolicyMaxAgeDays: Int = 0,
         passwordPolicyBlacklistEnabled: Boolean = false,
-        mfaPolicy                 : String = "optional",
-        themeAccentColor          : String,
-        themeLogoUrl              : String?,
-        themeFaviconUrl           : String?
+        mfaPolicy: String = "optional",
+        themeAccentColor: String,
+        themeLogoUrl: String?,
+        themeFaviconUrl: String?,
     ): AdminResult<Tenant> {
-        val tenant = tenantRepository.findBySlug(slug)
-            ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+        val tenant =
+            tenantRepository.findBySlug(slug)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
 
-        if (displayName.isBlank())
+        if (displayName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Display name is required."))
-        if (tokenExpirySeconds < 60)
+        }
+        if (tokenExpirySeconds < 60) {
             return AdminResult.Failure(AdminError.Validation("Token expiry must be at least 60 seconds."))
-        if (refreshTokenExpirySeconds < tokenExpirySeconds)
+        }
+        if (refreshTokenExpirySeconds < tokenExpirySeconds) {
             return AdminResult.Failure(AdminError.Validation("Refresh token expiry must be ≥ access token expiry."))
-        if (passwordPolicyMinLength < 4 || passwordPolicyMinLength > 128)
+        }
+        if (passwordPolicyMinLength < 4 || passwordPolicyMinLength > 128) {
             return AdminResult.Failure(AdminError.Validation("Password minimum length must be between 4 and 128."))
-        if (mfaPolicy !in listOf("optional", "required", "required_admins"))
-            return AdminResult.Failure(AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'."))
-
-        val updated = tenant.copy(
-            displayName               = displayName.trim(),
-            issuerUrl                 = issuerUrl?.trim()?.takeIf { it.isNotBlank() },
-            tokenExpirySeconds        = tokenExpirySeconds,
-            refreshTokenExpirySeconds = refreshTokenExpirySeconds,
-            registrationEnabled       = registrationEnabled,
-            emailVerificationRequired = emailVerificationRequired,
-            passwordPolicyMinLength   = passwordPolicyMinLength,
-            passwordPolicyRequireSpecial    = passwordPolicyRequireSpecial,
-            passwordPolicyRequireUppercase  = passwordPolicyRequireUppercase,
-            passwordPolicyRequireNumber     = passwordPolicyRequireNumber,
-            passwordPolicyHistoryCount      = passwordPolicyHistoryCount.coerceIn(0, 24),
-            passwordPolicyMaxAgeDays        = passwordPolicyMaxAgeDays.coerceIn(0, 365),
-            passwordPolicyBlacklistEnabled  = passwordPolicyBlacklistEnabled,
-            mfaPolicy                       = mfaPolicy,
-            theme = tenant.theme.copy(
-                accentColor = themeAccentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
-                logoUrl     = themeLogoUrl?.trim()?.takeIf { it.isNotBlank() },
-                faviconUrl  = themeFaviconUrl?.trim()?.takeIf { it.isNotBlank() }
+        }
+        if (mfaPolicy !in listOf("optional", "required", "required_admins")) {
+            return AdminResult.Failure(
+                AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'."),
             )
-        )
+        }
+
+        val updated =
+            tenant.copy(
+                displayName = displayName.trim(),
+                issuerUrl = issuerUrl?.trim()?.takeIf { it.isNotBlank() },
+                tokenExpirySeconds = tokenExpirySeconds,
+                refreshTokenExpirySeconds = refreshTokenExpirySeconds,
+                registrationEnabled = registrationEnabled,
+                emailVerificationRequired = emailVerificationRequired,
+                passwordPolicyMinLength = passwordPolicyMinLength,
+                passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
+                passwordPolicyRequireUppercase = passwordPolicyRequireUppercase,
+                passwordPolicyRequireNumber = passwordPolicyRequireNumber,
+                passwordPolicyHistoryCount = passwordPolicyHistoryCount.coerceIn(0, 24),
+                passwordPolicyMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
+                passwordPolicyBlacklistEnabled = passwordPolicyBlacklistEnabled,
+                mfaPolicy = mfaPolicy,
+                theme =
+                    tenant.theme.copy(
+                        accentColor = themeAccentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
+                        logoUrl = themeLogoUrl?.trim()?.takeIf { it.isNotBlank() },
+                        faviconUrl = themeFaviconUrl?.trim()?.takeIf { it.isNotBlank() },
+                    ),
+            )
 
         val saved = tenantRepository.update(updated)
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = null,
-            clientId  = null,
-            eventType = AuditEventType.ADMIN_TENANT_UPDATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("slug" to slug, "displayName" to displayName)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_TENANT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "displayName" to displayName),
+            ),
+        )
 
         return AdminResult.Success(saved)
     }
@@ -126,61 +136,77 @@ class AdminService(
      * Password must meet the tenant's full password policy.
      */
     fun createUser(
-        tenantId : Int,
-        username : String,
-        email    : String,
-        fullName : String,
-        password : String
+        tenantId: Int,
+        username: String,
+        email: String,
+        fullName: String,
+        password: String,
     ): AdminResult<User> {
-        val tenant = tenantRepository.findById(tenantId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
 
-        if (username.isBlank())
+        if (username.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
-        if (!username.matches(Regex("[a-zA-Z0-9._-]+")))
-            return AdminResult.Failure(AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."))
-        if (email.isBlank() || !email.contains('@'))
+        }
+        if (!username.matches(Regex("[a-zA-Z0-9._-]+"))) {
+            return AdminResult.Failure(
+                AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."),
+            )
+        }
+        if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
+        }
 
         // Enforce full password policy
         val policyError = passwordPolicy?.validate(password, tenant)
         if (policyError != null) {
             return AdminResult.Failure(AdminError.Validation(policyError))
         } else if (passwordPolicy == null && password.length < tenant.passwordPolicyMinLength) {
-            return AdminResult.Failure(AdminError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters."))
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
+                ),
+            )
         }
 
-        if (userRepository.existsByUsername(tenantId, username))
+        if (userRepository.existsByUsername(tenantId, username)) {
             return AdminResult.Failure(AdminError.Conflict("Username '$username' is already taken."))
-        if (userRepository.existsByEmail(tenantId, email))
+        }
+        if (userRepository.existsByEmail(tenantId, email)) {
             return AdminResult.Failure(AdminError.Conflict("Email '${email.lowercase()}' is already registered."))
+        }
 
         val hashedPassword = passwordHasher.hash(password)
-        val user = userRepository.save(User(
-            tenantId     = tenantId,
-            username     = username.trim(),
-            email        = email.trim(),
-            fullName     = fullName.trim(),
-            passwordHash = hashedPassword,
-            emailVerified = true,   // admin-created users are considered verified
-            enabled      = true
-        ))
+        val user =
+            userRepository.save(
+                User(
+                    tenantId = tenantId,
+                    username = username.trim(),
+                    email = email.trim(),
+                    fullName = fullName.trim(),
+                    passwordHash = hashedPassword,
+                    emailVerified = true, // admin-created users are considered verified
+                    enabled = true,
+                ),
+            )
 
         // Record in password history
         if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(user.id!!, tenantId, hashedPassword)
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = user.id,
-            clientId  = null,
-            eventType = AuditEventType.ADMIN_USER_CREATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("username" to username)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = user.id,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_USER_CREATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("username" to username),
+            ),
+        )
 
         return AdminResult.Success(user)
     }
@@ -190,35 +216,41 @@ class AdminService(
      * Username is intentionally immutable — it may appear in tokens already issued.
      */
     fun updateUser(
-        userId   : Int,
-        tenantId : Int,
-        email    : String,
-        fullName : String
+        userId: Int,
+        tenantId: Int,
+        email: String,
+        fullName: String,
     ): AdminResult<User> {
-        val user = userRepository.findById(userId)
-            ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+        val user =
+            userRepository.findById(userId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
 
-        if (user.tenantId != tenantId)
+        if (user.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
-        if (email.isBlank() || !email.contains('@'))
+        }
+        if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
+        }
 
         // Check email uniqueness only if it changed
         val newEmail = email.trim().lowercase()
-        if (newEmail != user.email && userRepository.existsByEmail(tenantId, newEmail))
+        if (newEmail != user.email && userRepository.existsByEmail(tenantId, newEmail)) {
             return AdminResult.Failure(AdminError.Conflict("Email '$newEmail' is already registered."))
+        }
 
         val updated = userRepository.update(user.copy(email = newEmail, fullName = fullName.trim()))
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.ADMIN_USER_UPDATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("username" to user.username)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_USER_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("username" to user.username),
+            ),
+        )
 
         return AdminResult.Success(updated)
     }
@@ -227,27 +259,31 @@ class AdminService(
      * Enables or disables a user account.
      */
     fun setUserEnabled(
-        userId   : Int,
-        tenantId : Int,
-        enabled  : Boolean
+        userId: Int,
+        tenantId: Int,
+        enabled: Boolean,
     ): AdminResult<Unit> {
-        val user = userRepository.findById(userId)
-            ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+        val user =
+            userRepository.findById(userId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
 
-        if (user.tenantId != tenantId)
+        if (user.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
+        }
 
         userRepository.update(user.copy(enabled = enabled))
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = if (enabled) AuditEventType.ADMIN_USER_ENABLED else AuditEventType.ADMIN_USER_DISABLED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("username" to user.username, "enabled" to enabled.toString())
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = if (enabled) AuditEventType.ADMIN_USER_ENABLED else AuditEventType.ADMIN_USER_DISABLED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("username" to user.username, "enabled" to enabled.toString()),
+            ),
+        )
 
         return AdminResult.Success(Unit)
     }
@@ -260,38 +296,44 @@ class AdminService(
      * Updates mutable application fields. clientId is immutable.
      */
     fun updateApplication(
-        appId        : Int,
-        tenantId     : Int,
-        name         : String,
-        description  : String?,
-        accessType   : String,
-        redirectUris : List<String>
+        appId: Int,
+        tenantId: Int,
+        name: String,
+        description: String?,
+        accessType: String,
+        redirectUris: List<String>,
     ): AdminResult<Application> {
-        val app = applicationRepository.findById(appId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
+        val app =
+            applicationRepository.findById(appId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
 
-        if (app.tenantId != tenantId)
+        if (app.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
-        if (name.isBlank())
+        }
+        if (name.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
+        }
 
-        val updated = applicationRepository.update(
-            appId        = appId,
-            name         = name.trim(),
-            description  = description?.trim()?.takeIf { it.isNotBlank() },
-            accessType   = accessType,
-            redirectUris = redirectUris
+        val updated =
+            applicationRepository.update(
+                appId = appId,
+                name = name.trim(),
+                description = description?.trim()?.takeIf { it.isNotBlank() },
+                accessType = accessType,
+                redirectUris = redirectUris,
+            )
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = appId,
+                eventType = AuditEventType.ADMIN_CLIENT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("clientId" to app.clientId),
+            ),
         )
-
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = null,
-            clientId  = appId,
-            eventType = AuditEventType.ADMIN_CLIENT_UPDATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("clientId" to app.clientId)
-        ))
 
         return AdminResult.Success(updated)
     }
@@ -300,27 +342,31 @@ class AdminService(
      * Enables or disables an application.
      */
     fun setApplicationEnabled(
-        appId    : Int,
-        tenantId : Int,
-        enabled  : Boolean
+        appId: Int,
+        tenantId: Int,
+        enabled: Boolean,
     ): AdminResult<Unit> {
-        val app = applicationRepository.findById(appId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
+        val app =
+            applicationRepository.findById(appId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
 
-        if (app.tenantId != tenantId)
+        if (app.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
+        }
 
         applicationRepository.setEnabled(appId, enabled)
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = null,
-            clientId  = appId,
-            eventType = if (enabled) AuditEventType.ADMIN_CLIENT_ENABLED else AuditEventType.ADMIN_CLIENT_DISABLED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("clientId" to app.clientId, "enabled" to enabled.toString())
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = appId,
+                eventType = if (enabled) AuditEventType.ADMIN_CLIENT_ENABLED else AuditEventType.ADMIN_CLIENT_DISABLED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("clientId" to app.clientId, "enabled" to enabled.toString()),
+            ),
+        )
 
         return AdminResult.Success(Unit)
     }
@@ -331,30 +377,34 @@ class AdminService(
      * Only the bcrypt hash is persisted.
      */
     fun regenerateClientSecret(
-        appId    : Int,
-        tenantId : Int
+        appId: Int,
+        tenantId: Int,
     ): AdminResult<String> {
-        val app = applicationRepository.findById(appId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
+        val app =
+            applicationRepository.findById(appId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
 
-        if (app.tenantId != tenantId)
+        if (app.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
+        }
 
         // Generate 32-byte (256-bit) cryptographically random secret, base64url encoded
-        val raw   = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        val raw = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val secret = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
 
         applicationRepository.setClientSecretHash(appId, passwordHasher.hash(secret))
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = null,
-            clientId  = appId,
-            eventType = AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("clientId" to app.clientId)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = appId,
+                eventType = AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("clientId" to app.clientId),
+            ),
+        )
 
         return AdminResult.Success(secret)
     }
@@ -369,48 +419,59 @@ class AdminService(
      * encrypts it before persistence via [EncryptionService].
      */
     fun updateSmtpConfig(
-        slug            : String,
-        smtpHost        : String?,
-        smtpPort        : Int,
-        smtpUsername    : String?,
-        smtpPassword    : String?,
-        smtpFromAddress : String?,
-        smtpFromName    : String?,
-        smtpTlsEnabled  : Boolean,
-        smtpEnabled     : Boolean
+        slug: String,
+        smtpHost: String?,
+        smtpPort: Int,
+        smtpUsername: String?,
+        smtpPassword: String?,
+        smtpFromAddress: String?,
+        smtpFromName: String?,
+        smtpTlsEnabled: Boolean,
+        smtpEnabled: Boolean,
     ): AdminResult<Tenant> {
-        val tenant = tenantRepository.findBySlug(slug)
-            ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+        val tenant =
+            tenantRepository.findBySlug(slug)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
 
         if (smtpEnabled) {
-            if (smtpHost.isNullOrBlank())
-                return AdminResult.Failure(AdminError.Validation("SMTP host is required when email delivery is enabled."))
-            if (smtpFromAddress.isNullOrBlank() || !smtpFromAddress.contains('@'))
+            if (smtpHost.isNullOrBlank()) {
+                return AdminResult.Failure(
+                    AdminError.Validation("SMTP host is required when email delivery is enabled."),
+                )
+            }
+            if (smtpFromAddress.isNullOrBlank() || !smtpFromAddress.contains('@')) {
                 return AdminResult.Failure(AdminError.Validation("A valid from address is required."))
-            if (smtpPort < 1 || smtpPort > 65535)
+            }
+            if (smtpPort < 1 || smtpPort > 65535) {
                 return AdminResult.Failure(AdminError.Validation("SMTP port must be between 1 and 65535."))
+            }
         }
 
-        val updated = tenantRepository.update(tenant.copy(
-            smtpHost        = smtpHost?.trim()?.takeIf { it.isNotBlank() },
-            smtpPort        = smtpPort,
-            smtpUsername    = smtpUsername?.trim()?.takeIf { it.isNotBlank() },
-            smtpPassword    = smtpPassword?.takeIf { it.isNotBlank() } ?: tenant.smtpPassword,
-            smtpFromAddress = smtpFromAddress?.trim()?.takeIf { it.isNotBlank() },
-            smtpFromName    = smtpFromName?.trim()?.takeIf { it.isNotBlank() },
-            smtpTlsEnabled  = smtpTlsEnabled,
-            smtpEnabled     = smtpEnabled
-        ))
+        val updated =
+            tenantRepository.update(
+                tenant.copy(
+                    smtpHost = smtpHost?.trim()?.takeIf { it.isNotBlank() },
+                    smtpPort = smtpPort,
+                    smtpUsername = smtpUsername?.trim()?.takeIf { it.isNotBlank() },
+                    smtpPassword = smtpPassword?.takeIf { it.isNotBlank() } ?: tenant.smtpPassword,
+                    smtpFromAddress = smtpFromAddress?.trim()?.takeIf { it.isNotBlank() },
+                    smtpFromName = smtpFromName?.trim()?.takeIf { it.isNotBlank() },
+                    smtpTlsEnabled = smtpTlsEnabled,
+                    smtpEnabled = smtpEnabled,
+                ),
+            )
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = null,
-            clientId  = null,
-            eventType = AuditEventType.ADMIN_SMTP_UPDATED,
-            ipAddress = null,
-            userAgent = null,
-            details   = mapOf("slug" to slug, "smtpEnabled" to smtpEnabled.toString())
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_SMTP_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "smtpEnabled" to smtpEnabled.toString()),
+            ),
+        )
 
         return AdminResult.Success(updated)
     }
@@ -425,31 +486,48 @@ class AdminService(
      * configured on the tenant.
      */
     fun sendPasswordResetEmail(
-        userId   : Int,
-        tenantId : Int,
-        baseUrl  : String
+        userId: Int,
+        tenantId: Int,
+        baseUrl: String,
     ): AdminResult<Unit> {
-        val tenant = tenantRepository.findById(tenantId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
-        val user = userRepository.findById(userId)
-            ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
-        if (user.tenantId != tenantId)
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+        if (user.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
-        if (!tenant.isSmtpReady)
-            return AdminResult.Failure(AdminError.Validation(
-                "SMTP is not configured for this workspace. Configure SMTP in Settings to use email-based password reset."))
+        }
+        if (!tenant.isSmtpReady) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "SMTP is not configured for this workspace. Configure SMTP in Settings to use email-based password reset.",
+                ),
+            )
+        }
 
-        return when (val result = selfServiceService.initiateForgotPassword(user.email, tenant.slug, baseUrl, ipAddress = null)) {
-            is SelfServiceResult.Success -> {
-                auditLog.record(AuditEvent(
-                    tenantId  = tenantId,
-                    userId    = userId,
-                    clientId  = null,
-                    eventType = AuditEventType.ADMIN_USER_PASSWORD_RESET,
+        return when (
+            val result =
+                selfServiceService.initiateForgotPassword(
+                    user.email,
+                    tenant.slug,
+                    baseUrl,
                     ipAddress = null,
-                    userAgent = null,
-                    details   = mapOf("username" to user.username, "method" to "email")
-                ))
+                )
+        ) {
+            is SelfServiceResult.Success -> {
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenantId,
+                        userId = userId,
+                        clientId = null,
+                        eventType = AuditEventType.ADMIN_USER_PASSWORD_RESET,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username, "method" to "email"),
+                    ),
+                )
                 AdminResult.Success(Unit)
             }
             is SelfServiceResult.Failure ->
@@ -462,15 +540,14 @@ class AdminService(
      * Delegates to [UserSelfServiceService] to keep the email flow in one place.
      */
     fun resendVerificationEmail(
-        userId   : Int,
-        tenantId : Int,
-        baseUrl  : String
-    ): AdminResult<Unit> {
-        return when (val result = selfServiceService.initiateEmailVerification(userId, tenantId, baseUrl)) {
+        userId: Int,
+        tenantId: Int,
+        baseUrl: String,
+    ): AdminResult<Unit> =
+        when (val result = selfServiceService.initiateEmailVerification(userId, tenantId, baseUrl)) {
             is SelfServiceResult.Success -> AdminResult.Success(Unit)
             is SelfServiceResult.Failure -> AdminResult.Failure(AdminError.Validation(result.error.message))
         }
-    }
 }
 
 // =============================================================================
@@ -478,12 +555,27 @@ class AdminService(
 // =============================================================================
 
 sealed class AdminResult<out T> {
-    data class Success<T>(val value: T) : AdminResult<T>()
-    data class Failure(val error: AdminError) : AdminResult<Nothing>()
+    data class Success<T>(
+        val value: T,
+    ) : AdminResult<T>()
+
+    data class Failure(
+        val error: AdminError,
+    ) : AdminResult<Nothing>()
 }
 
-sealed class AdminError(val message: String) {
-    class NotFound(message: String)    : AdminError(message)
-    class Conflict(message: String)    : AdminError(message)
-    class Validation(message: String)  : AdminError(message)
+sealed class AdminError(
+    val message: String,
+) {
+    class NotFound(
+        message: String,
+    ) : AdminError(message)
+
+    class Conflict(
+        message: String,
+    ) : AdminError(message)
+
+    class Validation(
+        message: String,
+    ) : AdminError(message)
 }

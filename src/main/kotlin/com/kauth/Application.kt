@@ -27,15 +27,17 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
+import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
+import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
-import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.MfaService
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
@@ -46,13 +48,10 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
-import com.kauth.adapter.web.api.apiRoutes
-import com.kauth.adapter.web.healthRoutes
-import io.ktor.server.auth.*
-import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.http.content.*
@@ -65,6 +64,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import org.slf4j.event.Level
 import kotlin.system.exitProcess
 
@@ -91,7 +91,8 @@ fun main() {
     // -------------------------------------------------------------------------
     val baseUrl = System.getenv("KAUTH_BASE_URL")
     if (baseUrl.isNullOrBlank()) {
-        System.err.println("""
+        System.err.println(
+            """
             ┌──────────────────────────────────────────────────────────┐
             │  FATAL: KAUTH_BASE_URL environment variable is not set.  │
             │                                                          │
@@ -101,7 +102,8 @@ fun main() {
             │  Example: KAUTH_BASE_URL=https://auth.yourdomain.com     │
             │  Local:   KAUTH_BASE_URL=http://localhost:8080           │
             └──────────────────────────────────────────────────────────┘
-        """.trimIndent())
+            """.trimIndent(),
+        )
         exitProcess(1)
     }
 
@@ -114,15 +116,16 @@ fun main() {
     //
     // TLS termination is handled by the reverse proxy (nginx, Caddy, etc.),
     // not by Ktor — but we validate the configured base URL here at startup.
-    val isHttps      = baseUrl.startsWith("https://")
-    val isLocalhost  = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
+    val isHttps = baseUrl.startsWith("https://")
+    val isLocalhost = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
 
     val env = System.getenv("KAUTH_ENV") ?: "development"
 
     if (!isHttps) {
         when {
             env == "production" -> {
-                System.err.println("""
+                System.err.println(
+                    """
                     ┌──────────────────────────────────────────────────────────────────┐
                     │  FATAL: KAUTH_BASE_URL must use HTTPS in production mode.        │
                     │                                                                  │
@@ -135,21 +138,26 @@ fun main() {
                     │                                                                  │
                     │  Current value: $baseUrl
                     └──────────────────────────────────────────────────────────────────┘
-                """.trimIndent())
+                    """.trimIndent(),
+                )
                 exitProcess(1)
             }
             !isLocalhost -> {
-                System.err.println("""
+                System.err.println(
+                    """
                     [WARN] KAUTH_BASE_URL is not HTTPS and does not appear to be localhost.
                            Current value: $baseUrl
                            This will break identity federation — OAuth2 providers (Google,
                            GitHub, Microsoft) reject non-HTTPS redirect URIs.
                            Ensure your reverse proxy handles TLS before exposing this to
                            any public or staging environment.
-                """.trimIndent())
+                    """.trimIndent(),
+                )
             }
             else -> {
-                System.err.println("[DEV]  KAUTH_BASE_URL is HTTP on localhost — acceptable for local development only.")
+                System.err.println(
+                    "[DEV]  KAUTH_BASE_URL is HTTP on localhost — acceptable for local development only.",
+                )
             }
         }
     }
@@ -157,7 +165,9 @@ fun main() {
     if (env == "production") {
         val legacySecret = System.getenv("JWT_SECRET")
         if (!legacySecret.isNullOrBlank() && legacySecret == "secret-key-12345") {
-            System.err.println("FATAL: JWT_SECRET is set to the insecure default value in production mode. Refusing to start.")
+            System.err.println(
+                "FATAL: JWT_SECRET is set to the insecure default value in production mode. Refusing to start.",
+            )
             exitProcess(1)
         }
     }
@@ -166,48 +176,50 @@ fun main() {
     // and portal session signing. Non-fatal: app starts without it, but SMTP
     // config will be unavailable and portal sessions won't survive restarts.
     if (!EncryptionService.isAvailable) {
-        System.err.println("""
+        System.err.println(
+            """
             [WARN] KAUTH_SECRET_KEY is not set.
                    SMTP passwords cannot be stored and portal sessions are ephemeral.
                    Set this env var to a random 32+ char string for production use.
-        """.trimIndent())
+            """.trimIndent(),
+        )
     }
 
     // -------------------------------------------------------------------------
     // Database + migrations
     // -------------------------------------------------------------------------
     DatabaseFactory.init(
-        url      = System.getenv("DB_URL")      ?: "jdbc:postgresql://localhost:5432/kauth_db",
-        user     = System.getenv("DB_USER")     ?: "postgres",
-        password = System.getenv("DB_PASSWORD") ?: "password"
+        url = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
+        user = System.getenv("DB_USER") ?: "postgres",
+        password = System.getenv("DB_PASSWORD") ?: "password",
     )
 
     // -------------------------------------------------------------------------
     // Repositories (constructed once, shared across all requests)
     // -------------------------------------------------------------------------
-    val userRepository        = PostgresUserRepository()
-    val tenantRepository      = PostgresTenantRepository()
+    val userRepository = PostgresUserRepository()
+    val tenantRepository = PostgresTenantRepository()
     val applicationRepository = PostgresApplicationRepository()
-    val tenantKeyRepository   = PostgresTenantKeyRepository()
-    val sessionRepository     = PostgresSessionRepository()
-    val authCodeRepository    = PostgresAuthorizationCodeRepository()
-    val auditLogRepository    = PostgresAuditLogRepository()
-    val passwordHasher        = BcryptPasswordHasher()
+    val tenantKeyRepository = PostgresTenantKeyRepository()
+    val sessionRepository = PostgresSessionRepository()
+    val authCodeRepository = PostgresAuthorizationCodeRepository()
+    val auditLogRepository = PostgresAuditLogRepository()
+    val passwordHasher = BcryptPasswordHasher()
     // Phase 3b: email verification + password reset token repositories
-    val evTokenRepository     = PostgresEmailVerificationTokenRepository()
-    val prTokenRepository     = PostgresPasswordResetTokenRepository()
+    val evTokenRepository = PostgresEmailVerificationTokenRepository()
+    val prTokenRepository = PostgresPasswordResetTokenRepository()
     // Phase 3c: roles & groups
-    val roleRepository        = PostgresRoleRepository()
-    val groupRepository       = PostgresGroupRepository()
+    val roleRepository = PostgresRoleRepository()
+    val groupRepository = PostgresGroupRepository()
     val passwordPolicyAdapter = PostgresPasswordPolicyAdapter(passwordHasher)
     // Phase 2: Social Login repositories
     val identityProviderRepository = PostgresIdentityProviderRepository()
-    val socialAccountRepository    = PostgresSocialAccountRepository()
+    val socialAccountRepository = PostgresSocialAccountRepository()
     // Phase 3a: API keys
-    val apiKeyRepository           = PostgresApiKeyRepository()
+    val apiKeyRepository = PostgresApiKeyRepository()
     // Phase 4: Webhooks — instantiated before auditLogAdapter so the adapter can fan out events
-    val webhookEndpointRepository  = PostgresWebhookEndpointRepository()
-    val webhookDeliveryRepository  = PostgresWebhookDeliveryRepository()
+    val webhookEndpointRepository = PostgresWebhookEndpointRepository()
+    val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
 
     // -------------------------------------------------------------------------
     // RS256 key provisioning — ensure every tenant has a signing key
@@ -220,29 +232,32 @@ fun main() {
     // built-in 'kotauth-portal' PUBLIC client with the correct redirect URI.
     // Run after key provisioning so tenant list is stable.
     // -------------------------------------------------------------------------
-    val portalClientProvisioning = PortalClientProvisioning(
-        tenantRepository      = tenantRepository,
-        applicationRepository = applicationRepository,
-        baseUrl               = baseUrl
-    )
+    val portalClientProvisioning =
+        PortalClientProvisioning(
+            tenantRepository = tenantRepository,
+            applicationRepository = applicationRepository,
+            baseUrl = baseUrl,
+        )
     portalClientProvisioning.provisionRedirectUris()
 
     // -------------------------------------------------------------------------
     // Token adapter — RS256, per-tenant key pairs
     // -------------------------------------------------------------------------
-    val tokenAdapter = JwtTokenAdapter(
-        baseUrl           = baseUrl,
-        tenantKeyRepository = tenantKeyRepository
-    )
+    val tokenAdapter =
+        JwtTokenAdapter(
+            baseUrl = baseUrl,
+            tenantKeyRepository = tenantKeyRepository,
+        )
 
     // -------------------------------------------------------------------------
     // Phase 4: Webhook service + audit adapter (order matters — webhook service
     // must exist before the audit adapter so the adapter can fan out events)
     // -------------------------------------------------------------------------
-    val webhookService  = WebhookService(
-        endpointRepository = webhookEndpointRepository,
-        deliveryRepository = webhookDeliveryRepository
-    )
+    val webhookService =
+        WebhookService(
+            endpointRepository = webhookEndpointRepository,
+            deliveryRepository = webhookDeliveryRepository,
+        )
     val auditLogAdapter = PostgresAuditLogAdapter(webhookService = webhookService)
 
     // -------------------------------------------------------------------------
@@ -251,164 +266,175 @@ fun main() {
 
     // Phase 3b: SMTP email adapter + self-service domain service
     val emailAdapter = SmtpEmailAdapter()
-    val selfServiceService = UserSelfServiceService(
-        userRepository    = userRepository,
-        tenantRepository  = tenantRepository,
-        sessionRepository = sessionRepository,
-        passwordHasher    = passwordHasher,
-        auditLog          = auditLogAdapter,
-        evTokenRepo       = evTokenRepository,
-        prTokenRepo       = prTokenRepository,
-        emailPort         = emailAdapter,
-        passwordPolicy    = passwordPolicyAdapter
-    )
+    val selfServiceService =
+        UserSelfServiceService(
+            userRepository = userRepository,
+            tenantRepository = tenantRepository,
+            sessionRepository = sessionRepository,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+            evTokenRepo = evTokenRepository,
+            prTokenRepo = prTokenRepository,
+            emailPort = emailAdapter,
+            passwordPolicy = passwordPolicyAdapter,
+        )
 
-    val authService = AuthService(
-        userRepository    = userRepository,
-        tenantRepository  = tenantRepository,
-        tokenPort         = tokenAdapter,
-        passwordHasher    = passwordHasher,
-        auditLog          = auditLogAdapter,
-        sessionRepository = sessionRepository,
-        selfServiceService = selfServiceService,
-        passwordPolicy    = passwordPolicyAdapter
-    )
-    val oauthService = OAuthService(
-        tenantRepository      = tenantRepository,
-        userRepository        = userRepository,
-        applicationRepository = applicationRepository,
-        sessionRepository     = sessionRepository,
-        authCodeRepository    = authCodeRepository,
-        tokenPort             = tokenAdapter,
-        passwordHasher        = passwordHasher,
-        auditLog              = auditLogAdapter,
-        roleRepository        = roleRepository
-    )
-    val adminService = AdminService(
-        tenantRepository      = tenantRepository,
-        userRepository        = userRepository,
-        applicationRepository = applicationRepository,
-        passwordHasher        = passwordHasher,
-        auditLog              = auditLogAdapter,
-        sessionRepository     = sessionRepository,
-        selfServiceService    = selfServiceService,
-        passwordPolicy        = passwordPolicyAdapter
-    )
-    val roleGroupService = RoleGroupService(
-        roleRepository        = roleRepository,
-        groupRepository       = groupRepository,
-        tenantRepository      = tenantRepository,
-        userRepository        = userRepository,
-        applicationRepository = applicationRepository,
-        auditLog              = auditLogAdapter
-    )
+    val authService =
+        AuthService(
+            userRepository = userRepository,
+            tenantRepository = tenantRepository,
+            tokenPort = tokenAdapter,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+            sessionRepository = sessionRepository,
+            selfServiceService = selfServiceService,
+            passwordPolicy = passwordPolicyAdapter,
+        )
+    val oauthService =
+        OAuthService(
+            tenantRepository = tenantRepository,
+            userRepository = userRepository,
+            applicationRepository = applicationRepository,
+            sessionRepository = sessionRepository,
+            authCodeRepository = authCodeRepository,
+            tokenPort = tokenAdapter,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+            roleRepository = roleRepository,
+        )
+    val adminService =
+        AdminService(
+            tenantRepository = tenantRepository,
+            userRepository = userRepository,
+            applicationRepository = applicationRepository,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+            sessionRepository = sessionRepository,
+            selfServiceService = selfServiceService,
+            passwordPolicy = passwordPolicyAdapter,
+        )
+    val roleGroupService =
+        RoleGroupService(
+            roleRepository = roleRepository,
+            groupRepository = groupRepository,
+            tenantRepository = tenantRepository,
+            userRepository = userRepository,
+            applicationRepository = applicationRepository,
+            auditLog = auditLogAdapter,
+        )
     // Phase 3c: MFA / TOTP
     val mfaRepository = PostgresMfaRepository()
-    val mfaService = MfaService(
-        mfaRepository    = mfaRepository,
-        userRepository   = userRepository,
-        tenantRepository = tenantRepository,
-        passwordHasher   = passwordHasher,
-        auditLog         = auditLogAdapter
-    )
+    val mfaService =
+        MfaService(
+            mfaRepository = mfaRepository,
+            userRepository = userRepository,
+            tenantRepository = tenantRepository,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+        )
 
     // Phase 3a: API key service
-    val apiKeyService = ApiKeyService(
-        apiKeyRepository = apiKeyRepository,
-        tenantRepository = tenantRepository
-    )
+    val apiKeyService =
+        ApiKeyService(
+            apiKeyRepository = apiKeyRepository,
+            tenantRepository = tenantRepository,
+        )
 
     // Phase 2: Social Login service — wires provider HTTP adapters
-    val socialLoginService = SocialLoginService(
-        identityProviderRepository = identityProviderRepository,
-        socialAccountRepository    = socialAccountRepository,
-        userRepository             = userRepository,
-        tenantRepository           = tenantRepository,
-        sessionRepository          = sessionRepository,
-        tokenPort                  = tokenAdapter,
-        passwordHasher             = passwordHasher,
-        auditLog                   = auditLogAdapter,
-        providerAdapters           = mapOf(
-            SocialProvider.GOOGLE to GoogleOAuthAdapter(),
-            SocialProvider.GITHUB to GitHubOAuthAdapter()
+    val socialLoginService =
+        SocialLoginService(
+            identityProviderRepository = identityProviderRepository,
+            socialAccountRepository = socialAccountRepository,
+            userRepository = userRepository,
+            tenantRepository = tenantRepository,
+            sessionRepository = sessionRepository,
+            tokenPort = tokenAdapter,
+            passwordHasher = passwordHasher,
+            auditLog = auditLogAdapter,
+            providerAdapters =
+                mapOf(
+                    SocialProvider.GOOGLE to GoogleOAuthAdapter(),
+                    SocialProvider.GITHUB to GitHubOAuthAdapter(),
+                ),
         )
-    )
 
     // -------------------------------------------------------------------------
     // Rate limiters (Phase 0)
     // -------------------------------------------------------------------------
-    val loginRateLimiter    = RateLimiter(maxRequests = 5,  windowSeconds = 60)   // 5 attempts / minute per IP
-    val registerRateLimiter = RateLimiter(maxRequests = 3,  windowSeconds = 300)  // 3 registrations / 5 min per IP
+    val loginRateLimiter = RateLimiter(maxRequests = 5, windowSeconds = 60) // 5 attempts / minute per IP
+    val registerRateLimiter = RateLimiter(maxRequests = 3, windowSeconds = 300) // 3 registrations / 5 min per IP
 
     // Phase 3b: portal session signing key — derived from KAUTH_SECRET_KEY for persistence
     // across restarts. Random key is used as fallback (sessions are valid only until restart).
-    val portalSessionKey: ByteArray = run {
-        val secret = System.getenv("KAUTH_SECRET_KEY")
-        if (!secret.isNullOrBlank()) {
-            java.security.MessageDigest.getInstance("SHA-256")
-                .digest("portal-session:$secret".toByteArray(Charsets.UTF_8))
-        } else {
-            ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+    val portalSessionKey: ByteArray =
+        run {
+            val secret = System.getenv("KAUTH_SECRET_KEY")
+            if (!secret.isNullOrBlank()) {
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest("portal-session:$secret".toByteArray(Charsets.UTF_8))
+            } else {
+                ByteArray(32).also { java.security.SecureRandom().nextBytes(it) }
+            }
         }
-    }
 
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         module(
-            authService                = authService,
-            oauthService               = oauthService,
-            adminService               = adminService,
-            roleGroupService           = roleGroupService,
-            selfServiceService         = selfServiceService,
-            mfaService                 = mfaService,
-            mfaRepository              = mfaRepository,
-            roleRepository             = roleRepository,
-            groupRepository            = groupRepository,
-            tenantRepository           = tenantRepository,
-            applicationRepository      = applicationRepository,
-            userRepository             = userRepository,
-            sessionRepository          = sessionRepository,
-            auditLogRepository         = auditLogRepository,
-            keyProvisioningService     = keyProvisioning,
-            loginRateLimiter           = loginRateLimiter,
-            registerRateLimiter        = registerRateLimiter,
-            portalSessionKey           = portalSessionKey,
-            baseUrl                    = baseUrl,
-            portalClientProvisioning   = portalClientProvisioning,
-            socialLoginService         = socialLoginService,
+            authService = authService,
+            oauthService = oauthService,
+            adminService = adminService,
+            roleGroupService = roleGroupService,
+            selfServiceService = selfServiceService,
+            mfaService = mfaService,
+            mfaRepository = mfaRepository,
+            roleRepository = roleRepository,
+            groupRepository = groupRepository,
+            tenantRepository = tenantRepository,
+            applicationRepository = applicationRepository,
+            userRepository = userRepository,
+            sessionRepository = sessionRepository,
+            auditLogRepository = auditLogRepository,
+            keyProvisioningService = keyProvisioning,
+            loginRateLimiter = loginRateLimiter,
+            registerRateLimiter = registerRateLimiter,
+            portalSessionKey = portalSessionKey,
+            baseUrl = baseUrl,
+            portalClientProvisioning = portalClientProvisioning,
+            socialLoginService = socialLoginService,
             identityProviderRepository = identityProviderRepository,
-            apiKeyService              = apiKeyService,
-            apiKeyRepository           = apiKeyRepository,
-            webhookService             = webhookService
+            apiKeyService = apiKeyService,
+            apiKeyRepository = apiKeyRepository,
+            webhookService = webhookService,
         )
     }.start(wait = true)
 }
 
 fun Application.module(
-    authService                : AuthService,
-    oauthService               : OAuthService,
-    adminService               : AdminService,
-    roleGroupService           : RoleGroupService,
-    selfServiceService         : UserSelfServiceService,
-    mfaService                 : MfaService,
-    tenantRepository           : com.kauth.domain.port.TenantRepository,
-    applicationRepository      : com.kauth.domain.port.ApplicationRepository,
-    userRepository             : com.kauth.domain.port.UserRepository,
-    sessionRepository          : com.kauth.domain.port.SessionRepository,
-    auditLogRepository         : com.kauth.domain.port.AuditLogRepository,
-    keyProvisioningService     : KeyProvisioningService,
-    mfaRepository              : com.kauth.domain.port.MfaRepository,
-    roleRepository             : com.kauth.domain.port.RoleRepository,
-    groupRepository            : com.kauth.domain.port.GroupRepository,
-    loginRateLimiter           : RateLimiter,
-    registerRateLimiter        : RateLimiter,
-    portalSessionKey           : ByteArray,
-    baseUrl                    : String,
-    portalClientProvisioning   : PortalClientProvisioning,
-    socialLoginService         : SocialLoginService? = null,                            // Phase 2
-    identityProviderRepository : com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
-    apiKeyService              : ApiKeyService? = null,                                 // Phase 3a
-    apiKeyRepository           : com.kauth.domain.port.ApiKeyRepository? = null,        // Phase 3a
-    webhookService             : WebhookService? = null                                 // Phase 4
+    authService: AuthService,
+    oauthService: OAuthService,
+    adminService: AdminService,
+    roleGroupService: RoleGroupService,
+    selfServiceService: UserSelfServiceService,
+    mfaService: MfaService,
+    tenantRepository: com.kauth.domain.port.TenantRepository,
+    applicationRepository: com.kauth.domain.port.ApplicationRepository,
+    userRepository: com.kauth.domain.port.UserRepository,
+    sessionRepository: com.kauth.domain.port.SessionRepository,
+    auditLogRepository: com.kauth.domain.port.AuditLogRepository,
+    keyProvisioningService: KeyProvisioningService,
+    mfaRepository: com.kauth.domain.port.MfaRepository,
+    roleRepository: com.kauth.domain.port.RoleRepository,
+    groupRepository: com.kauth.domain.port.GroupRepository,
+    loginRateLimiter: RateLimiter,
+    registerRateLimiter: RateLimiter,
+    portalSessionKey: ByteArray,
+    baseUrl: String,
+    portalClientProvisioning: PortalClientProvisioning,
+    socialLoginService: SocialLoginService? = null, // Phase 2
+    identityProviderRepository: com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
+    apiKeyService: ApiKeyService? = null, // Phase 3a
+    apiKeyRepository: com.kauth.domain.port.ApiKeyRepository? = null, // Phase 3a
+    webhookService: WebhookService? = null, // Phase 4
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -419,7 +445,11 @@ fun Application.module(
     // The ID flows into MDC so every log line emitted during a request automatically
     // includes "requestId" — enabling trace reconstruction in any log aggregator.
     install(CallId) {
-        generate { java.util.UUID.randomUUID().toString() }
+        generate {
+            java.util.UUID
+                .randomUUID()
+                .toString()
+        }
         replyToHeader(HttpHeaders.XRequestId)
     }
 
@@ -460,7 +490,7 @@ fun Application.module(
                 if (tokenCredential.token.startsWith("kauth_")) {
                     ApiKeyPrincipal(rawToken = tokenCredential.token)
                 } else {
-                    null  // Reject anything that doesn't look like our key format
+                    null // Reject anything that doesn't look like our key format
                 }
             }
         }
@@ -473,14 +503,14 @@ fun Application.module(
         val secureCookies = baseUrl.startsWith("https://")
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
-            cookie.secure   = secureCookies
-            cookie.maxAgeInSeconds = 3600 * 8  // 8-hour admin session
+            cookie.secure = secureCookies
+            cookie.maxAgeInSeconds = 3600 * 8 // 8-hour admin session
         }
         // Phase 3b: self-service portal session — HMAC-signed with derived key
         cookie<PortalSession>("KOTAUTH_PORTAL") {
             cookie.httpOnly = true
-            cookie.secure   = secureCookies
-            cookie.maxAgeInSeconds = 3600 * 4  // 4-hour portal session
+            cookie.secure = secureCookies
+            cookie.maxAgeInSeconds = 3600 * 4 // 4-hour portal session
             transform(SessionTransportTransformerMessageAuthentication(portalSessionKey))
         }
     }
@@ -493,25 +523,29 @@ fun Application.module(
             call.application.log.error("Unhandled exception at ${call.request.path()}", cause)
             if (call.request.path().startsWith("/admin")) {
                 val session = call.sessions.get<AdminSession>()
-                val workspaces = try {
-                    tenantRepository.findAll().map { it.slug to it.displayName }
-                } catch (_: Exception) {
-                    emptyList()
-                }
+                val workspaces =
+                    try {
+                        tenantRepository.findAll().map { it.slug to it.displayName }
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
                 call.respondHtml(
                     HttpStatusCode.InternalServerError,
                     AdminView.adminErrorPage(
-                        message       = cause.message ?: "An unexpected error occurred.",
+                        message = cause.message ?: "An unexpected error occurred.",
                         exceptionType = cause::class.qualifiedName,
                         allWorkspaces = workspaces,
-                        loggedInAs    = session?.username ?: "—"
-                    )
+                        loggedInAs = session?.username ?: "—",
+                    ),
                 )
             } else {
-                call.respond(HttpStatusCode.InternalServerError, mapOf(
-                    "error" to "server_error",
-                    "error_description" to "An unexpected error occurred"
-                ))
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf(
+                        "error" to "server_error",
+                        "error_description" to "An unexpected error occurred",
+                    ),
+                )
             }
         }
     }
@@ -532,62 +566,62 @@ fun Application.module(
 
         // All tenant auth + OIDC flows (Phase 1–2)
         authRoutes(
-            authService                = authService,
-            oauthService               = oauthService,
-            tenantRepository           = tenantRepository,
-            loginRateLimiter           = loginRateLimiter,
-            registerRateLimiter        = registerRateLimiter,
-            selfServiceService         = selfServiceService,
-            mfaService                 = mfaService,
-            roleRepository             = roleRepository,
-            socialLoginService         = socialLoginService,
+            authService = authService,
+            oauthService = oauthService,
+            tenantRepository = tenantRepository,
+            loginRateLimiter = loginRateLimiter,
+            registerRateLimiter = registerRateLimiter,
+            selfServiceService = selfServiceService,
+            mfaService = mfaService,
+            roleRepository = roleRepository,
+            socialLoginService = socialLoginService,
             identityProviderRepository = identityProviderRepository,
-            baseUrl                    = baseUrl
+            baseUrl = baseUrl,
         )
 
         // Self-service portal — /t/{slug}/account/* (Phase 4: OAuth-backed login)
         portalRoutes(
-            authService        = authService,
+            authService = authService,
             selfServiceService = selfServiceService,
-            tenantRepository   = tenantRepository,
-            mfaService         = mfaService,
-            userRepository     = userRepository,
-            oauthService       = oauthService,
-            baseUrl            = baseUrl
+            tenantRepository = tenantRepository,
+            mfaService = mfaService,
+            userRepository = userRepository,
+            oauthService = oauthService,
+            baseUrl = baseUrl,
         )
 
         // REST API v1 — /t/{tenantSlug}/api/v1/** (Phase 3b)
         if (apiKeyService != null) {
             apiRoutes(
-                apiKeyService     = apiKeyService,
-                tenantRepository  = tenantRepository,
-                userRepository    = userRepository,
-                roleRepository    = roleRepository,
-                groupRepository   = groupRepository,
+                apiKeyService = apiKeyService,
+                tenantRepository = tenantRepository,
+                userRepository = userRepository,
+                roleRepository = roleRepository,
+                groupRepository = groupRepository,
                 applicationRepository = applicationRepository,
                 sessionRepository = sessionRepository,
                 auditLogRepository = auditLogRepository,
-                roleGroupService  = roleGroupService,
-                adminService      = adminService
+                roleGroupService = roleGroupService,
+                adminService = adminService,
             )
         }
 
         // Admin console
         adminRoutes(
-            authService                = authService,
-            adminService               = adminService,
-            roleGroupService           = roleGroupService,
-            tenantRepository           = tenantRepository,
-            applicationRepository      = applicationRepository,
-            userRepository             = userRepository,
-            sessionRepository          = sessionRepository,
-            auditLogRepository         = auditLogRepository,
-            keyProvisioningService     = keyProvisioningService,
-            mfaRepository              = mfaRepository,
-            portalClientProvisioning   = portalClientProvisioning,
+            authService = authService,
+            adminService = adminService,
+            roleGroupService = roleGroupService,
+            tenantRepository = tenantRepository,
+            applicationRepository = applicationRepository,
+            userRepository = userRepository,
+            sessionRepository = sessionRepository,
+            auditLogRepository = auditLogRepository,
+            keyProvisioningService = keyProvisioningService,
+            mfaRepository = mfaRepository,
+            portalClientProvisioning = portalClientProvisioning,
             identityProviderRepository = identityProviderRepository,
-            apiKeyService              = apiKeyService,
-            webhookService             = webhookService
+            apiKeyService = apiKeyService,
+            webhookService = webhookService,
         )
     }
 }

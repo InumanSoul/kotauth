@@ -19,10 +19,9 @@ import javax.crypto.spec.SecretKeySpec
  * The shared secret is Base32-encoded for URI/QR code compatibility.
  */
 object TotpUtil {
-
-    private const val DIGITS     = 6
-    private const val PERIOD     = 30L  // seconds
-    private const val SECRET_LEN = 20   // 160-bit secret (HMAC-SHA1 key size)
+    private const val DIGITS = 6
+    private const val PERIOD = 30L // seconds
+    private const val SECRET_LEN = 20 // 160-bit secret (HMAC-SHA1 key size)
 
     // Base32 alphabet (RFC 4648)
     private const val BASE32_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
@@ -41,8 +40,12 @@ object TotpUtil {
      *
      * Format: otpauth://totp/{issuer}:{account}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30
      */
-    fun generateUri(secret: String, accountName: String, issuer: String): String {
-        val encodedIssuer  = java.net.URLEncoder.encode(issuer, "UTF-8")
+    fun generateUri(
+        secret: String,
+        accountName: String,
+        issuer: String,
+    ): String {
+        val encodedIssuer = java.net.URLEncoder.encode(issuer, "UTF-8")
         val encodedAccount = java.net.URLEncoder.encode(accountName, "UTF-8")
         return "otpauth://totp/$encodedIssuer:$encodedAccount" +
             "?secret=$secret" +
@@ -58,11 +61,15 @@ object TotpUtil {
      * Allows a ±1 time step window to accommodate clock skew between
      * the server and the user's authenticator app.
      */
-    fun verify(secret: String, code: String, timeMillis: Long = System.currentTimeMillis()): Boolean {
+    fun verify(
+        secret: String,
+        code: String,
+        timeMillis: Long = System.currentTimeMillis(),
+    ): Boolean {
         if (code.length != DIGITS || !code.all { it.isDigit() }) return false
 
         val secretBytes = base32Decode(secret)
-        val timeStep    = timeMillis / 1000 / PERIOD
+        val timeStep = timeMillis / 1000 / PERIOD
 
         // Check current step and ±1 window
         for (offset in -1L..1L) {
@@ -75,9 +82,12 @@ object TotpUtil {
     /**
      * Generates the current TOTP code for a given secret (useful for testing).
      */
-    fun generateCode(secret: String, timeMillis: Long = System.currentTimeMillis()): String {
+    fun generateCode(
+        secret: String,
+        timeMillis: Long = System.currentTimeMillis(),
+    ): String {
         val secretBytes = base32Decode(secret)
-        val timeStep    = timeMillis / 1000 / PERIOD
+        val timeStep = timeMillis / 1000 / PERIOD
         return generateOtp(secretBytes, timeStep)
     }
 
@@ -85,18 +95,22 @@ object TotpUtil {
     // Internal HOTP computation (RFC 4226)
     // -----------------------------------------------------------------------
 
-    private fun generateOtp(secret: ByteArray, counter: Long): String {
+    private fun generateOtp(
+        secret: ByteArray,
+        counter: Long,
+    ): String {
         val data = ByteBuffer.allocate(8).putLong(counter).array()
-        val mac  = Mac.getInstance("HmacSHA1")
+        val mac = Mac.getInstance("HmacSHA1")
         mac.init(SecretKeySpec(secret, "HmacSHA1"))
         val hash = mac.doFinal(data)
 
         // Dynamic truncation
         val offset = hash[hash.size - 1].toInt() and 0x0F
-        val binary = ((hash[offset].toInt()     and 0x7F) shl 24) or
-                     ((hash[offset + 1].toInt() and 0xFF) shl 16) or
-                     ((hash[offset + 2].toInt() and 0xFF) shl  8) or
-                      (hash[offset + 3].toInt() and 0xFF)
+        val binary =
+            ((hash[offset].toInt() and 0x7F) shl 24) or
+                ((hash[offset + 1].toInt() and 0xFF) shl 16) or
+                ((hash[offset + 2].toInt() and 0xFF) shl 8) or
+                (hash[offset + 3].toInt() and 0xFF)
 
         val otp = binary % Math.pow(10.0, DIGITS.toDouble()).toInt()
         return otp.toString().padStart(DIGITS, '0')
@@ -126,8 +140,8 @@ object TotpUtil {
 
     fun base32Decode(encoded: String): ByteArray {
         val cleaned = encoded.uppercase().replace("=", "")
-        val output  = mutableListOf<Byte>()
-        var buffer  = 0
+        val output = mutableListOf<Byte>()
+        var buffer = 0
         var bitsLeft = 0
         for (c in cleaned) {
             val value = BASE32_CHARS.indexOf(c)

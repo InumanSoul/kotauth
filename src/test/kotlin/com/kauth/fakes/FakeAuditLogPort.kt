@@ -9,12 +9,13 @@ import com.kauth.domain.port.AuditLogPort
  * Captures recorded events so tests can assert which events were fired.
  */
 class FakeAuditLogPort : AuditLogPort {
-
     private val _events = mutableListOf<AuditEvent>()
 
     val events: List<AuditEvent> get() = _events.toList()
 
-    fun clear() { _events.clear() }
+    fun clear() {
+        _events.clear()
+    }
 
     /** Convenience: count events of a specific type. */
     fun countOf(type: AuditEventType) = _events.count { it.eventType == type }

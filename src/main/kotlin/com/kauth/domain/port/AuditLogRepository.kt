@@ -11,7 +11,6 @@ import com.kauth.domain.model.AuditEventType
  * admin console query path.
  */
 interface AuditLogRepository {
-
     /**
      * Returns recent audit events for a tenant, ordered by [createdAt] DESC.
      *
@@ -26,13 +25,13 @@ interface AuditLogRepository {
         eventType: AuditEventType? = null,
         userId: Int? = null,
         limit: Int = 50,
-        offset: Int = 0
+        offset: Int = 0,
     ): List<AuditEvent>
 
     /** Returns the total count for the given filters (for pagination UI). */
     fun countByTenant(
         tenantId: Int,
         eventType: AuditEventType? = null,
-        userId: Int? = null
+        userId: Int? = null,
     ): Long
 }

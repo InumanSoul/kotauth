@@ -18,16 +18,16 @@ import java.time.Instant
  * whether the email exists. This prevents user enumeration.
  */
 data class PasswordResetToken(
-    val id: Int?           = null,
+    val id: Int? = null,
     val userId: Int,
     val tenantId: Int,
     val tokenHash: String,
     val expiresAt: Instant,
-    val usedAt: Instant?   = null,
+    val usedAt: Instant? = null,
     val ipAddress: String? = null,
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
-    val isUsed: Boolean    get() = usedAt != null
-    val isValid: Boolean   get() = !isExpired && !isUsed
+    val isUsed: Boolean get() = usedAt != null
+    val isValid: Boolean get() = !isExpired && !isUsed
 }

@@ -31,13 +31,12 @@ import java.time.Instant
  *   - "required_admins" → only users with admin roles must enroll (future)
  */
 class MfaService(
-    private val mfaRepository    : MfaRepository,
-    private val userRepository   : UserRepository,
-    private val tenantRepository : TenantRepository,
-    private val passwordHasher   : PasswordHasher,
-    private val auditLog         : AuditLogPort
+    private val mfaRepository: MfaRepository,
+    private val userRepository: UserRepository,
+    private val tenantRepository: TenantRepository,
+    private val passwordHasher: PasswordHasher,
+    private val auditLog: AuditLogPort,
 ) {
-
     companion object {
         /** Number of one-time recovery codes generated per enrollment. */
         const val RECOVERY_CODE_COUNT = 8
@@ -63,12 +62,14 @@ class MfaService(
         tenantId: Int,
         issuer: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): MfaResult<EnrollmentResponse> {
-        val user = userRepository.findById(userId)
-            ?: return MfaResult.Failure(MfaError.UserNotFound)
-        val tenant = tenantRepository.findById(tenantId)
-            ?: return MfaResult.Failure(MfaError.TenantNotFound)
+        val user =
+            userRepository.findById(userId)
+                ?: return MfaResult.Failure(MfaError.UserNotFound)
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return MfaResult.Failure(MfaError.TenantNotFound)
 
         // Check for existing enrollment
         val existing = mfaRepository.findEnrollmentByUserId(userId)
@@ -84,45 +85,54 @@ class MfaService(
 
         // Generate TOTP secret
         val secret = TotpUtil.generateSecret()
-        val uri    = TotpUtil.generateUri(
-            secret      = secret,
-            accountName = user.email,
-            issuer      = issuer.ifBlank { tenant.displayName }
-        )
+        val uri =
+            TotpUtil.generateUri(
+                secret = secret,
+                accountName = user.email,
+                issuer = issuer.ifBlank { tenant.displayName },
+            )
 
         // Persist enrollment (unverified)
-        val enrollment = mfaRepository.saveEnrollment(MfaEnrollment(
-            userId   = userId,
-            tenantId = tenantId,
-            method   = MfaMethod.TOTP,
-            secret   = secret
-        ))
+        val enrollment =
+            mfaRepository.saveEnrollment(
+                MfaEnrollment(
+                    userId = userId,
+                    tenantId = tenantId,
+                    method = MfaMethod.TOTP,
+                    secret = secret,
+                ),
+            )
 
         // Generate recovery codes
         val plaintextCodes = generateRecoveryCodes()
-        val hashedCodes    = plaintextCodes.map { code ->
-            MfaRecoveryCode(
-                userId   = userId,
-                tenantId = tenantId,
-                codeHash = passwordHasher.hash(code)
-            )
-        }
+        val hashedCodes =
+            plaintextCodes.map { code ->
+                MfaRecoveryCode(
+                    userId = userId,
+                    tenantId = tenantId,
+                    codeHash = passwordHasher.hash(code),
+                )
+            }
         mfaRepository.saveRecoveryCodes(hashedCodes)
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.MFA_ENROLLMENT_STARTED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.MFA_ENROLLMENT_STARTED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
-        return MfaResult.Success(EnrollmentResponse(
-            enrollment    = enrollment,
-            totpUri       = uri,
-            recoveryCodes = plaintextCodes
-        ))
+        return MfaResult.Success(
+            EnrollmentResponse(
+                enrollment = enrollment,
+                totpUri = uri,
+                recoveryCodes = plaintextCodes,
+            ),
+        )
     }
 
     /**
@@ -133,10 +143,11 @@ class MfaService(
         userId: Int,
         code: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): MfaResult<MfaEnrollment> {
-        val enrollment = mfaRepository.findEnrollmentByUserId(userId)
-            ?: return MfaResult.Failure(MfaError.NotEnrolled)
+        val enrollment =
+            mfaRepository.findEnrollmentByUserId(userId)
+                ?: return MfaResult.Failure(MfaError.NotEnrolled)
 
         if (enrollment.verified) {
             return MfaResult.Failure(MfaError.AlreadyEnrolled)
@@ -147,10 +158,13 @@ class MfaService(
         }
 
         // Mark enrollment as verified
-        val verified = mfaRepository.updateEnrollment(enrollment.copy(
-            verified   = true,
-            verifiedAt = Instant.now()
-        ))
+        val verified =
+            mfaRepository.updateEnrollment(
+                enrollment.copy(
+                    verified = true,
+                    verifiedAt = Instant.now(),
+                ),
+            )
 
         // Update user's mfaEnabled flag
         val user = userRepository.findById(userId)
@@ -158,14 +172,16 @@ class MfaService(
             userRepository.update(user.copy(mfaEnabled = true))
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = enrollment.tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.MFA_ENROLLMENT_VERIFIED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = enrollment.tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.MFA_ENROLLMENT_VERIFIED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
         return MfaResult.Success(verified)
     }
@@ -181,10 +197,11 @@ class MfaService(
         userId: Int,
         code: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): MfaResult<Boolean> {
-        val enrollment = mfaRepository.findEnrollmentByUserId(userId)
-            ?: return MfaResult.Failure(MfaError.NotEnrolled)
+        val enrollment =
+            mfaRepository.findEnrollmentByUserId(userId)
+                ?: return MfaResult.Failure(MfaError.NotEnrolled)
 
         if (!enrollment.verified || !enrollment.enabled) {
             return MfaResult.Failure(MfaError.NotEnrolled)
@@ -192,18 +209,27 @@ class MfaService(
 
         val valid = TotpUtil.verify(enrollment.secret, code)
 
-        auditLog.record(AuditEvent(
-            tenantId  = enrollment.tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = if (valid) AuditEventType.MFA_CHALLENGE_SUCCESS
-                        else       AuditEventType.MFA_CHALLENGE_FAILED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = enrollment.tenantId,
+                userId = userId,
+                clientId = null,
+                eventType =
+                    if (valid) {
+                        AuditEventType.MFA_CHALLENGE_SUCCESS
+                    } else {
+                        AuditEventType.MFA_CHALLENGE_FAILED
+                    },
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
-        return if (valid) MfaResult.Success(true)
-               else       MfaResult.Failure(MfaError.InvalidCode)
+        return if (valid) {
+            MfaResult.Success(true)
+        } else {
+            MfaResult.Failure(MfaError.InvalidCode)
+        }
     }
 
     /**
@@ -214,7 +240,7 @@ class MfaService(
         userId: Int,
         code: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): MfaResult<Boolean> {
         val unusedCodes = mfaRepository.findUnusedRecoveryCodes(userId)
         if (unusedCodes.isEmpty()) {
@@ -227,28 +253,32 @@ class MfaService(
             if (passwordHasher.verify(code, stored.codeHash)) {
                 mfaRepository.markRecoveryCodeUsed(stored.id!!)
 
-                auditLog.record(AuditEvent(
-                    tenantId  = stored.tenantId,
-                    userId    = userId,
-                    clientId  = null,
-                    eventType = AuditEventType.MFA_RECOVERY_CODE_USED,
-                    ipAddress = ipAddress,
-                    userAgent = userAgent,
-                    details   = mapOf("remaining" to (unusedCodes.size - 1).toString())
-                ))
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = stored.tenantId,
+                        userId = userId,
+                        clientId = null,
+                        eventType = AuditEventType.MFA_RECOVERY_CODE_USED,
+                        ipAddress = ipAddress,
+                        userAgent = userAgent,
+                        details = mapOf("remaining" to (unusedCodes.size - 1).toString()),
+                    ),
+                )
 
                 return MfaResult.Success(true)
             }
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = enrollment?.tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.MFA_CHALLENGE_FAILED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = enrollment?.tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.MFA_CHALLENGE_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
         return MfaResult.Failure(MfaError.InvalidCode)
     }
@@ -265,7 +295,7 @@ class MfaService(
         userId: Int,
         tenantId: Int,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): MfaResult<Unit> {
         mfaRepository.deleteEnrollmentsByUser(userId)
         mfaRepository.deleteRecoveryCodesByUser(userId)
@@ -275,14 +305,16 @@ class MfaService(
             userRepository.update(user.copy(mfaEnabled = false))
         }
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenantId,
-            userId    = userId,
-            clientId  = null,
-            eventType = AuditEventType.MFA_DISABLED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.MFA_DISABLED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
         return MfaResult.Success(Unit)
     }
@@ -303,16 +335,19 @@ class MfaService(
      *                        if roles are not available — the policy will not block login in
      *                        that case (conservative fail-open for the required_admins check).
      */
-    fun isMfaRequired(user: User, tenantMfaPolicy: String, userRoles: List<Role> = emptyList()): Boolean {
-        return when (tenantMfaPolicy) {
-            "required"        -> true
+    fun isMfaRequired(
+        user: User,
+        tenantMfaPolicy: String,
+        userRoles: List<Role> = emptyList(),
+    ): Boolean =
+        when (tenantMfaPolicy) {
+            "required" -> true
             // Only users holding the built-in "admin" role are required to enroll MFA.
             // Effective roles (direct assignments + group inheritance + composite expansion)
             // must be passed by the caller — MfaService has no repository access.
             "required_admins" -> userRoles.any { it.name == "admin" }
-            else              -> false  // "optional" — users may self-enroll via the portal
+            else -> false // "optional" — users may self-enroll via the portal
         }
-    }
 
     /**
      * Checks if a user needs to be challenged for MFA during login.
@@ -348,7 +383,7 @@ class MfaService(
 data class EnrollmentResponse(
     val enrollment: MfaEnrollment,
     val totpUri: String,
-    val recoveryCodes: List<String>
+    val recoveryCodes: List<String>,
 )
 
 // ---------------------------------------------------------------------------
@@ -356,15 +391,25 @@ data class EnrollmentResponse(
 // ---------------------------------------------------------------------------
 
 sealed class MfaResult<out T> {
-    data class Success<T>(val value: T) : MfaResult<T>()
-    data class Failure(val error: MfaError) : MfaResult<Nothing>()
+    data class Success<T>(
+        val value: T,
+    ) : MfaResult<T>()
+
+    data class Failure(
+        val error: MfaError,
+    ) : MfaResult<Nothing>()
 }
 
 sealed class MfaError {
     object UserNotFound : MfaError()
+
     object TenantNotFound : MfaError()
+
     object AlreadyEnrolled : MfaError()
+
     object NotEnrolled : MfaError()
+
     object InvalidCode : MfaError()
+
     object NoRecoveryCodesLeft : MfaError()
 }

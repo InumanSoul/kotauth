@@ -16,7 +16,6 @@ import com.kauth.domain.model.User
  * Implemented by [JwtTokenAdapter].
  */
 interface TokenPort {
-
     /**
      * Issues a full token set (access + refresh + id_token if openid in scope)
      * for a user authentication event.
@@ -32,7 +31,7 @@ interface TokenPort {
         client: Application?,
         scopes: List<String>,
         nonce: String? = null,
-        roles: List<Role> = emptyList()
+        roles: List<Role> = emptyList(),
     ): TokenResponse
 
     /**
@@ -41,7 +40,7 @@ interface TokenPort {
     fun issueClientCredentialsToken(
         tenant: Tenant,
         client: Application,
-        scopes: List<String>
+        scopes: List<String>,
     ): String
 
     /**

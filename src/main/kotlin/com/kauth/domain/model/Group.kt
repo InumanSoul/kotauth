@@ -20,5 +20,5 @@ data class Group(
     val parentGroupId: Int? = null,
     val attributes: Map<String, String> = emptyMap(),
     val roleIds: List<Int> = emptyList(),
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 )

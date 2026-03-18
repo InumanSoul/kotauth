@@ -14,11 +14,11 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class TokenResponse(
-    @SerialName("access_token")       val access_token: String,
-    @SerialName("token_type")         val token_type: String = "Bearer",
-    @SerialName("expires_in")         val expires_in: Long,
-    @SerialName("refresh_token")      val refresh_token: String? = null,
+    @SerialName("access_token") val access_token: String,
+    @SerialName("token_type") val token_type: String = "Bearer",
+    @SerialName("expires_in") val expires_in: Long,
+    @SerialName("refresh_token") val refresh_token: String? = null,
     @SerialName("refresh_expires_in") val refresh_expires_in: Long? = null,
-    @SerialName("id_token")           val id_token: String? = null,
-    @SerialName("scope")              val scope: String = "openid"
+    @SerialName("id_token") val id_token: String? = null,
+    @SerialName("scope") val scope: String = "openid",
 )

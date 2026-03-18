@@ -35,62 +35,85 @@ import kotlin.test.assertTrue
  *   - Refresh Token rotation
  */
 class OAuthServiceTest {
-
     // -------------------------------------------------------------------------
     // Fakes
     // -------------------------------------------------------------------------
 
-    private val tenants   = FakeTenantRepository()
-    private val users     = FakeUserRepository()
-    private val apps      = FakeApplicationRepository()
+    private val tenants = FakeTenantRepository()
+    private val users = FakeUserRepository()
+    private val apps = FakeApplicationRepository()
     private val authCodes = FakeAuthorizationCodeRepository()
-    private val sessions  = FakeSessionRepository()
-    private val hasher    = FakePasswordHasher()
-    private val tokens    = FakeTokenPort()
-    private val auditLog  = FakeAuditLogPort()
+    private val sessions = FakeSessionRepository()
+    private val hasher = FakePasswordHasher()
+    private val tokens = FakeTokenPort()
+    private val auditLog = FakeAuditLogPort()
 
-    private val svc = OAuthService(
-        tenantRepository      = tenants,
-        userRepository        = users,
-        applicationRepository = apps,
-        sessionRepository     = sessions,
-        authCodeRepository    = authCodes,
-        tokenPort             = tokens,
-        passwordHasher        = hasher,
-        auditLog              = auditLog
-    )
+    private val svc =
+        OAuthService(
+            tenantRepository = tenants,
+            userRepository = users,
+            applicationRepository = apps,
+            sessionRepository = sessions,
+            authCodeRepository = authCodes,
+            tokenPort = tokens,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+        )
 
     // -------------------------------------------------------------------------
     // Fixtures
     // -------------------------------------------------------------------------
 
     private val testTenant = Tenant(id = 1, slug = "acme", displayName = "Acme", issuerUrl = null)
-    private val testUser   = User(id = 10, tenantId = 1, username = "alice",
-                                  email = "alice@example.com", fullName = "Alice",
-                                  passwordHash = "hashed:pw", enabled = true)
+    private val testUser =
+        User(
+            id = 10,
+            tenantId = 1,
+            username = "alice",
+            email = "alice@example.com",
+            fullName = "Alice",
+            passwordHash = "hashed:pw",
+            enabled = true,
+        )
 
     /** Public client — PKCE required. */
-    private val publicClient = Application(
-        id = 1, tenantId = 1, clientId = "spa-app", name = "SPA",
-        description = null, accessType = AccessType.PUBLIC, enabled = true,
-        redirectUris = listOf("https://app.example.com/callback")
-    )
+    private val publicClient =
+        Application(
+            id = 1,
+            tenantId = 1,
+            clientId = "spa-app",
+            name = "SPA",
+            description = null,
+            accessType = AccessType.PUBLIC,
+            enabled = true,
+            redirectUris = listOf("https://app.example.com/callback"),
+        )
 
     /** Confidential client — secret required, PKCE optional. */
-    private val confidentialClient = Application(
-        id = 2, tenantId = 1, clientId = "backend-app", name = "Backend",
-        description = null, accessType = AccessType.CONFIDENTIAL, enabled = true,
-        redirectUris = listOf("https://backend.example.com/callback")
-    )
+    private val confidentialClient =
+        Application(
+            id = 2,
+            tenantId = 1,
+            clientId = "backend-app",
+            name = "Backend",
+            description = null,
+            accessType = AccessType.CONFIDENTIAL,
+            enabled = true,
+            redirectUris = listOf("https://backend.example.com/callback"),
+        )
 
     // Stable PKCE pair used across multiple tests
-    private val pkceVerifier  = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"  // 43-char base64url
+    private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk" // 43-char base64url
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
     @BeforeTest
     fun setup() {
-        tenants.clear(); users.clear(); apps.clear()
-        authCodes.clear(); sessions.clear(); auditLog.clear()
+        tenants.clear()
+        users.clear()
+        apps.clear()
+        authCodes.clear()
+        sessions.clear()
+        auditLog.clear()
 
         tenants.add(testTenant)
         users.add(testUser)
@@ -104,60 +127,90 @@ class OAuthServiceTest {
 
     @Test
     fun `issueAuthorizationCode returns TenantNotFound for unknown slug`() {
-        val result = svc.issueAuthorizationCode(
-            tenantSlug = "no-such", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback",
-            scopes = "openid", codeChallenge = pkceChallenge,
-            codeChallengeMethod = "S256", nonce = null, state = null
-        )
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "no-such",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.TenantNotFound>(result.error)
     }
 
     @Test
     fun `issueAuthorizationCode returns InvalidClient for unknown client_id`() {
-        val result = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "ghost-app",
-            redirectUri = "https://app.example.com/callback",
-            scopes = "openid", codeChallenge = pkceChallenge,
-            codeChallengeMethod = "S256", nonce = null, state = null
-        )
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "ghost-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidClient>(result.error)
     }
 
     @Test
     fun `issueAuthorizationCode returns InvalidRedirectUri for unregistered redirect URI`() {
-        val result = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://evil.attacker.com/steal",
-            scopes = "openid", codeChallenge = pkceChallenge,
-            codeChallengeMethod = "S256", nonce = null, state = null
-        )
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://evil.attacker.com/steal",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidRedirectUri>(result.error)
     }
 
     @Test
     fun `issueAuthorizationCode returns PkceRequired for PUBLIC client without code_challenge`() {
-        val result = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback",
-            scopes = "openid", codeChallenge = null,          // ← missing
-            codeChallengeMethod = null, nonce = null, state = null
-        )
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = null, // ← missing
+                codeChallengeMethod = null,
+                nonce = null,
+                state = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.PkceRequired>(result.error)
     }
 
     @Test
     fun `issueAuthorizationCode succeeds for public client with valid PKCE`() {
-        val result = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback",
-            scopes = "openid profile", codeChallenge = pkceChallenge,
-            codeChallengeMethod = "S256", nonce = "nonce-xyz", state = "state-abc"
-        )
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid profile",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = "nonce-xyz",
+                state = "state-abc",
+            )
         assertIs<OAuthResult.Success<AuthorizationCode>>(result)
         val code = result.value
         assertNotNull(code.code)
@@ -172,11 +225,15 @@ class OAuthServiceTest {
 
     @Test
     fun `exchangeAuthorizationCode returns InvalidGrant for unknown code`() {
-        val result = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = "no-such-code",
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
-        )
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = "no-such-code",
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidGrant>(result.error)
     }
@@ -184,68 +241,101 @@ class OAuthServiceTest {
     @Test
     fun `exchangeAuthorizationCode returns InvalidGrant for expired code`() {
         // Save an already-expired code directly into the fake repository
-        val expiredCode = AuthorizationCode(
-            code = "expired-code", tenantId = 1, clientId = publicClient.id,
-            userId = 10, redirectUri = "https://app.example.com/callback",
-            scopes = "openid", codeChallenge = pkceChallenge, codeChallengeMethod = "S256",
-            expiresAt = Instant.now().minusSeconds(120)  // ← in the past
-        )
+        val expiredCode =
+            AuthorizationCode(
+                code = "expired-code",
+                tenantId = 1,
+                clientId = publicClient.id,
+                userId = 10,
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                expiresAt = Instant.now().minusSeconds(120), // ← in the past
+            )
         authCodes.save(expiredCode)
 
-        val result = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = "expired-code",
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
-        )
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = "expired-code",
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidGrant>(result.error)
     }
 
     @Test
     fun `exchangeAuthorizationCode returns InvalidGrant when PKCE verifier does not match challenge`() {
-        val issueResult = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback", scopes = "openid",
-            codeChallenge = pkceChallenge, codeChallengeMethod = "S256",
-            nonce = null, state = null
-        )
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         assertIs<OAuthResult.Success<*>>(issueResult)
         val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
 
         // Use a different verifier — SHA256 won't match the stored challenge
-        val result = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = "tampered-verifier-that-is-long-enough-for-pkce-spec",
-            clientSecret = null
-        )
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = "tampered-verifier-that-is-long-enough-for-pkce-spec",
+                clientSecret = null,
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidGrant>(result.error)
     }
 
     @Test
     fun `exchangeAuthorizationCode succeeds and marks code as consumed`() {
-        val issueResult = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback", scopes = "openid",
-            codeChallenge = pkceChallenge, codeChallengeMethod = "S256",
-            nonce = null, state = null
-        )
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
 
-        val result = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
-        )
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
 
         assertIs<OAuthResult.Success<*>>(result)
         // Code must be consumed — replaying it must fail
-        val replayResult = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
-        )
+        val replayResult =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
         assertIs<OAuthResult.Failure>(replayResult)
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
     }
@@ -253,24 +343,36 @@ class OAuthServiceTest {
     @Test
     fun `exchangeAuthorizationCode revokes all user sessions on replay attack`() {
         // First: create and exchange a valid code to get a session
-        val issueResult = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback", scopes = "openid",
-            codeChallenge = pkceChallenge, codeChallengeMethod = "S256",
-            nonce = null, state = null
-        )
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
         svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
+            tenantSlug = "acme",
+            code = code,
+            clientId = "spa-app",
+            redirectUri = "https://app.example.com/callback",
+            codeVerifier = pkceVerifier,
+            clientSecret = null,
         )
 
         // Now replay the already-used code — sessions must be revoked
         svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
+            tenantSlug = "acme",
+            code = code,
+            clientId = "spa-app",
+            redirectUri = "https://app.example.com/callback",
+            codeVerifier = pkceVerifier,
+            clientSecret = null,
         )
 
         val activeSessions = sessions.findActiveByUser(1, 10)
@@ -284,10 +386,13 @@ class OAuthServiceTest {
 
     @Test
     fun `clientCredentials returns InvalidClient for wrong secret`() {
-        val result = svc.clientCredentials(
-            tenantSlug = "acme", clientId = "backend-app",
-            clientSecret = "wrong-secret", scopes = "openid"
-        )
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "wrong-secret",
+                scopes = "openid",
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidClient>(result.error)
     }
@@ -295,20 +400,26 @@ class OAuthServiceTest {
     @Test
     fun `clientCredentials returns InvalidClient for public client`() {
         // Public clients are not allowed to use client_credentials flow
-        val result = svc.clientCredentials(
-            tenantSlug = "acme", clientId = "spa-app",
-            clientSecret = "any", scopes = "openid"
-        )
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "spa-app",
+                clientSecret = "any",
+                scopes = "openid",
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidClient>(result.error)
     }
 
     @Test
     fun `clientCredentials returns token without refresh_token on success`() {
-        val result = svc.clientCredentials(
-            tenantSlug = "acme", clientId = "backend-app",
-            clientSecret = "secret123", scopes = "openid"
-        )
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+            )
         assertIs<OAuthResult.Success<*>>(result)
         val tokenResponse = (result as OAuthResult.Success<*>).value as com.kauth.domain.model.TokenResponse
         assertNotNull(tokenResponse.access_token)
@@ -322,9 +433,12 @@ class OAuthServiceTest {
 
     @Test
     fun `refreshTokens returns InvalidGrant for unknown refresh token`() {
-        val result = svc.refreshTokens(
-            tenantSlug = "acme", refreshToken = "no-such-token", clientId = "spa-app"
-        )
+        val result =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = "no-such-token",
+                clientId = "spa-app",
+            )
         assertIs<OAuthResult.Failure>(result)
         assertIs<OAuthError.InvalidGrant>(result.error)
     }
@@ -332,31 +446,50 @@ class OAuthServiceTest {
     @Test
     fun `refreshTokens rotates token — old session is revoked, new session is created`() {
         // First, establish a session via code exchange
-        val issueResult = svc.issueAuthorizationCode(
-            tenantSlug = "acme", userId = 10, clientId = "spa-app",
-            redirectUri = "https://app.example.com/callback", scopes = "openid",
-            codeChallenge = pkceChallenge, codeChallengeMethod = "S256",
-            nonce = null, state = null
-        )
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = 10,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
         val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
-        val exchangeResult = svc.exchangeAuthorizationCode(
-            tenantSlug = "acme", code = code,
-            clientId = "spa-app", redirectUri = "https://app.example.com/callback",
-            codeVerifier = pkceVerifier, clientSecret = null
-        )
-        val firstRefreshToken = (exchangeResult as OAuthResult.Success<*>)
-            .value.let { it as com.kauth.domain.model.TokenResponse }.refresh_token!!
+        val exchangeResult =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+        val firstRefreshToken =
+            (exchangeResult as OAuthResult.Success<*>)
+                .value
+                .let { it as com.kauth.domain.model.TokenResponse }
+                .refresh_token!!
 
         // Refresh
-        val refreshResult = svc.refreshTokens(
-            tenantSlug = "acme", refreshToken = firstRefreshToken, clientId = "spa-app"
-        )
+        val refreshResult =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = firstRefreshToken,
+                clientId = "spa-app",
+            )
         assertIs<OAuthResult.Success<*>>(refreshResult)
 
         // Replaying the old refresh token must now fail (rotation = single-use)
-        val replayResult = svc.refreshTokens(
-            tenantSlug = "acme", refreshToken = firstRefreshToken, clientId = "spa-app"
-        )
+        val replayResult =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = firstRefreshToken,
+                clientId = "spa-app",
+            )
         assertIs<OAuthResult.Failure>(replayResult)
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
     }

@@ -9,17 +9,17 @@ import java.time.Instant
  * A provider identity (provider + provider_user_id) is unique per tenant.
  */
 data class SocialAccount(
-    val id             : Int?    = null,
-    val userId         : Int,
-    val tenantId       : Int,
-    val provider       : SocialProvider,
+    val id: Int? = null,
+    val userId: Int,
+    val tenantId: Int,
+    val provider: SocialProvider,
     /** The stable unique identifier from the provider (Google sub, GitHub id). */
-    val providerUserId : String,
+    val providerUserId: String,
     /** Email from the provider at time of linking — may differ from local user email. */
-    val providerEmail  : String?,
+    val providerEmail: String?,
     /** Display name from the provider. */
-    val providerName   : String?,
+    val providerName: String?,
     /** Avatar URL from the provider (optional). */
-    val avatarUrl      : String? = null,
-    val linkedAt       : Instant = Instant.now()
+    val avatarUrl: String? = null,
+    val linkedAt: Instant = Instant.now(),
 )

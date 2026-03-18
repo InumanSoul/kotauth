@@ -22,10 +22,14 @@ import org.jetbrains.exposed.sql.transactions.transaction
  * Flyway owns the schema from here on.
  */
 object DatabaseFactory {
-
-    fun init(url: String, user: String, password: String) {
+    fun init(
+        url: String,
+        user: String,
+        password: String,
+    ) {
         // Step 1: run versioned SQL migrations from src/main/resources/db/migration/
-        Flyway.configure()
+        Flyway
+            .configure()
             .dataSource(url, user, password)
             .locations("classpath:db/migration")
             .load()
@@ -36,7 +40,7 @@ object DatabaseFactory {
             url = url,
             driver = "org.postgresql.Driver",
             user = user,
-            password = password
+            password = password,
         )
 
         // Step 3: seed the default admin user inside the master tenant (first boot only)
@@ -56,12 +60,13 @@ object DatabaseFactory {
      */
     private fun seedAdminIfEmpty() {
         if (UsersTable.selectAll().empty()) {
-            val masterTenantId = TenantsTable
-                .selectAll()
-                .where { TenantsTable.slug eq "master" }
-                .firstOrNull()
-                ?.get(TenantsTable.id)
-                ?: error("Master tenant not found — V1 migration may not have run correctly.")
+            val masterTenantId =
+                TenantsTable
+                    .selectAll()
+                    .where { TenantsTable.slug eq "master" }
+                    .firstOrNull()
+                    ?.get(TenantsTable.id)
+                    ?: error("Master tenant not found — V1 migration may not have run correctly.")
 
             val hasher = BcryptPasswordHasher()
             UsersTable.insert {

@@ -10,7 +10,6 @@ import java.time.Instant
  * Tokens are keyed by their SHA-256 hash — the raw token lives only in email links.
  */
 interface PasswordResetTokenRepository {
-
     /** Persists a new token record. Returns the saved instance with its DB id. */
     fun create(token: PasswordResetToken): PasswordResetToken
 
@@ -18,7 +17,10 @@ interface PasswordResetTokenRepository {
     fun findByTokenHash(hash: String): PasswordResetToken?
 
     /** Marks a token as used. Idempotent — no-op if already marked. */
-    fun markUsed(tokenId: Int, usedAt: Instant = Instant.now())
+    fun markUsed(
+        tokenId: Int,
+        usedAt: Instant = Instant.now(),
+    )
 
     /**
      * Deletes all unused tokens for a user.

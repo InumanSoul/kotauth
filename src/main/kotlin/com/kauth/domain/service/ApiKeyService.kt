@@ -25,10 +25,9 @@ import java.util.Base64
  * and SHA-256 is fast enough not to require rate-limiting at the hash level.
  */
 class ApiKeyService(
-    private val apiKeyRepository : ApiKeyRepository,
-    private val tenantRepository : TenantRepository
+    private val apiKeyRepository: ApiKeyRepository,
+    private val tenantRepository: TenantRepository,
 ) {
-
     // =========================================================================
     // Key generation
     // =========================================================================
@@ -44,41 +43,48 @@ class ApiKeyService(
      *         The [rawKey] is never stored — the caller MUST surface it to the user immediately.
      */
     fun create(
-        tenantId  : Int,
-        name      : String,
-        scopes    : List<String>,
-        expiresAt : Instant? = null
+        tenantId: Int,
+        name: String,
+        scopes: List<String>,
+        expiresAt: Instant? = null,
     ): ApiKeyResult<CreatedApiKey> {
-        if (name.isBlank())
+        if (name.isBlank()) {
             return ApiKeyResult.Failure(ApiKeyError.Validation("API key name is required."))
-        if (name.length > 128)
+        }
+        if (name.length > 128) {
             return ApiKeyResult.Failure(ApiKeyError.Validation("API key name must be 128 characters or fewer."))
+        }
 
-        val tenant = tenantRepository.findById(tenantId)
-            ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("Tenant $tenantId not found."))
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("Tenant $tenantId not found."))
 
         // Validate and filter scopes
         val validScopes = scopes.filter { it in ApiScope.ALL }
-        if (validScopes.isEmpty())
+        if (validScopes.isEmpty()) {
             return ApiKeyResult.Failure(ApiKeyError.Validation("At least one valid scope is required."))
+        }
 
         // Build raw key: kauth_<slug>_<32 random bytes base64url, no padding>
         val randomBytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val randomPart  = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
-        val rawKey      = "kauth_${tenant.slug}_$randomPart"
+        val randomPart = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
+        val rawKey = "kauth_${tenant.slug}_$randomPart"
 
-        val hash   = sha256Hex(rawKey)
-        val prefix = rawKey.take(16)   // e.g. "kauth_acme_4wQk2" — enough to identify in UI
+        val hash = sha256Hex(rawKey)
+        val prefix = rawKey.take(16) // e.g. "kauth_acme_4wQk2" — enough to identify in UI
 
-        val saved = apiKeyRepository.save(ApiKey(
-            tenantId  = tenantId,
-            name      = name.trim(),
-            keyPrefix = prefix,
-            keyHash   = hash,
-            scopes    = validScopes,
-            expiresAt = expiresAt,
-            enabled   = true
-        ))
+        val saved =
+            apiKeyRepository.save(
+                ApiKey(
+                    tenantId = tenantId,
+                    name = name.trim(),
+                    keyPrefix = prefix,
+                    keyHash = hash,
+                    scopes = validScopes,
+                    expiresAt = expiresAt,
+                    enabled = true,
+                ),
+            )
 
         return ApiKeyResult.Success(CreatedApiKey(apiKey = saved, rawKey = rawKey))
     }
@@ -100,12 +106,15 @@ class ApiKeyService(
      *
      * @return The validated [ApiKey] on success, or null on any failure.
      */
-    fun validate(rawKey: String, expectedTenantId: Int): ApiKey? {
-        val hash   = sha256Hex(rawKey)
+    fun validate(
+        rawKey: String,
+        expectedTenantId: Int,
+    ): ApiKey? {
+        val hash = sha256Hex(rawKey)
         val apiKey = apiKeyRepository.findByHash(hash) ?: return null
 
-        if (apiKey.tenantId != expectedTenantId)        return null
-        if (!apiKey.enabled)                            return null
+        if (apiKey.tenantId != expectedTenantId) return null
+        if (!apiKey.enabled) return null
         if (apiKey.expiresAt != null && apiKey.expiresAt.isBefore(Instant.now())) return null
 
         // Best-effort touch — don't block the request if this fails
@@ -118,17 +127,22 @@ class ApiKeyService(
     // Admin operations
     // =========================================================================
 
-    fun listForTenant(tenantId: Int): List<ApiKey> =
-        apiKeyRepository.findByTenantId(tenantId)
+    fun listForTenant(tenantId: Int): List<ApiKey> = apiKeyRepository.findByTenantId(tenantId)
 
-    fun revoke(id: Int, tenantId: Int): ApiKeyResult<Unit> {
+    fun revoke(
+        id: Int,
+        tenantId: Int,
+    ): ApiKeyResult<Unit> {
         apiKeyRepository.findById(id, tenantId)
             ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
         apiKeyRepository.revoke(id, tenantId)
         return ApiKeyResult.Success(Unit)
     }
 
-    fun delete(id: Int, tenantId: Int): ApiKeyResult<Unit> {
+    fun delete(
+        id: Int,
+        tenantId: Int,
+    ): ApiKeyResult<Unit> {
         apiKeyRepository.findById(id, tenantId)
             ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
         apiKeyRepository.delete(id, tenantId)
@@ -154,16 +168,28 @@ class ApiKeyService(
  * Surface [rawKey] to the user immediately — it cannot be recovered later.
  */
 data class CreatedApiKey(
-    val apiKey : ApiKey,
-    val rawKey : String
+    val apiKey: ApiKey,
+    val rawKey: String,
 )
 
 sealed class ApiKeyResult<out T> {
-    data class Success<T>(val value: T) : ApiKeyResult<T>()
-    data class Failure(val error: ApiKeyError) : ApiKeyResult<Nothing>()
+    data class Success<T>(
+        val value: T,
+    ) : ApiKeyResult<T>()
+
+    data class Failure(
+        val error: ApiKeyError,
+    ) : ApiKeyResult<Nothing>()
 }
 
-sealed class ApiKeyError(val message: String) {
-    class NotFound(message: String)   : ApiKeyError(message)
-    class Validation(message: String) : ApiKeyError(message)
+sealed class ApiKeyError(
+    val message: String,
+) {
+    class NotFound(
+        message: String,
+    ) : ApiKeyError(message)
+
+    class Validation(
+        message: String,
+    ) : ApiKeyError(message)
 }

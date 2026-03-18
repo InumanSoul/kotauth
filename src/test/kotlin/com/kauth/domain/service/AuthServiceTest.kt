@@ -24,49 +24,57 @@ import kotlin.test.assertTrue
  * Each test group is independent: @BeforeTest resets all fakes.
  */
 class AuthServiceTest {
-
     // -------------------------------------------------------------------------
     // Fakes (reset before each test)
     // -------------------------------------------------------------------------
 
-    private val tenants  = FakeTenantRepository()
-    private val users    = FakeUserRepository()
-    private val hasher   = FakePasswordHasher()
+    private val tenants = FakeTenantRepository()
+    private val users = FakeUserRepository()
+    private val hasher = FakePasswordHasher()
     private val auditLog = FakeAuditLogPort()
     private val sessions = FakeSessionRepository()
-    private val tokens   = FakeTokenPort()
+    private val tokens = FakeTokenPort()
 
-    private val svc = AuthService(
-        userRepository    = users,
-        tenantRepository  = tenants,
-        tokenPort         = tokens,
-        passwordHasher    = hasher,
-        auditLog          = auditLog,
-        sessionRepository = sessions
-    )
+    private val svc =
+        AuthService(
+            userRepository = users,
+            tenantRepository = tenants,
+            tokenPort = tokens,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+            sessionRepository = sessions,
+        )
 
     // -------------------------------------------------------------------------
     // Fixtures
     // -------------------------------------------------------------------------
 
-    private val testTenant = Tenant(
-        id = 1, slug = "acme", displayName = "Acme Corp",
-        issuerUrl = null, registrationEnabled = true
-    )
+    private val testTenant =
+        Tenant(
+            id = 1,
+            slug = "acme",
+            displayName = "Acme Corp",
+            issuerUrl = null,
+            registrationEnabled = true,
+        )
 
-    private val activeUser get() = User(
-        id           = 10,
-        tenantId     = 1,
-        username     = "alice",
-        email        = "alice@example.com",
-        fullName     = "Alice Test",
-        passwordHash = hasher.hash("correct-pass"),
-        enabled      = true
-    )
+    private val activeUser get() =
+        User(
+            id = 10,
+            tenantId = 1,
+            username = "alice",
+            email = "alice@example.com",
+            fullName = "Alice Test",
+            passwordHash = hasher.hash("correct-pass"),
+            enabled = true,
+        )
 
     @BeforeTest
     fun setup() {
-        tenants.clear(); users.clear(); auditLog.clear(); sessions.clear()
+        tenants.clear()
+        users.clear()
+        auditLog.clear()
+        sessions.clear()
         tenants.add(testTenant)
         users.add(activeUser)
     }
@@ -149,13 +157,16 @@ class AuthServiceTest {
     @Test
     fun `authenticate returns PasswordExpired when policy is set and password age exceeds limit`() {
         val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 90)
-        tenants.clear(); tenants.add(tenant)
+        tenants.clear()
+        tenants.add(tenant)
 
-        val expiredUser = activeUser.copy(
-            // last change was 91 days ago — exceeds the 90-day policy
-            lastPasswordChangeAt = Instant.now().minusSeconds(91L * 86_400)
-        )
-        users.clear(); users.add(expiredUser)
+        val expiredUser =
+            activeUser.copy(
+                // last change was 91 days ago — exceeds the 90-day policy
+                lastPasswordChangeAt = Instant.now().minusSeconds(91L * 86_400),
+            )
+        users.clear()
+        users.add(expiredUser)
 
         val result = svc.authenticate("acme", "alice", "correct-pass")
 
@@ -167,13 +178,16 @@ class AuthServiceTest {
     @Test
     fun `authenticate returns Success when password age is within policy limit`() {
         val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 90)
-        tenants.clear(); tenants.add(tenant)
+        tenants.clear()
+        tenants.add(tenant)
 
-        val freshUser = activeUser.copy(
-            // last change was 30 days ago — within the 90-day policy
-            lastPasswordChangeAt = Instant.now().minusSeconds(30L * 86_400)
-        )
-        users.clear(); users.add(freshUser)
+        val freshUser =
+            activeUser.copy(
+                // last change was 30 days ago — within the 90-day policy
+                lastPasswordChangeAt = Instant.now().minusSeconds(30L * 86_400),
+            )
+        users.clear()
+        users.add(freshUser)
 
         val result = svc.authenticate("acme", "alice", "correct-pass")
 
@@ -185,11 +199,13 @@ class AuthServiceTest {
         // Null timestamp = user created before expiry policy was enabled.
         // We must NOT lock them out to prevent mass lockouts when policy is first activated.
         val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 30)
-        tenants.clear(); tenants.add(tenant)
+        tenants.clear()
+        tenants.add(tenant)
 
         // User has never changed password (or was created before the policy was enabled)
         val legacyUser = activeUser.copy(lastPasswordChangeAt = null)
-        users.clear(); users.add(legacyUser)
+        users.clear()
+        users.add(legacyUser)
 
         val result = svc.authenticate("acme", "alice", "correct-pass")
 
@@ -200,12 +216,15 @@ class AuthServiceTest {
     fun `authenticate does NOT enforce expiry when policy is zero (disabled)`() {
         // passwordPolicyMaxAgeDays = 0 means "never expires"
         val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 0)
-        tenants.clear(); tenants.add(tenant)
+        tenants.clear()
+        tenants.add(tenant)
 
-        val oldUser = activeUser.copy(
-            lastPasswordChangeAt = Instant.now().minusSeconds(1000L * 86_400)
-        )
-        users.clear(); users.add(oldUser)
+        val oldUser =
+            activeUser.copy(
+                lastPasswordChangeAt = Instant.now().minusSeconds(1000L * 86_400),
+            )
+        users.clear()
+        users.add(oldUser)
 
         val result = svc.authenticate("acme", "alice", "correct-pass")
 
@@ -226,7 +245,8 @@ class AuthServiceTest {
     @Test
     fun `register returns RegistrationDisabled when tenant has registration off`() {
         val closed = testTenant.copy(registrationEnabled = false)
-        tenants.clear(); tenants.add(closed)
+        tenants.clear()
+        tenants.add(closed)
 
         val result = svc.register("acme", "bob", "bob@x.com", "Bob", "pass", "pass")
 
@@ -306,7 +326,8 @@ class AuthServiceTest {
     @Test
     fun `login evicts oldest session when concurrent session limit is exceeded`() {
         val limitedTenant = testTenant.copy(maxConcurrentSessions = 2)
-        tenants.clear(); tenants.add(limitedTenant)
+        tenants.clear()
+        tenants.add(limitedTenant)
 
         // Log in 3 times — the first session should be evicted after the third
         svc.login("acme", "alice", "correct-pass")

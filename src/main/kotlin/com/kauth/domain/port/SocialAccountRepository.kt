@@ -8,15 +8,14 @@ import com.kauth.domain.model.SocialProvider
  * Implemented by PostgresSocialAccountRepository.
  */
 interface SocialAccountRepository {
-
     /**
      * Finds a social account by provider identity.
      * Used during callback to check if the provider user is already linked to a local account.
      */
     fun findByProviderIdentity(
-        tenantId       : Int,
-        provider       : SocialProvider,
-        providerUserId : String
+        tenantId: Int,
+        provider: SocialProvider,
+        providerUserId: String,
     ): SocialAccount?
 
     /** Returns all social accounts linked to a local user. */
@@ -26,5 +25,8 @@ interface SocialAccountRepository {
     fun save(account: SocialAccount): SocialAccount
 
     /** Removes a social account link (user unlinks a provider). */
-    fun delete(userId: Int, provider: SocialProvider)
+    fun delete(
+        userId: Int,
+        provider: SocialProvider,
+    )
 }

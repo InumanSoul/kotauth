@@ -15,6 +15,9 @@ import com.kauth.domain.port.PasswordHasher
  */
 class FakePasswordHasher : PasswordHasher {
     override fun hash(rawPassword: String): String = "hashed:$rawPassword"
-    override fun verify(rawPassword: String, hashedPassword: String): Boolean =
-        hashedPassword == "hashed:$rawPassword"
+
+    override fun verify(
+        rawPassword: String,
+        hashedPassword: String,
+    ): Boolean = hashedPassword == "hashed:$rawPassword"
 }

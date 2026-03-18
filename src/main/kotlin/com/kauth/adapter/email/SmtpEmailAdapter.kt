@@ -32,7 +32,6 @@ import javax.mail.internet.MimeMultipart
  * before calling this adapter. If SMTP is not configured, this adapter will throw.
  */
 class SmtpEmailAdapter : EmailPort {
-
     private val log = LoggerFactory.getLogger(SmtpEmailAdapter::class.java)
 
     override fun sendVerificationEmail(
@@ -40,7 +39,7 @@ class SmtpEmailAdapter : EmailPort {
         toName: String,
         verifyUrl: String,
         workspaceName: String,
-        tenant: Tenant
+        tenant: Tenant,
     ) {
         val subject = "Verify your email address — $workspaceName"
         val html = buildVerificationHtml(toName, verifyUrl, workspaceName)
@@ -53,7 +52,7 @@ class SmtpEmailAdapter : EmailPort {
         toName: String,
         resetUrl: String,
         workspaceName: String,
-        tenant: Tenant
+        tenant: Tenant,
     ) {
         val subject = "Reset your password — $workspaceName"
         val html = buildPasswordResetHtml(toName, resetUrl, workspaceName)
@@ -66,81 +65,93 @@ class SmtpEmailAdapter : EmailPort {
     // -------------------------------------------------------------------------
 
     private fun send(
-        to          : String,
-        toName      : String,
-        subject     : String,
-        html        : String,
-        text        : String,
-        tenant      : Tenant
+        to: String,
+        toName: String,
+        subject: String,
+        html: String,
+        text: String,
+        tenant: Tenant,
     ) {
-        val host   = tenant.smtpHost ?: error("SMTP host not configured")
-        val port   = tenant.smtpPort
+        val host = tenant.smtpHost ?: error("SMTP host not configured")
+        val port = tenant.smtpPort
         // Port 465 always uses SSL-first (SMTPS). Any other port uses STARTTLS when TLS is enabled.
         val useSsl = (port == 465)
 
         // Auth requires BOTH username and password — if either is missing, skip auth entirely.
         val hasAuth = !tenant.smtpUsername.isNullOrBlank() && !tenant.smtpPassword.isNullOrBlank()
 
-        val props = Properties().apply {
-            put("mail.smtp.host", host)
-            put("mail.smtp.port", port.toString())
-            put("mail.smtp.auth", if (hasAuth) "true" else "false")
+        val props =
+            Properties().apply {
+                put("mail.smtp.host", host)
+                put("mail.smtp.port", port.toString())
+                put("mail.smtp.auth", if (hasAuth) "true" else "false")
 
-            when {
-                useSsl -> {
-                    // SSL-first connection (port 465 / SMTPS) — JavaMail wraps the socket in TLS
-                    // immediately on connect. Do NOT mix with starttls.enable.
-                    put("mail.smtp.ssl.enable", "true")
-                    put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
+                when {
+                    useSsl -> {
+                        // SSL-first connection (port 465 / SMTPS) — JavaMail wraps the socket in TLS
+                        // immediately on connect. Do NOT mix with starttls.enable.
+                        put("mail.smtp.ssl.enable", "true")
+                        put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
+                    }
+                    tenant.smtpTlsEnabled -> {
+                        // STARTTLS — connect plaintext then upgrade. `required=true` prevents silent
+                        // downgrade to unencrypted when the server is misconfigured.
+                        put("mail.smtp.starttls.enable", "true")
+                        put("mail.smtp.starttls.required", "true")
+                        put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
+                    }
                 }
-                tenant.smtpTlsEnabled -> {
-                    // STARTTLS — connect plaintext then upgrade. `required=true` prevents silent
-                    // downgrade to unencrypted when the server is misconfigured.
-                    put("mail.smtp.starttls.enable", "true")
-                    put("mail.smtp.starttls.required", "true")
-                    put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
-                }
+
+                put("mail.smtp.connectiontimeout", "10000")
+                put("mail.smtp.timeout", "10000")
+                put("mail.smtp.writetimeout", "10000")
             }
 
-            put("mail.smtp.connectiontimeout", "10000")
-            put("mail.smtp.timeout", "10000")
-            put("mail.smtp.writetimeout", "10000")
-        }
-
-        val authenticator: Authenticator? = if (hasAuth) {
-            object : Authenticator() {
-                override fun getPasswordAuthentication() =
-                    PasswordAuthentication(tenant.smtpUsername, tenant.smtpPassword)
+        val authenticator: Authenticator? =
+            if (hasAuth) {
+                object : Authenticator() {
+                    override fun getPasswordAuthentication() =
+                        PasswordAuthentication(tenant.smtpUsername, tenant.smtpPassword)
+                }
+            } else {
+                null
             }
-        } else null
 
         log.debug(
             "SMTP send: to={} host={}:{} ssl={} starttls={} auth={}",
-            to, host, port, useSsl, tenant.smtpTlsEnabled && !useSsl, hasAuth
+            to,
+            host,
+            port,
+            useSsl,
+            tenant.smtpTlsEnabled && !useSsl,
+            hasAuth,
         )
 
         val session = Session.getInstance(props, authenticator)
 
-        val fromAddress = InternetAddress(
-            tenant.smtpFromAddress ?: error("SMTP from address not configured"),
-            tenant.smtpFromName ?: workspaceDisplayName(tenant)
-        )
+        val fromAddress =
+            InternetAddress(
+                tenant.smtpFromAddress ?: error("SMTP from address not configured"),
+                tenant.smtpFromName ?: workspaceDisplayName(tenant),
+            )
 
-        val message = MimeMessage(session).apply {
-            setFrom(fromAddress)
-            setRecipient(Message.RecipientType.TO, InternetAddress(to, toName))
-            setSubject(subject, "UTF-8")
+        val message =
+            MimeMessage(session).apply {
+                setFrom(fromAddress)
+                setRecipient(Message.RecipientType.TO, InternetAddress(to, toName))
+                setSubject(subject, "UTF-8")
 
-            val htmlPart = MimeBodyPart().apply { setContent(html, "text/html; charset=UTF-8") }
-            val textPart = MimeBodyPart().apply { setContent(text, "text/plain; charset=UTF-8") }
+                val htmlPart = MimeBodyPart().apply { setContent(html, "text/html; charset=UTF-8") }
+                val textPart = MimeBodyPart().apply { setContent(text, "text/plain; charset=UTF-8") }
 
-            // multipart/alternative: mail clients pick the best format they support
-            val multipart = MimeMultipart("alternative").apply {
-                addBodyPart(textPart)  // plain text first (fallback)
-                addBodyPart(htmlPart)  // HTML second (preferred)
+                // multipart/alternative: mail clients pick the best format they support
+                val multipart =
+                    MimeMultipart("alternative").apply {
+                        addBodyPart(textPart) // plain text first (fallback)
+                        addBodyPart(htmlPart) // HTML second (preferred)
+                    }
+                setContent(multipart)
             }
-            setContent(multipart)
-        }
 
         try {
             Transport.send(message)
@@ -148,7 +159,12 @@ class SmtpEmailAdapter : EmailPort {
         } catch (e: Exception) {
             log.warn(
                 "SMTP send FAILED: to={} host={}:{} ssl={} reason={}",
-                to, host, port, useSsl, e.message, e
+                to,
+                host,
+                port,
+                useSsl,
+                e.message,
+                e,
             )
             throw e
         }
@@ -160,7 +176,11 @@ class SmtpEmailAdapter : EmailPort {
     // Email templates — plain HTML, workspace name only
     // -------------------------------------------------------------------------
 
-    private fun buildVerificationHtml(name: String, url: String, workspace: String) = """
+    private fun buildVerificationHtml(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = """
         <!DOCTYPE html>
         <html lang="en">
         <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -189,9 +209,13 @@ class SmtpEmailAdapter : EmailPort {
           </table>
         </body>
         </html>
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun buildVerificationText(name: String, url: String, workspace: String) = """
+    private fun buildVerificationText(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = """
         $workspace — Verify your email address
 
         Hi $name,
@@ -201,9 +225,13 @@ class SmtpEmailAdapter : EmailPort {
         $url
 
         If you did not create an account, you can safely ignore this email.
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun buildPasswordResetHtml(name: String, url: String, workspace: String) = """
+    private fun buildPasswordResetHtml(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = """
         <!DOCTYPE html>
         <html lang="en">
         <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -233,9 +261,13 @@ class SmtpEmailAdapter : EmailPort {
           </table>
         </body>
         </html>
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun buildPasswordResetText(name: String, url: String, workspace: String) = """
+    private fun buildPasswordResetText(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = """
         $workspace — Reset your password
 
         Hi $name,
@@ -246,11 +278,12 @@ class SmtpEmailAdapter : EmailPort {
         $url
 
         If you did not request a password reset, you can safely ignore this email.
-    """.trimIndent()
+        """.trimIndent()
 
-    private fun htmlEscape(s: String) = s
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace("\"", "&quot;")
+    private fun htmlEscape(s: String) =
+        s
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
 }

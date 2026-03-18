@@ -10,7 +10,6 @@ import java.time.Instant
  * Tokens are keyed by their SHA-256 hash — the raw token lives only in email links.
  */
 interface EmailVerificationTokenRepository {
-
     /** Persists a new token record. Returns the saved instance with its DB id. */
     fun create(token: EmailVerificationToken): EmailVerificationToken
 
@@ -18,7 +17,10 @@ interface EmailVerificationTokenRepository {
     fun findByTokenHash(hash: String): EmailVerificationToken?
 
     /** Marks a token as used. Idempotent — no-op if already marked. */
-    fun markUsed(tokenId: Int, usedAt: Instant = Instant.now())
+    fun markUsed(
+        tokenId: Int,
+        usedAt: Instant = Instant.now(),
+    )
 
     /**
      * Deletes all unused (not yet verified) tokens for a user.
