@@ -17,7 +17,6 @@ import java.time.format.DateTimeFormatter
  *   Authenticated pages — fixed sidebar left, scrollable content centered in remaining space
  */
 object PortalView {
-
     private val dtf = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm").withZone(ZoneOffset.UTC)
 
     // =========================================================================
@@ -25,205 +24,240 @@ object PortalView {
     // =========================================================================
 
     fun loginPage(
-        slug          : String,
-        workspaceName : String,
-        theme         : TenantTheme,
-        error         : String?
-    ): HTML.() -> Unit = {
-        head { authPageHead("$workspaceName | Sign In", theme) }
-        body {
-            div("brand") {
-                div("brand-name") { +workspaceName }
-            }
-            div("card") {
-                h1("card-title") { +"Account" }
-                p("card-subtitle") { +"Sign in to manage your account" }
-
-                if (!error.isNullOrBlank()) {
-                    div("alert alert-error") { +error }
+        slug: String,
+        workspaceName: String,
+        theme: TenantTheme,
+        error: String?,
+    ): HTML.() -> Unit =
+        {
+            head { authPageHead("$workspaceName | Sign In", theme) }
+            body {
+                div("brand") {
+                    div("brand-name") { +workspaceName }
                 }
+                div("card") {
+                    h1("card-title") { +"Account" }
+                    p("card-subtitle") { +"Sign in to manage your account" }
 
-                form(
-                    action  = "/t/$slug/account/login",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method  = FormMethod.post
-                ) {
-                    div("field") {
-                        label { htmlFor = "username"; +"Username" }
-                        input(type = InputType.text, name = "username") {
-                            id = "username"
-                            placeholder = "Enter your username"
-                            attributes["autocomplete"] = "username"
-                            required = true
-                            attributes["autofocus"] = "true"
-                        }
+                    if (!error.isNullOrBlank()) {
+                        div("alert alert-error") { +error }
                     }
-                    div("field") {
-                        label { htmlFor = "password"; +"Password" }
-                        input(type = InputType.password, name = "password") {
-                            id = "password"
-                            placeholder = "Enter your password"
-                            attributes["autocomplete"] = "current-password"
-                            required = true
-                        }
-                    }
-                    button(type = ButtonType.submit, classes = "btn") { +"Sign in" }
-                }
 
-                div("footer-link") {
-                    a(href = "/t/$slug/forgot-password") { +"Forgot password?" }
+                    form(
+                        action = "/t/$slug/account/login",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) {
+                        div("field") {
+                            label {
+                                htmlFor = "username"
+                                +"Username"
+                            }
+                            input(type = InputType.text, name = "username") {
+                                id = "username"
+                                placeholder = "Enter your username"
+                                attributes["autocomplete"] = "username"
+                                required = true
+                                attributes["autofocus"] = "true"
+                            }
+                        }
+                        div("field") {
+                            label {
+                                htmlFor = "password"
+                                +"Password"
+                            }
+                            input(type = InputType.password, name = "password") {
+                                id = "password"
+                                placeholder = "Enter your password"
+                                attributes["autocomplete"] = "current-password"
+                                required = true
+                            }
+                        }
+                        button(type = ButtonType.submit, classes = "btn") { +"Sign in" }
+                    }
+
+                    div("footer-link") {
+                        a(href = "/t/$slug/forgot-password") { +"Forgot password?" }
+                    }
                 }
             }
         }
-    }
 
     // =========================================================================
     // Profile page
     // =========================================================================
 
     fun profilePage(
-        slug          : String,
-        session       : PortalSession,
-        theme         : TenantTheme,
-        workspaceName : String,
-        successMsg    : String?,
-        errorMsg      : String?
-    ): HTML.() -> Unit = {
-        head { portalPageHead("Profile — $workspaceName", theme) }
-        body {
-            portalShell(slug, workspaceName, session.username, "profile") {
-                h2(classes = "portal-section-title") { +"Profile" }
+        slug: String,
+        session: PortalSession,
+        theme: TenantTheme,
+        workspaceName: String,
+        successMsg: String?,
+        errorMsg: String?,
+    ): HTML.() -> Unit =
+        {
+            head { portalPageHead("Profile — $workspaceName", theme) }
+            body {
+                portalShell(slug, workspaceName, session.username, "profile") {
+                    h2(classes = "portal-section-title") { +"Profile" }
 
-                if (successMsg != null)
-                    div(classes = "alert alert-success") { +"Profile updated successfully." }
-                if (!errorMsg.isNullOrBlank())
-                    div(classes = "alert alert-error") { +errorMsg }
+                    if (successMsg != null) {
+                        div(classes = "alert alert-success") { +"Profile updated successfully." }
+                    }
+                    if (!errorMsg.isNullOrBlank()) {
+                        div(classes = "alert alert-error") { +errorMsg }
+                    }
 
-                form(
-                    action  = "/t/$slug/account/profile",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method  = FormMethod.post,
-                    classes = "portal-form"
-                ) {
-                    div("field") {
-                        label { htmlFor = "username"; +"Username" }
-                        input(type = InputType.text, name = "username") {
-                            id = "username"
-                            value = session.username
-                            disabled = true
-                            title = "Username cannot be changed"
+                    form(
+                        action = "/t/$slug/account/profile",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                        classes = "portal-form",
+                    ) {
+                        div("field") {
+                            label {
+                                htmlFor = "username"
+                                +"Username"
+                            }
+                            input(type = InputType.text, name = "username") {
+                                id = "username"
+                                value = session.username
+                                disabled = true
+                                title = "Username cannot be changed"
+                            }
+                            p(classes = "form-hint") { +"Username cannot be changed after account creation." }
                         }
-                        p(classes = "form-hint") { +"Username cannot be changed after account creation." }
-                    }
-                    div("field") {
-                        label { htmlFor = "email"; +"Email address" }
-                        input(type = InputType.email, name = "email") {
-                            id = "email"
-                            placeholder = "you@example.com"
-                            attributes["autocomplete"] = "email"
-                            required = true
+                        div("field") {
+                            label {
+                                htmlFor = "email"
+                                +"Email address"
+                            }
+                            input(type = InputType.email, name = "email") {
+                                id = "email"
+                                placeholder = "you@example.com"
+                                attributes["autocomplete"] = "email"
+                                required = true
+                            }
                         }
-                    }
-                    div("field") {
-                        label { htmlFor = "full_name"; +"Full name" }
-                        input(type = InputType.text, name = "full_name") {
-                            id = "full_name"
-                            placeholder = "Your full name"
-                            required = true
+                        div("field") {
+                            label {
+                                htmlFor = "full_name"
+                                +"Full name"
+                            }
+                            input(type = InputType.text, name = "full_name") {
+                                id = "full_name"
+                                placeholder = "Your full name"
+                                required = true
+                            }
                         }
+                        button(type = ButtonType.submit, classes = "btn") { +"Save changes" }
                     }
-                    button(type = ButtonType.submit, classes = "btn") { +"Save changes" }
                 }
             }
         }
-    }
 
     // =========================================================================
     // Security page (change password + sessions)
     // =========================================================================
 
     fun securityPage(
-        slug          : String,
-        session       : PortalSession,
-        theme         : TenantTheme,
-        workspaceName : String,
-        sessions      : List<Session>,
-        successMsg    : String?,
-        errorMsg      : String?
-    ): HTML.() -> Unit = {
-        head { portalPageHead("Security — $workspaceName", theme) }
-        body {
-            portalShell(slug, workspaceName, session.username, "security") {
-                h2(classes = "portal-section-title") { +"Change password" }
+        slug: String,
+        session: PortalSession,
+        theme: TenantTheme,
+        workspaceName: String,
+        sessions: List<Session>,
+        successMsg: String?,
+        errorMsg: String?,
+    ): HTML.() -> Unit =
+        {
+            head { portalPageHead("Security — $workspaceName", theme) }
+            body {
+                portalShell(slug, workspaceName, session.username, "security") {
+                    h2(classes = "portal-section-title") { +"Change password" }
 
-                if (successMsg != null)
-                    div(classes = "alert alert-success") { +"Password changed successfully." }
-                if (!errorMsg.isNullOrBlank())
-                    div(classes = "alert alert-error") { +errorMsg }
-
-                form(
-                    action  = "/t/$slug/account/change-password",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method  = FormMethod.post,
-                    classes = "portal-form"
-                ) {
-                    div("field") {
-                        label { htmlFor = "current_password"; +"Current password" }
-                        input(type = InputType.password, name = "current_password") {
-                            id = "current_password"
-                            required = true
-                            attributes["autocomplete"] = "current-password"
-                        }
+                    if (successMsg != null) {
+                        div(classes = "alert alert-success") { +"Password changed successfully." }
                     }
-                    div("field") {
-                        label { htmlFor = "new_password"; +"New password" }
-                        input(type = InputType.password, name = "new_password") {
-                            id = "new_password"
-                            placeholder = "Minimum 8 characters"
-                            required = true
-                            attributes["autocomplete"] = "new-password"
-                        }
+                    if (!errorMsg.isNullOrBlank()) {
+                        div(classes = "alert alert-error") { +errorMsg }
                     }
-                    div("field") {
-                        label { htmlFor = "confirm_password"; +"Confirm new password" }
-                        input(type = InputType.password, name = "confirm_password") {
-                            id = "confirm_password"
-                            placeholder = "Repeat your new password"
-                            required = true
-                            attributes["autocomplete"] = "new-password"
-                        }
-                    }
-                    p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
-                    button(type = ButtonType.submit, classes = "btn") { +"Change password" }
-                }
 
-                hr(classes = "portal-divider")
-
-                h2(classes = "portal-section-title") { +"Active sessions" }
-                if (sessions.isEmpty()) {
-                    p(classes = "portal-empty") { +"No active sessions found." }
-                } else {
-                    table(classes = "portal-table") {
-                        thead {
-                            tr {
-                                th { +"Device / IP" }
-                                th { +"Started" }
-                                th { +"Expires" }
-                                th { +"" }
+                    form(
+                        action = "/t/$slug/account/change-password",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                        classes = "portal-form",
+                    ) {
+                        div("field") {
+                            label {
+                                htmlFor = "current_password"
+                                +"Current password"
+                            }
+                            input(type = InputType.password, name = "current_password") {
+                                id = "current_password"
+                                required = true
+                                attributes["autocomplete"] = "current-password"
                             }
                         }
-                        tbody {
-                            for (s in sessions) {
+                        div("field") {
+                            label {
+                                htmlFor = "new_password"
+                                +"New password"
+                            }
+                            input(type = InputType.password, name = "new_password") {
+                                id = "new_password"
+                                placeholder = "Minimum 8 characters"
+                                required = true
+                                attributes["autocomplete"] = "new-password"
+                            }
+                        }
+                        div("field") {
+                            label {
+                                htmlFor = "confirm_password"
+                                +"Confirm new password"
+                            }
+                            input(type = InputType.password, name = "confirm_password") {
+                                id = "confirm_password"
+                                placeholder = "Repeat your new password"
+                                required = true
+                                attributes["autocomplete"] = "new-password"
+                            }
+                        }
+                        p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
+                        button(type = ButtonType.submit, classes = "btn") { +"Change password" }
+                    }
+
+                    hr(classes = "portal-divider")
+
+                    h2(classes = "portal-section-title") { +"Active sessions" }
+                    if (sessions.isEmpty()) {
+                        p(classes = "portal-empty") { +"No active sessions found." }
+                    } else {
+                        table(classes = "portal-table") {
+                            thead {
                                 tr {
-                                    td { +(s.ipAddress ?: "—") }
-                                    td { +dtf.format(s.createdAt) }
-                                    td { +dtf.format(s.expiresAt) }
-                                    td {
-                                        form(
-                                            action  = "/t/$slug/account/sessions/${s.id}/revoke",
-                                            method  = FormMethod.post
-                                        ) {
-                                            button(type = ButtonType.submit, classes = "btn-danger-sm") { +"Revoke" }
+                                    th { +"Device / IP" }
+                                    th { +"Started" }
+                                    th { +"Expires" }
+                                    th { +"" }
+                                }
+                            }
+                            tbody {
+                                for (s in sessions) {
+                                    tr {
+                                        td { +(s.ipAddress ?: "—") }
+                                        td { +dtf.format(s.createdAt) }
+                                        td { +dtf.format(s.expiresAt) }
+                                        td {
+                                            form(
+                                                action = "/t/$slug/account/sessions/${s.id}/revoke",
+                                                method = FormMethod.post,
+                                            ) {
+                                                button(
+                                                    type = ButtonType.submit,
+                                                    classes = "btn-danger-sm",
+                                                ) { +"Revoke" }
+                                            }
                                         }
                                     }
                                 }
@@ -233,100 +267,109 @@ object PortalView {
                 }
             }
         }
-    }
 
     // =========================================================================
     // MFA challenge — Phase 3c
     // =========================================================================
 
     fun mfaChallengePage(
-        slug          : String,
-        workspaceName : String,
-        theme         : TenantTheme,
-        error         : String? = null
-    ): HTML.() -> Unit = {
-        head { authPageHead("$workspaceName | Verify Identity", theme) }
-        body {
-            div("brand") {
-                div("brand-name") { +workspaceName }
-            }
-            div("card") {
-                h1("card-title") { +"Two-Factor Authentication" }
-                p("card-subtitle") { id = "challenge-subtitle"; +"Enter the 6-digit code from your authenticator app" }
-
-                if (!error.isNullOrBlank()) {
-                    div("alert alert-error") { +error }
+        slug: String,
+        workspaceName: String,
+        theme: TenantTheme,
+        error: String? = null,
+    ): HTML.() -> Unit =
+        {
+            head { authPageHead("$workspaceName | Verify Identity", theme) }
+            body {
+                div("brand") {
+                    div("brand-name") { +workspaceName }
                 }
-
-                form(
-                    action  = "/t/$slug/account/mfa-challenge",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method  = FormMethod.post
-                ) {
-                    div("field") {
-                        label { htmlFor = "code"; id = "code-label"; +"Verification code" }
-                        input(type = InputType.text, name = "code") {
-                            id = "code"
-                            placeholder = "000000"
-                            attributes["autocomplete"] = "one-time-code"
-                            attributes["inputmode"] = "numeric"
-                            attributes["pattern"] = "[0-9]*"
-                            maxLength = "6"
-                            required = true
-                            attributes["autofocus"] = "true"
-                        }
+                div("card") {
+                    h1("card-title") { +"Two-Factor Authentication" }
+                    p("card-subtitle") {
+                        id = "challenge-subtitle"
+                        +"Enter the 6-digit code from your authenticator app"
                     }
-                    button(type = ButtonType.submit, classes = "btn") { +"Verify" }
-                }
 
-                div("footer-link") {
-                    a(href = "#") {
-                        id = "recovery-toggle"
-                        attributes["onclick"] = "toggleRecoveryMode(); return false;"
-                        +"Use a recovery code instead"
+                    if (!error.isNullOrBlank()) {
+                        div("alert alert-error") { +error }
                     }
-                }
 
-                div("footer-link") {
-                    a(href = "/t/$slug/account/login") { +"Back to login" }
-                }
-            }
-
-            script {
-                unsafe {
-                    raw("""
-                        var _recoveryMode = false;
-                        function toggleRecoveryMode() {
-                            _recoveryMode = !_recoveryMode;
-                            var input    = document.getElementById('code');
-                            var label    = document.getElementById('code-label');
-                            var subtitle = document.getElementById('challenge-subtitle');
-                            var toggle   = document.getElementById('recovery-toggle');
-                            if (_recoveryMode) {
-                                label.textContent    = 'Recovery code';
-                                subtitle.textContent = 'Enter one of the 8-character recovery codes you saved during setup';
-                                toggle.textContent   = 'Use authenticator app instead';
-                                input.placeholder    = 'e.g. a1b2c3d4';
-                                input.removeAttribute('inputmode');
-                                input.removeAttribute('pattern');
-                                input.removeAttribute('maxlength');
-                            } else {
-                                label.textContent    = 'Verification code';
-                                subtitle.textContent = 'Enter the 6-digit code from your authenticator app';
-                                toggle.textContent   = 'Use a recovery code instead';
-                                input.placeholder    = '000000';
-                                input.setAttribute('inputmode', 'numeric');
-                                input.setAttribute('pattern', '[0-9]*');
-                                input.setAttribute('maxlength', '6');
+                    form(
+                        action = "/t/$slug/account/mfa-challenge",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) {
+                        div("field") {
+                            label {
+                                htmlFor = "code"
+                                id = "code-label"
+                                +"Verification code"
                             }
-                            input.value = '';
-                            input.focus();
+                            input(type = InputType.text, name = "code") {
+                                id = "code"
+                                placeholder = "000000"
+                                attributes["autocomplete"] = "one-time-code"
+                                attributes["inputmode"] = "numeric"
+                                attributes["pattern"] = "[0-9]*"
+                                maxLength = "6"
+                                required = true
+                                attributes["autofocus"] = "true"
+                            }
                         }
-                    """.trimIndent())
+                        button(type = ButtonType.submit, classes = "btn") { +"Verify" }
+                    }
+
+                    div("footer-link") {
+                        a(href = "#") {
+                            id = "recovery-toggle"
+                            attributes["onclick"] = "toggleRecoveryMode(); return false;"
+                            +"Use a recovery code instead"
+                        }
+                    }
+
+                    div("footer-link") {
+                        a(href = "/t/$slug/account/login") { +"Back to login" }
+                    }
+                }
+
+                script {
+                    unsafe {
+                        raw(
+                            """
+                            var _recoveryMode = false;
+                            function toggleRecoveryMode() {
+                                _recoveryMode = !_recoveryMode;
+                                var input    = document.getElementById('code');
+                                var label    = document.getElementById('code-label');
+                                var subtitle = document.getElementById('challenge-subtitle');
+                                var toggle   = document.getElementById('recovery-toggle');
+                                if (_recoveryMode) {
+                                    label.textContent    = 'Recovery code';
+                                    subtitle.textContent = 'Enter one of the 8-character recovery codes you saved during setup';
+                                    toggle.textContent   = 'Use authenticator app instead';
+                                    input.placeholder    = 'e.g. a1b2c3d4';
+                                    input.removeAttribute('inputmode');
+                                    input.removeAttribute('pattern');
+                                    input.removeAttribute('maxlength');
+                                } else {
+                                    label.textContent    = 'Verification code';
+                                    subtitle.textContent = 'Enter the 6-digit code from your authenticator app';
+                                    toggle.textContent   = 'Use a recovery code instead';
+                                    input.placeholder    = '000000';
+                                    input.setAttribute('inputmode', 'numeric');
+                                    input.setAttribute('pattern', '[0-9]*');
+                                    input.setAttribute('maxlength', '6');
+                                }
+                                input.value = '';
+                                input.focus();
+                            }
+                            """.trimIndent(),
+                        )
+                    }
                 }
             }
         }
-    }
 
     // =========================================================================
     // MFA management page — Phase 3c
@@ -335,14 +378,14 @@ object PortalView {
     // =========================================================================
 
     fun mfaPage(
-        slug          : String,
-        session       : PortalSession,
-        theme         : TenantTheme,
-        workspaceName : String,
-        mfaEnabled    : Boolean,
-        successMsg    : String? = null,
-        errorMsg      : String? = null,
-        noticeMsg     : String? = null   // prominent banner used when MFA setup is required
+        slug: String,
+        session: PortalSession,
+        theme: TenantTheme,
+        workspaceName: String,
+        mfaEnabled: Boolean,
+        successMsg: String? = null,
+        errorMsg: String? = null,
+        noticeMsg: String? = null, // prominent banner used when MFA setup is required
     ): HTML.() -> Unit = {
         head {
             portalPageHead("Two-Factor Auth — $workspaceName", theme)
@@ -352,7 +395,8 @@ object PortalView {
             }
             style {
                 unsafe {
-                    raw("""
+                    raw(
+                        """
                         /* ── MFA status badge ──────────────────────────────── */
                         .mfa-status-row {
                             display: flex;
@@ -516,27 +560,32 @@ object PortalView {
                         .btn-outline:disabled { opacity: .55; cursor: not-allowed; }
                         /* ── Secondary spacing helper ──────────────────────── */
                         .mfa-hint-row { margin-top: 6px; }
-                    """.trimIndent())
+                        """.trimIndent(),
+                    )
                 }
             }
         }
         body {
             portalShell(slug, workspaceName, session.username, "mfa") {
-
                 h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
 
                 // Prominent notice — shown when the user is redirected here because MFA
                 // enrollment is required by the tenant policy but not yet configured.
-                if (!noticeMsg.isNullOrBlank())
+                if (!noticeMsg.isNullOrBlank()) {
                     div(classes = "alert alert-warning") {
                         style = "font-size:14px; padding:12px 16px;"
                         +noticeMsg
                     }
+                }
 
-                if (successMsg != null)
-                    div(classes = "alert alert-success") { +"Authenticator set up successfully. Your account is now protected with two-factor authentication." }
-                if (!errorMsg.isNullOrBlank())
+                if (successMsg != null) {
+                    div(classes = "alert alert-success") {
+                        +"Authenticator set up successfully. Your account is now protected with two-factor authentication."
+                    }
+                }
+                if (!errorMsg.isNullOrBlank()) {
                     div(classes = "alert alert-error") { +errorMsg }
+                }
 
                 if (mfaEnabled) {
                     // ── Active state ──────────────────────────────────────────────
@@ -546,26 +595,33 @@ object PortalView {
                     }
                     p { +"When you sign in you'll be asked for a 6-digit code from your authenticator app." }
                     p(classes = "form-hint mfa-hint-row") {
-                        +("Recovery codes were displayed once when you set up two-factor authentication. " +
-                        "To generate new codes, remove and re-enable two-factor authentication.")
+                        +(
+                            "Recovery codes were displayed once when you set up two-factor authentication. " +
+                                "To generate new codes, remove and re-enable two-factor authentication."
+                        )
                     }
 
                     hr(classes = "portal-divider")
 
-                    div { id = "disable-btn-row"
+                    div {
+                        id = "disable-btn-row"
                         button(classes = "btn-danger-outline") {
-                            attributes["onclick"] = """
+                            attributes["onclick"] =
+                                """
                                 document.getElementById('disable-confirm').style.display='block';
                                 document.getElementById('disable-btn-row').style.display='none';
-                            """.trimIndent()
+                                """.trimIndent()
                             +"Remove authenticator"
                         }
                     }
-                    div { id = "disable-confirm"
+                    div {
+                        id = "disable-confirm"
                         style = "display:none"
                         div(classes = "alert-warning") {
-                            +("This will remove your authenticator app and disable two-factor authentication. " +
-                            "Your account will only be protected by your password.")
+                            +(
+                                "This will remove your authenticator app and disable two-factor authentication. " +
+                                    "Your account will only be protected by your password."
+                            )
                         }
                         div(classes = "mfa-action-row") {
                             button(classes = "btn-danger") {
@@ -574,15 +630,15 @@ object PortalView {
                                 +"Yes, remove authenticator"
                             }
                             button(classes = "btn-outline") {
-                                attributes["onclick"] = """
+                                attributes["onclick"] =
+                                    """
                                     document.getElementById('disable-confirm').style.display='none';
                                     document.getElementById('disable-btn-row').style.display='block';
-                                """.trimIndent()
+                                    """.trimIndent()
                                 +"Cancel"
                             }
                         }
                     }
-
                 } else {
                     // ── Setup state ───────────────────────────────────────────────
                     div(classes = "mfa-status-row") {
@@ -591,7 +647,8 @@ object PortalView {
                     }
 
                     // Step 1 — intro
-                    div { id = "mfa-step-1"
+                    div {
+                        id = "mfa-step-1"
                         p {
                             +"You'll need an authenticator app such as "
                             strong { +"Google Authenticator" }
@@ -617,11 +674,14 @@ object PortalView {
                     }
 
                     // Step 2 — QR code + recovery codes + verification
-                    div { id = "mfa-step-2"
+                    div {
+                        id = "mfa-step-2"
                         style = "display:none"
 
                         p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
-                        p(classes = "form-hint") { +"Open your authenticator app and scan the QR code below to add your account." }
+                        p(
+                            classes = "form-hint",
+                        ) { +"Open your authenticator app and scan the QR code below to add your account." }
                         div(classes = "qr-container") { id = "qr-code" }
                         p(classes = "form-hint") {
                             +"Can't scan? Enter this key manually: "
@@ -631,8 +691,12 @@ object PortalView {
                         hr(classes = "portal-divider")
 
                         p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
-                        p { +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once." }
-                        div(classes = "alert-warning") { +"Save these codes now — they won't be shown again after you leave this page." }
+                        p {
+                            +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
+                        }
+                        div(
+                            classes = "alert-warning",
+                        ) { +"Save these codes now — they won't be shown again after you leave this page." }
                         div(classes = "recovery-codes-grid") { id = "recovery-codes" }
                         button(classes = "btn-outline") {
                             id = "copy-codes-btn"
@@ -644,19 +708,26 @@ object PortalView {
                         label(classes = "mfa-confirm-label") {
                             input(type = InputType.checkBox) {
                                 id = "codes-saved"
-                                attributes["onchange"] = "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                                attributes["onchange"] =
+                                    "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
                             }
                             +" I've saved my recovery codes in a safe place"
                         }
 
                         // Step 2b — verification (gated behind the checkbox)
-                        div { id = "mfa-step-2b"
+                        div {
+                            id = "mfa-step-2b"
                             style = "display:none"
                             hr(classes = "portal-divider")
                             p(classes = "mfa-step-heading") { +"3. Verify your setup" }
-                            p { +"Enter the 6-digit code shown in your authenticator app to confirm everything is working." }
+                            p {
+                                +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                            }
                             div("field") {
-                                label { htmlFor = "totp-code"; +"Verification code" }
+                                label {
+                                    htmlFor = "totp-code"
+                                    +"Verification code"
+                                }
                                 input(type = InputType.text, name = "code") {
                                     id = "totp-code"
                                     placeholder = "000000"
@@ -682,7 +753,8 @@ object PortalView {
                 // ── JavaScript ────────────────────────────────────────────────────
                 script {
                     unsafe {
-                        raw("""
+                        raw(
+                            """
                             async function startEnrollment(slug) {
                                 var btn   = document.getElementById('start-btn');
                                 var errEl = document.getElementById('enroll-error');
@@ -793,7 +865,8 @@ object PortalView {
                                     setTimeout(function() { btn.textContent = 'Copy codes'; }, 2000);
                                 });
                             }
-                        """.trimIndent())
+                            """.trimIndent(),
+                        )
                     }
                 }
             }
@@ -808,7 +881,10 @@ object PortalView {
      * Used only for the portal login page. Injects theme vars and links the auth
      * stylesheet so the card/field/btn classes work identically to the auth pages.
      */
-    private fun HEAD.authPageHead(title: String, theme: TenantTheme) {
+    private fun HEAD.authPageHead(
+        title: String,
+        theme: TenantTheme,
+    ) {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
@@ -817,8 +893,14 @@ object PortalView {
             link(rel = "icon", href = theme.faviconUrl)
         } else {
             link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
-            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
-            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
+            link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-32x32.png") {
+                attributes["sizes"] =
+                    "32x32"
+            }
+            link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-16x16.png") {
+                attributes["sizes"] =
+                    "16x16"
+            }
         }
         // Theme vars first — stylesheet reads from these
         style { unsafe { +theme.toCssVars() } }
@@ -833,7 +915,10 @@ object PortalView {
      * Used for authenticated portal pages. Extends the auth stylesheet with
      * portal-specific layout classes while keeping all token references consistent.
      */
-    private fun HEAD.portalPageHead(title: String, theme: TenantTheme) {
+    private fun HEAD.portalPageHead(
+        title: String,
+        theme: TenantTheme,
+    ) {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
@@ -842,8 +927,14 @@ object PortalView {
             link(rel = "icon", href = theme.faviconUrl)
         } else {
             link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
-            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-32x32.png") { attributes["sizes"] = "32x32" }
-            link(rel = "icon", type = "image/png",    href = "/static/favicon/favicon-16x16.png") { attributes["sizes"] = "16x16" }
+            link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-32x32.png") {
+                attributes["sizes"] =
+                    "32x32"
+            }
+            link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-16x16.png") {
+                attributes["sizes"] =
+                    "16x16"
+            }
         }
         // Theme vars first — both auth.css and portal inline CSS read from these
         style { unsafe { +theme.toCssVars() } }
@@ -851,7 +942,8 @@ object PortalView {
         // Portal-specific overrides — extend, not replace, the auth stylesheet
         style {
             unsafe {
-                raw("""
+                raw(
+                    """
                     /* Reset auth page body centering for portal layout */
                     body {
                         display: block;
@@ -1013,7 +1105,8 @@ object PortalView {
                         padding: 0.75rem 1.5rem;
                         margin-top: 8px;
                     }
-                """.trimIndent())
+                    """.trimIndent(),
+                )
             }
         }
     }
@@ -1023,11 +1116,11 @@ object PortalView {
     // =========================================================================
 
     private fun BODY.portalShell(
-        slug          : String,
-        workspaceName : String,
-        username      : String,
-        activePage    : String,
-        content       : DIV.() -> Unit
+        slug: String,
+        workspaceName: String,
+        username: String,
+        activePage: String,
+        content: DIV.() -> Unit,
     ) {
         div(classes = "portal-shell") {
             // ── Sticky sidebar ────────────────────────────────────────────
@@ -1038,22 +1131,23 @@ object PortalView {
                 }
                 div(classes = "portal-nav-links") {
                     a(
-                        href    = "/t/$slug/account/profile",
-                        classes = "portal-nav-link${if (activePage == "profile") " active" else ""}"
+                        href = "/t/$slug/account/profile",
+                        classes = "portal-nav-link${if (activePage == "profile") " active" else ""}",
                     ) { +"Profile" }
                     a(
-                        href    = "/t/$slug/account/security",
-                        classes = "portal-nav-link${if (activePage == "security") " active" else ""}"
+                        href = "/t/$slug/account/security",
+                        classes = "portal-nav-link${if (activePage == "security") " active" else ""}",
                     ) { +"Security" }
                     a(
-                        href    = "/t/$slug/account/mfa",
-                        classes = "portal-nav-link${if (activePage == "mfa") " active" else ""}"
+                        href = "/t/$slug/account/mfa",
+                        classes = "portal-nav-link${if (activePage == "mfa") " active" else ""}",
                     ) { +"Two-Factor Auth" }
                 }
                 div(classes = "portal-nav-footer") {
                     form(action = "/t/$slug/account/logout", method = FormMethod.post) {
                         button(type = ButtonType.submit, classes = "portal-nav-link") {
-                            style = "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
+                            style =
+                                "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
                             +"Sign out"
                         }
                     }

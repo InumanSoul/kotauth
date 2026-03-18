@@ -11,12 +11,13 @@ import com.kauth.domain.port.PasswordHasher
  * Adjust upward as hardware improves.
  */
 class BcryptPasswordHasher : PasswordHasher {
-
     override fun hash(rawPassword: String): String =
         BCrypt.withDefaults().hashToString(COST_FACTOR, rawPassword.toCharArray())
 
-    override fun verify(rawPassword: String, hashedPassword: String): Boolean =
-        BCrypt.verifyer().verify(rawPassword.toCharArray(), hashedPassword).verified
+    override fun verify(
+        rawPassword: String,
+        hashedPassword: String,
+    ): Boolean = BCrypt.verifyer().verify(rawPassword.toCharArray(), hashedPassword).verified
 
     companion object {
         private const val COST_FACTOR: Int = 12

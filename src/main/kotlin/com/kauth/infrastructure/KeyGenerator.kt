@@ -22,14 +22,13 @@ import java.util.Base64
  *     one after all tokens signed with the old key have expired.
  */
 object KeyGenerator {
-
     private const val KEY_SIZE = 2048
     private const val ALGORITHM = "RSA"
 
     data class KeyPairPem(
         val keyId: String,
         val publicKeyPem: String,
-        val privateKeyPem: String
+        val privateKeyPem: String,
     )
 
     /**
@@ -44,7 +43,7 @@ object KeyGenerator {
         return KeyPairPem(
             keyId = keyId,
             publicKeyPem = encodePublicKey(keyPair.public as RSAPublicKey),
-            privateKeyPem = encodePrivateKey(keyPair.private as RSAPrivateKey)
+            privateKeyPem = encodePrivateKey(keyPair.private as RSAPrivateKey),
         )
     }
 
@@ -72,16 +71,17 @@ object KeyGenerator {
 
     private fun encodePublicKey(key: RSAPublicKey): String =
         "-----BEGIN PUBLIC KEY-----\n" +
-        Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(key.encoded) +
-        "\n-----END PUBLIC KEY-----"
+            Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(key.encoded) +
+            "\n-----END PUBLIC KEY-----"
 
     private fun encodePrivateKey(key: RSAPrivateKey): String =
         "-----BEGIN PRIVATE KEY-----\n" +
-        Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(key.encoded) +
-        "\n-----END PRIVATE KEY-----"
+            Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(key.encoded) +
+            "\n-----END PRIVATE KEY-----"
 
     private fun stripPemHeaders(pem: String): String =
-        pem.lines()
+        pem
+            .lines()
             .filter { !it.startsWith("-----") && it.isNotBlank() }
             .joinToString("")
 }

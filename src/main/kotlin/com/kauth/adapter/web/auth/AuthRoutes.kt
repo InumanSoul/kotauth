@@ -9,7 +9,6 @@ import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
-import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthError
@@ -21,7 +20,6 @@ import com.kauth.domain.service.SocialLoginNeedsRegistration
 import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
-import com.kauth.domain.model.User
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.RateLimiter
@@ -63,52 +61,59 @@ fun Route.authRoutes(
     loginRateLimiter: RateLimiter,
     registerRateLimiter: RateLimiter,
     selfServiceService: UserSelfServiceService,
-    mfaService: MfaService? = null,                           // Phase 3c — nullable for backward compat
-    roleRepository: RoleRepository? = null,                   // Phase 1 fix — required_admins MFA check
-    socialLoginService: SocialLoginService? = null,           // Phase 2 — Social Login
-    identityProviderRepository: IdentityProviderRepository? = null,  // Phase 2 — load enabled providers
-    baseUrl: String = ""                                      // Phase 2 — needed for callback URI
+    mfaService: MfaService? = null, // Phase 3c — nullable for backward compat
+    roleRepository: RoleRepository? = null, // Phase 1 fix — required_admins MFA check
+    socialLoginService: SocialLoginService? = null, // Phase 2 — Social Login
+    identityProviderRepository: IdentityProviderRepository? = null, // Phase 2 — load enabled providers
+    baseUrl: String = "", // Phase 2 — needed for callback URI
 ) {
-
     route("/t/{slug}") {
-
         // ------------------------------------------------------------------
         // Login — browser UI (updated for OAuth2 passthrough)
         // ------------------------------------------------------------------
 
         get("/login") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val registered    = call.request.queryParameters["registered"] == "true"
+            val registered = call.request.queryParameters["registered"] == "true"
 
             // Preserve OAuth2 params from authorization endpoint redirect
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
             // Phase 2: load enabled social providers for this tenant
-            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-            } else emptyList()
+            val enabledProviders =
+                if (tenant != null && identityProviderRepository != null) {
+                    identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                } else {
+                    emptyList()
+                }
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(
-                tenantSlug       = slug,
-                theme            = theme,
-                workspaceName    = workspaceName,
-                success          = registered,
-                oauthParams      = oauthParams,
-                enabledProviders = enabledProviders
-            ))
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.loginPage(
+                    tenantSlug = slug,
+                    theme = theme,
+                    workspaceName = workspaceName,
+                    success = registered,
+                    oauthParams = oauthParams,
+                    enabledProviders = enabledProviders,
+                ),
+            )
         }
 
         post("/login") {
-            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-            } else emptyList()
+            val enabledProviders =
+                if (tenant != null && identityProviderRepository != null) {
+                    identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                } else {
+                    emptyList()
+                }
             val params = call.receiveParameters()
             val username = params["username"]?.trim() ?: ""
             val password = params["password"] ?: ""
@@ -120,7 +125,14 @@ fun Route.authRoutes(
             if (!loginRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.loginPage(slug, theme, workspaceName, error = "Too many login attempts. Please wait a moment and try again.", oauthParams = oauthParams, enabledProviders = enabledProviders)
+                    AuthView.loginPage(
+                        slug,
+                        theme,
+                        workspaceName,
+                        error = "Too many login attempts. Please wait a moment and try again.",
+                        oauthParams = oauthParams,
+                        enabledProviders = enabledProviders,
+                    ),
                 )
             }
 
@@ -134,7 +146,14 @@ fun Route.authRoutes(
                     } else {
                         call.respondHtml(
                             HttpStatusCode.Unauthorized,
-                            AuthView.loginPage(slug, theme, workspaceName, error = result.error.toMessage(), oauthParams = oauthParams, enabledProviders = enabledProviders)
+                            AuthView.loginPage(
+                                slug,
+                                theme,
+                                workspaceName,
+                                error = result.error.toMessage(),
+                                oauthParams = oauthParams,
+                                enabledProviders = enabledProviders,
+                            ),
                         )
                     }
                 }
@@ -150,29 +169,36 @@ fun Route.authRoutes(
                     // through even when MFA isn't enrolled yet. The portal callback will detect
                     // the gap and redirect the user directly to the MFA setup page with a
                     // prominent notice, so they can enroll from within the portal itself.
-                    val isPortalLogin = oauthParams.isOAuthFlow &&
-                        oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
+                    val isPortalLogin =
+                        oauthParams.isOAuthFlow &&
+                            oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
                     if (mfaService != null && tenant != null && !isPortalLogin) {
                         val mfaPolicy = tenant.mfaPolicy
                         if (mfaPolicy != "optional") {
                             // Resolve effective roles only when the policy actually needs them —
                             // avoids an unnecessary DB query for the "required" (all-users) case.
-                            val userRoles = if (mfaPolicy == "required_admins" && roleRepository != null) {
-                                roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
-                            } else emptyList()
+                            val userRoles =
+                                if (mfaPolicy == "required_admins" && roleRepository != null) {
+                                    roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
+                                } else {
+                                    emptyList()
+                                }
 
-                            if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) && !mfaService.shouldChallengeMfa(user.id!!)) {
+                            if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) &&
+                                !mfaService.shouldChallengeMfa(user.id!!)
+                            ) {
                                 return@post call.respondHtml(
                                     HttpStatusCode.Forbidden,
                                     AuthView.loginPage(
-                                        tenantSlug       = slug,
-                                        theme            = theme,
-                                        workspaceName    = workspaceName,
-                                        error            = "Multi-factor authentication is required for your account. " +
-                                                           "Please sign in to the user portal and enable MFA under Security settings.",
-                                        oauthParams      = oauthParams,
-                                        enabledProviders = enabledProviders
-                                    )
+                                        tenantSlug = slug,
+                                        theme = theme,
+                                        workspaceName = workspaceName,
+                                        error =
+                                            "Multi-factor authentication is required for your account. " +
+                                                "Please sign in to the user portal and enable MFA under Security settings.",
+                                        oauthParams = oauthParams,
+                                        enabledProviders = enabledProviders,
+                                    ),
                                 )
                             }
                         }
@@ -186,11 +212,11 @@ fun Route.authRoutes(
                         // (an unsigned cookie lets any client claim they passed MFA as any user).
                         val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
                         call.response.cookies.append(
-                            name  = "KOTAUTH_MFA_PENDING",
+                            name = "KOTAUTH_MFA_PENDING",
                             value = EncryptionService.signCookie(mfaPending),
-                            maxAge = 300L,   // 5 minutes
+                            maxAge = 300L, // 5 minutes
                             httpOnly = true,
-                            path = "/t/$slug"
+                            path = "/t/$slug",
                         )
                         val queryString = if (oauthParams.isOAuthFlow) oauthParams.toQueryString() else ""
                         call.respondRedirect("/t/$slug/mfa-challenge$queryString")
@@ -199,35 +225,50 @@ fun Route.authRoutes(
 
                     if (oauthParams.isOAuthFlow) {
                         // Authorization Code Flow: issue code and redirect
-                        val clientId    = oauthParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
-                        val redirectUri = oauthParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+                        val clientId =
+                            oauthParams.clientId
+                                ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
+                        val redirectUri =
+                            oauthParams.redirectUri
+                                ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
 
-                        when (val codeResult = oauthService.issueAuthorizationCode(
-                            tenantSlug          = slug,
-                            userId              = user.id!!,
-                            clientId            = clientId,
-                            redirectUri         = redirectUri,
-                            scopes              = oauthParams.scope ?: "openid",
-                            codeChallenge       = oauthParams.codeChallenge,
-                            codeChallengeMethod = oauthParams.codeChallengeMethod,
-                            nonce               = oauthParams.nonce,
-                            state               = oauthParams.state,
-                            ipAddress           = ipAddress
-                        )) {
+                        when (
+                            val codeResult =
+                                oauthService.issueAuthorizationCode(
+                                    tenantSlug = slug,
+                                    userId = user.id!!,
+                                    clientId = clientId,
+                                    redirectUri = redirectUri,
+                                    scopes = oauthParams.scope ?: "openid",
+                                    codeChallenge = oauthParams.codeChallenge,
+                                    codeChallengeMethod = oauthParams.codeChallengeMethod,
+                                    nonce = oauthParams.nonce,
+                                    state = oauthParams.state,
+                                    ipAddress = ipAddress,
+                                )
+                        ) {
                             is OAuthResult.Success -> {
-                                val code  = codeResult.value.code
+                                val code = codeResult.value.code
                                 val state = oauthParams.state
-                                val redirect = buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(code)
-                                    if (!state.isNullOrBlank()) append("&state=").append(state)
-                                }
+                                val redirect =
+                                    buildString {
+                                        append(redirectUri)
+                                        append("?code=").append(code)
+                                        if (!state.isNullOrBlank()) append("&state=").append(state)
+                                    }
                                 call.respondRedirect(redirect)
                             }
                             is OAuthResult.Failure -> {
                                 call.respondHtml(
                                     HttpStatusCode.BadRequest,
-                                    AuthView.loginPage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams, enabledProviders = enabledProviders)
+                                    AuthView.loginPage(
+                                        slug,
+                                        theme,
+                                        workspaceName,
+                                        error = codeResult.error.toDescription(),
+                                        oauthParams = oauthParams,
+                                        enabledProviders = enabledProviders,
+                                    ),
                                 )
                             }
                         }
@@ -235,7 +276,13 @@ fun Route.authRoutes(
                         // Direct login — issue tokens and persist a server-side session
                         when (val tokenResult = authService.login(slug, username, password, ipAddress, userAgent)) {
                             is AuthResult.Success -> call.respond(tokenResult.value)
-                            is AuthResult.Failure -> call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_credentials"))
+                            is AuthResult.Failure ->
+                                call.respond(
+                                    HttpStatusCode.Unauthorized,
+                                    mapOf(
+                                        "error" to "invalid_credentials",
+                                    ),
+                                )
                         }
                     }
                 }
@@ -247,44 +294,57 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/register") {
-            val slug             = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant           = tenantRepository.findBySlug(slug)
-            val theme            = tenant?.theme ?: TenantTheme.DEFAULT
-            val workspaceName    = tenant?.displayName ?: "KotAuth"
-            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-            } else emptyList()
-            call.respondHtml(HttpStatusCode.OK, AuthView.registerPage(slug, theme, workspaceName, enabledProviders = enabledProviders))
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val enabledProviders =
+                if (tenant != null && identityProviderRepository != null) {
+                    identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                } else {
+                    emptyList()
+                }
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.registerPage(slug, theme, workspaceName, enabledProviders = enabledProviders),
+            )
         }
 
         post("/register") {
-            val slug             = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant           = tenantRepository.findBySlug(slug)
-            val theme            = tenant?.theme ?: TenantTheme.DEFAULT
-            val workspaceName    = tenant?.displayName ?: "KotAuth"
-            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-            } else emptyList()
-            val ipAddress        = call.request.local.remoteAddress
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val enabledProviders =
+                if (tenant != null && identityProviderRepository != null) {
+                    identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                } else {
+                    emptyList()
+                }
+            val ipAddress = call.request.local.remoteAddress
 
             // Rate limiting on registration
             val rateLimitKey = "register:$ipAddress"
             if (!registerRateLimiter.isAllowed(rateLimitKey)) {
                 return@post call.respondHtml(
                     HttpStatusCode.TooManyRequests,
-                    AuthView.registerPage(slug, theme, workspaceName,
-                        error            = "Too many registration attempts. Please wait a moment.",
-                        enabledProviders = enabledProviders)
+                    AuthView.registerPage(
+                        slug,
+                        theme,
+                        workspaceName,
+                        error = "Too many registration attempts. Please wait a moment.",
+                        enabledProviders = enabledProviders,
+                    ),
                 )
             }
 
             val params = call.receiveParameters()
-            val username        = params["username"]?.trim() ?: ""
-            val email           = params["email"]?.trim() ?: ""
-            val fullName        = params["fullName"]?.trim() ?: ""
-            val password        = params["password"] ?: ""
+            val username = params["username"]?.trim() ?: ""
+            val email = params["email"]?.trim() ?: ""
+            val fullName = params["fullName"]?.trim() ?: ""
+            val password = params["password"] ?: ""
             val confirmPassword = params["confirmPassword"] ?: ""
-            val prefill         = RegisterPrefill(username = username, email = email, fullName = fullName)
+            val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
 
             when (val result = authService.register(slug, username, email, fullName, password, confirmPassword)) {
                 is AuthResult.Success ->
@@ -292,10 +352,14 @@ fun Route.authRoutes(
                 is AuthResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AuthView.registerPage(slug, theme, workspaceName,
-                            error            = result.error.toMessage(),
-                            prefill          = prefill,
-                            enabledProviders = enabledProviders)
+                        AuthView.registerPage(
+                            slug,
+                            theme,
+                            workspaceName,
+                            error = result.error.toMessage(),
+                            prefill = prefill,
+                            enabledProviders = enabledProviders,
+                        ),
                     )
             }
         }
@@ -305,25 +369,31 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/forgot-password") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val sent          = call.request.queryParameters["sent"] == "true"
+            val sent = call.request.queryParameters["sent"] == "true"
             // reason=expired: shown when the user is redirected from login due to an expired password
             val reason = call.request.queryParameters["reason"]
-            val errorMsg = if (reason == "expired")
-                "Your password has expired. Enter your email below to receive a reset link."
-            else null
-            call.respondHtml(HttpStatusCode.OK, AuthView.forgotPasswordPage(slug, theme, workspaceName, error = errorMsg, sent = sent))
+            val errorMsg =
+                if (reason == "expired") {
+                    "Your password has expired. Enter your email below to receive a reset link."
+                } else {
+                    null
+                }
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.forgotPasswordPage(slug, theme, workspaceName, error = errorMsg, sent = sent),
+            )
         }
 
         post("/forgot-password") {
-            val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val params    = call.receiveParameters()
-            val email     = params["email"]?.trim() ?: ""
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val params = call.receiveParameters()
+            val email = params["email"]?.trim() ?: ""
             val ipAddress = call.request.local.remoteAddress
-            val baseUrl   = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+            val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
 
             // Rate-limit to prevent email flooding
             val rateLimitKey = "forgot:$ipAddress"
@@ -343,11 +413,11 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/reset-password") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val token         = call.request.queryParameters["token"] ?: ""
+            val token = call.request.queryParameters["token"] ?: ""
 
             if (token.isBlank()) {
                 return@get call.respondRedirect("/t/$slug/forgot-password")
@@ -356,25 +426,31 @@ fun Route.authRoutes(
         }
 
         post("/reset-password") {
-            val slug            = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant          = tenantRepository.findBySlug(slug)
-            val theme           = tenant?.theme ?: TenantTheme.DEFAULT
-            val workspaceName   = tenant?.displayName ?: "KotAuth"
-            val params          = call.receiveParameters()
-            val token           = params["token"] ?: ""
-            val newPassword     = params["new_password"] ?: ""
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
+            val workspaceName = tenant?.displayName ?: "KotAuth"
+            val params = call.receiveParameters()
+            val token = params["token"] ?: ""
+            val newPassword = params["new_password"] ?: ""
             val confirmPassword = params["confirm_password"] ?: ""
 
             when (val result = selfServiceService.confirmPasswordReset(token, newPassword, confirmPassword)) {
                 is SelfServiceResult.Success ->
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, success = true)
+                        AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, success = true),
                     )
                 is SelfServiceResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
-                        AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, error = result.error.message)
+                        AuthView.resetPasswordPage(
+                            slug,
+                            theme,
+                            workspaceName,
+                            token = token,
+                            error = result.error.message,
+                        ),
                     )
             }
         }
@@ -384,16 +460,22 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/verify-email") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val token         = call.request.queryParameters["token"] ?: ""
+            val token = call.request.queryParameters["token"] ?: ""
 
             if (token.isBlank()) {
                 return@get call.respondHtml(
                     HttpStatusCode.BadRequest,
-                    AuthView.verifyEmailPage(slug, theme, workspaceName, success = false, message = "Verification link is missing or invalid.")
+                    AuthView.verifyEmailPage(
+                        slug,
+                        theme,
+                        workspaceName,
+                        success = false,
+                        message = "Verification link is missing or invalid.",
+                    ),
                 )
             }
 
@@ -401,12 +483,24 @@ fun Route.authRoutes(
                 is SelfServiceResult.Success ->
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AuthView.verifyEmailPage(slug, theme, workspaceName, success = true, message = "Your email address has been verified successfully.")
+                        AuthView.verifyEmailPage(
+                            slug,
+                            theme,
+                            workspaceName,
+                            success = true,
+                            message = "Your email address has been verified successfully.",
+                        ),
                     )
                 is SelfServiceResult.Failure ->
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
-                        AuthView.verifyEmailPage(slug, theme, workspaceName, success = false, message = result.error.message)
+                        AuthView.verifyEmailPage(
+                            slug,
+                            theme,
+                            workspaceName,
+                            success = false,
+                            message = result.error.message,
+                        ),
                     )
             }
         }
@@ -416,11 +510,11 @@ fun Route.authRoutes(
         // ------------------------------------------------------------------
 
         get("/mfa-challenge") {
-            val slug          = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val oauthParams   = call.request.queryParameters.toOAuthParams()
+            val oauthParams = call.request.queryParameters.toOAuthParams()
 
             // Verify MFA pending cookie — must be present and signature must be valid
             val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
@@ -428,16 +522,19 @@ fun Route.authRoutes(
                 return@get call.respondRedirect("/t/$slug/login")
             }
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.mfaChallengePage(slug, theme, workspaceName, oauthParams = oauthParams))
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.mfaChallengePage(slug, theme, workspaceName, oauthParams = oauthParams),
+            )
         }
 
         post("/mfa-challenge") {
-            val slug          = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val params    = call.receiveParameters()
-            val code      = params["code"]?.trim() ?: ""
+            val params = call.receiveParameters()
+            val code = params["code"]?.trim() ?: ""
             val ipAddress = call.request.local.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
             val oauthParams = params.toOAuthParams()
@@ -456,14 +553,20 @@ fun Route.authRoutes(
             if (parts.size != 3) {
                 return@post call.respondRedirect("/t/$slug/login")
             }
-            val userId    = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
+            val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
             val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
 
             // Check expiry (5 minutes)
             if (System.currentTimeMillis() - timestamp > 300_000) {
                 return@post call.respondHtml(
                     HttpStatusCode.Unauthorized,
-                    AuthView.mfaChallengePage(slug, theme, workspaceName, error = "MFA challenge expired. Please log in again.", oauthParams = oauthParams)
+                    AuthView.mfaChallengePage(
+                        slug,
+                        theme,
+                        workspaceName,
+                        error = "MFA challenge expired. Please log in again.",
+                        oauthParams = oauthParams,
+                    ),
                 )
             }
 
@@ -472,67 +575,92 @@ fun Route.authRoutes(
             }
 
             // Try TOTP code first, then recovery code
-            val mfaResult = if (code.length == 6 && code.all { it.isDigit() }) {
-                mfaService.verifyTotp(userId, code)
-            } else {
-                mfaService.verifyRecoveryCode(userId, code)
-            }
+            val mfaResult =
+                if (code.length == 6 && code.all { it.isDigit() }) {
+                    mfaService.verifyTotp(userId, code)
+                } else {
+                    mfaService.verifyRecoveryCode(userId, code)
+                }
 
             when (mfaResult) {
                 is MfaResult.Failure -> {
                     call.respondHtml(
                         HttpStatusCode.Unauthorized,
-                        AuthView.mfaChallengePage(slug, theme, workspaceName, error = "Invalid code. Please try again.", oauthParams = oauthParams)
+                        AuthView.mfaChallengePage(
+                            slug,
+                            theme,
+                            workspaceName,
+                            error = "Invalid code. Please try again.",
+                            oauthParams = oauthParams,
+                        ),
                     )
                 }
                 is MfaResult.Success -> {
                     // Clear MFA pending cookie
                     call.response.cookies.append(
-                        name     = "KOTAUTH_MFA_PENDING",
-                        value    = "",
-                        maxAge   = 0L,
-                        path     = "/t/$slug",
-                        httpOnly = true
+                        name = "KOTAUTH_MFA_PENDING",
+                        value = "",
+                        maxAge = 0L,
+                        path = "/t/$slug",
+                        httpOnly = true,
                     )
 
                     if (oauthParams.isOAuthFlow) {
-                        val clientId    = oauthParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
-                        val redirectUri = oauthParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+                        val clientId =
+                            oauthParams.clientId
+                                ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
+                        val redirectUri =
+                            oauthParams.redirectUri
+                                ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
 
-                        when (val codeResult = oauthService.issueAuthorizationCode(
-                            tenantSlug          = slug,
-                            userId              = userId,
-                            clientId            = clientId,
-                            redirectUri         = redirectUri,
-                            scopes              = oauthParams.scope ?: "openid",
-                            codeChallenge       = oauthParams.codeChallenge,
-                            codeChallengeMethod = oauthParams.codeChallengeMethod,
-                            nonce               = oauthParams.nonce,
-                            state               = oauthParams.state,
-                            ipAddress           = ipAddress
-                        )) {
+                        when (
+                            val codeResult =
+                                oauthService.issueAuthorizationCode(
+                                    tenantSlug = slug,
+                                    userId = userId,
+                                    clientId = clientId,
+                                    redirectUri = redirectUri,
+                                    scopes = oauthParams.scope ?: "openid",
+                                    codeChallenge = oauthParams.codeChallenge,
+                                    codeChallengeMethod = oauthParams.codeChallengeMethod,
+                                    nonce = oauthParams.nonce,
+                                    state = oauthParams.state,
+                                    ipAddress = ipAddress,
+                                )
+                        ) {
                             is OAuthResult.Success -> {
                                 val authCode = codeResult.value.code
-                                val state    = oauthParams.state
-                                val redirect = buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!state.isNullOrBlank()) append("&state=").append(state)
-                                }
+                                val state = oauthParams.state
+                                val redirect =
+                                    buildString {
+                                        append(redirectUri)
+                                        append("?code=").append(authCode)
+                                        if (!state.isNullOrBlank()) append("&state=").append(state)
+                                    }
                                 call.respondRedirect(redirect)
                             }
                             is OAuthResult.Failure -> {
-                                call.respondHtml(HttpStatusCode.BadRequest,
-                                    AuthView.mfaChallengePage(slug, theme, workspaceName, error = codeResult.error.toDescription(), oauthParams = oauthParams))
+                                call.respondHtml(
+                                    HttpStatusCode.BadRequest,
+                                    AuthView.mfaChallengePage(
+                                        slug,
+                                        theme,
+                                        workspaceName,
+                                        error = codeResult.error.toDescription(),
+                                        oauthParams = oauthParams,
+                                    ),
+                                )
                             }
                         }
                     } else {
                         // Direct login — complete the token issuance
                         // We need to re-authenticate to get tokens since we only stored userId
-                        call.respond(mapOf(
-                            "message" to "MFA verification successful",
-                            "user_id" to userId
-                        ))
+                        call.respond(
+                            mapOf(
+                                "message" to "MFA verification successful",
+                                "user_id" to userId,
+                            ),
+                        )
                     }
                 }
             }
@@ -544,30 +672,45 @@ fun Route.authRoutes(
 
         get("/.well-known/openid-configuration") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant = tenantRepository.findBySlug(slug)
-                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
+            val tenant =
+                tenantRepository.findBySlug(slug)
+                    ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
             val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
             val issuer = tenant.issuerUrl ?: "$baseUrl/t/$slug"
 
-            call.respond(mapOf(
-                "issuer"                                 to issuer,
-                "authorization_endpoint"                 to "$issuer/protocol/openid-connect/auth",
-                "token_endpoint"                         to "$issuer/protocol/openid-connect/token",
-                "userinfo_endpoint"                      to "$issuer/protocol/openid-connect/userinfo",
-                "jwks_uri"                               to "$issuer/protocol/openid-connect/certs",
-                "end_session_endpoint"                   to "$issuer/protocol/openid-connect/logout",
-                "revocation_endpoint"                    to "$issuer/protocol/openid-connect/revoke",
-                "introspection_endpoint"                 to "$issuer/protocol/openid-connect/introspect",
-                "response_types_supported"               to listOf("code"),
-                "grant_types_supported"                  to listOf("authorization_code", "client_credentials", "refresh_token"),
-                "subject_types_supported"                to listOf("public"),
-                "id_token_signing_alg_values_supported"  to listOf("RS256"),
-                "token_endpoint_auth_methods_supported"  to listOf("client_secret_post", "client_secret_basic"),
-                "scopes_supported"                       to listOf("openid", "profile", "email"),
-                "claims_supported"                       to listOf("sub", "iss", "aud", "exp", "iat", "email", "email_verified", "name", "preferred_username"),
-                "code_challenge_methods_supported"       to listOf("S256")
-            ))
+            call.respond(
+                mapOf(
+                    "issuer" to issuer,
+                    "authorization_endpoint" to "$issuer/protocol/openid-connect/auth",
+                    "token_endpoint" to "$issuer/protocol/openid-connect/token",
+                    "userinfo_endpoint" to "$issuer/protocol/openid-connect/userinfo",
+                    "jwks_uri" to "$issuer/protocol/openid-connect/certs",
+                    "end_session_endpoint" to "$issuer/protocol/openid-connect/logout",
+                    "revocation_endpoint" to "$issuer/protocol/openid-connect/revoke",
+                    "introspection_endpoint" to "$issuer/protocol/openid-connect/introspect",
+                    "response_types_supported" to listOf("code"),
+                    "grant_types_supported" to
+                        listOf("authorization_code", "client_credentials", "refresh_token"),
+                    "subject_types_supported" to listOf("public"),
+                    "id_token_signing_alg_values_supported" to listOf("RS256"),
+                    "token_endpoint_auth_methods_supported" to listOf("client_secret_post", "client_secret_basic"),
+                    "scopes_supported" to listOf("openid", "profile", "email"),
+                    "claims_supported" to
+                        listOf(
+                            "sub",
+                            "iss",
+                            "aud",
+                            "exp",
+                            "iat",
+                            "email",
+                            "email_verified",
+                            "name",
+                            "preferred_username",
+                        ),
+                    "code_challenge_methods_supported" to listOf("S256"),
+                ),
+            )
         }
 
         // ==================================================================
@@ -582,10 +725,11 @@ fun Route.authRoutes(
         // ==================================================================
 
         get("/auth/social/{provider}/redirect") {
-            val slug     = call.parameters["slug"]     ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val provider = SocialProvider.fromValueOrNull(provName)
-                ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
+            val provider =
+                SocialProvider.fromValueOrNull(provName)
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
             if (socialLoginService == null) {
                 return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
@@ -594,59 +738,73 @@ fun Route.authRoutes(
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
             // Build CSRF state: sign provider|slug|nonce|oauthParamsBase64
-            val nonce           = java.util.UUID.randomUUID().toString()
-            val oauthParamsB64  = java.util.Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
-            val statePayload    = "${provider.value}|$slug|$nonce|$oauthParamsB64"
-            val signedState     = EncryptionService.signCookie(statePayload)
+            val nonce =
+                java.util.UUID
+                    .randomUUID()
+                    .toString()
+            val oauthParamsB64 =
+                java.util.Base64
+                    .getUrlEncoder()
+                    .withoutPadding()
+                    .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
+            val statePayload = "${provider.value}|$slug|$nonce|$oauthParamsB64"
+            val signedState = EncryptionService.signCookie(statePayload)
 
             when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
                 is SocialLoginResult.Success -> call.respondRedirect(result.value)
                 is SocialLoginResult.Failure -> {
-                    val tenant        = tenantRepository.findBySlug(slug)
-                    val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+                    val tenant = tenantRepository.findBySlug(slug)
+                    val theme = tenant?.theme ?: TenantTheme.DEFAULT
                     val workspaceName = tenant?.displayName ?: "KotAuth"
-                    val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-                    } else emptyList()
+                    val enabledProviders =
+                        if (tenant != null && identityProviderRepository != null) {
+                            identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                        } else {
+                            emptyList()
+                        }
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
                         AuthView.loginPage(
-                            tenantSlug       = slug,
-                            theme            = theme,
-                            workspaceName    = workspaceName,
-                            error            = result.error.toMessage(),
-                            enabledProviders = enabledProviders
-                        )
+                            tenantSlug = slug,
+                            theme = theme,
+                            workspaceName = workspaceName,
+                            error = result.error.toMessage(),
+                            enabledProviders = enabledProviders,
+                        ),
                     )
                 }
                 // buildRedirectUrl never returns NeedsRegistration — that is a callback-only
                 // result. This branch satisfies the exhaustive-when requirement.
-                is SocialLoginResult.NeedsRegistration -> call.respond(
-                    HttpStatusCode.InternalServerError,
-                    mapOf("error" to "internal_error")
-                )
+                is SocialLoginResult.NeedsRegistration ->
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to "internal_error"),
+                    )
             }
         }
 
         get("/auth/social/{provider}/callback") {
-            val slug     = call.parameters["slug"]     ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val provider = SocialProvider.fromValueOrNull(provName)
-                ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
+            val provider =
+                SocialProvider.fromValueOrNull(provName)
+                    ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
-            val tenant        = tenantRepository.findBySlug(slug)
-            val theme         = tenant?.theme ?: TenantTheme.DEFAULT
+            val tenant = tenantRepository.findBySlug(slug)
+            val theme = tenant?.theme ?: TenantTheme.DEFAULT
             val workspaceName = tenant?.displayName ?: "KotAuth"
-            val enabledProviders = if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
-            } else emptyList()
+            val enabledProviders =
+                if (tenant != null && identityProviderRepository != null) {
+                    identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                } else {
+                    emptyList()
+                }
 
             if (socialLoginService == null) {
                 return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
             }
 
-            val code  = call.request.queryParameters["code"]
+            val code = call.request.queryParameters["code"]
             val state = call.request.queryParameters["state"]
             val error = call.request.queryParameters["error"]
 
@@ -655,12 +813,12 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug       = slug,
-                        theme            = theme,
-                        workspaceName    = workspaceName,
-                        error            = "Login with ${provider.displayName} was cancelled or failed.",
-                        enabledProviders = enabledProviders
-                    )
+                        tenantSlug = slug,
+                        theme = theme,
+                        workspaceName = workspaceName,
+                        error = "Login with ${provider.displayName} was cancelled or failed.",
+                        enabledProviders = enabledProviders,
+                    ),
                 )
                 return@get
             }
@@ -676,12 +834,12 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug       = slug,
-                        theme            = theme,
-                        workspaceName    = workspaceName,
-                        error            = "Invalid or expired state parameter. Please try signing in again.",
-                        enabledProviders = enabledProviders
-                    )
+                        tenantSlug = slug,
+                        theme = theme,
+                        workspaceName = workspaceName,
+                        error = "Invalid or expired state parameter. Please try signing in again.",
+                        enabledProviders = enabledProviders,
+                    ),
                 )
                 return@get
             }
@@ -692,59 +850,71 @@ fun Route.authRoutes(
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
-                        tenantSlug       = slug,
-                        theme            = theme,
-                        workspaceName    = workspaceName,
-                        error            = "State mismatch. Please try signing in again.",
-                        enabledProviders = enabledProviders
-                    )
+                        tenantSlug = slug,
+                        theme = theme,
+                        workspaceName = workspaceName,
+                        error = "State mismatch. Please try signing in again.",
+                        enabledProviders = enabledProviders,
+                    ),
                 )
                 return@get
             }
 
             // Recover the original OAuth params (if any) from the state
-            val oauthParamsRaw = try {
-                String(java.util.Base64.getUrlDecoder().decode(parts[3]), Charsets.UTF_8)
-            } catch (_: Exception) { "" }
+            val oauthParamsRaw =
+                try {
+                    String(
+                        java.util.Base64
+                            .getUrlDecoder()
+                            .decode(parts[3]),
+                        Charsets.UTF_8,
+                    )
+                } catch (_: Exception) {
+                    ""
+                }
             // Parse them back into OAuthParams
             val restoredParams = parseQueryStringToOAuthParams(oauthParamsRaw)
 
             val ipAddress = call.request.local.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
 
-            when (val result = socialLoginService.handleCallback(
-                tenantSlug = slug,
-                provider   = provider,
-                code       = code,
-                baseUrl    = baseUrl,
-                ipAddress  = ipAddress,
-                userAgent  = userAgent
-            )) {
+            when (
+                val result =
+                    socialLoginService.handleCallback(
+                        tenantSlug = slug,
+                        provider = provider,
+                        code = code,
+                        baseUrl = baseUrl,
+                        ipAddress = ipAddress,
+                        userAgent = userAgent,
+                    )
+            ) {
                 is SocialLoginResult.Failure -> {
                     call.respondHtml(
                         HttpStatusCode.BadRequest,
                         AuthView.loginPage(
-                            tenantSlug       = slug,
-                            theme            = theme,
-                            workspaceName    = workspaceName,
-                            error            = result.error.toMessage(),
-                            enabledProviders = enabledProviders
-                        )
+                            tenantSlug = slug,
+                            theme = theme,
+                            workspaceName = workspaceName,
+                            error = result.error.toMessage(),
+                            enabledProviders = enabledProviders,
+                        ),
                     )
                 }
                 is SocialLoginResult.NeedsRegistration -> {
                     // No existing account — store provider profile in a short-lived signed cookie
                     // and redirect to the registration completion page.
                     val pending = result.data
-                    val cookieVal = EncryptionService.signCookie(
-                        buildSocialPendingPayload(pending, slug, oauthParamsRaw)
-                    )
+                    val cookieVal =
+                        EncryptionService.signCookie(
+                            buildSocialPendingPayload(pending, slug, oauthParamsRaw),
+                        )
                     call.response.cookies.append(
-                        name     = "KOTAUTH_SOCIAL_PENDING",
-                        value    = cookieVal,
-                        maxAge   = 600L,
+                        name = "KOTAUTH_SOCIAL_PENDING",
+                        value = cookieVal,
+                        maxAge = 600L,
                         httpOnly = true,
-                        path     = "/t/$slug/auth/social"
+                        path = "/t/$slug/auth/social",
                     )
                     call.respondRedirect("/t/$slug/auth/social/complete-registration")
                 }
@@ -752,40 +922,46 @@ fun Route.authRoutes(
                     val loginSuccess = result.value
                     if (restoredParams.isOAuthFlow) {
                         // Authorization Code Flow — issue code and redirect
-                        val clientId    = restoredParams.clientId ?: return@get call.respond(HttpStatusCode.BadRequest)
-                        val redirectUri = restoredParams.redirectUri ?: return@get call.respond(HttpStatusCode.BadRequest)
-                        when (val codeResult = oauthService.issueAuthorizationCode(
-                            tenantSlug          = slug,
-                            userId              = loginSuccess.user.id!!,
-                            clientId            = clientId,
-                            redirectUri         = redirectUri,
-                            scopes              = restoredParams.scope ?: "openid",
-                            codeChallenge       = restoredParams.codeChallenge,
-                            codeChallengeMethod = restoredParams.codeChallengeMethod,
-                            nonce               = restoredParams.nonce,
-                            state               = restoredParams.state,
-                            ipAddress           = ipAddress
-                        )) {
+                        val clientId = restoredParams.clientId ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        val redirectUri =
+                            restoredParams.redirectUri ?: return@get call.respond(HttpStatusCode.BadRequest)
+                        when (
+                            val codeResult =
+                                oauthService.issueAuthorizationCode(
+                                    tenantSlug = slug,
+                                    userId = loginSuccess.user.id!!,
+                                    clientId = clientId,
+                                    redirectUri = redirectUri,
+                                    scopes = restoredParams.scope ?: "openid",
+                                    codeChallenge = restoredParams.codeChallenge,
+                                    codeChallengeMethod = restoredParams.codeChallengeMethod,
+                                    nonce = restoredParams.nonce,
+                                    state = restoredParams.state,
+                                    ipAddress = ipAddress,
+                                )
+                        ) {
                             is OAuthResult.Success -> {
-                                val authCode   = codeResult.value.code
+                                val authCode = codeResult.value.code
                                 val stateParam = restoredParams.state
-                                val redirect   = buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
-                                }
+                                val redirect =
+                                    buildString {
+                                        append(redirectUri)
+                                        append("?code=").append(authCode)
+                                        if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
+                                    }
                                 call.respondRedirect(redirect)
                             }
-                            is OAuthResult.Failure -> call.respondHtml(
-                                HttpStatusCode.BadRequest,
-                                AuthView.loginPage(
-                                    tenantSlug       = slug,
-                                    theme            = theme,
-                                    workspaceName    = workspaceName,
-                                    error            = codeResult.error.toDescription(),
-                                    enabledProviders = enabledProviders
+                            is OAuthResult.Failure ->
+                                call.respondHtml(
+                                    HttpStatusCode.BadRequest,
+                                    AuthView.loginPage(
+                                        tenantSlug = slug,
+                                        theme = theme,
+                                        workspaceName = workspaceName,
+                                        error = codeResult.error.toDescription(),
+                                        enabledProviders = enabledProviders,
+                                    ),
                                 )
-                            )
                         }
                     } else {
                         // Direct flow — return tokens as JSON
@@ -807,86 +983,97 @@ fun Route.authRoutes(
         // ==================================================================
 
         get("/auth/social/complete-registration") {
-            val slug   = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val theme  = tenant.theme
+            val theme = tenant.theme
             val workspaceName = tenant.displayName
 
             val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-            val pending   = parseSocialPendingCookie(rawCookie)
+            val pending = parseSocialPendingCookie(rawCookie)
 
             if (pending == null) {
                 // Cookie missing, expired, or tampered — send back to login
-                return@get call.respondRedirect("/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}")
+                return@get call.respondRedirect(
+                    "/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}",
+                )
             }
 
-            val suggestedUsername = pending.email
-                .substringBefore("@")
-                .replace(Regex("[^a-zA-Z0-9_]"), "")
-                .lowercase()
-                .take(32)
-                .ifBlank { "user" }
+            val suggestedUsername =
+                pending.email
+                    .substringBefore("@")
+                    .replace(Regex("[^a-zA-Z0-9_]"), "")
+                    .lowercase()
+                    .take(32)
+                    .ifBlank { "user" }
 
-            call.respondHtml(HttpStatusCode.OK, AuthView.socialRegistrationPage(
-                tenantSlug      = slug,
-                theme           = theme,
-                workspaceName   = workspaceName,
-                providerName    = pending.provider.displayName,
-                email           = pending.email,
-                prefillUsername = suggestedUsername,
-                prefillFullName = pending.name ?: ""
-            ))
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.socialRegistrationPage(
+                    tenantSlug = slug,
+                    theme = theme,
+                    workspaceName = workspaceName,
+                    providerName = pending.provider.displayName,
+                    email = pending.email,
+                    prefillUsername = suggestedUsername,
+                    prefillFullName = pending.name ?: "",
+                ),
+            )
         }
 
         post("/auth/social/complete-registration") {
-            val slug   = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val tenant = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-            val theme  = tenant.theme
+            val theme = tenant.theme
             val workspaceName = tenant.displayName
 
             val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-            val pending   = parseSocialPendingCookie(rawCookie)
+            val pending = parseSocialPendingCookie(rawCookie)
 
             if (pending == null) {
-                return@post call.respondRedirect("/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}")
+                return@post call.respondRedirect(
+                    "/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}",
+                )
             }
 
             if (socialLoginService == null) {
                 return@post call.respond(HttpStatusCode.NotImplemented)
             }
 
-            val params        = call.receiveParameters()
+            val params = call.receiveParameters()
             val chosenUsername = params["username"]?.trim() ?: ""
             val chosenFullName = params["full_name"]?.trim()
 
             val ipAddress = call.request.local.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
 
-            when (val result = socialLoginService.completeSocialRegistration(
-                tenantSlug     = slug,
-                provider       = pending.provider,
-                providerUserId = pending.providerUserId,
-                email          = pending.email,
-                providerName   = chosenFullName?.ifBlank { null } ?: pending.name,
-                avatarUrl      = pending.avatarUrl,
-                emailVerified  = pending.emailVerified,
-                chosenUsername = chosenUsername,
-                ipAddress      = ipAddress,
-                userAgent      = userAgent
-            )) {
+            when (
+                val result =
+                    socialLoginService.completeSocialRegistration(
+                        tenantSlug = slug,
+                        provider = pending.provider,
+                        providerUserId = pending.providerUserId,
+                        email = pending.email,
+                        providerName = chosenFullName?.ifBlank { null } ?: pending.name,
+                        avatarUrl = pending.avatarUrl,
+                        emailVerified = pending.emailVerified,
+                        chosenUsername = chosenUsername,
+                        ipAddress = ipAddress,
+                        userAgent = userAgent,
+                    )
+            ) {
                 is SocialLoginResult.Failure -> {
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
                         AuthView.socialRegistrationPage(
-                            tenantSlug      = slug,
-                            theme           = theme,
-                            workspaceName   = workspaceName,
-                            providerName    = pending.provider.displayName,
-                            email           = pending.email,
+                            tenantSlug = slug,
+                            theme = theme,
+                            workspaceName = workspaceName,
+                            providerName = pending.provider.displayName,
+                            email = pending.email,
                             prefillUsername = chosenUsername,
                             prefillFullName = chosenFullName ?: pending.name ?: "",
-                            error           = result.error.toMessage()
-                        )
+                            error = result.error.toMessage(),
+                        ),
                     )
                 }
                 is SocialLoginResult.NeedsRegistration -> {
@@ -894,63 +1081,69 @@ fun Route.authRoutes(
                     call.respondHtml(
                         HttpStatusCode.InternalServerError,
                         AuthView.socialRegistrationPage(
-                            tenantSlug    = slug,
-                            theme         = theme,
+                            tenantSlug = slug,
+                            theme = theme,
                             workspaceName = workspaceName,
-                            providerName  = pending.provider.displayName,
-                            email         = pending.email,
-                            error         = "An unexpected error occurred. Please try again."
-                        )
+                            providerName = pending.provider.displayName,
+                            email = pending.email,
+                            error = "An unexpected error occurred. Please try again.",
+                        ),
                     )
                 }
                 is SocialLoginResult.Success -> {
                     // Clear the pending cookie — single-use
                     call.response.cookies.append(
-                        name     = "KOTAUTH_SOCIAL_PENDING",
-                        value    = "",
-                        maxAge   = 0L,
+                        name = "KOTAUTH_SOCIAL_PENDING",
+                        value = "",
+                        maxAge = 0L,
                         httpOnly = true,
-                        path     = "/t/$slug/auth/social"
+                        path = "/t/$slug/auth/social",
                     )
                     val loginSuccess = result.value
                     val restoredParams = parseQueryStringToOAuthParams(pending.oauthParamsRaw)
 
                     if (restoredParams.isOAuthFlow) {
-                        val clientId    = restoredParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest)
-                        val redirectUri = restoredParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest)
-                        when (val codeResult = oauthService.issueAuthorizationCode(
-                            tenantSlug          = slug,
-                            userId              = loginSuccess.user.id!!,
-                            clientId            = clientId,
-                            redirectUri         = redirectUri,
-                            scopes              = restoredParams.scope ?: "openid",
-                            codeChallenge       = restoredParams.codeChallenge,
-                            codeChallengeMethod = restoredParams.codeChallengeMethod,
-                            nonce               = restoredParams.nonce,
-                            state               = restoredParams.state,
-                            ipAddress           = ipAddress
-                        )) {
+                        val clientId = restoredParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        val redirectUri =
+                            restoredParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest)
+                        when (
+                            val codeResult =
+                                oauthService.issueAuthorizationCode(
+                                    tenantSlug = slug,
+                                    userId = loginSuccess.user.id!!,
+                                    clientId = clientId,
+                                    redirectUri = redirectUri,
+                                    scopes = restoredParams.scope ?: "openid",
+                                    codeChallenge = restoredParams.codeChallenge,
+                                    codeChallengeMethod = restoredParams.codeChallengeMethod,
+                                    nonce = restoredParams.nonce,
+                                    state = restoredParams.state,
+                                    ipAddress = ipAddress,
+                                )
+                        ) {
                             is OAuthResult.Success -> {
-                                val authCode   = codeResult.value.code
+                                val authCode = codeResult.value.code
                                 val stateParam = restoredParams.state
-                                val redirect   = buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
-                                }
+                                val redirect =
+                                    buildString {
+                                        append(redirectUri)
+                                        append("?code=").append(authCode)
+                                        if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
+                                    }
                                 call.respondRedirect(redirect)
                             }
-                            is OAuthResult.Failure -> call.respondHtml(
-                                HttpStatusCode.BadRequest,
-                                AuthView.socialRegistrationPage(
-                                    tenantSlug    = slug,
-                                    theme         = theme,
-                                    workspaceName = workspaceName,
-                                    providerName  = pending.provider.displayName,
-                                    email         = pending.email,
-                                    error         = codeResult.error.toDescription()
+                            is OAuthResult.Failure ->
+                                call.respondHtml(
+                                    HttpStatusCode.BadRequest,
+                                    AuthView.socialRegistrationPage(
+                                        tenantSlug = slug,
+                                        theme = theme,
+                                        workspaceName = workspaceName,
+                                        providerName = pending.provider.displayName,
+                                        email = pending.email,
+                                        error = codeResult.error.toDescription(),
+                                    ),
                                 )
-                            )
                         }
                     } else {
                         // No OAuth flow context (direct browser visit to login page) —
@@ -967,8 +1160,9 @@ fun Route.authRoutes(
 
         get("/protocol/openid-connect/certs") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val tenant = tenantRepository.findBySlug(slug)
-                ?: return@get call.respond(HttpStatusCode.NotFound)
+            val tenant =
+                tenantRepository.findBySlug(slug)
+                    ?: return@get call.respond(HttpStatusCode.NotFound)
 
             val jwks = oauthService.getJwks(tenant.id)
             call.respond(mapOf("keys" to jwks))
@@ -983,27 +1177,33 @@ fun Route.authRoutes(
             val q = call.request.queryParameters
 
             val responseType = q["response_type"] ?: ""
-            val clientId     = q["client_id"] ?: ""
-            val redirectUri  = q["redirect_uri"] ?: ""
-            val scope        = q["scope"] ?: "openid"
-            val state        = q["state"]
-            val nonce        = q["nonce"]
-            val codeChallenge       = q["code_challenge"]
+            val clientId = q["client_id"] ?: ""
+            val redirectUri = q["redirect_uri"] ?: ""
+            val scope = q["scope"] ?: "openid"
+            val state = q["state"]
+            val nonce = q["nonce"]
+            val codeChallenge = q["code_challenge"]
             val codeChallengeMethod = q["code_challenge_method"]
 
             if (responseType != "code") {
-                call.respond(HttpStatusCode.BadRequest, mapOf(
-                    "error" to "unsupported_response_type",
-                    "error_description" to "Only 'code' response_type is supported"
-                ))
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "unsupported_response_type",
+                        "error_description" to "Only 'code' response_type is supported",
+                    ),
+                )
                 return@get
             }
 
             if (clientId.isBlank() || redirectUri.isBlank()) {
-                call.respond(HttpStatusCode.BadRequest, mapOf(
-                    "error" to "invalid_request",
-                    "error_description" to "client_id and redirect_uri are required"
-                ))
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "client_id and redirect_uri are required",
+                    ),
+                )
                 return@get
             }
 
@@ -1015,27 +1215,33 @@ fun Route.authRoutes(
             }
 
             // Redirect to login page preserving all OAuth2 params
-            val oauthParams = AuthView.OAuthParams(
-                responseType        = responseType,
-                clientId            = clientId,
-                redirectUri         = redirectUri,
-                scope               = scope,
-                state               = state,
-                codeChallenge       = codeChallenge,
-                codeChallengeMethod = codeChallengeMethod,
-                nonce               = nonce
+            val oauthParams =
+                AuthView.OAuthParams(
+                    responseType = responseType,
+                    clientId = clientId,
+                    redirectUri = redirectUri,
+                    scope = scope,
+                    state = state,
+                    codeChallenge = codeChallenge,
+                    codeChallengeMethod = codeChallengeMethod,
+                    nonce = nonce,
+                )
+
+            val enabledProviders =
+                identityProviderRepository
+                    ?.findEnabledByTenant(tenant.id)
+                    ?.map { it.provider } ?: emptyList()
+
+            call.respondHtml(
+                HttpStatusCode.OK,
+                AuthView.loginPage(
+                    tenantSlug = slug,
+                    theme = tenant.theme,
+                    workspaceName = tenant.displayName,
+                    oauthParams = oauthParams,
+                    enabledProviders = enabledProviders,
+                ),
             )
-
-            val enabledProviders = identityProviderRepository
-                ?.findEnabledByTenant(tenant.id)?.map { it.provider } ?: emptyList()
-
-            call.respondHtml(HttpStatusCode.OK, AuthView.loginPage(
-                tenantSlug       = slug,
-                theme            = tenant.theme,
-                workspaceName    = tenant.displayName,
-                oauthParams      = oauthParams,
-                enabledProviders = enabledProviders
-            ))
         }
 
         // ==================================================================
@@ -1053,54 +1259,102 @@ fun Route.authRoutes(
             val (formClientId, formClientSecret) = extractClientCredentials(call, params)
 
             when (grantType) {
-
                 "authorization_code" -> {
-                    val code         = params["code"] ?: return@post oauthError(call, "invalid_request", "code is required")
-                    val redirectUri  = params["redirect_uri"] ?: return@post oauthError(call, "invalid_request", "redirect_uri is required")
+                    val code =
+                        params["code"] ?: return@post oauthError(call, "invalid_request", "code is required")
+                    val redirectUri =
+                        params["redirect_uri"]
+                            ?: return@post oauthError(call, "invalid_request", "redirect_uri is required")
                     val codeVerifier = params["code_verifier"]
 
-                    when (val result = oauthService.exchangeAuthorizationCode(
-                        tenantSlug    = slug,
-                        code          = code,
-                        clientId      = formClientId ?: return@post oauthError(call, "invalid_client", "client_id required"),
-                        redirectUri   = redirectUri,
-                        codeVerifier  = codeVerifier,
-                        clientSecret  = formClientSecret,
-                        ipAddress     = ipAddress,
-                        userAgent     = userAgent
-                    )) {
+                    when (
+                        val result =
+                            oauthService.exchangeAuthorizationCode(
+                                tenantSlug = slug,
+                                code = code,
+                                clientId =
+                                    formClientId ?: return@post oauthError(
+                                        call,
+                                        "invalid_client",
+                                        "client_id required",
+                                    ),
+                                redirectUri = redirectUri,
+                                codeVerifier = codeVerifier,
+                                clientSecret = formClientSecret,
+                                ipAddress = ipAddress,
+                                userAgent = userAgent,
+                            )
+                    ) {
                         is OAuthResult.Success -> call.respond(result.value)
-                        is OAuthResult.Failure -> oauthError(call, result.error.toErrorCode(), result.error.toDescription())
+                        is OAuthResult.Failure ->
+                            oauthError(
+                                call,
+                                result.error.toErrorCode(),
+                                result.error.toDescription(),
+                            )
                     }
                 }
 
                 "client_credentials" -> {
                     val scopes = params["scope"] ?: ""
 
-                    when (val result = oauthService.clientCredentials(
-                        tenantSlug    = slug,
-                        clientId      = formClientId ?: return@post oauthError(call, "invalid_client", "client_id required"),
-                        clientSecret  = formClientSecret ?: return@post oauthError(call, "invalid_client", "client_secret required"),
-                        scopes        = scopes,
-                        ipAddress     = ipAddress
-                    )) {
+                    when (
+                        val result =
+                            oauthService.clientCredentials(
+                                tenantSlug = slug,
+                                clientId =
+                                    formClientId ?: return@post oauthError(
+                                        call,
+                                        "invalid_client",
+                                        "client_id required",
+                                    ),
+                                clientSecret =
+                                    formClientSecret ?: return@post oauthError(
+                                        call,
+                                        "invalid_client",
+                                        "client_secret required",
+                                    ),
+                                scopes = scopes,
+                                ipAddress = ipAddress,
+                            )
+                    ) {
                         is OAuthResult.Success -> call.respond(result.value)
-                        is OAuthResult.Failure -> oauthError(call, result.error.toErrorCode(), result.error.toDescription())
+                        is OAuthResult.Failure ->
+                            oauthError(
+                                call,
+                                result.error.toErrorCode(),
+                                result.error.toDescription(),
+                            )
                     }
                 }
 
                 "refresh_token" -> {
-                    val refreshToken = params["refresh_token"] ?: return@post oauthError(call, "invalid_request", "refresh_token is required")
+                    val refreshToken =
+                        params["refresh_token"]
+                            ?: return@post oauthError(call, "invalid_request", "refresh_token is required")
 
-                    when (val result = oauthService.refreshTokens(
-                        tenantSlug    = slug,
-                        refreshToken  = refreshToken,
-                        clientId      = formClientId ?: return@post oauthError(call, "invalid_client", "client_id required"),
-                        ipAddress     = ipAddress,
-                        userAgent     = userAgent
-                    )) {
+                    when (
+                        val result =
+                            oauthService.refreshTokens(
+                                tenantSlug = slug,
+                                refreshToken = refreshToken,
+                                clientId =
+                                    formClientId ?: return@post oauthError(
+                                        call,
+                                        "invalid_client",
+                                        "client_id required",
+                                    ),
+                                ipAddress = ipAddress,
+                                userAgent = userAgent,
+                            )
+                    ) {
                         is OAuthResult.Success -> call.respond(result.value)
-                        is OAuthResult.Failure -> oauthError(call, result.error.toErrorCode(), result.error.toDescription())
+                        is OAuthResult.Failure ->
+                            oauthError(
+                                call,
+                                result.error.toErrorCode(),
+                                result.error.toDescription(),
+                            )
                     }
                 }
 
@@ -1113,19 +1367,23 @@ fun Route.authRoutes(
         // ==================================================================
 
         get("/protocol/openid-connect/userinfo") {
-            val bearerToken = extractBearerToken(call)
-                ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
+            val bearerToken =
+                extractBearerToken(call)
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
 
-            val userInfo = oauthService.getUserInfo(bearerToken)
-                ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
+            val userInfo =
+                oauthService.getUserInfo(bearerToken)
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
 
-            call.respond(mapOf(
-                "sub"             to userInfo.sub,
-                "preferred_username" to userInfo.username,
-                "email"           to userInfo.email,
-                "email_verified"  to userInfo.emailVerified,
-                "name"            to userInfo.name
-            ))
+            call.respond(
+                mapOf(
+                    "sub" to userInfo.sub,
+                    "preferred_username" to userInfo.username,
+                    "email" to userInfo.email,
+                    "email_verified" to userInfo.emailVerified,
+                    "name" to userInfo.name,
+                ),
+            )
         }
 
         // ==================================================================
@@ -1134,10 +1392,14 @@ fun Route.authRoutes(
 
         post("/protocol/openid-connect/revoke") {
             val params = call.receiveParameters()
-            val token = params["token"] ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf(
-                "error" to "invalid_request",
-                "error_description" to "token parameter is required"
-            ))
+            val token =
+                params["token"] ?: return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "token parameter is required",
+                    ),
+                )
 
             oauthService.revokeToken(token)
             // RFC 7009: always return 200 OK (don't leak token validity)
@@ -1150,21 +1412,24 @@ fun Route.authRoutes(
 
         post("/protocol/openid-connect/introspect") {
             val params = call.receiveParameters()
-            val token     = params["token"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val typeHint  = params["token_type_hint"]
+            val token = params["token"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val typeHint = params["token_type_hint"]
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
 
             when (val result = oauthService.introspectToken(slug, token, typeHint)) {
                 is IntrospectionResult.Inactive -> call.respond(mapOf("active" to false))
-                is IntrospectionResult.Active   -> call.respond(mapOf(
-                    "active"     to true,
-                    "sub"        to result.sub,
-                    "username"   to (result.username ?: ""),
-                    "email"      to (result.email ?: ""),
-                    "scope"      to result.scopes.joinToString(" "),
-                    "exp"        to result.expiresAt,
-                    "client_id"  to (result.clientId ?: "")
-                ))
+                is IntrospectionResult.Active ->
+                    call.respond(
+                        mapOf(
+                            "active" to true,
+                            "sub" to result.sub,
+                            "username" to (result.username ?: ""),
+                            "email" to (result.email ?: ""),
+                            "scope" to result.scopes.joinToString(" "),
+                            "exp" to result.expiresAt,
+                            "client_id" to (result.clientId ?: ""),
+                        ),
+                    )
             }
         }
 
@@ -1174,8 +1439,9 @@ fun Route.authRoutes(
 
         route("/protocol/openid-connect/logout") {
             get {
-                val bearerToken = extractBearerToken(call)
-                    ?: call.request.queryParameters["id_token_hint"]
+                val bearerToken =
+                    extractBearerToken(call)
+                        ?: call.request.queryParameters["id_token_hint"]
 
                 if (bearerToken != null) {
                     val revokeAll = call.request.queryParameters["global_logout"] == "true"
@@ -1214,12 +1480,15 @@ private suspend fun oauthError(
     call: ApplicationCall,
     error: String,
     description: String,
-    status: HttpStatusCode = HttpStatusCode.BadRequest
+    status: HttpStatusCode = HttpStatusCode.BadRequest,
 ) {
-    call.respond(status, mapOf(
-        "error" to error,
-        "error_description" to description
-    ))
+    call.respond(
+        status,
+        mapOf(
+            "error" to error,
+            "error_description" to description,
+        ),
+    )
 }
 
 private fun extractBearerToken(call: ApplicationCall): String? {
@@ -1235,13 +1504,15 @@ private fun extractBearerToken(call: ApplicationCall): String? {
  */
 private fun extractClientCredentials(
     call: ApplicationCall,
-    params: Parameters
+    params: Parameters,
 ): Pair<String?, String?> {
     val auth = call.request.headers["Authorization"]
     if (auth != null && auth.startsWith("Basic ", ignoreCase = true)) {
-        val decoded = java.util.Base64.getDecoder()
-            .decode(auth.removePrefix("Basic ").trim())
-            .toString(Charsets.UTF_8)
+        val decoded =
+            java.util.Base64
+                .getDecoder()
+                .decode(auth.removePrefix("Basic ").trim())
+                .toString(Charsets.UTF_8)
         val sep = decoded.indexOf(':')
         if (sep > 0) {
             return decoded.substring(0, sep) to decoded.substring(sep + 1)
@@ -1250,60 +1521,69 @@ private fun extractClientCredentials(
     return params["client_id"] to params["client_secret"]
 }
 
-private fun Parameters.toOAuthParams() = AuthView.OAuthParams(
-    responseType        = this["response_type"],
-    clientId            = this["oauth_client_id"] ?: this["client_id"],
-    redirectUri         = this["redirect_uri"],
-    scope               = this["scope"],
-    state               = this["state"],
-    codeChallenge       = this["code_challenge"],
-    codeChallengeMethod = this["code_challenge_method"],
-    nonce               = this["nonce"]
-)
+private fun Parameters.toOAuthParams() =
+    AuthView.OAuthParams(
+        responseType = this["response_type"],
+        clientId = this["oauth_client_id"] ?: this["client_id"],
+        redirectUri = this["redirect_uri"],
+        scope = this["scope"],
+        state = this["state"],
+        codeChallenge = this["code_challenge"],
+        codeChallengeMethod = this["code_challenge_method"],
+        nonce = this["nonce"],
+    )
 
-private fun OAuthError.toErrorCode(): String = when (this) {
-    is OAuthError.TenantNotFound       -> "invalid_request"
-    is OAuthError.InvalidClient        -> "invalid_client"
-    is OAuthError.InvalidGrant         -> "invalid_grant"
-    is OAuthError.InvalidRequest       -> "invalid_request"
-    is OAuthError.InvalidRedirectUri   -> "invalid_request"
-    is OAuthError.PkceRequired         -> "invalid_request"
-    is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
-}
+private fun OAuthError.toErrorCode(): String =
+    when (this) {
+        is OAuthError.TenantNotFound -> "invalid_request"
+        is OAuthError.InvalidClient -> "invalid_client"
+        is OAuthError.InvalidGrant -> "invalid_grant"
+        is OAuthError.InvalidRequest -> "invalid_request"
+        is OAuthError.InvalidRedirectUri -> "invalid_request"
+        is OAuthError.PkceRequired -> "invalid_request"
+        is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
+    }
 
-private fun OAuthError.toDescription(): String = when (this) {
-    is OAuthError.TenantNotFound       -> "Tenant not found"
-    is OAuthError.InvalidClient        -> this.reason
-    is OAuthError.InvalidGrant         -> this.reason
-    is OAuthError.InvalidRequest       -> this.reason
-    is OAuthError.InvalidRedirectUri   -> "Invalid redirect_uri: ${this.uri}"
-    is OAuthError.PkceRequired         -> "PKCE is required for public clients"
-    is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
-}
+private fun OAuthError.toDescription(): String =
+    when (this) {
+        is OAuthError.TenantNotFound -> "Tenant not found"
+        is OAuthError.InvalidClient -> this.reason
+        is OAuthError.InvalidGrant -> this.reason
+        is OAuthError.InvalidRequest -> this.reason
+        is OAuthError.InvalidRedirectUri -> "Invalid redirect_uri: ${this.uri}"
+        is OAuthError.PkceRequired -> "PKCE is required for public clients"
+        is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
+    }
 
-private fun AuthError.toMessage(): String = when (this) {
-    is AuthError.InvalidCredentials   -> "Invalid username or password."
-    is AuthError.TenantNotFound       -> "Tenant not found."
-    is AuthError.RegistrationDisabled -> "Registration is not enabled for this tenant."
-    is AuthError.UserAlreadyExists    -> "That username is already taken."
-    is AuthError.EmailAlreadyExists   -> "An account with that email already exists."
-    is AuthError.WeakPassword         -> "Password must be at least $minLength characters."
-    is AuthError.ValidationError      -> this.message
-    is AuthError.PasswordExpired      -> "Your password has expired. Please reset it."
-}
+private fun AuthError.toMessage(): String =
+    when (this) {
+        is AuthError.InvalidCredentials -> "Invalid username or password."
+        is AuthError.TenantNotFound -> "Tenant not found."
+        is AuthError.RegistrationDisabled -> "Registration is not enabled for this tenant."
+        is AuthError.UserAlreadyExists -> "That username is already taken."
+        is AuthError.EmailAlreadyExists -> "An account with that email already exists."
+        is AuthError.WeakPassword -> "Password must be at least $minLength characters."
+        is AuthError.ValidationError -> this.message
+        is AuthError.PasswordExpired -> "Your password has expired. Please reset it."
+    }
 
-private fun SocialLoginError.toMessage(): String = when (this) {
-    is SocialLoginError.TenantNotFound        -> "Tenant not found."
-    is SocialLoginError.ProviderNotConfigured -> "Social login with this provider is not configured for this tenant."
-    is SocialLoginError.EmailNotProvided      -> "Your social account did not provide an email address. Please use username/password login or grant email access."
-    is SocialLoginError.UserDisabled          -> "Your account has been disabled."
-    is SocialLoginError.AccountCreationFailed -> "Failed to create an account. Please try again or contact support."
-    is SocialLoginError.RegistrationDisabled  -> "Account registration is not enabled for this workspace."
-    is SocialLoginError.UsernameConflict      -> "That username is already taken. Please choose a different one."
-    is SocialLoginError.InvalidUsername       -> this.reason
-    is SocialLoginError.ProviderError         -> "An error occurred communicating with the identity provider. Please try again."
-    is SocialLoginError.InternalError         -> "An internal error occurred. Please try again."
-}
+private fun SocialLoginError.toMessage(): String =
+    @Suppress("ktlint:standard:max-line-length")
+    when (this) {
+        is SocialLoginError.TenantNotFound -> "Tenant not found."
+        is SocialLoginError.ProviderNotConfigured ->
+            "Social login with this provider is not configured for this tenant."
+        is SocialLoginError.EmailNotProvided ->
+            "Your social account did not provide an email address. Please use username/password login or grant email access."
+        is SocialLoginError.UserDisabled -> "Your account has been disabled."
+        is SocialLoginError.AccountCreationFailed -> "Failed to create an account. Please try again or contact support."
+        is SocialLoginError.RegistrationDisabled -> "Account registration is not enabled for this workspace."
+        is SocialLoginError.UsernameConflict -> "That username is already taken. Please choose a different one."
+        is SocialLoginError.InvalidUsername -> this.reason
+        is SocialLoginError.ProviderError ->
+            "An error occurred communicating with the identity provider. Please try again."
+        is SocialLoginError.InternalError -> "An internal error occurred. Please try again."
+    }
 
 // ============================================================================
 // Social pending registration cookie helpers
@@ -1315,14 +1595,14 @@ private fun SocialLoginError.toMessage(): String = when (this) {
  * GET → POST round-trip, without touching server-side state.
  */
 private data class SocialPendingData(
-    val provider       : com.kauth.domain.model.SocialProvider,
-    val slug           : String,
-    val providerUserId : String,
-    val email          : String,
-    val name           : String?,
-    val avatarUrl      : String?,
-    val emailVerified  : Boolean,
-    val oauthParamsRaw : String   // raw query string, empty string when no OAuth context
+    val provider: com.kauth.domain.model.SocialProvider,
+    val slug: String,
+    val providerUserId: String,
+    val email: String,
+    val name: String?,
+    val avatarUrl: String?,
+    val emailVerified: Boolean,
+    val oauthParamsRaw: String, // raw query string, empty string when no OAuth context
 )
 
 /**
@@ -1331,11 +1611,15 @@ private data class SocialPendingData(
  *   provider | slug | providerUserId_b64 | email_b64 | name_b64 | avatarUrl_b64 | emailVerified | oauthParamsRaw_b64 | timestamp
  */
 private fun buildSocialPendingPayload(
-    data           : SocialLoginNeedsRegistration,
-    slug           : String,
-    oauthParamsRaw : String
+    data: SocialLoginNeedsRegistration,
+    slug: String,
+    oauthParamsRaw: String,
 ): String {
-    val enc = java.util.Base64.getUrlEncoder().withoutPadding()
+    val enc =
+        java.util.Base64
+            .getUrlEncoder()
+            .withoutPadding()
+
     fun String?.b64() = enc.encodeToString((this ?: "").toByteArray(Charsets.UTF_8))
     return listOf(
         data.provider.value,
@@ -1346,7 +1630,7 @@ private fun buildSocialPendingPayload(
         data.avatarUrl.b64(),
         data.emailVerified.toString(),
         oauthParamsRaw.b64(),
-        System.currentTimeMillis().toString()
+        System.currentTimeMillis().toString(),
     ).joinToString("|")
 }
 
@@ -1357,44 +1641,46 @@ private fun buildSocialPendingPayload(
 private fun parseSocialPendingCookie(rawCookie: String?): SocialPendingData? {
     if (rawCookie.isNullOrBlank()) return null
     val payload = EncryptionService.verifyCookie(rawCookie) ?: return null
-    val parts   = payload.split("|")
+    val parts = payload.split("|")
     if (parts.size < 9) return null
 
     val timestamp = parts[8].toLongOrNull() ?: return null
-    if (System.currentTimeMillis() - timestamp > 600_000) return null  // 10-minute TTL
+    if (System.currentTimeMillis() - timestamp > 600_000) return null // 10-minute TTL
 
     return try {
-        val dec      = java.util.Base64.getUrlDecoder()
+        val dec = java.util.Base64.getUrlDecoder()
+
         fun decode(s: String) = String(dec.decode(s), Charsets.UTF_8)
 
-        val provider       = com.kauth.domain.model.SocialProvider.fromValueOrNull(parts[0]) ?: return null
-        val slug           = parts[1]
+        val provider =
+            com.kauth.domain.model.SocialProvider
+                .fromValueOrNull(parts[0]) ?: return null
+        val slug = parts[1]
         val providerUserId = decode(parts[2])
-        val email          = decode(parts[3])
-        val name           = decode(parts[4]).ifBlank { null }
-        val avatarUrl      = decode(parts[5]).ifBlank { null }
-        val emailVerified  = parts[6].toBooleanStrictOrNull() ?: false
+        val email = decode(parts[3])
+        val name = decode(parts[4]).ifBlank { null }
+        val avatarUrl = decode(parts[5]).ifBlank { null }
+        val emailVerified = parts[6].toBooleanStrictOrNull() ?: false
         val oauthParamsRaw = decode(parts[7])
 
         if (email.isBlank() || providerUserId.isBlank()) return null
 
         SocialPendingData(
-            provider       = provider,
-            slug           = slug,
+            provider = provider,
+            slug = slug,
             providerUserId = providerUserId,
-            email          = email,
-            name           = name,
-            avatarUrl      = avatarUrl,
-            emailVerified  = emailVerified,
-            oauthParamsRaw = oauthParamsRaw
+            email = email,
+            name = name,
+            avatarUrl = avatarUrl,
+            emailVerified = emailVerified,
+            oauthParamsRaw = oauthParamsRaw,
         )
     } catch (_: Exception) {
         null
     }
 }
 
-private fun encodeParam(value: String) =
-    java.net.URLEncoder.encode(value, "UTF-8")
+private fun encodeParam(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
 
 /**
  * Parses a query string (with or without a leading '?') back into [AuthView.OAuthParams].
@@ -1409,22 +1695,27 @@ private fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
     if (qs.isBlank()) return AuthView.OAuthParams()
     val normalized = if (qs.startsWith("?")) qs.substring(1) else qs
     if (normalized.isBlank()) return AuthView.OAuthParams()
-    val map = normalized.split("&").mapNotNull {
-        val idx = it.indexOf('=')
-        if (idx < 0) null else {
-            val k = java.net.URLDecoder.decode(it.substring(0, idx), "UTF-8")
-            val v = java.net.URLDecoder.decode(it.substring(idx + 1), "UTF-8")
-            k to v
-        }
-    }.toMap()
+    val map =
+        normalized
+            .split("&")
+            .mapNotNull {
+                val idx = it.indexOf('=')
+                if (idx < 0) {
+                    null
+                } else {
+                    val k = java.net.URLDecoder.decode(it.substring(0, idx), "UTF-8")
+                    val v = java.net.URLDecoder.decode(it.substring(idx + 1), "UTF-8")
+                    k to v
+                }
+            }.toMap()
     return AuthView.OAuthParams(
-        responseType        = map["response_type"],
-        clientId            = map["oauth_client_id"] ?: map["client_id"],
-        redirectUri         = map["redirect_uri"],
-        scope               = map["scope"],
-        state               = map["state"],
-        codeChallenge       = map["code_challenge"],
+        responseType = map["response_type"],
+        clientId = map["oauth_client_id"] ?: map["client_id"],
+        redirectUri = map["redirect_uri"],
+        scope = map["scope"],
+        state = map["state"],
+        codeChallenge = map["code_challenge"],
         codeChallengeMethod = map["code_challenge_method"],
-        nonce               = map["nonce"]
+        nonce = map["nonce"],
     )
 }

@@ -11,10 +11,12 @@ import com.kauth.domain.model.MfaRecoveryCode
  * using [EncryptionService].
  */
 interface MfaRepository {
-
     // ---- Enrollments ----
 
-    fun findEnrollmentByUserId(userId: Int, method: String = "totp"): MfaEnrollment?
+    fun findEnrollmentByUserId(
+        userId: Int,
+        method: String = "totp",
+    ): MfaEnrollment?
 
     fun findEnrollmentById(id: Int): MfaEnrollment?
 

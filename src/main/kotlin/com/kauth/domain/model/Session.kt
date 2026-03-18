@@ -16,7 +16,7 @@ import java.time.Instant
 data class Session(
     val id: Int? = null,
     val tenantId: Int,
-    val userId: Int?,          // null for M2M (client_credentials)
+    val userId: Int?, // null for M2M (client_credentials)
     val clientId: Int?,
     val accessTokenHash: String,
     val refreshTokenHash: String?,
@@ -27,7 +27,7 @@ data class Session(
     val expiresAt: Instant,
     val refreshExpiresAt: Instant? = null,
     val lastActivityAt: Instant = Instant.now(),
-    val revokedAt: Instant? = null
+    val revokedAt: Instant? = null,
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null

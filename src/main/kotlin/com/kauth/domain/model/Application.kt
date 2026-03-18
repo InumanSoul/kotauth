@@ -21,22 +21,25 @@ data class Application(
     val enabled: Boolean,
     val redirectUris: List<String> = emptyList(),
     /** Per-client override for access token lifetime in seconds. Null means use tenant/server default. */
-    val tokenExpiryOverride: Int? = null
+    val tokenExpiryOverride: Int? = null,
 )
 
-enum class AccessType(val value: String) {
+enum class AccessType(
+    val value: String,
+) {
     PUBLIC("public"),
     CONFIDENTIAL("confidential"),
-    BEARER_ONLY("bearer_only");
+    BEARER_ONLY("bearer_only"),
+    ;
 
-    val label: String get() = when (this) {
-        PUBLIC       -> "Public"
-        CONFIDENTIAL -> "Confidential"
-        BEARER_ONLY  -> "Bearer Only"
-    }
+    val label: String get() =
+        when (this) {
+            PUBLIC -> "Public"
+            CONFIDENTIAL -> "Confidential"
+            BEARER_ONLY -> "Bearer Only"
+        }
 
     companion object {
-        fun fromValue(value: String): AccessType =
-            entries.firstOrNull { it.value == value } ?: PUBLIC
+        fun fromValue(value: String): AccessType = entries.firstOrNull { it.value == value } ?: PUBLIC
     }
 }

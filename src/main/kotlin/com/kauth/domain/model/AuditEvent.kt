@@ -17,7 +17,7 @@ data class AuditEvent(
     val ipAddress: String?,
     val userAgent: String?,
     val details: Map<String, String> = emptyMap(),
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 )
 
 enum class AuditEventType {
@@ -88,5 +88,5 @@ enum class AuditEventType {
     MFA_CHALLENGE_SUCCESS,
     MFA_CHALLENGE_FAILED,
     MFA_RECOVERY_CODE_USED,
-    MFA_DISABLED
+    MFA_DISABLED,
 }

@@ -19,67 +19,81 @@ import java.time.ZoneOffset
  * is intentional: social login cannot be configured without encryption being available.
  */
 class PostgresIdentityProviderRepository : IdentityProviderRepository {
-
-    override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> = transaction {
-        IdentityProvidersTable.selectAll()
-            .where { (IdentityProvidersTable.tenantId eq tenantId) and (IdentityProvidersTable.enabled eq true) }
-            .mapNotNull { it.toIdentityProvider() }
-    }
-
-    override fun findAllByTenant(tenantId: Int): List<IdentityProvider> = transaction {
-        IdentityProvidersTable.selectAll()
-            .where { IdentityProvidersTable.tenantId eq tenantId }
-            .mapNotNull { it.toIdentityProvider() }
-    }
-
-    override fun findByTenantAndProvider(tenantId: Int, provider: SocialProvider): IdentityProvider? = transaction {
-        IdentityProvidersTable.selectAll()
-            .where {
-                (IdentityProvidersTable.tenantId eq tenantId) and
-                (IdentityProvidersTable.provider eq provider.value)
-            }
-            .singleOrNull()
-            ?.toIdentityProvider()
-    }
-
-    override fun save(idp: IdentityProvider): IdentityProvider = transaction {
-        val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        val insertedId = IdentityProvidersTable.insert {
-            it[tenantId]     = idp.tenantId
-            it[provider]     = idp.provider.value
-            it[clientId]     = idp.clientId
-            it[clientSecret] = encryptedSecret
-            it[enabled]      = idp.enabled
-            it[createdAt]    = now
-            it[updatedAt]    = now
-        } get IdentityProvidersTable.id
-
-        IdentityProvidersTable.selectAll()
-            .where { IdentityProvidersTable.id eq insertedId }
-            .single()
-            .toIdentityProvider()!!
-    }
-
-    override fun update(idp: IdentityProvider): IdentityProvider = transaction {
-        val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
-        val now = OffsetDateTime.now(ZoneOffset.UTC)
-        IdentityProvidersTable.update({
-            (IdentityProvidersTable.tenantId eq idp.tenantId) and
-            (IdentityProvidersTable.provider eq idp.provider.value)
-        }) {
-            it[clientId]     = idp.clientId
-            it[clientSecret] = encryptedSecret
-            it[enabled]      = idp.enabled
-            it[updatedAt]    = now
+    override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> =
+        transaction {
+            IdentityProvidersTable
+                .selectAll()
+                .where { (IdentityProvidersTable.tenantId eq tenantId) and (IdentityProvidersTable.enabled eq true) }
+                .mapNotNull { it.toIdentityProvider() }
         }
-        findByTenantAndProvider(idp.tenantId, idp.provider)!!
-    }
 
-    override fun delete(tenantId: Int, provider: SocialProvider) = transaction {
+    override fun findAllByTenant(tenantId: Int): List<IdentityProvider> =
+        transaction {
+            IdentityProvidersTable
+                .selectAll()
+                .where { IdentityProvidersTable.tenantId eq tenantId }
+                .mapNotNull { it.toIdentityProvider() }
+        }
+
+    override fun findByTenantAndProvider(
+        tenantId: Int,
+        provider: SocialProvider,
+    ): IdentityProvider? =
+        transaction {
+            IdentityProvidersTable
+                .selectAll()
+                .where {
+                    (IdentityProvidersTable.tenantId eq tenantId) and
+                        (IdentityProvidersTable.provider eq provider.value)
+                }.singleOrNull()
+                ?.toIdentityProvider()
+        }
+
+    override fun save(idp: IdentityProvider): IdentityProvider =
+        transaction {
+            val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
+            val now = OffsetDateTime.now(ZoneOffset.UTC)
+            val insertedId =
+                IdentityProvidersTable.insert {
+                    it[tenantId] = idp.tenantId
+                    it[provider] = idp.provider.value
+                    it[clientId] = idp.clientId
+                    it[clientSecret] = encryptedSecret
+                    it[enabled] = idp.enabled
+                    it[createdAt] = now
+                    it[updatedAt] = now
+                } get IdentityProvidersTable.id
+
+            IdentityProvidersTable
+                .selectAll()
+                .where { IdentityProvidersTable.id eq insertedId }
+                .single()
+                .toIdentityProvider()!!
+        }
+
+    override fun update(idp: IdentityProvider): IdentityProvider =
+        transaction {
+            val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
+            val now = OffsetDateTime.now(ZoneOffset.UTC)
+            IdentityProvidersTable.update({
+                (IdentityProvidersTable.tenantId eq idp.tenantId) and
+                    (IdentityProvidersTable.provider eq idp.provider.value)
+            }) {
+                it[clientId] = idp.clientId
+                it[clientSecret] = encryptedSecret
+                it[enabled] = idp.enabled
+                it[updatedAt] = now
+            }
+            findByTenantAndProvider(idp.tenantId, idp.provider)!!
+        }
+
+    override fun delete(
+        tenantId: Int,
+        provider: SocialProvider,
+    ) = transaction {
         IdentityProvidersTable.deleteWhere {
             (IdentityProvidersTable.tenantId eq tenantId) and
-            (IdentityProvidersTable.provider eq provider.value)
+                (IdentityProvidersTable.provider eq provider.value)
         }
         Unit
     }
@@ -89,19 +103,21 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
     // ------------------------------------------------------------------
 
     private fun ResultRow.toIdentityProvider(): IdentityProvider? {
-        val providerEnum = SocialProvider.fromValueOrNull(this[IdentityProvidersTable.provider])
-            ?: return null
-        val decryptedSecret = EncryptionService.decrypt(this[IdentityProvidersTable.clientSecret])
-            ?: return null   // cannot decrypt — encryption key may have changed; skip silently
+        val providerEnum =
+            SocialProvider.fromValueOrNull(this[IdentityProvidersTable.provider])
+                ?: return null
+        val decryptedSecret =
+            EncryptionService.decrypt(this[IdentityProvidersTable.clientSecret])
+                ?: return null // cannot decrypt — encryption key may have changed; skip silently
         return IdentityProvider(
-            id           = this[IdentityProvidersTable.id],
-            tenantId     = this[IdentityProvidersTable.tenantId],
-            provider     = providerEnum,
-            clientId     = this[IdentityProvidersTable.clientId],
+            id = this[IdentityProvidersTable.id],
+            tenantId = this[IdentityProvidersTable.tenantId],
+            provider = providerEnum,
+            clientId = this[IdentityProvidersTable.clientId],
             clientSecret = decryptedSecret,
-            enabled      = this[IdentityProvidersTable.enabled],
-            createdAt    = this[IdentityProvidersTable.createdAt].toInstant(),
-            updatedAt    = this[IdentityProvidersTable.updatedAt].toInstant()
+            enabled = this[IdentityProvidersTable.enabled],
+            createdAt = this[IdentityProvidersTable.createdAt].toInstant(),
+            updatedAt = this[IdentityProvidersTable.updatedAt].toInstant(),
         )
     }
 }

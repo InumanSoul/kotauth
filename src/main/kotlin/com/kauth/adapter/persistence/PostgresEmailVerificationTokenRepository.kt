@@ -15,51 +15,58 @@ import java.time.ZoneOffset
  * Tokens are keyed by SHA-256 hash — the raw token is never stored.
  */
 class PostgresEmailVerificationTokenRepository : EmailVerificationTokenRepository {
+    override fun create(token: EmailVerificationToken): EmailVerificationToken =
+        transaction {
+            val insertedId =
+                EmailVerificationTokensTable.insert {
+                    it[userId] = token.userId
+                    it[tenantId] = token.tenantId
+                    it[tokenHash] = token.tokenHash
+                    it[expiresAt] = token.expiresAt.toOffsetDateTime()
+                    it[createdAt] = token.createdAt.toOffsetDateTime()
+                } get EmailVerificationTokensTable.id
 
-    override fun create(token: EmailVerificationToken): EmailVerificationToken = transaction {
-        val insertedId = EmailVerificationTokensTable.insert {
-            it[userId]    = token.userId
-            it[tenantId]  = token.tenantId
-            it[tokenHash] = token.tokenHash
-            it[expiresAt] = token.expiresAt.toOffsetDateTime()
-            it[createdAt] = token.createdAt.toOffsetDateTime()
-        } get EmailVerificationTokensTable.id
+            token.copy(id = insertedId)
+        }
 
-        token.copy(id = insertedId)
-    }
+    override fun findByTokenHash(hash: String): EmailVerificationToken? =
+        transaction {
+            EmailVerificationTokensTable
+                .selectAll()
+                .where { EmailVerificationTokensTable.tokenHash eq hash }
+                .map { it.toToken() }
+                .singleOrNull()
+        }
 
-    override fun findByTokenHash(hash: String): EmailVerificationToken? = transaction {
-        EmailVerificationTokensTable.selectAll()
-            .where { EmailVerificationTokensTable.tokenHash eq hash }
-            .map { it.toToken() }
-            .singleOrNull()
-    }
-
-    override fun markUsed(tokenId: Int, usedAt: Instant) = transaction {
+    override fun markUsed(
+        tokenId: Int,
+        usedAt: Instant,
+    ) = transaction {
         EmailVerificationTokensTable.update({ EmailVerificationTokensTable.id eq tokenId }) {
             it[EmailVerificationTokensTable.usedAt] = usedAt.toOffsetDateTime()
         }
         Unit
     }
 
-    override fun deleteUnusedByUser(userId: Int) = transaction {
-        EmailVerificationTokensTable.deleteWhere {
-            (EmailVerificationTokensTable.userId eq userId) and
-            (EmailVerificationTokensTable.usedAt.isNull())
+    override fun deleteUnusedByUser(userId: Int) =
+        transaction {
+            EmailVerificationTokensTable.deleteWhere {
+                (EmailVerificationTokensTable.userId eq userId) and
+                    (EmailVerificationTokensTable.usedAt.isNull())
+            }
+            Unit
         }
-        Unit
-    }
 
-    private fun ResultRow.toToken() = EmailVerificationToken(
-        id        = this[EmailVerificationTokensTable.id],
-        userId    = this[EmailVerificationTokensTable.userId],
-        tenantId  = this[EmailVerificationTokensTable.tenantId],
-        tokenHash = this[EmailVerificationTokensTable.tokenHash],
-        expiresAt = this[EmailVerificationTokensTable.expiresAt].toInstant(),
-        usedAt    = this[EmailVerificationTokensTable.usedAt]?.toInstant(),
-        createdAt = this[EmailVerificationTokensTable.createdAt].toInstant()
-    )
+    private fun ResultRow.toToken() =
+        EmailVerificationToken(
+            id = this[EmailVerificationTokensTable.id],
+            userId = this[EmailVerificationTokensTable.userId],
+            tenantId = this[EmailVerificationTokensTable.tenantId],
+            tokenHash = this[EmailVerificationTokensTable.tokenHash],
+            expiresAt = this[EmailVerificationTokensTable.expiresAt].toInstant(),
+            usedAt = this[EmailVerificationTokensTable.usedAt]?.toInstant(),
+            createdAt = this[EmailVerificationTokensTable.createdAt].toInstant(),
+        )
 
-    private fun Instant.toOffsetDateTime(): OffsetDateTime =
-        OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+    private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

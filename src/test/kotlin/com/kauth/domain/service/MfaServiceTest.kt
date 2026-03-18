@@ -29,39 +29,47 @@ import kotlin.test.assertTrue
  * these tests are not timing-sensitive under normal conditions.
  */
 class MfaServiceTest {
-
     // -------------------------------------------------------------------------
     // Fakes
     // -------------------------------------------------------------------------
 
-    private val mfaRepo  = FakeMfaRepository()
-    private val users    = FakeUserRepository()
-    private val tenants  = FakeTenantRepository()
-    private val hasher   = FakePasswordHasher()
+    private val mfaRepo = FakeMfaRepository()
+    private val users = FakeUserRepository()
+    private val tenants = FakeTenantRepository()
+    private val hasher = FakePasswordHasher()
     private val auditLog = FakeAuditLogPort()
 
-    private val svc = MfaService(
-        mfaRepository    = mfaRepo,
-        userRepository   = users,
-        tenantRepository = tenants,
-        passwordHasher   = hasher,
-        auditLog         = auditLog
-    )
+    private val svc =
+        MfaService(
+            mfaRepository = mfaRepo,
+            userRepository = users,
+            tenantRepository = tenants,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+        )
 
     // -------------------------------------------------------------------------
     // Fixtures
     // -------------------------------------------------------------------------
 
     private val testTenant = Tenant(id = 1, slug = "acme", displayName = "Acme", issuerUrl = null)
-    private val testUser   = User(
-        id = 10, tenantId = 1, username = "alice",
-        email = "alice@example.com", fullName = "Alice",
-        passwordHash = "hashed:pw", enabled = true
-    )
+    private val testUser =
+        User(
+            id = 10,
+            tenantId = 1,
+            username = "alice",
+            email = "alice@example.com",
+            fullName = "Alice",
+            passwordHash = "hashed:pw",
+            enabled = true,
+        )
 
     @BeforeTest
     fun setup() {
-        mfaRepo.clear(); users.clear(); tenants.clear(); auditLog.clear()
+        mfaRepo.clear()
+        users.clear()
+        tenants.clear()
+        auditLog.clear()
         tenants.add(testTenant)
         users.add(testUser)
     }
@@ -77,19 +85,27 @@ class MfaServiceTest {
         assertIs<MfaResult.Success<*>>(result)
         val response = (result as MfaResult.Success<EnrollmentResponse>).value
         assertTrue(response.totpUri.startsWith("otpauth://totp/"), "TOTP URI must use otpauth scheme")
-        assertEquals(MfaService.RECOVERY_CODE_COUNT, response.recoveryCodes.size,
-            "Must generate exactly ${MfaService.RECOVERY_CODE_COUNT} recovery codes")
+        assertEquals(
+            MfaService.RECOVERY_CODE_COUNT,
+            response.recoveryCodes.size,
+            "Must generate exactly ${MfaService.RECOVERY_CODE_COUNT} recovery codes",
+        )
         assertTrue(auditLog.hasEvent(AuditEventType.MFA_ENROLLMENT_STARTED))
     }
 
     @Test
     fun `beginEnrollment returns AlreadyEnrolled for user with verified enrollment`() {
         // Seed a verified enrollment directly
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = TotpUtil.generateSecret(),
-            verified = true, verifiedAt = Instant.now()
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = TotpUtil.generateSecret(),
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
 
         val result = svc.beginEnrollment(userId = 10, tenantId = 1, issuer = "Acme")
 
@@ -158,10 +174,15 @@ class MfaServiceTest {
     @Test
     fun `verifyTotp returns NotEnrolled for unverified enrollment`() {
         // Unverified enrollment — user hasn't finished setup
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = TotpUtil.generateSecret(), verified = false
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = TotpUtil.generateSecret(),
+                verified = false,
+            ),
+        )
 
         val result = svc.verifyTotp(userId = 10, code = "123456")
 
@@ -172,10 +193,16 @@ class MfaServiceTest {
     @Test
     fun `verifyTotp returns InvalidCode for wrong TOTP code`() {
         val secret = TotpUtil.generateSecret()
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = secret, verified = true, verifiedAt = Instant.now()
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
 
         val result = svc.verifyTotp(userId = 10, code = "000000")
 
@@ -187,10 +214,16 @@ class MfaServiceTest {
     @Test
     fun `verifyTotp succeeds with a valid TOTP code`() {
         val secret = TotpUtil.generateSecret()
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = secret, verified = true, verifiedAt = Instant.now()
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
         val validCode = TotpUtil.generateCode(secret)
 
         val result = svc.verifyTotp(userId = 10, code = validCode)
@@ -214,9 +247,11 @@ class MfaServiceTest {
     @Test
     fun `verifyRecoveryCode returns InvalidCode for wrong code`() {
         // Seed one recovery code
-        mfaRepo.saveRecoveryCodes(listOf(
-            MfaRecoveryCode(userId = 10, tenantId = 1, codeHash = hasher.hash("CORRECT1"))
-        ))
+        mfaRepo.saveRecoveryCodes(
+            listOf(
+                MfaRecoveryCode(userId = 10, tenantId = 1, codeHash = hasher.hash("CORRECT1")),
+            ),
+        )
 
         val result = svc.verifyRecoveryCode(userId = 10, code = "WRONGCOD")
 
@@ -226,9 +261,11 @@ class MfaServiceTest {
 
     @Test
     fun `verifyRecoveryCode succeeds and consumes the code — second use must fail`() {
-        mfaRepo.saveRecoveryCodes(listOf(
-            MfaRecoveryCode(userId = 10, tenantId = 1, codeHash = hasher.hash("CORRECT1"))
-        ))
+        mfaRepo.saveRecoveryCodes(
+            listOf(
+                MfaRecoveryCode(userId = 10, tenantId = 1, codeHash = hasher.hash("CORRECT1")),
+            ),
+        )
 
         val firstResult = svc.verifyRecoveryCode(userId = 10, code = "CORRECT1")
         assertIs<MfaResult.Success<*>>(firstResult)
@@ -251,20 +288,31 @@ class MfaServiceTest {
 
     @Test
     fun `shouldChallengeMfa returns false for unverified enrollment`() {
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = TotpUtil.generateSecret(), verified = false
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = TotpUtil.generateSecret(),
+                verified = false,
+            ),
+        )
         assertFalse(svc.shouldChallengeMfa(userId = 10))
     }
 
     @Test
     fun `shouldChallengeMfa returns true for verified, enabled enrollment`() {
-        mfaRepo.saveEnrollment(MfaEnrollment(
-            userId = 10, tenantId = 1, method = MfaMethod.TOTP,
-            secret = TotpUtil.generateSecret(), verified = true,
-            enabled = true, verifiedAt = Instant.now()
-        ))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = 10,
+                tenantId = 1,
+                method = MfaMethod.TOTP,
+                secret = TotpUtil.generateSecret(),
+                verified = true,
+                enabled = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
         assertTrue(svc.shouldChallengeMfa(userId = 10))
     }
 }

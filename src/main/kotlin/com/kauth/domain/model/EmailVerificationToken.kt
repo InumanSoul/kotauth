@@ -16,15 +16,15 @@ import java.time.Instant
  * Previous unused tokens for the same user are deleted before issuing a new one.
  */
 data class EmailVerificationToken(
-    val id: Int?           = null,
+    val id: Int? = null,
     val userId: Int,
     val tenantId: Int,
     val tokenHash: String,
     val expiresAt: Instant,
-    val usedAt: Instant?   = null,
-    val createdAt: Instant = Instant.now()
+    val usedAt: Instant? = null,
+    val createdAt: Instant = Instant.now(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
-    val isUsed: Boolean    get() = usedAt != null
-    val isValid: Boolean   get() = !isExpired && !isUsed
+    val isUsed: Boolean get() = usedAt != null
+    val isValid: Boolean get() = !isExpired && !isUsed
 }

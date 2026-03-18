@@ -18,13 +18,23 @@ interface SessionRepository {
     fun findActiveByRefreshTokenHash(hash: String): Session?
 
     /** Marks a session as revoked. No-op if already revoked. */
-    fun revoke(sessionId: Int, revokedAt: Instant = Instant.now())
+    fun revoke(
+        sessionId: Int,
+        revokedAt: Instant = Instant.now(),
+    )
 
     /** Revokes all active sessions for a user within a tenant. */
-    fun revokeAllForUser(tenantId: Int, userId: Int, revokedAt: Instant = Instant.now())
+    fun revokeAllForUser(
+        tenantId: Int,
+        userId: Int,
+        revokedAt: Instant = Instant.now(),
+    )
 
     /** Returns all active sessions for a user (for the self-service portal). */
-    fun findActiveByUser(tenantId: Int, userId: Int): List<Session>
+    fun findActiveByUser(
+        tenantId: Int,
+        userId: Int,
+    ): List<Session>
 
     /** Returns a session by its DB id, regardless of state. */
     fun findById(id: Int): Session?
@@ -36,11 +46,18 @@ interface SessionRepository {
      * Counts active (non-revoked, non-expired) sessions for a user within a tenant.
      * Phase 3b: used to enforce [Tenant.maxConcurrentSessions].
      */
-    fun countActiveByUser(tenantId: Int, userId: Int): Int
+    fun countActiveByUser(
+        tenantId: Int,
+        userId: Int,
+    ): Int
 
     /**
      * Revokes the oldest sessions for a user, keeping only [keepNewest] active.
      * Phase 3b: called after login when the session count exceeds the tenant limit.
      */
-    fun revokeOldestForUser(tenantId: Int, userId: Int, keepNewest: Int)
+    fun revokeOldestForUser(
+        tenantId: Int,
+        userId: Int,
+        keepNewest: Int,
+    )
 }

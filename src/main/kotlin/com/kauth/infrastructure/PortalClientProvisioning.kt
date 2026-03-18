@@ -16,11 +16,10 @@ import com.kauth.domain.port.TenantRepository
  * from a previous deployment (different base URL) are automatically corrected.
  */
 class PortalClientProvisioning(
-    private val tenantRepository      : TenantRepository,
-    private val applicationRepository : ApplicationRepository,
-    private val baseUrl               : String
+    private val tenantRepository: TenantRepository,
+    private val applicationRepository: ApplicationRepository,
+    private val baseUrl: String,
 ) {
-
     companion object {
         const val PORTAL_CLIENT_ID = "kotauth-portal"
     }
@@ -37,7 +36,7 @@ class PortalClientProvisioning(
         for (tenant in tenants) {
             if (tenant.isMaster) continue
 
-            val callbackUri  = "$baseUrl/t/${tenant.slug}/account/callback"
+            val callbackUri = "$baseUrl/t/${tenant.slug}/account/callback"
             val portalClient = applicationRepository.findByClientId(tenant.id, PORTAL_CLIENT_ID)
 
             if (portalClient == null) {
@@ -45,21 +44,21 @@ class PortalClientProvisioning(
                 // tenants, so new tenants have no portal client row yet. Create it now
                 // with the correct redirect URI already set.
                 applicationRepository.create(
-                    tenantId     = tenant.id,
-                    clientId     = PORTAL_CLIENT_ID,
-                    name         = "KotAuth Self-Service Portal",
-                    description  = "Built-in client for the tenant self-service portal (profile, password, MFA)",
-                    accessType   = "public",
-                    redirectUris = listOf(callbackUri)
+                    tenantId = tenant.id,
+                    clientId = PORTAL_CLIENT_ID,
+                    name = "KotAuth Self-Service Portal",
+                    description = "Built-in client for the tenant self-service portal (profile, password, MFA)",
+                    accessType = "public",
+                    redirectUris = listOf(callbackUri),
                 )
             } else if (portalClient.redirectUris != listOf(callbackUri)) {
                 // Only update when the URI has actually changed to avoid unnecessary writes
                 applicationRepository.update(
-                    appId        = portalClient.id,
-                    name         = portalClient.name,
-                    description  = portalClient.description,
-                    accessType   = portalClient.accessType.value,
-                    redirectUris = listOf(callbackUri)
+                    appId = portalClient.id,
+                    name = portalClient.name,
+                    description = portalClient.description,
+                    accessType = portalClient.accessType.value,
+                    redirectUris = listOf(callbackUri),
                 )
             }
         }

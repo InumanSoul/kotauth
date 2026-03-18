@@ -17,21 +17,21 @@ package com.kauth.domain.model
  */
 data class TenantTheme(
     // Brand colors — Zinc-dark palette, brand cyan accent
-    val accentColor: String       = "#1FBCFF",
-    val accentHoverColor: String  = "#0ea5d9",
+    val accentColor: String = "#1FBCFF",
+    val accentHoverColor: String = "#0ea5d9",
     // Surface colors — shadcn Zinc-dark token set
-    val bgDeep: String            = "#09090b",
-    val bgCard: String            = "#18181b",
-    val bgInput: String           = "#27272a",
+    val bgDeep: String = "#09090b",
+    val bgCard: String = "#18181b",
+    val bgInput: String = "#27272a",
     // Structure
-    val borderColor: String       = "#3f3f46",
-    val borderRadius: String      = "8px",
+    val borderColor: String = "#3f3f46",
+    val borderRadius: String = "8px",
     // Text
-    val textPrimary: String       = "#fafafa",
-    val textMuted: String         = "#a1a1aa",
+    val textPrimary: String = "#fafafa",
+    val textMuted: String = "#a1a1aa",
     // Brand identity
-    val logoUrl: String?          = null,
-    val faviconUrl: String?       = null
+    val logoUrl: String? = null,
+    val faviconUrl: String? = null,
 ) {
     /**
      * Emits a CSS :root block that overrides the base stylesheet variables.
@@ -40,19 +40,20 @@ data class TenantTheme(
      * The base CSS file uses var(--token) throughout — no hardcoded colors.
      * This block is the single source of truth for the tenant's visual identity.
      */
-    fun toCssVars(): String = buildString {
-        appendLine(":root {")
-        appendLine("  --accent:       $accentColor;")
-        appendLine("  --accent-hover: $accentHoverColor;")
-        appendLine("  --bg-deep:      $bgDeep;")
-        appendLine("  --bg-card:      $bgCard;")
-        appendLine("  --bg-input:     $bgInput;")
-        appendLine("  --border:       $borderColor;")
-        appendLine("  --radius:       $borderRadius;")
-        appendLine("  --text:         $textPrimary;")
-        appendLine("  --muted:        $textMuted;")
-        append("}")
-    }
+    fun toCssVars(): String =
+        buildString {
+            appendLine(":root {")
+            appendLine("  --accent:       $accentColor;")
+            appendLine("  --accent-hover: $accentHoverColor;")
+            appendLine("  --bg-deep:      $bgDeep;")
+            appendLine("  --bg-card:      $bgCard;")
+            appendLine("  --bg-input:     $bgInput;")
+            appendLine("  --border:       $borderColor;")
+            appendLine("  --radius:       $borderRadius;")
+            appendLine("  --text:         $textPrimary;")
+            appendLine("  --muted:        $textMuted;")
+            append("}")
+        }
 
     companion object {
         /**
@@ -60,42 +61,45 @@ data class TenantTheme(
          * Accent: brand cyan #1FBCFF (not purple — updated to match design system).
          * Surfaces follow the shadcn Zinc-dark token set.
          */
-        val DEFAULT = TenantTheme(
-            accentColor      = "#1FBCFF",
-            accentHoverColor = "#0ea5d9",
-            bgDeep           = "#09090b",
-            bgCard           = "#18181b",
-            bgInput          = "#27272a",
-            borderColor      = "#3f3f46",
-            borderRadius     = "0px",
-            textPrimary      = "#fafafa",
-            textMuted        = "#a1a1aa"
-        )
+        val DEFAULT =
+            TenantTheme(
+                accentColor = "#1FBCFF",
+                accentHoverColor = "#0ea5d9",
+                bgDeep = "#09090b",
+                bgCard = "#18181b",
+                bgInput = "#27272a",
+                borderColor = "#3f3f46",
+                borderRadius = "0px",
+                textPrimary = "#fafafa",
+                textMuted = "#a1a1aa",
+            )
 
         /** A light theme preset for tenants that want a clean white login page. */
-        val LIGHT = TenantTheme(
-            accentColor      = "#0ea5d9",
-            accentHoverColor = "#0284c7",
-            bgDeep           = "#f8fafc",
-            bgCard           = "#ffffff",
-            bgInput          = "#f1f5f9",
-            borderColor      = "#e2e8f0",
-            borderRadius     = "0px",
-            textPrimary      = "#0f172a",
-            textMuted        = "#64748b"
-        )
-        
+        val LIGHT =
+            TenantTheme(
+                accentColor = "#0ea5d9",
+                accentHoverColor = "#0284c7",
+                bgDeep = "#f8fafc",
+                bgCard = "#ffffff",
+                bgInput = "#f1f5f9",
+                borderColor = "#e2e8f0",
+                borderRadius = "0px",
+                textPrimary = "#0f172a",
+                textMuted = "#64748b",
+            )
+
         // Same as LIGHT but with rounded corners, for tenants that want a softer look without changing colors.
-        val SIMPLE = TenantTheme(
-            accentColor      = "#212121",
-            accentHoverColor = "#000000",
-            bgDeep           = "#fafafa",
-            bgCard           = "#ffffff",
-            bgInput          = "#f1f5f9",
-            borderColor      = "#e2e8f0",
-            borderRadius     = "8px",
-            textPrimary      = "#0f172a",
-            textMuted        = "#64748b"
-        )
+        val SIMPLE =
+            TenantTheme(
+                accentColor = "#212121",
+                accentHoverColor = "#000000",
+                bgDeep = "#fafafa",
+                bgCard = "#ffffff",
+                bgInput = "#f1f5f9",
+                borderColor = "#e2e8f0",
+                borderRadius = "8px",
+                textPrimary = "#0f172a",
+                textMuted = "#64748b",
+            )
     }
 }

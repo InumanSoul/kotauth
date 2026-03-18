@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory
  */
 class KeyProvisioningService(
     private val tenantRepository: TenantRepository,
-    private val tenantKeyRepository: TenantKeyRepository
+    private val tenantKeyRepository: TenantKeyRepository,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -44,15 +44,18 @@ class KeyProvisioningService(
         val existingKey = tenantKeyRepository.findActiveKey(tenant.id)
         if (existingKey == null) {
             log.info("Generating RS256 key pair for tenant '${tenant.slug}' (id=${tenant.id})")
-            val keyPair = KeyGenerator.generateRsaKeyPair(
-                keyId = "${tenant.slug}-${System.currentTimeMillis()}"
+            val keyPair =
+                KeyGenerator.generateRsaKeyPair(
+                    keyId = "${tenant.slug}-${System.currentTimeMillis()}",
+                )
+            tenantKeyRepository.save(
+                TenantKey(
+                    tenantId = tenant.id,
+                    keyId = keyPair.keyId,
+                    publicKeyPem = keyPair.publicKeyPem,
+                    privateKeyPem = keyPair.privateKeyPem,
+                ),
             )
-            tenantKeyRepository.save(TenantKey(
-                tenantId      = tenant.id,
-                keyId         = keyPair.keyId,
-                publicKeyPem  = keyPair.publicKeyPem,
-                privateKeyPem = keyPair.privateKeyPem
-            ))
             log.info("RS256 key '${keyPair.keyId}' created for tenant '${tenant.slug}'")
         } else {
             log.debug("Tenant '${tenant.slug}' already has active key '${existingKey.keyId}' — skipping")

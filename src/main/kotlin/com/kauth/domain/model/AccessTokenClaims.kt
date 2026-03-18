@@ -20,5 +20,5 @@ data class AccessTokenClaims(
     val issuedAt: Long,
     val expiresAt: Long,
     val realmRoles: List<String> = emptyList(),
-    val resourceRoles: Map<String, List<String>> = emptyMap()
+    val resourceRoles: Map<String, List<String>> = emptyMap(),
 )

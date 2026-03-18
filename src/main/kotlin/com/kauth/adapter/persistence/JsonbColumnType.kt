@@ -27,10 +27,11 @@ import org.postgresql.util.PGobject
 class JsonbColumnType : ColumnType<String>() {
     override fun sqlType(): String = "JSONB"
 
-    override fun valueFromDB(value: Any): String = when (value) {
-        is PGobject -> value.value ?: "{}"
-        else        -> value.toString()
-    }
+    override fun valueFromDB(value: Any): String =
+        when (value) {
+            is PGobject -> value.value ?: "{}"
+            else -> value.toString()
+        }
 
     override fun notNullValueToDB(value: String): Any =
         PGobject().apply {
@@ -39,5 +40,4 @@ class JsonbColumnType : ColumnType<String>() {
         }
 }
 
-fun Table.jsonb(name: String): Column<String> =
-    registerColumn(name, JsonbColumnType())
+fun Table.jsonb(name: String): Column<String> = registerColumn(name, JsonbColumnType())

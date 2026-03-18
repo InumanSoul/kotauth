@@ -1,6 +1,5 @@
 package com.kauth.domain.service
 
-import com.kauth.domain.model.Application
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
@@ -11,10 +10,10 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuthorizationCodeRepository
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
-import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.UserRepository
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -47,9 +46,8 @@ class OAuthService(
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val roleRepository: RoleRepository? = null  // Phase 3c — nullable for backward compat
+    private val roleRepository: RoleRepository? = null, // Phase 3c — nullable for backward compat
 ) {
-
     // -------------------------------------------------------------------------
     // Authorization Code Flow — Step 1: validate request, issue code
     // -------------------------------------------------------------------------
@@ -79,13 +77,15 @@ class OAuthService(
         codeChallengeMethod: String?,
         nonce: String?,
         state: String?,
-        ipAddress: String? = null
+        ipAddress: String? = null,
     ): OAuthResult<AuthorizationCode> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
 
-        val client = applicationRepository.findByClientId(tenant.id, clientId)
-            ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client_id: $clientId"))
+        val client =
+            applicationRepository.findByClientId(tenant.id, clientId)
+                ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client_id: $clientId"))
 
         if (!client.enabled) {
             return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
@@ -106,31 +106,34 @@ class OAuthService(
             }
         }
 
-        val code = AuthorizationCode(
-            code = generateSecureCode(),
-            tenantId = tenant.id,
-            clientId = client.id,
-            userId = userId,
-            redirectUri = redirectUri,
-            scopes = scopes.ifBlank { "openid" },
-            codeChallenge = codeChallenge,
-            codeChallengeMethod = if (codeChallenge != null) "S256" else null,
-            nonce = nonce,
-            state = state,
-            expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS)
-        )
+        val code =
+            AuthorizationCode(
+                code = generateSecureCode(),
+                tenantId = tenant.id,
+                clientId = client.id,
+                userId = userId,
+                redirectUri = redirectUri,
+                scopes = scopes.ifBlank { "openid" },
+                codeChallenge = codeChallenge,
+                codeChallengeMethod = if (codeChallenge != null) "S256" else null,
+                nonce = nonce,
+                state = state,
+                expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS),
+            )
 
         val saved = authCodeRepository.save(code)
 
-        auditLog.record(AuditEvent(
-            tenantId = tenant.id,
-            userId = userId,
-            clientId = client.id,
-            eventType = AuditEventType.AUTHORIZATION_CODE_ISSUED,
-            ipAddress = ipAddress,
-            userAgent = null,
-            details = mapOf("scopes" to scopes, "redirect_uri" to redirectUri)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = userId,
+                clientId = client.id,
+                eventType = AuditEventType.AUTHORIZATION_CODE_ISSUED,
+                ipAddress = ipAddress,
+                userAgent = null,
+                details = mapOf("scopes" to scopes, "redirect_uri" to redirectUri),
+            ),
+        )
 
         return OAuthResult.Success(saved)
     }
@@ -151,13 +154,15 @@ class OAuthService(
         codeVerifier: String?,
         clientSecret: String?,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): OAuthResult<TokenResponse> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
 
-        val client = applicationRepository.findByClientId(tenant.id, clientId)
-            ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client"))
+        val client =
+            applicationRepository.findByClientId(tenant.id, clientId)
+                ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client"))
 
         // Authenticate confidential clients
         if (client.accessType == AccessType.CONFIDENTIAL) {
@@ -170,23 +175,26 @@ class OAuthService(
             }
         }
 
-        val authCode = authCodeRepository.findByCode(code)
-            ?: return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code not found"))
+        val authCode =
+            authCodeRepository.findByCode(code)
+                ?: return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code not found"))
 
         // Single-use enforcement
         if (!authCode.isValid) {
             if (authCode.isUsed) {
                 // Potential replay attack — revoke all sessions for this user/client
                 sessionRepository.revokeAllForUser(authCode.tenantId, authCode.userId)
-                auditLog.record(AuditEvent(
-                    tenantId = tenant.id,
-                    userId = authCode.userId,
-                    clientId = client.id,
-                    eventType = AuditEventType.SESSION_REVOKED,
-                    ipAddress = ipAddress,
-                    userAgent = userAgent,
-                    details = mapOf("reason" to "authorization_code_replay_detected")
-                ))
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = authCode.userId,
+                        clientId = client.id,
+                        eventType = AuditEventType.SESSION_REVOKED,
+                        ipAddress = ipAddress,
+                        userAgent = userAgent,
+                        details = mapOf("reason" to "authorization_code_replay_detected"),
+                    ),
+                )
             }
             return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code is expired or already used"))
         }
@@ -206,8 +214,9 @@ class OAuthService(
             }
         }
 
-        val user = userRepository.findById(authCode.userId)
-            ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User not found"))
+        val user =
+            userRepository.findById(authCode.userId)
+                ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User not found"))
 
         if (!user.enabled) {
             return OAuthResult.Failure(OAuthError.InvalidGrant("User is disabled"))
@@ -218,43 +227,50 @@ class OAuthService(
         // Phase 3c: resolve effective roles for the user
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
 
-        val tokenResponse = tokenPort.issueUserTokens(
-            user = user,
-            tenant = tenant,
-            client = client,
-            scopes = scopes,
-            nonce = authCode.nonce,
-            roles = effectiveRoles
-        )
+        val tokenResponse =
+            tokenPort.issueUserTokens(
+                user = user,
+                tenant = tenant,
+                client = client,
+                scopes = scopes,
+                nonce = authCode.nonce,
+                roles = effectiveRoles,
+            )
 
         // Persist session
-        val session = sessionRepository.save(Session(
-            tenantId = tenant.id,
-            userId = user.id,
-            clientId = client.id,
-            accessTokenHash = sha256(tokenResponse.access_token),
-            refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
-            scopes = authCode.scopes,
-            ipAddress = ipAddress,
-            userAgent = userAgent,
-            expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-            refreshExpiresAt = tokenResponse.refresh_token?.let {
-                Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-            }
-        ))
+        val session =
+            sessionRepository.save(
+                Session(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = client.id,
+                    accessTokenHash = sha256(tokenResponse.access_token),
+                    refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
+                    scopes = authCode.scopes,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                    refreshExpiresAt =
+                        tokenResponse.refresh_token?.let {
+                            Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                        },
+                ),
+            )
 
         // Mark code as consumed
         authCodeRepository.markUsed(code)
 
-        auditLog.record(AuditEvent(
-            tenantId = tenant.id,
-            userId = user.id,
-            clientId = client.id,
-            eventType = AuditEventType.TOKEN_ISSUED,
-            ipAddress = ipAddress,
-            userAgent = userAgent,
-            details = mapOf("grant_type" to "authorization_code", "scopes" to authCode.scopes)
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = client.id,
+                eventType = AuditEventType.TOKEN_ISSUED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                details = mapOf("grant_type" to "authorization_code", "scopes" to authCode.scopes),
+            ),
+        )
 
         return OAuthResult.Success(tokenResponse)
     }
@@ -272,18 +288,22 @@ class OAuthService(
         clientId: String,
         clientSecret: String,
         scopes: String,
-        ipAddress: String? = null
+        ipAddress: String? = null,
     ): OAuthResult<TokenResponse> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
 
-        val client = applicationRepository.findByClientId(tenant.id, clientId)
-            ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client"))
+        val client =
+            applicationRepository.findByClientId(tenant.id, clientId)
+                ?: return OAuthResult.Failure(OAuthError.InvalidClient("Unknown client"))
 
         if (client.accessType != AccessType.CONFIDENTIAL) {
-            return OAuthResult.Failure(OAuthError.InvalidClient(
-                "client_credentials flow requires a CONFIDENTIAL client"
-            ))
+            return OAuthResult.Failure(
+                OAuthError.InvalidClient(
+                    "client_credentials flow requires a CONFIDENTIAL client",
+                ),
+            )
         }
 
         if (!client.enabled) {
@@ -301,34 +321,40 @@ class OAuthService(
         val expirySeconds = client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds
 
         // Persist session (no user_id for M2M)
-        sessionRepository.save(Session(
-            tenantId = tenant.id,
-            userId = null,
-            clientId = client.id,
-            accessTokenHash = sha256(accessToken),
-            refreshTokenHash = null,
-            scopes = requestedScopes.joinToString(" "),
-            ipAddress = ipAddress,
-            userAgent = null,
-            expiresAt = Instant.now().plusSeconds(expirySeconds)
-        ))
+        sessionRepository.save(
+            Session(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = client.id,
+                accessTokenHash = sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = requestedScopes.joinToString(" "),
+                ipAddress = ipAddress,
+                userAgent = null,
+                expiresAt = Instant.now().plusSeconds(expirySeconds),
+            ),
+        )
 
-        auditLog.record(AuditEvent(
-            tenantId = tenant.id,
-            userId = null,
-            clientId = client.id,
-            eventType = AuditEventType.TOKEN_ISSUED,
-            ipAddress = ipAddress,
-            userAgent = null,
-            details = mapOf("grant_type" to "client_credentials")
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = client.id,
+                eventType = AuditEventType.TOKEN_ISSUED,
+                ipAddress = ipAddress,
+                userAgent = null,
+                details = mapOf("grant_type" to "client_credentials"),
+            ),
+        )
 
-        return OAuthResult.Success(TokenResponse(
-            access_token = accessToken,
-            token_type = "Bearer",
-            expires_in = expirySeconds,
-            scope = requestedScopes.joinToString(" ")
-        ))
+        return OAuthResult.Success(
+            TokenResponse(
+                access_token = accessToken,
+                token_type = "Bearer",
+                expires_in = expirySeconds,
+                scope = requestedScopes.joinToString(" "),
+            ),
+        )
     }
 
     // -------------------------------------------------------------------------
@@ -348,10 +374,11 @@ class OAuthService(
         refreshToken: String,
         clientId: String,
         ipAddress: String? = null,
-        userAgent: String? = null
+        userAgent: String? = null,
     ): OAuthResult<TokenResponse> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
 
         val hash = sha256(refreshToken)
         val session = sessionRepository.findActiveByRefreshTokenHash(hash)
@@ -365,8 +392,9 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh tokens not supported for M2M sessions"))
         }
 
-        val user = userRepository.findById(session.userId)
-            ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User no longer exists"))
+        val user =
+            userRepository.findById(session.userId)
+                ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User no longer exists"))
 
         if (!user.enabled) {
             sessionRepository.revoke(session.id!!)
@@ -380,39 +408,45 @@ class OAuthService(
         // Phase 3c: resolve effective roles for refresh
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
 
-        val newTokens = tokenPort.issueUserTokens(
-            user = user,
-            tenant = tenant,
-            client = client,
-            scopes = scopes,
-            roles = effectiveRoles
-        )
+        val newTokens =
+            tokenPort.issueUserTokens(
+                user = user,
+                tenant = tenant,
+                client = client,
+                scopes = scopes,
+                roles = effectiveRoles,
+            )
 
         // Revoke old session, create new (rotation)
         sessionRepository.revoke(session.id!!)
-        sessionRepository.save(Session(
-            tenantId = tenant.id,
-            userId = user.id,
-            clientId = session.clientId,
-            accessTokenHash = sha256(newTokens.access_token),
-            refreshTokenHash = newTokens.refresh_token?.let { sha256(it) },
-            scopes = session.scopes,
-            ipAddress = ipAddress,
-            userAgent = userAgent,
-            expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-            refreshExpiresAt = newTokens.refresh_token?.let {
-                Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-            }
-        ))
+        sessionRepository.save(
+            Session(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = session.clientId,
+                accessTokenHash = sha256(newTokens.access_token),
+                refreshTokenHash = newTokens.refresh_token?.let { sha256(it) },
+                scopes = session.scopes,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                refreshExpiresAt =
+                    newTokens.refresh_token?.let {
+                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                    },
+            ),
+        )
 
-        auditLog.record(AuditEvent(
-            tenantId = tenant.id,
-            userId = user.id,
-            clientId = session.clientId,
-            eventType = AuditEventType.TOKEN_REFRESHED,
-            ipAddress = ipAddress,
-            userAgent = userAgent
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = session.clientId,
+                eventType = AuditEventType.TOKEN_REFRESHED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+            ),
+        )
 
         return OAuthResult.Success(newTokens)
     }
@@ -428,14 +462,16 @@ class OAuthService(
     fun introspectToken(
         tenantSlug: String,
         token: String,
-        tokenTypeHint: String? = null
+        tokenTypeHint: String? = null,
     ): IntrospectionResult {
         val hash = sha256(token)
-        val session = sessionRepository.findActiveByAccessTokenHash(hash)
-            ?: return IntrospectionResult.Inactive
+        val session =
+            sessionRepository.findActiveByAccessTokenHash(hash)
+                ?: return IntrospectionResult.Inactive
 
-        val claims = tokenPort.decodeAccessToken(token)
-            ?: return IntrospectionResult.Inactive
+        val claims =
+            tokenPort.decodeAccessToken(token)
+                ?: return IntrospectionResult.Inactive
 
         return IntrospectionResult.Active(
             sub = claims.sub,
@@ -443,9 +479,10 @@ class OAuthService(
             email = claims.email,
             scopes = claims.scopes,
             expiresAt = claims.expiresAt,
-            clientId = session.clientId?.let {
-                applicationRepository.findById(it)?.clientId
-            }
+            clientId =
+                session.clientId?.let {
+                    applicationRepository.findById(it)?.clientId
+                },
         )
     }
 
@@ -459,20 +496,22 @@ class OAuthService(
      */
     fun revokeToken(token: String) {
         val hash = sha256(token)
-        val byAccess  = sessionRepository.findActiveByAccessTokenHash(hash)
+        val byAccess = sessionRepository.findActiveByAccessTokenHash(hash)
         val byRefresh = sessionRepository.findActiveByRefreshTokenHash(hash)
-        val session   = byAccess ?: byRefresh ?: return  // No-op per spec
+        val session = byAccess ?: byRefresh ?: return // No-op per spec
 
         session.id?.let {
             sessionRepository.revoke(it)
-            auditLog.record(AuditEvent(
-                tenantId = session.tenantId,
-                userId = session.userId,
-                clientId = session.clientId,
-                eventType = AuditEventType.TOKEN_REVOKED,
-                ipAddress = null,
-                userAgent = null
-            ))
+            auditLog.record(
+                AuditEvent(
+                    tenantId = session.tenantId,
+                    userId = session.userId,
+                    clientId = session.clientId,
+                    eventType = AuditEventType.TOKEN_REVOKED,
+                    ipAddress = null,
+                    userAgent = null,
+                ),
+            )
         }
     }
 
@@ -489,13 +528,13 @@ class OAuthService(
         val username: String,
         val email: String,
         val emailVerified: Boolean,
-        val name: String
+        val name: String,
     )
 
     fun getUserInfo(accessToken: String): UserInfoResult? {
         val hash = sha256(accessToken)
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return null
-        val userId = session.userId ?: return null  // No userinfo for M2M tokens
+        val userId = session.userId ?: return null // No userinfo for M2M tokens
 
         val user = userRepository.findById(userId) ?: return null
         if (!user.enabled) return null
@@ -505,7 +544,7 @@ class OAuthService(
             username = user.username,
             email = user.email,
             emailVerified = user.emailVerified,
-            name = user.fullName
+            name = user.fullName,
         )
     }
 
@@ -520,7 +559,7 @@ class OAuthService(
     fun endSession(
         accessToken: String,
         revokeAll: Boolean = false,
-        ipAddress: String? = null
+        ipAddress: String? = null,
     ) {
         val hash = sha256(accessToken)
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return
@@ -531,23 +570,24 @@ class OAuthService(
             session.id?.let { sessionRepository.revoke(it) }
         }
 
-        auditLog.record(AuditEvent(
-            tenantId = session.tenantId,
-            userId = session.userId,
-            clientId = session.clientId,
-            eventType = AuditEventType.SESSION_REVOKED,
-            ipAddress = ipAddress,
-            userAgent = null,
-            details = mapOf("global_logout" to revokeAll.toString())
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = session.tenantId,
+                userId = session.userId,
+                clientId = session.clientId,
+                eventType = AuditEventType.SESSION_REVOKED,
+                ipAddress = ipAddress,
+                userAgent = null,
+                details = mapOf("global_logout" to revokeAll.toString()),
+            ),
+        )
     }
 
     // -------------------------------------------------------------------------
     // JWKS delegation (called from OIDC certs endpoint)
     // -------------------------------------------------------------------------
 
-    fun getJwks(tenantId: Int): List<Map<String, Any>> =
-        tokenPort.getTenantJwks(tenantId)
+    fun getJwks(tenantId: Int): List<Map<String, Any>> = tokenPort.getTenantJwks(tenantId)
 
     // -------------------------------------------------------------------------
     // Internal utilities
@@ -562,7 +602,10 @@ class OAuthService(
     /**
      * PKCE S256 verification: SHA-256(code_verifier) must equal code_challenge (base64url).
      */
-    private fun verifyPkce(codeVerifier: String, codeChallenge: String): Boolean {
+    private fun verifyPkce(
+        codeVerifier: String,
+        codeChallenge: String,
+    ): Boolean {
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(codeVerifier.toByteArray(Charsets.US_ASCII))
         val computed = Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
@@ -570,7 +613,7 @@ class OAuthService(
     }
 
     companion object {
-        private const val CODE_EXPIRY_SECONDS = 300L  // 5 minutes
+        private const val CODE_EXPIRY_SECONDS = 300L // 5 minutes
 
         /**
          * SHA-256 hex digest of a string. Used for token hashing in session storage.
@@ -589,28 +632,48 @@ class OAuthService(
 // -------------------------------------------------------------------------
 
 sealed class OAuthResult<out T> {
-    data class Success<T>(val value: T) : OAuthResult<T>()
-    data class Failure(val error: OAuthError) : OAuthResult<Nothing>()
+    data class Success<T>(
+        val value: T,
+    ) : OAuthResult<T>()
+
+    data class Failure(
+        val error: OAuthError,
+    ) : OAuthResult<Nothing>()
 }
 
 sealed class OAuthError {
     object TenantNotFound : OAuthError()
+
     object PkceRequired : OAuthError()
-    data class InvalidClient(val reason: String) : OAuthError()
-    data class InvalidGrant(val reason: String) : OAuthError()
-    data class InvalidRequest(val reason: String) : OAuthError()
-    data class InvalidRedirectUri(val uri: String) : OAuthError()
+
+    data class InvalidClient(
+        val reason: String,
+    ) : OAuthError()
+
+    data class InvalidGrant(
+        val reason: String,
+    ) : OAuthError()
+
+    data class InvalidRequest(
+        val reason: String,
+    ) : OAuthError()
+
+    data class InvalidRedirectUri(
+        val uri: String,
+    ) : OAuthError()
+
     object UnsupportedGrantType : OAuthError()
 }
 
 sealed class IntrospectionResult {
     object Inactive : IntrospectionResult()
+
     data class Active(
         val sub: String,
         val username: String?,
         val email: String?,
         val scopes: List<String>,
         val expiresAt: Long,
-        val clientId: String?
+        val clientId: String?,
     ) : IntrospectionResult()
 }

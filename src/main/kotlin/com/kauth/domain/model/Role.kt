@@ -20,20 +20,23 @@ data class Role(
     val scope: RoleScope = RoleScope.TENANT,
     val clientId: Int? = null,
     val childRoleIds: List<Int> = emptyList(),
-    val createdAt: Instant = Instant.now()
+    val createdAt: Instant = Instant.now(),
 )
 
 /**
  * Determines the visibility and claim placement of a role in issued tokens.
  */
-enum class RoleScope(val value: String) {
+enum class RoleScope(
+    val value: String,
+) {
     /** Global to the workspace — appears in `realm_access.roles`. */
     TENANT("tenant"),
+
     /** Scoped to a specific client/application — appears in `resource_access.{clientId}.roles`. */
-    CLIENT("client");
+    CLIENT("client"),
+    ;
 
     companion object {
-        fun fromValue(value: String): RoleScope =
-            entries.firstOrNull { it.value == value } ?: TENANT
+        fun fromValue(value: String): RoleScope = entries.firstOrNull { it.value == value } ?: TENANT
     }
 }

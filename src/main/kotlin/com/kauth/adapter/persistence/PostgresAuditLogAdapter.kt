@@ -22,25 +22,28 @@ import java.time.ZoneOffset
  * failures never affect the audit write or the calling auth flow.
  */
 class PostgresAuditLogAdapter(
-    private val webhookService: WebhookService? = null
+    private val webhookService: WebhookService? = null,
 ) : AuditLogPort {
-
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun record(event: AuditEvent) {
         try {
             transaction {
                 AuditLogTable.insert {
-                    it[tenantId]  = event.tenantId
-                    it[userId]    = event.userId
-                    it[clientId]  = event.clientId
+                    it[tenantId] = event.tenantId
+                    it[userId] = event.userId
+                    it[clientId] = event.clientId
                     it[eventType] = event.eventType.name
                     it[ipAddress] = event.ipAddress
                     it[userAgent] = event.userAgent
-                    it[details]   = if (event.details.isEmpty()) null
-                                    else event.details.entries.joinToString(",", "{", "}") { (k, v) ->
-                                        "\"$k\":\"${v.replace("\"", "\\\"")}\""
-                                    }
+                    it[details] =
+                        if (event.details.isEmpty()) {
+                            null
+                        } else {
+                            event.details.entries.joinToString(",", "{", "}") { (k, v) ->
+                                "\"$k\":\"${v.replace("\"", "\\\"")}\""
+                            }
+                        }
                     it[createdAt] = OffsetDateTime.ofInstant(event.createdAt, ZoneOffset.UTC)
                 }
             }
@@ -54,9 +57,9 @@ class PostgresAuditLogAdapter(
         val webhookEventType = auditTypeToWebhookEvent(event.eventType) ?: return
         try {
             webhookService?.dispatch(
-                tenantId    = tenantId,
-                eventType   = webhookEventType,
-                payloadData = buildPayloadData(event)
+                tenantId = tenantId,
+                eventType = webhookEventType,
+                payloadData = buildPayloadData(event),
             )
         } catch (e: Exception) {
             log.error("Webhook dispatch failed for event ${event.eventType}: ${e.message}", e)
@@ -68,36 +71,43 @@ class PostgresAuditLogAdapter(
     // -------------------------------------------------------------------------
 
     /** Maps [AuditEventType] values to their webhook event string counterparts. */
-    private fun auditTypeToWebhookEvent(type: AuditEventType): String? = when (type) {
-        AuditEventType.ADMIN_USER_CREATED,
-        AuditEventType.REGISTER_SUCCESS           -> WebhookEvent.USER_CREATED
+    private fun auditTypeToWebhookEvent(type: AuditEventType): String? =
+        when (type) {
+            AuditEventType.ADMIN_USER_CREATED,
+            AuditEventType.REGISTER_SUCCESS,
+            -> WebhookEvent.USER_CREATED
 
-        AuditEventType.ADMIN_USER_UPDATED,
-        AuditEventType.USER_PROFILE_UPDATED       -> WebhookEvent.USER_UPDATED
+            AuditEventType.ADMIN_USER_UPDATED,
+            AuditEventType.USER_PROFILE_UPDATED,
+            -> WebhookEvent.USER_UPDATED
 
-        AuditEventType.ADMIN_USER_DISABLED,
-        AuditEventType.ADMIN_USER_ENABLED         -> WebhookEvent.USER_UPDATED
+            AuditEventType.ADMIN_USER_DISABLED,
+            AuditEventType.ADMIN_USER_ENABLED,
+            -> WebhookEvent.USER_UPDATED
 
-        AuditEventType.LOGIN_SUCCESS              -> WebhookEvent.LOGIN_SUCCESS
-        AuditEventType.LOGIN_FAILED               -> WebhookEvent.LOGIN_FAILED
+            AuditEventType.LOGIN_SUCCESS -> WebhookEvent.LOGIN_SUCCESS
+            AuditEventType.LOGIN_FAILED -> WebhookEvent.LOGIN_FAILED
 
-        AuditEventType.PASSWORD_RESET_COMPLETED,
-        AuditEventType.ADMIN_USER_PASSWORD_RESET  -> WebhookEvent.PASSWORD_RESET
+            AuditEventType.PASSWORD_RESET_COMPLETED,
+            AuditEventType.ADMIN_USER_PASSWORD_RESET,
+            -> WebhookEvent.PASSWORD_RESET
 
-        AuditEventType.MFA_ENROLLMENT_VERIFIED    -> WebhookEvent.MFA_ENROLLED
+            AuditEventType.MFA_ENROLLMENT_VERIFIED -> WebhookEvent.MFA_ENROLLED
 
-        AuditEventType.SESSION_REVOKED,
-        AuditEventType.ADMIN_SESSION_REVOKED,
-        AuditEventType.USER_SESSION_REVOKED_SELF  -> WebhookEvent.SESSION_REVOKED
+            AuditEventType.SESSION_REVOKED,
+            AuditEventType.ADMIN_SESSION_REVOKED,
+            AuditEventType.USER_SESSION_REVOKED_SELF,
+            -> WebhookEvent.SESSION_REVOKED
 
-        else -> null  // Not mapped to a webhook event
-    }
+            else -> null // Not mapped to a webhook event
+        }
 
     /** Extracts a flat map of useful fields from an [AuditEvent] for the webhook payload. */
-    private fun buildPayloadData(event: AuditEvent): Map<String, Any?> = buildMap {
-        event.userId?.let    { put("userId",    it) }
-        event.clientId?.let  { put("clientId",  it) }
-        event.ipAddress?.let { put("ipAddress", it) }
-        putAll(event.details)
-    }
+    private fun buildPayloadData(event: AuditEvent): Map<String, Any?> =
+        buildMap {
+            event.userId?.let { put("userId", it) }
+            event.clientId?.let { put("clientId", it) }
+            event.ipAddress?.let { put("ipAddress", it) }
+            putAll(event.details)
+        }
 }

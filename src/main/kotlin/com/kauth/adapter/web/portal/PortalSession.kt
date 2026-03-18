@@ -28,9 +28,9 @@ import java.time.Instant
  * The cookie is HttpOnly.
  */
 data class PortalSession(
-    val userId    : Int,
-    val tenantId  : Int,
+    val userId: Int,
+    val tenantId: Int,
     val tenantSlug: String,
-    val username  : String,
-    val createdAt : Long = Instant.now().epochSecond
+    val username: String,
+    val createdAt: Long = Instant.now().epochSecond,
 )

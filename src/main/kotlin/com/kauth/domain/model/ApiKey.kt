@@ -13,18 +13,18 @@ import java.time.Instant
  * An empty scope list means no access — valid scopes are defined in [ApiScope].
  */
 data class ApiKey(
-    val id          : Int?    = null,
-    val tenantId    : Int,
-    val name        : String,
+    val id: Int? = null,
+    val tenantId: Int,
+    val name: String,
     /** First 8 chars of the raw key — shown in the admin UI as a hint (e.g. "kauth_my…"). */
-    val keyPrefix   : String,
+    val keyPrefix: String,
     /** SHA-256 hex digest of the full raw key — used for lookup on every request. */
-    val keyHash     : String,
-    val scopes      : List<String>,
-    val expiresAt   : Instant? = null,
-    val lastUsedAt  : Instant? = null,
-    val enabled     : Boolean  = true,
-    val createdAt   : Instant  = Instant.now()
+    val keyHash: String,
+    val scopes: List<String>,
+    val expiresAt: Instant? = null,
+    val lastUsedAt: Instant? = null,
+    val enabled: Boolean = true,
+    val createdAt: Instant = Instant.now(),
 )
 
 /**
@@ -33,24 +33,30 @@ data class ApiKey(
  * allowing access. Scopes are additive — a key may hold multiple.
  */
 object ApiScope {
-    const val USERS_READ         = "users:read"
-    const val USERS_WRITE        = "users:write"
-    const val ROLES_READ         = "roles:read"
-    const val ROLES_WRITE        = "roles:write"
-    const val GROUPS_READ        = "groups:read"
-    const val GROUPS_WRITE       = "groups:write"
-    const val APPLICATIONS_READ  = "applications:read"
+    const val USERS_READ = "users:read"
+    const val USERS_WRITE = "users:write"
+    const val ROLES_READ = "roles:read"
+    const val ROLES_WRITE = "roles:write"
+    const val GROUPS_READ = "groups:read"
+    const val GROUPS_WRITE = "groups:write"
+    const val APPLICATIONS_READ = "applications:read"
     const val APPLICATIONS_WRITE = "applications:write"
-    const val SESSIONS_READ      = "sessions:read"
-    const val SESSIONS_WRITE     = "sessions:write"
-    const val AUDIT_LOGS_READ    = "audit_logs:read"
+    const val SESSIONS_READ = "sessions:read"
+    const val SESSIONS_WRITE = "sessions:write"
+    const val AUDIT_LOGS_READ = "audit_logs:read"
 
-    val ALL = listOf(
-        USERS_READ, USERS_WRITE,
-        ROLES_READ, ROLES_WRITE,
-        GROUPS_READ, GROUPS_WRITE,
-        APPLICATIONS_READ, APPLICATIONS_WRITE,
-        SESSIONS_READ, SESSIONS_WRITE,
-        AUDIT_LOGS_READ
-    )
+    val ALL =
+        listOf(
+            USERS_READ,
+            USERS_WRITE,
+            ROLES_READ,
+            ROLES_WRITE,
+            GROUPS_READ,
+            GROUPS_WRITE,
+            APPLICATIONS_READ,
+            APPLICATIONS_WRITE,
+            SESSIONS_READ,
+            SESSIONS_WRITE,
+            AUDIT_LOGS_READ,
+        )
 }

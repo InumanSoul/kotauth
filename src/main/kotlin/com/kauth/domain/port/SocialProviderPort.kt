@@ -10,7 +10,6 @@ import com.kauth.domain.model.SocialProvider
  * The domain service depends only on this interface — zero provider coupling.
  */
 interface SocialProviderPort {
-
     /** Which provider this adapter handles. */
     val provider: SocialProvider
 
@@ -25,10 +24,10 @@ interface SocialProviderPort {
      * @param clientSecret Provider OAuth2 client secret.
      */
     fun exchangeCodeForProfile(
-        code         : String,
-        redirectUri  : String,
-        clientId     : String,
-        clientSecret : String
+        code: String,
+        redirectUri: String,
+        clientId: String,
+        clientSecret: String,
     ): SocialUserProfile
 
     /**
@@ -40,10 +39,10 @@ interface SocialProviderPort {
      * @param scopes      OAuth2 scopes to request (defaults are set per provider).
      */
     fun buildAuthorizationUrl(
-        clientId    : String,
-        redirectUri : String,
-        state       : String,
-        scopes      : List<String> = emptyList()
+        clientId: String,
+        redirectUri: String,
+        state: String,
+        scopes: List<String> = emptyList(),
     ): String
 }
 
@@ -52,10 +51,10 @@ interface SocialProviderPort {
  * Used internally by adapters — not exposed to the domain service.
  */
 data class SocialTokenResponse(
-    val accessToken  : String,
-    val tokenType    : String,
-    val idToken      : String? = null,   // Google only
-    val scope        : String? = null
+    val accessToken: String,
+    val tokenType: String,
+    val idToken: String? = null, // Google only
+    val scope: String? = null,
 )
 
 /**
@@ -64,13 +63,13 @@ data class SocialTokenResponse(
  */
 data class SocialUserProfile(
     /** Stable, unique identifier for this user within the provider. */
-    val providerUserId : String,
+    val providerUserId: String,
     /** Primary email address (may be null if not authorized by the user). */
-    val email          : String?,
+    val email: String?,
     /** Full display name from the provider. */
-    val name           : String?,
+    val name: String?,
     /** Whether the email has been verified by the provider. */
-    val emailVerified  : Boolean = false,
+    val emailVerified: Boolean = false,
     /** Profile picture URL from the provider (optional). */
-    val avatarUrl      : String? = null
+    val avatarUrl: String? = null,
 )

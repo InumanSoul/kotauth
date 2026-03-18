@@ -45,42 +45,44 @@ import java.time.Instant
  *   - Existing users are never modified.
  */
 class SocialLoginService(
-    private val identityProviderRepository : IdentityProviderRepository,
-    private val socialAccountRepository    : SocialAccountRepository,
-    private val userRepository             : UserRepository,
-    private val tenantRepository           : TenantRepository,
-    private val sessionRepository          : SessionRepository,
-    private val tokenPort                  : TokenPort,
-    private val passwordHasher             : PasswordHasher,
-    private val auditLog                   : AuditLogPort,
-    private val providerAdapters           : Map<SocialProvider, SocialProviderPort>
+    private val identityProviderRepository: IdentityProviderRepository,
+    private val socialAccountRepository: SocialAccountRepository,
+    private val userRepository: UserRepository,
+    private val tenantRepository: TenantRepository,
+    private val sessionRepository: SessionRepository,
+    private val tokenPort: TokenPort,
+    private val passwordHasher: PasswordHasher,
+    private val auditLog: AuditLogPort,
+    private val providerAdapters: Map<SocialProvider, SocialProviderPort>,
 ) {
-
     /**
      * Builds the provider authorization URL that the browser should be redirected to.
      */
     fun buildRedirectUrl(
-        tenantSlug : String,
-        provider   : SocialProvider,
-        state      : String,
-        baseUrl    : String
+        tenantSlug: String,
+        provider: SocialProvider,
+        state: String,
+        baseUrl: String,
     ): SocialLoginResult<String> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
 
         val idp = identityProviderRepository.findByTenantAndProvider(tenant.id, provider)
         if (idp == null || !idp.enabled) {
             return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
         }
 
-        val adapter = providerAdapters[provider]
-            ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
+        val adapter =
+            providerAdapters[provider]
+                ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
-        val url = adapter.buildAuthorizationUrl(
-            clientId    = idp.clientId,
-            redirectUri = callbackUri(baseUrl, tenantSlug, provider),
-            state       = state
-        )
+        val url =
+            adapter.buildAuthorizationUrl(
+                clientId = idp.clientId,
+                redirectUri = callbackUri(baseUrl, tenantSlug, provider),
+                state = state,
+            )
         return SocialLoginResult.Success(url)
     }
 
@@ -94,36 +96,39 @@ class SocialLoginService(
      *   Failure           — provider error, tenant not found, user disabled, etc.
      */
     fun handleCallback(
-        tenantSlug : String,
-        provider   : SocialProvider,
-        code       : String,
-        baseUrl    : String,
-        ipAddress  : String? = null,
-        userAgent  : String? = null
+        tenantSlug: String,
+        provider: SocialProvider,
+        code: String,
+        baseUrl: String,
+        ipAddress: String? = null,
+        userAgent: String? = null,
     ): SocialLoginResult<SocialLoginSuccess> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
 
         val idp = identityProviderRepository.findByTenantAndProvider(tenant.id, provider)
         if (idp == null || !idp.enabled) {
             return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
         }
 
-        val adapter = providerAdapters[provider]
-            ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
+        val adapter =
+            providerAdapters[provider]
+                ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
-        val profile = try {
-            adapter.exchangeCodeForProfile(
-                code         = code,
-                redirectUri  = callbackUri(baseUrl, tenantSlug, provider),
-                clientId     = idp.clientId,
-                clientSecret = idp.clientSecret
-            )
-        } catch (e: Exception) {
-            return SocialLoginResult.Failure(
-                SocialLoginError.ProviderError("Failed to exchange authorization code: ${e.message}")
-            )
-        }
+        val profile =
+            try {
+                adapter.exchangeCodeForProfile(
+                    code = code,
+                    redirectUri = callbackUri(baseUrl, tenantSlug, provider),
+                    clientId = idp.clientId,
+                    clientSecret = idp.clientSecret,
+                )
+            } catch (e: Exception) {
+                return SocialLoginResult.Failure(
+                    SocialLoginError.ProviderError("Failed to exchange authorization code: ${e.message}"),
+                )
+            }
 
         if (profile.email.isNullOrBlank()) {
             return SocialLoginResult.Failure(SocialLoginError.EmailNotProvided)
@@ -134,14 +139,16 @@ class SocialLoginService(
 
         if (existingUser == null) {
             // No account linked and no email match — hand off to the registration completion flow.
-            return SocialLoginResult.NeedsRegistration(SocialLoginNeedsRegistration(
-                provider       = provider,
-                providerUserId = profile.providerUserId,
-                email          = profile.email,
-                name           = profile.name,
-                avatarUrl      = profile.avatarUrl,
-                emailVerified  = profile.emailVerified
-            ))
+            return SocialLoginResult.NeedsRegistration(
+                SocialLoginNeedsRegistration(
+                    provider = provider,
+                    providerUserId = profile.providerUserId,
+                    email = profile.email,
+                    name = profile.name,
+                    avatarUrl = profile.avatarUrl,
+                    emailVerified = profile.emailVerified,
+                ),
+            )
         }
 
         return issueTokens(existingUser, tenant, provider, isNewUser = false, ipAddress, userAgent)
@@ -157,19 +164,20 @@ class SocialLoginService(
      *   - race condition: if a link or email match appeared since the callback, reuse that user
      */
     fun completeSocialRegistration(
-        tenantSlug     : String,
-        provider       : SocialProvider,
-        providerUserId : String,
-        email          : String,
-        providerName   : String?,
-        avatarUrl      : String?,
-        emailVerified  : Boolean,
-        chosenUsername : String,
-        ipAddress      : String? = null,
-        userAgent      : String? = null
+        tenantSlug: String,
+        provider: SocialProvider,
+        providerUserId: String,
+        email: String,
+        providerName: String?,
+        avatarUrl: String?,
+        emailVerified: Boolean,
+        chosenUsername: String,
+        ipAddress: String? = null,
+        userAgent: String? = null,
     ): SocialLoginResult<SocialLoginSuccess> {
-        val tenant = tenantRepository.findBySlug(tenantSlug)
-            ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return SocialLoginResult.Failure(SocialLoginError.TenantNotFound)
 
         if (!tenant.registrationEnabled) {
             return SocialLoginResult.Failure(SocialLoginError.RegistrationDisabled)
@@ -178,12 +186,12 @@ class SocialLoginService(
         val username = chosenUsername.trim()
         if (username.length < 3 || username.length > 50) {
             return SocialLoginResult.Failure(
-                SocialLoginError.InvalidUsername("Username must be between 3 and 50 characters.")
+                SocialLoginError.InvalidUsername("Username must be between 3 and 50 characters."),
             )
         }
         if (!username.matches(Regex("^[a-zA-Z0-9_]+$"))) {
             return SocialLoginResult.Failure(
-                SocialLoginError.InvalidUsername("Username may only contain letters, numbers, and underscores.")
+                SocialLoginError.InvalidUsername("Username may only contain letters, numbers, and underscores."),
             )
         }
 
@@ -199,15 +207,17 @@ class SocialLoginService(
         val normalizedEmail = email.trim().lowercase()
         val existingByEmail = userRepository.findByEmail(tenant.id, normalizedEmail)
         if (existingByEmail != null) {
-            socialAccountRepository.save(SocialAccount(
-                userId         = existingByEmail.id!!,
-                tenantId       = tenant.id,
-                provider       = provider,
-                providerUserId = providerUserId,
-                providerEmail  = email,
-                providerName   = providerName,
-                avatarUrl      = avatarUrl
-            ))
+            socialAccountRepository.save(
+                SocialAccount(
+                    userId = existingByEmail.id!!,
+                    tenantId = tenant.id,
+                    provider = provider,
+                    providerUserId = providerUserId,
+                    providerEmail = email,
+                    providerName = providerName,
+                    avatarUrl = avatarUrl,
+                ),
+            )
             return issueTokens(existingByEmail, tenant, provider, isNewUser = false, ipAddress, userAgent)
         }
 
@@ -217,23 +227,28 @@ class SocialLoginService(
 
         // Create the new user — social users get an unusable password hash so they cannot
         // log in via password until they explicitly set one through the self-service portal.
-        val newUser = userRepository.save(User(
-            tenantId      = tenant.id,
-            username      = username,
-            email         = normalizedEmail,
-            fullName      = providerName?.trim()?.ifBlank { null } ?: username,
-            passwordHash  = passwordHasher.hash(generateRandomPassword()),
-            emailVerified = emailVerified
-        ))
-        socialAccountRepository.save(SocialAccount(
-            userId         = newUser.id!!,
-            tenantId       = tenant.id,
-            provider       = provider,
-            providerUserId = providerUserId,
-            providerEmail  = email,
-            providerName   = providerName,
-            avatarUrl      = avatarUrl
-        ))
+        val newUser =
+            userRepository.save(
+                User(
+                    tenantId = tenant.id,
+                    username = username,
+                    email = normalizedEmail,
+                    fullName = providerName?.trim()?.ifBlank { null } ?: username,
+                    passwordHash = passwordHasher.hash(generateRandomPassword()),
+                    emailVerified = emailVerified,
+                ),
+            )
+        socialAccountRepository.save(
+            SocialAccount(
+                userId = newUser.id!!,
+                tenantId = tenant.id,
+                provider = provider,
+                providerUserId = providerUserId,
+                providerEmail = email,
+                providerName = providerName,
+                avatarUrl = avatarUrl,
+            ),
+        )
 
         return issueTokens(newUser, tenant, provider, isNewUser = true, ipAddress, userAgent)
     }
@@ -251,16 +266,17 @@ class SocialLoginService(
      *   else -> return null (caller decides what to do — typically: show registration page).
      */
     private fun findExistingUser(
-        tenantId : Int,
-        provider : SocialProvider,
-        profile  : SocialUserProfile
+        tenantId: Int,
+        provider: SocialProvider,
+        profile: SocialUserProfile,
     ): User? {
         // (a) Known social account link
-        val existing = socialAccountRepository.findByProviderIdentity(
-            tenantId       = tenantId,
-            provider       = provider,
-            providerUserId = profile.providerUserId
-        )
+        val existing =
+            socialAccountRepository.findByProviderIdentity(
+                tenantId = tenantId,
+                provider = provider,
+                providerUserId = profile.providerUserId,
+            )
         if (existing != null) {
             return userRepository.findById(existing.userId)
         }
@@ -269,15 +285,17 @@ class SocialLoginService(
 
         // (b) Email match — auto-link without touching the user's profile
         val existingUser = userRepository.findByEmail(tenantId, email) ?: return null
-        socialAccountRepository.save(SocialAccount(
-            userId         = existingUser.id!!,
-            tenantId       = tenantId,
-            provider       = provider,
-            providerUserId = profile.providerUserId,
-            providerEmail  = profile.email,
-            providerName   = profile.name,
-            avatarUrl      = profile.avatarUrl
-        ))
+        socialAccountRepository.save(
+            SocialAccount(
+                userId = existingUser.id!!,
+                tenantId = tenantId,
+                provider = provider,
+                providerUserId = profile.providerUserId,
+                providerEmail = profile.email,
+                providerName = profile.name,
+                avatarUrl = profile.avatarUrl,
+            ),
+        )
         return existingUser
     }
 
@@ -286,63 +304,73 @@ class SocialLoginService(
      * Shared by both handleCallback() and completeSocialRegistration().
      */
     private fun issueTokens(
-        user      : User,
-        tenant    : Tenant,
-        provider  : SocialProvider,
-        isNewUser : Boolean,
-        ipAddress : String?,
-        userAgent : String?
+        user: User,
+        tenant: Tenant,
+        provider: SocialProvider,
+        isNewUser: Boolean,
+        ipAddress: String?,
+        userAgent: String?,
     ): SocialLoginResult<SocialLoginSuccess> {
         if (!user.enabled) {
-            auditLog.record(AuditEvent(
-                tenantId  = tenant.id,
-                userId    = user.id,
-                clientId  = null,
-                eventType = AuditEventType.LOGIN_FAILED,
-                ipAddress = ipAddress,
-                userAgent = userAgent,
-                details   = mapOf("provider" to provider.value)
-            ))
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("provider" to provider.value),
+                ),
+            )
             return SocialLoginResult.Failure(SocialLoginError.UserDisabled)
         }
 
-        val tokens = tokenPort.issueUserTokens(
-            user   = user,
-            tenant = tenant,
-            client = null,
-            scopes = listOf("openid")
+        val tokens =
+            tokenPort.issueUserTokens(
+                user = user,
+                tenant = tenant,
+                client = null,
+                scopes = listOf("openid"),
+            )
+
+        sessionRepository.save(
+            Session(
+                tenantId = tenant.id,
+                userId = user.id!!,
+                clientId = null,
+                accessTokenHash = sha256(tokens.access_token),
+                refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
+                scopes = "openid",
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                refreshExpiresAt =
+                    tokens.refresh_token?.let {
+                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                    },
+            ),
         )
 
-        sessionRepository.save(Session(
-            tenantId         = tenant.id,
-            userId           = user.id!!,
-            clientId         = null,
-            accessTokenHash  = sha256(tokens.access_token),
-            refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
-            scopes           = "openid",
-            ipAddress        = ipAddress,
-            userAgent        = userAgent,
-            expiresAt        = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-            refreshExpiresAt = tokens.refresh_token?.let {
-                Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-            }
-        ))
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = null,
+                eventType = AuditEventType.LOGIN_SUCCESS,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                details = mapOf("provider" to provider.value, "new_user" to isNewUser.toString()),
+            ),
+        )
 
-        auditLog.record(AuditEvent(
-            tenantId  = tenant.id,
-            userId    = user.id,
-            clientId  = null,
-            eventType = AuditEventType.LOGIN_SUCCESS,
-            ipAddress = ipAddress,
-            userAgent = userAgent,
-            details   = mapOf("provider" to provider.value, "new_user" to isNewUser.toString())
-        ))
-
-        return SocialLoginResult.Success(SocialLoginSuccess(
-            tokens    = tokens,
-            user      = user,
-            isNewUser = isNewUser
-        ))
+        return SocialLoginResult.Success(
+            SocialLoginSuccess(
+                tokens = tokens,
+                user = user,
+                isNewUser = isNewUser,
+            ),
+        )
     }
 
     private fun generateRandomPassword(): String {
@@ -351,8 +379,11 @@ class SocialLoginService(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun callbackUri(baseUrl: String, tenantSlug: String, provider: SocialProvider): String =
-        "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
+    private fun callbackUri(
+        baseUrl: String,
+        tenantSlug: String,
+        provider: SocialProvider,
+    ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
 
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
@@ -365,37 +396,58 @@ class SocialLoginService(
 // ---------------------------------------------------------------------------
 
 data class SocialLoginSuccess(
-    val tokens    : TokenResponse,
-    val user      : User,
-    val isNewUser : Boolean
+    val tokens: TokenResponse,
+    val user: User,
+    val isNewUser: Boolean,
 )
 
 data class SocialLoginNeedsRegistration(
-    val provider       : SocialProvider,
-    val providerUserId : String,
-    val email          : String,
-    val name           : String?,
-    val avatarUrl      : String?,
-    val emailVerified  : Boolean
+    val provider: SocialProvider,
+    val providerUserId: String,
+    val email: String,
+    val name: String?,
+    val avatarUrl: String?,
+    val emailVerified: Boolean,
 )
 
 sealed class SocialLoginResult<out T> {
-    data class  Success<T>(val value: T)                  : SocialLoginResult<T>()
-    data class  Failure(val error: SocialLoginError)      : SocialLoginResult<Nothing>()
-    data class  NeedsRegistration(
-        val data: SocialLoginNeedsRegistration
+    data class Success<T>(
+        val value: T,
+    ) : SocialLoginResult<T>()
+
+    data class Failure(
+        val error: SocialLoginError,
+    ) : SocialLoginResult<Nothing>()
+
+    data class NeedsRegistration(
+        val data: SocialLoginNeedsRegistration,
     ) : SocialLoginResult<Nothing>()
 }
 
 sealed class SocialLoginError {
-    object TenantNotFound        : SocialLoginError()
+    object TenantNotFound : SocialLoginError()
+
     object ProviderNotConfigured : SocialLoginError()
-    object EmailNotProvided      : SocialLoginError()
-    object UserDisabled          : SocialLoginError()
+
+    object EmailNotProvided : SocialLoginError()
+
+    object UserDisabled : SocialLoginError()
+
     object AccountCreationFailed : SocialLoginError()
-    object RegistrationDisabled  : SocialLoginError()
-    object UsernameConflict      : SocialLoginError()
-    data class InvalidUsername(val reason: String) : SocialLoginError()
-    data class ProviderError(val message: String)  : SocialLoginError()
-    data class InternalError(val message: String)  : SocialLoginError()
+
+    object RegistrationDisabled : SocialLoginError()
+
+    object UsernameConflict : SocialLoginError()
+
+    data class InvalidUsername(
+        val reason: String,
+    ) : SocialLoginError()
+
+    data class ProviderError(
+        val message: String,
+    ) : SocialLoginError()
+
+    data class InternalError(
+        val message: String,
+    ) : SocialLoginError()
 }

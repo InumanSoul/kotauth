@@ -18,14 +18,26 @@ interface ApiKeyRepository {
     fun findByTenantId(tenantId: Int): List<ApiKey>
 
     /** Finds a specific key by id, scoped to tenant. */
-    fun findById(id: Int, tenantId: Int): ApiKey?
+    fun findById(
+        id: Int,
+        tenantId: Int,
+    ): ApiKey?
 
     /** Soft-revokes a key (sets enabled = false). */
-    fun revoke(id: Int, tenantId: Int)
+    fun revoke(
+        id: Int,
+        tenantId: Int,
+    )
 
     /** Updates last_used_at. Best-effort — called after successful auth, outside main transaction. */
-    fun touchLastUsed(id: Int, at: Instant)
+    fun touchLastUsed(
+        id: Int,
+        at: Instant,
+    )
 
     /** Hard-deletes a key. Only used for cleanup; prefer revoke for audit trail. */
-    fun delete(id: Int, tenantId: Int)
+    fun delete(
+        id: Int,
+        tenantId: Int,
+    )
 }

@@ -10,8 +10,7 @@ import java.time.Instant
  * Stores one enrollment per userId + a list of recovery codes.
  */
 class FakeMfaRepository : MfaRepository {
-
-    private val enrollments   = mutableMapOf<Int, MfaEnrollment>()   // keyed by userId
+    private val enrollments = mutableMapOf<Int, MfaEnrollment>() // keyed by userId
     private val recoveryCodes = mutableListOf<MfaRecoveryCode>()
     private var nextEnrollmentId = 1
     private var nextCodeId = 1
@@ -23,7 +22,10 @@ class FakeMfaRepository : MfaRepository {
         nextCodeId = 1
     }
 
-    override fun findEnrollmentByUserId(userId: Int, method: String) = enrollments[userId]
+    override fun findEnrollmentByUserId(
+        userId: Int,
+        method: String,
+    ) = enrollments[userId]
 
     override fun findEnrollmentById(id: Int) = enrollments.values.find { it.id == id }
 
@@ -38,7 +40,9 @@ class FakeMfaRepository : MfaRepository {
         return enrollment
     }
 
-    override fun deleteEnrollmentsByUser(userId: Int) { enrollments.remove(userId) }
+    override fun deleteEnrollmentsByUser(userId: Int) {
+        enrollments.remove(userId)
+    }
 
     override fun findUnusedRecoveryCodes(userId: Int) =
         recoveryCodes.filter { it.userId == userId && it.usedAt == null }

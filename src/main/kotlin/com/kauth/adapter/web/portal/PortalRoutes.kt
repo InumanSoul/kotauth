@@ -6,9 +6,8 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
-import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.OAuthResult
-import com.kauth.domain.service.SelfServiceError
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
@@ -20,13 +19,13 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Base64
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.add
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Base64
 
 /**
  * Self-service portal routes — Phase 4 (OAuth-backed login).
@@ -58,16 +57,15 @@ import kotlinx.serialization.json.add
  * if no valid PortalSession cookie is found.
  */
 fun Route.portalRoutes(
-    authService        : AuthService,
-    selfServiceService : UserSelfServiceService,
-    tenantRepository   : TenantRepository,
-    mfaService         : MfaService? = null,
-    userRepository     : UserRepository? = null,
-    oauthService       : OAuthService? = null,   // Phase 4: required for callback exchange
-    baseUrl            : String = ""             // Phase 4: base URL for redirect URI construction
+    authService: AuthService,
+    selfServiceService: UserSelfServiceService,
+    tenantRepository: TenantRepository,
+    mfaService: MfaService? = null,
+    userRepository: UserRepository? = null,
+    oauthService: OAuthService? = null, // Phase 4: required for callback exchange
+    baseUrl: String = "", // Phase 4: base URL for redirect URI construction
 ) {
     route("/t/{slug}/account") {
-
         // ------------------------------------------------------------------
         // Login — redirect to standard OAuth auth endpoint (PKCE)
         // ------------------------------------------------------------------
@@ -79,37 +77,40 @@ fun Route.portalRoutes(
             if (oauthService == null) {
                 // Fallback: show the old login page if OAuth service is not wired
                 val tenant = tenantRepository.findBySlug(slug)!!
-                val error  = call.request.queryParameters["error"]
-                return@get call.respondHtml(HttpStatusCode.OK,
-                    PortalView.loginPage(slug, tenant.displayName, tenant.theme, error))
+                val error = call.request.queryParameters["error"]
+                return@get call.respondHtml(
+                    HttpStatusCode.OK,
+                    PortalView.loginPage(slug, tenant.displayName, tenant.theme, error),
+                )
             }
 
             // Generate PKCE verifier + challenge
-            val verifier  = generatePkceVerifier()
+            val verifier = generatePkceVerifier()
             val challenge = generatePkceChallenge(verifier)
 
             // Store the verifier in a short-lived signed cookie (5 min) to survive
             // the round-trip through the auth server
             val cookieVal = EncryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}")
             call.response.cookies.append(
-                name     = "KOTAUTH_PORTAL_PKCE",
-                value    = cookieVal,
-                maxAge   = 300L,
+                name = "KOTAUTH_PORTAL_PKCE",
+                value = cookieVal,
+                maxAge = 300L,
                 httpOnly = true,
-                path     = "/t/$slug/account"
+                path = "/t/$slug/account",
             )
 
-            val redirectUri  = "$baseUrl/t/$slug/account/callback"
+            val redirectUri = "$baseUrl/t/$slug/account/callback"
             val authEndpoint = "/t/$slug/protocol/openid-connect/auth"
-            val authUrl = buildString {
-                append(authEndpoint)
-                append("?response_type=code")
-                append("&client_id=").append(PortalClientProvisioning.PORTAL_CLIENT_ID)
-                append("&redirect_uri=").append(java.net.URLEncoder.encode(redirectUri, "UTF-8"))
-                append("&scope=openid+profile+email")
-                append("&code_challenge=").append(challenge)
-                append("&code_challenge_method=S256")
-            }
+            val authUrl =
+                buildString {
+                    append(authEndpoint)
+                    append("?response_type=code")
+                    append("&client_id=").append(PortalClientProvisioning.PORTAL_CLIENT_ID)
+                    append("&redirect_uri=").append(java.net.URLEncoder.encode(redirectUri, "UTF-8"))
+                    append("&scope=openid+profile+email")
+                    append("&code_challenge=").append(challenge)
+                    append("&code_challenge_method=S256")
+                }
             call.respondRedirect(authUrl)
         }
 
@@ -119,97 +120,112 @@ fun Route.portalRoutes(
 
         get("/callback") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val code  = call.request.queryParameters["code"]
+            val code = call.request.queryParameters["code"]
             val error = call.request.queryParameters["error"]
 
             if (oauthService == null || code.isNullOrBlank()) {
                 val desc = error ?: "Authentication failed. Please try again."
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam(desc)}")
+                    "/t/$slug/account/login?error=${encodeParam(desc)}",
+                )
             }
 
             // Verify and extract PKCE verifier from signed cookie
             val rawPkce = call.request.cookies["KOTAUTH_PORTAL_PKCE"]
             if (rawPkce.isNullOrBlank()) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Session expired. Please try again.")}")
+                    "/t/$slug/account/login?error=${encodeParam("Session expired. Please try again.")}",
+                )
             }
             val pkcePayload = EncryptionService.verifyCookie(rawPkce)
             if (pkcePayload == null) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Invalid session. Please try again.")}")
+                    "/t/$slug/account/login?error=${encodeParam("Invalid session. Please try again.")}",
+                )
             }
             val pkceParts = pkcePayload.split("|")
             if (pkceParts.size != 3 || pkceParts[1] != slug) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Session mismatch. Please try again.")}")
+                    "/t/$slug/account/login?error=${encodeParam("Session mismatch. Please try again.")}",
+                )
             }
-            val verifier  = pkceParts[0]
+            val verifier = pkceParts[0]
             val timestamp = pkceParts[2].toLongOrNull() ?: 0L
             if (System.currentTimeMillis() - timestamp > 300_000) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Login session expired. Please try again.")}")
+                    "/t/$slug/account/login?error=${encodeParam("Login session expired. Please try again.")}",
+                )
             }
 
             // Clear the PKCE cookie — single-use
             call.response.cookies.append(
-                name = "KOTAUTH_PORTAL_PKCE", value = "", maxAge = 0L,
-                path = "/t/$slug/account", httpOnly = true
+                name = "KOTAUTH_PORTAL_PKCE",
+                value = "",
+                maxAge = 0L,
+                path = "/t/$slug/account",
+                httpOnly = true,
             )
 
-            val redirectUri  = "$baseUrl/t/$slug/account/callback"
-            val ipAddress    = call.request.local.remoteAddress
-            val userAgent    = call.request.headers["User-Agent"]
+            val redirectUri = "$baseUrl/t/$slug/account/callback"
+            val ipAddress = call.request.local.remoteAddress
+            val userAgent = call.request.headers["User-Agent"]
 
-            val tokenResult = oauthService.exchangeAuthorizationCode(
-                tenantSlug   = slug,
-                code         = code,
-                clientId     = PortalClientProvisioning.PORTAL_CLIENT_ID,
-                redirectUri  = redirectUri,
-                codeVerifier = verifier,
-                clientSecret = null,   // PUBLIC client — no secret
-                ipAddress    = ipAddress,
-                userAgent    = userAgent
-            )
+            val tokenResult =
+                oauthService.exchangeAuthorizationCode(
+                    tenantSlug = slug,
+                    code = code,
+                    clientId = PortalClientProvisioning.PORTAL_CLIENT_ID,
+                    redirectUri = redirectUri,
+                    codeVerifier = verifier,
+                    clientSecret = null, // PUBLIC client — no secret
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                )
 
             if (tokenResult is OAuthResult.Failure) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Login failed: ${tokenResult.error}")}")
+                    "/t/$slug/account/login?error=${encodeParam("Login failed: ${tokenResult.error}")}",
+                )
             }
 
             // Decode userId and username from the access token payload (base64 JWT claim)
             val accessToken = (tokenResult as OAuthResult.Success).value.access_token
             val claims = decodeJwtPayload(accessToken)
-            val userId   = claims["sub"]?.toIntOrNull()
+            val userId = claims["sub"]?.toIntOrNull()
             val username = claims["preferred_username"] ?: ""
             val tenantObj = tenantRepository.findBySlug(slug)
 
             if (userId == null || tenantObj == null) {
                 return@get call.respondRedirect(
-                    "/t/$slug/account/login?error=${encodeParam("Could not establish portal session.")}")
+                    "/t/$slug/account/login?error=${encodeParam("Could not establish portal session.")}",
+                )
             }
 
-            call.sessions.set(PortalSession(
-                userId     = userId,
-                tenantId   = tenantObj.id,
-                tenantSlug = slug,
-                username   = username
-            ))
+            call.sessions.set(
+                PortalSession(
+                    userId = userId,
+                    tenantId = tenantObj.id,
+                    tenantSlug = slug,
+                    username = username,
+                ),
+            )
 
             // If the tenant requires MFA but this user hasn't enrolled yet, redirect
             // directly to the MFA setup page with a prominent notice instead of landing
             // on the profile page. The standard login flow normally blocks these users
             // outright, but for portal logins we bypass that gate (in AuthRoutes) and
             // handle it here as a softer, guided redirect.
-            val mfaSetupNeeded = mfaService != null &&
-                tenantObj.mfaPolicy != "optional" &&
-                !mfaService.shouldChallengeMfa(userId)
+            val mfaSetupNeeded =
+                mfaService != null &&
+                    tenantObj.mfaPolicy != "optional" &&
+                    !mfaService.shouldChallengeMfa(userId)
 
             if (mfaSetupNeeded) {
-                val notice = encodeParam(
-                    "⚠\uFE0F Multi-factor authentication is required for your account. " +
-                    "Please set up an authenticator app below to keep your account secure."
-                )
+                val notice =
+                    encodeParam(
+                        "⚠\uFE0F Multi-factor authentication is required for your account. " +
+                            "Please set up an authenticator app below to keep your account secure.",
+                    )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
             } else {
                 call.respondRedirect("/t/$slug/account/profile")
@@ -237,33 +253,37 @@ fun Route.portalRoutes(
         // ------------------------------------------------------------------
 
         get("/profile") {
-            val slug    = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
-            val tenant  = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val user    = selfServiceService.getActiveSessions(session.userId, session.tenantId)
-                .let { null } // just to get user — fetch below
-            val userObj = run {
-                // We need the user — fetch active sessions gives us sessions, not user.
-                // Delegate to the port directly via selfServiceService's session list.
-                // Actually: the service doesn't expose a getUser. We route back through sessions.
-                // Simplest: read user from sessions (already authenticated).
-                // For now pull sessions to confirm we're still live, then we just need the user object.
-                // We use the user retrieved at login — stored in session.
-                session
-            }
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val user =
+                selfServiceService
+                    .getActiveSessions(session.userId, session.tenantId)
+                    .let { null } // just to get user — fetch below
+            val userObj =
+                run {
+                    // We need the user — fetch active sessions gives us sessions, not user.
+                    // Delegate to the port directly via selfServiceService's session list.
+                    // Actually: the service doesn't expose a getUser. We route back through sessions.
+                    // Simplest: read user from sessions (already authenticated).
+                    // For now pull sessions to confirm we're still live, then we just need the user object.
+                    // We use the user retrieved at login — stored in session.
+                    session
+                }
             val successMsg = call.request.queryParameters["saved"]
-            val errorMsg   = call.request.queryParameters["error"]
+            val errorMsg = call.request.queryParameters["error"]
 
-            call.respondHtml(HttpStatusCode.OK,
-                PortalView.profilePage(slug, session, tenant.theme, tenant.displayName, successMsg, errorMsg)
+            call.respondHtml(
+                HttpStatusCode.OK,
+                PortalView.profilePage(slug, session, tenant.theme, tenant.displayName, successMsg, errorMsg),
             )
         }
 
         post("/profile") {
-            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
-            val params  = call.receiveParameters()
-            val email    = params["email"]?.trim() ?: ""
+            val params = call.receiveParameters()
+            val email = params["email"]?.trim() ?: ""
             val fullName = params["full_name"]?.trim() ?: ""
 
             when (val result = selfServiceService.updateProfile(session.userId, session.tenantId, email, fullName)) {
@@ -279,31 +299,51 @@ fun Route.portalRoutes(
         // ------------------------------------------------------------------
 
         get("/security") {
-            val slug    = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
-            val tenant  = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
             val sessions = selfServiceService.getActiveSessions(session.userId, session.tenantId)
             val successMsg = call.request.queryParameters["saved"]
-            val errorMsg   = call.request.queryParameters["error"]
+            val errorMsg = call.request.queryParameters["error"]
 
-            call.respondHtml(HttpStatusCode.OK,
-                PortalView.securityPage(slug, session, tenant.theme, tenant.displayName, sessions, successMsg, errorMsg)
+            call.respondHtml(
+                HttpStatusCode.OK,
+                PortalView.securityPage(
+                    slug,
+                    session,
+                    tenant.theme,
+                    tenant.displayName,
+                    sessions,
+                    successMsg,
+                    errorMsg,
+                ),
             )
         }
 
         post("/change-password") {
-            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
-            val params  = call.receiveParameters()
+            val params = call.receiveParameters()
             val current = params["current_password"] ?: ""
-            val newPw   = params["new_password"] ?: ""
+            val newPw = params["new_password"] ?: ""
             val confirm = params["confirm_password"] ?: ""
 
-            when (val result = selfServiceService.changePassword(session.userId, session.tenantId, current, newPw, confirm)) {
+            when (
+                val result =
+                    selfServiceService.changePassword(
+                        session.userId,
+                        session.tenantId,
+                        current,
+                        newPw,
+                        confirm,
+                    )
+            ) {
                 is SelfServiceResult.Success -> {
                     // All sessions revoked — clear portal cookie, redirect to login
                     call.sessions.clear<PortalSession>()
-                    call.respondRedirect("/t/$slug/account/login?error=${encodeParam("Password changed. Please log in again.")}")
+                    call.respondRedirect(
+                        "/t/$slug/account/login?error=${encodeParam("Password changed. Please log in again.")}",
+                    )
                 }
                 is SelfServiceResult.Failure ->
                     call.respondRedirect("/t/$slug/account/security?error=${encodeParam(result.error.message)}")
@@ -311,10 +351,11 @@ fun Route.portalRoutes(
         }
 
         post("/sessions/{sessionId}/revoke") {
-            val slug      = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val session   = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
-            val sessionId = call.parameters["sessionId"]?.toIntOrNull()
-                ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val sessionId =
+                call.parameters["sessionId"]?.toIntOrNull()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest)
 
             selfServiceService.revokeSession(session.userId, session.tenantId, sessionId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
@@ -325,27 +366,27 @@ fun Route.portalRoutes(
         // ------------------------------------------------------------------
 
         get("/mfa") {
-            val slug       = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val session    = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
-            val tenant     = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
             val mfaEnabled = mfaService?.shouldChallengeMfa(session.userId) ?: false
             val successMsg = call.request.queryParameters["success"]
-            val errorMsg   = call.request.queryParameters["error"]
+            val errorMsg = call.request.queryParameters["error"]
             // notice = shown when the user was redirected here because MFA setup is required
-            val noticeMsg  = call.request.queryParameters["notice"]
+            val noticeMsg = call.request.queryParameters["notice"]
 
             call.respondHtml(
                 HttpStatusCode.OK,
                 PortalView.mfaPage(
-                    slug          = slug,
-                    session       = session,
-                    theme         = tenant.theme,
+                    slug = slug,
+                    session = session,
+                    theme = tenant.theme,
                     workspaceName = tenant.displayName,
-                    mfaEnabled    = mfaEnabled,
-                    successMsg    = successMsg,
-                    errorMsg      = errorMsg,
-                    noticeMsg     = noticeMsg
-                )
+                    mfaEnabled = mfaEnabled,
+                    successMsg = successMsg,
+                    errorMsg = errorMsg,
+                    noticeMsg = noticeMsg,
+                ),
             )
         }
 
@@ -355,47 +396,64 @@ fun Route.portalRoutes(
 
         // POST /t/{slug}/account/mfa/enroll — start TOTP enrollment
         post("/mfa/enroll") {
-            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session =
+                call.portalSession(slug)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
             if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
 
             val tenant = tenantRepository.findById(session.tenantId)
             val issuer = tenant?.displayName ?: "KotAuth"
 
             when (val result = mfaService.beginEnrollment(session.userId, session.tenantId, issuer)) {
-                is MfaResult.Success -> call.respond(buildJsonObject {
-                    put("totp_uri", result.value.totpUri)
-                    putJsonArray("recovery_codes") {
-                        result.value.recoveryCodes.forEach { add(it) }
-                    }
-                })
-                is MfaResult.Failure -> call.respond(HttpStatusCode.Conflict, buildJsonObject {
-                    put("error", result.error.toCode())
-                })
+                is MfaResult.Success ->
+                    call.respond(
+                        buildJsonObject {
+                            put("totp_uri", result.value.totpUri)
+                            putJsonArray("recovery_codes") {
+                                result.value.recoveryCodes.forEach { add(it) }
+                            }
+                        },
+                    )
+                is MfaResult.Failure ->
+                    call.respond(
+                        HttpStatusCode.Conflict,
+                        buildJsonObject {
+                            put("error", result.error.toCode())
+                        },
+                    )
             }
         }
 
         // POST /t/{slug}/account/mfa/verify — confirm enrollment with TOTP code
         post("/mfa/verify") {
-            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session =
+                call.portalSession(slug)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
             if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
 
             val params = call.receiveParameters()
-            val code   = params["code"]?.trim() ?: ""
+            val code = params["code"]?.trim() ?: ""
 
             when (val result = mfaService.verifyEnrollment(session.userId, code)) {
                 is MfaResult.Success -> call.respond(mapOf("status" to "verified"))
-                is MfaResult.Failure -> call.respond(HttpStatusCode.BadRequest, mapOf(
-                    "error" to result.error.toCode()
-                ))
+                is MfaResult.Failure ->
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to result.error.toCode(),
+                        ),
+                    )
             }
         }
 
         // POST /t/{slug}/account/mfa/disable — remove MFA enrollment
         post("/mfa/disable") {
-            val slug    = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val session = call.portalSession(slug) ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session =
+                call.portalSession(slug)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
             if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
 
             mfaService.disableMfa(session.userId, session.tenantId)
@@ -404,17 +462,17 @@ fun Route.portalRoutes(
     }
 }
 
-private fun MfaError.toCode(): String = when (this) {
-    is MfaError.UserNotFound        -> "user_not_found"
-    is MfaError.TenantNotFound      -> "tenant_not_found"
-    is MfaError.AlreadyEnrolled     -> "already_enrolled"
-    is MfaError.NotEnrolled         -> "not_enrolled"
-    is MfaError.InvalidCode         -> "invalid_code"
-    is MfaError.NoRecoveryCodesLeft -> "no_recovery_codes"
-}
+private fun MfaError.toCode(): String =
+    when (this) {
+        is MfaError.UserNotFound -> "user_not_found"
+        is MfaError.TenantNotFound -> "tenant_not_found"
+        is MfaError.AlreadyEnrolled -> "already_enrolled"
+        is MfaError.NotEnrolled -> "not_enrolled"
+        is MfaError.InvalidCode -> "invalid_code"
+        is MfaError.NoRecoveryCodesLeft -> "no_recovery_codes"
+    }
 
-private fun encodeParam(value: String) =
-    java.net.URLEncoder.encode(value, "UTF-8")
+private fun encodeParam(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
 
 // ============================================================================
 // PKCE helpers — RFC 7636
@@ -456,15 +514,19 @@ private fun decodeJwtPayload(jwt: String): Map<String, String> {
     return try {
         val parts = jwt.split(".")
         if (parts.size < 2) return emptyMap()
-        val payload = String(Base64.getUrlDecoder().decode(
-            // JWT base64url payload may omit padding
-            parts[1].padEnd((parts[1].length + 3) / 4 * 4, '=')
-        ), Charsets.UTF_8)
+        val payload =
+            String(
+                Base64.getUrlDecoder().decode(
+                    // JWT base64url payload may omit padding
+                    parts[1].padEnd((parts[1].length + 3) / 4 * 4, '='),
+                ),
+                Charsets.UTF_8,
+            )
         // Minimal JSON parsing — extract "key":"value" and "key":number pairs
         val result = mutableMapOf<String, String>()
         val pattern = Regex("\"(\\w+)\"\\s*:\\s*(?:\"([^\"]*)\"|(\\d+))")
         pattern.findAll(payload).forEach { match ->
-            val key   = match.groupValues[1]
+            val key = match.groupValues[1]
             val value = match.groupValues[2].ifEmpty { match.groupValues[3] }
             if (value.isNotEmpty()) result[key] = value
         }

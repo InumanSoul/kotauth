@@ -21,5 +21,5 @@ data class TenantKey(
     val algorithm: String = "RS256",
     val publicKeyPem: String,
     val privateKeyPem: String,
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
 )

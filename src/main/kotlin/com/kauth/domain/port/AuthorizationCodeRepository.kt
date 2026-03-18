@@ -15,5 +15,8 @@ interface AuthorizationCodeRepository {
     fun findByCode(code: String): AuthorizationCode?
 
     /** Marks a code as consumed (used_at = now). Must be called exactly once per code. */
-    fun markUsed(code: String, usedAt: Instant = Instant.now())
+    fun markUsed(
+        code: String,
+        usedAt: Instant = Instant.now(),
+    )
 }

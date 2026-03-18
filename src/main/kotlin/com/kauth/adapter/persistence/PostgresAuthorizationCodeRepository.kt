@@ -12,35 +12,41 @@ import java.time.ZoneOffset
  * Persistence adapter for OAuth2 authorization codes.
  */
 class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
+    override fun save(code: AuthorizationCode): AuthorizationCode =
+        transaction {
+            val insertedId =
+                AuthorizationCodesTable.insert {
+                    it[AuthorizationCodesTable.code] = code.code
+                    it[tenantId] = code.tenantId
+                    it[clientId] = code.clientId
+                    it[userId] = code.userId
+                    it[redirectUri] = code.redirectUri
+                    it[scopes] = code.scopes
+                    it[codeChallenge] = code.codeChallenge
+                    it[codeChallengeMethod] = code.codeChallengeMethod
+                    it[nonce] = code.nonce
+                    it[state] = code.state
+                    it[expiresAt] = code.expiresAt.toOffsetDateTime()
+                    it[usedAt] = code.usedAt?.toOffsetDateTime()
+                    it[createdAt] = code.createdAt.toOffsetDateTime()
+                } get AuthorizationCodesTable.id
 
-    override fun save(code: AuthorizationCode): AuthorizationCode = transaction {
-        val insertedId = AuthorizationCodesTable.insert {
-            it[AuthorizationCodesTable.code]                = code.code
-            it[tenantId]              = code.tenantId
-            it[clientId]              = code.clientId
-            it[userId]                = code.userId
-            it[redirectUri]           = code.redirectUri
-            it[scopes]                = code.scopes
-            it[codeChallenge]         = code.codeChallenge
-            it[codeChallengeMethod]   = code.codeChallengeMethod
-            it[nonce]                 = code.nonce
-            it[state]                 = code.state
-            it[expiresAt]             = code.expiresAt.toOffsetDateTime()
-            it[usedAt]                = code.usedAt?.toOffsetDateTime()
-            it[createdAt]             = code.createdAt.toOffsetDateTime()
-        } get AuthorizationCodesTable.id
+            code.copy(id = insertedId)
+        }
 
-        code.copy(id = insertedId)
-    }
+    override fun findByCode(code: String): AuthorizationCode? =
+        transaction {
+            AuthorizationCodesTable
+                .selectAll()
+                .where { AuthorizationCodesTable.code eq code }
+                .map { it.toAuthCode() }
+                .singleOrNull()
+        }
 
-    override fun findByCode(code: String): AuthorizationCode? = transaction {
-        AuthorizationCodesTable.selectAll()
-            .where { AuthorizationCodesTable.code eq code }
-            .map { it.toAuthCode() }
-            .singleOrNull()
-    }
-
-    override fun markUsed(code: String, usedAt: Instant) = transaction {
+    override fun markUsed(
+        code: String,
+        usedAt: Instant,
+    ) = transaction {
         AuthorizationCodesTable.update({ AuthorizationCodesTable.code eq code }) {
             it[AuthorizationCodesTable.usedAt] = usedAt.toOffsetDateTime()
         }
@@ -51,23 +57,23 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
     // Mappers
     // -------------------------------------------------------------------------
 
-    private fun ResultRow.toAuthCode() = AuthorizationCode(
-        id                    = this[AuthorizationCodesTable.id],
-        code                  = this[AuthorizationCodesTable.code],
-        tenantId              = this[AuthorizationCodesTable.tenantId],
-        clientId              = this[AuthorizationCodesTable.clientId],
-        userId                = this[AuthorizationCodesTable.userId],
-        redirectUri           = this[AuthorizationCodesTable.redirectUri],
-        scopes                = this[AuthorizationCodesTable.scopes],
-        codeChallenge         = this[AuthorizationCodesTable.codeChallenge],
-        codeChallengeMethod   = this[AuthorizationCodesTable.codeChallengeMethod],
-        nonce                 = this[AuthorizationCodesTable.nonce],
-        state                 = this[AuthorizationCodesTable.state],
-        expiresAt             = this[AuthorizationCodesTable.expiresAt].toInstant(),
-        usedAt                = this[AuthorizationCodesTable.usedAt]?.toInstant(),
-        createdAt             = this[AuthorizationCodesTable.createdAt].toInstant()
-    )
+    private fun ResultRow.toAuthCode() =
+        AuthorizationCode(
+            id = this[AuthorizationCodesTable.id],
+            code = this[AuthorizationCodesTable.code],
+            tenantId = this[AuthorizationCodesTable.tenantId],
+            clientId = this[AuthorizationCodesTable.clientId],
+            userId = this[AuthorizationCodesTable.userId],
+            redirectUri = this[AuthorizationCodesTable.redirectUri],
+            scopes = this[AuthorizationCodesTable.scopes],
+            codeChallenge = this[AuthorizationCodesTable.codeChallenge],
+            codeChallengeMethod = this[AuthorizationCodesTable.codeChallengeMethod],
+            nonce = this[AuthorizationCodesTable.nonce],
+            state = this[AuthorizationCodesTable.state],
+            expiresAt = this[AuthorizationCodesTable.expiresAt].toInstant(),
+            usedAt = this[AuthorizationCodesTable.usedAt]?.toInstant(),
+            createdAt = this[AuthorizationCodesTable.createdAt].toInstant(),
+        )
 
-    private fun Instant.toOffsetDateTime(): OffsetDateTime =
-        OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
+    private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
 }

@@ -40,9 +40,8 @@ import java.util.UUID
  */
 class JwtTokenAdapter(
     private val baseUrl: String,
-    private val tenantKeyRepository: TenantKeyRepository
+    private val tenantKeyRepository: TenantKeyRepository,
 ) : TokenPort {
-
     private val log = LoggerFactory.getLogger(javaClass)
     private val algorithmCache = mutableMapOf<Int, Pair<Algorithm, RSAPublicKey>>()
 
@@ -56,34 +55,38 @@ class JwtTokenAdapter(
         client: Application?,
         scopes: List<String>,
         nonce: String?,
-        roles: List<Role>
+        roles: List<Role>,
     ): TokenResponse {
         val (algorithm, _) = getOrCreateAlgorithm(tenant.id)
-        val issuer    = issuerFor(tenant)
-        val audience  = client?.clientId ?: tenant.slug
-        val subject   = user.id.toString()
-        val expiryMs  = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
+        val issuer = issuerFor(tenant)
+        val audience = client?.clientId ?: tenant.slug
+        val subject = user.id.toString()
+        val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)
 
         // Phase 3c: build role claim maps
         val tenantRoles = roles.filter { it.scope == RoleScope.TENANT }.map { it.name }
-        val clientRolesMap = roles.filter { it.scope == RoleScope.CLIENT }
-            .groupBy { it.clientId }
+        val clientRolesMap =
+            roles
+                .filter { it.scope == RoleScope.CLIENT }
+                .groupBy { it.clientId }
 
-        val accessTokenBuilder = JWT.create()
-            .withIssuer(issuer)
-            .withAudience(audience)
-            .withSubject(subject)
-            .withClaim("tenant_id", tenant.id)
-            .withClaim("username", user.username)
-            .withClaim("email", user.email)
-            .withClaim("email_verified", user.emailVerified)
-            .withClaim("name", user.fullName)
-            .withClaim("preferred_username", user.username)
-            .withClaim("scope", scopes.joinToString(" "))
-            .withIssuedAt(Date())
-            .withExpiresAt(expiresAt)
-            .withJWTId(UUID.randomUUID().toString())
+        val accessTokenBuilder =
+            JWT
+                .create()
+                .withIssuer(issuer)
+                .withAudience(audience)
+                .withSubject(subject)
+                .withClaim("tenant_id", tenant.id)
+                .withClaim("username", user.username)
+                .withClaim("email", user.email)
+                .withClaim("email_verified", user.emailVerified)
+                .withClaim("name", user.fullName)
+                .withClaim("preferred_username", user.username)
+                .withClaim("scope", scopes.joinToString(" "))
+                .withIssuedAt(Date())
+                .withExpiresAt(expiresAt)
+                .withJWTId(UUID.randomUUID().toString())
 
         // Embed realm_access (tenant-scoped roles)
         if (tenantRoles.isNotEmpty()) {
@@ -102,11 +105,12 @@ class JwtTokenAdapter(
                 // Prefer the string clientId from the Application domain object.
                 // Falls back to the integer-as-string only if the role belongs to a different
                 // client than the one being issued tokens for (edge case in multi-app tenants).
-                val stringClientId = if (client != null && client.id == appClientIdInt) {
-                    client.clientId
-                } else {
-                    appClientIdInt.toString()
-                }
+                val stringClientId =
+                    if (client != null && client.id == appClientIdInt) {
+                        client.clientId
+                    } else {
+                        appClientIdInt.toString()
+                    }
                 val roleNames = clientRoles.map { it.name }
                 resourceAccess[stringClientId] = mapOf("roles" to roleNames)
             }
@@ -117,32 +121,36 @@ class JwtTokenAdapter(
 
         val accessToken = accessTokenBuilder.sign(algorithm)
 
-        val idToken = if ("openid" in scopes) {
-            JWT.create()
-                .withIssuer(issuer)
-                .withAudience(audience)
-                .withSubject(subject)
-                .withClaim("email", user.email)
-                .withClaim("email_verified", user.emailVerified)
-                .withClaim("name", user.fullName)
-                .withClaim("preferred_username", user.username)
-                .apply { if (nonce != null) withClaim("nonce", nonce) }
-                .withIssuedAt(Date())
-                .withExpiresAt(expiresAt)
-                .sign(algorithm)
-        } else null
+        val idToken =
+            if ("openid" in scopes) {
+                JWT
+                    .create()
+                    .withIssuer(issuer)
+                    .withAudience(audience)
+                    .withSubject(subject)
+                    .withClaim("email", user.email)
+                    .withClaim("email_verified", user.emailVerified)
+                    .withClaim("name", user.fullName)
+                    .withClaim("preferred_username", user.username)
+                    .apply { if (nonce != null) withClaim("nonce", nonce) }
+                    .withIssuedAt(Date())
+                    .withExpiresAt(expiresAt)
+                    .sign(algorithm)
+            } else {
+                null
+            }
 
         val refreshToken = generateRefreshToken()
         val refreshExpirySeconds = tenant.refreshTokenExpirySeconds
 
         return TokenResponse(
-            access_token       = accessToken,
-            token_type         = "Bearer",
-            expires_in         = expiryMs / 1_000L,
-            refresh_token      = refreshToken,
+            access_token = accessToken,
+            token_type = "Bearer",
+            expires_in = expiryMs / 1_000L,
+            refresh_token = refreshToken,
             refresh_expires_in = refreshExpirySeconds,
-            id_token           = idToken,
-            scope              = scopes.joinToString(" ")
+            id_token = idToken,
+            scope = scopes.joinToString(" "),
         )
     }
 
@@ -153,16 +161,17 @@ class JwtTokenAdapter(
     override fun issueClientCredentialsToken(
         tenant: Tenant,
         client: Application,
-        scopes: List<String>
+        scopes: List<String>,
     ): String {
         val (algorithm, _) = getOrCreateAlgorithm(tenant.id)
-        val issuer    = issuerFor(tenant)
-        val expiryMs  = (client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
+        val issuer = issuerFor(tenant)
+        val expiryMs = (client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
 
-        return JWT.create()
+        return JWT
+            .create()
             .withIssuer(issuer)
             .withAudience(client.clientId)
-            .withSubject(client.clientId)         // sub = client_id for M2M
+            .withSubject(client.clientId) // sub = client_id for M2M
             .withClaim("tenant_id", tenant.id)
             .withClaim("client_id", client.clientId)
             .withClaim("scope", scopes.joinToString(" "))
@@ -188,34 +197,40 @@ class JwtTokenAdapter(
             val scopeStr = verified.getClaim("scope").asString() ?: ""
 
             // Phase 3c: decode role claims
-            val realmRoles = try {
-                val realmAccess = verified.getClaim("realm_access").asMap()
-                @Suppress("UNCHECKED_CAST")
-                (realmAccess?.get("roles") as? List<String>) ?: emptyList()
-            } catch (_: Exception) { emptyList() }
+            val realmRoles =
+                try {
+                    val realmAccess = verified.getClaim("realm_access").asMap()
+                    @Suppress("UNCHECKED_CAST")
+                    (realmAccess?.get("roles") as? List<String>) ?: emptyList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
 
-            val resourceRoles = try {
-                val resourceAccess = verified.getClaim("resource_access").asMap()
-                resourceAccess?.mapValues { (_, v) ->
-                    @Suppress("UNCHECKED_CAST")
-                    val inner = v as? Map<String, Any>
-                    @Suppress("UNCHECKED_CAST")
-                    (inner?.get("roles") as? List<String>) ?: emptyList()
-                } ?: emptyMap()
-            } catch (_: Exception) { emptyMap() }
+            val resourceRoles =
+                try {
+                    val resourceAccess = verified.getClaim("resource_access").asMap()
+                    resourceAccess?.mapValues { (_, v) ->
+                        @Suppress("UNCHECKED_CAST")
+                        val inner = v as? Map<String, Any>
+                        @Suppress("UNCHECKED_CAST")
+                        (inner?.get("roles") as? List<String>) ?: emptyList()
+                    } ?: emptyMap()
+                } catch (_: Exception) {
+                    emptyMap()
+                }
 
             AccessTokenClaims(
-                sub            = verified.subject ?: "",
-                iss            = verified.issuer ?: "",
-                aud            = verified.audience?.firstOrNull() ?: "",
-                tenantId       = tenantId,
-                username       = verified.getClaim("username").asString(),
-                email          = verified.getClaim("email").asString(),
-                scopes         = scopeStr.split(" ").filter { it.isNotBlank() },
-                issuedAt       = verified.issuedAtAsInstant?.epochSecond ?: 0L,
-                expiresAt      = verified.expiresAtAsInstant?.epochSecond ?: 0L,
-                realmRoles     = realmRoles,
-                resourceRoles  = resourceRoles
+                sub = verified.subject ?: "",
+                iss = verified.issuer ?: "",
+                aud = verified.audience?.firstOrNull() ?: "",
+                tenantId = tenantId,
+                username = verified.getClaim("username").asString(),
+                email = verified.getClaim("email").asString(),
+                scopes = scopeStr.split(" ").filter { it.isNotBlank() },
+                issuedAt = verified.issuedAtAsInstant?.epochSecond ?: 0L,
+                expiresAt = verified.expiresAtAsInstant?.epochSecond ?: 0L,
+                realmRoles = realmRoles,
+                resourceRoles = resourceRoles,
             )
         } catch (e: Exception) {
             log.debug("Token decode failed: ${e.message}")
@@ -227,12 +242,11 @@ class JwtTokenAdapter(
     // TokenPort — JWKS
     // -------------------------------------------------------------------------
 
-    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> {
-        return tenantKeyRepository.findEnabledKeys(tenantId).map { key ->
+    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> =
+        tenantKeyRepository.findEnabledKeys(tenantId).map { key ->
             val publicKey = KeyGenerator.decodePublicKey(key.publicKeyPem)
             buildJwk(key.keyId, publicKey)
         }
-    }
 
     // -------------------------------------------------------------------------
     // Internal helpers
@@ -241,37 +255,44 @@ class JwtTokenAdapter(
     private fun getOrCreateAlgorithm(tenantId: Int): Pair<Algorithm, RSAPublicKey> {
         algorithmCache[tenantId]?.let { return it }
 
-        val key = tenantKeyRepository.findActiveKey(tenantId)
-            ?: run {
-                log.warn("No active key found for tenant $tenantId — key generation should happen at startup via KeyProvisioningService")
-                throw IllegalStateException("No signing key available for tenant $tenantId")
-            }
+        val key =
+            tenantKeyRepository.findActiveKey(tenantId)
+                ?: run {
+                    log.warn(
+                        "No active key found for tenant $tenantId — key generation should happen at startup via KeyProvisioningService",
+                    )
+                    throw IllegalStateException("No signing key available for tenant $tenantId")
+                }
 
-        val publicKey  = KeyGenerator.decodePublicKey(key.publicKeyPem)
+        val publicKey = KeyGenerator.decodePublicKey(key.publicKeyPem)
         val privateKey = KeyGenerator.decodePrivateKey(key.privateKeyPem)
-        val algorithm  = Algorithm.RSA256(publicKey, privateKey)
+        val algorithm = Algorithm.RSA256(publicKey, privateKey)
 
         algorithmCache[tenantId] = algorithm to publicKey
         return algorithm to publicKey
     }
 
-    private fun buildJwk(keyId: String, publicKey: RSAPublicKey): Map<String, Any> {
+    private fun buildJwk(
+        keyId: String,
+        publicKey: RSAPublicKey,
+    ): Map<String, Any> {
         val encoder = Base64.getUrlEncoder().withoutPadding()
         return mapOf(
             "kty" to "RSA",
             "use" to "sig",
             "alg" to "RS256",
             "kid" to keyId,
-            "n"   to encoder.encodeToString(publicKey.modulus.toByteArrayUnsigned()),
-            "e"   to encoder.encodeToString(publicKey.publicExponent.toByteArrayUnsigned())
+            "n" to encoder.encodeToString(publicKey.modulus.toByteArrayUnsigned()),
+            "e" to encoder.encodeToString(publicKey.publicExponent.toByteArrayUnsigned()),
         )
     }
 
-    private fun issuerFor(tenant: Tenant): String =
-        tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
+    private fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
 
     private fun generateRefreshToken(): String =
-        Base64.getUrlEncoder().withoutPadding()
+        Base64
+            .getUrlEncoder()
+            .withoutPadding()
             .encodeToString(java.security.SecureRandom().generateSeed(32))
 
     private fun BigInteger.toByteArrayUnsigned(): ByteArray {

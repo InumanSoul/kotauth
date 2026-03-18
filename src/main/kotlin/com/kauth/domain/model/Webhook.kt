@@ -18,15 +18,15 @@ import java.time.Instant
  * An empty set means the endpoint receives nothing.
  */
 data class WebhookEndpoint(
-    val id          : Int?    = null,
-    val tenantId    : Int,
-    val url         : String,
+    val id: Int? = null,
+    val tenantId: Int,
+    val url: String,
     /** HMAC-SHA256 signing key — returned once at creation, never shown again in the UI. */
-    val secret      : String,
-    val events      : Set<String>,
-    val description : String  = "",
-    val enabled     : Boolean = true,
-    val createdAt   : Instant = Instant.now()
+    val secret: String,
+    val events: Set<String>,
+    val description: String = "",
+    val enabled: Boolean = true,
+    val createdAt: Instant = Instant.now(),
 )
 
 /**
@@ -36,24 +36,27 @@ data class WebhookEndpoint(
  * or [WebhookDeliveryStatus.FAILED] after exhausting retries.
  */
 data class WebhookDelivery(
-    val id             : Int?                   = null,
-    val endpointId     : Int,
+    val id: Int? = null,
+    val endpointId: Int,
     /** Webhook event name, e.g. "user.created". */
-    val eventType      : String,
+    val eventType: String,
     /** Raw JSON string of the payload that was (or will be) sent. */
-    val payload        : String,
-    val status         : WebhookDeliveryStatus  = WebhookDeliveryStatus.PENDING,
-    val attempts       : Int                    = 0,
-    val lastAttemptAt  : Instant?               = null,
+    val payload: String,
+    val status: WebhookDeliveryStatus = WebhookDeliveryStatus.PENDING,
+    val attempts: Int = 0,
+    val lastAttemptAt: Instant? = null,
     /** HTTP status code returned by the receiver, or null if no response was received. */
-    val responseStatus : Int?                   = null,
-    val createdAt      : Instant                = Instant.now()
+    val responseStatus: Int? = null,
+    val createdAt: Instant = Instant.now(),
 )
 
-enum class WebhookDeliveryStatus(val value: String) {
+enum class WebhookDeliveryStatus(
+    val value: String,
+) {
     PENDING("pending"),
     DELIVERED("delivered"),
-    FAILED("failed");
+    FAILED("failed"),
+    ;
 
     companion object {
         fun fromValue(v: String): WebhookDeliveryStatus =
@@ -71,20 +74,24 @@ enum class WebhookDeliveryStatus(val value: String) {
  * are a public contract with integrators.
  */
 object WebhookEvent {
-    const val USER_CREATED     = "user.created"
-    const val USER_UPDATED     = "user.updated"
-    const val USER_DELETED     = "user.deleted"
-    const val LOGIN_SUCCESS    = "login.success"
-    const val LOGIN_FAILED     = "login.failed"
-    const val PASSWORD_RESET   = "password.reset"
-    const val MFA_ENROLLED     = "mfa.enrolled"
-    const val SESSION_REVOKED  = "session.revoked"
+    const val USER_CREATED = "user.created"
+    const val USER_UPDATED = "user.updated"
+    const val USER_DELETED = "user.deleted"
+    const val LOGIN_SUCCESS = "login.success"
+    const val LOGIN_FAILED = "login.failed"
+    const val PASSWORD_RESET = "password.reset"
+    const val MFA_ENROLLED = "mfa.enrolled"
+    const val SESSION_REVOKED = "session.revoked"
 
-    val ALL = listOf(
-        USER_CREATED, USER_UPDATED, USER_DELETED,
-        LOGIN_SUCCESS, LOGIN_FAILED,
-        PASSWORD_RESET,
-        MFA_ENROLLED,
-        SESSION_REVOKED
-    )
+    val ALL =
+        listOf(
+            USER_CREATED,
+            USER_UPDATED,
+            USER_DELETED,
+            LOGIN_SUCCESS,
+            LOGIN_FAILED,
+            PASSWORD_RESET,
+            MFA_ENROLLED,
+            SESSION_REVOKED,
+        )
 }

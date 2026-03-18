@@ -11,18 +11,20 @@ import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
  * Exposed is used purely for querying, not schema management.
  */
 object UsersTable : Table("users") {
-    val id                    = integer("id").autoIncrement()
-    val tenantId              = integer("tenant_id") references TenantsTable.id
-    val username              = varchar("username", 50)
-    val email                 = varchar("email", 255)
-    val passwordHash          = varchar("password_hash", 128)
-    val fullName              = varchar("full_name", 100)
-    val emailVerified         = bool("email_verified").default(false)
-    val enabled               = bool("enabled").default(true)
+    val id = integer("id").autoIncrement()
+    val tenantId = integer("tenant_id") references TenantsTable.id
+    val username = varchar("username", 50)
+    val email = varchar("email", 255)
+    val passwordHash = varchar("password_hash", 128)
+    val fullName = varchar("full_name", 100)
+    val emailVerified = bool("email_verified").default(false)
+    val enabled = bool("enabled").default(true)
+
     // Phase 3b: set on every password change; used to revoke sessions
-    val lastPasswordChangeAt  = timestampWithTimeZone("last_password_change_at").nullable()
+    val lastPasswordChangeAt = timestampWithTimeZone("last_password_change_at").nullable()
+
     // Phase 3c: MFA — set to true when user has a verified TOTP enrollment
-    val mfaEnabled            = bool("mfa_enabled").default(false)
+    val mfaEnabled = bool("mfa_enabled").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }
