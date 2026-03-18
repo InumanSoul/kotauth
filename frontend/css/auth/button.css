@@ -1,0 +1,28 @@
+/* frontend/css/auth/button.css
+ *
+ * Primary action button for auth pages.
+ * Always full-width inside the card, uses the tenant accent color.
+ * Hover uses --color-accent-hover injected by TenantTheme.toCssVars().
+ */
+
+.btn {
+  width: 100%;
+  padding: 0.85rem;
+  background: var(--color-accent);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  color: #05080a;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 0.5rem;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn:hover  { background: var(--color-accent-hover); }
+.btn:active { transform: scale(0.98); }

@@ -1,0 +1,31 @@
+/* frontend/css/index-auth.css
+ *
+ * Auth pages bundle entry point.
+ * LightningCSS resolves all @import statements into a single
+ * minified file: src/main/resources/static/kotauth-auth.css
+ *
+ * IMPORTANT — no tokens.css import.
+ * All CSS custom property values (--color-bg, --color-accent, --radius, etc.)
+ * are injected at runtime by TenantTheme.toCssVars() as an inline <style> block
+ * in the page <head>, BEFORE this stylesheet is linked. The cascade resolves
+ * naturally because this file never redefines those properties.
+ *
+ * This is intentional: auth pages are fully tenant-customizable (white-label),
+ * while the admin console uses fixed hardcoded defaults from tokens.css.
+ *
+ * Import order: base reset → auth shell → brand → card → form → button → alert → social → misc
+ * No rules live here — this file is imports only.
+ */
+
+/* ── Base reset (no tokens — theme is injected by server) ────────────────── */
+@import "./base/reset.css";
+
+/* ── Auth layout and components ──────────────────────────────────────────── */
+@import "./auth/shell.css";
+@import "./auth/brand.css";
+@import "./auth/card.css";
+@import "./auth/form.css";
+@import "./auth/button.css";
+@import "./auth/alert.css";
+@import "./auth/social.css";
+@import "./auth/misc.css";

@@ -1,0 +1,36 @@
+/* frontend/css/index-admin.css
+ *
+ * Admin console bundle entry point.
+ * LightningCSS resolves all @import statements into a single
+ * minified file: src/main/resources/static/kotauth-admin.css
+ *
+ * Import order: base → layout → components → admin pages
+ * No rules live here — this file is imports only.
+ */
+
+/* ── Base layer ──────────────────────────────────────────────────────────── */
+@import "./base/tokens.css";
+@import "./base/reset.css";
+@import "./base/typography.css";
+
+/* ── Layout layer ────────────────────────────────────────────────────────── */
+@import "./layout/shell.css";
+@import "./layout/topbar.css";
+@import "./layout/rail.css";
+@import "./layout/sidebar.css";
+@import "./layout/content.css";
+
+/* ── Components ──────────────────────────────────────────────────────────── */
+@import "./components/button.css";
+@import "./components/badge.css";
+@import "./components/alert.css";
+@import "./components/card.css";
+@import "./components/form.css";
+@import "./components/stat-card.css";
+@import "./components/table.css";
+@import "./components/empty-state.css";
+@import "./components/ov-card.css";
+
+/* ── Admin-specific pages ────────────────────────────────────────────────── */
+@import "./admin/login.css";
+@import "./admin/form-card.css";

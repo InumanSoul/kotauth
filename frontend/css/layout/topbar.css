@@ -1,0 +1,279 @@
+/* frontend/css/layout/topbar.css
+ *
+ * Shell topbar — 56px fixed-height bar at the top of the admin console.
+ * Contains: workspace switcher (left), search (center), actions + avatar (right).
+ */
+
+/* ── Topbar bar ──────────────────────────────────────────────────────────── */
+
+.shell-topbar {
+  height: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  background: var(--color-bg);
+  border-bottom: var(--border-md);
+  z-index: 100;
+  position: relative;
+}
+
+/* ── Workspace switcher dropdown ─────────────────────────────────────────── */
+
+/* <details> wrapper — position:relative anchors the dropdown menu below it */
+.ws-dropdown {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Hide the native <details> marker across all browsers */
+.ws-dropdown summary             { list-style: none; }
+.ws-dropdown summary::-webkit-details-marker { display: none; }
+
+/* Visible trigger button */
+.ws-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.ws-switcher:hover,
+.ws-dropdown[open] .ws-switcher {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-border-md);
+}
+
+/* Workspace monogram badge */
+.ws-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* Workspace name + label stack */
+.ws-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  line-height: 1;
+}
+
+.ws-name  { font-size: 0.82rem; font-weight: 600; color: var(--color-text); }
+.ws-label { font-size: 0.65rem; color: var(--color-muted); font-family: var(--font-mono); }
+
+/* Animated chevron */
+.ws-chevron-icon {
+  width: 13px;
+  height: 13px;
+  position: relative;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.ws-chevron-icon::before,
+.ws-chevron-icon::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 1.5px;
+  background: var(--color-muted);
+  border-radius: 2px;
+  transition: transform 0.2s ease, background 0.15s;
+}
+
+.ws-chevron-icon::before { left: 2px;  transform: translateY(-50%) rotate(45deg); }
+.ws-chevron-icon::after  { right: 2px; transform: translateY(-50%) rotate(-45deg); }
+
+.ws-dropdown[open] .ws-chevron-icon::before { transform: translateY(-50%) rotate(-45deg); }
+.ws-dropdown[open] .ws-chevron-icon::after  { transform: translateY(-50%) rotate(45deg); }
+
+.ws-dropdown[open] .ws-chevron-icon::before,
+.ws-dropdown[open] .ws-chevron-icon::after  { background: var(--color-accent); }
+
+/* Dropdown panel */
+.ws-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  background: var(--color-card);
+  border: var(--border-md);
+  border-radius: var(--radius-xl);
+  padding: 6px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  animation: dropdown-in 0.15s ease;
+  transform-origin: top left;
+}
+
+@keyframes dropdown-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.ws-dropdown-empty {
+  display: block;
+  padding: 10px 12px;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.ws-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.1s;
+  text-decoration: none;
+}
+
+.ws-dropdown-item:hover { background: rgba(255, 255, 255, 0.07); text-decoration: none; }
+
+.ws-dropdown-item.active {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+.ws-dropdown-item-badge {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.ws-dropdown-item.active .ws-dropdown-item-badge {
+  background: rgba(31, 188, 255, 0.2);
+  border-color: var(--color-accent);
+}
+
+.ws-dropdown-item-name  { flex: 1; }
+
+.ws-dropdown-item-check {
+  font-size: 0.72rem;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.ws-dropdown-divider {
+  height: 1px;
+  background: var(--color-border-md);
+  margin: 6px 4px;
+}
+
+/* ── Search ──────────────────────────────────────────────────────────────── */
+
+.topbar-search-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.topbar-search {
+  width: 100%;
+  max-width: 360px;
+  height: 34px;
+  padding: 0 12px 0 34px;
+  background: rgba(255, 255, 255, 0.05);
+  border: var(--border-md);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b6b75' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 11px center;
+  font-family: inherit;
+}
+
+.topbar-search:focus {
+  border-color: var(--color-accent-border);
+  background-color: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
+}
+
+/* ── Right side: new workspace button + avatar ───────────────────────────── */
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Profile avatar */
+.topbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.06);
+  border: var(--border-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s;
+  user-select: none;
+}
+
+.topbar-avatar:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* Logout button — icon-only, red on hover */
+.logout-form { display: inline-flex; align-items: center; margin: 0; padding: 0; }
+
+.btn-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+  font-family: inherit;
+}
+
+.btn-logout:hover {
+  background: var(--color-red-bg);
+  border-color: var(--color-red-border);
+  color: var(--color-red);
+}

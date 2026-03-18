@@ -44,10 +44,6 @@ import java.time.format.DateTimeFormatter
  *   Application = internal Client  (what authenticates against a workspace)
  */
 object AdminView {
-    // -------------------------------------------------------------------------
-    // Shared <head> builder
-    // -------------------------------------------------------------------------
-
     private fun HEAD.adminHead(
         pageTitle: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
@@ -699,19 +695,14 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +workspace.displayName }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             span("td-code") { +workspace.slug }
                             if (workspace.isMaster) {
-                                span("badge badge-blue") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Master"
-                                }
+                                span("badge badge-blue badge--inline") { +"Master" }
                             }
                         }
                     }
-                    div {
-                        style = "display:flex; gap:0.5rem; align-items:center;"
+                    div("btn-group") {
                         a(
                             href = "/admin/workspaces/${workspace.slug}/applications/new",
                             classes = "btn btn-sm",
@@ -737,7 +728,6 @@ object AdminView {
                 div("card card-body") {
                     style = "max-width:480px;"
                     table {
-                        style = "width:100%;"
                         tbody {
                             detailRow("Slug", workspace.slug)
                             detailRow("Display Name", workspace.displayName)
@@ -757,13 +747,9 @@ object AdminView {
                 }
 
                 // Applications section
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Applications"
-                        }
+                        p("page-title page-title--sm") { +"Applications" }
                         p("page-subtitle") { +"OAuth2 / OIDC clients registered in this workspace" }
                     }
                 }
@@ -993,18 +979,11 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +application.name }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             span("td-code") { +application.clientId }
-                            span("badge badge-outline") {
-                                style = "margin-left:0.5rem; vertical-align:middle;"
-                                +application.accessType.label
-                            }
+                            span("badge badge-outline badge--inline") { +application.accessType.label }
                             if (!application.enabled) {
-                                span("badge badge-red") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Disabled"
-                                }
+                                span("badge badge-red badge--inline") { +"Disabled" }
                             }
                         }
                     }
@@ -1013,7 +992,6 @@ object AdminView {
                 div("card card-body") {
                     style = "max-width:540px;"
                     table {
-                        style = "width:100%;"
                         tbody {
                             detailRow("Client ID", application.clientId)
                             detailRow("Name", application.name)
@@ -1027,35 +1005,23 @@ object AdminView {
 
                 // New secret banner — shown once after regeneration
                 if (newSecret != null) {
-                    div("alert alert-info") {
-                        style = "margin-top:1.5rem; max-width:640px;"
-                        p {
-                            style = "font-weight:600; margin-bottom:0.35rem;"
-                            +"New Client Secret (copy now — shown once)"
-                        }
-                        p {
-                            span("td-code") {
-                                style = "font-size:0.9rem; word-break:break-all;"
-                                +newSecret
-                            }
-                        }
+                    div("alert alert-info alert--constrained") {
+                        style = "margin-top:1.5rem;"
+                        p("alert__title") { +"New Client Secret (copy now — shown once)" }
+                        div("secret-box") { +newSecret }
                     }
                 }
 
                 // Redirect URIs
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Redirect URIs"
-                        }
+                        p("page-title page-title--sm") { +"Redirect URIs" }
                     }
                 }
                 div("card card-body") {
                     if (application.redirectUris.isEmpty()) {
                         p {
-                            style = "color:var(--muted); font-size:0.85rem;"
+                            style = "color:var(--color-muted); font-size:0.85rem;"
                             +"No redirect URIs configured."
                         }
                     } else {
@@ -1066,8 +1032,8 @@ object AdminView {
                 }
 
                 // Actions
-                div {
-                    style = "display:flex; gap:0.75rem; margin-top:2rem; flex-wrap:wrap;"
+                div("btn-group") {
+                    style = "margin-top:2rem;"
                     a(
                         href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
                         classes = "btn btn-sm",
@@ -1102,7 +1068,7 @@ object AdminView {
     ) {
         tr {
             td {
-                style = "color:var(--muted); width:200px; font-size:0.78rem;"
+                style = "color:var(--color-muted); width:200px; font-size:0.78rem;"
                 +label
             }
             td {
@@ -1136,8 +1102,8 @@ object AdminView {
                         p("page-subtitle") { +"An unexpected error occurred processing your request." }
                     }
                 }
-                div("alert alert-error") {
-                    style = "max-width:640px; margin-top:1.5rem;"
+                div("alert alert-error alert--constrained") {
+                    style = "margin-top:1.5rem;"
                     if (exceptionType != null) {
                         p {
                             style = "font-size:0.75rem; opacity:0.65; margin-bottom:0.35rem;"
@@ -1192,14 +1158,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1378,14 +1342,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Security policy saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1577,8 +1539,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1828,8 +1789,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1934,23 +1894,18 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +user.username }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             if (user.enabled) {
                                 span("badge badge-green") { +"Active" }
                             } else {
                                 span("badge badge-red") { +"Disabled" }
                             }
                             if (!user.emailVerified) {
-                                span("badge badge-outline") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Email unverified"
-                                }
+                                span("badge badge-outline badge--inline") { +"Email unverified" }
                             }
                         }
                     }
-                    div {
-                        style = "display:flex; gap:0.5rem; flex-wrap:wrap;"
+                    div("btn-group") {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id}/toggle",
                             method = FormMethod.post,
@@ -1985,14 +1940,12 @@ object AdminView {
                 }
 
                 if (successMessage != null) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +successMessage
                     }
                 }
                 if (editError != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +editError
                     }
                 }
@@ -2042,13 +1995,9 @@ object AdminView {
                 }
 
                 // Active sessions table
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Active Sessions"
-                        }
+                        p("page-title page-title--sm") { +"Active Sessions" }
                         p("page-subtitle") { +"${sessions.size} active session${if (sessions.size != 1) "s" else ""}" }
                     }
                 }
@@ -2092,16 +2041,10 @@ object AdminView {
                 }
 
                 // Phase 3c: Password reset via email — sends a self-service reset link
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Password Reset"
-                        }
-                        p(
-                            "page-subtitle",
-                        ) { +"Send a password reset email to the user. They will set their own new password." }
+                        p("page-title page-title--sm") { +"Password Reset" }
+                        p("page-subtitle") { +"Send a password reset email to the user. They will set their own new password." }
                     }
                 }
                 div("form-card") {
@@ -2112,7 +2055,7 @@ object AdminView {
                             method = FormMethod.post,
                         ) {
                             p {
-                                style = "color:var(--text-muted);font-size:0.875rem;margin-bottom:1rem;"
+                                style = "color:var(--color-muted);font-size:0.875rem;margin-bottom:1rem;"
                                 +"A password reset link will be sent to "
                                 strong { +user.email }
                                 +". The link expires in 1 hour."
@@ -2123,7 +2066,7 @@ object AdminView {
                         }
                     } else {
                         p {
-                            style = "color:var(--text-muted);font-size:0.875rem;"
+                            style = "color:var(--color-muted);font-size:0.875rem;"
                             +"SMTP is not configured for this workspace. "
                             a(href = "/admin/workspaces/${workspace.slug}/settings") { +"Configure SMTP" }
                             +" to enable email-based password resets."
@@ -2324,15 +2267,13 @@ object AdminView {
                 // Pagination
                 if (totalPages > 1) {
                     div("pagination") {
-                        style = "margin-top:1rem; display:flex; gap:0.5rem; align-items:center;"
                         val baseUrl =
                             "/admin/workspaces/${workspace.slug}/logs" +
                                 (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
                         if (page > 1) {
                             a("${baseUrl}page=${page - 1}", classes = "btn btn-ghost btn-sm") { +"← Prev" }
                         }
-                        span {
-                            style = "font-size:0.85rem; color:var(--muted);"
+                        span("pagination-label") {
                             +"Page $page of $totalPages"
                         }
                         if (page < totalPages) {
@@ -2389,14 +2330,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"SMTP settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -2652,8 +2591,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -2793,8 +2731,7 @@ object AdminView {
                 }
 
                 // Edit name/description
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:1.5rem;"
+                div("form-card form-card--wide card--spaced") {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/edit",
                         encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -2831,12 +2768,10 @@ object AdminView {
                 }
 
                 // Composite children
-                div("card") {
-                    style = "margin-bottom:1.5rem;"
+                div("card card--spaced") {
                     p("form-section-title") { +"Composite Children" }
                     if (role.childRoleIds.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No child roles."
                         }
                     } else {
@@ -2879,9 +2814,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/children",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "childRoleId"
                                 availableChildren.forEach { r ->
@@ -2902,9 +2836,8 @@ object AdminView {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/assign-user",
                         method = FormMethod.post,
-                        classes = "inline-form",
+                        classes = "card-add-row",
                     ) {
-                        style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                         select {
                             name = "userId"
                             allUsers.forEach { u ->
@@ -3046,8 +2979,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -3163,8 +3095,7 @@ object AdminView {
                 }
 
                 // Edit name/description
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:1.5rem;"
+                div("form-card form-card--wide card--spaced") {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/edit",
                         encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -3200,12 +3131,10 @@ object AdminView {
                 }
 
                 // Assigned roles
-                div("card") {
-                    style = "margin-bottom:1.5rem;"
+                div("card card--spaced") {
                     p("form-section-title") { +"Assigned Roles" }
                     if (group.roleIds.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No roles assigned."
                         }
                     } else {
@@ -3249,9 +3178,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/assign-role",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "roleId"
                                 availableRoles.forEach { r ->
@@ -3270,8 +3198,7 @@ object AdminView {
                 div("card") {
                     p("form-section-title") { +"Members (${members.size})" }
                     if (members.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No members."
                         }
                     } else {
@@ -3315,9 +3242,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/add-member",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "userId"
                                 nonMembers.forEach { u ->
@@ -3370,8 +3296,8 @@ object AdminView {
                 }
 
                 // Stats
-                div("card") {
-                    style = "margin-bottom:1.5rem; padding:1.25rem;"
+                div("card card--spaced") {
+                    style = "padding:1.25rem;"
                     div {
                         style = "display:flex; gap:2rem;"
                         div {
@@ -3402,8 +3328,7 @@ object AdminView {
                     }
                 }
 
-                div("form-card") {
-                    style = "max-width:640px;"
+                div("form-card form-card--wide") {
                     p("form-section-title") { +"Configuration" }
                     p("td-muted") {
                         style = "padding:0 0.75rem 1rem;"
@@ -3484,14 +3409,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Identity provider settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -3503,16 +3426,15 @@ object AdminView {
                     val isConfigured = existing != null
                     val isEditing = editProvider == prov
 
-                    div("form-card") {
-                        style = "max-width:640px; margin-bottom:1.5rem;"
-                        div {
+                    div("form-card form-card--wide card--spaced") {
+                            div {
                             style = "display:flex; align-items:center; gap:1rem; margin-bottom:1rem;"
                             p("form-section-title") {
                                 style = "margin:0;"
                                 +prov.displayName
                             }
                             if (isConfigured) {
-                                val enabledBadge = if (existing!!.enabled) "badge-success" else "badge-neutral"
+                                val enabledBadge = if (existing!!.enabled) "badge-green" else "badge-neutral"
                                 val enabledText = if (existing.enabled) "Enabled" else "Disabled"
                                 span("badge $enabledBadge") { +enabledText }
                             } else {
@@ -3677,15 +3599,8 @@ object AdminView {
             if (newKeyRaw != null) {
                 div("alert alert-success") {
                     style = "max-width:720px; margin-bottom:1.5rem;"
-                    p {
-                        style = "font-weight:600; margin-bottom:0.5rem;"
-                        +"API key created — copy it now. You will not see it again."
-                    }
-                    div {
-                        style =
-                            "font-family:monospace; background:var(--color-bg-secondary); padding:0.75rem 1rem; border-radius:6px; word-break:break-all; font-size:0.875rem;"
-                        +newKeyRaw
-                    }
+                    p("alert__title") { +"API key created — copy it now. You will not see it again." }
+                    div("secret-box") { +newKeyRaw }
                 }
             }
 
@@ -3723,7 +3638,7 @@ object AdminView {
                                     td { span("td-code") { +key.name } }
                                     td { span("td-code") { +"${key.keyPrefix}…" } }
                                     td {
-                                        style = "font-size:0.78rem; color:var(--color-text-muted);"
+                                        style = "font-size:0.78rem; color:var(--color-muted);"
                                         +key.scopes.joinToString(", ")
                                     }
                                     td {
@@ -3792,8 +3707,7 @@ object AdminView {
             }
 
             // Create new key form
-            div("form-card") {
-                style = "max-width:640px;"
+            div("form-card form-card--wide") {
                 p("form-section-title") { +"Create New API Key" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/settings/api-keys",
@@ -3848,7 +3762,7 @@ object AdminView {
                         p("field-hint") { +"Leave blank for keys that never expire." }
                     }
                     div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-primary") { +"Create API Key" }
+                        button(type = ButtonType.submit, classes = "btn") { +"Create API Key" }
                     }
                 }
             }
@@ -3902,17 +3816,10 @@ object AdminView {
                 if (newSecret != null) {
                     div("alert alert-success") {
                         style = "max-width:720px; margin-bottom:1.5rem;"
+                        p("alert__title") { +"Webhook created — copy the signing secret now. You will not see it again." }
+                        div("secret-box") { +newSecret }
                         p {
-                            style = "font-weight:600; margin-bottom:0.5rem;"
-                            +"Webhook created — copy the signing secret now. You will not see it again."
-                        }
-                        div {
-                            style =
-                                "font-family:monospace; background:var(--color-bg-secondary); padding:0.75rem 1rem; border-radius:6px; word-break:break-all; font-size:0.875rem;"
-                            +newSecret
-                        }
-                        p {
-                            style = "margin-top:0.5rem; font-size:0.8rem; color:var(--color-text-muted);"
+                            style = "margin-top:0.5rem; font-size:0.8rem; color:var(--color-muted);"
                             +"Verify incoming payloads: "
                             code { +"X-KotAuth-Signature: sha256=HMAC-SHA256(secret, body)" }
                         }
@@ -3958,7 +3865,7 @@ object AdminView {
                                             span("td-muted") { +(ep.description.ifBlank { "—" }) }
                                         }
                                         td {
-                                            style = "font-size:0.78rem; color:var(--color-text-muted); max-width:200px;"
+                                            style = "font-size:0.78rem; color:var(--color-muted); max-width:200px;"
                                             +(
                                                 ep.events
                                                     .sorted()
@@ -3979,8 +3886,7 @@ object AdminView {
                                                     .format(ep.createdAt)
                                             }
                                         }
-                                        td {
-                                            style = "display:flex; gap:0.5rem; align-items:center;"
+                                        td("btn-group") {
                                             // Toggle enable/disable
                                             form(
                                                 action = "/admin/workspaces/${workspace.slug}/settings/webhooks/${ep.id}/toggle",
@@ -4018,8 +3924,8 @@ object AdminView {
                 }
 
                 // ─── Create endpoint form ──────────────────────────────────────
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:2rem;"
+                div("form-card form-card--wide") {
+                    style = "margin-bottom:2rem;"
                     p("form-section-title") { +"Add Webhook Endpoint" }
                     form(
                         action = "/admin/workspaces/${workspace.slug}/settings/webhooks",
@@ -4075,7 +3981,7 @@ object AdminView {
                             }
                         }
                         div("form-actions") {
-                            button(type = ButtonType.submit, classes = "btn btn-primary") { +"Add Endpoint" }
+                            button(type = ButtonType.submit, classes = "btn") { +"Add Endpoint" }
                         }
                     }
                 }

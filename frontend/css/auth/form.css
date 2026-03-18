@@ -1,0 +1,37 @@
+/* frontend/css/auth/form.css
+ *
+ * Form elements for auth pages (login, register, reset password, etc.).
+ * Sizing and spacing are tuned for the centered auth card layout,
+ * which is larger and more readable than the compact admin console forms.
+ *
+ * Border radius uses calc(var(--radius) - 2px) to be slightly tighter
+ * than the card container, maintaining visual hierarchy.
+ */
+
+.field { margin-bottom: 1rem; }
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--color-input);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+input:focus       { border-color: var(--color-accent); }
+input::placeholder { color: var(--color-muted); }

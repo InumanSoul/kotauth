@@ -1,0 +1,46 @@
+/* frontend/css/components/alert.css
+ *
+ * Inline feedback banners for the admin console.
+ * Functional colors (error, success, warning) are intentionally hardcoded —
+ * these must remain legible regardless of tenant theme.
+ *
+ * Base: .alert
+ * Modifiers: .alert-error  .alert-success  .alert-warn
+ */
+
+.alert {
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  margin-bottom: 1.25rem;
+  border: 1px solid;
+}
+
+.alert-error   { background: var(--color-red-bg);   border-color: var(--color-red-border);   color: var(--color-red); }
+.alert-success { background: var(--color-green-bg); border-color: var(--color-green-border); color: var(--color-green); }
+.alert-warn    { background: var(--color-amber-bg); border-color: var(--color-amber-border); color: var(--color-amber); }
+.alert-info    { background: var(--color-accent-bg); border-color: var(--color-accent-border); color: var(--color-accent); }
+
+/* ── Alert sub-elements ──────────────────────────────────────────────────── */
+
+/* Bold heading line inside an alert banner */
+.alert__title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+/* Constrained width — keeps alert banners aligned with form-card content
+ * on settings / edit pages where the surrounding content area is wide. */
+.alert--constrained { max-width: 640px; }
+
+/* Monospace reveal box for one-time secrets / API keys.
+ * Always sits inside an .alert-success banner. */
+.secret-box {
+  font-family: var(--font-mono);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  word-break: break-all;
+  font-size: 0.875rem;
+  margin-top: 0.4rem;
+}

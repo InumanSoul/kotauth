@@ -1,0 +1,118 @@
+/* frontend/css/layout/sidebar.css
+ *
+ * Context panel — 220px contextual sidebar, right of the rail.
+ * Shows workspace-scoped navigation (app list, section links, etc.).
+ * Has a custom scrollbar to avoid layout jumps.
+ */
+
+.ctx-panel {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--color-card);
+  border-right: var(--border-md);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar — subtle, matches the dark surface */
+.ctx-panel::-webkit-scrollbar         { width: 4px; }
+.ctx-panel::-webkit-scrollbar-track   { background: transparent; }
+.ctx-panel::-webkit-scrollbar-thumb   { background: rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); }
+
+/* Nav container */
+.ctx-nav {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2);
+  gap: 2px;
+  flex: 1;
+}
+
+/* Section header label */
+.ctx-section-title {
+  padding: 10px 8px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Nav link */
+.ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: background 0.1s, color 0.1s;
+  border: 1px solid transparent;
+}
+
+.ctx-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; text-decoration: none; }
+
+.ctx-item.active {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+.ctx-item-label { flex: 1; }
+
+/* Active indicator dot */
+.ctx-item-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* ── Empty state inside the context panel ────────────────────────────────── */
+
+.ctx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 28px 14px;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.ctx-empty-icon {
+  font-size: 1.5rem;
+  opacity: 0.25;
+  line-height: 1;
+}
+
+.ctx-empty-text {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.ctx-empty-action {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--color-accent);
+  opacity: 0.8;
+  padding: 4px 10px;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-1);
+  transition: opacity 0.15s, background 0.15s;
+  text-decoration: none;
+}
+
+.ctx-empty-action:hover { opacity: 1; background: var(--color-accent-bg); text-decoration: none; }

@@ -1,0 +1,36 @@
+/* frontend/css/auth/brand.css
+ *
+ * Tenant brand header displayed above the auth card.
+ * Logo image and name are configured per-tenant via TenantTheme.
+ *
+ * .brand          — container, centered
+ * .brand-logo     — optional tenant logo image
+ * .brand-name     — tenant name text (shown when no logo)
+ * .brand-tagline  — optional secondary line below the name
+ */
+
+.brand {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.brand-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.brand-logo {
+  max-height: 48px;
+  max-width: 180px;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
+}
+
+.brand-tagline {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}

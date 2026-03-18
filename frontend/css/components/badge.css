@@ -1,0 +1,73 @@
+/* frontend/css/components/badge.css
+ *
+ * Status and type badges — small labelling chips.
+ *
+ * Base: .badge
+ * Color modifiers (semantic):
+ *   .badge-green / .badge-active   — success / enabled
+ *   .badge-red   / .badge-error    — danger / error
+ *   .badge-blue  / .badge-pending  — info / pending
+ *   .badge-outline / .badge-disabled / .badge-neutral — muted / disabled
+ *
+ * BEM element: .badge__dot — a 5px filled circle, inherits currentColor.
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid;
+}
+
+/* Dot indicator used inside status badges */
+.badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+/* ── Color variants ───────────────────────────────────────────────────────── */
+
+.badge-green,
+.badge-active {
+  background: var(--color-green-bg);
+  color: var(--color-green);
+  border-color: var(--color-green-border);
+}
+
+.badge-red,
+.badge-error {
+  background: var(--color-red-bg);
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+}
+
+.badge-blue,
+.badge-pending {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+.badge-outline,
+.badge-disabled,
+.badge-neutral {
+  background: transparent;
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
+}
+
+/* Inline placement — adds left gap and aligns vertically when a badge
+ * appears alongside monospace text or a code span on the same line */
+.badge--inline {
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}

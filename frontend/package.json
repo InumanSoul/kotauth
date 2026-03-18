@@ -1,0 +1,15 @@
+{
+  "name": "kotauth-frontend",
+  "version": "1.0.0",
+  "description": "CSS build tooling for KotAuth. Not a Node.js app — only used at build time.",
+  "private": true,
+  "scripts": {
+    "build:admin": "lightningcss --bundle --minify --targets '>= 0.5%' css/index-admin.css -o ../src/main/resources/static/kotauth-admin.css",
+    "build:auth":  "lightningcss --bundle --minify --targets '>= 0.5%' css/index-auth.css  -o ../src/main/resources/static/kotauth-auth.css",
+    "build":       "npm run build:admin && npm run build:auth",
+    "watch":       "find css -name '*.css' | entr sh -c 'npm run build'"
+  },
+  "devDependencies": {
+    "lightningcss-cli": "1.32.0"
+  }
+}

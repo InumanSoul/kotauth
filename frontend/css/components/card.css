@@ -1,0 +1,45 @@
+/* frontend/css/components/card.css
+ *
+ * Generic card container used in admin content pages.
+ * Not used in auth pages — auth has its own auth/card.css with
+ * different max-width and shadow values.
+ *
+ * .card          — surface container
+ * .card-body     — padded inner area
+ * .card-title    — card heading
+ * .card-subtitle — secondary descriptor below the title
+ */
+
+.card {
+  background: var(--color-card);
+  border: var(--border-md);
+  border-radius: var(--radius-lg);
+}
+
+.card-body     { padding: 1.25rem 1.5rem; }
+.card-title    { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.2rem; }
+.card-subtitle { font-size: 0.78rem; color: var(--color-muted); margin-bottom: 1.5rem; }
+
+/* Tables inside .card-body always fill the available width */
+.card-body table { width: 100%; }
+
+/* Spaced variant — adds bottom margin when multiple cards are stacked
+ * vertically on the same page (role detail, workspace detail, etc.) */
+.card--spaced { margin-bottom: 1.5rem; }
+
+/* Empty-message — inline "no items" notice sitting inside a .card-body
+ * before a table renders. Muted, padded, smaller text. */
+.card-empty-msg {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  padding: 0.75rem;
+}
+
+/* Add-row — the inline assign/add form sitting at the bottom of a card
+ * (add child role, assign role, add member, etc.) */
+.card-add-row {
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -1,0 +1,86 @@
+/* frontend/css/layout/rail.css
+ *
+ * Icon navigation rail — 80px wide, left edge of the shell body.
+ * Contains: brand mark (top), nav items (middle), spacer, bottom slot.
+ */
+
+.rail {
+  width: 80px;
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border-right: var(--border-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Brand monogram at the top of the rail */
+.rail-brand {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.rail-brand:hover { text-decoration: none; }
+
+/* Nav item list */
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Individual nav item */
+.rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 64px;
+  padding: var(--space-2) var(--space-1);
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+
+.rail-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.rail-item.active {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+}
+
+/* Icon wrapper */
+.rail-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rail-icon svg { width: 20px; height: 20px; }
+
+/* Label below the icon */
+.rail-item-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* Pushes bottom-slot items to the foot of the rail */
+.rail-spacer { flex: 1; }
