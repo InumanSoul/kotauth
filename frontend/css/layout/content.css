@@ -1,0 +1,97 @@
+/* frontend/css/layout/content.css
+ *
+ * Main content area — fills the remaining horizontal space after rail + sidebar.
+ * Contains: .main wrapper, .content scrollable area, page header, breadcrumb.
+ */
+
+/* Main column wrapper */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Scrollable content area */
+.content {
+  padding: var(--space-6);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.content::-webkit-scrollbar         { width: 5px; }
+.content::-webkit-scrollbar-track   { background: transparent; }
+.content::-webkit-scrollbar-thumb   { background: rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); }
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.page-title       { font-size: 1.15rem; font-weight: 600; }
+.page-title--sm   { font-size: 1rem; }
+.page-subtitle    { font-size: 0.76rem; color: var(--color-muted); margin-top: 0.2rem; }
+
+/* Sub-section header — adds top breathing room when a second .page-header
+ * appears lower on the same page (e.g. Applications list under Workspace detail) */
+.page-header--section { margin-top: 2rem; }
+
+/* Badge / meta row sitting directly beneath a page title */
+.page-meta { margin-top: 2px; }
+
+/* ── Breadcrumb ──────────────────────────────────────────────────────────── */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-bottom: 1.25rem;
+}
+
+.breadcrumb a         { color: var(--color-muted); }
+.breadcrumb a:hover   { color: var(--color-text); text-decoration: none; }
+.breadcrumb-sep       { color: var(--color-subtle); }
+.breadcrumb-current   { color: var(--color-text); }
+
+/* ── Search / filter bar ─────────────────────────────────────────────────── */
+
+/* Wraps the search form on list pages (Users, Audit Log, etc.) */
+.search-form {
+  margin-bottom: 1rem;
+}
+
+/* Inner row: input + submit + optional clear link, all on one line */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+/* Let the search input fill available space, leave buttons at natural width */
+.search-row input,
+.search-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Pagination ──────────────────────────────────────────────────────────── */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.pagination-label {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}

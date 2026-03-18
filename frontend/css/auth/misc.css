@@ -1,0 +1,42 @@
+/* frontend/css/auth/misc.css
+ *
+ * Miscellaneous auth page utilities that don't belong to a named component.
+ *
+ * .footer-link  — "Don't have an account? Sign up" link row below the card
+ * .divider      — simple 1px horizontal rule for visual separation
+ */
+
+/* Footer link row */
+.footer-link {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.footer-link a            { color: var(--color-accent); text-decoration: none; }
+.footer-link a:hover      { text-decoration: underline; }
+
+/* Horizontal divider */
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: 1.5rem 0;
+}
+
+.copyright {
+  margin-top: 2rem;
+  font-size: 0.75rem;
+  color: var(--color-muted);
+
+  a {
+    margin-left: 0.25rem;
+    color: var(--color-muted);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--color-accent);
+    text-decoration: underline;
+  }
+}

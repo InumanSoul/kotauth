@@ -1,0 +1,44 @@
+/* frontend/css/components/form.css
+ *
+ * Form elements for the admin console.
+ * Covers native inputs, selects, textareas, labels, and the .field wrapper.
+ *
+ * Auth pages use auth/form.css — the rules there are similar but the
+ * sizing, font-size, and spacing differ to match the centered auth card layout.
+ */
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  background: var(--color-input);
+  border: var(--border-md);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+input:focus,
+select:focus,
+textarea:focus { border-color: var(--color-accent); }
+
+input::placeholder,
+textarea::placeholder { color: var(--color-muted); }
+
+label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Field wrapper — groups label + input + optional hint */
+.field      { margin-bottom: 1rem; }
+.field-hint { font-size: 0.72rem; color: var(--color-muted); margin-top: 0.3rem; }

@@ -1,0 +1,29 @@
+/* frontend/css/layout/shell.css
+ *
+ * Top-level app shell — full-viewport layout container.
+ *
+ * Structure:
+ *   .shell (flex-col, 100vh)
+ *   └── .shell-body (flex-row, fills remaining height)
+ *
+ * The topbar, rail, and context panel are separate layout files.
+ */
+
+body {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

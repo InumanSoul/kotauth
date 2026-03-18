@@ -1,0 +1,34 @@
+/* frontend/css/components/table.css
+ *
+ * Data tables for listing resources (users, apps, sessions, etc.).
+ * Uses native <table>, <th>, <td> elements.
+ *
+ * .td-muted  — secondary text cell (timestamps, slugs, etc.)
+ * .td-code   — monospace accent cell (IDs, client keys, etc.)
+ */
+
+table { width: 100%; border-collapse: collapse; }
+
+th {
+  text-align: left;
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 0.65rem 1rem;
+  border-bottom: var(--border-md);
+}
+
+td {
+  padding: 0.8rem 1rem;
+  font-size: 0.84rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:hover td      { background: var(--color-row-hover); }
+
+.td-muted { color: var(--color-muted); font-size: 0.78rem; }
+.td-code  { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-accent); }

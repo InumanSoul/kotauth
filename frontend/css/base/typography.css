@@ -1,0 +1,28 @@
+/* frontend/css/base/typography.css
+ *
+ * Base text rules for the admin bundle.
+ * Uses --font-sans and --font-mono from tokens.css.
+ *
+ * Not included in the auth bundle — auth sets font-family directly
+ * in auth/shell.css to stay self-contained.
+ */
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+}

@@ -1,0 +1,78 @@
+/* frontend/css/base/tokens.css
+ *
+ * Design token definitions for the admin console.
+ * Included in the admin bundle only — never in the auth bundle.
+ *
+ * Auth token values are injected at runtime via TenantTheme.toCssVars(),
+ * which writes a :root {} block into the page <head> before the auth
+ * stylesheet is linked.
+ *
+ * Rule: No selectors other than :root live here.
+ *       No hardcoded values anywhere else — always reference a token.
+ */
+
+:root {
+  /* ── Backgrounds ─────────────────────────────────────────────────────── */
+  --color-bg:           #0c0c0e;   /* page / body background               */
+  --color-surface:      #131316;   /* topbar, rail, sidebar surfaces        */
+  --color-card:         #18181c;   /* cards, overview panels                */
+  --color-input:        #27272a;   /* form input background                 */
+  --color-row-hover:    rgba(255, 255, 255, 0.025);
+
+  /* ── Borders ─────────────────────────────────────────────────────────── */
+  --color-border:       rgba(255, 255, 255, 0.07);
+  --color-border-md:    rgba(255, 255, 255, 0.11);
+  --color-border-em:    rgba(255, 255, 255, 0.18);
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --color-text:         #ededef;   /* primary text                          */
+  --color-muted:        #6b6b75;   /* labels, secondary text                */
+  --color-subtle:       #3d3d45;   /* hints, disabled, empty state          */
+
+  /* ── Accent — brand blue ─────────────────────────────────────────────── */
+  --color-accent:         #1fbcff;
+  --color-accent-hover:   #0ea5d9;
+  --color-accent-bg:      rgba(31, 188, 255, 0.08);
+  --color-accent-border:  rgba(31, 188, 255, 0.22);
+
+  /* ── Semantic: success ───────────────────────────────────────────────── */
+  --color-green:          #4ade80;
+  --color-green-bg:       rgba(74, 222, 128, 0.09);
+  --color-green-border:   rgba(74, 222, 128, 0.22);
+
+  /* ── Semantic: danger ────────────────────────────────────────────────── */
+  --color-red:            #f87171;
+  --color-red-bg:         rgba(248, 113, 113, 0.09);
+  --color-red-border:     rgba(248, 113, 113, 0.22);
+
+  /* ── Semantic: warning ───────────────────────────────────────────────── */
+  --color-amber:          #fbbf24;
+  --color-amber-bg:       rgba(251, 191, 36, 0.09);
+  --color-amber-border:   rgba(251, 191, 36, 0.22);
+
+  /* ── Typography ──────────────────────────────────────────────────────── */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Inconsolata', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ── Spacing scale (4px base) ────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+
+  /* ── Radius scale ────────────────────────────────────────────────────── */
+  --radius-sm:   4px;
+  --radius-md:   6px;
+  --radius-lg:   8px;
+  --radius-xl:   10px;
+  --radius-full: 9999px;
+
+  /* ── Border shorthands ───────────────────────────────────────────────── */
+  --border:    1px solid var(--color-border);
+  --border-md: 1px solid var(--color-border-md);
+  --border-em: 1px solid var(--color-border-em);
+}

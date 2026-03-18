@@ -1,0 +1,21 @@
+/* frontend/css/base/reset.css
+ *
+ * Minimal reset included in both admin and auth bundles.
+ * Body layout and overflow behavior is bundle-specific and lives in
+ * layout/shell.css (admin) or auth/shell.css (auth).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

@@ -44,10 +44,6 @@ import java.time.format.DateTimeFormatter
  *   Application = internal Client  (what authenticates against a workspace)
  */
 object AdminView {
-    // -------------------------------------------------------------------------
-    // Shared <head> builder
-    // -------------------------------------------------------------------------
-
     private fun HEAD.adminHead(
         pageTitle: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
@@ -319,6 +315,7 @@ object AdminView {
         span("ctx-section-title") { +"Settings" }
         val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
         ctxLink("$base", "general", activeSection, "General")
+        ctxLink("$base/branding", "branding", activeSection, "Branding")
         ctxLink("$base/smtp", "smtp", activeSection, "SMTP")
         ctxLink("$base/security", "security", activeSection, "Security policy")
         ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
@@ -699,19 +696,14 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +workspace.displayName }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             span("td-code") { +workspace.slug }
                             if (workspace.isMaster) {
-                                span("badge badge-blue") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Master"
-                                }
+                                span("badge badge-blue badge--inline") { +"Master" }
                             }
                         }
                     }
-                    div {
-                        style = "display:flex; gap:0.5rem; align-items:center;"
+                    div("btn-group") {
                         a(
                             href = "/admin/workspaces/${workspace.slug}/applications/new",
                             classes = "btn btn-sm",
@@ -737,7 +729,6 @@ object AdminView {
                 div("card card-body") {
                     style = "max-width:480px;"
                     table {
-                        style = "width:100%;"
                         tbody {
                             detailRow("Slug", workspace.slug)
                             detailRow("Display Name", workspace.displayName)
@@ -757,13 +748,9 @@ object AdminView {
                 }
 
                 // Applications section
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Applications"
-                        }
+                        p("page-title page-title--sm") { +"Applications" }
                         p("page-subtitle") { +"OAuth2 / OIDC clients registered in this workspace" }
                     }
                 }
@@ -993,18 +980,11 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +application.name }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             span("td-code") { +application.clientId }
-                            span("badge badge-outline") {
-                                style = "margin-left:0.5rem; vertical-align:middle;"
-                                +application.accessType.label
-                            }
+                            span("badge badge-outline badge--inline") { +application.accessType.label }
                             if (!application.enabled) {
-                                span("badge badge-red") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Disabled"
-                                }
+                                span("badge badge-red badge--inline") { +"Disabled" }
                             }
                         }
                     }
@@ -1013,7 +993,6 @@ object AdminView {
                 div("card card-body") {
                     style = "max-width:540px;"
                     table {
-                        style = "width:100%;"
                         tbody {
                             detailRow("Client ID", application.clientId)
                             detailRow("Name", application.name)
@@ -1027,35 +1006,23 @@ object AdminView {
 
                 // New secret banner — shown once after regeneration
                 if (newSecret != null) {
-                    div("alert alert-info") {
-                        style = "margin-top:1.5rem; max-width:640px;"
-                        p {
-                            style = "font-weight:600; margin-bottom:0.35rem;"
-                            +"New Client Secret (copy now — shown once)"
-                        }
-                        p {
-                            span("td-code") {
-                                style = "font-size:0.9rem; word-break:break-all;"
-                                +newSecret
-                            }
-                        }
+                    div("alert alert-info alert--constrained") {
+                        style = "margin-top:1.5rem;"
+                        p("alert__title") { +"New Client Secret (copy now — shown once)" }
+                        div("secret-box") { +newSecret }
                     }
                 }
 
                 // Redirect URIs
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Redirect URIs"
-                        }
+                        p("page-title page-title--sm") { +"Redirect URIs" }
                     }
                 }
                 div("card card-body") {
                     if (application.redirectUris.isEmpty()) {
                         p {
-                            style = "color:var(--muted); font-size:0.85rem;"
+                            style = "color:var(--color-muted); font-size:0.85rem;"
                             +"No redirect URIs configured."
                         }
                     } else {
@@ -1066,8 +1033,8 @@ object AdminView {
                 }
 
                 // Actions
-                div {
-                    style = "display:flex; gap:0.75rem; margin-top:2rem; flex-wrap:wrap;"
+                div("btn-group") {
+                    style = "margin-top:2rem;"
                     a(
                         href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
                         classes = "btn btn-sm",
@@ -1102,7 +1069,7 @@ object AdminView {
     ) {
         tr {
             td {
-                style = "color:var(--muted); width:200px; font-size:0.78rem;"
+                style = "color:var(--color-muted); width:200px; font-size:0.78rem;"
                 +label
             }
             td {
@@ -1136,8 +1103,8 @@ object AdminView {
                         p("page-subtitle") { +"An unexpected error occurred processing your request." }
                     }
                 }
-                div("alert alert-error") {
-                    style = "max-width:640px; margin-top:1.5rem;"
+                div("alert alert-error alert--constrained") {
+                    style = "margin-top:1.5rem;"
                     if (exceptionType != null) {
                         p {
                             style = "font-size:0.75rem; opacity:0.65; margin-bottom:0.35rem;"
@@ -1192,14 +1159,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1287,51 +1252,9 @@ object AdminView {
                             }
                         }
 
-                        p("form-section-title") { +"Branding" }
-                        div("field") {
-                            label {
-                                htmlFor = "themeAccentColor"
-                                +"Accent Color"
-                            }
-                            input(type = InputType.color, name = "themeAccentColor") {
-                                id = "themeAccentColor"
-                                value = workspace.theme.accentColor
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "themeLogoUrl"
-                                +"Logo URL (optional)"
-                            }
-                            input(type = InputType.url, name = "themeLogoUrl") {
-                                id = "themeLogoUrl"
-                                placeholder = "https://cdn.example.com/logo.png"
-                                value = workspace.theme.logoUrl ?: ""
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "themeFaviconUrl"
-                                +"Favicon URL (optional)"
-                            }
-                            input(type = InputType.url, name = "themeFaviconUrl") {
-                                id = "themeFaviconUrl"
-                                placeholder = "https://cdn.example.com/favicon.ico"
-                                value = workspace.theme.faviconUrl ?: ""
-                            }
-                        }
-
                         div("form-actions") {
                             button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
                             a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
-                            a(
-                                "/admin/workspaces/${workspace.slug}/settings/smtp",
-                                classes = "btn btn-ghost",
-                            ) { +"SMTP →" }
-                            a(
-                                "/admin/workspaces/${workspace.slug}/settings/security",
-                                classes = "btn btn-ghost",
-                            ) { +"Security Policy →" }
                         }
                     }
                 }
@@ -1378,14 +1301,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Security policy saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1535,6 +1456,293 @@ object AdminView {
         }
 
     // -------------------------------------------------------------------------
+    // Branding page  (/settings/branding)
+    // -------------------------------------------------------------------------
+
+    fun brandingPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false,
+    ): HTML.() -> Unit =
+        {
+            adminShell(
+                pageTitle = "Branding — ${workspace.displayName}",
+                activeRail = "settings",
+                activeAppSection = "branding",
+                allWorkspaces = allWorkspaces,
+                workspaceName = workspace.displayName,
+                workspaceSlug = workspace.slug,
+                loggedInAs = loggedInAs,
+            ) {
+                div("breadcrumb") {
+                    a("/admin") { +"Workspaces" }
+                    span("breadcrumb-sep") { +"/" }
+                    a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                    span("breadcrumb-sep") { +"/" }
+                    a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                    span("breadcrumb-sep") { +"/" }
+                    span("breadcrumb-current") { +"Branding" }
+                }
+                div("page-header") {
+                    div {
+                        p("page-title") { +"Branding" }
+                        p("page-subtitle") { +"Customize the appearance of ${workspace.displayName}'s auth pages." }
+                    }
+                }
+
+                if (saved) {
+                    div("alert alert-success alert--constrained") {
+                        +"Branding saved."
+                    }
+                }
+                if (error != null) {
+                    div("alert alert-error alert--constrained") {
+                        +error
+                    }
+                }
+
+                div("form-card form-card--wide") {
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/settings/branding",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) {
+                        // ---- Preset picker ----
+                        p("form-section-title") { +"Theme Preset" }
+                        div("field") {
+                            label { +"Apply a preset" }
+                            div {
+                                style = "display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.25rem;"
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "dark"
+                                    +"Dark"
+                                }
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "light"
+                                    +"Light"
+                                }
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "simple"
+                                    +"Simple"
+                                }
+                            }
+                            p("field-hint") { +"Fills all color fields below with the selected palette. Save to apply." }
+                        }
+
+                        // ---- Live preview ----
+                        p("form-section-title") { +"Preview" }
+                        div("field") {
+                            div {
+                                style = "border-radius:8px; overflow:hidden; max-width:260px;"
+                                div {
+                                    id = "previewCard"
+                                    style = "padding:1.25rem; border:1px solid #3f3f46; border-top:3px solid #1FBCFF; background:#18181b; border-radius:8px;"
+                                    p {
+                                        id = "previewTitle"
+                                        style = "font-weight:600; font-size:0.85rem; margin:0 0 1rem; color:#fafafa;"
+                                        +"Sign in"
+                                    }
+                                    div {
+                                        id = "previewInput"
+                                        style = "height:2rem; border-radius:4px; border:1px solid #3f3f46; background:#27272a; margin-bottom:0.75rem;"
+                                    }
+                                    div {
+                                        id = "previewBtn"
+                                        style = "height:2rem; border-radius:4px; text-align:center; line-height:2rem; font-size:0.78rem; font-weight:600; background:#1FBCFF; color:#09090b;"
+                                        +"Sign in"
+                                    }
+                                    p {
+                                        id = "previewMuted"
+                                        style = "font-size:0.75rem; margin:0.75rem 0 0; text-align:center; color:#a1a1aa;"
+                                        +"Forgot password?"
+                                    }
+                                }
+                            }
+                        }
+
+                        // ---- Color inputs (2-column grid) ----
+                        p("form-section-title") { +"Colors" }
+                        div {
+                            style = "display:grid; grid-template-columns:1fr 1fr; gap:0.75rem 1.5rem;"
+                            div("field") {
+                                label { htmlFor = "themeAccentColor"; +"Accent" }
+                                input(type = InputType.color, name = "themeAccentColor") {
+                                    id = "themeAccentColor"
+                                    value = workspace.theme.accentColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeAccentHover"; +"Accent Hover" }
+                                input(type = InputType.color, name = "themeAccentHover") {
+                                    id = "themeAccentHover"
+                                    value = workspace.theme.accentHoverColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgDeep"; +"Page Background" }
+                                input(type = InputType.color, name = "themeBgDeep") {
+                                    id = "themeBgDeep"
+                                    value = workspace.theme.bgDeep
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgCard"; +"Card Background" }
+                                input(type = InputType.color, name = "themeBgCard") {
+                                    id = "themeBgCard"
+                                    value = workspace.theme.bgCard
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgInput"; +"Input Background" }
+                                input(type = InputType.color, name = "themeBgInput") {
+                                    id = "themeBgInput"
+                                    value = workspace.theme.bgInput
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBorderColor"; +"Border" }
+                                input(type = InputType.color, name = "themeBorderColor") {
+                                    id = "themeBorderColor"
+                                    value = workspace.theme.borderColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeTextPrimary"; +"Text Primary" }
+                                input(type = InputType.color, name = "themeTextPrimary") {
+                                    id = "themeTextPrimary"
+                                    value = workspace.theme.textPrimary
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeTextMuted"; +"Text Muted" }
+                                input(type = InputType.color, name = "themeTextMuted") {
+                                    id = "themeTextMuted"
+                                    value = workspace.theme.textMuted
+                                }
+                            }
+                        }
+
+                        div("field") {
+                            label { htmlFor = "themeBorderRadius"; +"Border Radius" }
+                            input(type = InputType.text, name = "themeBorderRadius") {
+                                id = "themeBorderRadius"
+                                value = workspace.theme.borderRadius
+                                placeholder = "8px"
+                            }
+                            p("field-hint") { +"Applied to cards, inputs, and buttons on auth pages. e.g. 0px, 6px, 12px." }
+                        }
+
+                        // ---- Assets ----
+                        p("form-section-title") { +"Assets" }
+                        div("field") {
+                            label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
+                            input(type = InputType.url, name = "themeLogoUrl") {
+                                id = "themeLogoUrl"
+                                placeholder = "https://cdn.example.com/logo.png"
+                                value = workspace.theme.logoUrl ?: ""
+                            }
+                            p("field-hint") { +"Shown above the login card. Recommended max 180×48px." }
+                        }
+                        div("field") {
+                            label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
+                            input(type = InputType.url, name = "themeFaviconUrl") {
+                                id = "themeFaviconUrl"
+                                placeholder = "https://cdn.example.com/favicon.ico"
+                                value = workspace.theme.faviconUrl ?: ""
+                            }
+                        }
+
+                        div("form-actions") {
+                            button(type = ButtonType.submit, classes = "btn") { +"Save Branding" }
+                            a(
+                                "/admin/workspaces/${workspace.slug}/settings",
+                                classes = "btn btn-ghost",
+                            ) { +"← General Settings" }
+                        }
+
+                        // ---- Script: preset fill + live preview ----
+                        script {
+                            unsafe {
+                                +(
+                                    """
+(function () {
+  var PRESETS = {
+    dark: {
+      themeAccentColor: '#1FBCFF', themeAccentHover: '#0ea5d9',
+      themeBgDeep: '#09090b', themeBgCard: '#18181b', themeBgInput: '#27272a',
+      themeBorderColor: '#3f3f46', themeBorderRadius: '8px',
+      themeTextPrimary: '#fafafa', themeTextMuted: '#a1a1aa'
+    },
+    light: {
+      themeAccentColor: '#0ea5d9', themeAccentHover: '#0284c7',
+      themeBgDeep: '#f8fafc', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
+      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
+      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
+    },
+    simple: {
+      themeAccentColor: '#212121', themeAccentHover: '#000000',
+      themeBgDeep: '#fafafa', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
+      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
+      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
+    }
+  };
+
+  function updatePreview() {
+    var card   = document.getElementById('previewCard');
+    var title  = document.getElementById('previewTitle');
+    var inp    = document.getElementById('previewInput');
+    var btn    = document.getElementById('previewBtn');
+    var muted  = document.getElementById('previewMuted');
+    if (!card) return;
+    var accent = document.getElementById('themeAccentColor').value;
+    var bg     = document.getElementById('themeBgCard').value;
+    var bgIn   = document.getElementById('themeBgInput').value;
+    var border = document.getElementById('themeBorderColor').value;
+    var text   = document.getElementById('themeTextPrimary').value;
+    var mutedC = document.getElementById('themeTextMuted').value;
+    card.style.background     = bg;
+    card.style.borderColor    = border;
+    card.style.borderTopColor = accent;
+    title.style.color         = text;
+    inp.style.background      = bgIn;
+    inp.style.borderColor     = border;
+    btn.style.background      = accent;
+    btn.style.color           = bg;
+    muted.style.color         = mutedC;
+  }
+
+  document.querySelectorAll('[data-preset]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var p = PRESETS[this.getAttribute('data-preset')];
+      if (!p) return;
+      Object.keys(p).forEach(function (key) {
+        var el = document.getElementById(key);
+        if (el) el.value = p[key];
+      });
+      updatePreview();
+    });
+  });
+
+  ['themeAccentColor','themeBgCard','themeBgInput','themeBorderColor',
+   'themeTextPrimary','themeTextMuted'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updatePreview);
+  });
+
+  updatePreview();
+})();
+                                    """.trimIndent()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    // -------------------------------------------------------------------------
     // Edit application form
     // -------------------------------------------------------------------------
 
@@ -1577,8 +1785,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1828,8 +2035,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -1934,23 +2140,18 @@ object AdminView {
                 div("page-header") {
                     div {
                         p("page-title") { +user.username }
-                        p {
-                            style = "margin-top:2px;"
+                        p("page-meta") {
                             if (user.enabled) {
                                 span("badge badge-green") { +"Active" }
                             } else {
                                 span("badge badge-red") { +"Disabled" }
                             }
                             if (!user.emailVerified) {
-                                span("badge badge-outline") {
-                                    style = "margin-left:0.5rem; vertical-align:middle;"
-                                    +"Email unverified"
-                                }
+                                span("badge badge-outline badge--inline") { +"Email unverified" }
                             }
                         }
                     }
-                    div {
-                        style = "display:flex; gap:0.5rem; flex-wrap:wrap;"
+                    div("btn-group") {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id}/toggle",
                             method = FormMethod.post,
@@ -1985,14 +2186,12 @@ object AdminView {
                 }
 
                 if (successMessage != null) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +successMessage
                     }
                 }
                 if (editError != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +editError
                     }
                 }
@@ -2042,13 +2241,9 @@ object AdminView {
                 }
 
                 // Active sessions table
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Active Sessions"
-                        }
+                        p("page-title page-title--sm") { +"Active Sessions" }
                         p("page-subtitle") { +"${sessions.size} active session${if (sessions.size != 1) "s" else ""}" }
                     }
                 }
@@ -2092,16 +2287,10 @@ object AdminView {
                 }
 
                 // Phase 3c: Password reset via email — sends a self-service reset link
-                div("page-header") {
-                    style = "margin-top:2rem;"
+                div("page-header page-header--section") {
                     div {
-                        p("page-title") {
-                            style = "font-size:1rem;"
-                            +"Password Reset"
-                        }
-                        p(
-                            "page-subtitle",
-                        ) { +"Send a password reset email to the user. They will set their own new password." }
+                        p("page-title page-title--sm") { +"Password Reset" }
+                        p("page-subtitle") { +"Send a password reset email to the user. They will set their own new password." }
                     }
                 }
                 div("form-card") {
@@ -2112,7 +2301,7 @@ object AdminView {
                             method = FormMethod.post,
                         ) {
                             p {
-                                style = "color:var(--text-muted);font-size:0.875rem;margin-bottom:1rem;"
+                                style = "color:var(--color-muted);font-size:0.875rem;margin-bottom:1rem;"
                                 +"A password reset link will be sent to "
                                 strong { +user.email }
                                 +". The link expires in 1 hour."
@@ -2123,7 +2312,7 @@ object AdminView {
                         }
                     } else {
                         p {
-                            style = "color:var(--text-muted);font-size:0.875rem;"
+                            style = "color:var(--color-muted);font-size:0.875rem;"
                             +"SMTP is not configured for this workspace. "
                             a(href = "/admin/workspaces/${workspace.slug}/settings") { +"Configure SMTP" }
                             +" to enable email-based password resets."
@@ -2324,15 +2513,13 @@ object AdminView {
                 // Pagination
                 if (totalPages > 1) {
                     div("pagination") {
-                        style = "margin-top:1rem; display:flex; gap:0.5rem; align-items:center;"
                         val baseUrl =
                             "/admin/workspaces/${workspace.slug}/logs" +
                                 (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
                         if (page > 1) {
                             a("${baseUrl}page=${page - 1}", classes = "btn btn-ghost btn-sm") { +"← Prev" }
                         }
-                        span {
-                            style = "font-size:0.85rem; color:var(--muted);"
+                        span("pagination-label") {
                             +"Page $page of $totalPages"
                         }
                         if (page < totalPages) {
@@ -2389,14 +2576,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"SMTP settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -2652,8 +2837,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -2793,8 +2977,7 @@ object AdminView {
                 }
 
                 // Edit name/description
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:1.5rem;"
+                div("form-card form-card--wide card--spaced") {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/edit",
                         encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -2831,12 +3014,10 @@ object AdminView {
                 }
 
                 // Composite children
-                div("card") {
-                    style = "margin-bottom:1.5rem;"
+                div("card card--spaced") {
                     p("form-section-title") { +"Composite Children" }
                     if (role.childRoleIds.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No child roles."
                         }
                     } else {
@@ -2879,9 +3060,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/children",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "childRoleId"
                                 availableChildren.forEach { r ->
@@ -2902,9 +3082,8 @@ object AdminView {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/assign-user",
                         method = FormMethod.post,
-                        classes = "inline-form",
+                        classes = "card-add-row",
                     ) {
-                        style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                         select {
                             name = "userId"
                             allUsers.forEach { u ->
@@ -3046,8 +3225,7 @@ object AdminView {
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -3163,8 +3341,7 @@ object AdminView {
                 }
 
                 // Edit name/description
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:1.5rem;"
+                div("form-card form-card--wide card--spaced") {
                     form(
                         action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/edit",
                         encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -3200,12 +3377,10 @@ object AdminView {
                 }
 
                 // Assigned roles
-                div("card") {
-                    style = "margin-bottom:1.5rem;"
+                div("card card--spaced") {
                     p("form-section-title") { +"Assigned Roles" }
                     if (group.roleIds.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No roles assigned."
                         }
                     } else {
@@ -3249,9 +3424,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/assign-role",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "roleId"
                                 availableRoles.forEach { r ->
@@ -3270,8 +3444,7 @@ object AdminView {
                 div("card") {
                     p("form-section-title") { +"Members (${members.size})" }
                     if (members.isEmpty()) {
-                        p("td-muted") {
-                            style = "padding:0.75rem;"
+                        p("card-empty-msg") {
                             +"No members."
                         }
                     } else {
@@ -3315,9 +3488,8 @@ object AdminView {
                         form(
                             action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/add-member",
                             method = FormMethod.post,
-                            classes = "inline-form",
+                            classes = "card-add-row",
                         ) {
-                            style = "padding:0.75rem; display:flex; gap:0.5rem; align-items:center;"
                             select {
                                 name = "userId"
                                 nonMembers.forEach { u ->
@@ -3370,8 +3542,8 @@ object AdminView {
                 }
 
                 // Stats
-                div("card") {
-                    style = "margin-bottom:1.5rem; padding:1.25rem;"
+                div("card card--spaced") {
+                    style = "padding:1.25rem;"
                     div {
                         style = "display:flex; gap:2rem;"
                         div {
@@ -3402,8 +3574,7 @@ object AdminView {
                     }
                 }
 
-                div("form-card") {
-                    style = "max-width:640px;"
+                div("form-card form-card--wide") {
                     p("form-section-title") { +"Configuration" }
                     p("td-muted") {
                         style = "padding:0 0.75rem 1rem;"
@@ -3484,14 +3655,12 @@ object AdminView {
                 }
 
                 if (saved) {
-                    div("alert alert-success") {
-                        style = "max-width:640px;"
+                    div("alert alert-success alert--constrained") {
                         +"Identity provider settings saved."
                     }
                 }
                 if (error != null) {
-                    div("alert alert-error") {
-                        style = "max-width:640px;"
+                    div("alert alert-error alert--constrained") {
                         +error
                     }
                 }
@@ -3503,16 +3672,15 @@ object AdminView {
                     val isConfigured = existing != null
                     val isEditing = editProvider == prov
 
-                    div("form-card") {
-                        style = "max-width:640px; margin-bottom:1.5rem;"
-                        div {
+                    div("form-card form-card--wide card--spaced") {
+                            div {
                             style = "display:flex; align-items:center; gap:1rem; margin-bottom:1rem;"
                             p("form-section-title") {
                                 style = "margin:0;"
                                 +prov.displayName
                             }
                             if (isConfigured) {
-                                val enabledBadge = if (existing!!.enabled) "badge-success" else "badge-neutral"
+                                val enabledBadge = if (existing!!.enabled) "badge-green" else "badge-neutral"
                                 val enabledText = if (existing.enabled) "Enabled" else "Disabled"
                                 span("badge $enabledBadge") { +enabledText }
                             } else {
@@ -3677,15 +3845,8 @@ object AdminView {
             if (newKeyRaw != null) {
                 div("alert alert-success") {
                     style = "max-width:720px; margin-bottom:1.5rem;"
-                    p {
-                        style = "font-weight:600; margin-bottom:0.5rem;"
-                        +"API key created — copy it now. You will not see it again."
-                    }
-                    div {
-                        style =
-                            "font-family:monospace; background:var(--color-bg-secondary); padding:0.75rem 1rem; border-radius:6px; word-break:break-all; font-size:0.875rem;"
-                        +newKeyRaw
-                    }
+                    p("alert__title") { +"API key created — copy it now. You will not see it again." }
+                    div("secret-box") { +newKeyRaw }
                 }
             }
 
@@ -3723,7 +3884,7 @@ object AdminView {
                                     td { span("td-code") { +key.name } }
                                     td { span("td-code") { +"${key.keyPrefix}…" } }
                                     td {
-                                        style = "font-size:0.78rem; color:var(--color-text-muted);"
+                                        style = "font-size:0.78rem; color:var(--color-muted);"
                                         +key.scopes.joinToString(", ")
                                     }
                                     td {
@@ -3792,8 +3953,7 @@ object AdminView {
             }
 
             // Create new key form
-            div("form-card") {
-                style = "max-width:640px;"
+            div("form-card form-card--wide") {
                 p("form-section-title") { +"Create New API Key" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/settings/api-keys",
@@ -3848,7 +4008,7 @@ object AdminView {
                         p("field-hint") { +"Leave blank for keys that never expire." }
                     }
                     div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-primary") { +"Create API Key" }
+                        button(type = ButtonType.submit, classes = "btn") { +"Create API Key" }
                     }
                 }
             }
@@ -3902,17 +4062,10 @@ object AdminView {
                 if (newSecret != null) {
                     div("alert alert-success") {
                         style = "max-width:720px; margin-bottom:1.5rem;"
+                        p("alert__title") { +"Webhook created — copy the signing secret now. You will not see it again." }
+                        div("secret-box") { +newSecret }
                         p {
-                            style = "font-weight:600; margin-bottom:0.5rem;"
-                            +"Webhook created — copy the signing secret now. You will not see it again."
-                        }
-                        div {
-                            style =
-                                "font-family:monospace; background:var(--color-bg-secondary); padding:0.75rem 1rem; border-radius:6px; word-break:break-all; font-size:0.875rem;"
-                            +newSecret
-                        }
-                        p {
-                            style = "margin-top:0.5rem; font-size:0.8rem; color:var(--color-text-muted);"
+                            style = "margin-top:0.5rem; font-size:0.8rem; color:var(--color-muted);"
                             +"Verify incoming payloads: "
                             code { +"X-KotAuth-Signature: sha256=HMAC-SHA256(secret, body)" }
                         }
@@ -3958,7 +4111,7 @@ object AdminView {
                                             span("td-muted") { +(ep.description.ifBlank { "—" }) }
                                         }
                                         td {
-                                            style = "font-size:0.78rem; color:var(--color-text-muted); max-width:200px;"
+                                            style = "font-size:0.78rem; color:var(--color-muted); max-width:200px;"
                                             +(
                                                 ep.events
                                                     .sorted()
@@ -3979,8 +4132,7 @@ object AdminView {
                                                     .format(ep.createdAt)
                                             }
                                         }
-                                        td {
-                                            style = "display:flex; gap:0.5rem; align-items:center;"
+                                        td("btn-group") {
                                             // Toggle enable/disable
                                             form(
                                                 action = "/admin/workspaces/${workspace.slug}/settings/webhooks/${ep.id}/toggle",
@@ -4018,8 +4170,8 @@ object AdminView {
                 }
 
                 // ─── Create endpoint form ──────────────────────────────────────
-                div("form-card") {
-                    style = "max-width:640px; margin-bottom:2rem;"
+                div("form-card form-card--wide") {
+                    style = "margin-bottom:2rem;"
                     p("form-section-title") { +"Add Webhook Endpoint" }
                     form(
                         action = "/admin/workspaces/${workspace.slug}/settings/webhooks",
@@ -4075,7 +4227,7 @@ object AdminView {
                             }
                         }
                         div("form-actions") {
-                            button(type = ButtonType.submit, classes = "btn btn-primary") { +"Add Endpoint" }
+                            button(type = ButtonType.submit, classes = "btn") { +"Add Endpoint" }
                         }
                     }
                 }

@@ -1,0 +1,68 @@
+/* frontend/css/components/button.css
+ *
+ * Button variants for the admin console.
+ *
+ * Base: .btn
+ * Modifiers (appended directly, legacy single-dash convention):
+ *   .btn-ghost    — outline style
+ *   .btn-danger   — destructive action
+ *   .btn-sm       — compact size
+ *   .btn-full     — full-width, used in forms
+ *
+ * New components should follow BEM double-dash: .btn--primary, .btn--ghost, etc.
+ * Existing class names are kept for backward compatibility with AdminView.kt.
+ */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  color: #05080a;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+  font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:hover         { opacity: 0.88; text-decoration: none; }
+.btn:active        { transform: scale(0.98); }
+
+/* Ghost — outlined, no fill */
+.btn-ghost {
+  background: transparent;
+  border-color: var(--color-border-md);
+  color: var(--color-text);
+}
+
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--color-border-em); opacity: 1; }
+
+/* Danger — destructive action */
+.btn-danger {
+  background: var(--color-red-bg);
+  border-color: var(--color-red-border);
+  color: var(--color-red);
+}
+
+.btn-danger:hover { background: rgba(248, 113, 113, 0.18); opacity: 1; }
+
+/* Small — compact padding, tighter font */
+.btn-sm { padding: 0.32rem 0.7rem; font-size: 0.75rem; }
+
+/* Full width — used inside form cards */
+.btn-full { width: 100%; justify-content: center; padding: 0.72rem; font-size: 0.875rem; margin-top: 0.4rem; }
+
+/* Button group — horizontal flex row for action clusters (page header right
+ * side, application actions, user actions, etc.) */
+.btn-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

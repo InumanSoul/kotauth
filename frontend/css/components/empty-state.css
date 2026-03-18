@@ -1,0 +1,22 @@
+/* frontend/css/components/empty-state.css
+ *
+ * Page-level empty state — shown when a list or resource set has no items.
+ *
+ * .empty-state       — centered container
+ * .empty-state-icon  — large icon / emoji, faded
+ * .empty-state-text  — short descriptive message
+ */
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--color-muted);
+}
+
+.empty-state-icon {
+  font-size: 2rem;
+  opacity: 0.4;
+  margin-bottom: 0.6rem;
+}
+
+.empty-state-text { font-size: 0.86rem; }

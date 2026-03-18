@@ -458,9 +458,18 @@ fun Route.adminRoutes(
                                 passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
                                 passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
                                 mfaPolicy = workspace.mfaPolicy,
-                                themeAccentColor = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
-                                themeLogoUrl = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
-                                themeFaviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                                // Theme fields live on /settings/branding — preserve existing values
+                                themeAccentColor = workspace.theme.accentColor,
+                                themeAccentHover = workspace.theme.accentHoverColor,
+                                themeBgDeep = workspace.theme.bgDeep,
+                                themeBgCard = workspace.theme.bgCard,
+                                themeBgInput = workspace.theme.bgInput,
+                                themeBorderColor = workspace.theme.borderColor,
+                                themeBorderRadius = workspace.theme.borderRadius,
+                                themeTextPrimary = workspace.theme.textPrimary,
+                                themeTextMuted = workspace.theme.textMuted,
+                                themeLogoUrl = workspace.theme.logoUrl,
+                                themeFaviconUrl = workspace.theme.faviconUrl,
                             )
                     ) {
                         is AdminResult.Success ->
@@ -525,6 +534,14 @@ fun Route.adminRoutes(
                                 mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
                                 // Theme fields not on this form — preserve existing values
                                 themeAccentColor = workspace.theme.accentColor,
+                                themeAccentHover = workspace.theme.accentHoverColor,
+                                themeBgDeep = workspace.theme.bgDeep,
+                                themeBgCard = workspace.theme.bgCard,
+                                themeBgInput = workspace.theme.bgInput,
+                                themeBorderColor = workspace.theme.borderColor,
+                                themeBorderRadius = workspace.theme.borderRadius,
+                                themeTextPrimary = workspace.theme.textPrimary,
+                                themeTextMuted = workspace.theme.textMuted,
                                 themeLogoUrl = workspace.theme.logoUrl,
                                 themeFaviconUrl = workspace.theme.faviconUrl,
                             )
@@ -536,6 +553,101 @@ fun Route.adminRoutes(
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
                                 AdminView.securityPolicyPage(
+                                    workspace,
+                                    wsPairs,
+                                    session.username,
+                                    error = result.error.message,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------
+                // Branding settings  (/settings/branding)
+                // -------------------------------------------------------
+
+                get("/settings/branding") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val saved = call.request.queryParameters["saved"] == "true"
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.brandingPage(workspace, wsPairs, session.username, saved = saved),
+                    )
+                }
+
+                post("/settings/branding") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val params = call.receiveParameters()
+                    when (
+                        val result =
+                            adminService.updateWorkspaceSettings(
+                                slug = slug,
+                                // General fields not on this form — preserve existing values
+                                displayName = workspace.displayName,
+                                issuerUrl = workspace.issuerUrl,
+                                tokenExpirySeconds = workspace.tokenExpirySeconds,
+                                refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
+                                registrationEnabled = workspace.registrationEnabled,
+                                emailVerificationRequired = workspace.emailVerificationRequired,
+                                // Security fields not on this form — preserve existing values
+                                passwordPolicyMinLength = workspace.passwordPolicyMinLength,
+                                passwordPolicyRequireSpecial = workspace.passwordPolicyRequireSpecial,
+                                passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
+                                passwordPolicyRequireNumber = workspace.passwordPolicyRequireNumber,
+                                passwordPolicyHistoryCount = workspace.passwordPolicyHistoryCount,
+                                passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
+                                passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
+                                mfaPolicy = workspace.mfaPolicy,
+                                // Theme fields from the branding form
+                                themeAccentColor =
+                                    params["themeAccentColor"]?.trim()
+                                        ?: workspace.theme.accentColor,
+                                themeAccentHover =
+                                    params["themeAccentHover"]?.trim()
+                                        ?: workspace.theme.accentHoverColor,
+                                themeBgDeep =
+                                    params["themeBgDeep"]?.trim()
+                                        ?: workspace.theme.bgDeep,
+                                themeBgCard =
+                                    params["themeBgCard"]?.trim()
+                                        ?: workspace.theme.bgCard,
+                                themeBgInput =
+                                    params["themeBgInput"]?.trim()
+                                        ?: workspace.theme.bgInput,
+                                themeBorderColor =
+                                    params["themeBorderColor"]?.trim()
+                                        ?: workspace.theme.borderColor,
+                                themeBorderRadius =
+                                    params["themeBorderRadius"]?.trim()
+                                        ?: workspace.theme.borderRadius,
+                                themeTextPrimary =
+                                    params["themeTextPrimary"]?.trim()
+                                        ?: workspace.theme.textPrimary,
+                                themeTextMuted =
+                                    params["themeTextMuted"]?.trim()
+                                        ?: workspace.theme.textMuted,
+                                themeLogoUrl =
+                                    params["themeLogoUrl"]
+                                        ?.trim()
+                                        ?.takeIf { it.isNotBlank() },
+                                themeFaviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                            )
+                    ) {
+                        is AdminResult.Success ->
+                            call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
+                        is AdminResult.Failure -> {
+                            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                            call.respondHtml(
+                                HttpStatusCode.UnprocessableEntity,
+                                AdminView.brandingPage(
                                     workspace,
                                     wsPairs,
                                     session.username,

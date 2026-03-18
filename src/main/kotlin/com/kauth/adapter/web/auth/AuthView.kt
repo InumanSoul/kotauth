@@ -97,7 +97,7 @@ object AuthView {
     fun loginPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
@@ -112,7 +112,6 @@ object AuthView {
                     } else {
                         div("brand-name") { +workspaceName }
                     }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"Welcome back" }
@@ -215,7 +214,7 @@ object AuthView {
                                 val qs = oauthParams.toQueryString()
                                 a(
                                     href = "/t/$tenantSlug/auth/social/${prov.value}/redirect$qs",
-                                    classes = "btn btn-social btn-social-${prov.value}",
+                                    classes = "btn-social",
                                 ) {
                                     when (prov) {
                                         SocialProvider.GOOGLE -> {
@@ -248,6 +247,10 @@ object AuthView {
                         }
                     }
                 }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                }
             }
         }
 
@@ -264,7 +267,7 @@ object AuthView {
     fun registerPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
         enabledProviders: List<SocialProvider> = emptyList(),
@@ -278,7 +281,6 @@ object AuthView {
                     } else {
                         div("brand-name") { +workspaceName }
                     }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"Create account" }
@@ -376,7 +378,7 @@ object AuthView {
                             for (prov in enabledProviders) {
                                 a(
                                     href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
-                                    classes = "btn btn-social btn-social-${prov.value}",
+                                    classes = "btn-social",
                                 ) {
                                     span("social-icon") {}
                                     +prov.displayName
@@ -384,6 +386,10 @@ object AuthView {
                             }
                         }
                     }
+                }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
                 }
             }
         }
@@ -399,7 +405,7 @@ object AuthView {
     fun forgotPasswordPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         error: String? = null,
         sent: Boolean = false,
     ): HTML.() -> Unit =
@@ -412,7 +418,6 @@ object AuthView {
                     } else {
                         div("brand-name") { +workspaceName }
                     }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"Forgot password" }
@@ -459,6 +464,10 @@ object AuthView {
                         }
                     }
                 }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                }
             }
         }
 
@@ -473,7 +482,7 @@ object AuthView {
     fun resetPasswordPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         token: String,
         error: String? = null,
         success: Boolean = false,
@@ -487,7 +496,6 @@ object AuthView {
                     } else {
                         div("brand-name") { +workspaceName }
                     }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"Reset password" }
@@ -542,6 +550,10 @@ object AuthView {
                         }
                     }
                 }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                }
             }
         }
 
@@ -556,7 +568,7 @@ object AuthView {
     fun verifyEmailPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         success: Boolean,
         message: String,
     ): HTML.() -> Unit =
@@ -569,7 +581,6 @@ object AuthView {
                     } else {
                         div("brand-name") { +workspaceName }
                     }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"Email verification" }
@@ -586,6 +597,10 @@ object AuthView {
                             a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
                         }
                     }
+                }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
                 }
             }
         }
@@ -606,7 +621,7 @@ object AuthView {
     fun socialRegistrationPage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         providerName: String,
         email: String,
         prefillUsername: String = "",
@@ -618,7 +633,6 @@ object AuthView {
             body {
                 div("brand") {
                     div("brand-name") { +workspaceName }
-                    div("brand-tagline") { +"Modernized Identity & Access Management" }
                 }
                 div("card") {
                     h1("card-title") { +"One last step" }
@@ -682,6 +696,10 @@ object AuthView {
                         a(href = "/t/$tenantSlug/login") { +"Sign in" }
                     }
                 }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                }
             }
         }
 
@@ -692,7 +710,7 @@ object AuthView {
     fun mfaChallengePage(
         tenantSlug: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "KotAuth",
+        workspaceName: String = "Kotauth",
         error: String? = null,
         oauthParams: OAuthParams = OAuthParams(),
     ): HTML.() -> Unit =
@@ -753,7 +771,7 @@ object AuthView {
                             oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
                         }
 
-                        div("form-group") {
+                        div("field") {
                             label {
                                 htmlFor = "code"
                                 +"Authentication code"
@@ -768,12 +786,16 @@ object AuthView {
                             }
                         }
 
-                        button(type = ButtonType.submit, classes = "btn-primary") { +"Verify" }
+                        button(type = ButtonType.submit, classes = "btn") { +"Verify" }
                     }
 
                     div("footer-link") {
                         a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
                     }
+                }
+                p("copyright") {
+                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
                 }
             }
         }

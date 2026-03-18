@@ -75,6 +75,13 @@ class PostgresTenantRepository : TenantRepository {
                 it[passwordPolicyRequireSpecial] = tenant.passwordPolicyRequireSpecial
                 it[themeAccentColor] = tenant.theme.accentColor
                 it[themeAccentHover] = tenant.theme.accentHoverColor
+                it[themeBgDeep] = tenant.theme.bgDeep
+                it[themeBgCard] = tenant.theme.bgCard
+                it[themeBgInput] = tenant.theme.bgInput
+                it[themeBorderColor] = tenant.theme.borderColor
+                it[themeBorderRadius] = tenant.theme.borderRadius
+                it[themeTextPrimary] = tenant.theme.textPrimary
+                it[themeTextMuted] = tenant.theme.textMuted
                 it[themeLogoUrl] = tenant.theme.logoUrl
                 it[themeFaviconUrl] = tenant.theme.faviconUrl
                 // Phase 3b SMTP fields

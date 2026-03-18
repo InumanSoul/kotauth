@@ -1,0 +1,73 @@
+/* frontend/css/admin/form-card.css
+ *
+ * Form card layout used on settings and edit pages in the admin console.
+ * Wraps a form in a constrained-width card with labeled sections.
+ *
+ * .form-card           — constrained card container
+ * .form-section-title  — section divider with uppercase label
+ * .checkbox-row        — horizontal label + checkbox pair
+ * .checkbox-label      — readable label text beside a checkbox
+ * .form-actions        — bottom row with save / cancel buttons
+ */
+
+.form-card {
+  background: var(--color-card);
+  border: var(--border-md);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.form-section-title {
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin: 1.25rem 0 0.75rem;
+  padding-top: 1.25rem;
+  border-top: var(--border);
+}
+
+.form-section-title:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.7rem;
+}
+
+.checkbox-row input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.checkbox-label {
+  font-size: 0.84rem;
+  color: var(--color-text);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.form-actions { display: flex; gap: 0.7rem; margin-top: 1.5rem; }
+
+/* Wide variant — 640px instead of the default 560px.
+ * Used for edit cards that need slightly more room (e.g. workspace / role
+ * description editors sitting beside other cards on a detail page). */
+.form-card--wide { max-width: 640px; }
+
+/* Inline form — strips block-level margin so <form> can sit inside flex rows
+ * (e.g. a Revoke button inside a table cell alongside other elements). */
+.inline-form {
+  display: contents;
+}
