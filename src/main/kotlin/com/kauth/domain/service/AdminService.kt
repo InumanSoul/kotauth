@@ -61,6 +61,14 @@ class AdminService(
         passwordPolicyBlacklistEnabled: Boolean = false,
         mfaPolicy: String = "optional",
         themeAccentColor: String,
+        themeAccentHover: String,
+        themeBgDeep: String,
+        themeBgCard: String,
+        themeBgInput: String,
+        themeBorderColor: String,
+        themeBorderRadius: String,
+        themeTextPrimary: String,
+        themeTextMuted: String,
         themeLogoUrl: String?,
         themeFaviconUrl: String?,
     ): AdminResult<Tenant> {
@@ -103,8 +111,16 @@ class AdminService(
                 passwordPolicyBlacklistEnabled = passwordPolicyBlacklistEnabled,
                 mfaPolicy = mfaPolicy,
                 theme =
-                    tenant.theme.copy(
+                    TenantTheme(
                         accentColor = themeAccentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
+                        accentHoverColor = themeAccentHover.trim().ifBlank { TenantTheme.DEFAULT.accentHoverColor },
+                        bgDeep = themeBgDeep.trim().ifBlank { TenantTheme.DEFAULT.bgDeep },
+                        bgCard = themeBgCard.trim().ifBlank { TenantTheme.DEFAULT.bgCard },
+                        bgInput = themeBgInput.trim().ifBlank { TenantTheme.DEFAULT.bgInput },
+                        borderColor = themeBorderColor.trim().ifBlank { TenantTheme.DEFAULT.borderColor },
+                        borderRadius = themeBorderRadius.trim().ifBlank { TenantTheme.DEFAULT.borderRadius },
+                        textPrimary = themeTextPrimary.trim().ifBlank { TenantTheme.DEFAULT.textPrimary },
+                        textMuted = themeTextMuted.trim().ifBlank { TenantTheme.DEFAULT.textMuted },
                         logoUrl = themeLogoUrl?.trim()?.takeIf { it.isNotBlank() },
                         faviconUrl = themeFaviconUrl?.trim()?.takeIf { it.isNotBlank() },
                     ),

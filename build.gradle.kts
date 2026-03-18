@@ -86,53 +86,60 @@ tasks.test {
 val lightningCssBin = "frontend/node_modules/.bin/lightningcss"
 
 // Step 1: install lightningcss-cli from frontend/package-lock.json (once, then cached)
-val installCssDeps = tasks.register<Exec>("installCssDeps") {
-    description = "Installs LightningCSS CLI into frontend/node_modules via npm ci"
-    group = "build"
+val installCssDeps =
+    tasks.register<Exec>("installCssDeps") {
+        description = "Installs LightningCSS CLI into frontend/node_modules via npm ci"
+        group = "build"
 
-    commandLine("npm", "ci", "--prefix", "frontend")
+        commandLine("npm", "ci", "--prefix", "frontend")
 
-    inputs.files("frontend/package.json", "frontend/package-lock.json")
-    outputs.dir("frontend/node_modules")
-}
+        inputs.files("frontend/package.json", "frontend/package-lock.json")
+        outputs.dir("frontend/node_modules")
+    }
 
 // Step 2a: compile admin bundle
-val compileCssAdmin = tasks.register<Exec>("compileCssAdmin") {
-    description = "Compiles the admin console CSS bundle (frontend/css/index-admin.css → kotauth-admin.css)"
-    group = "build"
-    dependsOn(installCssDeps)
+val compileCssAdmin =
+    tasks.register<Exec>("compileCssAdmin") {
+        description = "Compiles the admin console CSS bundle (frontend/css/index-admin.css → kotauth-admin.css)"
+        group = "build"
+        dependsOn(installCssDeps)
 
-    commandLine(
-        lightningCssBin,
-        "--bundle",
-        "--minify",
-        "--targets", ">= 0.5%",
-        "frontend/css/index-admin.css",
-        "-o", "src/main/resources/static/kotauth-admin.css",
-    )
+        commandLine(
+            lightningCssBin,
+            "--bundle",
+            "--minify",
+            "--targets",
+            ">= 0.5%",
+            "frontend/css/index-admin.css",
+            "-o",
+            "src/main/resources/static/kotauth-admin.css",
+        )
 
-    inputs.dir("frontend/css")
-    outputs.file("src/main/resources/static/kotauth-admin.css")
-}
+        inputs.dir("frontend/css")
+        outputs.file("src/main/resources/static/kotauth-admin.css")
+    }
 
 // Step 2b: compile auth bundle
-val compileCssAuth = tasks.register<Exec>("compileCssAuth") {
-    description = "Compiles the auth pages CSS bundle (frontend/css/index-auth.css → kotauth-auth.css)"
-    group = "build"
-    dependsOn(installCssDeps)
+val compileCssAuth =
+    tasks.register<Exec>("compileCssAuth") {
+        description = "Compiles the auth pages CSS bundle (frontend/css/index-auth.css → kotauth-auth.css)"
+        group = "build"
+        dependsOn(installCssDeps)
 
-    commandLine(
-        lightningCssBin,
-        "--bundle",
-        "--minify",
-        "--targets", ">= 0.5%",
-        "frontend/css/index-auth.css",
-        "-o", "src/main/resources/static/kotauth-auth.css",
-    )
+        commandLine(
+            lightningCssBin,
+            "--bundle",
+            "--minify",
+            "--targets",
+            ">= 0.5%",
+            "frontend/css/index-auth.css",
+            "-o",
+            "src/main/resources/static/kotauth-auth.css",
+        )
 
-    inputs.dir("frontend/css")
-    outputs.file("src/main/resources/static/kotauth-auth.css")
-}
+        inputs.dir("frontend/css")
+        outputs.file("src/main/resources/static/kotauth-auth.css")
+    }
 
 // Both CSS bundles must be ready before resources are packaged into the JAR
 tasks.named("processResources") {

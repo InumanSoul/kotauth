@@ -315,6 +315,7 @@ object AdminView {
         span("ctx-section-title") { +"Settings" }
         val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
         ctxLink("$base", "general", activeSection, "General")
+        ctxLink("$base/branding", "branding", activeSection, "Branding")
         ctxLink("$base/smtp", "smtp", activeSection, "SMTP")
         ctxLink("$base/security", "security", activeSection, "Security policy")
         ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
@@ -1251,51 +1252,9 @@ object AdminView {
                             }
                         }
 
-                        p("form-section-title") { +"Branding" }
-                        div("field") {
-                            label {
-                                htmlFor = "themeAccentColor"
-                                +"Accent Color"
-                            }
-                            input(type = InputType.color, name = "themeAccentColor") {
-                                id = "themeAccentColor"
-                                value = workspace.theme.accentColor
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "themeLogoUrl"
-                                +"Logo URL (optional)"
-                            }
-                            input(type = InputType.url, name = "themeLogoUrl") {
-                                id = "themeLogoUrl"
-                                placeholder = "https://cdn.example.com/logo.png"
-                                value = workspace.theme.logoUrl ?: ""
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "themeFaviconUrl"
-                                +"Favicon URL (optional)"
-                            }
-                            input(type = InputType.url, name = "themeFaviconUrl") {
-                                id = "themeFaviconUrl"
-                                placeholder = "https://cdn.example.com/favicon.ico"
-                                value = workspace.theme.faviconUrl ?: ""
-                            }
-                        }
-
                         div("form-actions") {
                             button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
                             a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
-                            a(
-                                "/admin/workspaces/${workspace.slug}/settings/smtp",
-                                classes = "btn btn-ghost",
-                            ) { +"SMTP →" }
-                            a(
-                                "/admin/workspaces/${workspace.slug}/settings/security",
-                                classes = "btn btn-ghost",
-                            ) { +"Security Policy →" }
                         }
                     }
                 }
@@ -1490,6 +1449,293 @@ object AdminView {
                                 "/admin/workspaces/${workspace.slug}/settings",
                                 classes = "btn btn-ghost",
                             ) { +"← General Settings" }
+                        }
+                    }
+                }
+            }
+        }
+
+    // -------------------------------------------------------------------------
+    // Branding page  (/settings/branding)
+    // -------------------------------------------------------------------------
+
+    fun brandingPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false,
+    ): HTML.() -> Unit =
+        {
+            adminShell(
+                pageTitle = "Branding — ${workspace.displayName}",
+                activeRail = "settings",
+                activeAppSection = "branding",
+                allWorkspaces = allWorkspaces,
+                workspaceName = workspace.displayName,
+                workspaceSlug = workspace.slug,
+                loggedInAs = loggedInAs,
+            ) {
+                div("breadcrumb") {
+                    a("/admin") { +"Workspaces" }
+                    span("breadcrumb-sep") { +"/" }
+                    a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                    span("breadcrumb-sep") { +"/" }
+                    a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
+                    span("breadcrumb-sep") { +"/" }
+                    span("breadcrumb-current") { +"Branding" }
+                }
+                div("page-header") {
+                    div {
+                        p("page-title") { +"Branding" }
+                        p("page-subtitle") { +"Customize the appearance of ${workspace.displayName}'s auth pages." }
+                    }
+                }
+
+                if (saved) {
+                    div("alert alert-success alert--constrained") {
+                        +"Branding saved."
+                    }
+                }
+                if (error != null) {
+                    div("alert alert-error alert--constrained") {
+                        +error
+                    }
+                }
+
+                div("form-card form-card--wide") {
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/settings/branding",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) {
+                        // ---- Preset picker ----
+                        p("form-section-title") { +"Theme Preset" }
+                        div("field") {
+                            label { +"Apply a preset" }
+                            div {
+                                style = "display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.25rem;"
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "dark"
+                                    +"Dark"
+                                }
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "light"
+                                    +"Light"
+                                }
+                                button(type = ButtonType.button, classes = "btn btn-ghost") {
+                                    attributes["data-preset"] = "simple"
+                                    +"Simple"
+                                }
+                            }
+                            p("field-hint") { +"Fills all color fields below with the selected palette. Save to apply." }
+                        }
+
+                        // ---- Live preview ----
+                        p("form-section-title") { +"Preview" }
+                        div("field") {
+                            div {
+                                style = "border-radius:8px; overflow:hidden; max-width:260px;"
+                                div {
+                                    id = "previewCard"
+                                    style = "padding:1.25rem; border:1px solid #3f3f46; border-top:3px solid #1FBCFF; background:#18181b; border-radius:8px;"
+                                    p {
+                                        id = "previewTitle"
+                                        style = "font-weight:600; font-size:0.85rem; margin:0 0 1rem; color:#fafafa;"
+                                        +"Sign in"
+                                    }
+                                    div {
+                                        id = "previewInput"
+                                        style = "height:2rem; border-radius:4px; border:1px solid #3f3f46; background:#27272a; margin-bottom:0.75rem;"
+                                    }
+                                    div {
+                                        id = "previewBtn"
+                                        style = "height:2rem; border-radius:4px; text-align:center; line-height:2rem; font-size:0.78rem; font-weight:600; background:#1FBCFF; color:#09090b;"
+                                        +"Sign in"
+                                    }
+                                    p {
+                                        id = "previewMuted"
+                                        style = "font-size:0.75rem; margin:0.75rem 0 0; text-align:center; color:#a1a1aa;"
+                                        +"Forgot password?"
+                                    }
+                                }
+                            }
+                        }
+
+                        // ---- Color inputs (2-column grid) ----
+                        p("form-section-title") { +"Colors" }
+                        div {
+                            style = "display:grid; grid-template-columns:1fr 1fr; gap:0.75rem 1.5rem;"
+                            div("field") {
+                                label { htmlFor = "themeAccentColor"; +"Accent" }
+                                input(type = InputType.color, name = "themeAccentColor") {
+                                    id = "themeAccentColor"
+                                    value = workspace.theme.accentColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeAccentHover"; +"Accent Hover" }
+                                input(type = InputType.color, name = "themeAccentHover") {
+                                    id = "themeAccentHover"
+                                    value = workspace.theme.accentHoverColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgDeep"; +"Page Background" }
+                                input(type = InputType.color, name = "themeBgDeep") {
+                                    id = "themeBgDeep"
+                                    value = workspace.theme.bgDeep
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgCard"; +"Card Background" }
+                                input(type = InputType.color, name = "themeBgCard") {
+                                    id = "themeBgCard"
+                                    value = workspace.theme.bgCard
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBgInput"; +"Input Background" }
+                                input(type = InputType.color, name = "themeBgInput") {
+                                    id = "themeBgInput"
+                                    value = workspace.theme.bgInput
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeBorderColor"; +"Border" }
+                                input(type = InputType.color, name = "themeBorderColor") {
+                                    id = "themeBorderColor"
+                                    value = workspace.theme.borderColor
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeTextPrimary"; +"Text Primary" }
+                                input(type = InputType.color, name = "themeTextPrimary") {
+                                    id = "themeTextPrimary"
+                                    value = workspace.theme.textPrimary
+                                }
+                            }
+                            div("field") {
+                                label { htmlFor = "themeTextMuted"; +"Text Muted" }
+                                input(type = InputType.color, name = "themeTextMuted") {
+                                    id = "themeTextMuted"
+                                    value = workspace.theme.textMuted
+                                }
+                            }
+                        }
+
+                        div("field") {
+                            label { htmlFor = "themeBorderRadius"; +"Border Radius" }
+                            input(type = InputType.text, name = "themeBorderRadius") {
+                                id = "themeBorderRadius"
+                                value = workspace.theme.borderRadius
+                                placeholder = "8px"
+                            }
+                            p("field-hint") { +"Applied to cards, inputs, and buttons on auth pages. e.g. 0px, 6px, 12px." }
+                        }
+
+                        // ---- Assets ----
+                        p("form-section-title") { +"Assets" }
+                        div("field") {
+                            label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
+                            input(type = InputType.url, name = "themeLogoUrl") {
+                                id = "themeLogoUrl"
+                                placeholder = "https://cdn.example.com/logo.png"
+                                value = workspace.theme.logoUrl ?: ""
+                            }
+                            p("field-hint") { +"Shown above the login card. Recommended max 180×48px." }
+                        }
+                        div("field") {
+                            label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
+                            input(type = InputType.url, name = "themeFaviconUrl") {
+                                id = "themeFaviconUrl"
+                                placeholder = "https://cdn.example.com/favicon.ico"
+                                value = workspace.theme.faviconUrl ?: ""
+                            }
+                        }
+
+                        div("form-actions") {
+                            button(type = ButtonType.submit, classes = "btn") { +"Save Branding" }
+                            a(
+                                "/admin/workspaces/${workspace.slug}/settings",
+                                classes = "btn btn-ghost",
+                            ) { +"← General Settings" }
+                        }
+
+                        // ---- Script: preset fill + live preview ----
+                        script {
+                            unsafe {
+                                +(
+                                    """
+(function () {
+  var PRESETS = {
+    dark: {
+      themeAccentColor: '#1FBCFF', themeAccentHover: '#0ea5d9',
+      themeBgDeep: '#09090b', themeBgCard: '#18181b', themeBgInput: '#27272a',
+      themeBorderColor: '#3f3f46', themeBorderRadius: '8px',
+      themeTextPrimary: '#fafafa', themeTextMuted: '#a1a1aa'
+    },
+    light: {
+      themeAccentColor: '#0ea5d9', themeAccentHover: '#0284c7',
+      themeBgDeep: '#f8fafc', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
+      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
+      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
+    },
+    simple: {
+      themeAccentColor: '#212121', themeAccentHover: '#000000',
+      themeBgDeep: '#fafafa', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
+      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
+      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
+    }
+  };
+
+  function updatePreview() {
+    var card   = document.getElementById('previewCard');
+    var title  = document.getElementById('previewTitle');
+    var inp    = document.getElementById('previewInput');
+    var btn    = document.getElementById('previewBtn');
+    var muted  = document.getElementById('previewMuted');
+    if (!card) return;
+    var accent = document.getElementById('themeAccentColor').value;
+    var bg     = document.getElementById('themeBgCard').value;
+    var bgIn   = document.getElementById('themeBgInput').value;
+    var border = document.getElementById('themeBorderColor').value;
+    var text   = document.getElementById('themeTextPrimary').value;
+    var mutedC = document.getElementById('themeTextMuted').value;
+    card.style.background     = bg;
+    card.style.borderColor    = border;
+    card.style.borderTopColor = accent;
+    title.style.color         = text;
+    inp.style.background      = bgIn;
+    inp.style.borderColor     = border;
+    btn.style.background      = accent;
+    btn.style.color           = bg;
+    muted.style.color         = mutedC;
+  }
+
+  document.querySelectorAll('[data-preset]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var p = PRESETS[this.getAttribute('data-preset')];
+      if (!p) return;
+      Object.keys(p).forEach(function (key) {
+        var el = document.getElementById(key);
+        if (el) el.value = p[key];
+      });
+      updatePreview();
+    });
+  });
+
+  ['themeAccentColor','themeBgCard','themeBgInput','themeBorderColor',
+   'themeTextPrimary','themeTextMuted'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('input', updatePreview);
+  });
+
+  updatePreview();
+})();
+                                    """.trimIndent()
+                                )
+                            }
                         }
                     }
                 }
