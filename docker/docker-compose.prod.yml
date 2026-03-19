@@ -18,6 +18,8 @@
 #   ACME_EMAIL=you@yourdomain.com       # Let's Encrypt notifications
 # ─────────────────────────────────────────────────────────────────────────────
 
+name: kotauth
+
 services:
   caddy:
     image: caddy:2-alpine

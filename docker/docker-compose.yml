@@ -13,6 +13,8 @@
 # To build from source instead, use docker/docker-compose.dev.yml (or: make up).
 # ─────────────────────────────────────────────────────────────────────────────
 
+name: kotauth
+
 services:
   db:
     image: postgres:15
@@ -36,7 +38,7 @@ services:
     image: ghcr.io/inumansoul/kotauth:latest
     container_name: kotauth
     env_file:
-      - ../.env
+      - .env
     environment:
       # DB_URL takes full precedence if set in .env — use it to connect to an
       # external or managed database (e.g. RDS, Supabase, Neon).

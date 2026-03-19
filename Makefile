@@ -40,24 +40,28 @@ jar: ## Build fat JAR only, skipping tests (faster iteration)
 	./gradlew buildFatJar -x test
 
 # ── Docker ────────────────────────────────────────────────────────────────────
+# --project-directory . ensures Docker Compose reads .env and resolves env_file
+# paths from the repo root, not from the docker/ subdirectory.
 # Makefile targets use docker/docker-compose.dev.yml (build from source).
 # To run the pre-built image instead:
-#   docker compose -f docker/docker-compose.yml up -d
+#   docker compose --project-directory . -f docker/docker-compose.yml up -d
+
+COMPOSE_DEV = docker compose --project-directory . -f docker/docker-compose.dev.yml
 
 up: ## Build images from source and start all services (dev)
-	docker compose -f docker/docker-compose.dev.yml up -d --build
+	$(COMPOSE_DEV) up -d --build
 
 up-fresh: ## Rebuild dev images from scratch (no layer cache)
-	docker compose -f docker/docker-compose.dev.yml build --no-cache && docker compose -f docker/docker-compose.dev.yml up -d
+	$(COMPOSE_DEV) build --no-cache && $(COMPOSE_DEV) up -d
 
 down: ## Stop and remove containers
-	docker compose -f docker/docker-compose.dev.yml down
+	$(COMPOSE_DEV) down
 
 nuke: ## Stop containers and wipe volumes (destroys the database)
-	docker compose -f docker/docker-compose.dev.yml down -v
+	$(COMPOSE_DEV) down -v
 
 logs: ## Follow app container logs
-	docker compose -f docker/docker-compose.dev.yml logs -f app
+	$(COMPOSE_DEV) logs -f app
 
 health: ## Probe the local health endpoint
 	@curl -sf http://localhost:8080/health/ready && echo " OK" || echo " FAILED"
