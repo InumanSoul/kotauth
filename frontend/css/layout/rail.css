@@ -18,7 +18,7 @@
 .rail-brand {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
@@ -31,13 +31,14 @@
   margin-block-end: 1rem;
 
   img {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     object-fit: contain;
+    opacity: 0.5;
   }
 }
 
-.rail-brand:hover { opacity: 0.75; }
+.rail-brand:hover { opacity: 1; }
 
 /* Nav item list */
 .rail-nav {
