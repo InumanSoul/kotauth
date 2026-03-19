@@ -17,12 +17,6 @@ object WelcomeView {
     // Data shapes
     // -------------------------------------------------------------------------
 
-    data class AppInfo(
-        val version: String,
-        val kotlinVersion: String,
-        val ktorVersion: String,
-    )
-
     data class HealthInfo(
         val dbStatus: String,
         val dbLatencyMs: Long?,
@@ -145,46 +139,46 @@ object WelcomeView {
                         }
                     }
                     // -- Quick links ---------------------------------------------
-                    div(classes = "card-grid") {
-                        a(classes = "card", href = "/admin"){
-                            div(classes = "card__top") {
-                                div(classes = "card__icon") {
+                    div(classes = "wc-card-grid") {
+                        a(classes = "wc-card", href = "/admin"){
+                            div(classes = "wc-card__top") {
+                                div(classes = "wc-card__icon") {
                                     inlineSvgIcon(iconName = "admin", ariaLabel = "admin console icon")
                                 }
-                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "card__arrow")
+                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "wc-card__arrow")
                             }
-                            div(classes = "card__title") { +"Admin Console" }
-                            div(classes = "card__desc") { +"Manage applications, users, scopes and OAuth clients through the visual interface." }
+                            div(classes = "wc-card__title") { +"Admin Console" }
+                            div(classes = "wc-card__desc") { +"Manage applications, users, scopes and OAuth clients through the visual interface." }
                         }
-                        a(classes = "card", href = "/api/docs"){
-                            div(classes = "card__top") {
-                                div(classes = "card__icon") {
+                        a(classes = "wc-card", href = "/api/docs"){
+                            div(classes = "wc-card__top") {
+                                div(classes = "wc-card__icon") {
                                     inlineSvgIcon(iconName = "code", ariaLabel = "api docs icon")
                                 }
-                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "card__arrow")
+                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "wc-card__arrow")
                             }
-                            div(classes = "card__title") { +"API Docs" }
-                            div(classes = "card__desc") { +"Explore the REST API with interactive documentation, schemas and request examples." }
+                            div(classes = "wc-card__title") { +"API Docs" }
+                            div(classes = "wc-card__desc") { +"Explore the REST API with interactive documentation, schemas and request examples." }
                         }
-                        a(classes = "card", href = "/health/ready"){
-                            div(classes = "card__top") {
-                                div(classes = "card__icon") {
+                        a(classes = "wc-card", href = "/health/ready"){
+                            div(classes = "wc-card__top") {
+                                div(classes = "wc-card__icon") {
                                     inlineSvgIcon(iconName = "pulse", ariaLabel = "health check icon")
                                 }
-                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "card__arrow")
+                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "wc-card__arrow")
                             }
-                            div(classes = "card__title") { +"Health Check" }
-                            div(classes = "card__desc") { +"Inspect runtime health, database connectivity and configuration status as JSON." }
+                            div(classes = "wc-card__title") { +"Health Check" }
+                            div(classes = "wc-card__desc") { +"Inspect runtime health, database connectivity and configuration status as JSON." }
                         }
-                        a(classes = "card", href = "/t/master/.well-known/openid-configuration"){
-                            div(classes = "card__top") {
-                                div(classes = "card__icon") {
+                        a(classes = "wc-card", href = "/t/master/.well-known/openid-configuration"){
+                            div(classes = "wc-card__top") {
+                                div(classes = "wc-card__icon") {
                                     inlineSvgIcon(iconName = "globe", ariaLabel = "oidc discovery icon")
                                 }
-                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "card__arrow")
+                                inlineSvgIcon(iconName = "arrow-t-r", ariaLabel = "arrow icon", cssClass = "wc-card__arrow")
                             }
-                            div(classes = "card__title") { +"OIDC Discovery" }
-                            div(classes = "card__desc") { +"View the OpenID Connect discovery document, endpoint metadata and supported claims." }
+                            div(classes = "wc-card__title") { +"OIDC Discovery" }
+                            div(classes = "wc-card__desc") { +"View the OpenID Connect discovery document, endpoint metadata and supported claims." }
                         }
                     }
 
