@@ -20,7 +20,7 @@
   padding: 0.5rem 1rem;
   background: var(--color-accent);
   border: 1px solid var(--color-accent);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   color: #05080a;
   font-size: 0.8rem;
   font-weight: 600;

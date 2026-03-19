@@ -42,6 +42,7 @@ Kotlin
   test           Run the test suite
   build          Full build — CSS + lint + tests + fat JAR
   jar            Fat JAR only, skipping tests
+  version        Generate version.properties resource (required before running from IDE)
 
 Docker
   up             Build images and start all services

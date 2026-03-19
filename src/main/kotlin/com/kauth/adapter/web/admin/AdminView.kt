@@ -140,6 +140,12 @@ object AdminView {
                                     }
                                 }
                             }
+                            a(
+                                href = "/admin/workspaces/new",
+                                classes = "ws-dropdown-item ws-dropdown-create",
+                            ) {
+                                +"Add a workspace"
+                            }
                         }
                     }
 
@@ -152,9 +158,6 @@ object AdminView {
 
                     // Right: new workspace + profile avatar
                     div("topbar-right") {
-                        a("/admin/workspaces/new", classes = "btn btn-primary btn-sm") {
-                            span { +"New Workspace" }
-                        }
                         div("topbar-avatar") {
                             attributes["title"] = "Signed in as $loggedInAs"
                             +(loggedInAs.firstOrNull()?.uppercaseChar()?.toString() ?: "A")
@@ -180,7 +183,6 @@ object AdminView {
                     // When a workspace is selected, rail items navigate to workspace-scoped URLs.
                     // Without a workspace, directory/security/logs fall back to the redirect stubs.
                     div("rail") {
-                        a("/admin", classes = "rail-brand") { +"K" }
                         div("rail-nav") {
                             val ws = workspaceSlug
                             railItem(
@@ -207,23 +209,30 @@ object AdminView {
                                 activeRail,
                                 "logs",
                             )
+                            railItem(
+                                if (ws != null) "/admin/workspaces/$ws/settings" else "/admin/settings",
+                                "settings",
+                                activeRail,
+                                "settings"
+                            )
                         }
                         div("rail-spacer") {}
-                        div("rail-nav") {
-                            val ws = workspaceSlug
-                            railItem("/admin/workspaces/$ws/settings", "settings", activeRail, "settings")
+                        a("/admin", classes = "rail-brand") {
+                            img(src = "/static/favicon/favicon-32x32.png", alt = "kotauth Brand") {}
                         }
                     }
 
                     // Context panel (220px)
-                    div("ctx-panel") {
-                        div("ctx-nav") {
-                            when (activeRail) {
-                                "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
-                                "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
-                                "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
-                                "logs" -> renderLogsCtxPanel(activeAppSection)
-                                "settings" -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
+                    if (workspaceSlug != null) {
+                        div("ctx-panel") {
+                            div("ctx-nav") {
+                                when (activeRail) {
+                                    "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
+                                    "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
+                                    "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
+                                    "logs" -> renderLogsCtxPanel(activeAppSection)
+                                    "settings" -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
+                                }
                             }
                         }
                     }
@@ -248,15 +257,6 @@ object AdminView {
         apps: List<Pair<String, String>>,
         activeAppSlug: String?,
     ) {
-        if (workspaceSlug == null) {
-            // No workspace selected — guide the user
-            div("ctx-empty") {
-                div("ctx-empty-icon") { +"◫" }
-                p("ctx-empty-text") { +"Select a workspace to view its applications." }
-            }
-            return
-        }
-
         span("ctx-section-title") { +"Applications" }
 
         if (apps.isEmpty()) {
@@ -392,9 +392,7 @@ object AdminView {
             body {
                 div("login-shell") {
                     div("brand") {
-                        div("brand-mark") { +"K" }
-                        div("brand-name") { +"KotAuth" }
-                        div("brand-sub") { +"Admin Console" }
+                        img(src = "/static/brand/kotauth-negative.svg", alt = "kotauth Brand") {}
                     }
                     div("login-card") {
                         h1("card-title") { +"Administrator Login" }
@@ -435,6 +433,7 @@ object AdminView {
                             button(type = ButtonType.submit, classes = "btn btn-full") { +"Sign In" }
                         }
                     }
+                    p("copyright") { +"© ${java.time.Year.now()} Powered by kotauth" }
                 }
             }
         }

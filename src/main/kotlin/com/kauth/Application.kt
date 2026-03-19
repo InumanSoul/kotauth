@@ -24,14 +24,17 @@ import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
+import com.kauth.adapter.web.WelcomeView
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.healthRoutes
+import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
+import com.kauth.adapter.web.welcomeRoutes
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
@@ -59,14 +62,18 @@ import io.ktor.server.netty.*
 import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.callloging.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
+import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 import kotlin.system.exitProcess
+
+private val startupLog = LoggerFactory.getLogger("com.kauth.startup")
 
 /**
  * KotAuth — Composition Root (Phase 2)
@@ -86,6 +93,9 @@ import kotlin.system.exitProcess
  *   4. Start Ktor server
  */
 fun main() {
+    val startTime = System.currentTimeMillis()
+    val appInfo = loadAppInfo()
+
     // -------------------------------------------------------------------------
     // Phase 0: Startup validation — fail fast on misconfigured environment
     // -------------------------------------------------------------------------
@@ -120,6 +130,7 @@ fun main() {
     val isLocalhost = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
 
     val env = System.getenv("KAUTH_ENV") ?: "development"
+    val isDevelopment = env != "production"
 
     if (!isHttps) {
         when {
@@ -363,6 +374,7 @@ fun main() {
     // -------------------------------------------------------------------------
     val loginRateLimiter = RateLimiter(maxRequests = 5, windowSeconds = 60) // 5 attempts / minute per IP
     val registerRateLimiter = RateLimiter(maxRequests = 3, windowSeconds = 300) // 3 registrations / 5 min per IP
+    val tokenRateLimiter = RateLimiter(maxRequests = 20, windowSeconds = 60) // 20 token requests / minute per IP
 
     // Phase 3b: portal session signing key — derived from KAUTH_SECRET_KEY for persistence
     // across restarts. Random key is used as fallback (sessions are valid only until restart).
@@ -378,35 +390,60 @@ fun main() {
             }
         }
 
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-        module(
-            authService = authService,
-            oauthService = oauthService,
-            adminService = adminService,
-            roleGroupService = roleGroupService,
-            selfServiceService = selfServiceService,
-            mfaService = mfaService,
-            mfaRepository = mfaRepository,
-            roleRepository = roleRepository,
-            groupRepository = groupRepository,
-            tenantRepository = tenantRepository,
-            applicationRepository = applicationRepository,
-            userRepository = userRepository,
-            sessionRepository = sessionRepository,
-            auditLogRepository = auditLogRepository,
-            keyProvisioningService = keyProvisioning,
-            loginRateLimiter = loginRateLimiter,
-            registerRateLimiter = registerRateLimiter,
-            portalSessionKey = portalSessionKey,
-            baseUrl = baseUrl,
-            portalClientProvisioning = portalClientProvisioning,
-            socialLoginService = socialLoginService,
-            identityProviderRepository = identityProviderRepository,
-            apiKeyService = apiKeyService,
-            apiKeyRepository = apiKeyRepository,
-            webhookService = webhookService,
-        )
-    }.start(wait = true)
+    val server =
+        embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+            module(
+                authService = authService,
+                oauthService = oauthService,
+                adminService = adminService,
+                roleGroupService = roleGroupService,
+                selfServiceService = selfServiceService,
+                mfaService = mfaService,
+                mfaRepository = mfaRepository,
+                roleRepository = roleRepository,
+                groupRepository = groupRepository,
+                tenantRepository = tenantRepository,
+                applicationRepository = applicationRepository,
+                userRepository = userRepository,
+                sessionRepository = sessionRepository,
+                auditLogRepository = auditLogRepository,
+                keyProvisioningService = keyProvisioning,
+                loginRateLimiter = loginRateLimiter,
+                registerRateLimiter = registerRateLimiter,
+                tokenRateLimiter = tokenRateLimiter,
+                portalSessionKey = portalSessionKey,
+                baseUrl = baseUrl,
+                portalClientProvisioning = portalClientProvisioning,
+                socialLoginService = socialLoginService,
+                identityProviderRepository = identityProviderRepository,
+                apiKeyService = apiKeyService,
+                apiKeyRepository = apiKeyRepository,
+                webhookService = webhookService,
+                appInfo = appInfo,
+                startTime = startTime,
+                isDevelopment = isDevelopment,
+            )
+        }
+
+    // Allow in-flight requests to complete before the JVM exits.
+    // 1 s grace lets active connections drain; 5 s hard timeout ensures
+    // the container actually stops and doesn't hang a deploy pipeline.
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            server.stop(gracePeriodMillis = 1_000, timeoutMillis = 5_000)
+        },
+    )
+
+    startupLog.info(
+        "KotAuth v{} started | env={} | baseUrl={} | encryption={} | jvm={}",
+        appInfo.version,
+        env,
+        baseUrl,
+        EncryptionService.isAvailable,
+        System.getProperty("java.version"),
+    )
+
+    server.start(wait = true)
 }
 
 fun Application.module(
@@ -427,6 +464,7 @@ fun Application.module(
     groupRepository: com.kauth.domain.port.GroupRepository,
     loginRateLimiter: RateLimiter,
     registerRateLimiter: RateLimiter,
+    tokenRateLimiter: RateLimiter,
     portalSessionKey: ByteArray,
     baseUrl: String,
     portalClientProvisioning: PortalClientProvisioning,
@@ -435,10 +473,27 @@ fun Application.module(
     apiKeyService: ApiKeyService? = null, // Phase 3a
     apiKeyRepository: com.kauth.domain.port.ApiKeyRepository? = null, // Phase 3a
     webhookService: WebhookService? = null, // Phase 4
+    appInfo: WelcomeView.AppInfo,
+    startTime: Long,
+    isDevelopment: Boolean,
 ) {
     // -------------------------------------------------------------------------
     // Plugins
     // -------------------------------------------------------------------------
+
+    // Security headers added to every response.
+    // HSTS is only emitted when the server is behind HTTPS — sending it over HTTP
+    // in development would lock the browser to HTTPS on localhost.
+    install(DefaultHeaders) {
+        header("X-Content-Type-Options", "nosniff")
+        header("X-Frame-Options", "DENY")
+        header("Referrer-Policy", "strict-origin-when-cross-origin")
+        header(HttpHeaders.Server, "KotAuth")
+        if (baseUrl.startsWith("https://")) {
+            header(HttpHeaders.StrictTransportSecurity, "max-age=31536000; includeSubDomains")
+        }
+    }
+
     install(ContentNegotiation) { json() }
 
     // Assign a unique ID to every request and echo it in the X-Request-Id response header.
@@ -556,10 +611,8 @@ fun Application.module(
     routing {
         staticResources("/static", "static")
 
-        // Root → master tenant login
-        get("/") {
-            call.respondRedirect("/t/master/login", permanent = false)
-        }
+        // Welcome / status page — developer landing page at the root
+        welcomeRoutes(baseUrl, appInfo, startTime, isDevelopment)
 
         // Health probes — liveness (/health) + readiness (/health/ready)
         healthRoutes(baseUrl)
@@ -571,6 +624,7 @@ fun Application.module(
             tenantRepository = tenantRepository,
             loginRateLimiter = loginRateLimiter,
             registerRateLimiter = registerRateLimiter,
+            tokenRateLimiter = tokenRateLimiter,
             selfServiceService = selfServiceService,
             mfaService = mfaService,
             roleRepository = roleRepository,

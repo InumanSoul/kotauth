@@ -29,6 +29,7 @@ import io.ktor.server.html.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.*
 
 /**
  * Web adapter — HTTP routes for the auth module (Phase 2).
@@ -60,6 +61,7 @@ fun Route.authRoutes(
     tenantRepository: TenantRepository,
     loginRateLimiter: RateLimiter,
     registerRateLimiter: RateLimiter,
+    tokenRateLimiter: RateLimiter,
     selfServiceService: UserSelfServiceService,
     mfaService: MfaService? = null, // Phase 3c — nullable for backward compat
     roleRepository: RoleRepository? = null, // Phase 1 fix — required_admins MFA check
@@ -680,36 +682,57 @@ fun Route.authRoutes(
             val issuer = tenant.issuerUrl ?: "$baseUrl/t/$slug"
 
             call.respond(
-                mapOf(
-                    "issuer" to issuer,
-                    "authorization_endpoint" to "$issuer/protocol/openid-connect/auth",
-                    "token_endpoint" to "$issuer/protocol/openid-connect/token",
-                    "userinfo_endpoint" to "$issuer/protocol/openid-connect/userinfo",
-                    "jwks_uri" to "$issuer/protocol/openid-connect/certs",
-                    "end_session_endpoint" to "$issuer/protocol/openid-connect/logout",
-                    "revocation_endpoint" to "$issuer/protocol/openid-connect/revoke",
-                    "introspection_endpoint" to "$issuer/protocol/openid-connect/introspect",
-                    "response_types_supported" to listOf("code"),
-                    "grant_types_supported" to
-                        listOf("authorization_code", "client_credentials", "refresh_token"),
-                    "subject_types_supported" to listOf("public"),
-                    "id_token_signing_alg_values_supported" to listOf("RS256"),
-                    "token_endpoint_auth_methods_supported" to listOf("client_secret_post", "client_secret_basic"),
-                    "scopes_supported" to listOf("openid", "profile", "email"),
-                    "claims_supported" to
-                        listOf(
-                            "sub",
-                            "iss",
-                            "aud",
-                            "exp",
-                            "iat",
-                            "email",
-                            "email_verified",
-                            "name",
-                            "preferred_username",
-                        ),
-                    "code_challenge_methods_supported" to listOf("S256"),
-                ),
+                buildJsonObject {
+                    put("issuer", issuer)
+                    put("authorization_endpoint", "$issuer/protocol/openid-connect/auth")
+                    put("token_endpoint", "$issuer/protocol/openid-connect/token")
+                    put("userinfo_endpoint", "$issuer/protocol/openid-connect/userinfo")
+                    put("jwks_uri", "$issuer/protocol/openid-connect/certs")
+                    put("end_session_endpoint", "$issuer/protocol/openid-connect/logout")
+                    put("revocation_endpoint", "$issuer/protocol/openid-connect/revoke")
+                    put("introspection_endpoint", "$issuer/protocol/openid-connect/introspect")
+                    put("response_types_supported", buildJsonArray { add("code") })
+                    put(
+                        "grant_types_supported",
+                        buildJsonArray {
+                            add("authorization_code")
+                            add("client_credentials")
+                            add("refresh_token")
+                        },
+                    )
+                    put("subject_types_supported", buildJsonArray { add("public") })
+                    put("id_token_signing_alg_values_supported", buildJsonArray { add("RS256") })
+                    put(
+                        "token_endpoint_auth_methods_supported",
+                        buildJsonArray {
+                            add("client_secret_post")
+                            add("client_secret_basic")
+                        },
+                    )
+                    put(
+                        "scopes_supported",
+                        buildJsonArray {
+                            add("openid")
+                            add("profile")
+                            add("email")
+                        },
+                    )
+                    put(
+                        "claims_supported",
+                        buildJsonArray {
+                            add("sub")
+                            add("iss")
+                            add("aud")
+                            add("exp")
+                            add("iat")
+                            add("email")
+                            add("email_verified")
+                            add("name")
+                            add("preferred_username")
+                        },
+                    )
+                    put("code_challenge_methods_supported", buildJsonArray { add("S256") })
+                },
             )
         }
 
@@ -1250,9 +1273,20 @@ fun Route.authRoutes(
 
         post("/protocol/openid-connect/token") {
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val ipAddress = call.request.local.remoteAddress
+
+            if (!tokenRateLimiter.isAllowed("token:$ipAddress")) {
+                return@post call.respond(
+                    HttpStatusCode.TooManyRequests,
+                    mapOf(
+                        "error" to "rate_limit_exceeded",
+                        "error_description" to "Too many token requests. Please slow down.",
+                    ),
+                )
+            }
+
             val params = call.receiveParameters()
             val grantType = params["grant_type"] ?: ""
-            val ipAddress = call.request.local.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
 
             // Support both form body and Basic auth for client_id/secret

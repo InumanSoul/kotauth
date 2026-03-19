@@ -71,6 +71,7 @@ class AuthRoutesTest {
     // Rate limiters generous enough to never trip during tests
     private val loginLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
     private val registerLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
+    private val tokenLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
 
     // MockK mocks for services that aren't the focus of these tests
     private val selfService = mockk<UserSelfServiceService>(relaxed = true)
@@ -169,6 +170,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         mfaService = mfaService,
                     )
@@ -228,6 +230,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         mfaService = mfaService,
                     )
@@ -268,6 +271,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         // mfaService intentionally omitted
                     )
@@ -301,6 +305,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -337,6 +342,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -372,6 +378,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -403,6 +410,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -432,6 +440,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -490,6 +499,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -528,6 +538,7 @@ class AuthRoutesTest {
                         tenantRepository = tenantRepo,
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                     )
                 }
@@ -544,6 +555,164 @@ class AuthRoutesTest {
                 )
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/.well-known/openid-configuration — OIDC discovery
+    // =========================================================================
+
+    @Test
+    fun `GET openid-configuration returns 200 with all required OIDC fields as JSON`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(
+                response.headers["Content-Type"]?.contains("application/json") == true,
+                "Content-Type must be application/json",
+            )
+
+            val body = response.bodyAsText()
+            // Required OIDC discovery fields
+            assertTrue(body.contains("\"issuer\""), "Must contain issuer")
+            assertTrue(body.contains("\"authorization_endpoint\""), "Must contain authorization_endpoint")
+            assertTrue(body.contains("\"token_endpoint\""), "Must contain token_endpoint")
+            assertTrue(body.contains("\"jwks_uri\""), "Must contain jwks_uri")
+            assertTrue(body.contains("\"userinfo_endpoint\""), "Must contain userinfo_endpoint")
+            // Array fields must serialize as JSON arrays, not as raw strings —
+            // this is the direct regression guard for the Map<String, Any> serialization bug
+            assertTrue(
+                body.contains("\"response_types_supported\":[") ||
+                    body.contains("\"response_types_supported\": ["),
+                "response_types_supported must be a JSON array",
+            )
+            assertTrue(
+                body.contains("\"grant_types_supported\":[") ||
+                    body.contains("\"grant_types_supported\": ["),
+                "grant_types_supported must be a JSON array",
+            )
+        }
+
+    @Test
+    fun `GET openid-configuration returns 404 for unknown tenant slug`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/ghost/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertTrue(response.bodyAsText().contains("tenant_not_found"))
+        }
+
+    @Test
+    fun `GET openid-configuration uses custom issuerUrl when configured on tenant`() =
+        testApplication {
+            val customIssuer = "https://auth.custom.example.com"
+            tenantRepo.clear()
+            tenantRepo.add(tenant.copy(issuerUrl = customIssuer))
+            userRepo.clear()
+            userRepo.add(user)
+            appRepo.clear()
+            appRepo.add(publicApp)
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("\"issuer\":\"$customIssuer\"") ||
+                    body.contains("\"issuer\": \"$customIssuer\""),
+                "issuer must equal the tenant's custom issuerUrl",
+            )
+            // All derived endpoints must also be rooted at the custom issuer
+            assertTrue(
+                body.contains(customIssuer),
+                "Derived endpoint URLs must use the custom issuer as their base",
+            )
+        }
+
+    @Test
+    fun `GET openid-configuration derives issuer from request when tenant issuerUrl is null`() =
+        testApplication {
+            // Default tenant fixture already has issuerUrl = null
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            // Issuer must include the tenant slug path segment
+            assertTrue(
+                body.contains("/t/acme"),
+                "Derived issuer must contain the tenant slug path segment",
+            )
+            // Derived endpoints must be consistent with the issuer
+            assertTrue(
+                body.contains("/t/acme/protocol/openid-connect/token"),
+                "token_endpoint must be derived from the fallback issuer",
+            )
         }
 
     // -------------------------------------------------------------------------

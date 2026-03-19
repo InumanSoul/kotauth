@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
-> Last updated: 2026-03-17
-> Current version: 1.0.0-dev (Phase 4 Webhooks complete — Phase 5 Documentation next)
+> Last updated: 2026-03-19
+> Current version: 1.0.0 (Phase 4 Webhooks complete — Phase 5 Documentation next)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
@@ -34,6 +34,11 @@ This document is the living record of what has been built, what compiles and run
 | Swagger UI (`/api/docs`) + OpenAPI spec | ✅ Functional |
 | Webhook endpoints (admin UI + delivery) | ✅ Functional |
 | Webhook event fan-out (async, HMAC-signed) | ✅ Functional |
+| Welcome / status page (`GET /`) | ✅ Functional |
+| Security headers (X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy) | ✅ Applied to all responses |
+| Token endpoint rate limiting (20 req/min per IP) | ✅ Active |
+| Graceful shutdown (1 s grace, 5 s hard timeout) | ✅ Active |
+| Structured startup log (version, env, baseUrl, encryption) | ✅ Active |
 
 ---
 

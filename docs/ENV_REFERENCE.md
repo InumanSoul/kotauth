@@ -29,8 +29,8 @@ Controls startup validation strictness.
 
 | Value | Behavior |
 |---|---|
-| `development` | HTTP allowed, default secrets tolerated, startup warnings printed |
-| `production` | HTTPS required, default JWT secret rejected, strict cookie flags enforced |
+| `development` | HTTP allowed, default secrets tolerated, startup warnings printed, welcome page shows live health details |
+| `production` | HTTPS required, default JWT secret rejected, strict cookie flags enforced, welcome page hides health details |
 
 ```
 KAUTH_ENV=production
@@ -137,6 +137,7 @@ These are not environment variables — they are configured per workspace throug
 
 ```env
 KAUTH_BASE_URL=http://localhost:8080
+KAUTH_ENV=development
 KAUTH_SECRET_KEY=a2c35a1bfe82492eb087c5a29b28fc2b1fc2505da2a6f5dd37201c2bf4df39b3
 # DB is injected by docker-compose, no need to set here
 ```
