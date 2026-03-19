@@ -38,8 +38,11 @@ services:
     env_file:
       - ../.env
     environment:
-      # Database connection — wired to the db service above.
-      DB_URL: jdbc:postgresql://db:5432/${DB_NAME:-kotauth_db}
+      # DB_URL takes full precedence if set in .env — use it to connect to an
+      # external or managed database (e.g. RDS, Supabase, Neon).
+      # If not set, the URL is constructed from DB_HOST, DB_PORT, and DB_NAME,
+      # which point at the bundled db service by default.
+      DB_URL: ${DB_URL:-jdbc:postgresql://${DB_HOST:-db}:${DB_PORT:-5432}/${DB_NAME:-kotauth_db}}
       DB_USER: ${DB_USER:-kotauth}
       DB_PASSWORD: ${DB_PASSWORD}
     ports:
