@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth lint lint-fix test build jar up up-fresh down nuke logs health
+.PHONY: help css css-admin css-auth lint lint-fix test build jar version up up-fresh down nuke logs health
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,9 @@ css-auth: ## Compile the auth pages CSS bundle only
 	./gradlew compileCssAuth
 
 # ── Kotlin ────────────────────────────────────────────────────────────────────
+
+version: ## Generate version.properties resource (required before running from IDE)
+	./gradlew generateVersionProperties
 
 lint: ## Run ktlint check (all .kt except *View.kt)
 	./gradlew ktlintCheck
@@ -39,10 +42,10 @@ jar: ## Build fat JAR only, skipping tests (faster iteration)
 # ── Docker ────────────────────────────────────────────────────────────────────
 
 up: ## Build images and start all services
-	docker compose up --build
+	docker compose up -d --build
 
-up-fresh: ## Rebuild everything from scratch (no Docker layer cache)
-	docker compose up --build --no-cache
+up-fresh: ## Rebuild everything from scratch
+	docker compose up -d --build
 
 down: ## Stop and remove containers
 	docker compose down

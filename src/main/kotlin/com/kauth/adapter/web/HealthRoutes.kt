@@ -118,7 +118,7 @@ fun Route.healthRoutes(baseUrl: String) {
  * Uses the same Exposed DSL pattern as the rest of the persistence layer.
  * Measures round-trip latency to surface degraded performance early.
  */
-private fun pingDatabase(): DbCheckResult {
+internal fun pingDatabase(): DbCheckResult {
     val start = System.currentTimeMillis()
     return try {
         transaction {
@@ -142,7 +142,7 @@ private fun pingDatabase(): DbCheckResult {
  * Startup enforcement (exitProcess) handles hard failures; this surfaces
  * soft warnings for operators checking the health endpoint after deploy.
  */
-private fun checkConfig(baseUrl: String): ConfigCheckResult {
+internal fun checkConfig(baseUrl: String): ConfigCheckResult {
     val isHttps = baseUrl.startsWith("https://")
     val isLocalhost = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
     val secretKeyPresent = EncryptionService.isAvailable

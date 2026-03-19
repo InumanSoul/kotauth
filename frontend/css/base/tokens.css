@@ -65,6 +65,7 @@
   --space-10: 40px;
 
   /* ── Radius scale ────────────────────────────────────────────────────── */
+  --radius-none: 0;
   --radius-sm:   4px;
   --radius-md:   6px;
   --radius-lg:   8px;

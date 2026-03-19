@@ -95,10 +95,12 @@ Eight event types delivered with HMAC-SHA256 signatures: `user.created`, `user.u
 - bcrypt password hashing
 - AES-256-GCM encryption for SMTP credentials at rest
 - SHA-256 refresh token and API key hashing — never stored in plaintext
-- Rate limiting on login (5/min) and register (3/5 min) per IP
+- Rate limiting on login (5/min), register (3/5 min), and token endpoint (20/min) per IP
+- Security response headers on all responses: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security` (HTTPS only)
 - CSRF protection on all form endpoints
 - `Secure` cookie flag derived from `KAUTH_BASE_URL` at startup
 - Startup validation — server refuses to start if `KAUTH_ENV=production` and unsafe defaults are detected
+- Graceful shutdown — in-flight requests complete within a 5-second window before the server exits
 
 ### Deployment
 

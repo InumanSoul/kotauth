@@ -34,3 +34,4 @@
 /* ── Admin-specific pages ────────────────────────────────────────────────── */
 @import "./admin/login.css";
 @import "./admin/form-card.css";
+@import "./admin/welcome.css";

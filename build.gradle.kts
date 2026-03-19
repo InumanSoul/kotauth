@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.0.0"
+version = "1.0.1"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -34,6 +34,7 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     implementation("io.ktor:ktor-server-call-id:$ktorVersion")
+    implementation("io.ktor:ktor-server-default-headers:$ktorVersion")
 
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
@@ -141,9 +142,33 @@ val compileCssAuth =
         outputs.file("src/main/resources/static/kotauth-auth.css")
     }
 
-// Both CSS bundles must be ready before resources are packaged into the JAR
+// ── Version properties ────────────────────────────────────────────────────
+// Generates src/main/resources/version.properties so the running application
+// can report its own version without parsing build files at runtime.
+// The file is listed in .gitignore — it is produced fresh on every build.
+val generateVersionProperties =
+    tasks.register("generateVersionProperties") {
+        description = "Generates version.properties with app and runtime version metadata"
+        group = "build"
+
+        val propertiesFile = file("src/main/resources/version.properties")
+        outputs.file(propertiesFile)
+
+        doLast {
+            propertiesFile.parentFile.mkdirs()
+            propertiesFile.writeText(
+                """
+                app.version=${project.version}
+                kotlin.version=1.9.24
+                ktor.version=$ktorVersion
+                """.trimIndent(),
+            )
+        }
+    }
+
+// Both CSS bundles and version properties must be ready before resources are packaged into the JAR
 tasks.named("processResources") {
-    dependsOn(compileCssAdmin, compileCssAuth)
+    dependsOn(compileCssAdmin, compileCssAuth, generateVersionProperties)
 }
 
 ktlint {

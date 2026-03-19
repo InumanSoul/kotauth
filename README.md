@@ -18,7 +18,7 @@ Kotauth is an open-source authentication and identity platform that bridges the 
 - **REST API v1** — 30+ endpoints, API key authentication, OpenAPI 3.1 spec with Swagger UI
 - **Webhooks** — HMAC-signed event delivery with exponential backoff retry
 - **Audit logging** — 30+ immutable event types, append-only, queryable via API and admin UI
-- **Security** — bcrypt passwords, AES-256-GCM secrets at rest, rate limiting, per-tenant RS256 key pairs
+- **Security** — bcrypt passwords, AES-256-GCM secrets at rest, rate limiting on login/register/token endpoints (IP-based), security response headers (X-Content-Type-Options, X-Frame-Options, HSTS on HTTPS), per-tenant RS256 key pairs
 
 ---
 
@@ -33,13 +33,9 @@ git clone https://github.com/your-org/kotauth.git
 cd kotauth
 ```
 
-**2. Create your `.env` file**
+**2. Set up your `.env` file**
 
-```bash
-cp .env.example .env
-```
-
-The defaults work for local development. For a custom secret key:
+A `.env` file with safe development defaults is included in the repo. For a custom secret key:
 
 ```bash
 echo "KAUTH_SECRET_KEY=$(openssl rand -hex 32)" >> .env
@@ -141,7 +137,7 @@ KAUTH_SECRET_KEY=<openssl rand -hex 32>
 Swagger UI is available at:
 
 ```
-http://localhost:8080/t/{workspace-slug}/api/v1/docs
+http://localhost:8080/api/docs
 ```
 
 The raw OpenAPI 3.1 spec is at `src/main/resources/openapi/v1.yaml`.

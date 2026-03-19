@@ -1,0 +1,283 @@
+/* Welcome page styles */
+
+.welcome-shell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 100dvh;
+  padding: 1.5rem;
+  background: var(--color-bg);
+  overflow: auto;
+
+  a {
+    text-decoration: none;
+  }
+}
+
+.welcome-content {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.welcome-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -5%, rgba(31,188,255,0.28) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 35% at 85% 105%, rgba(31,188,255,0.20) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Header block */
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  img {
+    width: 160px;
+    height: 64px;
+    object-fit: contain;
+  }
+}
+
+/* dev status panel */
+.status-panel {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+  padding: 18px 24px;
+  margin-bottom: 0;
+  display: none;
+}
+
+.status-panel--visible {
+  display: block;
+}
+
+/* Top line states */
+.status-panel--ok       { border-top: 2px solid var(--color-green); }
+.status-panel--degraded { border-top: 2px solid var(--color-amber); }
+.status-panel--critical { border-top: 2px solid var(--color-red); }
+
+.status-panel__header {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  margin-bottom: 14px;
+}
+
+.status-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-item__label {
+  font-size: 11px;
+  color: var(--color-muted);
+  letter-spacing: 0.03em;
+}
+
+.status-item__value {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--color-text);
+  font-weight: 400;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-green);
+  box-shadow: 0 0 6px rgba(74,222,128,0.5);
+  flex-shrink: 0;
+}
+
+.status-dot--ok       { background: var(--color-green); box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+.status-dot--degraded { background: var(--color-amber); box-shadow: 0 0 6px rgba(245,158,11,0.5); }
+.status-dot--critical { background: var(--color-red); box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+
+.status-item__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  margin-top: 1px;
+}
+
+/* ── Card grid ── */
+.card-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+/* When status panel is visible above, collapse the shared border */
+.status-panel--visible + .card-grid {
+  border-top: none;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  text-decoration: none;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-card);
+  padding: 22px 24px;
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Right column: no right border (outer border owns it) */
+.card:nth-child(2n) {
+  border-right: none;
+}
+
+/* Last row: no bottom border (outer border owns it) */
+.card:nth-last-child(-n+2) {
+  border-bottom: none;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(31,188,255,0.05) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.card:hover {
+  box-shadow: inset 0 0 0 1px var(--color-border-em);
+  background: #1c1c21;
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+.card__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 0;
+  background: var(--color-accent-bg);
+  border: 1px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.card__icon svg {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.card__arrow {
+  color: var(--color-subtle);
+  transition: color 0.15s ease, transform 0.15s ease;
+  margin-top: 2px;
+}
+
+.card:hover .card__arrow {
+  color: var(--color-accent);
+  transform: translate(2px, -2px);
+}
+
+.card__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.card__desc {
+  font-size: 13px;
+  color: var(--color-muted);
+  line-height: 1.55;
+}
+
+
+/* ── Footer ── */
+.ft-notes {
+  margin-top: 24px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+  letter-spacing: 0.03em;
+  text-align: center;
+}
+
+.ft-notes span {
+  color: var(--color-subtle);
+  margin-inline: 1.25rem;
+}
+
+/* ── Responsive ── */
+@media (max-width: 520px) {
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+  /* All cards lose right border in single-col */
+  .card {
+    border-right: none;
+  }
+  /* Re-add bottom border to cards that 2-col rule removed */
+  .card:nth-last-child(-n+2) {
+    border-bottom: 1px solid var(--color-border);
+  }
+  /* Only the true last card has no bottom border */
+  .card:last-child {
+    border-bottom: none;
+  }
+  .status-panel__grid {
+    grid-template-columns: 1fr;
+  }
+}

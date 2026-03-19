@@ -1,5 +1,5 @@
 {
-  "version": "2.8",
+  "version": "2.9",
   "children": [
     {
       "type": "frame",
@@ -536,6 +536,8 @@
                 {
                   "type": "frame",
                   "id": "QxwTd",
+                  "x": 0,
+                  "y": 0,
                   "name": "Leading Icon",
                   "enabled": false,
                   "width": 24,
@@ -936,6 +938,8 @@
                 {
                   "type": "frame",
                   "id": "e8zkD",
+                  "x": 0,
+                  "y": 0,
                   "name": "Leading Icon",
                   "enabled": false,
                   "width": 24,
@@ -1043,6 +1047,8 @@
                 {
                   "type": "frame",
                   "id": "nKhRK",
+                  "x": 0,
+                  "y": 0,
                   "name": "plus",
                   "enabled": false,
                   "width": 20,
@@ -1409,6 +1415,8 @@
                 {
                   "type": "frame",
                   "id": "bmFzX",
+                  "x": 0,
+                  "y": 0,
                   "name": "Leading Icon",
                   "enabled": false,
                   "width": 24,
@@ -1686,6 +1694,8 @@
                 {
                   "type": "frame",
                   "id": "YkjVR",
+                  "x": 0,
+                  "y": 0,
                   "name": "Leading Icon",
                   "enabled": false,
                   "width": 24,
@@ -2307,6 +2317,8 @@
                                 {
                                   "type": "frame",
                                   "id": "hwjJ2",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2346,6 +2358,8 @@
                             {
                               "type": "frame",
                               "id": "ZlDGN",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -2409,6 +2423,8 @@
                                 {
                                   "type": "frame",
                                   "id": "KgqIS",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2448,6 +2464,8 @@
                             {
                               "type": "frame",
                               "id": "XUCDJ",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -2511,6 +2529,8 @@
                                 {
                                   "type": "frame",
                                   "id": "JJYZ3",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2550,6 +2570,8 @@
                             {
                               "type": "frame",
                               "id": "58Xt6",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -2643,6 +2665,8 @@
                                 {
                                   "type": "frame",
                                   "id": "qPEMI",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2744,6 +2768,8 @@
                                 {
                                   "type": "frame",
                                   "id": "rvDMM",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2845,6 +2871,8 @@
                                 {
                                   "type": "frame",
                                   "id": "5i3zU",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -2946,6 +2974,8 @@
                                 {
                                   "type": "frame",
                                   "id": "KzTlY",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -3047,6 +3077,8 @@
                                 {
                                   "type": "frame",
                                   "id": "JC8Hl",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -3148,6 +3180,8 @@
                                 {
                                   "type": "frame",
                                   "id": "VHRze",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -3492,6 +3526,8 @@
                             {
                               "type": "frame",
                               "id": "ioXMd",
+                              "x": 0,
+                              "y": 0,
                               "name": "Badge/Default",
                               "enabled": false,
                               "fill": "$p:--primary",
@@ -3524,9 +3560,11 @@
                         {
                           "type": "frame",
                           "id": "YZ8bV",
+                          "x": 0,
+                          "y": 0,
                           "name": "Card Actions",
                           "enabled": false,
-                          "width": "fill_container",
+                          "width": "fill_container(0)",
                           "height": 68,
                           "stroke": {
                             "align": "inside",
@@ -3620,6 +3658,8 @@
                             {
                               "type": "frame",
                               "id": "jZPIm",
+                              "x": 0,
+                              "y": 0,
                               "name": "Badge/Default",
                               "enabled": false,
                               "fill": "$p:--primary",
@@ -3652,9 +3692,11 @@
                         {
                           "type": "frame",
                           "id": "kBzaA",
+                          "x": 0,
+                          "y": 0,
                           "name": "Card Actions",
                           "enabled": false,
-                          "width": "fill_container",
+                          "width": "fill_container(0)",
                           "height": 68,
                           "stroke": {
                             "align": "inside",
@@ -3748,6 +3790,8 @@
                             {
                               "type": "frame",
                               "id": "Sqtys",
+                              "x": 0,
+                              "y": 0,
                               "name": "Badge/Default",
                               "enabled": false,
                               "fill": "$p:--primary",
@@ -3780,9 +3824,11 @@
                         {
                           "type": "frame",
                           "id": "jcNul",
+                          "x": 0,
+                          "y": 0,
                           "name": "Card Actions",
                           "enabled": false,
-                          "width": "fill_container",
+                          "width": "fill_container(0)",
                           "height": 68,
                           "stroke": {
                             "align": "inside",
@@ -4368,6 +4414,8 @@
                                 {
                                   "type": "frame",
                                   "id": "JfbHj",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -4407,6 +4455,8 @@
                             {
                               "type": "frame",
                               "id": "e5PmA",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -4470,6 +4520,8 @@
                                 {
                                   "type": "frame",
                                   "id": "H2xt9",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -4509,6 +4561,8 @@
                             {
                               "type": "frame",
                               "id": "kKJCR",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -4572,6 +4626,8 @@
                                 {
                                   "type": "frame",
                                   "id": "FXayR",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -4611,6 +4667,8 @@
                             {
                               "type": "frame",
                               "id": "A01bZ",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -4708,6 +4766,8 @@
                                 {
                                   "type": "frame",
                                   "id": "kbTRf",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -4810,6 +4870,8 @@
                                 {
                                   "type": "frame",
                                   "id": "KcqgL",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -4911,6 +4973,8 @@
                                 {
                                   "type": "frame",
                                   "id": "DqIzw",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -5012,6 +5076,8 @@
                                 {
                                   "type": "frame",
                                   "id": "XVp7v",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -5113,6 +5179,8 @@
                                 {
                                   "type": "frame",
                                   "id": "hQbWK",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -5214,6 +5282,8 @@
                                 {
                                   "type": "frame",
                                   "id": "tPTR6",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -5907,7 +5977,7 @@
                 "p:Mode": "Dark"
               },
               "clip": true,
-              "width": 307.9999999999116,
+              "width": 1365,
               "height": 711.0741222366711,
               "fill": "$p:--sidebar",
               "children": [
@@ -6256,6 +6326,8 @@
                                 {
                                   "type": "frame",
                                   "id": "Zm5Bw",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6295,6 +6367,8 @@
                             {
                               "type": "frame",
                               "id": "TjCyh",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -6358,6 +6432,8 @@
                                 {
                                   "type": "frame",
                                   "id": "E9Px3",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6397,6 +6473,8 @@
                             {
                               "type": "frame",
                               "id": "YOYpx",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -6460,6 +6538,8 @@
                                 {
                                   "type": "frame",
                                   "id": "0HtFa",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6499,6 +6579,8 @@
                             {
                               "type": "frame",
                               "id": "a1mMh",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -6592,6 +6674,8 @@
                                 {
                                   "type": "frame",
                                   "id": "uY42m",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6693,6 +6777,8 @@
                                 {
                                   "type": "frame",
                                   "id": "ztar9",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6794,6 +6880,8 @@
                                 {
                                   "type": "frame",
                                   "id": "Uvzau",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6895,6 +6983,8 @@
                                 {
                                   "type": "frame",
                                   "id": "saIr9",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -6996,6 +7086,8 @@
                                 {
                                   "type": "frame",
                                   "id": "4ET4b",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -7097,6 +7189,8 @@
                                 {
                                   "type": "frame",
                                   "id": "9S7fx",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -8429,6 +8523,8 @@
                             {
                               "type": "icon_font",
                               "id": "Q39o2",
+                              "x": 0,
+                              "y": 0,
                               "enabled": false,
                               "width": 12,
                               "height": 12,
@@ -8969,6 +9065,8 @@
                         {
                           "type": "frame",
                           "id": "8CDrH",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9008,6 +9106,8 @@
                     {
                       "type": "frame",
                       "id": "2qw9R",
+                      "x": 0,
+                      "y": 0,
                       "name": "Item Content Right",
                       "enabled": false,
                       "gap": 8,
@@ -9071,6 +9171,8 @@
                         {
                           "type": "frame",
                           "id": "ITDpc",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9110,6 +9212,8 @@
                     {
                       "type": "frame",
                       "id": "hcucx",
+                      "x": 0,
+                      "y": 0,
                       "name": "Item Content Right",
                       "enabled": false,
                       "gap": 8,
@@ -9173,6 +9277,8 @@
                         {
                           "type": "frame",
                           "id": "1PveL",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9212,6 +9318,8 @@
                     {
                       "type": "frame",
                       "id": "poPrt",
+                      "x": 0,
+                      "y": 0,
                       "name": "Item Content Right",
                       "enabled": false,
                       "gap": 8,
@@ -9305,6 +9413,8 @@
                         {
                           "type": "frame",
                           "id": "7B5Vi",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9406,6 +9516,8 @@
                         {
                           "type": "frame",
                           "id": "XU5Ih",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9507,6 +9619,8 @@
                         {
                           "type": "frame",
                           "id": "LNhwc",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9608,6 +9722,8 @@
                         {
                           "type": "frame",
                           "id": "f1oLI",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9709,6 +9825,8 @@
                         {
                           "type": "frame",
                           "id": "Vcpyj",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -9810,6 +9928,8 @@
                         {
                           "type": "frame",
                           "id": "ozdfp",
+                          "x": 0,
+                          "y": 0,
                           "name": "Leading Icon",
                           "enabled": false,
                           "width": 16,
@@ -10323,7 +10443,7 @@
                 "p:Mode": "Dark"
               },
               "clip": true,
-              "width": 1365.0000000000002,
+              "width": 1365,
               "height": "fill_container",
               "fill": "$p:--sidebar",
               "children": [
@@ -10672,6 +10792,8 @@
                                 {
                                   "type": "frame",
                                   "id": "kQeAw",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -10711,6 +10833,8 @@
                             {
                               "type": "frame",
                               "id": "GXYl9",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -10774,6 +10898,8 @@
                                 {
                                   "type": "frame",
                                   "id": "1QWrZ",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -10813,6 +10939,8 @@
                             {
                               "type": "frame",
                               "id": "5VJ6Y",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -10876,6 +11004,8 @@
                                 {
                                   "type": "frame",
                                   "id": "iv0cy",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -10915,6 +11045,8 @@
                             {
                               "type": "frame",
                               "id": "01L5c",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -11012,6 +11144,8 @@
                                 {
                                   "type": "frame",
                                   "id": "goVao",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -11113,6 +11247,8 @@
                                 {
                                   "type": "frame",
                                   "id": "MosWd",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -11215,6 +11351,8 @@
                                 {
                                   "type": "frame",
                                   "id": "6PDme",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -11316,6 +11454,8 @@
                                 {
                                   "type": "frame",
                                   "id": "0PBtu",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -11417,6 +11557,8 @@
                                 {
                                   "type": "frame",
                                   "id": "64erX",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -11518,6 +11660,8 @@
                                 {
                                   "type": "frame",
                                   "id": "VsCYX",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -12601,6 +12745,8 @@
                                 {
                                   "type": "frame",
                                   "id": "DrNgo",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -12640,6 +12786,8 @@
                             {
                               "type": "frame",
                               "id": "VbENA",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -12703,6 +12851,8 @@
                                 {
                                   "type": "frame",
                                   "id": "EB9I1",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -12742,6 +12892,8 @@
                             {
                               "type": "frame",
                               "id": "klaHM",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -12805,6 +12957,8 @@
                                 {
                                   "type": "frame",
                                   "id": "O0msi",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -12844,6 +12998,8 @@
                             {
                               "type": "frame",
                               "id": "FGOeT",
+                              "x": 0,
+                              "y": 0,
                               "name": "Item Content Right",
                               "enabled": false,
                               "gap": 8,
@@ -12937,6 +13093,8 @@
                                 {
                                   "type": "frame",
                                   "id": "DEKUa",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13038,6 +13196,8 @@
                                 {
                                   "type": "frame",
                                   "id": "hQfCu",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13139,6 +13299,8 @@
                                 {
                                   "type": "frame",
                                   "id": "tRtk5",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13240,6 +13402,8 @@
                                 {
                                   "type": "frame",
                                   "id": "J8z6R",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13341,6 +13505,8 @@
                                 {
                                   "type": "frame",
                                   "id": "J5vyQ",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13442,6 +13608,8 @@
                                 {
                                   "type": "frame",
                                   "id": "k3uHn",
+                                  "x": 0,
+                                  "y": 0,
                                   "name": "Leading Icon",
                                   "enabled": false,
                                   "width": 16,
@@ -13952,6 +14120,223 @@
                   ]
                 }
               ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "g399o",
+      "x": 3430,
+      "y": -1090,
+      "name": "welcome",
+      "theme": {
+        "p:Base": "Zinc",
+        "p:Mode": "Dark"
+      },
+      "width": 1366,
+      "height": 768,
+      "fill": "$p:--background",
+      "cornerRadius": 8,
+      "layout": "vertical",
+      "gap": 24,
+      "padding": 24,
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "id": "9v9Xi",
+          "type": "ref",
+          "ref": "KYJPB",
+          "descendants": {
+            "Ca1WZ": {
+              "enabled": false
+            }
+          }
+        },
+        {
+          "type": "group",
+          "id": "Y0V1r",
+          "children": [
+            {
+              "type": "frame",
+              "id": "qBoyY",
+              "x": 0,
+              "y": 0,
+              "name": "cardL",
+              "width": 320,
+              "height": 103,
+              "fill": "$p:--card",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$p:--border"
+              },
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "1uzow",
+                  "x": 24,
+                  "y": 24,
+                  "fill": "$p:--foreground",
+                  "content": "Admin Console",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "zIVuw",
+                  "x": 24,
+                  "y": 62,
+                  "fill": "$p:--muted-foreground",
+                  "content": "Sign in to your account",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "obrvo",
+              "x": 319.9990283252255,
+              "y": 0.7499990363918414,
+              "name": "cardL",
+              "width": 320,
+              "height": "fit_content(102)",
+              "fill": "$p:--card",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$p:--border"
+              },
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "uzsKT",
+                  "x": 24,
+                  "y": 24,
+                  "fill": "$p:--foreground",
+                  "content": "Health Check",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "0ntKr",
+                  "x": 24,
+                  "y": 62,
+                  "fill": "$p:--muted-foreground",
+                  "content": "Sign in to your account",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "8ysUA",
+              "x": 1,
+              "y": 102.70833349227905,
+              "name": "cardL",
+              "width": 319,
+              "height": "fit_content(102)",
+              "fill": "$p:--card",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$p:--border"
+              },
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ltV0M",
+                  "x": 24,
+                  "y": 24,
+                  "fill": "$p:--foreground",
+                  "content": "API Docs",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "8N4wm",
+                  "x": 24,
+                  "y": 62,
+                  "fill": "$p:--muted-foreground",
+                  "content": "Sign in to your account",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "k6YUG",
+              "x": 320,
+              "y": 102.35416674613953,
+              "name": "cardL",
+              "width": 320,
+              "height": "fit_content(102)",
+              "fill": "$p:--card",
+              "stroke": {
+                "align": "inside",
+                "thickness": 1,
+                "fill": "$p:--border"
+              },
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "DNuke",
+                  "x": 24,
+                  "y": 24,
+                  "fill": "$p:--foreground",
+                  "content": "OICD Discovery",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "OspPe",
+                  "x": 24,
+                  "y": 62,
+                  "fill": "$p:--muted-foreground",
+                  "content": "Sign in to your account",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "9D6DM",
+          "name": "footerRowL",
+          "width": "fill_container",
+          "gap": 4,
+          "justifyContent": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "9rddU",
+              "fill": "$p:--muted-foreground",
+              "content": "uptime 0h 7m 43s·Kotlin 1.9.24·Ktor 2.3.12·JVM 17.0.18",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
             }
           ]
         }
