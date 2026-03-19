@@ -135,7 +135,7 @@
 }
 
 /* ── Card grid ── */
-.card-grid {
+.wc-card-grid {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -145,11 +145,11 @@
 }
 
 /* When status panel is visible above, collapse the shared border */
-.status-panel--visible + .card-grid {
+.status-panel--visible + .wc-card-grid {
   border-top: none;
 }
 
-.card {
+.wc-card {
   display: flex;
   flex-direction: column;
   text-decoration: none;
@@ -166,16 +166,16 @@
 }
 
 /* Right column: no right border (outer border owns it) */
-.card:nth-child(2n) {
+.wc-card:nth-child(2n) {
   border-right: none;
 }
 
 /* Last row: no bottom border (outer border owns it) */
-.card:nth-last-child(-n+2) {
+.wc-card:nth-last-child(-n+2) {
   border-bottom: none;
 }
 
-.card::before {
+.wc-card::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -185,23 +185,23 @@
   pointer-events: none;
 }
 
-.card:hover {
+.wc-card:hover {
   box-shadow: inset 0 0 0 1px var(--color-border-em);
   background: #1c1c21;
 }
 
-.card:hover::before {
+.wc-card:hover::before {
   opacity: 1;
 }
 
-.card__top {
+.wc-card__top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 14px;
 }
 
-.card__icon {
+.wc-card__icon {
   width: 36px;
   height: 36px;
   border-radius: 0;
@@ -214,31 +214,31 @@
   flex-shrink: 0;
 }
 
-.card__icon svg {
+.wc-card__icon svg {
   width: 16px;
   height: 16px;
   object-fit: contain;
 }
 
-.card__arrow {
+.wc-card__arrow {
   color: var(--color-subtle);
   transition: color 0.15s ease, transform 0.15s ease;
   margin-top: 2px;
 }
 
-.card:hover .card__arrow {
+.wc-card:hover .wc-card__arrow {
   color: var(--color-accent);
   transform: translate(2px, -2px);
 }
 
-.card__title {
+.wc-card__title {
   font-size: 14px;
   font-weight: 500;
   color: var(--color-text);
   margin-bottom: 6px;
 }
 
-.card__desc {
+.wc-card__desc {
   font-size: 13px;
   color: var(--color-muted);
   line-height: 1.55;
@@ -262,19 +262,19 @@
 
 /* ── Responsive ── */
 @media (max-width: 520px) {
-  .card-grid {
+  .wc-card-grid {
     grid-template-columns: 1fr;
   }
   /* All cards lose right border in single-col */
-  .card {
+  .wc-card {
     border-right: none;
   }
   /* Re-add bottom border to cards that 2-col rule removed */
-  .card:nth-last-child(-n+2) {
+  .wc-card:nth-last-child(-n+2) {
     border-bottom: 1px solid var(--color-border);
   }
   /* Only the true last card has no bottom border */
-  .card:last-child {
+  .wc-card:last-child {
     border-bottom: none;
   }
   .status-panel__grid {
