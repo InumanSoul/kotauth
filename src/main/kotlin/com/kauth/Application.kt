@@ -24,7 +24,7 @@ import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
-import com.kauth.adapter.web.WelcomeView
+import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.adminRoutes
@@ -473,7 +473,7 @@ fun Application.module(
     apiKeyService: ApiKeyService? = null, // Phase 3a
     apiKeyRepository: com.kauth.domain.port.ApiKeyRepository? = null, // Phase 3a
     webhookService: WebhookService? = null, // Phase 4
-    appInfo: WelcomeView.AppInfo,
+    appInfo: AppInfo,
     startTime: Long,
     isDevelopment: Boolean,
 ) {
@@ -665,6 +665,7 @@ fun Application.module(
             authService = authService,
             adminService = adminService,
             roleGroupService = roleGroupService,
+            appInfo = appInfo,
             tenantRepository = tenantRepository,
             applicationRepository = applicationRepository,
             userRepository = userRepository,

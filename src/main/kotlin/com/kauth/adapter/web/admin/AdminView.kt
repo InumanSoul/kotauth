@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
@@ -43,7 +44,15 @@ import java.time.format.DateTimeFormatter
  *   Workspace   = internal Tenant  (what an org owns)
  *   Application = internal Client  (what authenticates against a workspace)
  */
+
 object AdminView {
+    @Volatile
+    private var shellAppInfo: AppInfo = AppInfo()
+
+    fun setShellAppInfo(appInfo: AppInfo) {
+        shellAppInfo = appInfo
+    }
+
     private fun HEAD.adminHead(
         pageTitle: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
@@ -89,6 +98,7 @@ object AdminView {
 
     private fun HTML.adminShell(
         pageTitle: String,
+        appInfo: AppInfo = shellAppInfo,
         activeRail: String = "apps",
         allWorkspaces: List<Pair<String, String>> = emptyList(),
         workspaceName: String = "KotAuth",
@@ -218,7 +228,8 @@ object AdminView {
                         }
                         div("rail-spacer") {}
                         a("/admin", classes = "rail-brand") {
-                            img(src = "/static/favicon/favicon-32x32.png", alt = "kotauth Brand") {}
+                            img(src = "/static/brand/kotauth-negative-icon.svg", alt = "kotauth Brand") {}
+                            p { +"v${appInfo.version}" }
                         }
                     }
 

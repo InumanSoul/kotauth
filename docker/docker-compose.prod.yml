@@ -1,0 +1,49 @@
+# ─── Kotauth — production stack with Caddy (automatic TLS) ───────────────────
+# Extends docker-compose.yml with a Caddy reverse proxy that handles
+# automatic TLS certificate provisioning via Let's Encrypt.
+#
+# Prerequisites:
+#   - A domain pointing to this server (e.g. auth.yourdomain.com)
+#   - Ports 80 and 443 open on the host firewall
+#   - A filled-in .env with KAUTH_ENV=production, KAUTH_BASE_URL=https://...
+#
+# Usage (run from repo root or your kotauth/ directory):
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
+#
+# Required .env additions for production:
+#   KAUTH_BASE_URL=https://auth.yourdomain.com
+#   KAUTH_ENV=production
+#   KAUTH_SECRET_KEY=<openssl rand -hex 32>
+#   DOMAIN=auth.yourdomain.com          # used by Caddy below
+#   ACME_EMAIL=you@yourdomain.com       # Let's Encrypt notifications
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: kotauth
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: kotauth-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required — set it in .env (e.g. auth.yourdomain.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required — used for Let's Encrypt notifications}
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # The app service inherits port 8080 from docker-compose.yml.
+  # Block it at the firewall level so only Caddy handles public traffic.
+  # Example (ufw): ufw deny 8080
+  app: {}
+
+volumes:
+  caddy_data:
+  caddy_config:

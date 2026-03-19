@@ -1,0 +1,17 @@
+# Kotauth — Caddy reverse proxy configuration
+# Used by docker-compose.prod.yml.
+#
+# Caddy automatically obtains and renews TLS certificates from Let's Encrypt.
+# DOMAIN and ACME_EMAIL are injected from the environment by docker-compose.
+#
+# For self-signed / internal TLS, replace `tls {email}` with `tls internal`.
+
+{$DOMAIN} {
+    tls {$ACME_EMAIL}
+
+    reverse_proxy app:8080 {
+        # Pass real client IP through to Kotauth for rate limiting and audit logs.
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Real-IP {remote_host}
+    }
+}

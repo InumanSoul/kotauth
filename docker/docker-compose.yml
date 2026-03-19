@@ -1,0 +1,66 @@
+# ─── Kotauth — pre-built image stack ─────────────────────────────────────────
+# Uses the published image from GitHub Container Registry. No build step.
+# No repo clone required — just this file and a .env in the same directory.
+#
+# Quickstart (no clone):
+#   mkdir kotauth && cd kotauth
+#   curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker/docker-compose.yml
+#   curl -o .env.example https://raw.githubusercontent.com/inumansoul/kotauth/main/.env.example
+#   cp .env.example .env
+#   # Edit .env: set KAUTH_SECRET_KEY (openssl rand -hex 32) and KAUTH_BASE_URL
+#   docker compose up -d
+#
+# To build from source instead, use docker/docker-compose.dev.yml (or: make up).
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: kotauth
+
+services:
+  db:
+    image: postgres:15
+    container_name: kotauth-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-kotauth_db}
+      POSTGRES_USER: ${DB_USER:-kotauth}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required — copy .env.example to .env and fill it in}
+    volumes:
+      - kotauth_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kotauth} -d ${DB_NAME:-kotauth_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/inumansoul/kotauth:latest
+    container_name: kotauth
+    env_file:
+      - .env
+    environment:
+      # DB_URL takes full precedence if set in .env — use it to connect to an
+      # external or managed database (e.g. RDS, Supabase, Neon).
+      # If not set, the URL is constructed from DB_HOST, DB_PORT, and DB_NAME,
+      # which point at the bundled db service by default.
+      DB_URL: ${DB_URL:-jdbc:postgresql://${DB_HOST:-db}:${DB_PORT:-5432}/${DB_NAME:-kotauth_db}}
+      DB_USER: ${DB_USER:-kotauth}
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      # /health/ready performs a DB ping + config validity check.
+      # The container is not marked healthy until migrations have completed.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  kotauth_db_data:
