@@ -46,7 +46,7 @@ A 32+ character hex string used for:
 - HMAC-SHA256 signing of short-lived cookies (MFA pending, PKCE verifier, portal session)
 
 ```
-KAUTH_SECRET_KEY=a2c35a1bfe82492eb087c5a29b28fc2b1fc2505da2a6f5dd37201c2bf4df39b3
+KAUTH_SECRET_KEY=<output of: openssl rand -hex 32>
 ```
 
 Generate one:
@@ -135,11 +135,16 @@ These are not environment variables — they are configured per workspace throug
 
 ## Example `.env` for Local Development
 
+Copy `.env.example` to `.env` and fill in `KAUTH_SECRET_KEY`. DB credentials are handled by `docker-compose.yml`.
+
 ```env
 KAUTH_BASE_URL=http://localhost:8080
 KAUTH_ENV=development
-KAUTH_SECRET_KEY=a2c35a1bfe82492eb087c5a29b28fc2b1fc2505da2a6f5dd37201c2bf4df39b3
-# DB is injected by docker-compose, no need to set here
+KAUTH_SECRET_KEY=        # generate: openssl rand -hex 32
+
+DB_NAME=kotauth_db
+DB_USER=kotauth
+DB_PASSWORD=changeme     # fine for local dev, change for production
 ```
 
 ## Example `.env` for Production
@@ -147,8 +152,15 @@ KAUTH_SECRET_KEY=a2c35a1bfe82492eb087c5a29b28fc2b1fc2505da2a6f5dd37201c2bf4df39b
 ```env
 KAUTH_BASE_URL=https://auth.yourdomain.com
 KAUTH_ENV=production
-KAUTH_SECRET_KEY=<openssl rand -hex 32>
-DB_URL=jdbc:postgresql://your-db-host:5432/kotauth_db
+KAUTH_SECRET_KEY=        # generate: openssl rand -hex 32   ← never skip this
+
+DB_NAME=kotauth_db
 DB_USER=kotauth
-DB_PASSWORD=<strong password>
+DB_PASSWORD=             # use a strong, unique password
+
+# Required when using docker-compose.prod.yml (Caddy TLS)
+DOMAIN=auth.yourdomain.com
+ACME_EMAIL=you@yourdomain.com
 ```
+
+See [docs/guides/production-deployment.md](guides/production-deployment.md) for the full deployment walkthrough.

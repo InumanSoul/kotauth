@@ -11,3 +11,6 @@ build/
 # Design files don't need to go into the image
 design/
 docs/
+
+# Docker recipes and Caddy config are not needed in the image
+docker/

@@ -1,8 +1,99 @@
 # Kotauth
 
+[![CI](https://github.com/inumansoul/kotauth/actions/workflows/ci.yml/badge.svg)](https://github.com/inumansoul/kotauth/actions/workflows/ci.yml)
+[![Docker Image](https://img.shields.io/badge/ghcr.io-kotauth-blue?logo=docker)](https://ghcr.io/inumansoul/kotauth)
+[![Latest Release](https://img.shields.io/github/v/release/inumansoul/kotauth)](https://github.com/inumansoul/kotauth/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > Identity infrastructure for modern applications. Self-hosted, container-native, developer-first.
 
 Kotauth is an open-source authentication and identity platform that bridges the gap between enterprise IAM systems (Keycloak, Okta) and developer-friendly SaaS tools (Clerk, Auth0). Full OAuth2/OIDC compliance. Runs in Docker. Up in minutes.
+
+---
+
+## Quickstart — pre-built image (fastest)
+
+You need Docker and Docker Compose. Nothing else — no repo clone, no build step.
+
+**1. Grab the compose file and env template**
+
+```bash
+mkdir kotauth && cd kotauth
+curl --create-dirs -o docker/docker-compose.yml \
+  https://raw.githubusercontent.com/inumansoul/kotauth/main/docker/docker-compose.yml
+curl -o .env.example \
+  https://raw.githubusercontent.com/inumansoul/kotauth/main/.env.example
+cp .env.example .env
+```
+
+**2. Set your secret key and base URL**
+
+Open `.env` and fill in the two required values:
+
+```bash
+# In .env:
+KAUTH_BASE_URL=http://localhost:8080
+KAUTH_SECRET_KEY=$(openssl rand -hex 32)
+```
+
+**3. Start**
+
+```bash
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Kotauth starts on port `8080`. PostgreSQL is bundled — no separate database setup. Flyway migrations run automatically on first boot.
+
+**4. Open the admin console**
+
+```
+http://localhost:8080/admin
+```
+
+Default master workspace credentials are printed in the startup log on first run. Change them immediately.
+
+**5. Create a workspace**
+
+In the admin console, create a new workspace (e.g. `my-app`). This is your tenant — it gets its own users, OAuth clients, and signing keys. Your OIDC discovery document is then live at:
+
+```
+http://localhost:8080/t/my-app/.well-known/openid-configuration
+```
+
+---
+
+## Quickstart — build from source
+
+For contributors or anyone who wants to run from the cloned repo.
+
+```bash
+git clone https://github.com/inumansoul/kotauth.git
+cd kotauth
+cp .env.example .env
+# Edit .env: set KAUTH_SECRET_KEY and KAUTH_BASE_URL
+make up
+```
+
+`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
+
+---
+
+## Docker images
+
+Images are published to GitHub Container Registry on every tagged release.
+
+| Tag | Description |
+|---|---|
+| `ghcr.io/inumansoul/kotauth:latest` | Latest stable release |
+| `ghcr.io/inumansoul/kotauth:1` | Latest patch in the `1.x` line |
+| `ghcr.io/inumansoul/kotauth:1.0` | Latest patch in `1.0.x` |
+| `ghcr.io/inumansoul/kotauth:1.0.1` | Exact version pin |
+
+Pre-release tags (e.g. `1.0.1-rc1`) are published but do not move the `latest` or major/minor tags.
+
+```bash
+docker pull ghcr.io/inumansoul/kotauth:latest
+```
 
 ---
 
@@ -18,55 +109,57 @@ Kotauth is an open-source authentication and identity platform that bridges the 
 - **REST API v1** — 30+ endpoints, API key authentication, OpenAPI 3.1 spec with Swagger UI
 - **Webhooks** — HMAC-signed event delivery with exponential backoff retry
 - **Audit logging** — 30+ immutable event types, append-only, queryable via API and admin UI
-- **Security** — bcrypt passwords, AES-256-GCM secrets at rest, rate limiting on login/register/token endpoints (IP-based), security response headers (X-Content-Type-Options, X-Frame-Options, HSTS on HTTPS), per-tenant RS256 key pairs
+- **Security** — bcrypt passwords, AES-256-GCM secrets at rest, rate limiting on login/register/token endpoints (IP-based), security response headers, per-tenant RS256 key pairs
 
 ---
 
-## Quickstart
+## Environment variables
 
-You need Docker and Docker Compose. Nothing else.
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `KAUTH_BASE_URL` | **Yes** | — | Public base URL. Used in OIDC tokens and discovery docs. Must be `https://` in production. |
+| `KAUTH_SECRET_KEY` | Recommended | Random (ephemeral) | 32+ char hex string. Used for AES-256-GCM encryption and session signing. If not set, SMTP config is unavailable and sessions don't survive restarts. |
+| `KAUTH_ENV` | No | `development` | Set to `production` to enable HTTPS enforcement and strict startup validation. |
+| `DB_URL` | **Yes** | — | PostgreSQL JDBC URL. Example: `jdbc:postgresql://db:5432/kotauth_db` |
+| `DB_USER` | **Yes** | — | PostgreSQL username. |
+| `DB_PASSWORD` | **Yes** | — | PostgreSQL password. |
 
-**1. Clone the repo**
+For the full reference including per-tenant SMTP and security policy configuration, see [docs/ENV_REFERENCE.md](docs/ENV_REFERENCE.md).
+
+---
+
+## Production deployment
+
+See the full guide: [docs/guides/production-deployment.md](docs/guides/production-deployment.md).
+
+The short version: TLS is required. Use `docker/docker-compose.prod.yml` which adds a Caddy sidecar for automatic Let's Encrypt certificates.
 
 ```bash
-git clone https://github.com/your-org/kotauth.git
-cd kotauth
+# Requires: DOMAIN and ACME_EMAIL set in .env, ports 80/443 open
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
 ```
 
-**2. Set up your `.env` file**
+Minimum requirements: 512 MB RAM, 1 vCPU, PostgreSQL 14+.
 
-A `.env` file with safe development defaults is included in the repo. For a custom secret key:
+---
 
-```bash
-echo "KAUTH_SECRET_KEY=$(openssl rand -hex 32)" >> .env
-echo "KAUTH_BASE_URL=http://localhost:8080" >> .env
-```
+## Integration guides
 
-**3. Start**
+- [React SPA with TanStack Router](docs/guides/react-spa-tanstack-router.md)
+- [Production deployment](docs/guides/production-deployment.md)
+- Generic OIDC *(coming soon)*
 
-```bash
-docker compose up
-```
+---
 
-Kotauth starts on port `8080`. Database migrations run automatically on first boot.
+## API reference
 
-**4. Open the admin console**
+Swagger UI is available at:
 
 ```
-http://localhost:8080/admin
+http://localhost:8080/api/docs
 ```
 
-Default master workspace credentials are printed in the startup log on first run. Change them immediately.
-
-**5. Create a workspace**
-
-In the admin console, create a new workspace (e.g. `my-app`). This is your tenant — it gets its own users, OAuth clients, and signing keys.
-
-That's it. Your OIDC discovery document is live at:
-
-```
-http://localhost:8080/t/my-app/.well-known/openid-configuration
-```
+The raw OpenAPI 3.1 spec is at `src/main/resources/openapi/v1.yaml`.
 
 ---
 
@@ -83,64 +176,6 @@ Kotauth maps IAM complexity to five concepts:
 | **API Key** | Service credential |
 
 Each workspace is a fully isolated identity directory. The same email address can exist in multiple workspaces — they are completely independent.
-
----
-
-## Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `KAUTH_BASE_URL` | **Yes** | — | Public base URL. Used in OIDC tokens and discovery docs. Must be `https://` in production. |
-| `KAUTH_SECRET_KEY` | Recommended | Random (ephemeral) | 32+ char hex string. Used for AES-256-GCM encryption and session signing. If not set, SMTP config is unavailable and sessions don't survive restarts. |
-| `KAUTH_ENV` | No | `development` | Set to `production` to enable HTTPS enforcement and strict startup validation. |
-| `DB_URL` | **Yes** | — | PostgreSQL JDBC URL. Example: `jdbc:postgresql://db:5432/kotauth_db` |
-| `DB_USER` | **Yes** | — | PostgreSQL username. |
-| `DB_PASSWORD` | **Yes** | — | PostgreSQL password. |
-
-For the full reference including per-tenant SMTP and security policy configuration, see [docs/ENV_REFERENCE.md](docs/ENV_REFERENCE.md).
-
----
-
-## Production Deployment
-
-**Minimum requirements:** 512 MB RAM, 1 vCPU, PostgreSQL 14+.
-
-**TLS is required for production.** Kotauth expects TLS to be terminated by a reverse proxy (nginx, Caddy, Traefik). Set `KAUTH_ENV=production` and ensure `KAUTH_BASE_URL` starts with `https://` — the server will refuse to start otherwise.
-
-Example with Caddy:
-
-```
-auth.yourdomain.com {
-    reverse_proxy kotauth:8080
-}
-```
-
-Then in your `.env`:
-
-```
-KAUTH_BASE_URL=https://auth.yourdomain.com
-KAUTH_ENV=production
-KAUTH_SECRET_KEY=<openssl rand -hex 32>
-```
-
----
-
-## Integration Guides
-
-- [React SPA with TanStack Router](docs/guides/react-spa-tanstack-router.md)
-- Generic OIDC *(coming soon)*
-
----
-
-## API Reference
-
-Swagger UI is available at:
-
-```
-http://localhost:8080/api/docs
-```
-
-The raw OpenAPI 3.1 spec is at `src/main/resources/openapi/v1.yaml`.
 
 ---
 
@@ -169,7 +204,7 @@ Key decisions are documented as ADRs in [docs/IMPLEMENTATION_STATUS.md](docs/IMP
 
 ---
 
-## Tech Stack
+## Tech stack
 
 - **Runtime:** Kotlin, Ktor 2, JVM 17
 - **Database:** PostgreSQL 15, Exposed ORM, Flyway migrations

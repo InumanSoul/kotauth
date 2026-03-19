@@ -40,21 +40,24 @@ jar: ## Build fat JAR only, skipping tests (faster iteration)
 	./gradlew buildFatJar -x test
 
 # ── Docker ────────────────────────────────────────────────────────────────────
+# Makefile targets use docker/docker-compose.dev.yml (build from source).
+# To run the pre-built image instead:
+#   docker compose -f docker/docker-compose.yml up -d
 
-up: ## Build images and start all services
-	docker compose up -d --build
+up: ## Build images from source and start all services (dev)
+	docker compose -f docker/docker-compose.dev.yml up -d --build
 
-up-fresh: ## Rebuild everything from scratch
-	docker compose up -d --build
+up-fresh: ## Rebuild dev images from scratch (no layer cache)
+	docker compose -f docker/docker-compose.dev.yml build --no-cache && docker compose -f docker/docker-compose.dev.yml up -d
 
 down: ## Stop and remove containers
-	docker compose down
+	docker compose -f docker/docker-compose.dev.yml down
 
 nuke: ## Stop containers and wipe volumes (destroys the database)
-	docker compose down -v
+	docker compose -f docker/docker-compose.dev.yml down -v
 
 logs: ## Follow app container logs
-	docker compose logs -f app
+	docker compose -f docker/docker-compose.dev.yml logs -f app
 
 health: ## Probe the local health endpoint
 	@curl -sf http://localhost:8080/health/ready && echo " OK" || echo " FAILED"
