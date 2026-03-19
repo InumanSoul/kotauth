@@ -665,6 +665,7 @@ fun Application.module(
             authService = authService,
             adminService = adminService,
             roleGroupService = roleGroupService,
+            appInfo = appInfo,
             tenantRepository = tenantRepository,
             applicationRepository = applicationRepository,
             userRepository = userRepository,

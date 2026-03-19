@@ -46,6 +46,13 @@ import java.time.format.DateTimeFormatter
  */
 
 object AdminView {
+    @Volatile
+    private var shellAppInfo: AppInfo = AppInfo()
+
+    fun setShellAppInfo(appInfo: AppInfo) {
+        shellAppInfo = appInfo
+    }
+
     private fun HEAD.adminHead(
         pageTitle: String,
         theme: TenantTheme = TenantTheme.DEFAULT,
@@ -91,7 +98,7 @@ object AdminView {
 
     private fun HTML.adminShell(
         pageTitle: String,
-        appInfo: AppInfo = AppInfo(),
+        appInfo: AppInfo = shellAppInfo,
         activeRail: String = "apps",
         allWorkspaces: List<Pair<String, String>> = emptyList(),
         workspaceName: String = "KotAuth",
@@ -221,8 +228,8 @@ object AdminView {
                         }
                         div("rail-spacer") {}
                         a("/admin", classes = "rail-brand") {
-                            img(src = "/static/favicon/favicon-32x32.png", alt = "kotauth Brand") {}
-                            p { + appInfo.version }
+                            img(src = "/static/brand/kotauth-negative-icon.svg", alt = "kotauth Brand") {}
+                            p { +"v${appInfo.version}" }
                         }
                     }
 

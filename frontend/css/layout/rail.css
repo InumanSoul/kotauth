@@ -16,7 +16,6 @@
 
 /* Brand monogram at the top of the rail */
 .rail-brand {
-  height: 52px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -29,7 +28,7 @@
   text-decoration: none;
   flex-shrink: 0;
   transition: all 0.3s ease;
-  margin-block-end: .25rem;
+  margin-block-end: 1rem;
 
   img {
     width: 40px;

@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.RoleScope
@@ -56,6 +57,7 @@ fun Route.adminRoutes(
     authService: AuthService,
     adminService: AdminService,
     roleGroupService: RoleGroupService,
+    appInfo: AppInfo,
     tenantRepository: TenantRepository,
     applicationRepository: ApplicationRepository,
     userRepository: UserRepository,
@@ -68,6 +70,8 @@ fun Route.adminRoutes(
     apiKeyService: com.kauth.domain.service.ApiKeyService? = null, // Phase 3a — REST API keys
     webhookService: com.kauth.domain.service.WebhookService? = null, // Phase 4 — Webhooks
 ) {
+    AdminView.setShellAppInfo(appInfo)
+
     route("/admin") {
         // ---------------------------------------------------------------
         // Login / logout
