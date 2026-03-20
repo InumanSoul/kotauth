@@ -1,84 +1,125 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
-// Dashboard — workspace list overview.
-internal fun dashboardPageImpl(
+/**
+ * Lightweight redirector page served at /admin when multiple workspaces exist.
+ *
+ * Reads `kotauth_last_ws` from localStorage and redirects to that workspace.
+ * Falls back to [fallbackSlug] (the first available workspace) if nothing is
+ * stored or the stored value is empty.
+ *
+ * This page renders no shell — just a blank body with an inline script that
+ * fires immediately. The user sees a near-instant redirect.
+ */
+internal fun workspaceRedirectorImpl(fallbackSlug: String): HTML.() -> Unit =
+    {
+        head {
+            title { +"KotAuth — Redirecting…" }
+            meta(charset = "UTF-8")
+        }
+        body {
+            script {
+                unsafe {
+                    +"""
+                    (function() {
+                      var slug = null;
+                      try { slug = localStorage.getItem('kotauth_last_ws'); } catch(e) {}
+                      if (!slug) slug = '${fallbackSlug}';
+                      window.location.replace('/admin/workspaces/' + encodeURIComponent(slug));
+                    })();
+                    """.trimIndent()
+                }
+            }
+        }
+    }
+
+/**
+ * Workspace management list — accessible via "Manage workspaces" in the
+ * topbar dropdown. Shows all workspaces with a CTA to create new ones.
+ */
+internal fun workspaceListPageImpl(
     workspaces: List<Tenant>,
+    allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
-        val wsPairs = workspaces.map { it.slug to it.displayName }
         adminShell(
             pageTitle = "Workspaces",
             activeRail = "apps",
-            allWorkspaces = wsPairs,
+            allWorkspaces = allWorkspaces,
             workspaceName = "KotAuth",
-            workspaceSlug = null, // no workspace selected — ctx panel shows empty state
+            workspaceSlug = null,
             loggedInAs = loggedInAs,
         ) {
-            div("stat-grid") {
-                div("stat-card") {
-                    div("stat-label") { +"Total Workspaces" }
-                    div("stat-value") { +"${workspaces.size}" }
-                }
-                div("stat-card") {
-                    div("stat-label") { +"Registration Enabled" }
-                    div("stat-value") { +"${workspaces.count { it.registrationEnabled }}" }
-                }
-                div("stat-card") {
-                    div("stat-label") { +"Master Workspace" }
-                    div("stat-value") { +"1" }
-                }
-            }
-
             div("page-header") {
-                div {
-                    p("page-title") { +"Workspaces" }
-                    p("page-subtitle") { +"All authorization boundary workspaces" }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Workspaces" }
+                        p("page-header__sub") { +"All authorization boundary workspaces" }
+                    }
+                }
+                div("page-header__actions") {
+                    primaryLink("/admin/workspaces/new", "New Workspace")
                 }
             }
 
-            div("card") {
-                if (workspaces.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"◫" }
-                        p("empty-state-text") { +"No workspaces yet." }
-                        p("empty-state-text") {
-                            style = "margin-top:0.5rem; font-size:0.8rem;"
-                            +"Use the "
-                            strong { +"New Workspace" }
-                            +" button in the top bar to create your first one."
-                        }
-                    }
-                } else {
-                    table {
+            if (workspaces.isEmpty()) {
+                emptyState(
+                    iconName = "admin",
+                    title = "No workspaces yet",
+                    description = "Create your first workspace to get started.",
+                ) {
+                    a(
+                        href = "/admin/workspaces/new",
+                        classes = "empty-state__cta",
+                    ) { +"+ New Workspace" }
+                }
+            } else {
+                div("ov-card") {
+                    table("data-table") {
                         thead {
                             tr {
-                                th { +"Slug" }
+                                th { style = "width:200px;"; +"Slug" }
                                 th { +"Name" }
-                                th { +"Registration" }
-                                th { +"Token TTL" }
-                                th { +"" }
+                                th { style = "width:130px;"; +"Registration" }
+                                th { style = "width:70px;" }
                             }
                         }
                         tbody {
                             workspaces.forEach { ws ->
                                 tr {
-                                    td { span("td-code") { +ws.slug } }
-                                    td { +ws.displayName }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${ws.slug}",
+                                            classes = "data-table__id",
+                                        ) { +ws.slug }
+                                    }
+                                    td { span("data-table__name") { +ws.displayName } }
                                     td {
                                         if (ws.registrationEnabled) {
-                                            span("badge badge-green") { +"Enabled" }
+                                            span("badge badge--active") {
+                                                span("badge__dot") {}
+                                                +"Enabled"
+                                            }
                                         } else {
-                                            span("badge badge-red") { +"Disabled" }
+                                            span("badge badge--inactive") {
+                                                span("badge__dot") {}
+                                                +"Disabled"
+                                            }
                                         }
                                     }
-                                    td { span("td-muted") { +"${ws.tokenExpirySeconds}s" } }
                                     td {
-                                        a("/admin/workspaces/${ws.slug}", classes = "btn btn-ghost btn-sm") {
-                                            +"Open →"
+                                        div("data-table__actions") {
+                                            a(
+                                                href = "/admin/workspaces/${ws.slug}",
+                                                classes = "btn btn--ghost btn--sm",
+                                            ) {
+                                                +"Open"
+                                                inlineSvgIcon("open-sm", "open")
+                                            }
                                         }
                                     }
                                 }

@@ -46,12 +46,16 @@ object AdminView {
         loggedInAs: String = "—",
     ): HTML.() -> Unit = adminErrorPageImpl(message, exceptionType, allWorkspaces, loggedInAs)
 
-    // ── Dashboard ───────────────────────────────────────────────────────
+    // ── Dashboard / redirect ────────────────────────────────────────────
 
-    fun dashboardPage(
+    fun workspaceRedirector(fallbackSlug: String): HTML.() -> Unit =
+        workspaceRedirectorImpl(fallbackSlug)
+
+    fun workspaceListPage(
         workspaces: List<Tenant>,
+        allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
-    ): HTML.() -> Unit = dashboardPageImpl(workspaces, loggedInAs)
+    ): HTML.() -> Unit = workspaceListPageImpl(workspaces, allWorkspaces, loggedInAs)
 
     // ── Workspace ───────────────────────────────────────────────────────
 

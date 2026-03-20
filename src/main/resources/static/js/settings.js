@@ -1,5 +1,5 @@
 /**
- * settings.js — CSP-safe interactions for settings pages.
+ * settings.js — CSP-safe interactions for admin pages.
  *
  * Features:
  *   1. Chip-grid All/None toggles  (data-chips-all, data-chips-none)
@@ -7,11 +7,18 @@
  *   3. Copy to clipboard           (data-copy)
  *   4. Confirm dialogs             (data-confirm)
  *   5. Scope toggle (show/hide)    (data-scope-toggle)
+ *   6. Persist last workspace slug (localStorage → kotauth_last_ws)
  *
  * All bindings use data-* attributes — zero inline JS.
  */
 ;(function () {
   'use strict';
+
+  // ── persist last workspace for smart redirect ────────────
+  var wsMatch = window.location.pathname.match(/^\/admin\/workspaces\/([^/]+)/);
+  if (wsMatch) {
+    try { localStorage.setItem('kotauth_last_ws', wsMatch[1]); } catch(e) {}
+  }
 
   // ── helpers ─────────────────────────────────────────────────
   function updateCount(gridEl) {

@@ -86,14 +86,16 @@ fun DIV.pageHeaderWithTitleRow(
 ) {
     div("page-header") {
         div("page-header__left") {
-            div("page-header__title-row") {
-                h1("page-header__title") { +title }
-                if (titleBadge != null) {
-                    span { titleBadge() }
+            div("page-header__identity") {
+                div("page-header__title-row") {
+                    h1("page-header__title") { +title }
+                    if (titleBadge != null) {
+                        span { titleBadge() }
+                    }
                 }
-            }
-            if (meta != null) {
-                div("page-header__meta") { meta() }
+                if (meta != null) {
+                    div("page-header__meta") { meta() }
+                }
             }
         }
         if (actions != null) {

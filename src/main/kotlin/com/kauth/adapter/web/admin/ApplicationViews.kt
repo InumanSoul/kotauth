@@ -46,26 +46,28 @@ internal fun applicationDetailPageImpl(
             // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
-                    div("page-header__title-row") {
-                        h1("page-header__title") { +application.name }
-                        if (application.enabled) {
-                            span("badge badge--active") {
-                                span("badge__dot") {}
-                                +"Active"
-                            }
-                        } else {
-                            span("badge badge--inactive") {
-                                span("badge__dot") {}
-                                +"Disabled"
+                    div("page-header__identity") {
+                        div("page-header__title-row") {
+                            h1("page-header__title") { +application.name }
+                            if (application.enabled) {
+                                span("badge badge--active") {
+                                    span("badge__dot") {}
+                                    +"Active"
+                                }
+                            } else {
+                                span("badge badge--inactive") {
+                                    span("badge__dot") {}
+                                    +"Disabled"
+                                }
                             }
                         }
-                    }
-                    div("page-header__meta") {
-                        span("badge badge--id") { +application.clientId }
-                        when (application.accessType) {
-                            AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                            AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                            AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
+                        div("page-header__meta") {
+                            span("badge badge--id") { +application.clientId }
+                            when (application.accessType) {
+                                AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
+                                AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
+                                AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
+                            }
                         }
                     }
                 }
@@ -211,11 +213,13 @@ internal fun createApplicationPageImpl(
             // ── Page header with external submit ───────────────────
             div("page-header") {
                 div("page-header__left") {
-                    h1("page-header__title") { +"Create Application" }
-                    p("page-header__sub") {
-                        +"Register a new OAuth2 / OIDC application in the "
-                        strong { +workspace.displayName }
-                        +" workspace."
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Create Application" }
+                        p("page-header__sub") {
+                            +"Register a new OAuth2 / OIDC application in the "
+                            strong { +workspace.displayName }
+                            +" workspace."
+                        }
                     }
                 }
                 div("page-header__actions") {
@@ -362,8 +366,10 @@ internal fun editApplicationPageImpl(
             // ── Page header with external submit ───────────────────
             div("page-header") {
                 div("page-header__left") {
-                    h1("page-header__title") { +"Edit Application" }
-                    p("page-header__sub") { +"Update settings for ${application.name}." }
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Edit Application" }
+                        p("page-header__sub") { +"Update settings for ${application.name}." }
+                    }
                 }
                 div("page-header__actions") {
                     a(

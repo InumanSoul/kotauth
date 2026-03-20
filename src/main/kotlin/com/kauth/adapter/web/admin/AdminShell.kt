@@ -118,10 +118,15 @@ internal fun HTML.adminShell(
                                 }
                             }
                         }
+                        div("ws-dropdown-divider") {}
                         a(
                             href = "/admin/workspaces/new",
-                            classes = "ws-dropdown-item ws-dropdown-create",
-                        ) { +"Add a workspace" }
+                            classes = "ws-dropdown-item ws-dropdown-action",
+                        ) { +"Add workspace" }
+                        a(
+                            href = "/admin/workspaces",
+                            classes = "ws-dropdown-item ws-dropdown-action",
+                        ) { +"Manage workspaces" }
                     }
                 }
 

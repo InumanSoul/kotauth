@@ -299,9 +299,11 @@ internal fun createWorkspacePageImpl(
             // ── Page header with external submit ───────────────────
             div("page-header") {
                 div("page-header__left") {
-                    h1("page-header__title") { +"Create Workspace" }
-                    p("page-header__sub") {
-                        +"A workspace is an isolated authorization boundary — like an Auth0 tenant."
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Create Workspace" }
+                        p("page-header__sub") {
+                            +"A workspace is an isolated authorization boundary — like an Auth0 tenant."
+                        }
                     }
                 }
                 div("page-header__actions") {

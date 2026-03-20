@@ -101,16 +101,22 @@ fun Route.adminRoutes(
         }
 
         // ---------------------------------------------------------------
-        // Dashboard
+        // Smart redirect: last workspace → first workspace → create
         // ---------------------------------------------------------------
 
         get {
-            val session = call.sessions.get<AdminSession>()!!
-            val workspaces = tenantRepository.findAll()
-            call.respondHtml(
-                HttpStatusCode.OK,
-                AdminView.dashboardPage(workspaces, session.username),
-            )
+            val workspaces = tenantRepository.findAll().filter { !it.isMaster }
+            if (workspaces.isEmpty()) {
+                call.respondRedirect("/admin/workspaces/new")
+            } else if (workspaces.size == 1) {
+                call.respondRedirect("/admin/workspaces/${workspaces.first().slug}")
+            } else {
+                // Multiple workspaces — serve a lightweight redirector that
+                // reads the last-visited slug from localStorage. Falls back
+                // to the first workspace if nothing is stored.
+                val fallback = workspaces.first().slug
+                call.respondHtml(HttpStatusCode.OK, AdminView.workspaceRedirector(fallback))
+            }
         }
 
         // ===============================================================
@@ -118,7 +124,15 @@ fun Route.adminRoutes(
         // ===============================================================
 
         route("/workspaces") {
-            get { call.respondRedirect("/admin") }
+            get {
+                val session = call.sessions.get<AdminSession>()!!
+                val workspaces = tenantRepository.findAll()
+                val wsPairs = workspaces.map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.workspaceListPage(workspaces, wsPairs, session.username),
+                )
+            }
 
             get("/new") {
                 val session = call.sessions.get<AdminSession>()!!
