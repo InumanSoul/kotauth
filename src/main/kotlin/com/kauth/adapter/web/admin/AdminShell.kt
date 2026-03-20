@@ -34,12 +34,8 @@ internal fun HEAD.adminHead(
     }
     style { unsafe { +theme.toCssVars() } }
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
-    script(src = "/static/htmx.min.js") {}
-    script {
-        unsafe {
-            +"""document.addEventListener('DOMContentLoaded',function(){htmx.config.responseHandling=[{code:"204",swap:false},{code:"[23]..",swap:true},{code:"422",swap:true},{code:"[45]..",swap:false,error:true}]});"""
-        }
-    }
+    script(src = "/static/js/htmx.min.js") {}
+    script(src = "/static/js/htmx-config.js") {}
     style {
         unsafe {
             +(
@@ -192,7 +188,7 @@ internal fun HTML.adminShell(
                     div("rail__spacer") {}
                     a("/admin", classes = "rail__brand") {
                         img(src = "/static/brand/kotauth-negative-icon.svg", alt = "kotauth Brand") {}
-                        p { +"v${appInfo.version}" }
+                        p(classes = "rail__version") { +"v${appInfo.version}" }
                     }
                 }
 

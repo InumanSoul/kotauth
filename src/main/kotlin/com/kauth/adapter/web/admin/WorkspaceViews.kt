@@ -746,268 +746,246 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Branding" }
-            }
+            val t = workspace.theme
+            val slug = workspace.slug
+
+            // ── Breadcrumb ─────────────────────────────────────────
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "Branding" to null,
+            )
+
+            // ── Page header ────────────────────────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Branding" }
-                    p("page-subtitle") { +"Customize the appearance of ${workspace.displayName}'s auth pages." }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Branding" }
+                        p("page-header__sub") {
+                            +"Customize the appearance of ${workspace.displayName}'s auth pages."
+                        }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "branding-form"
+                        +"Save Branding"
+                    }
                 }
             }
 
+            // ── Alerts ─────────────────────────────────────────────
             if (saved) {
-                div("alert alert-success alert--constrained") {
-                    +"Branding saved."
-                }
+                div("notice notice--success") { +"Branding saved." }
             }
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
+                div("notice notice--error") { +error }
+            }
+
+            // ── Two-column layout ──────────────────────────────────
+            form(
+                action = "/admin/workspaces/$slug/settings/branding",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "branding-form"
+
+                div("branding-layout") {
+
+                    // ══════════════════════════════════════════════
+                    //  LEFT COLUMN — form sections
+                    // ══════════════════════════════════════════════
+                    div("branding-form") {
+
+                        // ── Assets ─────────────────────────────────
+                        div("form-section") {
+                            div("form-section__label") { +"Assets" }
+                            div("ov-card") {
+                                div("edit-row") {
+                                    span("edit-row__label") { +"Logo URL" }
+                                    div {
+                                        input(type = InputType.url, name = "themeLogoUrl") {
+                                            classes = setOf("edit-row__field")
+                                            id = "field-logo"
+                                            placeholder = "https://cdn.example.com/logo.png"
+                                            value = t.logoUrl ?: ""
+                                            attributes["data-logo-preview"] = ""
+                                        }
+                                        div("edit-row__hint") {
+                                            +"Shown above the login card. Recommended max 180×48px."
+                                        }
+                                    }
+                                }
+                                div("edit-row") {
+                                    span("edit-row__label") { +"Favicon URL" }
+                                    div {
+                                        input(type = InputType.url, name = "themeFaviconUrl") {
+                                            classes = setOf("edit-row__field")
+                                            id = "field-favicon"
+                                            placeholder = "https://cdn.example.com/favicon.ico"
+                                            value = t.faviconUrl ?: ""
+                                        }
+                                        div("edit-row__hint") {
+                                            +"Browser tab icon. Recommended 32×32px .ico or .png."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Theme Presets ──────────────────────────
+                        div("form-section") {
+                            div("form-section__label") { +"Theme Preset" }
+                            div("preset-group") {
+                                button(type = ButtonType.button) {
+                                    classes = setOf("preset-btn", "preset-btn--active")
+                                    attributes["data-preset"] = "dark"
+                                    +"Dark"
+                                }
+                                button(type = ButtonType.button) {
+                                    classes = setOf("preset-btn")
+                                    attributes["data-preset"] = "light"
+                                    +"Light"
+                                }
+                                button(type = ButtonType.button) {
+                                    classes = setOf("preset-btn")
+                                    attributes["data-preset"] = "simple"
+                                    +"Simple"
+                                }
+                            }
+                        }
+
+                        // ── Colors ─────────────────────────────────
+                        div("form-section") {
+                            div("form-section__label") { +"Colors" }
+                            div("color-grid") {
+                                colorField("Accent", "accent", "themeAccentColor", t.accentColor)
+                                colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
+                                colorField("Page Background", "page-bg", "themeBgDeep", t.bgDeep)
+                                colorField("Card Background", "card-bg", "themeBgCard", t.bgCard)
+                                colorField("Input Background", "input-bg", "themeBgInput", t.bgInput)
+                                colorField("Border", "border", "themeBorderColor", t.borderColor)
+                                colorField("Text Primary", "text", "themeTextPrimary", t.textPrimary)
+                                colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
+                            }
+                        }
+
+                        // ── Border Radius ──────────────────────────
+                        div("form-section") {
+                            div("form-section__label") { +"Border Radius" }
+                            div("preset-group") {
+                                val radiusPresets = listOf("0px" to "Sharp", "8px" to "Rounded", "40px" to "Pill")
+                                for ((rv, label) in radiusPresets) {
+                                    button(type = ButtonType.button) {
+                                        classes = if (t.borderRadius == rv) {
+                                            setOf("preset-btn", "preset-btn--active")
+                                        } else {
+                                            setOf("preset-btn")
+                                        }
+                                        attributes["data-radius"] = rv
+                                        +label
+                                    }
+                                }
+                            }
+                            input(type = InputType.text, name = "themeBorderRadius") {
+                                classes = setOf("edit-row__field")
+                                id = "field-radius"
+                                value = t.borderRadius
+                                placeholder = "e.g. 0px, 6px, 12px"
+                                attributes["data-radius-input"] = ""
+                                style = "margin-top:6px;"
+                            }
+                        }
+                    }
+
+                    // ══════════════════════════════════════════════
+                    //  RIGHT COLUMN — sticky live preview
+                    // ══════════════════════════════════════════════
+                    div("branding-preview") {
+                        div("preview-panel") {
+                            div("preview-panel__header") {
+                                +"Preview"
+                                span("preview-panel__label") { +"Live — updates as you edit" }
+                            }
+                            div("preview-panel__body") {
+                                id = "preview-body"
+                                style = "background:${t.bgDeep};"
+
+                                div("auth-mock") {
+                                    div("auth-mock__card") {
+                                        id = "preview-card"
+                                        style = "--pm-accent:${t.accentColor};--pm-card:${t.bgCard};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"
+
+                                        div("auth-mock__logo-area") {
+                                            div("auth-mock__logo-placeholder") {
+                                                id = "preview-logo-placeholder"
+                                                +"LOGO"
+                                            }
+                                            div("auth-mock__title") { +"Sign in" }
+                                            div("auth-mock__subtitle") {
+                                                +"to continue to ${workspace.displayName}"
+                                            }
+                                        }
+                                        div("auth-mock__field") {
+                                            style = "border-radius:${t.borderRadius};"
+                                            +"Email or username"
+                                        }
+                                        div("auth-mock__field") {
+                                            style = "border-radius:${t.borderRadius};"
+                                            +"Password"
+                                        }
+                                        div("auth-mock__btn") {
+                                            id = "preview-btn"
+                                            style = "background:${t.accentColor};border-radius:${t.borderRadius};"
+                                            +"Sign in"
+                                        }
+                                        div("auth-mock__footer") {
+                                            +"No account? "
+                                            a("#") { +"Register" }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            div("form-card form-card--wide") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/settings/branding",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    // ---- Preset picker ----
-                    p("form-section-title") { +"Theme Preset" }
-                    div("field") {
-                        label { +"Apply a preset" }
-                        div {
-                            style = "display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.25rem;"
-                            button(type = ButtonType.button, classes = "btn btn-ghost") {
-                                attributes["data-preset"] = "dark"
-                                +"Dark"
-                            }
-                            button(type = ButtonType.button, classes = "btn btn-ghost") {
-                                attributes["data-preset"] = "light"
-                                +"Light"
-                            }
-                            button(type = ButtonType.button, classes = "btn btn-ghost") {
-                                attributes["data-preset"] = "simple"
-                                +"Simple"
-                            }
-                        }
-                        p("field-hint") { +"Fills all color fields below with the selected palette. Save to apply." }
-                    }
-
-                    // ---- Live preview ----
-                    p("form-section-title") { +"Preview" }
-                    div("field") {
-                        div {
-                            style = "border-radius:8px; overflow:hidden; max-width:260px;"
-                            div {
-                                id = "previewCard"
-                                style = "padding:1.25rem; border:1px solid #3f3f46; border-top:3px solid #1FBCFF; background:#18181b; border-radius:8px;"
-                                p {
-                                    id = "previewTitle"
-                                    style = "font-weight:600; font-size:0.85rem; margin:0 0 1rem; color:#fafafa;"
-                                    +"Sign in"
-                                }
-                                div {
-                                    id = "previewInput"
-                                    style = "height:2rem; border-radius:4px; border:1px solid #3f3f46; background:#27272a; margin-bottom:0.75rem;"
-                                }
-                                div {
-                                    id = "previewBtn"
-                                    style = "height:2rem; border-radius:4px; text-align:center; line-height:2rem; font-size:0.78rem; font-weight:600; background:#1FBCFF; color:#09090b;"
-                                    +"Sign in"
-                                }
-                                p {
-                                    id = "previewMuted"
-                                    style = "font-size:0.75rem; margin:0.75rem 0 0; text-align:center; color:#a1a1aa;"
-                                    +"Forgot password?"
-                                }
-                            }
-                        }
-                    }
-
-                    // ---- Color inputs (2-column grid) ----
-                    p("form-section-title") { +"Colors" }
-                    div {
-                        style = "display:grid; grid-template-columns:1fr 1fr; gap:0.75rem 1.5rem;"
-                        div("field") {
-                            label { htmlFor = "themeAccentColor"; +"Accent" }
-                            input(type = InputType.color, name = "themeAccentColor") {
-                                id = "themeAccentColor"
-                                value = workspace.theme.accentColor
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeAccentHover"; +"Accent Hover" }
-                            input(type = InputType.color, name = "themeAccentHover") {
-                                id = "themeAccentHover"
-                                value = workspace.theme.accentHoverColor
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeBgDeep"; +"Page Background" }
-                            input(type = InputType.color, name = "themeBgDeep") {
-                                id = "themeBgDeep"
-                                value = workspace.theme.bgDeep
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeBgCard"; +"Card Background" }
-                            input(type = InputType.color, name = "themeBgCard") {
-                                id = "themeBgCard"
-                                value = workspace.theme.bgCard
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeBgInput"; +"Input Background" }
-                            input(type = InputType.color, name = "themeBgInput") {
-                                id = "themeBgInput"
-                                value = workspace.theme.bgInput
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeBorderColor"; +"Border" }
-                            input(type = InputType.color, name = "themeBorderColor") {
-                                id = "themeBorderColor"
-                                value = workspace.theme.borderColor
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeTextPrimary"; +"Text Primary" }
-                            input(type = InputType.color, name = "themeTextPrimary") {
-                                id = "themeTextPrimary"
-                                value = workspace.theme.textPrimary
-                            }
-                        }
-                        div("field") {
-                            label { htmlFor = "themeTextMuted"; +"Text Muted" }
-                            input(type = InputType.color, name = "themeTextMuted") {
-                                id = "themeTextMuted"
-                                value = workspace.theme.textMuted
-                            }
-                        }
-                    }
-
-                    div("field") {
-                        label { htmlFor = "themeBorderRadius"; +"Border Radius" }
-                        input(type = InputType.text, name = "themeBorderRadius") {
-                            id = "themeBorderRadius"
-                            value = workspace.theme.borderRadius
-                            placeholder = "8px"
-                        }
-                        p("field-hint") { +"Applied to cards, inputs, and buttons on auth pages. e.g. 0px, 6px, 12px." }
-                    }
-
-                    // ---- Assets ----
-                    p("form-section-title") { +"Assets" }
-                    div("field") {
-                        label { htmlFor = "themeLogoUrl"; +"Logo URL (optional)" }
-                        input(type = InputType.url, name = "themeLogoUrl") {
-                            id = "themeLogoUrl"
-                            placeholder = "https://cdn.example.com/logo.png"
-                            value = workspace.theme.logoUrl ?: ""
-                        }
-                        p("field-hint") { +"Shown above the login card. Recommended max 180×48px." }
-                    }
-                    div("field") {
-                        label { htmlFor = "themeFaviconUrl"; +"Favicon URL (optional)" }
-                        input(type = InputType.url, name = "themeFaviconUrl") {
-                            id = "themeFaviconUrl"
-                            placeholder = "https://cdn.example.com/favicon.ico"
-                            value = workspace.theme.faviconUrl ?: ""
-                        }
-                    }
-
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Save Branding" }
-                        a(
-                            "/admin/workspaces/${workspace.slug}/settings",
-                            classes = "btn btn-ghost",
-                        ) { +"← General Settings" }
-                    }
-
-                    // ---- Script: preset fill + live preview ----
-                    script {
-                        unsafe {
-                            +(
-                                """
-(function () {
-  var PRESETS = {
-    dark: {
-      themeAccentColor: '#1FBCFF', themeAccentHover: '#0ea5d9',
-      themeBgDeep: '#09090b', themeBgCard: '#18181b', themeBgInput: '#27272a',
-      themeBorderColor: '#3f3f46', themeBorderRadius: '8px',
-      themeTextPrimary: '#fafafa', themeTextMuted: '#a1a1aa'
-    },
-    light: {
-      themeAccentColor: '#0ea5d9', themeAccentHover: '#0284c7',
-      themeBgDeep: '#f8fafc', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
-      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
-      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
-    },
-    simple: {
-      themeAccentColor: '#212121', themeAccentHover: '#000000',
-      themeBgDeep: '#fafafa', themeBgCard: '#ffffff', themeBgInput: '#f1f5f9',
-      themeBorderColor: '#e2e8f0', themeBorderRadius: '8px',
-      themeTextPrimary: '#0f172a', themeTextMuted: '#64748b'
+            // ── Script: live preview + presets (external) ──────────
+            script(src = "/static/js/branding.js") {}
+        }
     }
-  };
 
-  function updatePreview() {
-    var card   = document.getElementById('previewCard');
-    var title  = document.getElementById('previewTitle');
-    var inp    = document.getElementById('previewInput');
-    var btn    = document.getElementById('previewBtn');
-    var muted  = document.getElementById('previewMuted');
-    if (!card) return;
-    var accent = document.getElementById('themeAccentColor').value;
-    var bg     = document.getElementById('themeBgCard').value;
-    var bgIn   = document.getElementById('themeBgInput').value;
-    var border = document.getElementById('themeBorderColor').value;
-    var text   = document.getElementById('themeTextPrimary').value;
-    var mutedC = document.getElementById('themeTextMuted').value;
-    card.style.background     = bg;
-    card.style.borderColor    = border;
-    card.style.borderTopColor = accent;
-    title.style.color         = text;
-    inp.style.background      = bgIn;
-    inp.style.borderColor     = border;
-    btn.style.background      = accent;
-    btn.style.color           = bg;
-    muted.style.color         = mutedC;
-  }
-
-  document.querySelectorAll('[data-preset]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var p = PRESETS[this.getAttribute('data-preset')];
-      if (!p) return;
-      Object.keys(p).forEach(function (key) {
-        var el = document.getElementById(key);
-        if (el) el.value = p[key];
-      });
-      updatePreview();
-    });
-  });
-
-  ['themeAccentColor','themeBgCard','themeBgInput','themeBorderColor',
-   'themeTextPrimary','themeTextMuted'].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('input', updatePreview);
-  });
-
-  updatePreview();
-})();
-                                """.trimIndent()
-                            )
-                        }
-                    }
+// ── Color field helper ─────────────────────────────────────────────────
+// Renders one cell in the .color-grid: label + swatch/native picker + hex input.
+// `key` is the short preview key (e.g. "accent"), `formName` is the form field name.
+private fun DIV.colorField(label: String, key: String, formName: String, currentValue: String) {
+    div("color-field") {
+        div("color-field__label") { +label }
+        div("color-field__picker") {
+            div("color-field__swatch-wrap") {
+                div("color-field__swatch") {
+                    id = "swatch-$key"
+                    style = "background:$currentValue;"
                 }
+                input(type = InputType.color) {
+                    classes = setOf("color-field__native")
+                    id = "native-$key"
+                    name = formName
+                    value = currentValue
+                    attributes["data-color-key"] = key
+                }
+            }
+            input(type = InputType.text) {
+                classes = setOf("color-field__hex")
+                id = "hex-$key"
+                value = currentValue.uppercase()
+                maxLength = "7"
+                attributes["data-hex-key"] = key
             }
         }
     }
+}
+

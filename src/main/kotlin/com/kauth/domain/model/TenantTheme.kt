@@ -16,14 +16,14 @@ package com.kauth.domain.model
  */
 data class TenantTheme(
     val accentColor: String = "#1FBCFF",
-    val accentHoverColor: String = "#0ea5d9",
-    val bgDeep: String = "#09090b",
-    val bgCard: String = "#18181b",
-    val bgInput: String = "#27272a",
-    val borderColor: String = "#3f3f46",
+    val accentHoverColor: String = "#0AAEE8",
+    val bgDeep: String = "#0C0C0E",
+    val bgCard: String = "#1E1E24",
+    val bgInput: String = "#2A2A32",
+    val borderColor: String = "#2E2E36",
     val borderRadius: String = "8px",
-    val textPrimary: String = "#fafafa",
-    val textMuted: String = "#a1a1aa",
+    val textPrimary: String = "#EDEDEF",
+    val textMuted: String = "#6B6B75",
     val logoUrl: String? = null,
     val faviconUrl: String? = null,
 ) {
@@ -52,46 +52,46 @@ data class TenantTheme(
         }
 
     companion object {
-        /**  KotAuth default dark theme.*/
+        /** KotAuth default dark theme. */
         val DEFAULT =
             TenantTheme(
                 accentColor = "#1FBCFF",
-                accentHoverColor = "#0ea5d9",
-                bgDeep = "#09090b",
-                bgCard = "#18181b",
-                bgInput = "#27272a",
-                borderColor = "#3f3f46",
-                borderRadius = "0px",
-                textPrimary = "#fafafa",
-                textMuted = "#a1a1aa",
+                accentHoverColor = "#0AAEE8",
+                bgDeep = "#0C0C0E",
+                bgCard = "#1E1E24",
+                bgInput = "#2A2A32",
+                borderColor = "#2E2E36",
+                borderRadius = "8px",
+                textPrimary = "#EDEDEF",
+                textMuted = "#6B6B75",
             )
 
         /** A light theme preset for tenants that want a clean white login page. */
         val LIGHT =
             TenantTheme(
-                accentColor = "#0ea5d9",
-                accentHoverColor = "#0284c7",
-                bgDeep = "#f8fafc",
-                bgCard = "#ffffff",
-                bgInput = "#f1f5f9",
-                borderColor = "#e2e8f0",
-                borderRadius = "0px",
-                textPrimary = "#0f172a",
-                textMuted = "#64748b",
+                accentColor = "#0A6EBD",
+                accentHoverColor = "#085FA3",
+                bgDeep = "#F4F5F7",
+                bgCard = "#FFFFFF",
+                bgInput = "#F0F1F3",
+                borderColor = "#E0E1E4",
+                borderRadius = "8px",
+                textPrimary = "#111114",
+                textMuted = "#7A7A85",
             )
 
-        // Same as LIGHT but with rounded corners.
+        /** Minimal monochrome theme with sharp corners. */
         val SIMPLE =
             TenantTheme(
-                accentColor = "#212121",
-                accentHoverColor = "#000000",
-                bgDeep = "#fafafa",
-                bgCard = "#ffffff",
-                bgInput = "#f1f5f9",
-                borderColor = "#e2e8f0",
-                borderRadius = "8px",
-                textPrimary = "#0f172a",
-                textMuted = "#64748b",
+                accentColor = "#111114",
+                accentHoverColor = "#333336",
+                bgDeep = "#FFFFFF",
+                bgCard = "#FAFAFA",
+                bgInput = "#F4F4F6",
+                borderColor = "#DDDDE0",
+                borderRadius = "0px",
+                textPrimary = "#111114",
+                textMuted = "#6B6B75",
             )
     }
 }

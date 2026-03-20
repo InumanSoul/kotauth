@@ -26,8 +26,8 @@
 
   /* ── Text ────────────────────────────────────────────────────────────── */
   --color-text:         #f1f1f2;   /* primary text                          */
-  --color-muted:        #9b9ba4;   /* labels, secondary text                */
-  --color-subtle:       #616169;   /* hints, disabled, empty state          */
+  --color-muted:        #a2a2a9;   /* labels, secondary text                */
+  --color-subtle:       #72727a;   /* hints, disabled, empty state          */
 
   /* ── Accent — brand blue ─────────────────────────────────────────────── */
   --color-accent:         #1fbcff;

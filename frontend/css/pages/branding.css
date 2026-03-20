@@ -1,0 +1,181 @@
+/* ── Branding page ─────────────────────────────────────────────
+   Two-column layout: scrollable form (left) + sticky preview (right).
+   ────────────────────────────────────────────────────────────── */
+
+/* ── two-column branding layout ── */
+.branding-layout {
+  display: grid;
+  grid-template-columns: 1fr 35dvw;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── left: scrollable form column ── */
+.branding-form { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── right: sticky preview column ── */
+.branding-preview {
+  position: sticky;
+  top: calc(42px + 28px); /* topbar + content padding */
+}
+
+/* ── section block ── */
+.form-section { display: flex; flex-direction: column; gap: 8px; }
+
+.form-section__label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-subtle);
+}
+
+/* ── preset button group ── */
+.preset-group {
+  display: flex;
+  border: 0.5px solid var(--color-border-md);
+  background: var(--color-card);
+}
+.preset-btn {
+  flex: 1; padding: 7px 0;
+  font-size: 12px; font-weight: 500; font-family: var(--font-sans);
+  color: var(--color-muted); background: transparent;
+  border: none; border-right: 0.5px solid var(--color-border-md);
+  cursor: pointer; transition: background 0.12s, color 0.12s;
+  text-align: center;
+}
+.preset-btn:last-child { border-right: none; }
+.preset-btn:hover { background: var(--color-row-hover); color: var(--color-text); }
+.preset-btn--active { background: var(--color-accent-bg); color: var(--color-accent); }
+
+/* ── color grid ── */
+.color-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 0.5px solid var(--color-border-md);
+  background: var(--color-card);
+}
+
+.color-field {
+  padding: 12px 14px;
+  border-right: 0.5px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border);
+}
+/* Remove right border from even columns */
+.color-field:nth-child(2n) { border-right: none; }
+/* Remove bottom border from last row */
+.color-field:nth-last-child(-n+2) { border-bottom: none; }
+
+.color-field__label {
+  font-size: 10px; font-weight: 500; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--color-subtle);
+  margin-bottom: 8px;
+}
+
+/* The actual picker row: swatch + hex input */
+.color-field__picker {
+  display: flex; align-items: center; gap: 8px;
+}
+
+/* Clickable swatch — wraps a hidden <input type="color"> */
+.color-field__swatch-wrap {
+  position: relative; flex-shrink: 0;
+  width: 28px; height: 28px;
+  border: 0.5px solid var(--color-border-md);
+  cursor: pointer; overflow: hidden;
+}
+.color-field__swatch {
+  width: 100%; height: 100%;
+  display: block;
+}
+/* Native color input sits over swatch, fully transparent */
+.color-field__native {
+  position: absolute; inset: 0;
+  opacity: 0; width: 100%; height: 100%;
+  cursor: pointer; border: none; padding: 0;
+}
+
+.color-field__hex {
+  flex: 1; height: 28px;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid var(--color-border-md); border-radius: 0;
+  padding: 0 8px;
+  font-size: 12px; font-family: var(--font-mono); color: var(--color-text);
+  outline: none; transition: border-color 0.15s;
+  text-transform: uppercase;
+}
+.color-field__hex:focus { border-color: var(--color-accent); background: rgba(31,188,255,0.04); }
+
+/* ── preview panel ── */
+.preview-panel {
+  background: var(--color-card);
+  border: 0.5px solid var(--color-border-md);
+}
+.preview-panel__header {
+  padding: 10px 14px;
+  border-bottom: 0.5px solid var(--color-border);
+  font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.preview-panel__label {
+  font-size: 11px; color: var(--color-subtle);
+  font-weight: 400; letter-spacing: 0; text-transform: none;
+}
+.preview-panel__body {
+  padding: 24px 20px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 420px;
+}
+
+/* ── auth screen mockup (inside preview) ── */
+.auth-mock {
+  width: 100%;
+  max-width: 260px;
+  display: flex; flex-direction: column; gap: 0;
+  font-family: var(--font-sans);
+}
+.auth-mock__card {
+  padding: 28px 24px 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  background: var(--pm-card, #1e1e24);
+  border: 1px solid var(--pm-border, rgba(255,255,255,0.10));
+  border-radius: var(--pm-radius, 8px);
+}
+.auth-mock__logo-area {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  margin-bottom: 4px;
+}
+.auth-mock__logo-placeholder {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: rgba(255,255,255,0.2); letter-spacing: 0.04em;
+}
+.auth-mock__title {
+  font-size: 15px; font-weight: 500;
+  color: var(--pm-text, #ededef);
+  margin-top: 2px;
+}
+.auth-mock__subtitle {
+  font-size: 11px;
+  color: var(--pm-muted, #6b6b75);
+}
+.auth-mock__field {
+  height: 34px;
+  background: var(--pm-input, rgba(255,255,255,0.07));
+  border: 1px solid var(--pm-border, rgba(255,255,255,0.10));
+  border-radius: var(--pm-radius, 8px);
+  padding: 0 10px;
+  font-size: 12px; color: var(--pm-muted, #6b6b75);
+  display: flex; align-items: center;
+}
+.auth-mock__btn {
+  height: 34px;
+  background: var(--pm-accent, #1fbcff);
+  border-radius: var(--pm-radius, 8px);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 500;
+  color: var(--pm-accent-text, #05080a);
+}
+.auth-mock__footer {
+  text-align: center;
+  font-size: 11px; color: var(--pm-muted, #6b6b75);
+}
+.auth-mock__footer a { color: var(--pm-accent, #1fbcff); text-decoration: none; }

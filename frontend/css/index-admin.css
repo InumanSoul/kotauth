@@ -40,6 +40,7 @@
 @import "./pages/workspace-overview.css";
 @import "./pages/app-detail.css";
 @import "./pages/user-detail.css";
+@import "./pages/branding.css";
 
 /* ── Admin-specific pages (legacy) ───────────────────────────────────────── */
 @import "./admin/login.css";
