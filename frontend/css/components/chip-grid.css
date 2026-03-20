@@ -1,0 +1,118 @@
+/* frontend/css/components/chip-grid.css
+ *
+ * Toggleable chip grid for scope/event multi-select.
+ * Each chip is a hidden checkbox + styled label.
+ *
+ * .chip-grid__header         — header row with label, count, all/none toggles
+ * .chip-grid__header-label   — uppercase section title
+ * .chip-grid__header-actions — right-aligned controls
+ * .chip-grid__toggle         — text button (All / None)
+ * .chip-grid__count          — mono counter "3 / 11 selected"
+ * .chip-grid                 — flex-wrap container for chips
+ * .scope-chip                — wrapper label for one chip
+ * .scope-chip__label         — visible chip pill
+ *
+ * Usage:
+ *   <div class="chip-grid__header">
+ *     <span class="chip-grid__header-label">Scopes</span>
+ *     <div class="chip-grid__header-actions">
+ *       <span class="chip-grid__count">0 / 11 selected</span>
+ *       <button class="chip-grid__toggle" data-chips-all="scopes-grid">All</button>
+ *       <button class="chip-grid__toggle" data-chips-none="scopes-grid">None</button>
+ *     </div>
+ *   </div>
+ *   <div class="chip-grid" id="scopes-grid">
+ *     <label class="scope-chip">
+ *       <input type="checkbox" name="scopes" value="USERS:READ">
+ *       <span class="scope-chip__label">USERS:READ</span>
+ *     </label>
+ *   </div>
+ */
+
+.chip-grid__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.chip-grid__header-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+}
+
+.chip-grid__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.chip-grid__toggle {
+  font-size: 11px;
+  color: var(--color-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-sans);
+  transition: color 0.12s;
+}
+
+.chip-grid__toggle:hover { color: var(--color-accent); }
+
+.chip-grid__count {
+  font-size: 11px;
+  color: var(--color-subtle);
+  font-family: var(--font-mono);
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4);
+}
+
+.scope-chip {
+  display: inline-flex;
+  /* Reset global label rule (components/form.css) */
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  font-weight: normal;
+  color: inherit;
+  margin-bottom: 0;
+}
+
+.scope-chip input { display: none; }
+
+/* Off state */
+.scope-chip__label {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border: 0.5px solid var(--color-border);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-subtle);
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+
+.scope-chip__label:hover {
+  border-color: var(--color-border-md);
+  color: var(--color-muted);
+}
+
+/* On state */
+.scope-chip input:checked + .scope-chip__label {
+  background: var(--color-accent-bg);
+  border-color: var(--color-accent-border);
+  color: var(--color-accent);
+}

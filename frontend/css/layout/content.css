@@ -1,10 +1,14 @@
 /* frontend/css/layout/content.css
  *
  * Main content area — fills the remaining horizontal space after rail + sidebar.
- * Contains: .main wrapper, .content scrollable area, page header, breadcrumb.
+ *
+ * New BEM classes (.content-outer, .content-inner, .breadcrumb__*, .page-header__*)
+ * coexist with legacy classes (.main, .content, .page-title, .breadcrumb-sep, etc.)
+ * for backward compatibility with AdminView.kt.
  */
 
-/* Main column wrapper */
+/* ── Main column wrapper (legacy flex model) ──────────────────────────── */
+
 .main {
   flex: 1;
   display: flex;
@@ -13,69 +17,156 @@
   overflow: hidden;
 }
 
-/* Scrollable content area */
+/* Scrollable content area (legacy) */
 .content {
   padding: var(--space-6);
   flex: 1;
   overflow-y: auto;
 }
 
-.content::-webkit-scrollbar         { width: 5px; }
-.content::-webkit-scrollbar-track   { background: transparent; }
-.content::-webkit-scrollbar-thumb   { background: rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); }
+.content::-webkit-scrollbar       { width: 5px; }
+.content::-webkit-scrollbar-track  { background: transparent; }
+.content::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.08); }
 
-/* ── Page header ─────────────────────────────────────────────────────────── */
+/* ── New content wrappers (for Phase 2 Kotlin migration) ──────────────── */
+
+.content-outer {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-8) var(--space-10) var(--space-20);
+}
+
+.content-outer::-webkit-scrollbar       { width: 5px; }
+.content-outer::-webkit-scrollbar-track  { background: transparent; }
+.content-outer::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.08); }
+
+.content-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* Page-specific width overrides */
+.content-inner--narrow { max-width: 620px; }
+.content-inner--wide   { max-width: 1020px; }
+
+/* ── Page header (new BEM) ─────────────────────────────────────────────── */
 
 .page-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  gap: 1rem;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
-.page-title       { font-size: 1.15rem; font-weight: 600; }
+.page-header__left {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.page-header__identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.page-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.page-header__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+}
+
+.page-header__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.page-header__sub {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.page-header__sub strong {
+  color: var(--color-text);
+  font-weight: 400;
+}
+
+.page-header__slug {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  padding-top: var(--space-1);
+}
+
+/* ── Page header (legacy — keep until Phase 2) ─────────────────────────── */
+
+.page-title       { font-size: 1.15rem; font-weight: var(--weight-semibold); }
 .page-title--sm   { font-size: 1rem; }
 .page-subtitle    { font-size: 0.76rem; color: var(--color-muted); margin-top: 0.2rem; }
-
-/* Sub-section header — adds top breathing room when a second .page-header
- * appears lower on the same page (e.g. Applications list under Workspace detail) */
 .page-header--section { margin-top: 2rem; }
-
-/* Badge / meta row sitting directly beneath a page title */
 .page-meta { margin-top: 2px; }
 
-/* ── Breadcrumb ──────────────────────────────────────────────────────────── */
+/* ── Breadcrumb (new BEM) ──────────────────────────────────────────────── */
 
 .breadcrumb {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  margin-bottom: 1.25rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+  font-size: 12px;
 }
 
-.breadcrumb a         { color: var(--color-muted); }
-.breadcrumb a:hover   { color: var(--color-text); text-decoration: none; }
-.breadcrumb-sep       { color: var(--color-subtle); }
-.breadcrumb-current   { color: var(--color-text); }
+.breadcrumb__link {
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: color 0.1s;
+  cursor: pointer;
+}
+
+.breadcrumb__link:hover { color: var(--color-text); text-decoration: none; }
+.breadcrumb__sep { color: var(--color-subtle); font-size: 10px; }
+.breadcrumb__current { color: var(--color-text); }
+
+/* Breadcrumb legacy (keep until Phase 2) */
+.breadcrumb a       { color: var(--color-muted); }
+.breadcrumb a:hover { color: var(--color-text); text-decoration: none; }
+.breadcrumb-sep     { color: var(--color-subtle); }
+.breadcrumb-current { color: var(--color-text); }
 
 /* ── Search / filter bar ─────────────────────────────────────────────────── */
 
-/* Wraps the search form on list pages (Users, Audit Log, etc.) */
-.search-form {
-  margin-bottom: 1rem;
-}
+.search-form { margin-bottom: 1rem; }
 
-/* Inner row: input + submit + optional clear link, all on one line */
 .search-row {
   display: flex;
   align-items: center;
   gap: 0.6rem;
 }
 
-/* Let the search input fill available space, leave buttons at natural width */
 .search-row input,
 .search-row select {
   flex: 1;

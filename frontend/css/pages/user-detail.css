@@ -1,0 +1,157 @@
+/* frontend/css/pages/user-detail.css
+ *
+ * Page-specific styles for the user detail page.
+ *
+ * Components:
+ *   .user-header           — page header with avatar, name, meta, actions
+ *   .user-header__avatar   — 44px circular accent monogram
+ *   .user-header__name     — user display name
+ *   .user-header__meta     — badge row below name
+ *   .user-header__actions  — action buttons (right side)
+ *   .lock-icon             — small lock indicator for immutable fields
+ *   .edit-row              — inline edit form row (grid: label + field)
+ *   .edit-row__label       — left label column
+ *   .edit-row__field       — editable input field
+ *   .edit-row__hint        — helper text below field
+ *   .edit-actions          — save/cancel action bar
+ */
+
+/* ── User header ───────────────────────────────────────────────────────── */
+#profile-section{
+  margin-bottom: var(--space-5);
+}
+
+.user-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.user-header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.user-header__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: var(--weight-medium);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.user-header__name {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+  margin-bottom: var(--space-2);
+}
+
+.user-header__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.user-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  padding-top: var(--space-1);
+}
+
+/* ── Lock icon ─────────────────────────────────────────────────────────── */
+
+.lock-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-subtle);
+  flex-shrink: 0;
+}
+.lock-icon svg { width: 12px; height: 12px; }
+
+/* ── Edit form rows ────────────────────────────────────────────────────── */
+
+.edit-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: start;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.edit-row:last-of-type { border-bottom: none; }
+
+.edit-row__label {
+  font-size: 12px;
+  color: var(--color-muted);
+  padding-top: var(--space-2);
+}
+
+.edit-row__field {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: var(--font-sans);
+}
+
+.edit-row__field:focus {
+  border-color: var(--color-accent);
+  background: rgba(31, 188, 255, 0.04);
+}
+
+.edit-row__field--mono { font-family: var(--font-mono); }
+
+.edit-row__field--select {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b75' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.edit-row__field::placeholder { color: var(--color-subtle); }
+
+.edit-row__field:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.edit-row__hint {
+  font-size: var(--text-sm);
+  color: var(--color-subtle);
+  margin-top: var(--space-1);
+}
+
+/* ── Edit actions bar ──────────────────────────────────────────────────── */
+
+.edit-actions {
+  padding: var(--space-3) var(--space-4);
+  border-top: 0.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.02);
+}

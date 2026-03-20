@@ -1,0 +1,20 @@
+/* frontend/css/components/copy-btn.css
+ *
+ * Copy-to-clipboard button refinements.
+ *
+ * The button uses `btn btn--ghost btn--icon` for structure and
+ * `.copy-btn` only for the inline copy-specific overrides:
+ *   - hover accent
+ *   - "copied" check feedback via data-copied state
+ */
+
+.copy-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}
+
+.copy-btn[data-copied] {
+  color: var(--color-green, #34d399);
+  border-color: var(--color-green, #34d399);
+}

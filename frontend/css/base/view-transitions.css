@@ -1,0 +1,74 @@
+/* frontend/css/base/view-transitions.css
+ *
+ * View transitions for smooth page navigation.
+ *
+ * - Cross-document (MPA): @view-transition triggers on full page loads
+ * - Same-document (htmx): globalViewTransitions config triggers on swaps
+ *
+ * The .content element is the main transition target — shell, rail,
+ * and sidebar stay stable while only the page content fades.
+ */
+
+/* ── Enable cross-document view transitions ─────────────────────────────── */
+
+@view-transition { navigation: auto; }
+
+/* ── Transition targets ─────────────────────────────────────────────────── */
+
+.content,
+.content-outer { view-transition-name: page-content; }
+
+/* Prevent the root snapshot from also fading (keeps shell stable) */
+:root { view-transition-name: none; }
+
+/* ── Fade animation ─────────────────────────────────────────────────────── */
+
+::view-transition-old(page-content) {
+  animation: vt-fade-out 0.15s ease-out both;
+}
+
+::view-transition-new(page-content) {
+  animation: vt-fade-in 0.15s ease-in both;
+}
+
+@keyframes vt-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Sidebar dot slide ────────────────────────────────────────────────── */
+
+/* The group pseudo animates position — this is the actual slide */
+::view-transition-group(sidebar-dot) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Kill the default crossfade on old/new — just slide, no flicker */
+::view-transition-old(sidebar-dot),
+::view-transition-new(sidebar-dot) {
+  animation: none;
+}
+
+/* ── Sidebar hide ────────────────────────────────────────────────── */
+::view-transition-group(sidebar){
+  animation-duration: 0.15s;
+  animation-timing-function: ease-in-out;
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(page-content),
+  ::view-transition-new(page-content) {
+    animation-duration: 0.01s;
+  }
+  ::view-transition-group(sidebar-dot) {
+    animation-duration: 0.01s;
+  }
+}

@@ -7,7 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.3] - 2026-03-19
+
+### Added
+
+- **BEM design system — settings pages**: Rewrote Security Policy, SMTP, Identity Providers, API Keys, and Webhooks pages from legacy CSS to BEM components (`ov-card`, `edit-row`, `toggle-row`, `chip-grid`, `copy-field`, `key-table`)
+- **BEM design system — RBAC pages**: Rewrote Roles (list/create/detail) and Groups (list/create/detail) to BEM with `data-table`, `page-header`, `edit-row`, `key-table`, and `empty-state` components
+- **`settings.js`** — CSP-safe JavaScript for all admin interactions: clipboard copy (`data-copy`), confirm dialogs (`data-confirm`), chip-grid toggles (`data-chips-all`/`data-chips-none`), scope field toggle (`data-scope-toggle`)
+- **`copy.svg`** icon for clipboard copy buttons
+- **`btn--icon`** CSS modifier for icon-only square buttons (24×24)
+- **`ov-card__section-label--danger`** CSS modifier for danger zone headings
+- **`badge--danger`** CSS modifier (red variant) for failed delivery status
+- **`copy-field`** CSS component for monospace value + copy button (callback URLs, one-time secrets)
+- **Frontend Architecture docs** — added JavaScript (`settings.js`) and htmx patterns sections to `docs/FRONTEND_CSS.md`
+
+### Changed
+
+- **`copyBtn()` rewritten** — replaced inline `onclick` with `data-copy` attribute and SVG icon; now uses `btn btn--ghost btn--icon` base classes
+- **Lock icon** — replaced 🔒 emoji with inline SVG (`lock.svg`) on user detail page
+- **Copy buttons across all pages** — replaced `⎘` unicode glyph with `copy.svg` icon in Identity Providers, API Keys, and Webhooks copy-field buttons
+- **User detail page** — converted Profile, Active Sessions, and Danger Zone from legacy `section`/`section__title` to `ov-card`/`ov-card__section-label`
+- **Branding page** — replaced `form-section__label` with `ov-card__section-label`; each section now wrapped in its own `ov-card`
+- **ov-card stacking** — increased sibling gap from 12px to 20px
+- **`ov-card__section-label`** — now flex row (`justify-content: space-between`) to support action buttons alongside the title
+- **`empty-state__icon`** — added `color: var(--color-muted)` and `svg { width: 16px; height: 16px }` for consistent icon rendering
+- **Reset password button** — now always visible on user detail page; disabled with tooltip when SMTP is not configured
+- **`docs/FRONTEND_CSS.md`** — updated folder structure, file responsibilities table, and component reference to reflect all new BEM components and CSS files
+
+### Fixed
+
+- **Global label bleed** — added explicit `text-transform: none` resets on `.check-row`, `.radio-row`, `.toggle`, and `.scope-chip` to counteract global `label { text-transform: uppercase }` from `form.css`
+- **Checkbox/radio sizing** — added `padding: 0; min-width: 14px; min-height: 14px` resets to prevent global `input` padding from inflating checkbox and radio inputs
+- **Branding double-spacing** — removed flex gap from `.branding-form` to prevent stacking with ov-card sibling margin
+- **Branding double-border** — removed `border` from `.preset-group` and `.color-grid` now that they sit inside bordered ov-cards
 
 ---
 

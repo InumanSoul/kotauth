@@ -4,7 +4,7 @@
  * LightningCSS resolves all @import statements into a single
  * minified file: src/main/resources/static/kotauth-admin.css
  *
- * Import order: base → layout → components → admin pages
+ * Import order: base → layout → components → pages → admin legacy
  * No rules live here — this file is imports only.
  */
 
@@ -12,6 +12,7 @@
 @import "./base/tokens.css";
 @import "./base/reset.css";
 @import "./base/typography.css";
+@import "./base/view-transitions.css";
 
 /* ── Layout layer ────────────────────────────────────────────────────────── */
 @import "./layout/shell.css";
@@ -26,12 +27,28 @@
 @import "./components/alert.css";
 @import "./components/card.css";
 @import "./components/form.css";
-@import "./components/stat-card.css";
 @import "./components/table.css";
 @import "./components/empty-state.css";
 @import "./components/ov-card.css";
+@import "./components/notice.css";
+@import "./components/copy-btn.css";
+@import "./components/divider.css";
+@import "./components/danger-zone.css";
+@import "./components/section.css";
+@import "./components/toggle.css";
+@import "./components/check-row.css";
+@import "./components/radio-row.css";
+@import "./components/chip-grid.css";
 
-/* ── Admin-specific pages ────────────────────────────────────────────────── */
+/* ── Page-specific ───────────────────────────────────────────────────────── */
+@import "./pages/workspace-overview.css";
+@import "./pages/app-detail.css";
+@import "./pages/user-detail.css";
+@import "./pages/branding.css";
+@import "./pages/settings.css";
+@import "./pages/security-mfa.css";
+
+/* ── Admin-specific pages (legacy) ───────────────────────────────────────── */
 @import "./admin/login.css";
 @import "./admin/form-card.css";
 @import "./admin/welcome.css";

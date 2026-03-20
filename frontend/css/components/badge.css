@@ -3,11 +3,19 @@
  * Status and type badges — small labelling chips.
  *
  * Base: .badge
- * Color modifiers (semantic):
- *   .badge-green / .badge-active   — success / enabled
- *   .badge-red   / .badge-error    — danger / error
- *   .badge-blue  / .badge-pending  — info / pending
- *   .badge-outline / .badge-disabled / .badge-neutral — muted / disabled
+ *
+ * BEM variants (new — used by new page designs):
+ *   .badge--active        — success / enabled (green)
+ *   .badge--inactive      — disabled / paused (muted)
+ *   .badge--public        — public access type (muted)
+ *   .badge--confidential  — confidential access type (accent)
+ *   .badge--id            — monospace identifier chip (accent)
+ *
+ * Legacy variants (kept for backward compat with AdminView.kt):
+ *   .badge-green / .badge-active   — success
+ *   .badge-red   / .badge-error    — danger
+ *   .badge-blue  / .badge-pending  — info
+ *   .badge-outline / .badge-neutral — muted
  *
  * BEM element: .badge__dot — a 5px filled circle, inherits currentColor.
  */
@@ -15,14 +23,13 @@
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border: 1px solid;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-normal);
+  border: 0.5px solid;
 }
 
 /* Dot indicator used inside status badges */
@@ -34,7 +41,68 @@
   flex-shrink: 0;
 }
 
-/* ── Color variants ───────────────────────────────────────────────────────── */
+/* ── BEM color variants (new) ──────────────────────────────────────────── */
+
+.badge--active {
+  background: var(--color-green-bg);
+  color: var(--color-green);
+  border-color: var(--color-green-border);
+}
+
+.badge--inactive {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
+}
+
+.badge--public {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
+}
+
+.badge--confidential {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+.badge--id {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+/* Subtle mono ID variant (e.g. user detail where ID is less prominent) */
+.badge--id-muted {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
+}
+
+.badge--info {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+.badge--warn {
+  background: var(--color-amber-bg);
+  color: var(--color-amber);
+  border-color: var(--color-amber-border);
+}
+
+.badge--danger {
+  background: var(--color-red-bg);
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+}
+
+/* ── Legacy color variants (keep until Phase 2) ────────────────────────── */
 
 .badge-green,
 .badge-active {
@@ -65,8 +133,7 @@
   border-color: var(--color-border-md);
 }
 
-/* Inline placement — adds left gap and aligns vertically when a badge
- * appears alongside monospace text or a code span on the same line */
+/* Inline placement (legacy) */
 .badge--inline {
   margin-left: 0.5rem;
   vertical-align: middle;

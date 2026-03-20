@@ -30,29 +30,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import java.time.Instant
 
-/**
- * Admin console routes — Phase 3a (complete admin console).
- *
- * URL structure:
- *   /admin                                                   — workspace list (dashboard)
- *   /admin/workspaces/new                                    — create workspace
- *   /admin/workspaces/{slug}                                 — workspace detail
- *   /admin/workspaces/{slug}/settings                        — edit workspace settings
- *   /admin/workspaces/{slug}/applications/new                — create application
- *   /admin/workspaces/{slug}/applications/{clientId}         — application detail
- *   /admin/workspaces/{slug}/applications/{clientId}/edit    — edit application
- *   /admin/workspaces/{slug}/applications/{clientId}/toggle  — enable/disable
- *   /admin/workspaces/{slug}/applications/{clientId}/regenerate-secret
- *   /admin/workspaces/{slug}/users                           — user list
- *   /admin/workspaces/{slug}/users/new                       — create user
- *   /admin/workspaces/{slug}/users/{id}                      — user detail
- *   /admin/workspaces/{slug}/users/{id}/toggle               — enable/disable user
- *   /admin/workspaces/{slug}/users/{id}/edit                 — edit user profile
- *   /admin/workspaces/{slug}/users/{id}/revoke-sessions      — revoke all user sessions
- *   /admin/workspaces/{slug}/sessions                        — active sessions
- *   /admin/workspaces/{slug}/sessions/{id}/revoke            — revoke one session
- *   /admin/workspaces/{slug}/logs                            — audit log
- */
 fun Route.adminRoutes(
     authService: AuthService,
     adminService: AdminService,
@@ -124,16 +101,22 @@ fun Route.adminRoutes(
         }
 
         // ---------------------------------------------------------------
-        // Dashboard
+        // Smart redirect: last workspace → first workspace → create
         // ---------------------------------------------------------------
 
         get {
-            val session = call.sessions.get<AdminSession>()!!
-            val workspaces = tenantRepository.findAll()
-            call.respondHtml(
-                HttpStatusCode.OK,
-                AdminView.dashboardPage(workspaces, session.username),
-            )
+            val workspaces = tenantRepository.findAll().filter { !it.isMaster }
+            if (workspaces.isEmpty()) {
+                call.respondRedirect("/admin/workspaces/new")
+            } else if (workspaces.size == 1) {
+                call.respondRedirect("/admin/workspaces/${workspaces.first().slug}")
+            } else {
+                // Multiple workspaces — serve a lightweight redirector that
+                // reads the last-visited slug from localStorage. Falls back
+                // to the first workspace if nothing is stored.
+                val fallback = workspaces.first().slug
+                call.respondHtml(HttpStatusCode.OK, AdminView.workspaceRedirector(fallback))
+            }
         }
 
         // ===============================================================
@@ -141,7 +124,15 @@ fun Route.adminRoutes(
         // ===============================================================
 
         route("/workspaces") {
-            get { call.respondRedirect("/admin") }
+            get {
+                val session = call.sessions.get<AdminSession>()!!
+                val workspaces = tenantRepository.findAll()
+                val wsPairs = workspaces.map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.workspaceListPage(workspaces, wsPairs, session.username),
+                )
+            }
 
             get("/new") {
                 val session = call.sessions.get<AdminSession>()!!
@@ -252,7 +243,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // SMTP settings (Phase 3b)
+                // SMTP settings
                 // -------------------------------------------------------
 
                 get("/settings/smtp") {
@@ -306,7 +297,7 @@ fun Route.adminRoutes(
                 }
 
                 // ----------------------------------------------------------
-                // Identity Providers — Phase 2 (Social Login)
+                // Identity Providers
                 // ----------------------------------------------------------
 
                 get("/settings/identity-providers") {
@@ -385,7 +376,7 @@ fun Route.adminRoutes(
 
                     val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
                     if (existing == null) {
-                        // New provider
+                        // New provider — secret is mandatory
                         if (newSecret.isNullOrBlank()) {
                             val providers = idpRepo.findAllByTenant(workspace.id)
                             return@post call.respondHtml(
@@ -400,13 +391,15 @@ fun Route.adminRoutes(
                                 ),
                             )
                         }
+                        // New providers start disabled until configuration is verified;
+                        // ignore the toggle value on first save.
                         idpRepo.save(
                             IdentityProvider(
                                 tenantId = workspace.id,
                                 provider = provider,
                                 clientId = newClientId,
                                 clientSecret = newSecret,
-                                enabled = enabled,
+                                enabled = false,
                             ),
                         )
                     } else {
@@ -969,6 +962,42 @@ fun Route.adminRoutes(
                             )
                         }
 
+                        // ── htmx fragment: read-only profile section ──
+                        get("/profile-fragment") {
+                            val slug =
+                                call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val userId =
+                                call.parameters["userId"]?.toIntOrNull()
+                                    ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace =
+                                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val user =
+                                userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                            call.respondText(
+                                AdminView.userProfileReadFragment(workspace, user),
+                                ContentType.Text.Html,
+                            )
+                        }
+
+                        // ── htmx fragment: edit profile form ──
+                        get("/edit-fragment") {
+                            val slug =
+                                call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val userId =
+                                call.parameters["userId"]?.toIntOrNull()
+                                    ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace =
+                                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val user =
+                                userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                            call.respondText(
+                                AdminView.userProfileEditFragment(workspace, user),
+                                ContentType.Text.Html,
+                            )
+                        }
+
                         post("/toggle") {
                             val slug =
                                 call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -999,23 +1028,51 @@ fun Route.adminRoutes(
                             val params = call.receiveParameters()
                             val email = params["email"]?.trim() ?: ""
                             val fullName = params["fullName"]?.trim() ?: ""
+                            val isHtmx = call.request.headers["HX-Request"] == "true"
                             when (val result = adminService.updateUser(userId, workspace.id, email, fullName)) {
-                                is AdminResult.Success ->
-                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                                is AdminResult.Success -> {
+                                    if (isHtmx) {
+                                        // Return updated read-only profile fragment
+                                        val updatedUser = userRepository.findById(userId) ?: user
+                                        call.respondText(
+                                            AdminView.userProfileReadFragment(
+                                                workspace,
+                                                updatedUser,
+                                                successMessage = "Profile saved.",
+                                            ),
+                                            ContentType.Text.Html,
+                                        )
+                                    } else {
+                                        call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                                    }
+                                }
                                 is AdminResult.Failure -> {
-                                    val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
-                                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
-                                    call.respondHtml(
-                                        HttpStatusCode.UnprocessableEntity,
-                                        AdminView.userDetailPage(
-                                            workspace,
-                                            user,
-                                            sessions,
-                                            wsPairs,
-                                            session.username,
-                                            editError = result.error.message,
-                                        ),
-                                    )
+                                    if (isHtmx) {
+                                        // Return edit form with error message
+                                        call.respondText(
+                                            AdminView.userProfileEditFragment(
+                                                workspace,
+                                                user,
+                                                editError = result.error.message,
+                                            ),
+                                            ContentType.Text.Html,
+                                            HttpStatusCode.UnprocessableEntity,
+                                        )
+                                    } else {
+                                        val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
+                                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                                        call.respondHtml(
+                                            HttpStatusCode.UnprocessableEntity,
+                                            AdminView.userDetailPage(
+                                                workspace,
+                                                user,
+                                                sessions,
+                                                wsPairs,
+                                                session.username,
+                                                editError = result.error.message,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1521,11 +1578,11 @@ fun Route.adminRoutes(
                         tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                     val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     val users = userRepository.findByTenantId(workspace.id, null)
-                    val mfaEnrolledCount =
+                    val (enrolled, notEnrolled) =
                         if (mfaRepository != null) {
-                            users.count { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
+                            users.partition { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
                         } else {
-                            0
+                            emptyList<com.kauth.domain.model.User>() to users
                         }
                     call.respondHtml(
                         HttpStatusCode.OK,
@@ -1534,7 +1591,9 @@ fun Route.adminRoutes(
                             wsPairs,
                             session.username,
                             totalUsers = users.size,
-                            enrolledUsers = mfaEnrolledCount,
+                            enrolledUsers = enrolled.size,
+                            enrolledUserList = enrolled,
+                            notEnrolledUserList = notEnrolled,
                         ),
                     )
                 }
@@ -1552,7 +1611,19 @@ fun Route.adminRoutes(
                     val keys = apiKeyService?.listForTenant(workspace.id) ?: emptyList()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.apiKeysPage(workspace, keys, wsPairs, session.username),
+                        AdminView.apiKeysListPage(workspace, keys, wsPairs, session.username),
+                    )
+                }
+
+                get("/settings/api-keys/new") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.createApiKeyPage(workspace, wsPairs, session.username),
                     )
                 }
 
@@ -1582,7 +1653,7 @@ fun Route.adminRoutes(
                             val keys = svc.listForTenant(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.OK,
-                                AdminView.apiKeysPage(
+                                AdminView.apiKeysListPage(
                                     workspace,
                                     keys,
                                     wsPairs,
@@ -1595,9 +1666,8 @@ fun Route.adminRoutes(
                             val keys = svc.listForTenant(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
-                                AdminView.apiKeysPage(
+                                AdminView.createApiKeyPage(
                                     workspace,
-                                    keys,
                                     wsPairs,
                                     session.username,
                                     error = result.error.message,
@@ -1641,7 +1711,19 @@ fun Route.adminRoutes(
                     val deliveries = webhookService?.recentDeliveries(workspace.id) ?: emptyList()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.webhooksPage(workspace, endpoints, deliveries, wsPairs, session.username),
+                        AdminView.webhooksListPage(workspace, endpoints, deliveries, wsPairs, session.username),
+                    )
+                }
+
+                get("/settings/webhooks/new") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.createWebhookPage(workspace, wsPairs, session.username),
                     )
                 }
 
@@ -1664,7 +1746,7 @@ fun Route.adminRoutes(
                             val deliveries = svc.recentDeliveries(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.OK,
-                                AdminView.webhooksPage(
+                                AdminView.webhooksListPage(
                                     workspace,
                                     endpoints,
                                     deliveries,
@@ -1675,14 +1757,10 @@ fun Route.adminRoutes(
                             )
                         }
                         is com.kauth.domain.service.WebhookResult.Failure -> {
-                            val endpoints = svc.listEndpoints(workspace.id)
-                            val deliveries = svc.recentDeliveries(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
-                                AdminView.webhooksPage(
+                                AdminView.createWebhookPage(
                                     workspace,
-                                    endpoints,
-                                    deliveries,
                                     wsPairs,
                                     session.username,
                                     error = result.error,

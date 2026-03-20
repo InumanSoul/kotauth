@@ -1,0 +1,71 @@
+/* frontend/css/components/notice.css
+ *
+ * Conditional notice banner — shown when workspace/page has actionable issues.
+ * Default color: amber (warning). Extend with .notice--error, .notice--info if needed.
+ *
+ * .notice         — container (flex row)
+ * .notice__icon   — left icon slot
+ * .notice__body   — column with title + description
+ * .notice__title  — bold heading
+ * .notice__desc   — secondary text
+ * .notice__link   — right-aligned CTA link
+ */
+
+.notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--color-amber-bg);
+  border: 0.5px solid var(--color-amber-border);
+}
+
+.notice__icon {
+  color: var(--color-amber);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.notice__icon svg { width: 13px; height: 13px; }
+
+.notice__body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.notice__title {
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--color-amber);
+}
+
+.notice__desc {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.notice__link {
+  font-size: var(--text-sm);
+  color: var(--color-amber);
+  text-decoration: none;
+  border-bottom: 0.5px solid var(--color-amber-border);
+  margin-left: auto;
+  align-self: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 1px 0;
+}
+
+.notice__link:hover { opacity: 0.8; text-decoration: none; }
+
+/* ── Semantic modifiers ── */
+
+.notice--success { background: var(--color-green-bg); border-color: var(--color-green-border); }
+.notice--success .notice__icon,
+.notice--success .notice__title { color: var(--color-green); }
+
+.notice--error { background: var(--color-red-bg); border-color: var(--color-red-border); }
+.notice--error .notice__icon,
+.notice--error .notice__title { color: var(--color-red); }

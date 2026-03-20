@@ -395,7 +395,7 @@ fun Route.authRoutes(
             val params = call.receiveParameters()
             val email = params["email"]?.trim() ?: ""
             val ipAddress = call.request.local.remoteAddress
-            val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+            val callbackBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
 
             // Rate-limit to prevent email flooding
             val rateLimitKey = "forgot:$ipAddress"
@@ -406,7 +406,7 @@ fun Route.authRoutes(
 
             // Always fires and always redirects to the "sent" page — never reveals
             // whether the email exists. Any SMTP errors are swallowed by the service.
-            selfServiceService.initiateForgotPassword(email, slug, baseUrl, ipAddress)
+            selfServiceService.initiateForgotPassword(email, slug, callbackBaseUrl, ipAddress)
             call.respondRedirect("/t/$slug/forgot-password?sent=true")
         }
 
@@ -678,8 +678,8 @@ fun Route.authRoutes(
                 tenantRepository.findBySlug(slug)
                     ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
-            val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
-            val issuer = tenant.issuerUrl ?: "$baseUrl/t/$slug"
+            val openidBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+            val issuer = tenant.issuerUrl ?: "$openidBaseUrl/t/$slug"
 
             call.respond(
                 buildJsonObject {

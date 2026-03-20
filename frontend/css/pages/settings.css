@@ -1,0 +1,154 @@
+/* frontend/css/pages/settings.css
+ *
+ * Settings-specific components used across General, SMTP, Security,
+ * Identity Providers, API Keys, and Webhooks pages.
+ */
+
+/* ── toggle row — full-width toggle inside ov-card ── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.toggle-row:last-child { border-bottom: none; }
+
+.toggle-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toggle-row__title {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.toggle-row__desc {
+  font-size: 11px;
+  color: var(--color-subtle);
+}
+
+/* ── provider card header ── */
+.provider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border-md);
+  background: rgba(255,255,255,0.02);
+}
+
+.provider-header__name {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ── setup hint row ── */
+.setup-row {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+  background: rgba(255,255,255,0.015);
+}
+
+.setup-row__text {
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-2);
+}
+
+.setup-row__text a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.setup-row__text a:hover { text-decoration: underline; }
+
+/* ── copy field — mono value + copy button ── */
+.copy-field {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 0.5px solid var(--color-border-md);
+  background: rgba(255,255,255,0.03);
+}
+
+.copy-field__value {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: all;
+}
+
+.copy-field__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: none;
+  border-left: 0.5px solid var(--color-border-md);
+  color: var(--color-subtle);
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.copy-field__btn svg { width: 13px; height: 13px; }
+
+.copy-field__btn:hover { color: var(--color-accent); }
+
+/* ── api key table ── */
+.key-table {
+  width: 100%;
+  background: var(--color-card);
+  border: 0.5px solid var(--color-border-md);
+  border-collapse: collapse;
+  margin-bottom: var(--space-3);
+}
+
+.key-table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-4);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  background: rgba(255,255,255,0.02);
+  border-bottom: 0.5px solid var(--color-border-md);
+}
+
+.key-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+  vertical-align: middle;
+  font-size: 12px;
+}
+
+.key-table tbody tr:last-child td { border-bottom: none; }
+
+.key-table tbody tr:hover { background: var(--color-row-hover); }
+
+.key-table__name {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.key-table__meta {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

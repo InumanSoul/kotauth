@@ -25,9 +25,9 @@
   --color-border-em:    rgba(255, 255, 255, 0.18);
 
   /* ── Text ────────────────────────────────────────────────────────────── */
-  --color-text:         #ededef;   /* primary text                          */
-  --color-muted:        #6b6b75;   /* labels, secondary text                */
-  --color-subtle:       #3d3d45;   /* hints, disabled, empty state          */
+  --color-text:         #f1f1f2;   /* primary text                          */
+  --color-muted:        #a2a2a9;   /* labels, secondary text                */
+  --color-subtle:       #72727a;   /* hints, disabled, empty state          */
 
   /* ── Accent — brand blue ─────────────────────────────────────────────── */
   --color-accent:         #1fbcff;
@@ -51,8 +51,29 @@
   --color-amber-border:   rgba(251, 191, 36, 0.22);
 
   /* ── Typography ──────────────────────────────────────────────────────── */
-  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'Inconsolata', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  /* ── Typography scale ──────────────────────────────────────────────── */
+  --text-xs:   10px;   /* micro labels, section headings, hints         */
+  --text-sm:   11px;   /* secondary labels, small buttons, hints        */
+  --text-base: 13px;   /* body copy, table cells, form fields           */
+  --text-md:   15px;   /* large values, insight numbers                 */
+  --text-lg:   20px;   /* page titles, h1                               */
+  --text-xl:   24px;   /* hero / dashboard headings                     */
+
+  --leading-tight:   1.2;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.6;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+
+  --tracking-tight:   0.02em;
+  --tracking-normal:  0.03em;
+  --tracking-wide:    0.07em;
+  --tracking-wider:   0.08em;
 
   /* ── Spacing scale (4px base) ────────────────────────────────────────── */
   --space-1:  4px;
@@ -63,17 +84,18 @@
   --space-6:  24px;
   --space-8:  32px;
   --space-10: 40px;
+  --space-20: 80px;
 
   /* ── Radius scale ────────────────────────────────────────────────────── */
   --radius-none: 0;
-  --radius-sm:   4px;
-  --radius-md:   6px;
-  --radius-lg:   8px;
-  --radius-xl:   10px;
-  --radius-full: 9999px;
+  --radius-sm:   0;
+  --radius-md:   0;
+  --radius-lg:   0;
+  --radius-xl:   0;
+  --radius-full: 9999px;  /* avatar circles, dots — intentionally kept */
 
   /* ── Border shorthands ───────────────────────────────────────────────── */
-  --border:    1px solid var(--color-border);
-  --border-md: 1px solid var(--color-border-md);
-  --border-em: 1px solid var(--color-border-em);
+  --border:    0.5px solid var(--color-border);
+  --border-md: 0.5px solid var(--color-border-md);
+  --border-em: 0.5px solid var(--color-border-em);
 }

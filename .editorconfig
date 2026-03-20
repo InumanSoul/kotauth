@@ -14,6 +14,14 @@ max_line_length = 120
 # Banning them would make persistence adapters unnecessarily verbose.
 ktlint_standard_no-wildcard-imports = disabled
 
+# kotlinx.html DSL view files — deeply nested lambdas cause non-converging
+# formatter loops between indent and wrapping rules. Disable ktlint entirely.
+[*View.kt]
+ktlint = disabled
+
+[*Views.kt]
+ktlint = disabled
+
 [*.{yml,yaml}]
 indent_size = 2
 
