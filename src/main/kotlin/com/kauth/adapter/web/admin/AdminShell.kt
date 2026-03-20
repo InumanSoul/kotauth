@@ -199,7 +199,7 @@ internal fun HTML.adminShell(
                             "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
                             "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
                             "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
-                            "logs" -> renderLogsCtxPanel(activeAppSection)
+                            "logs" -> renderLogsCtxPanel(workspaceSlug, activeAppSection)
                             "settings" -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
                         }
                     }
@@ -298,13 +298,15 @@ internal fun DIV.renderSecurityCtxPanel(
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
     ctxLink("$base/mfa", "mfa", activeSection, "MFA")
     ctxLink("$base/sessions", "sessions", activeSection, "Sessions")
-    ctxLink("$base/logs", "audit", activeSection, "Audit log")
 }
 
-internal fun DIV.renderLogsCtxPanel(activeSection: String) {
+internal fun DIV.renderLogsCtxPanel(
+    workspaceSlug: String?,
+    activeSection: String,
+) {
     span("sidebar__heading") { +"Logs" }
-    ctxLink("/admin/logs/events", "events", activeSection, "Events")
-    ctxLink("/admin/logs/errors", "errors", activeSection, "Errors")
+    val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
+    ctxLink("$base/logs", "audit", activeSection, "Audit Log")
 }
 
 internal fun DIV.renderSettingsCtxPanel(
