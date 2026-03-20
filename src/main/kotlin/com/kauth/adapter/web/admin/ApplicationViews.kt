@@ -36,7 +36,9 @@ internal fun applicationDetailPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -182,7 +184,8 @@ internal fun applicationDetailPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Create application form.
@@ -203,7 +206,9 @@ internal fun createApplicationPageImpl(
             workspaceSlug = workspace.slug,
             apps = appPairs,
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -330,7 +335,8 @@ internal fun createApplicationPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Edit application form.
@@ -354,7 +360,9 @@ internal fun editApplicationPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -478,5 +486,6 @@ internal fun editApplicationPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }

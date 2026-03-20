@@ -32,7 +32,9 @@ internal fun workspaceDetailPageImpl(
             workspaceSlug = workspace.slug,
             apps = appPairs,
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to null,
@@ -248,7 +250,8 @@ internal fun workspaceDetailPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 /**
@@ -290,7 +293,9 @@ internal fun createWorkspacePageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner content-inner--wide") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 "New Workspace" to null,
@@ -434,7 +439,8 @@ internal fun createWorkspacePageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Workspace settings form.
@@ -455,7 +461,9 @@ internal fun workspaceSettingsPageImpl(
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -573,7 +581,8 @@ internal fun workspaceSettingsPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Security policy page.
@@ -595,7 +604,9 @@ internal fun securityPolicyPageImpl(
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -753,7 +764,8 @@ internal fun securityPolicyPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Branding page.
@@ -773,7 +785,9 @@ internal fun brandingPageImpl(
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner content-inner--wide") {
             val t = workspace.theme
             val slug = workspace.slug
 
@@ -980,7 +994,8 @@ internal fun brandingPageImpl(
 
             // ── Script: live preview + presets (external) ──────────
             script(src = "/static/js/branding.js") {}
-        }
+                    }
+}
     }
 
 // ── Color field helper ─────────────────────────────────────────────────

@@ -254,7 +254,9 @@ internal fun identityProvidersPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -390,7 +392,8 @@ internal fun identityProvidersPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // ─── API Keys ───────────────────────────────────────────────────────────────
@@ -413,7 +416,9 @@ internal fun apiKeysListPageImpl(
         workspaceSlug = slug,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-    ) {
+    contentClass = "content-outer",
+) {
+            div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────
         breadcrumb(
             "Workspaces" to "/admin",
@@ -556,7 +561,8 @@ internal fun apiKeysListPageImpl(
                 }
             }
         }
-    }
+                }
+}
 }
 
 internal fun createApiKeyPageImpl(
@@ -577,7 +583,9 @@ internal fun createApiKeyPageImpl(
         workspaceSlug = slug,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-    ) {
+    contentClass = "content-outer",
+) {
+            div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────
         breadcrumb(
             "Workspaces" to "/admin",
@@ -681,5 +689,6 @@ internal fun createApiKeyPageImpl(
                 }
             }
         }
-    }
+                }
+}
 }

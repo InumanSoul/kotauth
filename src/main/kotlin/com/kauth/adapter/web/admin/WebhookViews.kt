@@ -31,7 +31,9 @@ internal fun webhooksListPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -220,7 +222,8 @@ internal fun webhooksListPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // ─── Create Webhook Endpoint Page ───────────────────────────────────────────
@@ -243,7 +246,9 @@ internal fun createWebhookPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -345,5 +350,6 @@ internal fun createWebhookPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }

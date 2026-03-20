@@ -24,7 +24,9 @@ internal fun userDetailPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -183,7 +185,8 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // ─── htmx fragments ────────────────────────────────────────────────────────
@@ -344,7 +347,9 @@ internal fun userListPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -461,7 +466,8 @@ internal fun userListPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 // Create user form.
@@ -481,7 +487,9 @@ internal fun createUserPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 workspace.slug to "/admin/workspaces/${workspace.slug}",
@@ -576,5 +584,6 @@ internal fun createUserPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }

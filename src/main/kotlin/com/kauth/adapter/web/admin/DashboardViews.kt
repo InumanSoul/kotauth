@@ -53,7 +53,9 @@ internal fun workspaceListPageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner content-inner--wide") {
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
@@ -128,5 +130,6 @@ internal fun workspaceListPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }

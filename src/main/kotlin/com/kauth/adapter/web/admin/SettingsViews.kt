@@ -27,7 +27,9 @@ internal fun smtpSettingsPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -180,5 +182,6 @@ internal fun smtpSettingsPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }

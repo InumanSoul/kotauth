@@ -22,30 +22,29 @@ internal fun activeSessionsPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "sessions",
             loggedInAs = loggedInAs,
+            contentClass = "content-outer",
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Sessions" }
-            }
-            div("page-header") {
-                div {
-                    p("page-title") { +"Active Sessions" }
-                    p(
-                        "page-subtitle",
-                    ) { +"${sessions.size} active session${if (sessions.size != 1) "s" else ""} in this workspace" }
-                }
-            }
-            div("card") {
+            div("content-inner") {
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    workspace.slug to "/admin/workspaces/${workspace.slug}",
+                    "Security" to "/admin/workspaces/${workspace.slug}/mfa",
+                    "Sessions" to null,
+                )
+
+                pageHeader(
+                    title = "Active Sessions",
+                    subtitle = "${sessions.size} active session${if (sessions.size != 1) "s" else ""} in this workspace",
+                )
+
                 if (sessions.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"⊘" }
-                        p("empty-state-text") { +"No active sessions." }
-                    }
+                    emptyState(
+                        iconName = "user",
+                        title = "No active sessions",
+                        description = "There are no active sessions in this workspace.",
+                    )
                 } else {
-                    table {
+                    table("data-table") {
                         thead {
                             tr {
                                 th { +"Session ID" }
@@ -60,19 +59,19 @@ internal fun activeSessionsPageImpl(
                         tbody {
                             sessions.forEach { s ->
                                 tr {
-                                    td { span("td-code") { +"#${s.id}" } }
-                                    td { span("td-muted") { +(s.userId?.toString() ?: "M2M") } }
-                                    td { span("td-muted") { +(s.clientId?.toString() ?: "—") } }
-                                    td { span("td-code") { +(s.ipAddress ?: "—") } }
-                                    td { span("td-muted") { +s.createdAt.toDisplayString() } }
-                                    td { span("td-muted") { +s.expiresAt.toDisplayString() } }
+                                    td { span("data-table__id") { +"#${s.id}" } }
+                                    td { +(s.userId?.toString() ?: "M2M") }
+                                    td { +(s.clientId?.toString() ?: "—") }
+                                    td { span("data-table__email") { +(s.ipAddress ?: "—") } }
+                                    td { +s.createdAt.toDisplayString() }
+                                    td { +s.expiresAt.toDisplayString() }
                                     td {
                                         form(
                                             action = "/admin/workspaces/${workspace.slug}/sessions/${s.id}/revoke",
                                             method = FormMethod.post,
                                             classes = "inline-form",
                                         ) {
-                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
+                                            button(type = ButtonType.submit, classes = "btn btn--ghost btn--sm") {
                                                 +"Revoke"
                                             }
                                         }

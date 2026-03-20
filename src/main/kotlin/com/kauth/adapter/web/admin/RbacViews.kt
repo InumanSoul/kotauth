@@ -24,7 +24,9 @@ internal fun rolesListPageImpl(
             workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -96,7 +98,8 @@ internal fun rolesListPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 internal fun createRolePageImpl(
@@ -117,7 +120,9 @@ internal fun createRolePageImpl(
             workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -220,7 +225,8 @@ internal fun createRolePageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 internal fun roleDetailPageImpl(
@@ -242,7 +248,9 @@ internal fun roleDetailPageImpl(
             workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -397,7 +405,8 @@ internal fun roleDetailPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 internal fun groupsListPageImpl(
@@ -418,7 +427,9 @@ internal fun groupsListPageImpl(
             workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-        ) {
+                  contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -490,7 +501,8 @@ internal fun groupsListPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 internal fun createGroupPageImpl(
@@ -511,7 +523,9 @@ internal fun createGroupPageImpl(
             workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -585,7 +599,8 @@ internal fun createGroupPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
 
 internal fun groupDetailPageImpl(
@@ -609,7 +624,9 @@ internal fun groupDetailPageImpl(
             workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-        ) {
+                    contentClass = "content-outer",
+) {
+            div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -813,5 +830,6 @@ internal fun groupDetailPageImpl(
                     }
                 }
             }
-        }
+                    }
+}
     }
