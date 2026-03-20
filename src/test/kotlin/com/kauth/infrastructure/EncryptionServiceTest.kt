@@ -2,6 +2,8 @@ package com.kauth.infrastructure
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -99,5 +101,105 @@ class EncryptionServiceTest {
         val result = EncryptionService.decrypt(corrupted)
 
         assertNull(result, "decrypt must return null when ciphertext has been tampered with")
+    }
+
+    @Test
+    fun `encrypt produces different ciphertexts for the same plaintext (random IV)`() {
+        if (!EncryptionService.isAvailable) return
+
+        val plaintext = "same-value-twice"
+        val enc1 = EncryptionService.encrypt(plaintext)
+        val enc2 = EncryptionService.encrypt(plaintext)
+
+        assertNotEquals(enc1, enc2, "Each encryption should use a unique IV and produce different ciphertext")
+
+        assertEquals(plaintext, EncryptionService.decrypt(enc1))
+        assertEquals(plaintext, EncryptionService.decrypt(enc2))
+    }
+
+    @Test
+    fun `encrypt output has expected iv-dot-ciphertext format`() {
+        if (!EncryptionService.isAvailable) return
+
+        val encrypted = EncryptionService.encrypt("test")
+        val parts = encrypted.split(".")
+        assertEquals(2, parts.size, "Encrypted value must have exactly two dot-separated parts (iv.ciphertext)")
+        assertTrue(parts[0].isNotEmpty(), "IV part must not be empty")
+        assertTrue(parts[1].isNotEmpty(), "Ciphertext part must not be empty")
+    }
+
+    @Test
+    fun `decrypt returns null for empty string`() {
+        assertNull(EncryptionService.decrypt(""))
+    }
+
+    @Test
+    fun `decrypt returns null for string without dot separator`() {
+        assertNull(EncryptionService.decrypt("nodothere"))
+    }
+
+    @Test
+    fun `decrypt returns null for string with too many dots`() {
+        if (!EncryptionService.isAvailable) return
+
+        val encrypted = EncryptionService.encrypt("test")
+        val corrupted = "$encrypted.extra"
+        assertNull(EncryptionService.decrypt(corrupted), "Three-part string should fail decryption")
+    }
+
+    // -------------------------------------------------------------------------
+    // Additional cookie signing edge cases
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `signCookie - handles empty value`() {
+        val signed = EncryptionService.signCookie("")
+        assertTrue(signed.startsWith("."), "Empty value should produce a cookie starting with dot")
+        val verified = EncryptionService.verifyCookie(signed)
+        assertEquals("", verified, "Round-trip should return empty string")
+    }
+
+    @Test
+    fun `signCookie - handles value containing dots`() {
+        val value = "part1.part2.part3"
+        val signed = EncryptionService.signCookie(value)
+        val verified = EncryptionService.verifyCookie(signed)
+        assertEquals(value, verified, "Values with dots should round-trip correctly (lastIndexOf split)")
+    }
+
+    @Test
+    fun `signCookie - handles unicode content`() {
+        val value = "user:42|café|日本語"
+        val signed = EncryptionService.signCookie(value)
+        val verified = EncryptionService.verifyCookie(signed)
+        assertEquals(value, verified, "Unicode content should round-trip correctly")
+    }
+
+    @Test
+    fun `verifyCookie - rejects completely empty string`() {
+        assertNull(EncryptionService.verifyCookie(""))
+    }
+
+    @Test
+    fun `verifyCookie - rejects signature from a different value swapped in`() {
+        val signed1 = EncryptionService.signCookie("user:1|tenant:a")
+        val signed2 = EncryptionService.signCookie("user:2|tenant:b")
+
+        // Take the value from signed1 and the signature from signed2
+        val lastDot1 = signed1.lastIndexOf('.')
+        val lastDot2 = signed2.lastIndexOf('.')
+        val frankenCookie = signed1.substring(0, lastDot1) + signed2.substring(lastDot2)
+
+        assertNull(
+            EncryptionService.verifyCookie(frankenCookie),
+            "Mismatched value+signature should be rejected",
+        )
+    }
+
+    @Test
+    fun `signCookie is deterministic - same value produces same signature`() {
+        val signed1 = EncryptionService.signCookie("deterministic-test")
+        val signed2 = EncryptionService.signCookie("deterministic-test")
+        assertEquals(signed1, signed2, "HMAC signing should be deterministic for the same key and value")
     }
 }

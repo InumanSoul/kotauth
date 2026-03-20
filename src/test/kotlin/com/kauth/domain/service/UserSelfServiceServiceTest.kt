@@ -162,9 +162,6 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `initiateEmailVerification - smtp not configured`() {
-        val result = svc.initiateEmailVerification(userId = 10, tenantId = 2, baseUrl = "http://localhost")
-        // alice is tenantId=1 but we're asking about tenantId=2 (no-smtp) — user won't be found,
-        // but the tenant check happens first. Let's use a user in tenant 2.
         val userInNoSmtp =
             users.add(
                 User(
@@ -175,9 +172,9 @@ class UserSelfServiceServiceTest {
                     passwordHash = hasher.hash("pass"),
                 ),
             )
-        val r = svc.initiateEmailVerification(userId = userInNoSmtp.id!!, tenantId = 2, baseUrl = "http://localhost")
-        assertIs<SelfServiceResult.Failure>(r)
-        assertIs<SelfServiceError.SmtpNotConfigured>(r.error)
+        val result = svc.initiateEmailVerification(userId = userInNoSmtp.id!!, tenantId = 2, baseUrl = "http://localhost")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.SmtpNotConfigured>(result.error)
     }
 
     @Test

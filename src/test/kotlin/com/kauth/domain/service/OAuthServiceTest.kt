@@ -1,9 +1,11 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.fakes.FakeApplicationRepository
@@ -114,6 +116,7 @@ class OAuthServiceTest {
         authCodes.clear()
         sessions.clear()
         auditLog.clear()
+        tokens.reset()
 
         tenants.add(testTenant)
         users.add(testUser)
@@ -492,6 +495,295 @@ class OAuthServiceTest {
             )
         assertIs<OAuthResult.Failure>(replayResult)
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
+    }
+
+    // =========================================================================
+    // introspectToken
+    // =========================================================================
+
+    @Test
+    fun `introspectToken returns Inactive for unknown token`() {
+        val result = svc.introspectToken(tenantSlug = "acme", token = "unknown-token")
+        assertIs<IntrospectionResult.Inactive>(result)
+    }
+
+    @Test
+    fun `introspectToken returns Inactive when session exists but token cannot be decoded`() {
+        // Create a session with a known access token hash
+        val accessToken = "valid-access-token"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+        // FakeTokenPort.decodeAccessToken returns null by default
+        tokens.claimsToReturn = null
+
+        val result = svc.introspectToken(tenantSlug = "acme", token = accessToken)
+        assertIs<IntrospectionResult.Inactive>(result)
+    }
+
+    @Test
+    fun `introspectToken returns Active with claims when session and token are valid`() {
+        val accessToken = "valid-access-token"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid profile",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+        val expiresAt = Instant.now().plusSeconds(3600).epochSecond
+        tokens.claimsToReturn = AccessTokenClaims(
+            sub = "10",
+            iss = "https://acme.example.com",
+            aud = "spa-app",
+            tenantId = 1,
+            username = "alice",
+            email = "alice@example.com",
+            scopes = listOf("openid", "profile"),
+            issuedAt = Instant.now().epochSecond,
+            expiresAt = expiresAt,
+        )
+
+        val result = svc.introspectToken(tenantSlug = "acme", token = accessToken)
+        assertIs<IntrospectionResult.Active>(result)
+        assertEquals("10", result.sub)
+        assertEquals("alice", result.username)
+        assertEquals("alice@example.com", result.email)
+        assertEquals(listOf("openid", "profile"), result.scopes)
+        assertEquals(expiresAt, result.expiresAt)
+    }
+
+    // =========================================================================
+    // revokeToken
+    // =========================================================================
+
+    @Test
+    fun `revokeToken - unknown token is a no-op`() {
+        svc.revokeToken("nonexistent-token")
+        // No exception — per RFC 7009 always returns success
+    }
+
+    @Test
+    fun `revokeToken - revokes session by access token`() {
+        val accessToken = "access-to-revoke"
+        val session = sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        svc.revokeToken(accessToken)
+
+        val revoked = sessions.findById(session.id!!)
+        assertNotNull(revoked)
+        assertNotNull(revoked.revokedAt, "Session should be revoked")
+        assertTrue(auditLog.hasEvent(AuditEventType.TOKEN_REVOKED))
+    }
+
+    @Test
+    fun `revokeToken - revokes session by refresh token`() {
+        val refreshToken = "refresh-to-revoke"
+        val session = sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256("some-access"),
+                refreshTokenHash = OAuthService.sha256(refreshToken),
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+                refreshExpiresAt = Instant.now().plusSeconds(86400),
+            ),
+        )
+
+        svc.revokeToken(refreshToken)
+
+        val revoked = sessions.findById(session.id!!)
+        assertNotNull(revoked)
+        assertNotNull(revoked.revokedAt, "Session should be revoked via refresh token")
+    }
+
+    // =========================================================================
+    // getUserInfo
+    // =========================================================================
+
+    @Test
+    fun `getUserInfo - returns null for unknown token`() {
+        assertNull(svc.getUserInfo("unknown-token"))
+    }
+
+    @Test
+    fun `getUserInfo - returns null for M2M session (no userId)`() {
+        val accessToken = "m2m-access"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = null,
+                clientId = confidentialClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        assertNull(svc.getUserInfo(accessToken))
+    }
+
+    @Test
+    fun `getUserInfo - returns null for disabled user`() {
+        val disabledUser = testUser.copy(id = 20, username = "bob", email = "bob@example.com", enabled = false)
+        users.add(disabledUser)
+        val accessToken = "disabled-user-access"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 20,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        assertNull(svc.getUserInfo(accessToken))
+    }
+
+    @Test
+    fun `getUserInfo - returns user claims for valid token`() {
+        val accessToken = "valid-userinfo-token"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid profile",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        val info = svc.getUserInfo(accessToken)
+        assertNotNull(info)
+        assertEquals("10", info.sub)
+        assertEquals("alice", info.username)
+        assertEquals("alice@example.com", info.email)
+        assertTrue(info.emailVerified.not(), "testUser has emailVerified=false by default")
+        assertEquals("Alice", info.name)
+    }
+
+    // =========================================================================
+    // endSession
+    // =========================================================================
+
+    @Test
+    fun `endSession - unknown token is a no-op`() {
+        svc.endSession(accessToken = "no-such-token")
+        // No exception
+    }
+
+    @Test
+    fun `endSession - revokes single session`() {
+        val accessToken = "session-to-end"
+        val session = sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+        // Create a second session that should NOT be revoked
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256("other-access"),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        svc.endSession(accessToken = accessToken)
+
+        assertNotNull(sessions.findById(session.id!!)?.revokedAt, "Target session should be revoked")
+        assertEquals(1, sessions.findActiveByUser(1, 10).size, "Other session should remain active")
+        assertTrue(auditLog.hasEvent(AuditEventType.SESSION_REVOKED))
+    }
+
+    @Test
+    fun `endSession - revokeAll revokes all user sessions`() {
+        val accessToken = "session-global-logout"
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+        sessions.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = publicClient.id,
+                accessTokenHash = OAuthService.sha256("other-access-2"),
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        svc.endSession(accessToken = accessToken, revokeAll = true)
+
+        assertEquals(0, sessions.findActiveByUser(1, 10).size, "All sessions should be revoked for global logout")
+    }
+
+    // =========================================================================
+    // getJwks
+    // =========================================================================
+
+    @Test
+    fun `getJwks - delegates to tokenPort and returns empty by default`() {
+        val jwks = svc.getJwks(tenantId = 1)
+        assertTrue(jwks.isEmpty())
+    }
+
+    @Test
+    fun `getJwks - returns configured JWKS from tokenPort`() {
+        tokens.jwksToReturn = listOf(mapOf("kty" to "RSA", "kid" to "key-1", "use" to "sig"))
+        val jwks = svc.getJwks(tenantId = 1)
+        assertEquals(1, jwks.size)
+        assertEquals("RSA", jwks[0]["kty"])
+        assertEquals("key-1", jwks[0]["kid"])
     }
 
     // -------------------------------------------------------------------------
