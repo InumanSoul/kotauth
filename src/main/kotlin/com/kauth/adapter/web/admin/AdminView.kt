@@ -20,25 +20,10 @@ import kotlinx.html.*
  * View layer for the admin console.
  *
  * Pure functions: data in → HTML out. No HTTP context, no service calls, no side effects.
- *
- * Shell architecture (matches design/kotauth.pen "Admin Side Nav"):
- *
- *   .shell
- *   ├── .shell-topbar
- *   │     ├── .ws-dropdown (<details>)  — workspace switcher with live dropdown
- *   │     ├── .topbar-search-wrap       — search (center)
- *   │     └── .topbar-right             — new workspace btn + profile avatar
- *   └── .shell-body
- *       ├── .rail      — 88px icon nav (Apps / Directory / Security / Logs / Settings)
- *       ├── .ctx-panel — 220px workspace-scoped context nav (apps list + app sections)
- *       └── .main      — page content
- *
  * Terminology (public-facing):
  *   Workspace   = internal Tenant  (what an org owns)
  *   Application = internal Client  (what authenticates against a workspace)
  *
- * All page rendering is delegated to dedicated *Views.kt files.
- * This object is a thin public API that preserves backward compatibility.
  */
 
 object AdminView {

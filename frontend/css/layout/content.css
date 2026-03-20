@@ -86,6 +86,16 @@
   flex-wrap: wrap;
 }
 
+.page-header__sub {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.page-header__sub strong {
+  color: var(--color-text);
+  font-weight: 400;
+}
+
 .page-header__slug {
   display: inline-flex;
   align-items: center;

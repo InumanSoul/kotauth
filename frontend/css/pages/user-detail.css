@@ -115,6 +115,8 @@
   background: rgba(31, 188, 255, 0.04);
 }
 
+.edit-row__field--mono { font-family: var(--font-mono); }
+
 .edit-row__field:disabled {
   color: var(--color-muted);
   cursor: not-allowed;

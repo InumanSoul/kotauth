@@ -316,88 +316,115 @@ internal fun userListPageImpl(
             activeAppSection = "users",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Users" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                workspace.slug to "/admin/workspaces/${workspace.slug}",
+                "Users" to null,
+            )
+
+            // ── Page header ──────────────────────────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Users" }
-                    p(
-                        "page-subtitle",
-                    ) { +"${users.size} user${if (users.size != 1) "s" else ""} in this workspace" }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Users" }
+                        span("page-header__sub") {
+                            +"${users.size} user${if (users.size != 1) "s" else ""} in this workspace"
+                        }
+                    }
                 }
-                a(
-                    href = "/admin/workspaces/${workspace.slug}/users/new",
-                    classes = "btn btn-sm",
-                ) { +"+ New User" }
+                div("page-header__actions") {
+                    primaryLink(
+                        "/admin/workspaces/${workspace.slug}/users/new",
+                        "New User",
+                        "plus",
+                    )
+                }
             }
 
-            // Search bar
+            // ── Search bar (server-side GET) ─────────────────────────
             form(
                 action = "/admin/workspaces/${workspace.slug}/users",
                 method = FormMethod.get,
-                classes = "search-form",
             ) {
-                div("search-row") {
-                    input(type = InputType.search, name = "q") {
-                        id = "q"
-                        placeholder = "Search by username, email, or name…"
+                div("filter-bar") {
+                    inlineSvgIcon("search", "search", cssClass = "filter-bar__icon")
+                    input(type = InputType.search, name = "q", classes = "filter-bar__input") {
+                        placeholder = "Filter by username, email, or name…"
                         value = search ?: ""
-                    }
-                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Search" }
-                    if (search != null) {
-                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost btn-sm") {
-                            +"Clear"
-                        }
+                        attributes["onchange"] = "this.form.submit()"
                     }
                 }
             }
 
-            div("card") {
-                if (users.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"◷" }
-                        p("empty-state-text") {
-                            if (search != null) {
-                                +"No users match \"$search\"."
-                            } else {
-                                +"No users yet."
-                            }
+            // ── Users table ──────────────────────────────────────────
+            if (users.isEmpty()) {
+                emptyState(
+                    iconName = "user",
+                    title = if (search != null) "No users found" else "No users yet",
+                    description = if (search != null) {
+                        "No users match \"$search\". Try a different username, email, or name."
+                    } else {
+                        "Create a user to get started."
+                    },
+                    cta = if (search != null) {
+                        {
+                            a(
+                                href = "/admin/workspaces/${workspace.slug}/users",
+                                classes = "empty-state__cta",
+                            ) { +"Clear filter" }
+                        }
+                    } else {
+                        null
+                    },
+                )
+            } else {
+                table("data-table") {
+                    thead {
+                        tr {
+                            th { style = "width:200px;"; +"Username" }
+                            th { +"Full Name" }
+                            th { +"Email" }
+                            th { style = "width:110px;"; +"Status" }
+                            th { style = "width:70px;" }
                         }
                     }
-                } else {
-                    table {
-                        thead {
+                    tbody {
+                        users.forEach { user ->
                             tr {
-                                th { +"Username" }
-                                th { +"Full Name" }
-                                th { +"Email" }
-                                th { +"Status" }
-                                th { +"" }
-                            }
-                        }
-                        tbody {
-                            users.forEach { user ->
-                                tr {
-                                    td { span("td-code") { +user.username } }
-                                    td { +user.fullName }
-                                    td { +user.email }
-                                    td {
-                                        if (user.enabled) {
-                                            span("badge badge-green") { +"Active" }
-                                        } else {
-                                            span("badge badge-red") { +"Disabled" }
+                                td {
+                                    a(
+                                        href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
+                                        classes = "data-table__id",
+                                    ) { +user.username }
+                                }
+                                td {
+                                    span("data-table__name") { +user.fullName }
+                                }
+                                td {
+                                    span("data-table__email") { +user.email }
+                                }
+                                td {
+                                    if (user.enabled) {
+                                        span("badge badge--active") {
+                                            span("badge__dot") {}
+                                            +"Active"
+                                        }
+                                    } else {
+                                        span("badge badge--inactive") {
+                                            span("badge__dot") {}
+                                            +"Disabled"
                                         }
                                     }
-                                    td {
+                                }
+                                td {
+                                    div("data-table__actions") {
                                         a(
                                             href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
-                                            classes = "btn btn-ghost btn-sm",
-                                        ) { +"Open →" }
+                                            classes = "btn btn--ghost btn--sm",
+                                        ) {
+                                            +"Open"
+                                            inlineSvgIcon("open-sm", "open")
+                                        }
                                     }
                                 }
                             }
@@ -426,90 +453,97 @@ internal fun createUserPageImpl(
             activeAppSection = "users",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/users") { +"Users" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"New User" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                workspace.slug to "/admin/workspaces/${workspace.slug}",
+                "Users" to "/admin/workspaces/${workspace.slug}/users",
+                "New User" to null,
+            )
+
+            // ── Page header (narrow form variant) ────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Create User" }
-                    p("page-subtitle") {
-                        +"Add a user to the "
-                        strong { +workspace.displayName }
-                        +" workspace. The account will be pre-verified."
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Create User" }
+                        p("page-header__sub") {
+                            +"Add a user to the "
+                            strong { +workspace.displayName }
+                            +" workspace. The account will be pre-verified."
+                        }
                     }
                 }
             }
+
             if (error != null) {
-                div("alert alert-error alert--constrained") {
+                div("alert alert-error") {
+                    style = "margin-bottom:20px;"
                     +error
                 }
             }
-            div("form-card") {
+
+            // ── Form ─────────────────────────────────────────────────
+            div("ov-card") {
                 form(
                     action = "/admin/workspaces/${workspace.slug}/users",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                     method = FormMethod.post,
                 ) {
-                    div("field") {
-                        label {
-                            htmlFor = "username"
-                            +"Username"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Username" }
+                        div {
+                            input(classes = "edit-row__field edit-row__field--mono") {
+                                type = InputType.text
+                                name = "username"
+                                required = true
+                                value = prefill.username
+                                placeholder = "johndoe"
+                                autoComplete = false
+                                attributes["spellcheck"] = "false"
+                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                            }
+                            div("edit-row__hint") {
+                                +"Letters, digits, dots, underscores, hyphens. Immutable after creation."
+                            }
                         }
-                        input(type = InputType.text, name = "username") {
-                            id = "username"
-                            required = true
-                            value = prefill.username
-                            placeholder = "johndoe"
-                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
-                        }
-                        p(
-                            "field-hint",
-                        ) { +"Letters, digits, dots, underscores, hyphens. Immutable after creation." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "email"
-                            +"Email"
-                        }
-                        input(type = InputType.email, name = "email") {
-                            id = "email"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Email" }
+                        input(classes = "edit-row__field") {
+                            type = InputType.email
+                            name = "email"
                             required = true
                             value = prefill.email
                             placeholder = "john@example.com"
+                            autoComplete = false
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "fullName"
-                            +"Full Name"
-                        }
-                        input(type = InputType.text, name = "fullName") {
-                            id = "fullName"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Full Name" }
+                        input(classes = "edit-row__field") {
+                            type = InputType.text
+                            name = "fullName"
                             value = prefill.fullName
                             placeholder = "John Doe"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "password"
-                            +"Password"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password" }
+                        div {
+                            input(classes = "edit-row__field") {
+                                type = InputType.password
+                                name = "password"
+                                required = true
+                                placeholder = "Minimum 8 characters"
+                            }
+                            div("edit-row__hint") { +"The user can change it after login." }
                         }
-                        input(type = InputType.password, name = "password") {
-                            id = "password"
-                            required = true
-                            placeholder = "Minimum 4 characters"
-                        }
-                        p("field-hint") { +"Minimum 4 characters. The user can change it after login." }
                     }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Create User" }
-                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost") { +"Cancel" }
+                    div("edit-actions") {
+                        button(type = ButtonType.submit, classes = "btn btn--primary") { +"Create User" }
+                        a(
+                            href = "/admin/workspaces/${workspace.slug}/users",
+                            classes = "btn btn--ghost",
+                        ) { +"Cancel" }
                     }
                 }
             }
