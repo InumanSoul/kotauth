@@ -1,7 +1,7 @@
 /* frontend/css/base/typography.css
  *
  * Base text rules for the admin bundle.
- * Uses --font-sans and --font-mono from tokens.css.
+ * Uses --font-sans, --font-mono, and --text-* scale from tokens.css.
  *
  * Not included in the auth bundle — auth sets font-family directly
  * in auth/shell.css to stay self-contained.
@@ -9,8 +9,47 @@
 
 body {
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
 }
+
+/* ── Heading scale ─────────────────────────────────────────────────────── */
+
+h1, .text-lg {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+h2, .text-md {
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
+
+h3, .text-base {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-normal);
+}
+
+/* ── Body scale utilities ──────────────────────────────────────────────── */
+
+.text-sm  { font-size: var(--text-sm); }
+.text-xs  { font-size: var(--text-xs); }
+
+/* ── Section / label typography ────────────────────────────────────────── */
+
+.label-upper {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+}
+
+/* ── Links ─────────────────────────────────────────────────────────────── */
 
 a {
   color: var(--color-accent);
@@ -20,6 +59,8 @@ a {
 a:hover {
   text-decoration: underline;
 }
+
+/* ── Monospace ─────────────────────────────────────────────────────────── */
 
 code,
 pre,

@@ -1,18 +1,77 @@
 /* frontend/css/components/table.css
  *
  * Data tables for listing resources (users, apps, sessions, etc.).
- * Uses native <table>, <th>, <td> elements.
  *
- * .td-muted  — secondary text cell (timestamps, slugs, etc.)
- * .td-code   — monospace accent cell (IDs, client keys, etc.)
+ * New BEM block: .data-table (used by new page designs)
+ *   .data-table__id      — monospace accent link (client IDs)
+ *   .data-table__name    — primary text cell
+ *   .data-table__actions — right-aligned action buttons cell
+ *
+ * Legacy classes (kept for backward compat with AdminView.kt):
+ *   .td-muted, .td-code
  */
+
+/* ── New .data-table BEM block ─────────────────────────────────────────── */
+
+.data-table {
+  width: 100%;
+  background: var(--color-card);
+  border: 0.5px solid var(--color-border-md);
+  border-collapse: collapse;
+}
+
+.data-table thead tr { border-bottom: 0.5px solid var(--color-border-md); }
+
+.data-table th {
+  text-align: left;
+  padding: 9px 16px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  background: rgba(255, 255, 255, 0.02);
+  white-space: nowrap;
+}
+
+.data-table td {
+  padding: 11px 16px;
+  vertical-align: middle;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr { transition: background 0.1s; }
+.data-table tbody tr:hover { background: var(--color-row-hover); }
+
+.data-table__id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.data-table__id:hover { text-decoration: underline; }
+
+.data-table__name {
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.data-table__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* ── Legacy bare table styles (keep until Phase 2) ─────────────────────── */
 
 table { width: 100%; border-collapse: collapse; }
 
 th {
   text-align: left;
   font-size: 0.66rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--color-muted);
   text-transform: uppercase;
   letter-spacing: 0.07em;
@@ -23,7 +82,7 @@ th {
 td {
   padding: 0.8rem 1rem;
   font-size: 0.84rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.04);
   vertical-align: middle;
 }
 

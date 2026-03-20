@@ -1,0 +1,30 @@
+/* frontend/css/components/copy-btn.css
+ *
+ * Small clipboard copy button — sits inline next to copyable values
+ * (client IDs, usernames, URIs, etc.).
+ *
+ * .copy-btn — 18×18 bordered icon button
+ */
+
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 0;
+  background: transparent;
+  border: 0.5px solid var(--color-border-md);
+  color: var(--color-muted);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.12s;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+}
+
+.copy-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+}

@@ -1,9 +1,75 @@
 /* frontend/css/layout/sidebar.css
  *
- * Context panel — 220px contextual sidebar, right of the rail.
- * Shows workspace-scoped navigation (app list, section links, etc.).
- * Has a custom scrollbar to avoid layout jumps.
+ * Context sidebar — sits right of the rail inside the shell body.
+ * Shows workspace-scoped navigation (app list, section links).
+ *
+ * New BEM classes (.sidebar, .sidebar__*) coexist with legacy classes
+ * (.ctx-panel, .ctx-nav, .ctx-item, etc.) for backward compatibility.
  */
+
+/* ── New BEM sidebar (for Phase 2 Kotlin migration) ────────────────────── */
+
+.sidebar {
+  width: 180px;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 14px 0;
+}
+
+.sidebar::-webkit-scrollbar       { width: 4px; }
+.sidebar::-webkit-scrollbar-track  { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.1); }
+
+.sidebar__heading {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  padding: 0 14px 6px;
+}
+
+.sidebar__section { margin-bottom: 16px; }
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  text-decoration: none;
+}
+
+.sidebar__item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.sidebar__item--active {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-text);
+}
+
+.sidebar__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-subtle);
+  flex-shrink: 0;
+}
+
+.sidebar__item--active .sidebar__dot { background: var(--color-accent); }
+
+/* ── Legacy classes (keep until AdminView.kt Phase 2 migration) ────────── */
 
 .ctx-panel {
   width: 220px;
@@ -16,12 +82,10 @@
   overflow-x: hidden;
 }
 
-/* Custom scrollbar — subtle, matches the dark surface */
-.ctx-panel::-webkit-scrollbar         { width: 4px; }
-.ctx-panel::-webkit-scrollbar-track   { background: transparent; }
-.ctx-panel::-webkit-scrollbar-thumb   { background: rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); }
+.ctx-panel::-webkit-scrollbar       { width: 4px; }
+.ctx-panel::-webkit-scrollbar-track  { background: transparent; }
+.ctx-panel::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); }
 
-/* Nav container */
 .ctx-nav {
   display: flex;
   flex-direction: column;
@@ -30,18 +94,16 @@
   flex: 1;
 }
 
-/* Section header label */
 .ctx-section-title {
   padding: 10px 8px 4px;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
   color: var(--color-muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-/* Nav link */
 .ctx-item {
   display: flex;
   align-items: center;
@@ -53,7 +115,7 @@
   color: var(--color-text);
   text-decoration: none;
   transition: background 0.1s, color 0.1s;
-  border: 1px solid transparent;
+  border: 0.5px solid transparent;
 }
 
 .ctx-item:hover { background: rgba(255, 255, 255, 0.06); color: #fff; text-decoration: none; }
@@ -66,7 +128,6 @@
 
 .ctx-item-label { flex: 1; }
 
-/* Active indicator dot */
 .ctx-item-dot {
   width: 5px;
   height: 5px;
@@ -88,17 +149,8 @@
   flex: 1;
 }
 
-.ctx-empty-icon {
-  font-size: 1.5rem;
-  opacity: 0.25;
-  line-height: 1;
-}
-
-.ctx-empty-text {
-  font-size: 0.75rem;
-  color: var(--color-muted);
-  line-height: 1.4;
-}
+.ctx-empty-icon  { font-size: 1.5rem; opacity: 0.25; line-height: 1; }
+.ctx-empty-text  { font-size: 0.75rem; color: var(--color-muted); line-height: 1.4; }
 
 .ctx-empty-action {
   display: inline-flex;
@@ -108,7 +160,7 @@
   color: var(--color-accent);
   opacity: 0.8;
   padding: 4px 10px;
-  border: 1px solid var(--color-accent-border);
+  border: 0.5px solid var(--color-accent-border);
   border-radius: var(--radius-sm);
   margin-top: var(--space-1);
   transition: opacity 0.15s, background 0.15s;

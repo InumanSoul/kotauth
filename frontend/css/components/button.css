@@ -2,64 +2,98 @@
  *
  * Button variants for the admin console.
  *
- * Base: .btn
- * Modifiers (appended directly, legacy single-dash convention):
- *   .btn-ghost    — outline style
- *   .btn-danger   — destructive action
- *   .btn-sm       — compact size
- *   .btn-full     — full-width, used in forms
+ * Base: .btn — transparent with border (neutral default).
  *
- * New components should follow BEM double-dash: .btn--primary, .btn--ghost, etc.
- * Existing class names are kept for backward compatibility with AdminView.kt.
+ * BEM modifiers (new — used by new page designs):
+ *   .btn--primary  — accent fill, dark text
+ *   .btn--ghost    — outlined, muted
+ *   .btn--danger   — red outlined
+ *   .btn--warning  — amber outlined
+ *   .btn--sm       — compact size
+ *
+ * Legacy modifiers (kept for backward compat with AdminView.kt):
+ *   .btn-ghost, .btn-danger, .btn-sm, .btn-full
+ *
+ * Utility: .btn-group — horizontal flex row for button clusters.
  */
 
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.5rem 1rem;
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  color: #05080a;
-  font-size: 0.8rem;
-  font-weight: 600;
+  gap: 5px;
+  padding: 6px 13px;
+  border-radius: 0;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  font-family: var(--font-sans);
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  font-family: inherit;
-  text-decoration: none;
+  border: 0.5px solid;
+  transition: all 0.15s;
   white-space: nowrap;
+  background: none;
+  text-decoration: none;
+  color: var(--color-text);
 }
 
-.btn:hover         { opacity: 0.88; text-decoration: none; }
-.btn:active        { transform: scale(0.98); }
+.btn:hover { text-decoration: none; }
 
-/* Ghost — outlined, no fill */
+.btn svg { width: 11px; height: 11px; }
+
+/* ── BEM modifiers (new) ───────────────────────────────────────────────── */
+
+.btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #05080a;
+}
+.btn--primary:hover { opacity: 0.88; }
+
+.btn--ghost {
+  border-color: var(--color-border-md);
+  color: var(--color-muted);
+}
+.btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--color-border-em);
+  color: var(--color-text);
+}
+
+.btn--danger {
+  border-color: var(--color-red-border);
+  color: var(--color-red);
+}
+.btn--danger:hover { background: var(--color-red-bg); }
+
+.btn--warning {
+  border-color: var(--color-amber-border);
+  color: var(--color-amber);
+}
+.btn--warning:hover { background: var(--color-amber-bg); }
+
+.btn--sm { padding: 5px 10px; font-size: var(--text-sm); }
+
+/* ── Legacy modifiers (keep until Phase 2) ─────────────────────────────── */
+
 .btn-ghost {
   background: transparent;
   border-color: var(--color-border-md);
   color: var(--color-text);
 }
-
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.05); border-color: var(--color-border-em); opacity: 1; }
 
-/* Danger — destructive action */
 .btn-danger {
   background: var(--color-red-bg);
   border-color: var(--color-red-border);
   color: var(--color-red);
 }
-
 .btn-danger:hover { background: rgba(248, 113, 113, 0.18); opacity: 1; }
 
-/* Small — compact padding, tighter font */
 .btn-sm { padding: 0.32rem 0.7rem; font-size: 0.75rem; }
 
-/* Full width — used inside form cards */
 .btn-full { width: 100%; justify-content: center; padding: 0.72rem; font-size: 0.875rem; margin-top: 0.4rem; }
 
-/* Button group — horizontal flex row for action clusters (page header right
- * side, application actions, user actions, etc.) */
+/* ── Button group ──────────────────────────────────────────────────────── */
+
 .btn-group {
   display: flex;
   align-items: center;

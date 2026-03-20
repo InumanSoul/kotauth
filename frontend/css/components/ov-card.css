@@ -3,36 +3,74 @@
  * Overview card — key-value detail panel used on app and user detail pages.
  * Follows strict BEM: .ov-card is the block, __row/__label/__value are elements.
  *
- * .ov-card                  — card container
- * .ov-card__row             — horizontal label + value pair
- * .ov-card__row--stacked    — vertical label above value (for longer values)
- * .ov-card__label           — row label (left / top)
- * .ov-card__value           — row value (right / below)
- * .ov-card__value--mono     — monospace accent value (IDs, keys)
- * .ov-card__value--muted    — italic secondary value
- * .ov-card__value--empty    — placeholder for unset fields
- * .ov-card__actions         — footer action bar inside the card
+ * .ov-card                     — card container
+ * .ov-card__section-label      — divider heading row (uppercase label, subtle bg)
+ * .ov-card__row                — horizontal label + value pair (grid 2-col)
+ * .ov-card__row--stacked       — vertical label above value (block layout)
+ * .ov-card__row--inherited     — subtle bg for inherited/readonly values
+ * .ov-card__label              — row label (left / top)
+ * .ov-card__value              — row value (right / below)
+ * .ov-card__value--mono        — monospace accent value (IDs, keys)
+ * .ov-card__value--muted       — italic secondary value
+ * .ov-card__value--empty       — placeholder for unset fields
+ * .ov-card__value--inherited   — inherited from parent, subtle styling
+ * .ov-card__actions            — footer action bar inside the card
  */
 
 .ov-card {
   background: var(--color-card);
-  border: var(--border-md);
-  border-radius: var(--radius-xl);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: 0;
   overflow: hidden;
 }
+
+/* ── Section label (divider heading row) ───────────────────────────────── */
+
+.ov-card__section-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  padding: 10px 16px 9px;
+  border-bottom: 0.5px solid var(--color-border-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Grid row ──────────────────────────────────────────────────────────── */
 
 .ov-card__row {
   display: grid;
   grid-template-columns: 152px 1fr;
   align-items: center;
-  min-height: 40px;
-  padding: 9px var(--space-4);
-  border-bottom: var(--border);
+  min-height: 38px;
+  padding: 8px 16px;
+  border-bottom: 0.5px solid var(--color-border);
   transition: background 0.12s;
 }
 
 .ov-card__row:last-child { border-bottom: none; }
 .ov-card__row:hover      { background: var(--color-row-hover); }
+
+/* Inherited row — subtle bg for values inherited from workspace */
+.ov-card__row--inherited {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+/* ── Stacked layout ────────────────────────────────────────────────────── */
+
+.ov-card__row--stacked {
+  display: block;
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--color-border);
+  transition: background 0.12s;
+}
+
+.ov-card__row--stacked:last-child { border-bottom: none; }
+.ov-card__row--stacked:hover      { background: var(--color-row-hover); }
+.ov-card__row--stacked .ov-card__label { margin-bottom: 5px; }
+
+/* ── Label & Value ─────────────────────────────────────────────────────── */
 
 .ov-card__label {
   font-size: 12px;
@@ -40,7 +78,7 @@
 }
 
 .ov-card__value {
-  font-size: 13px;
+  font-size: var(--text-base);
   color: var(--color-text);
   display: flex;
   align-items: center;
@@ -55,7 +93,6 @@
 
 .ov-card__value--muted {
   color: var(--color-muted);
-  font-style: italic;
   font-size: 12px;
 }
 
@@ -65,22 +102,19 @@
   font-size: 12px;
 }
 
-/* Stacked layout — label on top, value below */
-.ov-card__row--stacked {
-  display: block;
-  padding: 11px var(--space-4);
-  border-bottom: var(--border);
-  transition: background 0.12s;
+.ov-card__value--inherited {
+  font-size: 12px;
+  color: var(--color-subtle);
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.ov-card__row--stacked:last-child      { border-bottom: none; }
-.ov-card__row--stacked:hover           { background: var(--color-row-hover); }
-.ov-card__row--stacked .ov-card__label { margin-bottom: 5px; }
+/* ── Actions footer ────────────────────────────────────────────────────── */
 
-/* Actions footer */
 .ov-card__actions {
   padding: var(--space-3) var(--space-4);
-  border-top: var(--border);
+  border-top: 0.5px solid var(--color-border);
   display: flex;
   align-items: center;
   gap: var(--space-2);

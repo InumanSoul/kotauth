@@ -1,0 +1,49 @@
+/* frontend/css/components/section.css
+ *
+ * Section component — groups content blocks with a header row.
+ * Used consistently across all detail pages (workspace, app, user).
+ *
+ * .section                — block with bottom spacing
+ * .section__header        — flex row: title on left, optional action on right
+ * .section__title         — uppercase micro label
+ * .section__title--danger — red-tinted variant for danger zones
+ * .section__desc          — optional subtitle below title
+ * .section__action        — right-aligned text button
+ */
+
+.section { margin-bottom: 24px; }
+
+.section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section__title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--tracking-wider);
+  text-transform: uppercase;
+  color: var(--color-subtle);
+}
+
+.section__title--danger { color: rgba(248, 113, 113, 0.45); }
+
+.section__desc {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin-top: 1px;
+}
+
+.section__action {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-sans);
+}
+
+.section__action:hover { opacity: 0.75; }

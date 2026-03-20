@@ -1,0 +1,139 @@
+/* frontend/css/pages/user-detail.css
+ *
+ * Page-specific styles for the user detail page.
+ *
+ * Components:
+ *   .user-header           — page header with avatar, name, meta, actions
+ *   .user-header__avatar   — 44px circular accent monogram
+ *   .user-header__name     — user display name
+ *   .user-header__meta     — badge row below name
+ *   .user-header__actions  — action buttons (right side)
+ *   .lock-icon             — small lock indicator for immutable fields
+ *   .edit-row              — inline edit form row (grid: label + field)
+ *   .edit-row__label       — left label column
+ *   .edit-row__field       — editable input field
+ *   .edit-row__hint        — helper text below field
+ *   .edit-actions          — save/cancel action bar
+ */
+
+/* ── User header ───────────────────────────────────────────────────────── */
+
+.user-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.user-header__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.user-header__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: var(--weight-medium);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.user-header__name {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  line-height: var(--leading-tight);
+  margin-bottom: 6px;
+}
+
+.user-header__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.user-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* ── Lock icon ─────────────────────────────────────────────────────────── */
+
+.lock-icon {
+  color: var(--color-subtle);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* ── Edit form rows ────────────────────────────────────────────────────── */
+
+.edit-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: start;
+  min-height: 48px;
+  padding: 8px 16px;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.edit-row:last-of-type { border-bottom: none; }
+
+.edit-row__label {
+  font-size: 12px;
+  color: var(--color-muted);
+  padding-top: 9px;
+}
+
+.edit-row__field {
+  background: rgba(255, 255, 255, 0.05);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: 0;
+  padding: 7px 10px;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: var(--font-sans);
+}
+
+.edit-row__field:focus {
+  border-color: var(--color-accent);
+  background: rgba(31, 188, 255, 0.04);
+}
+
+.edit-row__field:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.edit-row__hint {
+  font-size: var(--text-sm);
+  color: var(--color-subtle);
+  margin-top: 4px;
+}
+
+/* ── Edit actions bar ──────────────────────────────────────────────────── */
+
+.edit-actions {
+  padding: 12px 16px;
+  border-top: 0.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}

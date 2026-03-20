@@ -1,0 +1,48 @@
+/* frontend/css/components/danger-zone.css
+ *
+ * Danger zone cards — destructive action confirmations at page bottom.
+ *
+ * .danger-zone              — vertical stack of cards
+ * .danger-zone__card        — red-tinted card with action button
+ * .danger-zone__card--warning — amber variant (e.g. disable vs delete)
+ * .danger-zone__title       — card heading
+ * .danger-zone__title--warning — amber heading variant
+ * .danger-zone__desc        — descriptive body text
+ */
+
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.danger-zone__card {
+  background: rgba(248, 113, 113, 0.03);
+  border: 0.5px solid rgba(248, 113, 113, 0.12);
+  border-radius: 0;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.danger-zone__card--warning {
+  background: rgba(251, 191, 36, 0.03);
+  border-color: rgba(251, 191, 36, 0.12);
+}
+
+.danger-zone__title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--color-red);
+  margin-bottom: 3px;
+}
+
+.danger-zone__title--warning { color: var(--color-amber); }
+
+.danger-zone__desc {
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: var(--leading-normal);
+}
