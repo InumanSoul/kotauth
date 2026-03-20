@@ -76,6 +76,9 @@
   img:hover { opacity: 1; }
 }
 
+.rail__brand:hover { text-decoration: none; }
+
+
 .rail__version {
   font-family: var(--font-mono);
   font-size: 9px;

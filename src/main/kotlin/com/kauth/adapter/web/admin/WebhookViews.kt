@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
@@ -60,7 +61,7 @@ internal fun webhooksPageImpl(
                             classes = setOf("copy-field__btn")
                             attributes["data-copy"] = newSecret
                             title = "Copy"
-                            +"\u2398"
+                            inlineSvgIcon("copy", "Copy")
                         }
                     }
                     p("edit-row__hint") {

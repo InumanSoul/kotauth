@@ -66,6 +66,12 @@ internal fun userDetailPageImpl(
                             label = "Send Reset Email",
                             btnClass = "btn btn--ghost btn--sm",
                         )
+                    } else {
+                        button(classes = "btn btn--ghost btn--sm") {
+                            disabled = true
+                            title = "Configure SMTP to enable password reset emails"
+                            +"Send Reset Email"
+                        }
                     }
                     button(classes = "btn btn--ghost btn--sm") {
                         attributes["hx-get"] =
@@ -97,13 +103,13 @@ internal fun userDetailPageImpl(
             userProfileReadFragment(workspace, user)
 
             // ── Active Sessions ──────────────────────────────────────
-            section(
-                title = "Active Sessions",
-                action = {
+            div("ov-card") {
+                div("ov-card__section-label") {
+                    span { +"Active Sessions" }
                     div {
                         style = "display:flex;align-items:center;gap:10px;"
                         span {
-                            style = "font-size:11px;color:var(--color-subtle);"
+                            style = "font-size:11px;color:var(--color-subtle);text-transform:none;letter-spacing:normal;"
                             +"${sessions.size} session${if (sessions.size != 1) "s" else ""}"
                         }
                         if (sessions.isNotEmpty()) {
@@ -115,13 +121,12 @@ internal fun userDetailPageImpl(
                         } else {
                             button(classes = "btn btn--warning btn--sm") {
                                 disabled = true
-                                style = "opacity:0.35;cursor:not-allowed;"
+                                title = "No active sessions to revoke"
                                 +"Revoke all"
                             }
                         }
                     }
-                },
-            ) {
+                }
                 if (sessions.isEmpty()) {
                     emptyState(
                         iconName = "lock",
@@ -162,10 +167,9 @@ internal fun userDetailPageImpl(
                 }
             }
 
-            divider()
-
             // ── Danger zone ──────────────────────────────────────────
-            section(title = "Danger zone", danger = true) {
+            div("ov-card") {
+                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
                 div("danger-zone") {
                     dangerZoneCard(
                         title = "Disable this user",
@@ -193,11 +197,8 @@ internal fun DIV.userProfileReadFragment(
     user: User,
     successMessage: String? = null,
 ) {
-    div("section") {
+    div {
         id = "profile-section"
-        div("section__header") {
-            span("section__title") { +"Profile" }
-        }
         if (successMessage != null) {
             div("notice") {
                 style = "margin-bottom:12px;"
@@ -207,7 +208,8 @@ internal fun DIV.userProfileReadFragment(
                 }
             }
         }
-        ovCard {
+        div("ov-card") {
+            div("ov-card__section-label") { +"Profile" }
             div("ov-card__row") {
                 span("ov-card__label") { +"Username" }
                 span("ov-card__value") {
@@ -215,7 +217,7 @@ internal fun DIV.userProfileReadFragment(
                     copyBtn(user.username)
                     span("lock-icon") {
                         attributes["title"] = "Immutable after creation"
-                        +"\uD83D\uDD12"
+                        inlineSvgIcon("lock", "Immutable")
                     }
                 }
             }
@@ -238,11 +240,8 @@ internal fun DIV.userProfileEditFragment(
     user: User,
     editError: String? = null,
 ) {
-    div("section") {
+    div {
         id = "profile-section"
-        div("section__header") {
-            span("section__title") { +"Edit Profile" }
-        }
         if (editError != null) {
             div("alert alert-error") {
                 style = "margin-bottom:12px;"
@@ -250,6 +249,7 @@ internal fun DIV.userProfileEditFragment(
             }
         }
         div("ov-card") {
+            div("ov-card__section-label") { +"Edit Profile" }
             form(
                 action = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit",
                 encType = FormEncType.applicationXWwwFormUrlEncoded,

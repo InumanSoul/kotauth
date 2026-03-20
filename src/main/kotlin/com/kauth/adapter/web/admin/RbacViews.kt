@@ -14,71 +14,81 @@ internal fun rolesListPageImpl(
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "Roles — ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Roles" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Roles" to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +"Roles" }
-                    p(
-                        "page-subtitle",
-                    ) { +"${roles.size} role${if (roles.size != 1) "s" else ""} in this workspace" }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Roles" }
+                        span("page-header__sub") {
+                            +"${roles.size} role${if (roles.size != 1) "s" else ""} in this workspace"
+                        }
+                    }
                 }
-                a(
-                    href = "/admin/workspaces/${workspace.slug}/roles/create",
-                    classes = "btn",
-                ) { +"+ Create Role" }
+                div("page-header__actions") {
+                    primaryLink("/admin/workspaces/$slug/roles/create", "Create Role", "plus")
+                }
             }
 
-            div("card") {
-                if (roles.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"◎" }
-                        p("empty-state-text") { +"No roles defined yet." }
-                    }
-                } else {
-                    table {
-                        thead {
-                            tr {
-                                th { +"Name" }
-                                th { +"Scope" }
-                                th { +"Description" }
-                                th { +"Composite" }
-                                th { +"" }
-                            }
+            if (roles.isEmpty()) {
+                emptyState(
+                    iconName = "lock",
+                    title = "No roles yet",
+                    description = "Create a role to define permissions for this workspace.",
+                )
+            } else {
+                table("data-table") {
+                    thead {
+                        tr {
+                            th { +"Name" }
+                            th { +"Scope" }
+                            th { +"Description" }
+                            th { +"Composite" }
+                            th { style = "width:70px;" }
                         }
-                        tbody {
-                            roles.forEach { role ->
-                                tr {
-                                    td { span("td-code") { +(role.name) } }
-                                    td {
-                                        val isWorkspace = role.scope.value == "tenant"
-                                        span("badge badge-${if (isWorkspace) "green" else "blue"}") {
-                                            +(if (isWorkspace) "workspace" else "application")
-                                        }
+                    }
+                    tbody {
+                        roles.forEach { role ->
+                            tr {
+                                td {
+                                    a(
+                                        href = "/admin/workspaces/$slug/roles/${role.id}",
+                                        classes = "data-table__id",
+                                    ) { +role.name }
+                                }
+                                td {
+                                    val isWorkspace = role.scope.value == "tenant"
+                                    span(if (isWorkspace) "badge badge--active" else "badge badge--confidential") {
+                                        +(if (isWorkspace) "workspace" else "application")
                                     }
-                                    td { +(role.description ?: "—") }
-                                    td {
-                                        +(if (role.childRoleIds.isNotEmpty()) "${role.childRoleIds.size} children" else "—")
+                                }
+                                td { span("data-table__name") { +(role.description ?: "\u2014") } }
+                                td {
+                                    span("data-table__name") {
+                                        +(if (role.childRoleIds.isNotEmpty()) "${role.childRoleIds.size} children" else "\u2014")
                                     }
-                                    td {
+                                }
+                                td {
+                                    div("data-table__actions") {
                                         a(
-                                            href = "/admin/workspaces/${workspace.slug}/roles/${role.id}",
-                                            classes = "btn btn-ghost btn-sm",
-                                        ) { +"Open →" }
+                                            href = "/admin/workspaces/$slug/roles/${role.id}",
+                                            classes = "btn btn--ghost btn--sm",
+                                        ) { +"Open" }
                                     }
                                 }
                             }
@@ -97,107 +107,107 @@ internal fun createRolePageImpl(
     error: String? = null,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "New Role — ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/roles") { +"Roles" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"New Role" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Roles" to "/admin/workspaces/$slug/roles",
+                "New Role" to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +"Create Role" }
-                    p("page-subtitle") {
-                        +"Add a role to the "
-                        strong { +workspace.displayName }
-                        +" workspace."
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Create Role" }
+                        p("page-header__sub") { +"Add a role to ${workspace.displayName}." }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "create-role-form"
+                        +"Create Role"
                     }
                 }
             }
+
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
-            div("form-card") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/roles",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    div("field") {
-                        label {
-                            htmlFor = "roleName"
-                            +"Name"
+
+            form(
+                action = "/admin/workspaces/$slug/roles",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "create-role-form"
+
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Role Details" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
+                        div {
+                            input(type = InputType.text, name = "name") {
+                                classes = setOf("edit-row__field")
+                                required = true
+                                placeholder = "e.g. admin, editor, viewer"
+                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                            }
+                            div("edit-row__hint") { +"Letters, digits, dots, underscores, hyphens only." }
                         }
-                        input(type = InputType.text, name = "name") {
-                            id = "roleName"
-                            required = true
-                            placeholder = "e.g. admin, editor, viewer"
-                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
-                        }
-                        p("field-hint") { +"Letters, digits, dots, underscores, hyphens only." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "roleDesc"
-                            +"Description (optional)"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
                         input(type = InputType.text, name = "description") {
-                            id = "roleDesc"
+                            classes = setOf("edit-row__field")
                             placeholder = "Short description of what this role grants"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "roleScope"
-                            +"Scope"
-                        }
-                        select {
-                            name = "scope"
-                            id = "roleScope"
-                            attributes["onchange"] =
-                                "document.getElementById('appField').style.display=this.value==='client'?'block':'none'"
-                            option {
-                                value = "tenant"
-                                +"Workspace (realm-level)"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Scope" }
+                        div {
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "scope"
+                                id = "roleScope"
+                                attributes["data-scope-toggle"] = "appField"
+                                option {
+                                    value = "tenant"
+                                    +"Workspace (realm-level)"
+                                }
+                                option {
+                                    value = "client"
+                                    +"Application (app-scoped)"
+                                }
                             }
-                            option {
-                                value = "client"
-                                +"Application (app-scoped)"
+                            div("edit-row__hint") {
+                                +"Workspace roles apply across the entire workspace. Application roles are scoped to a specific app."
                             }
-                        }
-                        p("field-hint") {
-                            +"Workspace roles apply across the entire workspace. Application roles are scoped to a specific app."
                         }
                     }
-                    div("field") {
+                    div("edit-row") {
                         id = "appField"
                         style = "display:none;"
-                        label {
-                            htmlFor = "clientId"
-                            +"Application"
-                        }
+                        span("edit-row__label") { +"Application" }
                         if (apps.isEmpty()) {
-                            p("field-hint") { +"No applications in this workspace yet. Create one first." }
+                            div("edit-row__hint") { +"No applications in this workspace yet. Create one first." }
                         } else {
                             select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
                                 name = "clientId"
-                                id = "clientId"
                                 option {
                                     value = ""
-                                    +"— select application —"
+                                    +"\u2014 select application \u2014"
                                 }
                                 apps.forEach { app ->
                                     option {
@@ -207,10 +217,6 @@ internal fun createRolePageImpl(
                                 }
                             }
                         }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Create Role" }
-                        a("/admin/workspaces/${workspace.slug}/roles", classes = "btn btn-ghost") { +"Cancel" }
                     }
                 }
             }
@@ -226,112 +232,111 @@ internal fun roleDetailPageImpl(
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "${role.name} — Roles",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/roles") { +"Roles" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +role.name }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Roles" to "/admin/workspaces/$slug/roles",
+                role.name to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +role.name }
-                    p("page-subtitle") { +"${role.scope.value} role · ${role.description ?: "no description"}" }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +role.name }
+                        p("page-header__sub") { +"${role.scope.value} role \u00b7 ${role.description ?: "no description"}" }
+                    }
                 }
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/delete",
-                    method = FormMethod.post,
-                    classes = "inline-form",
-                ) {
-                    button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
-                        attributes["onclick"] = "return confirm('Delete role ${role.name}?')"
-                        +"Delete"
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "edit-role-form"
+                        +"Save"
+                    }
+                    form(
+                        action = "/admin/workspaces/$slug/roles/${role.id}/delete",
+                        method = FormMethod.post,
+                    ) {
+                        button(type = ButtonType.submit) {
+                            classes = setOf("btn", "btn--danger")
+                            attributes["data-confirm"] = "Delete role ${role.name}?"
+                            +"Delete"
+                        }
                     }
                 }
             }
 
-            // Edit name/description
-            div("form-card form-card--wide card--spaced") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/edit",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    p("form-section-title") { +"Edit Role" }
-                    div("field") {
-                        label {
-                            htmlFor = "roleName"
-                            +"Name"
-                        }
+            // ── Edit name/description ────────────────────────────────
+            form(
+                action = "/admin/workspaces/$slug/roles/${role.id}/edit",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "edit-role-form"
+
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Edit Role" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
                         input(type = InputType.text, name = "name") {
-                            id = "roleName"
+                            classes = setOf("edit-row__field")
                             required = true
-                            value =
-                                role.name
+                            value = role.name
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "roleDesc"
-                            +"Description"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
                         input(type = InputType.text, name = "description") {
-                            id = "roleDesc"
-                            value =
-                                role.description ?: ""
+                            classes = setOf("edit-row__field")
+                            value = role.description ?: ""
                         }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
                     }
                 }
             }
 
-            // Composite children
-            div("card card--spaced") {
-                p("form-section-title") { +"Composite Children" }
+            // ── Composite children ───────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Composite Children" }
                 if (role.childRoleIds.isEmpty()) {
-                    p("card-empty-msg") {
+                    p("edit-row__hint") {
+                        style = "padding:12px 16px;"
                         +"No child roles."
                     }
                 } else {
-                    table {
+                    table("key-table") {
                         thead {
                             tr {
                                 th { +"Child Role" }
-                                th { +"" }
+                                th { style = "width:80px;" }
                             }
                         }
                         tbody {
                             role.childRoleIds.forEach { childId ->
                                 val child = allRoles.find { it.id == childId }
                                 tr {
-                                    td { +(child?.name ?: "#$childId") }
+                                    td { span("key-table__name") { +(child?.name ?: "#$childId") } }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/remove-child",
+                                            action = "/admin/workspaces/$slug/roles/${role.id}/remove-child",
                                             method = FormMethod.post,
-                                            classes = "inline-form",
                                         ) {
                                             input(type = InputType.hidden, name = "childRoleId") {
-                                                value =
-                                                    childId.toString()
+                                                value = childId.toString()
                                             }
-                                            button(
-                                                type = ButtonType.submit,
-                                                classes = "btn btn-ghost btn-sm",
-                                            ) { +"Remove" }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                +"Remove"
+                                            }
                                         }
                                     }
                                 }
@@ -339,46 +344,57 @@ internal fun roleDetailPageImpl(
                         }
                     }
                 }
-                // Add child form
                 val availableChildren = allRoles.filter { it.id != role.id && it.id !in role.childRoleIds }
                 if (availableChildren.isNotEmpty()) {
-                    form(
-                        action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/children",
-                        method = FormMethod.post,
-                        classes = "card-add-row",
-                    ) {
-                        select {
-                            name = "childRoleId"
-                            availableChildren.forEach { r ->
-                                option {
-                                    value = r.id.toString()
-                                    +r.name
+                    div("edit-actions") {
+                        form(
+                            action = "/admin/workspaces/$slug/roles/${role.id}/children",
+                            method = FormMethod.post,
+                        ) {
+                            style = "display:flex; align-items:center; gap:8px;"
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "childRoleId"
+                                availableChildren.forEach { r ->
+                                    option {
+                                        value = r.id.toString()
+                                        +r.name
+                                    }
                                 }
                             }
+                            button(type = ButtonType.submit) {
+                                classes = setOf("btn", "btn--primary", "btn--sm")
+                                +"Add Child"
+                            }
                         }
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Add Child" }
                     }
                 }
             }
 
-            // Assign user
-            div("card") {
-                p("form-section-title") { +"Assigned Users" }
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/roles/${role.id}/assign-user",
-                    method = FormMethod.post,
-                    classes = "card-add-row",
-                ) {
-                    select {
-                        name = "userId"
-                        allUsers.forEach { u ->
-                            option {
-                                value = u.id.toString()
-                                +"${u.username} (${u.email})"
+            // ── Assigned users ───────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Assigned Users" }
+                div("edit-actions") {
+                    form(
+                        action = "/admin/workspaces/$slug/roles/${role.id}/assign-user",
+                        method = FormMethod.post,
+                    ) {
+                        style = "display:flex; align-items:center; gap:8px;"
+                        select {
+                            classes = setOf("edit-row__field", "edit-row__field--select")
+                            name = "userId"
+                            allUsers.forEach { u ->
+                                option {
+                                    value = u.id.toString()
+                                    +"${u.username} (${u.email})"
+                                }
                             }
                         }
+                        button(type = ButtonType.submit) {
+                            classes = setOf("btn", "btn--primary", "btn--sm")
+                            +"Assign"
+                        }
                     }
-                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Assign" }
                 }
             }
         }
@@ -392,69 +408,81 @@ internal fun groupsListPageImpl(
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "Groups — ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Groups" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Groups" to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +"Groups" }
-                    p(
-                        "page-subtitle",
-                    ) { +"${groups.size} group${if (groups.size != 1) "s" else ""} in this workspace" }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Groups" }
+                        span("page-header__sub") {
+                            +"${groups.size} group${if (groups.size != 1) "s" else ""} in this workspace"
+                        }
+                    }
                 }
-                a(
-                    href = "/admin/workspaces/${workspace.slug}/groups/create",
-                    classes = "btn",
-                ) { +"+ Create Group" }
+                div("page-header__actions") {
+                    primaryLink("/admin/workspaces/$slug/groups/create", "Create Group", "plus")
+                }
             }
 
-            div("card") {
-                if (groups.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"◫" }
-                        p("empty-state-text") { +"No groups defined yet." }
-                    }
-                } else {
-                    table {
-                        thead {
-                            tr {
-                                th { +"Name" }
-                                th { +"Parent" }
-                                th { +"Roles" }
-                                th { +"Description" }
-                                th { +"" }
-                            }
+            if (groups.isEmpty()) {
+                emptyState(
+                    iconName = "user",
+                    title = "No groups yet",
+                    description = "Create a group to organize users and assign roles in bulk.",
+                )
+            } else {
+                table("data-table") {
+                    thead {
+                        tr {
+                            th { +"Name" }
+                            th { +"Parent" }
+                            th { +"Roles" }
+                            th { +"Description" }
+                            th { style = "width:70px;" }
                         }
-                        tbody {
-                            groups.forEach { group ->
-                                val parent = groups.find { it.id == group.parentGroupId }
-                                val roleNames =
-                                    group.roleIds.mapNotNull { rid ->
-                                        roles.find { it.id == rid }?.name
+                    }
+                    tbody {
+                        groups.forEach { group ->
+                            val parent = groups.find { it.id == group.parentGroupId }
+                            val roleNames =
+                                group.roleIds.mapNotNull { rid ->
+                                    roles.find { it.id == rid }?.name
+                                }
+                            tr {
+                                td {
+                                    a(
+                                        href = "/admin/workspaces/$slug/groups/${group.id}",
+                                        classes = "data-table__id",
+                                    ) { +group.name }
+                                }
+                                td { span("data-table__name") { +(parent?.name ?: "\u2014") } }
+                                td {
+                                    span("data-table__name") {
+                                        +(if (roleNames.isNotEmpty()) roleNames.joinToString(", ") else "\u2014")
                                     }
-                                tr {
-                                    td { span("td-code") { +group.name } }
-                                    td { +(parent?.name ?: "—") }
-                                    td { +(if (roleNames.isNotEmpty()) roleNames.joinToString(", ") else "—") }
-                                    td { +(group.description ?: "—") }
-                                    td {
+                                }
+                                td { span("data-table__name") { +(group.description ?: "\u2014") } }
+                                td {
+                                    div("data-table__actions") {
                                         a(
-                                            href = "/admin/workspaces/${workspace.slug}/groups/${group.id}",
-                                            classes = "btn btn-ghost btn-sm",
-                                        ) { +"Open →" }
+                                            href = "/admin/workspaces/$slug/groups/${group.id}",
+                                            classes = "btn btn--ghost btn--sm",
+                                        ) { +"Open" }
                                     }
                                 }
                             }
@@ -473,90 +501,87 @@ internal fun createGroupPageImpl(
     error: String? = null,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "New Group — ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/groups") { +"Groups" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"New Group" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Groups" to "/admin/workspaces/$slug/groups",
+                "New Group" to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +"Create Group" }
-                    p("page-subtitle") {
-                        +"Add a group to the "
-                        strong { +workspace.displayName }
-                        +" workspace."
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Create Group" }
+                        p("page-header__sub") { +"Add a group to ${workspace.displayName}." }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "create-group-form"
+                        +"Create Group"
                     }
                 }
             }
+
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
-            div("form-card") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/groups",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    div("field") {
-                        label {
-                            htmlFor = "groupName"
-                            +"Name"
-                        }
+
+            form(
+                action = "/admin/workspaces/$slug/groups",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "create-group-form"
+
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Group Details" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
                         input(type = InputType.text, name = "name") {
-                            id = "groupName"
+                            classes = setOf("edit-row__field")
                             required = true
                             placeholder = "e.g. engineering, marketing, ops"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "groupDesc"
-                            +"Description (optional)"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
                         input(type = InputType.text, name = "description") {
-                            id = "groupDesc"
+                            classes = setOf("edit-row__field")
                             placeholder = "What this group represents"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "parentGroup"
-                            +"Parent Group (optional)"
-                        }
-                        select {
-                            name = "parentGroupId"
-                            id = "parentGroup"
-                            option {
-                                value = ""
-                                +"— None (top-level) —"
-                            }
-                            groups.forEach { g ->
+                    div("edit-row") {
+                        span("edit-row__label") { +"Parent Group" }
+                        div {
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "parentGroupId"
                                 option {
-                                    value = g.id.toString()
-                                    +g.name
+                                    value = ""
+                                    +"\u2014 None (top-level) \u2014"
+                                }
+                                groups.forEach { g ->
+                                    option {
+                                        value = g.id.toString()
+                                        +g.name
+                                    }
                                 }
                             }
+                            div("edit-row__hint") { +"Nested groups inherit the roles assigned to their parent." }
                         }
-                        p("field-hint") { +"Nested groups inherit the roles assigned to their parent." }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Create Group" }
-                        a("/admin/workspaces/${workspace.slug}/groups", classes = "btn btn-ghost") { +"Cancel" }
                     }
                 }
             }
@@ -574,117 +599,119 @@ internal fun groupDetailPageImpl(
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "${group.name} — Groups",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/groups") { +"Groups" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +group.name }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Groups" to "/admin/workspaces/$slug/groups",
+                group.name to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +group.name }
-                    p("page-subtitle") {
-                        val parent = allGroups.find { it.id == group.parentGroupId }
-                        +(if (parent != null) "Child of ${parent.name}" else "Top-level group")
-                        +" · ${group.description ?: "no description"}"
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +group.name }
+                        p("page-header__sub") {
+                            val parent = allGroups.find { it.id == group.parentGroupId }
+                            +(if (parent != null) "Child of ${parent.name}" else "Top-level group")
+                            +" \u00b7 ${group.description ?: "no description"}"
+                        }
                     }
                 }
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/delete",
-                    method = FormMethod.post,
-                    classes = "inline-form",
-                ) {
-                    button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
-                        attributes["onclick"] = "return confirm('Delete group ${group.name}?')"
-                        +"Delete"
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "edit-group-form"
+                        +"Save"
+                    }
+                    form(
+                        action = "/admin/workspaces/$slug/groups/${group.id}/delete",
+                        method = FormMethod.post,
+                    ) {
+                        button(type = ButtonType.submit) {
+                            classes = setOf("btn", "btn--danger")
+                            attributes["data-confirm"] = "Delete group ${group.name}?"
+                            +"Delete"
+                        }
                     }
                 }
             }
 
-            // Edit name/description
-            div("form-card form-card--wide card--spaced") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/edit",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    p("form-section-title") { +"Edit Group" }
-                    div("field") {
-                        label {
-                            htmlFor = "gName"
-                            +"Name"
-                        }
+            // ── Edit name/description ────────────────────────────────
+            form(
+                action = "/admin/workspaces/$slug/groups/${group.id}/edit",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "edit-group-form"
+
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Edit Group" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
                         input(type = InputType.text, name = "name") {
-                            id = "gName"
+                            classes = setOf("edit-row__field")
                             required = true
                             value = group.name
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "gDesc"
-                            +"Description"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
                         input(type = InputType.text, name = "description") {
-                            id = "gDesc"
-                            value =
-                                group.description ?: ""
+                            classes = setOf("edit-row__field")
+                            value = group.description ?: ""
                         }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
                     }
                 }
             }
 
-            // Assigned roles
-            div("card card--spaced") {
-                p("form-section-title") { +"Assigned Roles" }
+            // ── Assigned roles ───────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Assigned Roles" }
                 if (group.roleIds.isEmpty()) {
-                    p("card-empty-msg") {
+                    p("edit-row__hint") {
+                        style = "padding:12px 16px;"
                         +"No roles assigned."
                     }
                 } else {
-                    table {
+                    table("key-table") {
                         thead {
                             tr {
                                 th { +"Role" }
                                 th { +"Scope" }
-                                th { +"" }
+                                th { style = "width:80px;" }
                             }
                         }
                         tbody {
                             group.roleIds.forEach { rid ->
                                 val r = allRoles.find { it.id == rid }
                                 tr {
-                                    td { +(r?.name ?: "#$rid") }
-                                    td { span("badge badge-green") { +(r?.scope?.value ?: "?") } }
+                                    td { span("key-table__name") { +(r?.name ?: "#$rid") } }
+                                    td {
+                                        span("badge badge--active") { +(r?.scope?.value ?: "?") }
+                                    }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/unassign-role",
+                                            action = "/admin/workspaces/$slug/groups/${group.id}/unassign-role",
                                             method = FormMethod.post,
-                                            classes = "inline-form",
                                         ) {
-                                            input(
-                                                type = InputType.hidden,
-                                                name = "roleId",
-                                            ) { value = rid.toString() }
-                                            button(
-                                                type = ButtonType.submit,
-                                                classes = "btn btn-ghost btn-sm",
-                                            ) { +"Remove" }
+                                            input(type = InputType.hidden, name = "roleId") {
+                                                value = rid.toString()
+                                            }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                +"Remove"
+                                            }
                                         }
                                     }
                                 }
@@ -694,60 +721,65 @@ internal fun groupDetailPageImpl(
                 }
                 val availableRoles = allRoles.filter { it.id !in group.roleIds }
                 if (availableRoles.isNotEmpty()) {
-                    form(
-                        action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/assign-role",
-                        method = FormMethod.post,
-                        classes = "card-add-row",
-                    ) {
-                        select {
-                            name = "roleId"
-                            availableRoles.forEach { r ->
-                                option {
-                                    value = r.id.toString()
-                                    +r.name
+                    div("edit-actions") {
+                        form(
+                            action = "/admin/workspaces/$slug/groups/${group.id}/assign-role",
+                            method = FormMethod.post,
+                        ) {
+                            style = "display:flex; align-items:center; gap:8px;"
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "roleId"
+                                availableRoles.forEach { r ->
+                                    option {
+                                        value = r.id.toString()
+                                        +r.name
+                                    }
                                 }
                             }
+                            button(type = ButtonType.submit) {
+                                classes = setOf("btn", "btn--primary", "btn--sm")
+                                +"Assign Role"
+                            }
                         }
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Assign Role" }
                     }
                 }
             }
 
-            // Members
-            div("card") {
-                p("form-section-title") { +"Members (${members.size})" }
+            // ── Members ──────────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Members (${members.size})" }
                 if (members.isEmpty()) {
-                    p("card-empty-msg") {
+                    p("edit-row__hint") {
+                        style = "padding:12px 16px;"
                         +"No members."
                     }
                 } else {
-                    table {
+                    table("key-table") {
                         thead {
                             tr {
                                 th { +"Username" }
                                 th { +"Email" }
-                                th { +"" }
+                                th { style = "width:80px;" }
                             }
                         }
                         tbody {
                             members.forEach { u ->
                                 tr {
-                                    td { span("td-code") { +u.username } }
-                                    td { +u.email }
+                                    td { span("key-table__name") { +u.username } }
+                                    td { span("key-table__meta") { +u.email } }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/remove-member",
+                                            action = "/admin/workspaces/$slug/groups/${group.id}/remove-member",
                                             method = FormMethod.post,
-                                            classes = "inline-form",
                                         ) {
                                             input(type = InputType.hidden, name = "userId") {
-                                                value =
-                                                    u.id.toString()
+                                                value = u.id.toString()
                                             }
-                                            button(
-                                                type = ButtonType.submit,
-                                                classes = "btn btn-ghost btn-sm",
-                                            ) { +"Remove" }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                +"Remove"
+                                            }
                                         }
                                     }
                                 }
@@ -755,24 +787,29 @@ internal fun groupDetailPageImpl(
                         }
                     }
                 }
-                // Add member
                 val nonMembers = allUsers.filter { u -> members.none { it.id == u.id } }
                 if (nonMembers.isNotEmpty()) {
-                    form(
-                        action = "/admin/workspaces/${workspace.slug}/groups/${group.id}/add-member",
-                        method = FormMethod.post,
-                        classes = "card-add-row",
-                    ) {
-                        select {
-                            name = "userId"
-                            nonMembers.forEach { u ->
-                                option {
-                                    value = u.id.toString()
-                                    +"${u.username} (${u.email})"
+                    div("edit-actions") {
+                        form(
+                            action = "/admin/workspaces/$slug/groups/${group.id}/add-member",
+                            method = FormMethod.post,
+                        ) {
+                            style = "display:flex; align-items:center; gap:8px;"
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "userId"
+                                nonMembers.forEach { u ->
+                                    option {
+                                        value = u.id.toString()
+                                        +"${u.username} (${u.email})"
+                                    }
                                 }
                             }
+                            button(type = ButtonType.submit) {
+                                classes = setOf("btn", "btn--primary", "btn--sm")
+                                +"Add Member"
+                            }
                         }
-                        button(type = ButtonType.submit, classes = "btn btn-sm") { +"Add Member" }
                     }
                 }
             }

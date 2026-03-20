@@ -10,6 +10,7 @@
  *   .btn--danger   — red outlined
  *   .btn--warning  — amber outlined
  *   .btn--sm       — compact size
+ *   .btn--icon     — icon-only square button (no text padding)
  *
  * Legacy modifiers (kept for backward compat with AdminView.kt):
  *   .btn-ghost, .btn-danger, .btn-sm, .btn-full
@@ -71,6 +72,14 @@
 .btn--warning:hover { background: var(--color-amber-bg); }
 
 .btn--sm { padding: 5px 10px; font-size: var(--text-sm); }
+
+.btn--icon {
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  justify-content: center;
+}
+.btn--icon svg { width: 13px; height: 13px; }
 
 /* ── Legacy modifiers (keep until Phase 2) ─────────────────────────────── */
 

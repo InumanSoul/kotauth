@@ -73,10 +73,12 @@
 /* ── Lock icon ─────────────────────────────────────────────────────────── */
 
 .lock-icon {
+  display: inline-flex;
+  align-items: center;
   color: var(--color-subtle);
-  font-size: 10px;
   flex-shrink: 0;
 }
+.lock-icon svg { width: 12px; height: 12px; }
 
 /* ── Edit form rows ────────────────────────────────────────────────────── */
 

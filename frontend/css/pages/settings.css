@@ -94,15 +94,19 @@
 }
 
 .copy-field__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 10px;
   background: none;
   border: none;
   border-left: 0.5px solid var(--color-border-md);
   color: var(--color-subtle);
   cursor: pointer;
-  font-size: 13px;
   transition: color 0.12s;
 }
+
+.copy-field__btn svg { width: 13px; height: 13px; }
 
 .copy-field__btn:hover { color: var(--color-accent); }
 

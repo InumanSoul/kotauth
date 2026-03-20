@@ -21,9 +21,6 @@ internal fun renderFragment(block: DIV.() -> Unit): String {
     return wrapped.removePrefix("<div>").removeSuffix("</div>")
 }
 
-/** Copy glyph — used as button text content, not SVG. */
-private const val COPY_GLYPH = "⎘"
-
 /**
  * Renders a breadcrumb trail using BEM classes.
  *
@@ -207,15 +204,13 @@ fun DIV.ovRowInherited(
 
 // ─── Small Components ───────────────────────────────────────────────────────
 
-/** Copy-to-clipboard button. */
+/** Copy-to-clipboard button — CSP-safe, uses data-copy handled by settings.js. */
 fun FlowOrInteractiveOrPhrasingContent.copyBtn(textToCopy: String) {
-    button(classes = "copy-btn") {
-        attributes["onclick"] =
-            "navigator.clipboard.writeText('$textToCopy')" +
-            ".then(()=>{this.textContent='✓';" +
-            "setTimeout(()=>this.textContent='⎘',1200)})"
+    button(classes = "btn btn--ghost btn--icon copy-btn") {
+        type = ButtonType.button
+        attributes["data-copy"] = textToCopy
         attributes["title"] = "Copy"
-        +COPY_GLYPH
+        inlineSvgIcon("copy", "Copy")
     }
 }
 

@@ -6,6 +6,7 @@
  *   2. Chip-grid count updates     (chip-grid change → .chip-grid__count)
  *   3. Copy to clipboard           (data-copy)
  *   4. Confirm dialogs             (data-confirm)
+ *   5. Scope toggle (show/hide)    (data-scope-toggle)
  *
  * All bindings use data-* attributes — zero inline JS.
  */
@@ -60,6 +61,9 @@
   });
 
   // ── copy to clipboard ──────────────────────────────────────
+  var CHECK_SVG = '<svg width="13" height="13" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+    '<path d="M3 8l3 3 6-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-copy]');
     if (!btn) return;
@@ -67,11 +71,25 @@
     var text = btn.getAttribute('data-copy');
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        var orig = btn.textContent;
-        btn.textContent = '\u2713';
-        setTimeout(function () { btn.textContent = orig; }, 1500);
+        var origHtml = btn.innerHTML;
+        btn.innerHTML = CHECK_SVG;
+        btn.setAttribute('data-copied', '');
+        setTimeout(function () {
+          btn.innerHTML = origHtml;
+          btn.removeAttribute('data-copied');
+        }, 1500);
       });
     }
+  });
+
+  // ── scope toggle (show/hide field by select value) ────────
+  document.addEventListener('change', function (e) {
+    var sel = e.target.closest('[data-scope-toggle]');
+    if (!sel) return;
+    var targetId = sel.getAttribute('data-scope-toggle');
+    var target = document.getElementById(targetId);
+    if (!target) return;
+    target.style.display = sel.value === 'application' ? '' : 'none';
   });
 
   // ── confirm dialogs ────────────────────────────────────────

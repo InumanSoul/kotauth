@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.IdentityProvider
@@ -206,7 +207,7 @@ internal fun identityProvidersPageImpl(
                                     classes = setOf("copy-field__btn")
                                     attributes["data-copy"] = callbackUrl
                                     title = "Copy"
-                                    +"\u2398"
+                                    inlineSvgIcon("copy", "Copy")
                                 }
                             }
                         }
@@ -304,7 +305,7 @@ internal fun apiKeysPageImpl(
                         classes = setOf("copy-field__btn")
                         attributes["data-copy"] = newKeyRaw
                         title = "Copy"
-                        +"\u2398"
+                        inlineSvgIcon("copy", "Copy")
                     }
                 }
             }
