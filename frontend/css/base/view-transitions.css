@@ -40,11 +40,28 @@
   to   { opacity: 1; }
 }
 
+/* ── Sidebar dot slide ────────────────────────────────────────────────── */
+
+/* The group pseudo animates position — this is the actual slide */
+::view-transition-group(sidebar-dot) {
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Kill the default crossfade on old/new — just slide, no flicker */
+::view-transition-old(sidebar-dot),
+::view-transition-new(sidebar-dot) {
+  animation: none;
+}
+
 /* ── Reduced motion ─────────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-old(page-content),
   ::view-transition-new(page-content) {
+    animation-duration: 0.01s;
+  }
+  ::view-transition-group(sidebar-dot) {
     animation-duration: 0.01s;
   }
 }

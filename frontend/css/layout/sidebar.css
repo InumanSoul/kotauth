@@ -68,4 +68,7 @@
   flex-shrink: 0;
 }
 
-.sidebar__item--active .sidebar__dot { background: var(--color-accent); }
+.sidebar__item--active .sidebar__dot {
+  background: var(--color-accent);
+  view-transition-name: sidebar-dot;
+}
