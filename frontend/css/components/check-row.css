@@ -1,0 +1,82 @@
+/* frontend/css/components/check-row.css
+ *
+ * Styled checkbox rows for multi-option groups inside ov-cards.
+ * Uses a custom-drawn checkmark via ::after pseudo-element.
+ *
+ * .check-row          — clickable row (use as <label>)
+ * .check-row__label   — text label
+ * .check-row__hint    — optional right-aligned hint text
+ *
+ * Usage:
+ *   <label class="check-row">
+ *     <input type="checkbox" name="foo" value="true">
+ *     <span class="check-row__label">Allow public registration</span>
+ *     <span class="check-row__hint">Optional hint</span>
+ *   </label>
+ */
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 0.5px solid var(--color-border);
+  cursor: pointer;
+  transition: background 0.1s;
+  /* Reset global label rule (components/form.css) */
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  font-weight: normal;
+  color: inherit;
+  margin-bottom: 0;
+}
+
+.check-row:last-child { border-bottom: none; }
+
+.check-row:hover { background: var(--color-row-hover); }
+
+.check-row input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 0;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid var(--color-border-md);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.12s;
+}
+
+.check-row input[type="checkbox"]:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.check-row input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 7px;
+  border: 1.5px solid #05080a;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+
+.check-row__label {
+  font-size: 13px;
+  color: var(--color-text);
+  flex: 1;
+}
+
+.check-row__hint {
+  font-size: 11px;
+  color: var(--color-subtle);
+}

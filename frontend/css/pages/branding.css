@@ -11,7 +11,7 @@
 }
 
 /* ── left: scrollable form column ── */
-.branding-form { display: flex; flex-direction: column; gap: 20px; }
+.branding-form { display: flex; flex-direction: column; }
 
 /* ── right: sticky preview column ── */
 .branding-preview {
@@ -19,18 +19,9 @@
   top: calc(42px + 28px); /* topbar + content padding */
 }
 
-/* ── section block ── */
-.form-section { display: flex; flex-direction: column; gap: 8px; }
-
-.form-section__label {
-  font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--color-subtle);
-}
-
 /* ── preset button group ── */
 .preset-group {
   display: flex;
-  border: 0.5px solid var(--color-border-md);
   background: var(--color-card);
 }
 .preset-btn {
@@ -49,7 +40,6 @@
 .color-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border: 0.5px solid var(--color-border-md);
   background: var(--color-card);
 }
 

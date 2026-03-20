@@ -411,126 +411,130 @@ internal fun workspaceSettingsPageImpl(
     saved: Boolean = false,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
         adminShell(
-            pageTitle = "Settings — ${workspace.displayName}",
+            pageTitle = "General Settings — ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "general",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Settings" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "General" to null,
+            )
+
             div("page-header") {
-                div {
-                    p("page-title") { +"Workspace Settings" }
-                    p("page-subtitle") { +"Configure tokens, policies, and branding for ${workspace.displayName}." }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"General Settings" }
+                        p("page-header__sub") {
+                            +"Configure identity, token lifetimes and registration policy for ${workspace.displayName}."
+                        }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "general-form"
+                        +"Save Settings"
+                    }
                 }
             }
 
             if (saved) {
-                div("alert alert-success alert--constrained") {
-                    +"Settings saved."
-                }
+                div("notice notice--success") { +"Settings saved." }
             }
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
 
-            div("form-card") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/settings",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    p("form-section-title") { +"Identity" }
-                    div("field") {
-                        label {
-                            htmlFor = "displayName"
-                            +"Display Name"
-                        }
+            form(
+                action = "/admin/workspaces/$slug/settings",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "general-form"
+
+                // ── Identity ───────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Identity" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Display Name" }
                         input(type = InputType.text, name = "displayName") {
-                            id = "displayName"
+                            classes = setOf("edit-row__field")
                             required = true
                             value = workspace.displayName
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "issuerUrl"
-                            +"Issuer URL (optional)"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Issuer URL" }
+                        div {
+                            input(type = InputType.url, name = "issuerUrl") {
+                                classes = setOf("edit-row__field")
+                                placeholder = "https://auth.example.com"
+                                value = workspace.issuerUrl ?: ""
+                            }
+                            div("edit-row__hint") {
+                                +"The "
+                                code { +"iss" }
+                                +" claim in tokens. Defaults to "
+                                code { +"/t/$slug" }
+                                +" if blank."
+                            }
                         }
-                        input(type = InputType.url, name = "issuerUrl") {
-                            id = "issuerUrl"
-                            placeholder = "https://auth.example.com"
-                            value = workspace.issuerUrl ?: ""
-                        }
-                        p("field-hint") { +"The 'iss' claim in tokens. Defaults to /t/${workspace.slug} if blank." }
                     }
+                }
 
-                    p("form-section-title") { +"Token Lifetimes" }
-                    div("field") {
-                        label {
-                            htmlFor = "tokenExpirySeconds"
-                            +"Access Token TTL (seconds)"
+                // ── Token Lifetimes ────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Token Lifetimes" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Access Token TTL" }
+                        div {
+                            input(type = InputType.number, name = "tokenExpirySeconds") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                required = true
+                                attributes["min"] = "60"
+                                value = workspace.tokenExpirySeconds.toString()
+                            }
+                            div("edit-row__hint") { +"Seconds. Minimum 60. Typical: 3600 (1h)." }
                         }
-                        input(type = InputType.number, name = "tokenExpirySeconds") {
-                            id = "tokenExpirySeconds"
-                            required = true
-                            attributes["min"] = "60"
-                            value = workspace.tokenExpirySeconds.toString()
-                        }
-                        p("field-hint") { +"Minimum 60 seconds. Typical: 3600 (1 hour)." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "refreshTokenExpirySeconds"
-                            +"Refresh Token TTL (seconds)"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Refresh Token TTL" }
+                        div {
+                            input(type = InputType.number, name = "refreshTokenExpirySeconds") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                required = true
+                                attributes["min"] = "60"
+                                value = workspace.refreshTokenExpirySeconds.toString()
+                            }
+                            div("edit-row__hint") { +"Seconds. Must be ≥ access token TTL. Typical: 86400 (24h)." }
                         }
-                        input(type = InputType.number, name = "refreshTokenExpirySeconds") {
-                            id = "refreshTokenExpirySeconds"
-                            required = true
-                            attributes["min"] = "60"
-                            value = workspace.refreshTokenExpirySeconds.toString()
-                        }
-                        p("field-hint") { +"Must be ≥ access token TTL. Typical: 86400 (1 day)." }
                     }
+                }
 
-                    p("form-section-title") { +"Registration Policy" }
-                    div("checkbox-row") {
+                // ── Registration Policy ────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Registration Policy" }
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "registrationEnabled") {
-                            id = "registrationEnabled"
+                            attributes["value"] = "true"
                             if (workspace.registrationEnabled) checked = true
-                            attributes["value"] = "true"
                         }
-                        label("checkbox-label") {
-                            htmlFor = "registrationEnabled"
-                            +"Allow public registration"
-                        }
+                        span("check-row__label") { +"Allow public registration" }
                     }
-                    div("checkbox-row") {
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "emailVerificationRequired") {
-                            id = "emailVerificationRequired"
-                            if (workspace.emailVerificationRequired) checked = true
                             attributes["value"] = "true"
+                            if (workspace.emailVerificationRequired) checked = true
                         }
-                        label("checkbox-label") {
-                            htmlFor = "emailVerificationRequired"
-                            +"Require email verification"
-                        }
-                    }
-
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Save Settings" }
-                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                        span("check-row__label") { +"Require email verification" }
                     }
                 }
             }
@@ -546,182 +550,171 @@ internal fun securityPolicyPageImpl(
     saved: Boolean = false,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+
         adminShell(
             pageTitle = "Security Policy — ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Security Policy" }
-            }
+            // ── Breadcrumb ───────────────────────────────────────────
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "Security Policy" to null,
+            )
+
+            // ── Page header ──────────────────────────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Security Policy" }
-                    p(
-                        "page-subtitle",
-                    ) { +"Configure password rules and MFA requirements for ${workspace.displayName}." }
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Security Policy" }
+                        p("page-header__sub") {
+                            +"Configure password rules and MFA requirements for ${workspace.displayName}."
+                        }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        attributes["form"] = "security-form"
+                        +"Save Policy"
+                    }
                 }
             }
 
+            // ── Notices ──────────────────────────────────────────────
             if (saved) {
-                div("alert alert-success alert--constrained") {
-                    +"Security policy saved."
-                }
+                div("notice notice--success") { +"Security policy saved." }
             }
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
 
-            div("form-card") {
-                form(
-                    action = "/admin/workspaces/${workspace.slug}/settings/security",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    p("form-section-title") { +"Password Policy" }
-                    div("field") {
-                        label {
-                            htmlFor = "passwordPolicyMinLength"
-                            +"Minimum Length"
+            // ── Form (wraps both cards) ──────────────────────────────
+            form(
+                action = "/admin/workspaces/$slug/settings/security",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                id = "security-form"
+
+                // ── Password Policy ──────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Password Policy" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Minimum Length" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyMinLength") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                required = true
+                                attributes["min"] = "4"
+                                attributes["max"] = "128"
+                                value = workspace.passwordPolicyMinLength.toString()
+                            }
+                            div("edit-row__hint") { +"Between 4 and 128 characters." }
                         }
-                        input(type = InputType.number, name = "passwordPolicyMinLength") {
-                            id = "passwordPolicyMinLength"
-                            required = true
-                            attributes["min"] = "4"
-                            attributes["max"] = "128"
-                            value = workspace.passwordPolicyMinLength.toString()
-                        }
-                        p("field-hint") { +"Between 4 and 128 characters." }
                     }
-                    div("checkbox-row") {
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireSpecial") {
-                            id = "passwordPolicyRequireSpecial"
+                            attributes["value"] = "true"
                             if (workspace.passwordPolicyRequireSpecial) checked = true
-                            attributes["value"] = "true"
                         }
-                        label("checkbox-label") {
-                            htmlFor = "passwordPolicyRequireSpecial"
-                            +"Require special character (!@#\$%...)"
-                        }
+                        span("check-row__label") { +"Require special character" }
+                        span("check-row__hint") { +"!@#\$%…" }
                     }
-                    div("checkbox-row") {
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireUppercase") {
-                            id = "passwordPolicyRequireUppercase"
+                            attributes["value"] = "true"
                             if (workspace.passwordPolicyRequireUppercase) checked = true
-                            attributes["value"] = "true"
                         }
-                        label("checkbox-label") {
-                            htmlFor = "passwordPolicyRequireUppercase"
-                            +"Require uppercase letter"
-                        }
+                        span("check-row__label") { +"Require uppercase letter" }
                     }
-                    div("checkbox-row") {
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireNumber") {
-                            id = "passwordPolicyRequireNumber"
+                            attributes["value"] = "true"
                             if (workspace.passwordPolicyRequireNumber) checked = true
-                            attributes["value"] = "true"
                         }
-                        label("checkbox-label") {
-                            htmlFor = "passwordPolicyRequireNumber"
-                            +"Require at least one number"
-                        }
+                        span("check-row__label") { +"Require at least one number" }
                     }
-                    div("checkbox-row") {
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyBlacklistEnabled") {
-                            id = "passwordPolicyBlacklistEnabled"
-                            if (workspace.passwordPolicyBlacklistEnabled) checked = true
                             attributes["value"] = "true"
+                            if (workspace.passwordPolicyBlacklistEnabled) checked = true
                         }
-                        label("checkbox-label") {
-                            htmlFor = "passwordPolicyBlacklistEnabled"
-                            +"Block common/breached passwords"
+                        span("check-row__label") { +"Block common / breached passwords" }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password History" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyHistoryCount") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "24"
+                                value = workspace.passwordPolicyHistoryCount.toString()
+                            }
+                            div("edit-row__hint") { +"Previous passwords to remember. 0 = disabled, max 24." }
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "passwordPolicyHistoryCount"
-                            +"Password History"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password Expiry" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "365"
+                                value = workspace.passwordPolicyMaxAgeDays.toString()
+                            }
+                            div("edit-row__hint") { +"Days before forced change. 0 = never expires." }
                         }
-                        input(type = InputType.number, name = "passwordPolicyHistoryCount") {
-                            id = "passwordPolicyHistoryCount"
-                            attributes["min"] = "0"
-                            attributes["max"] = "24"
-                            value = workspace.passwordPolicyHistoryCount.toString()
-                        }
-                        p("field-hint") { +"Number of previous passwords to remember (0 = disabled, max 24)." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "passwordPolicyMaxAgeDays"
-                            +"Password Expiry (days)"
-                        }
-                        input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
-                            id = "passwordPolicyMaxAgeDays"
-                            attributes["min"] = "0"
-                            attributes["max"] = "365"
-                            value = workspace.passwordPolicyMaxAgeDays.toString()
-                        }
-                        p("field-hint") { +"Force password change after N days (0 = never expires)." }
-                    }
+                }
 
-                    p("form-section-title") { +"Multi-Factor Authentication" }
-                    div("field") {
-                        label {
-                            htmlFor = "mfaPolicy"
-                            +"MFA Policy"
-                        }
-                        select {
-                            name = "mfaPolicy"
-                            id = "mfaPolicy"
-                            option {
+                // ── Multi-Factor Authentication ──────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Multi-Factor Authentication" }
+                    div("radio-group") {
+                        label("radio-row") {
+                            input(type = InputType.radio, name = "mfaPolicy") {
                                 value = "optional"
-                                if (workspace.mfaPolicy ==
-                                    "optional"
-                                ) {
-                                    selected = true
-                                }
-                                +"Optional"
+                                if (workspace.mfaPolicy == "optional") checked = true
                             }
-                            option {
-                                value = "required"
-                                if (workspace.mfaPolicy ==
-                                    "required"
-                                ) {
-                                    selected = true
+                            div("radio-row__body") {
+                                span("radio-row__label") { +"Optional" }
+                                span("radio-row__desc") {
+                                    +"Users may enroll in TOTP-based MFA but are not required to."
                                 }
-                                +"Required for all users"
-                            }
-                            option {
-                                value = "required_admins"
-                                if (workspace.mfaPolicy ==
-                                    "required_admins"
-                                ) {
-                                    selected = true
-                                }
-                                +"Required for admins only"
                             }
                         }
-                        p("field-hint") { +"Controls whether users must enroll in TOTP-based MFA." }
-                    }
-
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Save Security Policy" }
-                        a(
-                            "/admin/workspaces/${workspace.slug}/settings",
-                            classes = "btn btn-ghost",
-                        ) { +"← General Settings" }
+                        label("radio-row") {
+                            input(type = InputType.radio, name = "mfaPolicy") {
+                                value = "required"
+                                if (workspace.mfaPolicy == "required") checked = true
+                            }
+                            div("radio-row__body") {
+                                span("radio-row__label") { +"Required" }
+                                span("radio-row__desc") {
+                                    +"Users must enroll in MFA before they can access applications."
+                                }
+                            }
+                        }
+                        label("radio-row") {
+                            input(type = InputType.radio, name = "mfaPolicy") {
+                                value = "required_admins"
+                                if (workspace.mfaPolicy == "required_admins") checked = true
+                            }
+                            div("radio-row__body") {
+                                span("radio-row__label") { +"Required for admins only" }
+                                span("radio-row__desc") {
+                                    +"Only admin users must enroll. Regular users may opt in."
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -800,44 +793,42 @@ internal fun brandingPageImpl(
                     div("branding-form") {
 
                         // ── Assets ─────────────────────────────────
-                        div("form-section") {
-                            div("form-section__label") { +"Assets" }
-                            div("ov-card") {
-                                div("edit-row") {
-                                    span("edit-row__label") { +"Logo URL" }
-                                    div {
-                                        input(type = InputType.url, name = "themeLogoUrl") {
-                                            classes = setOf("edit-row__field")
-                                            id = "field-logo"
-                                            placeholder = "https://cdn.example.com/logo.png"
-                                            value = t.logoUrl ?: ""
-                                            attributes["data-logo-preview"] = ""
-                                        }
-                                        div("edit-row__hint") {
-                                            +"Shown above the login card. Recommended max 180×48px."
-                                        }
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Assets" }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Logo URL" }
+                                div {
+                                    input(type = InputType.url, name = "themeLogoUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-logo"
+                                        placeholder = "https://cdn.example.com/logo.png"
+                                        value = t.logoUrl ?: ""
+                                        attributes["data-logo-preview"] = ""
+                                    }
+                                    div("edit-row__hint") {
+                                        +"Shown above the login card. Recommended max 180×48px."
                                     }
                                 }
-                                div("edit-row") {
-                                    span("edit-row__label") { +"Favicon URL" }
-                                    div {
-                                        input(type = InputType.url, name = "themeFaviconUrl") {
-                                            classes = setOf("edit-row__field")
-                                            id = "field-favicon"
-                                            placeholder = "https://cdn.example.com/favicon.ico"
-                                            value = t.faviconUrl ?: ""
-                                        }
-                                        div("edit-row__hint") {
-                                            +"Browser tab icon. Recommended 32×32px .ico or .png."
-                                        }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Favicon URL" }
+                                div {
+                                    input(type = InputType.url, name = "themeFaviconUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-favicon"
+                                        placeholder = "https://cdn.example.com/favicon.ico"
+                                        value = t.faviconUrl ?: ""
+                                    }
+                                    div("edit-row__hint") {
+                                        +"Browser tab icon. Recommended 32×32px .ico or .png."
                                     }
                                 }
                             }
                         }
 
                         // ── Theme Presets ──────────────────────────
-                        div("form-section") {
-                            div("form-section__label") { +"Theme Preset" }
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Theme Preset" }
                             div("preset-group") {
                                 button(type = ButtonType.button) {
                                     classes = setOf("preset-btn", "preset-btn--active")
@@ -858,8 +849,8 @@ internal fun brandingPageImpl(
                         }
 
                         // ── Colors ─────────────────────────────────
-                        div("form-section") {
-                            div("form-section__label") { +"Colors" }
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Colors" }
                             div("color-grid") {
                                 colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
@@ -873,8 +864,8 @@ internal fun brandingPageImpl(
                         }
 
                         // ── Border Radius ──────────────────────────
-                        div("form-section") {
-                            div("form-section__label") { +"Border Radius" }
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Border Radius" }
                             div("preset-group") {
                                 val radiusPresets = listOf("0px" to "Sharp", "8px" to "Rounded", "40px" to "Pill")
                                 for ((rv, label) in radiusPresets) {
@@ -895,7 +886,7 @@ internal fun brandingPageImpl(
                                 value = t.borderRadius
                                 placeholder = "e.g. 0px, 6px, 12px"
                                 attributes["data-radius-input"] = ""
-                                style = "margin-top:6px;"
+                                style = "margin-top:6px; margin:6px 16px 14px;"
                             }
                         }
                     }

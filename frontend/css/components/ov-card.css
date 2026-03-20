@@ -24,6 +24,8 @@
   overflow: hidden;
 }
 
+.ov-card + .ov-card { margin-top: 12px; }
+
 /* ── Section label (divider heading row) ───────────────────────────────── */
 
 .ov-card__section-label {

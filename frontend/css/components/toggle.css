@@ -1,0 +1,76 @@
+/* frontend/css/components/toggle.css
+ *
+ * Toggle switch — replaces native checkbox with a sliding track + thumb.
+ * Wrap a hidden <input type="checkbox"> + .toggle__track inside <label class="toggle">.
+ *
+ * .toggle              — outer label (inline-flex)
+ * .toggle__track       — pill-shaped track
+ * .toggle__thumb       — sliding circle
+ * .toggle__label       — optional text next to the switch
+ * .toggle__label--muted — dimmed variant
+ *
+ * Usage:
+ *   <label class="toggle">
+ *     <input type="checkbox" name="enabled">
+ *     <span class="toggle__track"><span class="toggle__thumb"></span></span>
+ *     <span class="toggle__label">Enable</span>
+ *   </label>
+ */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  /* Reset global label rule (components/form.css) */
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: inherit;
+  font-weight: normal;
+  color: inherit;
+  margin-bottom: 0;
+}
+
+.toggle input { display: none; }
+
+.toggle__track {
+  width: 30px;
+  height: 17px;
+  border-radius: 99px;
+  background: var(--color-subtle);
+  border: 0.5px solid var(--color-border-md);
+  position: relative;
+  transition: background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.toggle input:checked ~ .toggle__track {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.15s;
+}
+
+.toggle input:checked ~ .toggle__track .toggle__thumb {
+  transform: translateX(13px);
+}
+
+.toggle__label {
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.toggle__label--muted {
+  font-size: 12px;
+  color: var(--color-muted);
+}

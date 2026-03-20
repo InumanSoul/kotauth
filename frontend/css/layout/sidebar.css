@@ -46,6 +46,7 @@
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
   text-decoration: none;
+  justify-content: space-between;
 }
 
 .sidebar__item:hover {

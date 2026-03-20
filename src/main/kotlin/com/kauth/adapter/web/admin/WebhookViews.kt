@@ -18,43 +18,52 @@ internal fun webhooksPageImpl(
     error: String? = null,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+        val totalEvents = WebhookEvent.ALL.size
+
         adminShell(
             pageTitle = "Webhooks — ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Webhooks" }
-            }
+            // ── Breadcrumb ───────────────────────────────────────────
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "Webhooks" to null,
+            )
+
+            // ── Page header ──────────────────────────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Webhooks" }
-                    p(
-                        "page-subtitle",
-                    ) {
-                        +"Receive HTTP callbacks when security events occur. Payloads are signed with HMAC-SHA256."
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Webhooks" }
+                        p("page-header__sub") {
+                            +"Receive HTTP callbacks when security events occur. Payloads signed with HMAC-SHA256."
+                        }
                     }
                 }
             }
 
-            // One-time secret reveal
+            // ── One-time secret reveal ───────────────────────────────
             if (newSecret != null) {
-                div("alert alert-success") {
-                    style = "max-width:720px; margin-bottom:1.5rem;"
-                    p("alert__title") { +"Webhook created — copy the signing secret now. You will not see it again." }
-                    div("secret-box") { +newSecret }
-                    p {
-                        style = "margin-top:0.5rem; font-size:0.8rem; color:var(--color-muted);"
+                div("notice notice--success") {
+                    p { +"Webhook created — copy the signing secret now. You will not see it again." }
+                    div("copy-field") {
+                        span("copy-field__value") { +newSecret }
+                        button(type = ButtonType.button) {
+                            classes = setOf("copy-field__btn")
+                            attributes["data-copy"] = newSecret
+                            title = "Copy"
+                            +"\u2398"
+                        }
+                    }
+                    p("edit-row__hint") {
                         +"Verify incoming payloads: "
                         code { +"X-KotAuth-Signature: sha256=HMAC-SHA256(secret, body)" }
                     }
@@ -62,93 +71,73 @@ internal fun webhooksPageImpl(
             }
 
             if (error != null) {
-                div("alert alert-error") {
-                    style = "max-width:720px;"
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
 
-            // Endpoints table
-            div("card") {
-                style = "max-width:960px; margin-bottom:2rem;"
-                if (endpoints.isEmpty()) {
-                    p("td-muted") {
-                        style = "padding:1rem;"
-                        +"No webhook endpoints yet. Add one below."
-                    }
-                } else {
-                    table {
-                        thead {
-                            tr {
-                                th { +"URL" }
-                                th { +"Description" }
-                                th { +"Events" }
-                                th { +"Status" }
-                                th { +"Created" }
-                                th { +"" }
-                            }
+            // ── Existing endpoints ───────────────────────────────────
+            if (endpoints.isEmpty()) {
+                div("empty-state") {
+                    p("empty-state__title") { +"No webhook endpoints yet" }
+                    p("empty-state__desc") { +"Add an endpoint below to start receiving event deliveries." }
+                }
+            } else {
+                table("key-table") {
+                    thead {
+                        tr {
+                            th { +"URL" }
+                            th { +"Description" }
+                            th { +"Events" }
+                            th { +"Status" }
+                            th { +"Created" }
+                            th { +"" }
                         }
-                        tbody {
-                            endpoints.forEach { ep ->
-                                tr {
-                                    td {
-                                        style =
-                                            "font-size:0.82rem; font-family:monospace; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                                        +ep.url
+                    }
+                    tbody {
+                        endpoints.forEach { ep ->
+                            tr {
+                                td { span("key-table__meta") { +ep.url } }
+                                td { span("key-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
+                                td {
+                                    span("key-table__meta") {
+                                        +(ep.events.sorted().joinToString(", ").ifBlank { "none" })
                                     }
-                                    td {
-                                        span("td-muted") { +(ep.description.ifBlank { "—" }) }
+                                }
+                                td {
+                                    val badgeCls = if (ep.enabled) "badge badge--active" else "badge badge--inactive"
+                                    span(badgeCls) { +(if (ep.enabled) "Enabled" else "Disabled") }
+                                }
+                                td {
+                                    span("key-table__meta") {
+                                        +DateTimeFormatter
+                                            .ofPattern("MMM d, yyyy")
+                                            .withZone(java.time.ZoneId.of("UTC"))
+                                            .format(ep.createdAt)
                                     }
-                                    td {
-                                        style = "font-size:0.78rem; color:var(--color-muted); max-width:200px;"
-                                        +(
-                                            ep.events
-                                                .sorted()
-                                                .joinToString(", ")
-                                                .ifBlank { "none" }
-                                        )
-                                    }
-                                    td {
-                                        span(if (ep.enabled) "badge badge-active" else "badge badge-disabled") {
-                                            +(if (ep.enabled) "Enabled" else "Disabled")
+                                }
+                                td {
+                                    // Toggle
+                                    form(
+                                        action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/toggle",
+                                        method = FormMethod.post,
+                                    ) {
+                                        input(type = InputType.hidden, name = "enabled") {
+                                            value = if (ep.enabled) "false" else "true"
+                                        }
+                                        button(type = ButtonType.submit) {
+                                            classes = setOf("btn", "btn--ghost", "btn--sm")
+                                            +(if (ep.enabled) "Disable" else "Enable")
                                         }
                                     }
-                                    td {
-                                        span("td-muted") {
-                                            +DateTimeFormatter
-                                                .ofPattern("MMM d, yyyy")
-                                                .withZone(java.time.ZoneId.of("UTC"))
-                                                .format(ep.createdAt)
-                                        }
-                                    }
-                                    td("btn-group") {
-                                        // Toggle enable/disable
-                                        form(
-                                            action = "/admin/workspaces/${workspace.slug}/settings/webhooks/${ep.id}/toggle",
-                                            method = FormMethod.post,
-                                            classes = "inline-form",
-                                        ) {
-                                            input(type = InputType.hidden, name = "enabled") {
-                                                value = if (ep.enabled) "false" else "true"
-                                            }
-                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
-                                                +(if (ep.enabled) "Disable" else "Enable")
-                                            }
-                                        }
-                                        // Delete
-                                        form(
-                                            action = "/admin/workspaces/${workspace.slug}/settings/webhooks/${ep.id}/delete",
-                                            method = FormMethod.post,
-                                            classes = "inline-form",
-                                        ) {
-                                            button(
-                                                type = ButtonType.submit,
-                                                classes = "btn btn-ghost btn-sm btn-danger",
-                                            ) {
-                                                attributes["onclick"] =
-                                                    "return confirm('Delete this webhook endpoint? All delivery history will be lost.')"
-                                                +"Delete"
-                                            }
+                                    // Delete
+                                    form(
+                                        action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/delete",
+                                        method = FormMethod.post,
+                                    ) {
+                                        button(type = ButtonType.submit) {
+                                            classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
+                                            attributes["data-confirm"] =
+                                                "Delete this webhook endpoint? All delivery history will be lost."
+                                            +"Delete"
                                         }
                                     }
                                 }
@@ -158,127 +147,121 @@ internal fun webhooksPageImpl(
                 }
             }
 
-            // Create endpoint form
-            div("form-card form-card--wide") {
-                style = "margin-bottom:2rem;"
-                p("form-section-title") { +"Add Webhook Endpoint" }
+            // ── Add endpoint form ────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Add Webhook Endpoint" }
                 form(
-                    action = "/admin/workspaces/${workspace.slug}/settings/webhooks",
+                    action = "/admin/workspaces/$slug/settings/webhooks",
                     method = FormMethod.post,
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                 ) {
-                    div("field") {
-                        label {
-                            htmlFor = "whUrl"
-                            +"Target URL"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Target URL" }
+                        div {
+                            input(type = InputType.url, name = "url") {
+                                classes = setOf("edit-row__field")
+                                placeholder = "https://your-app.example.com/webhooks/kotauth"
+                                required = true
+                                maxLength = "2048"
+                            }
+                            div("edit-row__hint") { +"KotAuth will POST signed JSON payloads to this URL." }
                         }
-                        input(type = InputType.url, name = "url") {
-                            id = "whUrl"
-                            placeholder = "https://your-app.example.com/webhooks/kotauth"
-                            required = true
-                            maxLength = "2048"
-                        }
-                        p("field-hint") { +"KotAuth will POST signed JSON payloads to this URL." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "whDesc"
-                            +"Description (optional)"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
                         input(type = InputType.text, name = "description") {
-                            id = "whDesc"
+                            classes = setOf("edit-row__field")
                             placeholder = "e.g. Slack alerts integration"
                             maxLength = "256"
                         }
                     }
-                    div("field") {
-                        label { +"Events" }
-                        p("field-hint") {
-                            style = "margin-bottom:0.5rem;"
-                            +"Select the events this endpoint should receive."
+
+                    // ── Events chip grid ─────────────────────────────
+                    div {
+                        div("chip-grid__header") {
+                            span("chip-grid__header-label") { +"Events" }
+                            div("chip-grid__header-actions") {
+                                span("chip-grid__count") {
+                                    id = "events-count"
+                                    +"0 / $totalEvents selected"
+                                }
+                                button(type = ButtonType.button) {
+                                    classes = setOf("chip-grid__toggle")
+                                    attributes["data-chips-all"] = "events-grid"
+                                    +"All"
+                                }
+                                button(type = ButtonType.button) {
+                                    classes = setOf("chip-grid__toggle")
+                                    attributes["data-chips-none"] = "events-grid"
+                                    +"None"
+                                }
+                            }
                         }
-                        div {
-                            style = "display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;"
+                        div("chip-grid") {
+                            id = "events-grid"
                             WebhookEvent.ALL.forEach { event ->
-                                label {
-                                    style =
-                                        "display:flex; align-items:center; gap:0.5rem; font-size:0.875rem; font-weight:400;"
+                                label("scope-chip") {
                                     input(type = InputType.checkBox, name = "events") {
                                         value = event
-                                        checked = true
                                     }
-                                    span("td-code") {
-                                        style = "font-size:0.8rem;"
-                                        +event
-                                    }
+                                    span("scope-chip__label") { +event }
                                 }
                             }
                         }
                     }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Add Endpoint" }
+
+                    div("edit-actions") {
+                        button(type = ButtonType.submit) {
+                            classes = setOf("btn", "btn--primary")
+                            +"Add Endpoint"
+                        }
                     }
                 }
             }
 
-            // Recent delivery history
+            // ── Recent delivery history ──────────────────────────────
             if (deliveries.isNotEmpty()) {
-                p("form-section-title") {
-                    style = "max-width:960px;"
-                    +"Recent Delivery History"
-                }
-                div("card") {
-                    style = "max-width:960px;"
-                    table {
-                        thead {
-                            tr {
-                                th { +"Event" }
-                                th { +"Endpoint" }
-                                th { +"Status" }
-                                th { +"HTTP" }
-                                th { +"Attempts" }
-                                th { +"Last attempt" }
-                            }
+                div("ov-card__section-label") { +"Recent Delivery History" }
+                table("key-table") {
+                    thead {
+                        tr {
+                            th { +"Event" }
+                            th { +"Endpoint" }
+                            th { +"Status" }
+                            th { +"HTTP" }
+                            th { +"Attempts" }
+                            th { +"Last attempt" }
                         }
-                        tbody {
-                            deliveries.take(50).forEach { d ->
-                                val ep = endpoints.firstOrNull { it.id == d.endpointId }
-                                tr {
-                                    td {
-                                        span("td-code") {
-                                            style = "font-size:0.8rem;"
-                                            +d.eventType
-                                        }
+                    }
+                    tbody {
+                        deliveries.take(50).forEach { d ->
+                            val ep = endpoints.firstOrNull { it.id == d.endpointId }
+                            tr {
+                                td { span("key-table__meta") { +d.eventType } }
+                                td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
+                                td {
+                                    span(
+                                        when (d.status) {
+                                            WebhookDeliveryStatus.DELIVERED -> "badge badge--active"
+                                            WebhookDeliveryStatus.FAILED -> "badge badge--danger"
+                                            WebhookDeliveryStatus.PENDING -> "badge badge--inactive"
+                                        },
+                                    ) {
+                                        +d.status.value
                                     }
-                                    td {
-                                        style =
-                                            "font-size:0.78rem; font-family:monospace; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-                                        +(ep?.url ?: "#${d.endpointId}")
-                                    }
-                                    td {
-                                        span(
-                                            when (d.status) {
-                                                WebhookDeliveryStatus.DELIVERED -> "badge badge-active"
-                                                WebhookDeliveryStatus.FAILED -> "badge badge-error"
-                                                WebhookDeliveryStatus.PENDING -> "badge badge-pending"
-                                            },
-                                        ) {
-                                            +d.status.value
-                                        }
-                                    }
-                                    td { span("td-muted") { +(d.responseStatus?.toString() ?: "—") } }
-                                    td { span("td-muted") { +d.attempts.toString() } }
-                                    td {
-                                        span("td-muted") {
-                                            +(
-                                                d.lastAttemptAt?.let {
-                                                    DateTimeFormatter
-                                                        .ofPattern("MMM d HH:mm")
-                                                        .withZone(java.time.ZoneId.of("UTC"))
-                                                        .format(it)
-                                                } ?: "—"
-                                            )
-                                        }
+                                }
+                                td { span("key-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
+                                td { span("key-table__meta") { +d.attempts.toString() } }
+                                td {
+                                    span("key-table__meta") {
+                                        +(
+                                            d.lastAttemptAt?.let {
+                                                DateTimeFormatter
+                                                    .ofPattern("MMM d HH:mm")
+                                                    .withZone(java.time.ZoneId.of("UTC"))
+                                                    .format(it)
+                                            } ?: "\u2014"
+                                        )
                                     }
                                 }
                             }

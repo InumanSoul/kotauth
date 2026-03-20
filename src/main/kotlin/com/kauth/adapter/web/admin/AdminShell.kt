@@ -36,6 +36,7 @@ internal fun HEAD.adminHead(
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
     script(src = "/static/js/htmx.min.js") {}
     script(src = "/static/js/htmx-config.js") {}
+    script(src = "/static/js/settings.js") { attributes["defer"] = "true" }
     style {
         unsafe {
             +(
@@ -193,15 +194,13 @@ internal fun HTML.adminShell(
                 }
 
                 if (workspaceSlug != null) {
-                    div("ctx-panel") {
-                        div("ctx-nav") {
-                            when (activeRail) {
-                                "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
-                                "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
-                                "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
-                                "logs" -> renderLogsCtxPanel(activeAppSection)
-                                "settings" -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
-                            }
+                    div("sidebar") {
+                        when (activeRail) {
+                            "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
+                            "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
+                            "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
+                            "logs" -> renderLogsCtxPanel(activeAppSection)
+                            "settings" -> renderSettingsCtxPanel(workspaceSlug, activeAppSection)
                         }
                     }
                 }
@@ -247,9 +246,9 @@ private fun DIV.ctxLink(
     activeKey: String,
     label: String,
 ) {
-    a(href, classes = "ctx-item${if (key == activeKey) " active" else ""}") {
-        span("ctx-item-label") { +label }
-        if (key == activeKey) span("ctx-item-dot") {}
+    a(href, classes = "sidebar__item${if (key == activeKey) " sidebar__item--active" else ""}") {
+        span() { +label }
+        if (key == activeKey) span("sidebar__dot") {}
     }
 }
 
@@ -258,7 +257,7 @@ internal fun DIV.renderAppsCtxPanel(
     apps: List<Pair<String, String>>,
     activeAppSlug: String?,
 ) {
-    span("ctx-section-title") { +"Applications" }
+    span("sidebar__heading") { +"Applications" }
     if (apps.isEmpty()) {
         div("ctx-empty") {
             div("ctx-empty-icon") { +"⊡" }
@@ -271,9 +270,10 @@ internal fun DIV.renderAppsCtxPanel(
         apps.forEach { (appSlug, appName) ->
             a(
                 href = "/admin/workspaces/$workspaceSlug/applications/$appSlug",
-                classes = "ctx-item${if (appSlug == activeAppSlug) " active" else ""}",
+                classes = "sidebar__item${if (appSlug == activeAppSlug) " sidebar__item--active" else ""}",
             ) {
-                span("ctx-item-label") { +appName }
+                span() { +appName }
+                if (appSlug == activeAppSlug) span("sidebar__dot") {}
             }
         }
     }
@@ -283,7 +283,7 @@ internal fun DIV.renderDirectoryCtxPanel(
     workspaceSlug: String?,
     activeSection: String,
 ) {
-    span("ctx-section-title") { +"Directory" }
+    span("sidebar__heading") { +"Directory" }
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
     ctxLink("$base/users", "users", activeSection, "Users")
     ctxLink("$base/groups", "groups", activeSection, "Groups")
@@ -294,7 +294,7 @@ internal fun DIV.renderSecurityCtxPanel(
     workspaceSlug: String?,
     activeSection: String,
 ) {
-    span("ctx-section-title") { +"Security" }
+    span("sidebar__heading") { +"Security" }
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
     ctxLink("$base/mfa", "mfa", activeSection, "MFA")
     ctxLink("$base/sessions", "sessions", activeSection, "Sessions")
@@ -302,7 +302,7 @@ internal fun DIV.renderSecurityCtxPanel(
 }
 
 internal fun DIV.renderLogsCtxPanel(activeSection: String) {
-    span("ctx-section-title") { +"Logs" }
+    span("sidebar__heading") { +"Logs" }
     ctxLink("/admin/logs/events", "events", activeSection, "Events")
     ctxLink("/admin/logs/errors", "errors", activeSection, "Errors")
 }
@@ -311,7 +311,7 @@ internal fun DIV.renderSettingsCtxPanel(
     workspaceSlug: String?,
     activeSection: String,
 ) {
-    span("ctx-section-title") { +"Settings" }
+    span("sidebar__heading") { +"Settings" }
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/settings" else "/admin/settings"
     ctxLink(base, "general", activeSection, "General")
     ctxLink("$base/branding", "branding", activeSection, "Branding")

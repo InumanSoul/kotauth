@@ -103,173 +103,148 @@ internal fun identityProvidersPageImpl(
     saved: Boolean = false,
 ): HTML.() -> Unit =
     {
+        val slug = workspace.slug
+        val baseUrl = workspace.issuerUrl ?: "https://your-domain.com"
+
         adminShell(
             pageTitle = "Identity Providers — ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
-            workspaceSlug = workspace.slug,
+            workspaceSlug = slug,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Identity Providers" }
-            }
+            // ── Breadcrumb ───────────────────────────────────────────
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "Identity Providers" to null,
+            )
+
+            // ── Page header ──────────────────────────────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Identity Providers" }
-                    p("page-subtitle") {
-                        +"Configure social login providers for ${workspace.displayName}. "
-                        +"Users can sign in with their Google or GitHub accounts."
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Identity Providers" }
+                        p("page-header__sub") {
+                            +"Configure SSO. Users can sign in with their existing accounts."
+                        }
                     }
                 }
             }
 
+            // ── Notices ──────────────────────────────────────────────
             if (saved) {
-                div("alert alert-success alert--constrained") {
-                    +"Identity provider settings saved."
-                }
+                div("notice notice--success") { +"Identity provider settings saved." }
             }
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
 
+            // ── Provider cards ───────────────────────────────────────
             val providerMap = providers.associateBy { it.provider }
 
             for (prov in SocialProvider.entries) {
                 val existing = providerMap[prov]
                 val isConfigured = existing != null
-                val isEditing = editProvider == prov
+                val callbackUrl = "$baseUrl/t/$slug/auth/social/${prov.value}/callback"
 
-                div("form-card form-card--wide card--spaced") {
-                        div {
-                        style = "display:flex; align-items:center; gap:1rem; margin-bottom:1rem;"
-                        p("form-section-title") {
-                            style = "margin:0;"
-                            +prov.displayName
-                        }
-                        if (isConfigured) {
-                            val enabledBadge = if (existing!!.enabled) "badge-green" else "badge-neutral"
-                            val enabledText = if (existing.enabled) "Enabled" else "Disabled"
-                            span("badge $enabledBadge") { +enabledText }
-                        } else {
-                            span("badge badge-neutral") { +"Not configured" }
-                        }
-                    }
-
-                    p("field-hint") {
-                        style = "margin-bottom:1rem;"
-                        when (prov) {
-                            SocialProvider.GOOGLE -> {
-                                +"Create credentials in "
-                                a(
-                                    href = "https://console.cloud.google.com/apis/credentials",
-                                    target = "_blank",
-                                ) { +"Google Cloud Console" }
-                                +". Set the authorized redirect URI to: "
-                                code {
-                                    +"${workspace.issuerUrl ?: "https://your-domain.com"}/t/${workspace.slug}/auth/social/google/callback"
+                div("ov-card") {
+                    form(
+                        action = "/admin/workspaces/$slug/settings/identity-providers/${prov.value}",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) {
+                        // ── Header: name + badge + toggle ────────────
+                        div("provider-header") {
+                            div("provider-header__name") {
+                                +prov.displayName
+                                if (isConfigured) {
+                                    val badgeCls = if (existing!!.enabled) "badge badge--active" else "badge badge--inactive"
+                                    span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
+                                } else {
+                                    span("badge badge--inactive") { +"Not configured" }
                                 }
                             }
-                            SocialProvider.GITHUB -> {
-                                +"Register an OAuth App in "
-                                a(
-                                    href = "https://github.com/settings/developers",
-                                    target = "_blank",
-                                ) { +"GitHub Developer Settings" }
-                                +". Set the callback URL to: "
-                                code {
-                                    +"${workspace.issuerUrl ?: "https://your-domain.com"}/t/${workspace.slug}/auth/social/github/callback"
-                                }
-                            }
-                        }
-                    }
-
-                    if (isEditing || !isConfigured) {
-                        // Show the inline edit form
-                        form(
-                            action = "/admin/workspaces/${workspace.slug}/settings/identity-providers/${prov.value}",
-                            encType = FormEncType.applicationXWwwFormUrlEncoded,
-                            method = FormMethod.post,
-                        ) {
-                            div("field") {
-                                label {
-                                    htmlFor = "${prov.value}_clientId"
-                                    +"Client ID"
-                                }
-                                input(type = InputType.text, name = "clientId") {
-                                    id = "${prov.value}_clientId"
-                                    placeholder = "Enter ${prov.displayName} client ID"
-                                    required = true
-                                    value = existing?.clientId ?: ""
-                                    attributes["autocomplete"] = "off"
-                                }
-                            }
-                            div("field") {
-                                label {
-                                    htmlFor = "${prov.value}_clientSecret"
-                                    +"Client Secret"
-                                }
-                                input(type = InputType.password, name = "clientSecret") {
-                                    id = "${prov.value}_clientSecret"
-                                    attributes["autocomplete"] = "new-password"
-                                    // Never pre-fill — secret is encrypted at rest
-                                }
-                                p("field-hint") {
-                                    if (isConfigured) {
-                                        +"A secret is already set. Leave blank to keep the existing secret."
-                                    } else {
-                                        +"Enter the OAuth2 client secret. It is stored encrypted."
-                                    }
-                                }
-                            }
-                            div("checkbox-row") {
+                            label("toggle") {
                                 input(type = InputType.checkBox, name = "enabled") {
-                                    id = "${prov.value}_enabled"
                                     attributes["value"] = "true"
                                     if (existing?.enabled != false) checked = true
                                 }
-                                label("checkbox-label") {
-                                    htmlFor = "${prov.value}_enabled"
-                                    +"Enable ${prov.displayName} login"
+                                span("toggle__track") { span("toggle__thumb") {} }
+                                span("toggle__label toggle__label--muted") { +"Enable" }
+                            }
+                        }
+
+                        // ── Setup instructions + callback URL ────────
+                        div("setup-row") {
+                            div("setup-row__text") {
+                                when (prov) {
+                                    SocialProvider.GOOGLE -> {
+                                        +"Create credentials in "
+                                        a(
+                                            href = "https://console.cloud.google.com/apis/credentials",
+                                            target = "_blank",
+                                        ) { +"Google Cloud Console" }
+                                        +". Set the authorized redirect URI to:"
+                                    }
+                                    SocialProvider.GITHUB -> {
+                                        +"Register an OAuth App in "
+                                        a(
+                                            href = "https://github.com/settings/developers",
+                                            target = "_blank",
+                                        ) { +"GitHub Developer Settings" }
+                                        +". Set the callback URL to:"
+                                    }
                                 }
                             }
-                            div {
-                                style = "display:flex; gap:0.75rem; margin-top:1.25rem;"
-                                button(type = ButtonType.submit, classes = "btn btn-sm") { +"Save" }
-                                if (isConfigured) {
-                                    a(
-                                        href = "/admin/workspaces/${workspace.slug}/settings/identity-providers",
-                                        classes = "btn btn-ghost btn-sm",
-                                    ) { +"Cancel" }
+                            div("copy-field") {
+                                span("copy-field__value") { +callbackUrl }
+                                button(type = ButtonType.button) {
+                                    classes = setOf("copy-field__btn")
+                                    attributes["data-copy"] = callbackUrl
+                                    title = "Copy"
+                                    +"\u2398"
                                 }
                             }
                         }
-                    } else {
-                        // Collapsed view with edit + delete actions
-                        div {
-                            style = "display:flex; gap:0.75rem;"
-                            a(
-                                href = "/admin/workspaces/${workspace.slug}/settings/identity-providers?edit=${prov.value}",
-                                classes = "btn btn-ghost btn-sm",
-                            ) { +"Edit" }
-                            form(
-                                action = "/admin/workspaces/${workspace.slug}/settings/identity-providers/${prov.value}/delete",
-                                method = FormMethod.post,
-                            ) {
-                                button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm btn-danger") {
-                                    attributes["onclick"] =
-                                        "return confirm('Remove ${prov.displayName} login configuration?')"
-                                    +"Remove"
+
+                        // ── Credentials ──────────────────────────────
+                        div("edit-row") {
+                            span("edit-row__label") { +"Client ID" }
+                            input(type = InputType.text, name = "clientId") {
+                                classes = setOf("edit-row__field")
+                                placeholder = "Enter ${prov.displayName} client ID"
+                                required = true
+                                value = existing?.clientId ?: ""
+                                attributes["autocomplete"] = "off"
+                            }
+                        }
+                        div("edit-row") {
+                            span("edit-row__label") { +"Client Secret" }
+                            div {
+                                input(type = InputType.password, name = "clientSecret") {
+                                    classes = setOf("edit-row__field")
+                                    placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                                    attributes["autocomplete"] = "new-password"
                                 }
+                                div("edit-row__hint") {
+                                    if (isConfigured) {
+                                        +"Stored encrypted. Leave blank to keep existing secret."
+                                    } else {
+                                        +"Stored encrypted."
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Save action ──────────────────────────────
+                        div("edit-actions") {
+                            button(type = ButtonType.submit) {
+                                classes = setOf("btn", "btn--primary", "btn--sm")
+                                +"Save ${prov.displayName}"
                             }
                         }
                     }
@@ -287,134 +262,134 @@ internal fun apiKeysPageImpl(
     error: String? = null,
     scopes: List<String> = ApiScope.ALL,
 ): HTML.() -> Unit = {
+    val slug = workspace.slug
+    val totalScopes = scopes.size
+
     adminShell(
         pageTitle = "API Keys — ${workspace.displayName}",
         activeRail = "settings",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
-        workspaceSlug = workspace.slug,
+        workspaceSlug = slug,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
     ) {
-        div("breadcrumb") {
-            a("/admin") { +"Workspaces" }
-            span("breadcrumb-sep") { +"/" }
-            a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-            span("breadcrumb-sep") { +"/" }
-            a("/admin/workspaces/${workspace.slug}/settings") { +"Settings" }
-            span("breadcrumb-sep") { +"/" }
-            span("breadcrumb-current") { +"API Keys" }
-        }
+        // ── Breadcrumb ───────────────────────────────────────────
+        breadcrumb(
+            "Workspaces" to "/admin",
+            slug to "/admin/workspaces/$slug",
+            "Settings" to "/admin/workspaces/$slug/settings",
+            "API Keys" to null,
+        )
+
+        // ── Page header ──────────────────────────────────────────
         div("page-header") {
-            div {
-                p("page-title") { +"API Keys" }
-                p(
-                    "page-subtitle",
-                ) { +"Machine-to-machine authentication for the REST API. Keys are shown once on creation." }
+            div("page-header__left") {
+                div("page-header__identity") {
+                    h1("page-header__title") { +"API Keys" }
+                    p("page-header__sub") {
+                        +"Machine-to-machine authentication. Keys are shown once on creation."
+                    }
+                }
             }
         }
 
-        // One-time key reveal
+        // ── One-time key reveal ──────────────────────────────────
         if (newKeyRaw != null) {
-            div("alert alert-success") {
-                style = "max-width:720px; margin-bottom:1.5rem;"
-                p("alert__title") { +"API key created — copy it now. You will not see it again." }
-                div("secret-box") { +newKeyRaw }
+            div("notice notice--success") {
+                p { +"API key created — copy it now. You will not see it again." }
+                div("copy-field") {
+                    span("copy-field__value") { +newKeyRaw }
+                    button(type = ButtonType.button) {
+                        classes = setOf("copy-field__btn")
+                        attributes["data-copy"] = newKeyRaw
+                        title = "Copy"
+                        +"\u2398"
+                    }
+                }
             }
         }
 
         if (error != null) {
-            div("alert alert-error") {
-                style = "max-width:720px;"
-                +error
-            }
+            div("notice notice--error") { +error }
         }
 
-        // Existing keys table
-        div("card") {
-            style = "max-width:900px; margin-bottom:2rem;"
-            if (apiKeys.isEmpty()) {
-                p("td-muted") {
-                    style = "padding:1rem;"
-                    +"No API keys yet. Create one below."
-                }
-            } else {
-                table {
-                    thead {
-                        tr {
-                            th { +"Name" }
-                            th { +"Prefix" }
-                            th { +"Scopes" }
-                            th { +"Last used" }
-                            th { +"Expires" }
-                            th { +"Status" }
-                            th { +"" }
-                        }
+        // ── Existing keys table ──────────────────────────────────
+        if (apiKeys.isEmpty()) {
+            div("empty-state") {
+                p("empty-state__title") { +"No API keys yet" }
+                p("empty-state__desc") { +"Create a key below to enable machine-to-machine access." }
+            }
+        } else {
+            table("key-table") {
+                thead {
+                    tr {
+                        th { +"Name" }
+                        th { +"Prefix" }
+                        th { +"Scopes" }
+                        th { +"Last used" }
+                        th { +"Expires" }
+                        th { +"Status" }
+                        th { +"" }
                     }
-                    tbody {
-                        apiKeys.forEach { key ->
-                            tr {
-                                td { span("td-code") { +key.name } }
-                                td { span("td-code") { +"${key.keyPrefix}…" } }
-                                td {
-                                    style = "font-size:0.78rem; color:var(--color-muted);"
-                                    +key.scopes.joinToString(", ")
+                }
+                tbody {
+                    apiKeys.forEach { key ->
+                        tr {
+                            td { span("key-table__name") { +key.name } }
+                            td { span("key-table__meta") { +"${key.keyPrefix}\u2026" } }
+                            td {
+                                span("key-table__meta") { +key.scopes.joinToString(", ") }
+                            }
+                            td {
+                                span("key-table__meta") {
+                                    +(
+                                        key.lastUsedAt?.let {
+                                            java.time.format.DateTimeFormatter
+                                                .ofPattern("MMM d, yyyy")
+                                                .withZone(java.time.ZoneId.of("UTC"))
+                                                .format(it)
+                                        } ?: "Never"
+                                    )
                                 }
-                                td {
-                                    span("td-muted") {
-                                        +(
-                                            key.lastUsedAt?.let {
-                                                java.time.format.DateTimeFormatter
-                                                    .ofPattern("MMM d, yyyy")
-                                                    .withZone(java.time.ZoneId.of("UTC"))
-                                                    .format(it)
-                                            } ?: "Never"
-                                        )
-                                    }
+                            }
+                            td {
+                                span("key-table__meta") {
+                                    +(
+                                        key.expiresAt?.let {
+                                            java.time.format.DateTimeFormatter
+                                                .ofPattern("MMM d, yyyy")
+                                                .withZone(java.time.ZoneId.of("UTC"))
+                                                .format(it)
+                                        } ?: "Never"
+                                    )
                                 }
-                                td {
-                                    span("td-muted") {
-                                        +(
-                                            key.expiresAt?.let {
-                                                java.time.format.DateTimeFormatter
-                                                    .ofPattern("MMM d, yyyy")
-                                                    .withZone(java.time.ZoneId.of("UTC"))
-                                                    .format(it)
-                                            } ?: "Never"
-                                        )
-                                    }
-                                }
-                                td {
-                                    span(if (key.enabled) "badge badge-active" else "badge badge-disabled") {
-                                        +(if (key.enabled) "Active" else "Revoked")
-                                    }
-                                }
-                                td {
-                                    if (key.enabled) {
-                                        form(
-                                            action = "/admin/workspaces/${workspace.slug}/settings/api-keys/${key.id}/revoke",
-                                            method = FormMethod.post,
-                                            classes = "inline-form",
-                                        ) {
-                                            button(
-                                                type = ButtonType.submit,
-                                                classes = "btn btn-ghost btn-sm btn-danger",
-                                            ) {
-                                                attributes["onclick"] =
-                                                    "return confirm('Revoke this API key? This cannot be undone.')"
-                                                +"Revoke"
-                                            }
+                            }
+                            td {
+                                val badgeCls = if (key.enabled) "badge badge--active" else "badge badge--inactive"
+                                span(badgeCls) { +(if (key.enabled) "Active" else "Revoked") }
+                            }
+                            td {
+                                if (key.enabled) {
+                                    form(
+                                        action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/revoke",
+                                        method = FormMethod.post,
+                                    ) {
+                                        button(type = ButtonType.submit) {
+                                            classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
+                                            attributes["data-confirm"] = "Revoke this API key? This cannot be undone."
+                                            +"Revoke"
                                         }
-                                    } else {
-                                        form(
-                                            action = "/admin/workspaces/${workspace.slug}/settings/api-keys/${key.id}/delete",
-                                            method = FormMethod.post,
-                                            classes = "inline-form",
-                                        ) {
-                                            button(type = ButtonType.submit, classes = "btn btn-ghost btn-sm") {
-                                                attributes["onclick"] = "return confirm('Delete this key?')"
-                                                +"Delete"
-                                            }
+                                    }
+                                } else {
+                                    form(
+                                        action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/delete",
+                                        method = FormMethod.post,
+                                    ) {
+                                        button(type = ButtonType.submit) {
+                                            classes = setOf("btn", "btn--ghost", "btn--sm")
+                                            attributes["data-confirm"] = "Delete this key?"
+                                            +"Delete"
                                         }
                                     }
                                 }
@@ -425,63 +400,76 @@ internal fun apiKeysPageImpl(
             }
         }
 
-        // Create new key form
-        div("form-card form-card--wide") {
-            p("form-section-title") { +"Create New API Key" }
+        // ── Create new key form ──────────────────────────────────
+        div("ov-card") {
+            div("ov-card__section-label") { +"Create New API Key" }
             form(
-                action = "/admin/workspaces/${workspace.slug}/settings/api-keys",
+                action = "/admin/workspaces/$slug/settings/api-keys",
                 method = FormMethod.post,
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
             ) {
-                div("field") {
-                    label {
-                        htmlFor = "keyName"
-                        +"Name"
-                    }
-                    input(type = InputType.text, name = "name") {
-                        id = "keyName"
-                        placeholder = "e.g. CI/CD pipeline"
-                        required = true
-                        maxLength = "128"
-                    }
-                    p("field-hint") { +"A descriptive label to identify this key." }
-                }
-                div("field") {
-                    label { +"Scopes" }
-                    p("field-hint") {
-                        style = "margin-bottom:0.5rem;"
-                        +"Select the permissions this key will have."
-                    }
+                div("edit-row") {
+                    span("edit-row__label") { +"Name" }
                     div {
-                        style = "display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;"
-                        ApiScope.ALL.forEach { scope ->
-                            label {
-                                style =
-                                    "display:flex; align-items:center; gap:0.5rem; font-size:0.875rem; font-weight:400;"
+                        input(type = InputType.text, name = "name") {
+                            classes = setOf("edit-row__field")
+                            placeholder = "e.g. CI/CD pipeline"
+                            required = true
+                            maxLength = "128"
+                        }
+                        div("edit-row__hint") { +"A descriptive label to identify this key." }
+                    }
+                }
+
+                // ── Scopes chip grid ─────────────────────────────
+                div {
+                    div("chip-grid__header") {
+                        span("chip-grid__header-label") { +"Scopes" }
+                        div("chip-grid__header-actions") {
+                            span("chip-grid__count") {
+                                id = "scopes-count"
+                                +"0 / $totalScopes selected"
+                            }
+                            button(type = ButtonType.button) {
+                                classes = setOf("chip-grid__toggle")
+                                attributes["data-chips-all"] = "scopes-grid"
+                                +"All"
+                            }
+                            button(type = ButtonType.button) {
+                                classes = setOf("chip-grid__toggle")
+                                attributes["data-chips-none"] = "scopes-grid"
+                                +"None"
+                            }
+                        }
+                    }
+                    div("chip-grid") {
+                        id = "scopes-grid"
+                        scopes.forEach { scope ->
+                            label("scope-chip") {
                                 input(type = InputType.checkBox, name = "scopes") {
                                     value = scope
-                                    checked = true
                                 }
-                                span("td-code") {
-                                    style = "font-size:0.8rem;"
-                                    +scope
-                                }
+                                span("scope-chip__label") { +scope }
                             }
                         }
                     }
                 }
-                div("field") {
-                    label {
-                        htmlFor = "expiresAt"
-                        +"Expiry (optional)"
+
+                div("edit-row") {
+                    span("edit-row__label") { +"Expiry" }
+                    div {
+                        input(type = InputType.date, name = "expiresAt") {
+                            classes = setOf("edit-row__field")
+                        }
+                        div("edit-row__hint") { +"Leave blank for keys that never expire." }
                     }
-                    input(type = InputType.date, name = "expiresAt") {
-                        id = "expiresAt"
-                    }
-                    p("field-hint") { +"Leave blank for keys that never expire." }
                 }
-                div("form-actions") {
-                    button(type = ButtonType.submit, classes = "btn") { +"Create API Key" }
+
+                div("edit-actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--primary")
+                        +"Create API Key"
+                    }
                 }
             }
         }

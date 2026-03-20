@@ -84,6 +84,12 @@
   border-color: var(--color-border-md);
 }
 
+.badge--danger {
+  background: var(--color-red-bg);
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+}
+
 /* ── Legacy color variants (keep until Phase 2) ────────────────────────── */
 
 .badge-green,

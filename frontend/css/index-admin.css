@@ -35,12 +35,17 @@
 @import "./components/divider.css";
 @import "./components/danger-zone.css";
 @import "./components/section.css";
+@import "./components/toggle.css";
+@import "./components/check-row.css";
+@import "./components/radio-row.css";
+@import "./components/chip-grid.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";
 @import "./pages/app-detail.css";
 @import "./pages/user-detail.css";
 @import "./pages/branding.css";
+@import "./pages/settings.css";
 
 /* ── Admin-specific pages (legacy) ───────────────────────────────────────── */
 @import "./admin/login.css";
