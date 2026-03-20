@@ -75,7 +75,7 @@
 }
 
 .insight-item:last-child { border-right: none; }
-.insight-item:hover { background: var(--color-row-hover); }
+.insight-item:hover { background: var(--color-row-hover); text-decoration: none; }
 
 .insight-item__label {
   font-size: var(--text-xs);

@@ -256,20 +256,6 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val user =
-                selfServiceService
-                    .getActiveSessions(session.userId, session.tenantId)
-                    .let { null } // just to get user — fetch below
-            val userObj =
-                run {
-                    // We need the user — fetch active sessions gives us sessions, not user.
-                    // Delegate to the port directly via selfServiceService's session list.
-                    // Actually: the service doesn't expose a getUser. We route back through sessions.
-                    // Simplest: read user from sessions (already authenticated).
-                    // For now pull sessions to confirm we're still live, then we just need the user object.
-                    // We use the user retrieved at login — stored in session.
-                    session
-                }
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]
 

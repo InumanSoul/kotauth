@@ -894,7 +894,7 @@ private fun com.kauth.domain.model.Group.toApiDto() =
 
 private fun com.kauth.domain.model.Application.toApiDto() =
     ApplicationDto(
-        id = id!!,
+        id = id,
         clientId = clientId,
         name = name,
         description = description,

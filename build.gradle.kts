@@ -184,5 +184,6 @@ ktlint {
         // formatter loops between the indent and wrapping rules. These files are
         // presentation-only; all business logic is linted normally.
         exclude("**/*View.kt")
+        exclude("**/*Views.kt")
     }
 }
