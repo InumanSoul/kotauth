@@ -362,7 +362,7 @@ fun Route.adminRoutes(
 
                     val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
                     if (existing == null) {
-                        // New provider
+                        // New provider — secret is mandatory
                         if (newSecret.isNullOrBlank()) {
                             val providers = idpRepo.findAllByTenant(workspace.id)
                             return@post call.respondHtml(
@@ -377,13 +377,15 @@ fun Route.adminRoutes(
                                 ),
                             )
                         }
+                        // New providers start disabled until configuration is verified;
+                        // ignore the toggle value on first save.
                         idpRepo.save(
                             IdentityProvider(
                                 tenantId = workspace.id,
                                 provider = provider,
                                 clientId = newClientId,
                                 clientSecret = newSecret,
-                                enabled = enabled,
+                                enabled = false,
                             ),
                         )
                     } else {

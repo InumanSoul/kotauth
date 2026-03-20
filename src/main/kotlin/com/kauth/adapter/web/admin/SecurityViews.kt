@@ -172,7 +172,7 @@ internal fun identityProvidersPageImpl(
                             label("toggle") {
                                 input(type = InputType.checkBox, name = "enabled") {
                                     attributes["value"] = "true"
-                                    if (existing?.enabled != false) checked = true
+                                    if (existing?.enabled == true) checked = true
                                 }
                                 span("toggle__track") { span("toggle__thumb") {} }
                                 span("toggle__label toggle__label--muted") { +"Enable" }

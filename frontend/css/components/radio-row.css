@@ -41,6 +41,7 @@
   font-weight: normal;
   color: inherit;
   margin-bottom: 0;
+  align-items: center;
 }
 
 .radio-row:last-child { border-bottom: none; }

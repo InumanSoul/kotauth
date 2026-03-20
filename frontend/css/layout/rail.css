@@ -47,6 +47,10 @@
   color: var(--color-accent);
 }
 
+.rail__item--active:hover {
+  text-decoration: none;
+}
+
 .rail__item svg { width: 20px; height: 20px; }
 
 .rail__label {
