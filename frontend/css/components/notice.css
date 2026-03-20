@@ -61,14 +61,11 @@
 .notice__link:hover { opacity: 0.8; text-decoration: none; }
 
 /* ── Semantic modifiers ── */
-.notice--success {
-  background: var(--color-green-bg);
-  border-color: var(--color-green-border);
-  color: var(--color-green);
-}
 
-.notice--error {
-  background: var(--color-red-bg);
-  border-color: var(--color-red-border);
-  color: var(--color-red);
-}
+.notice--success { background: var(--color-green-bg); border-color: var(--color-green-border); }
+.notice--success .notice__icon,
+.notice--success .notice__title { color: var(--color-green); }
+
+.notice--error { background: var(--color-red-bg); border-color: var(--color-red-border); }
+.notice--error .notice__icon,
+.notice--error .notice__title { color: var(--color-red); }

@@ -85,8 +85,8 @@ internal fun userDetailPageImpl(
 
             // ── Alerts ───────────────────────────────────────────────
             if (successMessage != null) {
-                div("notice") {
-                    span("notice__icon") { inlineSvgIcon("warning", "warning") }
+                div("notice notice--success") {
+                    span("notice__icon") { inlineSvgIcon("check-circle", "Success") }
                     div("notice__body") {
                         span("notice__title") { +successMessage }
                     }
@@ -200,9 +200,9 @@ internal fun DIV.userProfileReadFragment(
     div {
         id = "profile-section"
         if (successMessage != null) {
-            div("notice") {
+            div("notice notice--success") {
                 style = "margin-bottom:12px;"
-                span("notice__icon") { inlineSvgIcon("warning", "warning") }
+                span("notice__icon") { inlineSvgIcon("check-circle", "Success") }
                 div("notice__body") {
                     span("notice__title") { +successMessage }
                 }
