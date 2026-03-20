@@ -54,6 +54,7 @@ fun DIV.breadcrumb(vararg crumbs: Pair<String, String?>) {
  */
 fun DIV.pageHeader(
     title: String,
+    subtitle: String? = null,
     left: (DIV.() -> Unit)? = null,
     meta: (DIV.() -> Unit)? = null,
     actions: (DIV.() -> Unit)? = null,
@@ -63,6 +64,9 @@ fun DIV.pageHeader(
             left?.invoke(this)
             div("page-header__identity") {
                 h1("page-header__title") { +title }
+                if (subtitle != null) {
+                    p("page-header__sub") { +subtitle }
+                }
                 if (meta != null) {
                     div("page-header__meta") { meta() }
                 }

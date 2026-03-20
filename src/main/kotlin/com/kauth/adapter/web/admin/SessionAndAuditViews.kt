@@ -105,105 +105,123 @@ internal fun auditLogPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "events",
             loggedInAs = loggedInAs,
+            showSidebar = false,
+            contentClass = "content-outer",
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Audit Log" }
-            }
-            div("page-header") {
-                div {
-                    p("page-title") { +"Audit Log" }
-                    p("page-subtitle") { +"Security-relevant events for the ${workspace.displayName} workspace." }
-                }
-            }
+            div("content-inner content-inner--wide") {
+                // Breadcrumb
+                nav("breadcrumb") {
+                        a("/admin", classes = "breadcrumb__link") { +"Workspaces" }
+                        span("breadcrumb__sep") { +"/" }
+                        a("/admin/workspaces/${workspace.slug}", classes = "breadcrumb__link") { +workspace.slug }
+                        span("breadcrumb__sep") { +"/" }
+                        span("breadcrumb__current") { +"Audit Log" }
+                    }
 
-            // Filter bar
-            form(
-                action = "/admin/workspaces/${workspace.slug}/logs",
-                method = FormMethod.get,
-                classes = "search-form",
-            ) {
-                div("search-row") {
-                    select {
-                        name = "event"
-                        option {
-                            value = ""
-                            selected = (eventTypeFilter == null)
-                            +"All events"
+                    // Page header
+                    div("page-header") {
+                        div("page-header__left") {
+                            div("page-header__identity") {
+                                h1("page-header__title") { +"Audit Log" }
+                                p("page-header__sub") {
+                                    +"Security-relevant events for the "
+                                    strong { +workspace.displayName }
+                                    +" workspace."
+                                }
+                            }
                         }
-                        AuditEventType.entries.forEach { type ->
+                    }
+
+                    // Filter bar
+                    form(
+                        action = "/admin/workspaces/${workspace.slug}/logs",
+                        method = FormMethod.get,
+                        classes = "filter-bar filter-bar--row",
+                    ) {
+                        select("filter-bar__select") {
+                            name = "event"
                             option {
-                                value = type.name
-                                selected = (type.name == eventTypeFilter)
-                                +type.name.lowercase().replace('_', ' ')
+                                value = ""
+                                selected = (eventTypeFilter == null)
+                                +"All events"
+                            }
+                            AuditEventType.entries.forEach { type ->
+                                option {
+                                    value = type.name
+                                    selected = (type.name == eventTypeFilter)
+                                    +type.name.lowercase().replace('_', ' ')
+                                }
                             }
                         }
-                    }
-                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Filter" }
-                    if (eventTypeFilter != null) {
-                        a("/admin/workspaces/${workspace.slug}/logs", classes = "btn btn-ghost btn-sm") {
-                            +"Clear"
+                        button(type = ButtonType.submit, classes = "btn btn--sm") { +"Filter" }
+                        if (eventTypeFilter != null) {
+                            a(
+                                "/admin/workspaces/${workspace.slug}/logs",
+                                classes = "btn btn--ghost btn--sm",
+                            ) { +"Clear" }
                         }
                     }
-                }
-            }
 
-            div("card") {
-                if (events.isEmpty()) {
-                    div("empty-state") {
-                        div("empty-state-icon") { +"⊘" }
-                        p("empty-state-text") { +"No events found." }
-                    }
-                } else {
-                    table {
-                        thead {
-                            tr {
-                                th { +"Time" }
-                                th { +"Event" }
-                                th { +"User" }
-                                th { +"Client" }
-                                th { +"IP" }
-                            }
-                        }
-                        tbody {
-                            events.forEach { e ->
+                    // Data table
+                    if (events.isEmpty()) {
+                        emptyState(
+                            iconName = "search",
+                            title = "No events found",
+                            description =
+                                if (eventTypeFilter != null) {
+                                    "No events match the selected filter. Try clearing the filter."
+                                } else {
+                                    "No audit events have been recorded for this workspace yet."
+                                },
+                        )
+                    } else {
+                        table("data-table") {
+                            thead {
                                 tr {
-                                    td { span("td-muted") { +e.createdAt.toDisplayString() } }
-                                    td {
-                                        span("td-code") {
-                                            style = "font-size:0.75rem;"
-                                            +e.eventType.name
+                                    th { +"Time" }
+                                    th { +"Event" }
+                                    th { +"User" }
+                                    th { +"Client" }
+                                    th { +"IP" }
+                                }
+                            }
+                            tbody {
+                                events.forEach { e ->
+                                    tr {
+                                        td { +e.createdAt.toDisplayString() }
+                                        td { span("data-table__id") { +e.eventType.name } }
+                                        td { +(e.userId?.toString() ?: "—") }
+                                        td { +(e.clientId?.toString() ?: "—") }
+                                        td {
+                                            span("data-table__email") { +(e.ipAddress ?: "—") }
                                         }
                                     }
-                                    td { span("td-muted") { +(e.userId?.toString() ?: "—") } }
-                                    td { span("td-muted") { +(e.clientId?.toString() ?: "—") } }
-                                    td { span("td-muted") { +(e.ipAddress ?: "—") } }
+                                }
+                            }
+                        }
+                    }
+
+                    // Pagination
+                    if (totalPages > 1) {
+                        div("data-table-pagination") {
+                            val baseUrl =
+                                "/admin/workspaces/${workspace.slug}/logs" +
+                                    (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
+                            if (page > 1) {
+                                a("${baseUrl}page=${page - 1}", classes = "btn btn--ghost btn--sm") {
+                                    +"← Prev"
+                                }
+                            }
+                            span("data-table-pagination__label") {
+                                +"Page $page of $totalPages"
+                            }
+                            if (page < totalPages) {
+                                a("${baseUrl}page=${page + 1}", classes = "btn btn--ghost btn--sm") {
+                                    +"Next →"
                                 }
                             }
                         }
                     }
                 }
             }
-
-            // Pagination
-            if (totalPages > 1) {
-                div("pagination") {
-                    val baseUrl =
-                        "/admin/workspaces/${workspace.slug}/logs" +
-                            (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
-                    if (page > 1) {
-                        a("${baseUrl}page=${page - 1}", classes = "btn btn-ghost btn-sm") { +"← Prev" }
-                    }
-                    span("pagination-label") {
-                        +"Page $page of $totalPages"
-                    }
-                    if (page < totalPages) {
-                        a("${baseUrl}page=${page + 1}", classes = "btn btn-ghost btn-sm") { +"Next →" }
-                    }
-                }
-            }
         }
-    }

@@ -259,7 +259,18 @@ object AdminView {
         loggedInAs: String,
         totalUsers: Int = 0,
         enrolledUsers: Int = 0,
-    ): HTML.() -> Unit = mfaSettingsPageImpl(workspace, allWorkspaces, loggedInAs, totalUsers, enrolledUsers)
+        enrolledUserList: List<User> = emptyList(),
+        notEnrolledUserList: List<User> = emptyList(),
+    ): HTML.() -> Unit =
+        mfaSettingsPageImpl(
+            workspace,
+            allWorkspaces,
+            loggedInAs,
+            totalUsers,
+            enrolledUsers,
+            enrolledUserList,
+            notEnrolledUserList,
+        )
 
     fun identityProvidersPage(
         workspace: Tenant,

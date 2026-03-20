@@ -36,13 +36,18 @@
   padding: var(--space-8) var(--space-10) var(--space-20);
 }
 
+.content-outer::-webkit-scrollbar       { width: 5px; }
+.content-outer::-webkit-scrollbar-track  { background: transparent; }
+.content-outer::-webkit-scrollbar-thumb  { background: rgba(255, 255, 255, 0.08); }
+
 .content-inner {
   max-width: 900px;
   margin: 0 auto;
 }
 
-/* Page-specific width overrides (applied via .content-inner--narrow etc.) */
+/* Page-specific width overrides */
 .content-inner--narrow { max-width: 620px; }
+.content-inner--wide   { max-width: 1020px; }
 
 /* ── Page header (new BEM) ─────────────────────────────────────────────── */
 

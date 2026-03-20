@@ -84,6 +84,18 @@
   border-color: var(--color-border-md);
 }
 
+.badge--info {
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent-border);
+}
+
+.badge--warn {
+  background: var(--color-amber-bg);
+  color: var(--color-amber);
+  border-color: var(--color-amber-border);
+}
+
 .badge--danger {
   background: var(--color-red-bg);
   color: var(--color-red);

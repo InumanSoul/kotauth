@@ -46,6 +46,7 @@
 @import "./pages/user-detail.css";
 @import "./pages/branding.css";
 @import "./pages/settings.css";
+@import "./pages/security-mfa.css";
 
 /* ── Admin-specific pages (legacy) ───────────────────────────────────────── */
 @import "./admin/login.css";

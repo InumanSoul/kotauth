@@ -66,6 +66,11 @@ internal fun HEAD.adminHead(
  * @param activeAppSlug Highlighted app in the ctx panel
  * @param activeAppSection Highlighted sub-section in the ctx panel
  * @param loggedInAs  Username for the profile avatar
+ * @param showSidebar Whether to render the context sidebar (default true).
+ *                    Set to false for single-page sections like Audit Log.
+ * @param contentClass CSS class for the scrollable content wrapper.
+ *                     Defaults to "content" (legacy). Use "content-outer"
+ *                     for new BEM pages (wider padding, no sidebar).
  * @param content     Page content lambda
  */
 internal fun HTML.adminShell(
@@ -79,6 +84,8 @@ internal fun HTML.adminShell(
     activeAppSlug: String? = null,
     activeAppSection: String = "overview",
     loggedInAs: String,
+    showSidebar: Boolean = true,
+    contentClass: String = "content",
     content: DIV.() -> Unit,
 ) {
     head { adminHead(pageTitle) }
@@ -198,7 +205,7 @@ internal fun HTML.adminShell(
                     }
                 }
 
-                if (workspaceSlug != null) {
+                if (workspaceSlug != null && showSidebar) {
                     div("sidebar") {
                         when (activeRail) {
                             "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
@@ -211,7 +218,7 @@ internal fun HTML.adminShell(
                 }
 
                 div("main") {
-                    div("content") {
+                    div(contentClass) {
                         content()
                     }
                 }

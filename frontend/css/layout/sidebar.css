@@ -19,6 +19,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: var(--space-4) 0;
+  view-transition-name: sidebar;
 }
 
 .sidebar::-webkit-scrollbar       { width: 4px; }

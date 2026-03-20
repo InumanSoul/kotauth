@@ -6,6 +6,7 @@ import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.User
 import kotlinx.html.*
 
 internal fun mfaSettingsPageImpl(
@@ -14,8 +15,20 @@ internal fun mfaSettingsPageImpl(
     loggedInAs: String,
     totalUsers: Int = 0,
     enrolledUsers: Int = 0,
+    enrolledUserList: List<User> = emptyList(),
+    notEnrolledUserList: List<User> = emptyList(),
 ): HTML.() -> Unit =
     {
+        val notEnrolled = totalUsers - enrolledUsers
+        val policyLabel =
+            when (workspace.mfaPolicy) {
+                "required" -> "Required"
+                "required_admins" -> "Required (admins)"
+                else -> "Optional"
+            }
+        val enrollmentRate = if (totalUsers > 0) "${enrolledUsers * 100 / totalUsers}%" else "—"
+        val enrollUrl = "/t/${workspace.slug}/account/mfa/enroll"
+
         adminShell(
             pageTitle = "MFA — ${workspace.displayName}",
             activeRail = "security",
@@ -24,66 +37,192 @@ internal fun mfaSettingsPageImpl(
             workspaceSlug = workspace.slug,
             activeAppSection = "mfa",
             loggedInAs = loggedInAs,
+            contentClass = "content-outer",
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"MFA" }
-            }
-            div("page-header") {
-                div {
-                    p("page-title") { +"Multi-Factor Authentication" }
-                    p("page-subtitle") { +"TOTP-based MFA for ${workspace.displayName}." }
-                }
-            }
+            div("content-inner") {
+                // Breadcrumb
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    workspace.slug to "/admin/workspaces/${workspace.slug}",
+                    "Security" to "/admin/workspaces/${workspace.slug}/sessions",
+                    "MFA" to null,
+                )
 
-            // Stats
-            div("card card--spaced") {
-                style = "padding:1.25rem;"
-                div {
-                    style = "display:flex; gap:2rem;"
-                    div {
-                        p("td-muted") { +"Current Policy" }
-                        p("page-title") {
-                            style = "font-size:1.1rem;"
-                            +when (workspace.mfaPolicy) {
-                                "required" -> "Required"
-                                "required_admins" -> "Required (admins)"
-                                else -> "Optional"
+                // Page header
+                pageHeader(
+                    title = "Multi-Factor Authentication",
+                    subtitle = "TOTP-based MFA enrollment status for ${workspace.displayName}.",
+                    actions = {
+                        a(
+                            "/admin/workspaces/${workspace.slug}/settings/security",
+                            classes = "btn btn--ghost",
+                        ) {
+                            inlineSvgIcon("lock", "Security")
+                            +"Security Policy"
+                        }
+                    },
+                )
+
+                // Notice: conditional — shown when no users enrolled and policy is optional
+                if (enrolledUsers == 0 && workspace.mfaPolicy == "optional") {
+                    notice(
+                        title = "No users have enrolled in MFA",
+                        description = "Policy is set to Optional. Share the enrollment URL below to encourage users to enable MFA.",
+                        linkHref = "/admin/workspaces/${workspace.slug}/settings/security",
+                        linkText = "Change policy",
+                    )
+                }
+
+                // Stat strip — 3-column insight bar
+                div("insight-bar insight-bar--cols-3") {
+                    // Current Policy
+                    a(
+                        href = "/admin/workspaces/${workspace.slug}/settings/security",
+                        classes = "insight-item",
+                    ) {
+                        span("insight-item__label") { +"Current Policy" }
+                        span("insight-item__value") {
+                            val badgeMod =
+                                when (workspace.mfaPolicy) {
+                                    "required" -> "badge--active"
+                                    "required_admins" -> "badge--info"
+                                    else -> "badge--inactive"
+                                }
+                            span("badge $badgeMod") { +policyLabel }
+                        }
+                        span("insight-item__arrow") {
+                            +"Change in Security Policy"
+                            inlineSvgIcon("arrow-small", "arrow")
+                        }
+                    }
+
+                    // Enrolled Users
+                    div("insight-item insight-item--static") {
+                        span("insight-item__label") { +"Enrolled Users" }
+                        span("insight-item__value insight-item__value--mono") {
+                            +"$enrolledUsers"
+                            span {
+                                attributes["style"] =
+                                    "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
+                                +" / $totalUsers"
+                            }
+                        }
+                        span("insight-item__hint") { +"$enrollmentRate enrollment rate" }
+                    }
+
+                    // Not Enrolled
+                    div("insight-item insight-item--static") {
+                        span("insight-item__label") { +"Not Enrolled" }
+                        val valueClass =
+                            if (notEnrolled > 0) {
+                                "insight-item__value insight-item__value--warn"
+                            } else {
+                                "insight-item__value insight-item__value--ok"
+                            }
+                        span(valueClass) { +"$notEnrolled" }
+                        span("insight-item__hint") {
+                            +if (notEnrolled == 1) "user without MFA" else "users without MFA"
+                        }
+                    }
+                }
+
+                // Enrollment URL card
+                ovCard {
+                    ovSectionLabel("Self-service enrollment URL")
+                    div("info-card-body") {
+                        p("info-card-body__desc") {
+                            +"Share this URL with users to let them enroll their TOTP authenticator app. "
+                            +"The link requires them to be signed in."
+                        }
+                        div("copy-field") {
+                            span("copy-field__value") { +enrollUrl }
+                            button(classes = "copy-field__btn") {
+                                type = ButtonType.button
+                                attributes["data-copy"] = enrollUrl
+                                attributes["title"] = "Copy"
+                                inlineSvgIcon("copy", "Copy")
                             }
                         }
                     }
-                    div {
-                        p("td-muted") { +"Enrolled Users" }
-                        p("page-title") {
-                            style = "font-size:1.1rem;"
-                            +"$enrolledUsers / $totalUsers"
-                        }
-                    }
-                    div {
-                        p("td-muted") { +"Enrollment Rate" }
-                        p("page-title") {
-                            style = "font-size:1.1rem;"
-                            +if (totalUsers > 0) "${(enrolledUsers * 100 / totalUsers)}%" else "—"
-                        }
-                    }
                 }
-            }
 
-            div("form-card form-card--wide") {
-                p("form-section-title") { +"Configuration" }
-                p("td-muted") {
-                    style = "padding:0 0.75rem 1rem;"
-                    +"The MFA policy is managed in workspace settings. "
-                    +"Users enroll via their account portal at /t/${workspace.slug}/account/mfa/enroll."
+                // Enrolled users table
+                ovCard {
+                    ovSectionLabel("Enrolled Users")
+                    if (enrolledUserList.isEmpty()) {
+                        emptyState(
+                            iconName = "rail-security",
+                            title = "No users enrolled yet",
+                            description = "Users who enable MFA will appear here with their enrollment date.",
+                        )
+                    } else {
+                        table("data-table") {
+                            thead {
+                                tr {
+                                    th { +"Username" }
+                                    th { +"Full Name" }
+                                    th { +"Email" }
+                                }
+                            }
+                            tbody {
+                                enrolledUserList.forEach { u ->
+                                    tr {
+                                        td {
+                                            a(
+                                                "/admin/workspaces/${workspace.slug}/users/${u.id}",
+                                                classes = "mfa-user-id",
+                                            ) { +u.username }
+                                        }
+                                        td { span("mfa-user-name") { +u.fullName } }
+                                        td { span("mfa-user-email") { +u.email } }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-                div("form-actions") {
-                    a(
-                        "/admin/workspaces/${workspace.slug}/settings",
-                        classes = "btn btn-sm",
-                    ) { +"Go to Workspace Settings" }
+
+                // Not enrolled table
+                ovCard {
+                    ovSectionLabel("Not Enrolled")
+                    if (notEnrolledUserList.isEmpty() && notEnrolled == 0) {
+                        emptyState(
+                            iconName = "check-circle",
+                            title = "All users enrolled",
+                            description = "Every user in this workspace has MFA enabled.",
+                        )
+                    } else if (notEnrolledUserList.isEmpty()) {
+                        // User lists not yet wired from backend — show count-based placeholder
+                        emptyState(
+                            iconName = "user",
+                            title = "$notEnrolled user${if (notEnrolled != 1) "s" else ""} without MFA",
+                            description = "Connect the user data to see individual enrollment status.",
+                        )
+                    } else {
+                        table("data-table") {
+                            thead {
+                                tr {
+                                    th { +"Username" }
+                                    th { +"Full Name" }
+                                    th { +"Email" }
+                                }
+                            }
+                            tbody {
+                                notEnrolledUserList.forEach { u ->
+                                    tr {
+                                        td {
+                                            a(
+                                                "/admin/workspaces/${workspace.slug}/users/${u.id}",
+                                                classes = "mfa-user-id",
+                                            ) { +u.username }
+                                        }
+                                        td { span("mfa-user-name") { +u.fullName } }
+                                        td { span("mfa-user-email") { +u.email } }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

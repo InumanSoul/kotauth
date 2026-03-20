@@ -1578,11 +1578,11 @@ fun Route.adminRoutes(
                         tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                     val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     val users = userRepository.findByTenantId(workspace.id, null)
-                    val mfaEnrolledCount =
+                    val (enrolled, notEnrolled) =
                         if (mfaRepository != null) {
-                            users.count { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
+                            users.partition { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
                         } else {
-                            0
+                            emptyList<com.kauth.domain.model.User>() to users
                         }
                     call.respondHtml(
                         HttpStatusCode.OK,
@@ -1591,7 +1591,9 @@ fun Route.adminRoutes(
                             wsPairs,
                             session.username,
                             totalUsers = users.size,
-                            enrolledUsers = mfaEnrolledCount,
+                            enrolledUsers = enrolled.size,
+                            enrolledUserList = enrolled,
+                            notEnrolledUserList = notEnrolled,
                         ),
                     )
                 }

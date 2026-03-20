@@ -1,0 +1,69 @@
+/* frontend/css/pages/security-mfa.css
+ *
+ * Page-specific styles for the MFA settings page.
+ *
+ * Extends existing components:
+ *   .insight-bar--cols-3  — 3-column variant of the insight bar
+ *   .info-card-body       — padded body inside an ov-card (enrollment URL, etc.)
+ *
+ * Reuses from other files:
+ *   .insight-bar / .insight-item  — workspace-overview.css
+ *   .ov-card / .ov-card__section-label — ov-card.css
+ *   .copy-field — settings.css
+ *   .data-table — table.css
+ *   .notice — notice.css
+ */
+
+/* ── 3-column insight bar modifier ───────────────────────────────────────── */
+
+.insight-bar--cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* Non-clickable variant — remove pointer cursor and hover */
+.insight-item--static {
+  cursor: default;
+}
+.insight-item--static:hover { background: transparent; }
+
+/* ── Info card body (padded content area inside ov-card) ──────────────── */
+
+.info-card-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.info-card-body__desc {
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: var(--leading-relaxed);
+}
+
+/* ── Table inside ov-card (flush edges, no double border) ──────────────── */
+
+.ov-card > .data-table {
+  border: none;
+  border-top: 0.5px solid var(--color-border);
+}
+
+/* ── User cell helpers ───────────────────────────────────────────────── */
+
+.mfa-user-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.mfa-user-id:hover { text-decoration: underline; }
+
+.mfa-user-name {
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.mfa-user-email {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
