@@ -67,9 +67,11 @@ internal fun userDetailPageImpl(
                             btnClass = "btn btn--ghost btn--sm",
                         )
                     }
-                    // Toggle to edit mode — inline JS
                     button(classes = "btn btn--ghost btn--sm") {
-                        attributes["onclick"] = "toggleEdit()"
+                        attributes["hx-get"] =
+                            "/admin/workspaces/${workspace.slug}/users/${user.id}/edit-fragment"
+                        attributes["hx-target"] = "#profile-section"
+                        attributes["hx-swap"] = "outerHTML"
                         +"Edit Profile"
                     }
                 }
@@ -91,86 +93,8 @@ internal fun userDetailPageImpl(
                 }
             }
 
-            // ── Profile (read mode) ──────────────────────────────────
-            div("section") {
-                id = "read-section"
-                div("section__header") {
-                    span("section__title") { +"Profile" }
-                }
-                ovCard {
-                    div("ov-card__row") {
-                        span("ov-card__label") { +"Username" }
-                        span("ov-card__value") {
-                            span("ov-card__value--mono") { +user.username }
-                            copyBtn(user.username)
-                            span("lock-icon") {
-                                attributes["title"] = "Immutable after creation"
-                                +"\uD83D\uDD12"
-                            }
-                        }
-                    }
-                    ovRow("Email") {
-                        +user.email
-                        copyBtn(user.email)
-                    }
-                    ovRowText("Full Name", user.fullName.ifBlank { "—" })
-                    ovRowMuted("Member since", "—")
-                }
-            }
-
-            // ── Profile (edit mode, hidden by default) ───────────────
-            div("section") {
-                id = "edit-section"
-                style = "display:none;"
-                div("section__header") {
-                    span("section__title") { +"Edit Profile" }
-                }
-                div("ov-card") {
-                    form(
-                        action = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                    ) {
-                        div("edit-row") {
-                            span("edit-row__label") { +"Username" }
-                            div {
-                                input(classes = "edit-row__field") {
-                                    type = InputType.text
-                                    value = user.username
-                                    disabled = true
-                                }
-                                div("edit-row__hint") { +"Immutable after creation" }
-                            }
-                        }
-                        div("edit-row") {
-                            span("edit-row__label") { +"Email" }
-                            input(classes = "edit-row__field") {
-                                type = InputType.email
-                                name = "email"
-                                value = user.email
-                            }
-                        }
-                        div("edit-row") {
-                            span("edit-row__label") { +"Full Name" }
-                            input(classes = "edit-row__field") {
-                                type = InputType.text
-                                name = "fullName"
-                                value = user.fullName
-                            }
-                        }
-                        div("edit-actions") {
-                            button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
-                                +"Save changes"
-                            }
-                            button(classes = "btn btn--ghost btn--sm") {
-                                type = ButtonType.button
-                                attributes["onclick"] = "toggleEdit()"
-                                +"Cancel"
-                            }
-                        }
-                    }
-                }
-            }
+            // ── Profile (read mode — swapped via htmx) ──────────────
+            userProfileReadFragment(workspace, user)
 
             // ── Active Sessions ──────────────────────────────────────
             section(
@@ -255,24 +179,129 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
+        }
+    }
 
-            // ── Toggle script ────────────────────────────────────────
-            script {
-                unsafe {
-                    +
-"""
-function toggleEdit() {
-    var r = document.getElementById('read-section');
-    var e = document.getElementById('edit-section');
-    var hidden = e.style.display === 'none';
-    r.style.display = hidden ? 'none' : 'block';
-    e.style.display = hidden ? 'block' : 'none';
+// ─── htmx fragments ────────────────────────────────────────────────────────
+
+/**
+ * Profile read-only section — rendered as a swappable fragment.
+ * Used both in the full page and returned standalone for htmx swaps.
+ */
+internal fun DIV.userProfileReadFragment(
+    workspace: Tenant,
+    user: User,
+    successMessage: String? = null,
+) {
+    div("section") {
+        id = "profile-section"
+        div("section__header") {
+            span("section__title") { +"Profile" }
+        }
+        if (successMessage != null) {
+            div("notice") {
+                style = "margin-bottom:12px;"
+                span("notice__icon") { inlineSvgIcon("warning", "warning") }
+                div("notice__body") {
+                    span("notice__title") { +successMessage }
+                }
+            }
+        }
+        ovCard {
+            div("ov-card__row") {
+                span("ov-card__label") { +"Username" }
+                span("ov-card__value") {
+                    span("ov-card__value--mono") { +user.username }
+                    copyBtn(user.username)
+                    span("lock-icon") {
+                        attributes["title"] = "Immutable after creation"
+                        +"\uD83D\uDD12"
+                    }
+                }
+            }
+            ovRow("Email") {
+                +user.email
+                copyBtn(user.email)
+            }
+            ovRowText("Full Name", user.fullName.ifBlank { "—" })
+            ovRowMuted("Member since", "—")
+        }
+    }
 }
-"""
+
+/**
+ * Profile edit form section — returned as a standalone fragment for htmx swap.
+ * Replaces #profile-section when the user clicks "Edit Profile".
+ */
+internal fun DIV.userProfileEditFragment(
+    workspace: Tenant,
+    user: User,
+    editError: String? = null,
+) {
+    div("section") {
+        id = "profile-section"
+        div("section__header") {
+            span("section__title") { +"Edit Profile" }
+        }
+        if (editError != null) {
+            div("alert alert-error") {
+                style = "margin-bottom:12px;"
+                +editError
+            }
+        }
+        div("ov-card") {
+            form(
+                action = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                attributes["hx-post"] = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit"
+                attributes["hx-target"] = "#profile-section"
+                attributes["hx-swap"] = "outerHTML"
+                div("edit-row") {
+                    span("edit-row__label") { +"Username" }
+                    div {
+                        input(classes = "edit-row__field edit-row__field--mono") {
+                            type = InputType.text
+                            value = user.username
+                            disabled = true
+                        }
+                        div("edit-row__hint") { +"Immutable after creation" }
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Email" }
+                    input(classes = "edit-row__field") {
+                        type = InputType.email
+                        name = "email"
+                        value = user.email
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Full Name" }
+                    input(classes = "edit-row__field") {
+                        type = InputType.text
+                        name = "fullName"
+                        value = user.fullName
+                    }
+                }
+                div("edit-actions") {
+                    button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
+                        +"Save changes"
+                    }
+                    button(classes = "btn btn--ghost btn--sm") {
+                        type = ButtonType.button
+                        attributes["hx-get"] =
+                            "/admin/workspaces/${workspace.slug}/users/${user.id}/profile-fragment"
+                        attributes["hx-target"] = "#profile-section"
+                        attributes["hx-swap"] = "outerHTML"
+                        +"Cancel"
+                    }
                 }
             }
         }
     }
+}
 
 // ─── Private helpers ────────────────────────────────────────────────────────
 

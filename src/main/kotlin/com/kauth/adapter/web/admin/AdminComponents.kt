@@ -2,6 +2,24 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.inlineSvgIcon
 import kotlinx.html.*
+import kotlinx.html.stream.createHTML
+
+/**
+ * Renders a [FlowContent.() -> Unit] lambda to an HTML string fragment.
+ *
+ * Used by htmx fragment endpoints that need to return partial HTML
+ * (not a full `<!DOCTYPE html>` page). The lambda should render exactly
+ * one root element (e.g. a `div("section") { ... }`) — that element
+ * becomes the top-level of the returned string.
+ *
+ * Implementation note: we use a transparent `<div>` as the kotlinx.html
+ * entry point, then strip it to return only the inner content.
+ */
+internal fun renderFragment(block: DIV.() -> Unit): String {
+    val wrapped = createHTML(prettyPrint = false).div { block() }
+    // Strip the outer <div>...</div> wrapper added by createHTML().div
+    return wrapped.removePrefix("<div>").removeSuffix("</div>")
+}
 
 /** Copy glyph — used as button text content, not SVG. */
 private const val COPY_GLYPH = "⎘"

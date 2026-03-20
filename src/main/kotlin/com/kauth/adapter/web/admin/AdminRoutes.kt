@@ -946,6 +946,42 @@ fun Route.adminRoutes(
                             )
                         }
 
+                        // ── htmx fragment: read-only profile section ──
+                        get("/profile-fragment") {
+                            val slug =
+                                call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val userId =
+                                call.parameters["userId"]?.toIntOrNull()
+                                    ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace =
+                                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val user =
+                                userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                            call.respondText(
+                                AdminView.userProfileReadFragment(workspace, user),
+                                ContentType.Text.Html,
+                            )
+                        }
+
+                        // ── htmx fragment: edit profile form ──
+                        get("/edit-fragment") {
+                            val slug =
+                                call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val userId =
+                                call.parameters["userId"]?.toIntOrNull()
+                                    ?: return@get call.respond(HttpStatusCode.BadRequest)
+                            val workspace =
+                                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            val user =
+                                userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
+                            if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                            call.respondText(
+                                AdminView.userProfileEditFragment(workspace, user),
+                                ContentType.Text.Html,
+                            )
+                        }
+
                         post("/toggle") {
                             val slug =
                                 call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -976,23 +1012,51 @@ fun Route.adminRoutes(
                             val params = call.receiveParameters()
                             val email = params["email"]?.trim() ?: ""
                             val fullName = params["fullName"]?.trim() ?: ""
+                            val isHtmx = call.request.headers["HX-Request"] == "true"
                             when (val result = adminService.updateUser(userId, workspace.id, email, fullName)) {
-                                is AdminResult.Success ->
-                                    call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                                is AdminResult.Success -> {
+                                    if (isHtmx) {
+                                        // Return updated read-only profile fragment
+                                        val updatedUser = userRepository.findById(userId) ?: user
+                                        call.respondText(
+                                            AdminView.userProfileReadFragment(
+                                                workspace,
+                                                updatedUser,
+                                                successMessage = "Profile saved.",
+                                            ),
+                                            ContentType.Text.Html,
+                                        )
+                                    } else {
+                                        call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                                    }
+                                }
                                 is AdminResult.Failure -> {
-                                    val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
-                                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
-                                    call.respondHtml(
-                                        HttpStatusCode.UnprocessableEntity,
-                                        AdminView.userDetailPage(
-                                            workspace,
-                                            user,
-                                            sessions,
-                                            wsPairs,
-                                            session.username,
-                                            editError = result.error.message,
-                                        ),
-                                    )
+                                    if (isHtmx) {
+                                        // Return edit form with error message
+                                        call.respondText(
+                                            AdminView.userProfileEditFragment(
+                                                workspace,
+                                                user,
+                                                editError = result.error.message,
+                                            ),
+                                            ContentType.Text.Html,
+                                            HttpStatusCode.UnprocessableEntity,
+                                        )
+                                    } else {
+                                        val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
+                                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                                        call.respondHtml(
+                                            HttpStatusCode.UnprocessableEntity,
+                                            AdminView.userDetailPage(
+                                                workspace,
+                                                user,
+                                                sessions,
+                                                wsPairs,
+                                                session.username,
+                                                editError = result.error.message,
+                                            ),
+                                        )
+                                    }
                                 }
                             }
                         }

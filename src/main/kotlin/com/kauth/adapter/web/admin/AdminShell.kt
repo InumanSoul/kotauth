@@ -34,6 +34,12 @@ internal fun HEAD.adminHead(
     }
     style { unsafe { +theme.toCssVars() } }
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
+    script(src = "/static/htmx.min.js") {}
+    script {
+        unsafe {
+            +"""document.addEventListener('DOMContentLoaded',function(){htmx.config.responseHandling=[{code:"204",swap:false},{code:"[23]..",swap:true},{code:"422",swap:true},{code:"[45]..",swap:false,error:true}]});"""
+        }
+    }
     style {
         unsafe {
             +(
@@ -152,41 +158,39 @@ internal fun HTML.adminShell(
             // ── Body: rail + ctx-panel + main ────────────────────────
             div("shell-body") {
                 div("rail") {
-                    div("rail-nav") {
-                        val ws = workspaceSlug
-                        railItem(
-                            href = if (ws != null) "/admin/workspaces/$ws" else "/admin",
-                            key = "apps",
-                            activeKey = activeRail,
-                            iconKey = "apps",
-                        )
-                        railItem(
-                            href = if (ws != null) "/admin/workspaces/$ws/users" else "/admin/directory",
-                            key = "directory",
-                            activeKey = activeRail,
-                            iconKey = "directory",
-                        )
-                        railItem(
-                            href = if (ws != null) "/admin/workspaces/$ws/sessions" else "/admin/security",
-                            key = "security",
-                            activeKey = activeRail,
-                            iconKey = "security",
-                        )
-                        railItem(
-                            href = if (ws != null) "/admin/workspaces/$ws/logs" else "/admin/logs",
-                            key = "logs",
-                            activeKey = activeRail,
-                            iconKey = "logs",
-                        )
-                        railItem(
-                            href = if (ws != null) "/admin/workspaces/$ws/settings" else "/admin/settings",
-                            key = "settings",
-                            activeKey = activeRail,
-                            iconKey = "settings",
-                        )
-                    }
-                    div("rail-spacer") {}
-                    a("/admin", classes = "rail-brand") {
+                    val ws = workspaceSlug
+                    railItem(
+                        href = if (ws != null) "/admin/workspaces/$ws" else "/admin",
+                        key = "apps",
+                        activeKey = activeRail,
+                        iconKey = "apps",
+                    )
+                    railItem(
+                        href = if (ws != null) "/admin/workspaces/$ws/users" else "/admin/directory",
+                        key = "directory",
+                        activeKey = activeRail,
+                        iconKey = "directory",
+                    )
+                    railItem(
+                        href = if (ws != null) "/admin/workspaces/$ws/sessions" else "/admin/security",
+                        key = "security",
+                        activeKey = activeRail,
+                        iconKey = "security",
+                    )
+                    railItem(
+                        href = if (ws != null) "/admin/workspaces/$ws/logs" else "/admin/logs",
+                        key = "logs",
+                        activeKey = activeRail,
+                        iconKey = "logs",
+                    )
+                    railItem(
+                        href = if (ws != null) "/admin/workspaces/$ws/settings" else "/admin/settings",
+                        key = "settings",
+                        activeKey = activeRail,
+                        iconKey = "settings",
+                    )
+                    div("rail__spacer") {}
+                    a("/admin", classes = "rail__brand") {
                         img(src = "/static/brand/kotauth-negative-icon.svg", alt = "kotauth Brand") {}
                         p { +"v${appInfo.version}" }
                     }
@@ -233,11 +237,9 @@ private fun DIV.railItem(
             "settings" -> "rail-settings" to "Settings"
             else -> iconKey to iconKey
         }
-    a(href, classes = "rail-item${if (key == activeKey) " active" else ""}") {
-        div("rail-icon") {
-            inlineSvgIcon(iconName, label)
-        }
-        span("rail-item-label") { +label }
+    a(href, classes = "rail__item${if (key == activeKey) " rail__item--active" else ""}") {
+        inlineSvgIcon(iconName, label)
+        span("rail__label") { +label }
     }
 }
 

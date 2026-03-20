@@ -149,6 +149,22 @@ object AdminView {
         editError: String? = null,
     ): HTML.() -> Unit = userDetailPageImpl(workspace, user, sessions, allWorkspaces, loggedInAs, successMessage, editError)
 
+    // ── User htmx fragments ──────────────────────────────────────────
+
+    /** Returns the read-only profile section as an HTML fragment string. */
+    fun userProfileReadFragment(
+        workspace: Tenant,
+        user: User,
+        successMessage: String? = null,
+    ): String = renderFragment { userProfileReadFragment(workspace, user, successMessage) }
+
+    /** Returns the edit profile form section as an HTML fragment string. */
+    fun userProfileEditFragment(
+        workspace: Tenant,
+        user: User,
+        editError: String? = null,
+    ): String = renderFragment { userProfileEditFragment(workspace, user, editError) }
+
     // ── Sessions & Audit ────────────────────────────────────────────────
 
     fun activeSessionsPage(
