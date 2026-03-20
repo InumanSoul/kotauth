@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.0.2"
+version = "1.0.3"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -47,12 +47,10 @@ dependencies {
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
-
-    // Phase 3b — SMTP email delivery (JavaMail, no wrapper libraries)
     implementation("com.sun.mail:javax.mail:1.6.2")
 
     // ---- Test dependencies ----
-    // Ktor in-memory test engine — full routing + serialisation, no real server or DB
+    // Ktor in-memory test engine
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
     // Kotlin test assertions + JUnit 5 runner
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
@@ -67,23 +65,6 @@ tasks.test {
 }
 
 // ── CSS compilation ───────────────────────────────────────────────────────
-// LightningCSS bundles + minifies the source CSS in frontend/css/ and writes
-// the compiled output to src/main/resources/static/ so it is embedded in the
-// fat JAR by processResources.
-//
-// Two bundles are compiled separately:
-//   index-admin.css → kotauth-admin.css  (admin console, fixed dark theme)
-//   index-auth.css  → kotauth-auth.css   (auth pages, tenant-themeable)
-//
-// LightningCSS is installed via npm into frontend/node_modules/ (no global
-// install required). The installCssDeps task handles this automatically —
-// it only re-runs when frontend/package.json or package-lock.json change.
-//
-// In Docker (multi-stage), the CSS is compiled in a dedicated css-build stage
-// (node:20-slim) and copied into place before Gradle runs, so all three CSS
-// tasks are skipped with -x flags in the kotlin-build stage. See Dockerfile.
-
-// Local lightningcss binary installed by npm into frontend/node_modules
 val lightningCssBin = "frontend/node_modules/.bin/lightningcss"
 
 // Step 1: install lightningcss-cli from frontend/package-lock.json (once, then cached)
@@ -180,10 +161,5 @@ ktlint {
     }
     filter {
         exclude("**/generated/**")
-        // kotlinx.html DSL files — deeply nested lambdas create non-converging
-        // formatter loops between the indent and wrapping rules. These files are
-        // presentation-only; all business logic is linted normally.
-        exclude("**/*View.kt")
-        exclude("**/*Views.kt")
     }
 }

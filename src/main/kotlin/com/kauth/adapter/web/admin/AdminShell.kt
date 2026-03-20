@@ -247,7 +247,7 @@ private fun DIV.ctxLink(
     label: String,
 ) {
     a(href, classes = "sidebar__item${if (key == activeKey) " sidebar__item--active" else ""}") {
-        span() { +label }
+        span { +label }
         if (key == activeKey) span("sidebar__dot") {}
     }
 }
@@ -272,7 +272,7 @@ internal fun DIV.renderAppsCtxPanel(
                 href = "/admin/workspaces/$workspaceSlug/applications/$appSlug",
                 classes = "sidebar__item${if (appSlug == activeAppSlug) " sidebar__item--active" else ""}",
             ) {
-                span() { +appName }
+                span { +appName }
                 if (appSlug == activeAppSlug) span("sidebar__dot") {}
             }
         }
