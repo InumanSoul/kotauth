@@ -30,29 +30,6 @@ import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import java.time.Instant
 
-/**
- * Admin console routes — Phase 3a (complete admin console).
- *
- * URL structure:
- *   /admin                                                   — workspace list (dashboard)
- *   /admin/workspaces/new                                    — create workspace
- *   /admin/workspaces/{slug}                                 — workspace detail
- *   /admin/workspaces/{slug}/settings                        — edit workspace settings
- *   /admin/workspaces/{slug}/applications/new                — create application
- *   /admin/workspaces/{slug}/applications/{clientId}         — application detail
- *   /admin/workspaces/{slug}/applications/{clientId}/edit    — edit application
- *   /admin/workspaces/{slug}/applications/{clientId}/toggle  — enable/disable
- *   /admin/workspaces/{slug}/applications/{clientId}/regenerate-secret
- *   /admin/workspaces/{slug}/users                           — user list
- *   /admin/workspaces/{slug}/users/new                       — create user
- *   /admin/workspaces/{slug}/users/{id}                      — user detail
- *   /admin/workspaces/{slug}/users/{id}/toggle               — enable/disable user
- *   /admin/workspaces/{slug}/users/{id}/edit                 — edit user profile
- *   /admin/workspaces/{slug}/users/{id}/revoke-sessions      — revoke all user sessions
- *   /admin/workspaces/{slug}/sessions                        — active sessions
- *   /admin/workspaces/{slug}/sessions/{id}/revoke            — revoke one session
- *   /admin/workspaces/{slug}/logs                            — audit log
- */
 fun Route.adminRoutes(
     authService: AuthService,
     adminService: AdminService,
@@ -252,7 +229,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // SMTP settings (Phase 3b)
+                // SMTP settings
                 // -------------------------------------------------------
 
                 get("/settings/smtp") {
@@ -306,7 +283,7 @@ fun Route.adminRoutes(
                 }
 
                 // ----------------------------------------------------------
-                // Identity Providers — Phase 2 (Social Login)
+                // Identity Providers
                 // ----------------------------------------------------------
 
                 get("/settings/identity-providers") {

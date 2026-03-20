@@ -288,3 +288,230 @@ private fun userInitials(
         fullName.take(2).uppercase()
     }
 }
+
+/**
+ * Holds create-user form values for prefill after a failed submission.
+ */
+data class UserPrefill(
+    val username: String = "",
+    val email: String = "",
+    val fullName: String = "",
+)
+
+// User list page.
+internal fun userListPageImpl(
+    workspace: Tenant,
+    users: List<User>,
+    allWorkspaces: List<Pair<String, String>>,
+    loggedInAs: String,
+    search: String? = null,
+): HTML.() -> Unit =
+    {
+        adminShell(
+            pageTitle = "Users — ${workspace.displayName}",
+            activeRail = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "users",
+            loggedInAs = loggedInAs,
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Users" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Users" }
+                    p(
+                        "page-subtitle",
+                    ) { +"${users.size} user${if (users.size != 1) "s" else ""} in this workspace" }
+                }
+                a(
+                    href = "/admin/workspaces/${workspace.slug}/users/new",
+                    classes = "btn btn-sm",
+                ) { +"+ New User" }
+            }
+
+            // Search bar
+            form(
+                action = "/admin/workspaces/${workspace.slug}/users",
+                method = FormMethod.get,
+                classes = "search-form",
+            ) {
+                div("search-row") {
+                    input(type = InputType.search, name = "q") {
+                        id = "q"
+                        placeholder = "Search by username, email, or name…"
+                        value = search ?: ""
+                    }
+                    button(type = ButtonType.submit, classes = "btn btn-sm") { +"Search" }
+                    if (search != null) {
+                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost btn-sm") {
+                            +"Clear"
+                        }
+                    }
+                }
+            }
+
+            div("card") {
+                if (users.isEmpty()) {
+                    div("empty-state") {
+                        div("empty-state-icon") { +"◷" }
+                        p("empty-state-text") {
+                            if (search != null) {
+                                +"No users match \"$search\"."
+                            } else {
+                                +"No users yet."
+                            }
+                        }
+                    }
+                } else {
+                    table {
+                        thead {
+                            tr {
+                                th { +"Username" }
+                                th { +"Full Name" }
+                                th { +"Email" }
+                                th { +"Status" }
+                                th { +"" }
+                            }
+                        }
+                        tbody {
+                            users.forEach { user ->
+                                tr {
+                                    td { span("td-code") { +user.username } }
+                                    td { +user.fullName }
+                                    td { +user.email }
+                                    td {
+                                        if (user.enabled) {
+                                            span("badge badge-green") { +"Active" }
+                                        } else {
+                                            span("badge badge-red") { +"Disabled" }
+                                        }
+                                    }
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
+                                            classes = "btn btn-ghost btn-sm",
+                                        ) { +"Open →" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+// Create user form.
+internal fun createUserPageImpl(
+    workspace: Tenant,
+    allWorkspaces: List<Pair<String, String>>,
+    loggedInAs: String,
+    error: String? = null,
+    prefill: UserPrefill = UserPrefill(),
+): HTML.() -> Unit =
+    {
+        adminShell(
+            pageTitle = "New User — ${workspace.displayName}",
+            activeRail = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            activeAppSection = "users",
+            loggedInAs = loggedInAs,
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}/users") { +"Users" }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New User" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create User" }
+                    p("page-subtitle") {
+                        +"Add a user to the "
+                        strong { +workspace.displayName }
+                        +" workspace. The account will be pre-verified."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error alert--constrained") {
+                    +error
+                }
+            }
+            div("form-card") {
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/users",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post,
+                ) {
+                    div("field") {
+                        label {
+                            htmlFor = "username"
+                            +"Username"
+                        }
+                        input(type = InputType.text, name = "username") {
+                            id = "username"
+                            required = true
+                            value = prefill.username
+                            placeholder = "johndoe"
+                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                        }
+                        p(
+                            "field-hint",
+                        ) { +"Letters, digits, dots, underscores, hyphens. Immutable after creation." }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "email"
+                            +"Email"
+                        }
+                        input(type = InputType.email, name = "email") {
+                            id = "email"
+                            required = true
+                            value = prefill.email
+                            placeholder = "john@example.com"
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "fullName"
+                            +"Full Name"
+                        }
+                        input(type = InputType.text, name = "fullName") {
+                            id = "fullName"
+                            value = prefill.fullName
+                            placeholder = "John Doe"
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "password"
+                            +"Password"
+                        }
+                        input(type = InputType.password, name = "password") {
+                            id = "password"
+                            required = true
+                            placeholder = "Minimum 4 characters"
+                        }
+                        p("field-hint") { +"Minimum 4 characters. The user can change it after login." }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create User" }
+                        a("/admin/workspaces/${workspace.slug}/users", classes = "btn btn-ghost") { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }

@@ -5,6 +5,17 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
+/**
+ * Holds create-application form values for prefill after a failed submission.
+ */
+data class ApplicationPrefill(
+    val clientId: String = "",
+    val name: String = "",
+    val description: String = "",
+    val accessType: String = "public",
+    val redirectUris: String = "", // newline-separated URIs
+)
+
 internal fun applicationDetailPageImpl(
     workspace: Tenant,
     application: Application,
@@ -171,6 +182,273 @@ internal fun applicationDetailPageImpl(
                                 btnClass = "btn btn--warning btn--sm",
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+// Create application form.
+internal fun createApplicationPageImpl(
+    workspace: Tenant,
+    allWorkspaces: List<Pair<String, String>>,
+    loggedInAs: String,
+    error: String? = null,
+    prefill: ApplicationPrefill = ApplicationPrefill(),
+): HTML.() -> Unit =
+    {
+        val appPairs = emptyList<Pair<String, String>>() // no apps yet when creating
+        adminShell(
+            pageTitle = "New Application — ${workspace.displayName}",
+            activeRail = "apps",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            apps = appPairs,
+            loggedInAs = loggedInAs,
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"New Application" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Create Application" }
+                    p("page-subtitle") {
+                        +"Register a new OAuth2 / OIDC application in the "
+                        strong { +workspace.displayName }
+                        +" workspace."
+                    }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error") { +error }
+            }
+            div("form-card") {
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/applications",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post,
+                ) {
+                    div("field") {
+                        label {
+                            htmlFor = "clientId"
+                            +"Client ID"
+                        }
+                        input(type = InputType.text, name = "clientId") {
+                            id = "clientId"
+                            placeholder = "my-frontend"
+                            required = true
+                            value = prefill.clientId
+                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                        }
+                        p("field-hint") { +"Unique identifier, e.g. my-frontend. Immutable after creation." }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "name"
+                            +"Name"
+                        }
+                        input(type = InputType.text, name = "name") {
+                            id = "name"
+                            placeholder = "My Frontend App"
+                            required = true
+                            value = prefill.name
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "description"
+                            +"Description (optional)"
+                        }
+                        input(type = InputType.text, name = "description") {
+                            id = "description"
+                            placeholder = "Short description of this application"
+                            value = prefill.description
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "accessType"
+                            +"Access Type"
+                        }
+                        select {
+                            name = "accessType"
+                            id = "accessType"
+                            option {
+                                value = "public"
+                                selected = (prefill.accessType == "public")
+                                +"Public — browser / SPA / mobile (no secret)"
+                            }
+                            option {
+                                value = "confidential"
+                                selected = (prefill.accessType == "confidential")
+                                +"Confidential — server-side app with a secret"
+                            }
+                            option {
+                                value = "bearer_only"
+                                selected = (prefill.accessType == "bearer_only")
+                                +"Bearer Only — resource server (validates tokens only)"
+                            }
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "redirectUris"
+                            +"Redirect URIs"
+                        }
+                        textArea {
+                            name = "redirectUris"
+                            id = "redirectUris"
+                            rows = "4"
+                            attributes["placeholder"] =
+                                "https://app.example.com/callback\nhttps://localhost:3000/callback"
+                            +prefill.redirectUris
+                        }
+                        p("field-hint") { +"One URI per line. These are allowed OAuth2 callback URLs." }
+                    }
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Create Application" }
+                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                    }
+                }
+            }
+        }
+    }
+
+// Edit application form.
+internal fun editApplicationPageImpl(
+    workspace: Tenant,
+    application: Application,
+    allWorkspaces: List<Pair<String, String>>,
+    allApps: List<Application>,
+    loggedInAs: String,
+    error: String? = null,
+): HTML.() -> Unit =
+    {
+        val appPairs = allApps.map { it.clientId to it.name }
+        adminShell(
+            pageTitle = "Edit ${application.name}",
+            activeRail = "apps",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = workspace.slug,
+            apps = appPairs,
+            activeAppSlug = application.clientId,
+            activeAppSection = "overview",
+            loggedInAs = loggedInAs,
+        ) {
+            div("breadcrumb") {
+                a("/admin") { +"Workspaces" }
+                span("breadcrumb-sep") { +"/" }
+                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
+                span("breadcrumb-sep") { +"/" }
+                a(
+                    "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
+                ) { +application.clientId }
+                span("breadcrumb-sep") { +"/" }
+                span("breadcrumb-current") { +"Edit" }
+            }
+            div("page-header") {
+                div {
+                    p("page-title") { +"Edit Application" }
+                    p("page-subtitle") { +"Update settings for ${application.name}." }
+                }
+            }
+            if (error != null) {
+                div("alert alert-error alert--constrained") {
+                    +error
+                }
+            }
+            div("form-card") {
+                form(
+                    action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post,
+                ) {
+                    p("form-section-title") { +"Identity" }
+                    div("field") {
+                        label { +"Client ID" }
+                        input(type = InputType.text) {
+                            disabled = true
+                            value = application.clientId
+                        }
+                        p("field-hint") { +"Client ID is immutable — it may appear in issued tokens." }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "name"
+                            +"Name"
+                        }
+                        input(type = InputType.text, name = "name") {
+                            id = "name"
+                            required = true
+                            value = application.name
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "description"
+                            +"Description (optional)"
+                        }
+                        input(type = InputType.text, name = "description") {
+                            id = "description"
+                            placeholder = "Short description of this application"
+                            value = application.description ?: ""
+                        }
+                    }
+
+                    p("form-section-title") { +"Access" }
+                    div("field") {
+                        label {
+                            htmlFor = "accessType"
+                            +"Access Type"
+                        }
+                        select {
+                            name = "accessType"
+                            id = "accessType"
+                            option {
+                                value = "public"
+                                selected = (application.accessType == AccessType.PUBLIC)
+                                +"Public — browser / SPA / mobile (no secret)"
+                            }
+                            option {
+                                value = "confidential"
+                                selected = (application.accessType == AccessType.CONFIDENTIAL)
+                                +"Confidential — server-side app with a secret"
+                            }
+                            option {
+                                value = "bearer_only"
+                                selected = (application.accessType == AccessType.BEARER_ONLY)
+                                +"Bearer Only — resource server (validates tokens only)"
+                            }
+                        }
+                    }
+                    div("field") {
+                        label {
+                            htmlFor = "redirectUris"
+                            +"Redirect URIs"
+                        }
+                        textArea {
+                            name = "redirectUris"
+                            id = "redirectUris"
+                            rows = "4"
+                            attributes["placeholder"] =
+                                "https://app.example.com/callback\nhttps://localhost:3000/callback"
+                            +application.redirectUris.joinToString("\n")
+                        }
+                        p("field-hint") { +"One URI per line." }
+                    }
+
+                    div("form-actions") {
+                        button(type = ButtonType.submit, classes = "btn") { +"Save Changes" }
+                        a(
+                            "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
+                            classes = "btn btn-ghost",
+                        ) { +"Cancel" }
                     }
                 }
             }
