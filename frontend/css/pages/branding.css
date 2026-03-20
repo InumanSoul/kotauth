@@ -6,7 +6,7 @@
 .branding-layout {
   display: grid;
   grid-template-columns: 1fr 35dvw;
-  gap: 24px;
+  gap: var(--space-6);
   align-items: start;
 }
 
@@ -25,7 +25,7 @@
   background: var(--color-card);
 }
 .preset-btn {
-  flex: 1; padding: 7px 0;
+  flex: 1; padding: var(--space-2) 0;
   font-size: 12px; font-weight: 500; font-family: var(--font-sans);
   color: var(--color-muted); background: transparent;
   border: none; border-right: 0.5px solid var(--color-border-md);
@@ -44,7 +44,7 @@
 }
 
 .color-field {
-  padding: 12px 14px;
+  padding: var(--space-3) var(--space-4);
   border-right: 0.5px solid var(--color-border);
   border-bottom: 0.5px solid var(--color-border);
 }
@@ -56,12 +56,12 @@
 .color-field__label {
   font-size: 10px; font-weight: 500; letter-spacing: 0.07em;
   text-transform: uppercase; color: var(--color-subtle);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 /* The actual picker row: swatch + hex input */
 .color-field__picker {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: var(--space-2);
 }
 
 /* Clickable swatch — wraps a hidden <input type="color"> */
@@ -99,7 +99,7 @@
   border: 0.5px solid var(--color-border-md);
 }
 .preview-panel__header {
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border);
   font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--color-subtle);
@@ -110,7 +110,7 @@
   font-weight: 400; letter-spacing: 0; text-transform: none;
 }
 .preview-panel__body {
-  padding: 24px 20px;
+  padding: var(--space-6) var(--space-5);
   display: flex; align-items: center; justify-content: center;
   min-height: 420px;
 }
@@ -123,15 +123,15 @@
   font-family: var(--font-sans);
 }
 .auth-mock__card {
-  padding: 28px 24px 20px;
-  display: flex; flex-direction: column; gap: 16px;
+  padding: var(--space-8) var(--space-6) var(--space-5);
+  display: flex; flex-direction: column; gap: var(--space-4);
   background: var(--pm-card, #1e1e24);
   border: 1px solid var(--pm-border, rgba(255,255,255,0.10));
   border-radius: var(--pm-radius, 8px);
 }
 .auth-mock__logo-area {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
-  margin-bottom: 4px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1);
+  margin-bottom: var(--space-1);
 }
 .auth-mock__logo-placeholder {
   width: 32px; height: 32px;

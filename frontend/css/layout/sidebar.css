@@ -18,7 +18,7 @@
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 14px 0;
+  padding: var(--space-4) 0;
 }
 
 .sidebar::-webkit-scrollbar       { width: 4px; }
@@ -31,16 +31,16 @@
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   color: var(--color-subtle);
-  padding: 0 14px 6px;
+  padding: 0 var(--space-4) var(--space-2);
 }
 
-.sidebar__section { margin-bottom: 16px; }
+.sidebar__section { margin-bottom: var(--space-4); }
 
 .sidebar__item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
   font-size: 12px;
   color: var(--color-muted);
   cursor: pointer;

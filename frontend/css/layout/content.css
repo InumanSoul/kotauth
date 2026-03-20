@@ -33,7 +33,7 @@
 .content-outer {
   flex: 1;
   overflow-y: auto;
-  padding: 28px 40px 80px;
+  padding: var(--space-8) var(--space-10) var(--space-20);
 }
 
 .content-inner {
@@ -50,26 +50,26 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
 .page-header__left {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .page-header__identity {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 .page-header__title-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .page-header__title {
@@ -82,7 +82,7 @@
 .page-header__meta {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -99,8 +99,8 @@
 .page-header__slug {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 8px;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
   background: var(--color-accent-bg);
   border: 0.5px solid var(--color-accent-border);
   font-family: var(--font-mono);
@@ -112,9 +112,9 @@
 .page-header__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex-shrink: 0;
-  padding-top: 4px;
+  padding-top: var(--space-1);
 }
 
 /* ── Page header (legacy — keep until Phase 2) ─────────────────────────── */
@@ -130,8 +130,8 @@
 .breadcrumb {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
   font-size: 12px;
 }
 

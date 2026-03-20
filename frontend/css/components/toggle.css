@@ -20,7 +20,7 @@
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   cursor: pointer;
   user-select: none;
   /* Reset global label rule (components/form.css) */

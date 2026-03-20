@@ -13,18 +13,18 @@
 .danger-zone {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .danger-zone__card {
   background: rgba(248, 113, 113, 0.03);
   border: 0.5px solid rgba(248, 113, 113, 0.12);
   border-radius: 0;
-  padding: 14px 16px;
+  padding: var(--space-4) var(--space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .danger-zone__card--warning {
@@ -36,7 +36,7 @@
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
   color: var(--color-red);
-  margin-bottom: 3px;
+  margin-bottom: var(--space-1);
 }
 
 .danger-zone__title--warning { color: var(--color-amber); }

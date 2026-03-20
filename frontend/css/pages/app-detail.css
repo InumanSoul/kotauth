@@ -12,7 +12,7 @@
 .inherited-link {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   color: var(--color-muted);
   text-decoration: none;

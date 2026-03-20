@@ -60,15 +60,15 @@
   grid-template-columns: repeat(4, 1fr);
   border: 0.5px solid var(--color-border-md);
   background: var(--color-card);
-  margin-bottom: 28px;
+  margin-bottom: var(--space-8);
 }
 
 .insight-item {
-  padding: 14px 16px;
+  padding: var(--space-4) var(--space-4);
   border-right: 0.5px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: var(--space-1);
   text-decoration: none;
   transition: background 0.12s;
   cursor: pointer;
@@ -88,7 +88,7 @@
 .insight-item__value {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
   font-size: var(--text-md);
   font-weight: var(--weight-medium);
   color: var(--color-text);
@@ -115,11 +115,11 @@
 .insight-item__arrow {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   font-size: var(--text-sm);
   color: var(--color-subtle);
   margin-top: auto;
-  padding-top: 6px;
+  padding-top: var(--space-2);
   transition: color 0.15s;
 }
 

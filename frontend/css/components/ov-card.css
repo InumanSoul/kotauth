@@ -24,7 +24,7 @@
   overflow: hidden;
 }
 
-.ov-card + .ov-card { margin-top: 20px; }
+.ov-card + .ov-card { margin-top: var(--space-5); }
 
 /* ── Section label (divider heading row) ───────────────────────────────── */
 
@@ -34,13 +34,13 @@
   letter-spacing: var(--tracking-wider);
   text-transform: uppercase;
   color: var(--color-subtle);
-  padding: 10px 16px 9px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border-md);
   background: rgba(255, 255, 255, 0.02);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .ov-card__section-label--danger { color: rgba(248, 113, 113, 0.45); }
@@ -52,7 +52,7 @@
   grid-template-columns: 152px 1fr;
   align-items: center;
   min-height: 38px;
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   border-bottom: 0.5px solid var(--color-border);
   transition: background 0.12s;
 }
@@ -69,14 +69,14 @@
 
 .ov-card__row--stacked {
   display: block;
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border);
   transition: background 0.12s;
 }
 
 .ov-card__row--stacked:last-child { border-bottom: none; }
 .ov-card__row--stacked:hover      { background: var(--color-row-hover); }
-.ov-card__row--stacked .ov-card__label { margin-bottom: 5px; }
+.ov-card__row--stacked .ov-card__label { margin-bottom: var(--space-1); }
 
 /* ── Label & Value ─────────────────────────────────────────────────────── */
 
@@ -90,7 +90,7 @@
   color: var(--color-text);
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 .ov-card__value--mono {
@@ -115,7 +115,7 @@
   color: var(--color-subtle);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 /* ── Actions footer ────────────────────────────────────────────────────── */

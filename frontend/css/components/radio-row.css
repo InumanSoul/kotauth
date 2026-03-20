@@ -29,8 +29,8 @@
 .radio-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 11px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border);
   cursor: pointer;
   transition: background 0.1s;

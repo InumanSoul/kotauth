@@ -21,8 +21,8 @@
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 13px;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
   border-radius: 0;
   font-size: 12px;
   font-weight: var(--weight-medium);
@@ -71,10 +71,10 @@
 }
 .btn--warning:hover { background: var(--color-amber-bg); }
 
-.btn--sm { padding: 5px 10px; font-size: var(--text-sm); }
+.btn--sm { padding: var(--space-1) var(--space-3); font-size: var(--text-sm); }
 
 .btn--icon {
-  padding: 4px;
+  padding: var(--space-1);
   width: 24px;
   height: 24px;
   justify-content: center;

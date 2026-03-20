@@ -29,7 +29,7 @@
 
 .data-table th {
   text-align: left;
-  padding: 9px 16px;
+  padding: var(--space-2) var(--space-4);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   letter-spacing: var(--tracking-wide);
@@ -40,7 +40,7 @@
 }
 
 .data-table td {
-  padding: 11px 16px;
+  padding: var(--space-3) var(--space-4);
   vertical-align: middle;
   border-bottom: 0.5px solid var(--color-border);
 }
@@ -72,14 +72,14 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 /* ── Inline filter bar (reusable above any data-table) ─────────────────── */
 
 .filter-bar {
   position: relative;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .filter-bar__icon {

@@ -33,7 +33,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 16px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 0.5px solid var(--color-border);
 }
 
@@ -48,7 +48,7 @@
 .chip-grid__header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .chip-grid__toggle {
@@ -73,8 +73,8 @@
 .chip-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 14px 16px;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-4);
 }
 
 .scope-chip {
@@ -94,7 +94,7 @@
 .scope-chip__label {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
+  padding: var(--space-1) var(--space-2);
   border: 0.5px solid var(--color-border);
   background: transparent;
   font-family: var(--font-mono);
