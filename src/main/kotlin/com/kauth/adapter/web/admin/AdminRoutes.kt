@@ -1593,7 +1593,19 @@ fun Route.adminRoutes(
                     val keys = apiKeyService?.listForTenant(workspace.id) ?: emptyList()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.apiKeysPage(workspace, keys, wsPairs, session.username),
+                        AdminView.apiKeysListPage(workspace, keys, wsPairs, session.username),
+                    )
+                }
+
+                get("/settings/api-keys/new") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.createApiKeyPage(workspace, wsPairs, session.username),
                     )
                 }
 
@@ -1623,7 +1635,7 @@ fun Route.adminRoutes(
                             val keys = svc.listForTenant(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.OK,
-                                AdminView.apiKeysPage(
+                                AdminView.apiKeysListPage(
                                     workspace,
                                     keys,
                                     wsPairs,
@@ -1636,9 +1648,8 @@ fun Route.adminRoutes(
                             val keys = svc.listForTenant(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
-                                AdminView.apiKeysPage(
+                                AdminView.createApiKeyPage(
                                     workspace,
-                                    keys,
                                     wsPairs,
                                     session.username,
                                     error = result.error.message,
@@ -1682,7 +1693,19 @@ fun Route.adminRoutes(
                     val deliveries = webhookService?.recentDeliveries(workspace.id) ?: emptyList()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.webhooksPage(workspace, endpoints, deliveries, wsPairs, session.username),
+                        AdminView.webhooksListPage(workspace, endpoints, deliveries, wsPairs, session.username),
+                    )
+                }
+
+                get("/settings/webhooks/new") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val workspace =
+                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.createWebhookPage(workspace, wsPairs, session.username),
                     )
                 }
 
@@ -1705,7 +1728,7 @@ fun Route.adminRoutes(
                             val deliveries = svc.recentDeliveries(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.OK,
-                                AdminView.webhooksPage(
+                                AdminView.webhooksListPage(
                                     workspace,
                                     endpoints,
                                     deliveries,
@@ -1716,14 +1739,10 @@ fun Route.adminRoutes(
                             )
                         }
                         is com.kauth.domain.service.WebhookResult.Failure -> {
-                            val endpoints = svc.listEndpoints(workspace.id)
-                            val deliveries = svc.recentDeliveries(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
-                                AdminView.webhooksPage(
+                                AdminView.createWebhookPage(
                                     workspace,
-                                    endpoints,
-                                    deliveries,
                                     wsPairs,
                                     session.username,
                                     error = result.error,

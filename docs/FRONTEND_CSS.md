@@ -1,8 +1,9 @@
-# Frontend CSS Architecture
+# Frontend Architecture
 
-CSS source layer for KotAuth's UI. Component-scoped source files compiled to
-two minified bundles at build time using LightningCSS. No Node.js in the final
-Docker image.
+CSS, JavaScript, and htmx patterns for KotAuth's admin UI. Component-scoped CSS
+source files compiled to two minified bundles at build time using LightningCSS.
+CSP-safe JavaScript interactions via `data-*` attributes. Surgical htmx for
+in-page state transitions. No Node.js in the final Docker image.
 
 ---
 
@@ -21,7 +22,9 @@ Docker image.
 11. [Build Pipeline](#build-pipeline)
 12. [Dockerfile Integration](#dockerfile-integration)
 13. [Development Workflow](#development-workflow)
-14. [Rules and Constraints](#rules-and-constraints)
+14. [JavaScript — settings.js](#javascript--settingsjs)
+15. [htmx Patterns](#htmx-patterns)
+16. [Rules and Constraints](#rules-and-constraints)
 
 ---
 
@@ -66,19 +69,37 @@ project-root/
 │       │   └── content.css            ← .main, .content, .page-header, .breadcrumb
 │       │
 │       ├── components/                ← Admin bundle only
-│       │   ├── button.css             ← .btn, .btn-ghost, .btn-danger, .btn-sm, .btn-full
-│       │   ├── badge.css              ← .badge, .badge-active, .badge-error, etc.
+│       │   ├── button.css             ← .btn, .btn--primary/ghost/danger/warning/sm/icon
+│       │   ├── badge.css              ← .badge, .badge--active/inactive/confidential/danger
 │       │   ├── alert.css              ← .alert, .alert-error, .alert-success, .alert-warn
-│       │   ├── card.css               ← .card, .card-body, .card-title, .card-subtitle
-│       │   ├── form.css               ← input, select, textarea, label, .field
+│       │   ├── card.css               ← .card, .card-body, .card-title (legacy)
+│       │   ├── form.css               ← input, select, textarea, label, .field (legacy global)
 │       │   ├── stat-card.css          ← .stat-grid, .stat-card, .stat-label, .stat-value
-│       │   ├── table.css              ← table, th, td, .td-muted, .td-code
-│       │   ├── empty-state.css        ← .empty-state, .empty-state-icon, .empty-state-text
-│       │   └── ov-card.css            ← .ov-card, .ov-card__row, .ov-card__value (BEM)
+│       │   ├── table.css              ← .data-table, .data-table__id/name/actions (BEM)
+│       │   ├── empty-state.css        ← .empty-state, .empty-state__icon/title/desc/cta (BEM)
+│       │   ├── ov-card.css            ← .ov-card, .ov-card__section-label/row/label/value (BEM)
+│       │   ├── notice.css             ← .notice, .notice--success/error (BEM)
+│       │   ├── copy-btn.css           ← .copy-btn hover/copied state (extends btn--ghost btn--icon)
+│       │   ├── divider.css            ← .divider horizontal separator
+│       │   ├── danger-zone.css        ← .danger-zone card for destructive actions
+│       │   ├── section.css            ← .section, .section__header/title (legacy)
+│       │   ├── toggle.css             ← .toggle switch component (BEM)
+│       │   ├── check-row.css          ← .check-row checkbox row (BEM)
+│       │   ├── radio-row.css          ← .radio-row radio button row (BEM)
+│       │   └── chip-grid.css          ← .chip-grid, .scope-chip multi-select chips (BEM)
 │       │
-│       ├── admin/                     ← Admin-specific pages
+│       ├── pages/                     ← Page-specific styles
+│       │   ├── workspace-overview.css ← Workspace overview page
+│       │   ├── app-detail.css         ← Application detail page
+│       │   ├── user-detail.css        ← .user-header, .lock-icon, .edit-row/actions (BEM)
+│       │   ├── branding.css           ← Branding settings page
+│       │   └── settings.css           ← .toggle-row, .provider-header, .copy-field,
+│       │                                 .key-table, .setup-row (settings pages)
+│       │
+│       ├── admin/                     ← Admin-specific pages (legacy)
 │       │   ├── login.css              ← .login-shell, .brand-mark, .login-card
-│       │   └── form-card.css          ← .form-card, .form-section-title, .checkbox-row
+│       │   ├── form-card.css          ← .form-card, .form-section-title, .checkbox-row
+│       │   └── welcome.css            ← Admin welcome page
 │       │
 │       └── auth/                      ← Auth bundle only
 │           ├── shell.css              ← body centered layout
@@ -326,18 +347,33 @@ Most existing classes in the admin console use a single-dash modifier convention
 | `layout/topbar.css` | Admin | Topbar, workspace switcher dropdown, search, avatar |
 | `layout/rail.css` | Admin | Icon navigation rail |
 | `layout/sidebar.css` | Admin | Context panel, section titles, nav items |
-| `layout/content.css` | Admin | Main content area, page header, breadcrumb |
-| `components/button.css` | Admin | All button variants |
-| `components/badge.css` | Admin | Status and type badges |
-| `components/alert.css` | Admin | Inline feedback banners |
-| `components/card.css` | Admin | Generic card containers |
-| `components/form.css` | Admin | Input, select, textarea, label, .field |
+| `layout/content.css` | Admin | Main content area, `.page-header`, `.breadcrumb` |
+| `components/button.css` | Admin | `.btn` + BEM modifiers (`--primary`, `--ghost`, `--danger`, `--warning`, `--sm`, `--icon`) |
+| `components/badge.css` | Admin | `.badge` + BEM modifiers (`--active`, `--inactive`, `--confidential`, `--danger`) |
+| `components/alert.css` | Admin | Inline feedback banners (legacy) |
+| `components/card.css` | Admin | Generic card containers (legacy) |
+| `components/form.css` | Admin | Global input/select/label rules (legacy — causes bleed, see note below) |
 | `components/stat-card.css` | Admin | Metric stat grid |
-| `components/table.css` | Admin | Data tables |
-| `components/empty-state.css` | Admin | Empty content placeholders |
-| `components/ov-card.css` | Admin | BEM overview / key-value card |
+| `components/table.css` | Admin | `.data-table` with `__id`, `__name`, `__email`, `__actions` |
+| `components/empty-state.css` | Admin | `.empty-state` with `__icon` (SVG sized), `__title`, `__desc`, `__cta` |
+| `components/ov-card.css` | Admin | `.ov-card` with `__section-label`, `__row`, `__label`, `__value` + modifiers |
+| `components/notice.css` | Admin | `.notice` with `--success`, `--error` modifiers |
+| `components/copy-btn.css` | Admin | `.copy-btn` hover/copied state (used with `btn--ghost btn--icon`) |
+| `components/divider.css` | Admin | `.divider` horizontal separator |
+| `components/danger-zone.css` | Admin | `.danger-zone` destructive action card |
+| `components/section.css` | Admin | `.section`, `.section__header`, `.section__title` (legacy) |
+| `components/toggle.css` | Admin | `.toggle` switch component |
+| `components/check-row.css` | Admin | `.check-row` labeled checkbox with global rule resets |
+| `components/radio-row.css` | Admin | `.radio-row` labeled radio with global rule resets |
+| `components/chip-grid.css` | Admin | `.chip-grid`, `.scope-chip` multi-select chip grid |
+| `pages/workspace-overview.css` | Admin | Workspace overview page |
+| `pages/app-detail.css` | Admin | Application detail page |
+| `pages/user-detail.css` | Admin | `.user-header`, `.lock-icon`, `.edit-row`, `.edit-actions` |
+| `pages/branding.css` | Admin | Branding settings (preset-group, color-grid) |
+| `pages/settings.css` | Admin | `.toggle-row`, `.provider-header`, `.copy-field`, `.key-table`, `.setup-row` |
 | `admin/login.css` | Admin | Admin login page layout |
-| `admin/form-card.css` | Admin | Settings and edit form cards |
+| `admin/form-card.css` | Admin | Settings and edit form cards (legacy) |
+| `admin/welcome.css` | Admin | Admin welcome page |
 | `auth/shell.css` | Auth | Body centered layout |
 | `auth/brand.css` | Auth | Tenant brand header |
 | `auth/card.css` | Auth | Auth card with shadow |
@@ -347,45 +383,144 @@ Most existing classes in the admin console use a single-dash modifier convention
 | `auth/social.css` | Auth | Social login divider and provider buttons |
 | `auth/misc.css` | Auth | Footer links and dividers |
 
+> **Known issue — `components/form.css` global bleed:** This file has global `label { text-transform: uppercase }` and `input { width: 100%; padding: 0.6rem }` rules that infect BEM components using `<label>` and `<input>` elements. BEM components (check-row, radio-row, toggle, scope-chip) include explicit resets to counteract this. A future cleanup should scope these rules to `.field label` or similar.
+
 ---
 
 ## Component Reference
 
-### `ov-card` — reference BEM component
+### `ov-card` — primary card component
+
+The ov-card is the standard container for detail pages, settings forms, and any key-value layout. Cards stack with 20px gap via `.ov-card + .ov-card { margin-top: 20px }`.
 
 ```css
-.ov-card             { background: var(--color-card); border: var(--border-md); ... }
-.ov-card__row        { display: grid; grid-template-columns: 152px 1fr; ... }
-.ov-card__label      { font-size: 12px; color: var(--color-muted); }
-.ov-card__value      { font-size: 13px; color: var(--color-text); }
-.ov-card__value--mono   { font-family: var(--font-mono); color: var(--color-accent); }
-.ov-card__value--muted  { color: var(--color-muted); font-style: italic; }
-.ov-card__value--empty  { color: var(--color-subtle); font-style: italic; }
-.ov-card__row--stacked  { display: block; ... }
-.ov-card__actions    { padding: ...; border-top: var(--border); ... }
+.ov-card                          /* card container */
+.ov-card__section-label           /* flex header row: title left, actions right */
+.ov-card__section-label--danger   /* red-tinted variant for danger zones */
+.ov-card__row                     /* grid row: 152px label + 1fr value */
+.ov-card__row--stacked            /* vertical: label above value */
+.ov-card__row--inherited          /* subtle bg for inherited/readonly values */
+.ov-card__label                   /* row label */
+.ov-card__value                   /* row value (flex, centered) */
+.ov-card__value--mono             /* monospace accent (IDs, keys) */
+.ov-card__value--muted            /* secondary text */
+.ov-card__value--empty            /* placeholder for unset fields */
+.ov-card__actions                 /* footer action bar */
 ```
 
-Kotlin usage:
+Kotlin usage — read-only card:
 
 ```kotlin
-div(classes = "ov-card") {
-    div(classes = "ov-card__row") {
-        span(classes = "ov-card__label") { +"Client ID" }
-        span(classes = "ov-card__value") {
-            span(classes = "ov-card__value--mono") { +app.clientId }
-        }
-    }
-    div(classes = "ov-card__row") {
-        span(classes = "ov-card__label") { +"Status" }
-        span(classes = "ov-card__value") {
-            span(classes = "badge ${if (app.active) "badge-active" else "badge-disabled"}") {
-                span(classes = "badge__dot") {}
-                +if (app.active) "Active" else "Disabled"
-            }
+div("ov-card") {
+    div("ov-card__section-label") { +"Profile" }
+    div("ov-card__row") {
+        span("ov-card__label") { +"Client ID" }
+        span("ov-card__value") {
+            span("ov-card__value--mono") { +app.clientId }
+            copyBtn(app.clientId)
         }
     }
 }
 ```
+
+Kotlin usage — section label with actions:
+
+```kotlin
+div("ov-card") {
+    div("ov-card__section-label") {
+        span { +"Active Sessions" }
+        div { /* action buttons go here */ }
+    }
+    /* table or content */
+}
+```
+
+### `edit-row` — form row for editable fields
+
+Used inside ov-cards for settings and edit forms. Grid layout matching ov-card__row proportions.
+
+```css
+.edit-row                /* grid: 160px label + 1fr field */
+.edit-row__label         /* left label column */
+.edit-row__field         /* input with border and focus state */
+.edit-row__field--mono   /* monospace variant */
+.edit-row__field--select /* styled select with chevron background */
+.edit-row__hint          /* helper text below field */
+.edit-actions            /* save/cancel action bar with top border */
+```
+
+### `data-table` — list page table
+
+```css
+.data-table              /* full-width bordered table */
+.data-table__id          /* accent link in first column */
+.data-table__name        /* primary text cell */
+.data-table__email       /* secondary text cell */
+.data-table__actions     /* right-aligned action buttons */
+```
+
+### `key-table` — compact sub-table for detail pages
+
+Used for child resources inside a detail page (composite roles, assigned users, webhook history).
+
+```css
+.key-table               /* bordered table with hover rows */
+.key-table__name         /* bold primary cell */
+.key-table__meta         /* monospace secondary cell */
+```
+
+### `empty-state` — empty list placeholder
+
+```css
+.empty-state             /* centered card with dashed border */
+.empty-state__icon       /* 32×32 icon box — color: var(--color-muted) */
+.empty-state__icon svg   /* 16×16 constrained SVG icon */
+.empty-state__title      /* short heading */
+.empty-state__desc       /* body text, max 260px */
+.empty-state__cta        /* optional accent action button */
+```
+
+### `chip-grid` — multi-select chips
+
+Used for scope selection (API keys) and event selection (webhooks).
+
+```css
+.chip-grid               /* flex-wrap grid of chips */
+.chip-grid__header       /* header row with count and All/None buttons */
+.chip-grid__count        /* "3 / 12 selected" live counter */
+.scope-chip              /* individual checkbox chip */
+```
+
+### `copy-field` — monospace value + copy button
+
+Inline field for one-time-visible secrets and callback URLs.
+
+```css
+.copy-field              /* flex container with border */
+.copy-field__value       /* mono, user-select:all, ellipsis overflow */
+.copy-field__btn         /* border-left separator, SVG icon, hover accent */
+```
+
+### `copy-btn` — inline copy button
+
+Small icon button using `btn btn--ghost btn--icon copy-btn`. Uses `data-copy` attribute for CSP-safe clipboard access via `settings.js`.
+
+```css
+.copy-btn:hover          /* accent border and color */
+.copy-btn[data-copied]   /* green check feedback state */
+```
+
+### Other BEM components
+
+| Component | File | Purpose |
+|---|---|---|
+| `.toggle` | `toggle.css` | On/off switch (label + track + thumb) |
+| `.check-row` | `check-row.css` | Labeled checkbox with description |
+| `.radio-row` | `radio-row.css` | Labeled radio button with description |
+| `.notice` | `notice.css` | Alert banner (`--success`, `--error`) |
+| `.badge` | `badge.css` | Status pills (`--active`, `--inactive`, `--confidential`, `--danger`) |
+| `.page-header` | `content.css` | Page title with breadcrumb and action buttons |
+| `.breadcrumb` | `content.css` | Navigation breadcrumb trail |
 
 ---
 
@@ -445,16 +580,42 @@ Auth component  → `frontend/css/auth/my-component.css`
 Kotlin view files contain class name strings and structural HTML only. Zero visual knowledge — no colors, no pixel values, no style attributes.
 
 ```kotlin
-// Correct
-span(classes = "badge ${if (app.active) "badge-active" else "badge-disabled"}") {
-    span(classes = "badge__dot") {}
-    +if (app.active) "Active" else "Disabled"
+// Correct — BEM badge with modifier
+span("badge badge--active") {
+    span("badge__dot") {}
+    +"Active"
 }
 
 // Wrong — hardcoded color in Kotlin
 div { style = "color: #4ade80; padding: 8px;" }
-val color = if (active) "#4ade80" else "#f87171"
 ```
+
+### View Architecture
+
+Views follow a pure function pattern: `data in → HTML out`. Each page has a top-level function (e.g. `userDetailPageImpl`) that returns an `HTML.() -> Unit` lambda. Shared components live in `AdminComponents.kt` as extension functions on `DIV`.
+
+Key helpers in `AdminComponents.kt`:
+
+| Helper | Purpose |
+|---|---|
+| `ovCard { }` | Wraps content in `.ov-card` |
+| `ovRow(label) { }` | Grid row with label + custom value |
+| `ovRowMono(label, value, copyable)` | Monospace accent row with optional copy button |
+| `ovRowText(label, value)` | Plain text row |
+| `ovRowMuted(label, value)` | Secondary/muted row |
+| `ovSectionLabel(label)` | Section divider inside an ov-card |
+| `breadcrumb(vararg crumbs)` | Breadcrumb trail |
+| `primaryLink(href, label, icon)` | Accent link button with SVG icon |
+| `emptyState(icon, title, desc)` | Empty list placeholder |
+| `copyBtn(text)` | CSP-safe copy-to-clipboard button |
+| `postButton(action, label)` | Inline POST form with submit button |
+| `dangerZoneCard(title, desc) { }` | Destructive action card |
+
+### SVG Icons
+
+Icons are inline SVGs loaded from `src/main/resources/static/icons/`. Use `inlineSvgIcon(name, ariaLabel)` in any `HTMLTag` context. Icons use `currentColor` for stroke/fill, inheriting from the parent's CSS `color` property.
+
+Available icons: `admin`, `arrow-small`, `arrow-t-r`, `code`, `copy`, `edit`, `external-link`, `globe`, `lock`, `logout`, `open-sm`, `plus`, `pulse`, `rail-*`, `redirect`, `search`, `slug`, `user`, `warning`.
 
 ---
 
@@ -581,6 +742,97 @@ npm run watch          # watch mode via entr (requires entr installed)
 ```
 
 Drop `--minify` in `frontend/package.json` scripts during development for readable DevTools output. Remember to restore it before committing.
+
+---
+
+## JavaScript — `settings.js`
+
+All client-side interactions use a single CSP-safe script: `src/main/resources/static/js/settings.js`. It runs as an IIFE with `'use strict'` and binds behavior exclusively through `data-*` attributes — zero inline event handlers anywhere in the Kotlin views.
+
+### Data attributes
+
+| Attribute | Element | Behavior |
+|---|---|---|
+| `data-copy="text"` | `<button>` | Copies `text` to clipboard. Shows a checkmark SVG for 1.5s feedback. Sets `[data-copied]` for CSS styling. |
+| `data-confirm="message"` | `<button>` | Shows `window.confirm(message)` before the action. Prevents default on cancel. |
+| `data-chips-all="gridId"` | `<button>` | Checks all checkboxes in the `#gridId` chip-grid. Updates the count. |
+| `data-chips-none="gridId"` | `<button>` | Unchecks all checkboxes in the `#gridId` chip-grid. Updates the count. |
+| `data-scope-toggle="targetId"` | `<select>` | Shows `#targetId` when value is `"application"`, hides it otherwise. |
+
+### Chip-grid live count
+
+Any `change` event on `.chip-grid input[type="checkbox"]` automatically recalculates the `.chip-grid__count` text to `"N / M selected"`.
+
+### Adding new interactions
+
+1. Define a `data-*` attribute name.
+2. Add a delegated listener in `settings.js` (always on `document`, using `e.target.closest('[data-*]')`).
+3. Reference the attribute in Kotlin: `attributes["data-my-thing"] = "value"`.
+4. Never use inline `onclick`, `onchange`, or any `on*` attribute — this violates CSP.
+
+---
+
+## htmx Patterns
+
+KotAuth uses htmx for targeted, in-page interactions — not for navigation. The guiding principle: **use htmx for localized state transitions on the same URL, not as a page router.**
+
+### When to use htmx
+
+| Pattern | Example | Why it fits |
+|---|---|---|
+| **Inline edit/read toggle** | Profile section: read mode → edit mode → save → read mode | Same URL, same context, two states of the same content |
+| **Inline form save** | Toggle a setting, save a field — swap just the notice banner ("Saved!") | High-frequency action, user stays in context |
+| **Row-level actions** | Revoke a session — remove the row, update the count | Surgical DOM update, no page flash |
+| **Live filtering** | User list search — swap just the table body | Filter feels instant, URL stays bookmarkable |
+| **Delete with fade** | Remove a table row with `hx-swap="outerHTML swap:0.2s"` | Smooth removal without full reload |
+
+### When NOT to use htmx
+
+| Anti-pattern | Why it doesn't fit |
+|---|---|
+| **Page-to-page navigation** (e.g. General → SMTP → Security) | You're building a SPA router. Every route needs two render paths (full page + fragment). URL management, active nav state, breadcrumb, and `<title>` all need updating. Complexity cost far exceeds the marginal speed gain on low-frequency settings pages. |
+| **Full form submissions that redirect** | Standard POST → redirect → GET is simple, reliable, and works with browser back/forward. Only htmx-ify if the redirect is unnecessary (user stays on the same page). |
+
+### Implementation pattern
+
+Kotlin side — the view function renders both the swappable target and the trigger:
+
+```kotlin
+// Trigger button
+button(classes = "btn btn--ghost btn--sm") {
+    attributes["hx-get"] = "/admin/workspaces/$slug/users/$id/edit-fragment"
+    attributes["hx-target"] = "#profile-section"
+    attributes["hx-swap"] = "outerHTML"
+    +"Edit Profile"
+}
+
+// Swappable target (rendered by a shared fragment function)
+div {
+    id = "profile-section"
+    div("ov-card") {
+        div("ov-card__section-label") { +"Profile" }
+        /* ... read-only content ... */
+    }
+}
+```
+
+Route side — detect htmx requests and return fragments:
+
+```kotlin
+get("/edit-fragment") {
+    val html = renderFragment { userProfileEditFragment(workspace, user) }
+    call.respondText(html, ContentType.Text.Html)
+}
+```
+
+The `renderFragment()` helper in `AdminComponents.kt` renders a `DIV.() -> Unit` lambda to an HTML string without the full `<!DOCTYPE>` shell.
+
+### Rules
+
+1. **Always use `id` targets.** The swapped element must have a stable `id` that both the full page render and the fragment render produce identically.
+2. **Fragment functions are pure.** They take data parameters and return HTML. They don't access `call`, `session`, or any HTTP context.
+3. **Full page must still work.** A browser refresh on any URL must render the complete page with shell. htmx fragments are a progressive enhancement, not a replacement.
+4. **Use `hx-swap="outerHTML"`** for section replacements. The fragment replaces the entire target element (including its `id`), so the next swap still has a valid target.
 
 ---
 

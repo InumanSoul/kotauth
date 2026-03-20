@@ -12,6 +12,7 @@
 @import "./base/tokens.css";
 @import "./base/reset.css";
 @import "./base/typography.css";
+@import "./base/view-transitions.css";
 
 /* ── Layout layer ────────────────────────────────────────────────────────── */
 @import "./layout/shell.css";

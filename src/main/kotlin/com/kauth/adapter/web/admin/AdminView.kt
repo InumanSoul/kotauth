@@ -267,19 +267,26 @@ object AdminView {
         saved: Boolean = false,
     ): HTML.() -> Unit = identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, editProvider, error, saved)
 
-    fun apiKeysPage(
+    fun apiKeysListPage(
         workspace: Tenant,
         apiKeys: List<ApiKey>,
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
         newKeyRaw: String? = null,
         error: String? = null,
+    ): HTML.() -> Unit = apiKeysListPageImpl(workspace, apiKeys, allWorkspaces, loggedInAs, newKeyRaw, error)
+
+    fun createApiKeyPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
         scopes: List<String> = ApiScope.ALL,
-    ): HTML.() -> Unit = apiKeysPageImpl(workspace, apiKeys, allWorkspaces, loggedInAs, newKeyRaw, error, scopes)
+    ): HTML.() -> Unit = createApiKeyPageImpl(workspace, allWorkspaces, loggedInAs, error, scopes)
 
     // ── Webhooks ────────────────────────────────────────────────────────
 
-    fun webhooksPage(
+    fun webhooksListPage(
         workspace: Tenant,
         endpoints: List<WebhookEndpoint>,
         deliveries: List<WebhookDelivery>,
@@ -287,5 +294,12 @@ object AdminView {
         loggedInAs: String,
         newSecret: String? = null,
         error: String? = null,
-    ): HTML.() -> Unit = webhooksPageImpl(workspace, endpoints, deliveries, allWorkspaces, loggedInAs, newSecret, error)
+    ): HTML.() -> Unit = webhooksListPageImpl(workspace, endpoints, deliveries, allWorkspaces, loggedInAs, newSecret, error)
+
+    fun createWebhookPage(
+        workspace: Tenant,
+        allWorkspaces: List<Pair<String, String>>,
+        loggedInAs: String,
+        error: String? = null,
+    ): HTML.() -> Unit = createWebhookPageImpl(workspace, allWorkspaces, loggedInAs, error)
 }

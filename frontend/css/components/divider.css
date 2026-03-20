@@ -1,12 +1,1 @@
-/* frontend/css/components/divider.css
- *
- * Simple horizontal separator line.
- *
- * .divider — 0.5px line with vertical spacing
- */
-
-.divider {
-  height: 0.5px;
-  background: var(--color-border);
-  margin: 24px 0;
-}
+/* DEPRECATED — divider component removed; ov-card spacing handles separation. */

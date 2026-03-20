@@ -89,46 +89,44 @@ internal fun applicationDetailPageImpl(
                 )
             }
 
-            // ── Overview section ─────────────────────────────────────
-            section(title = "Overview") {
-                ovCard {
-                    ovRowMono("Client ID", application.clientId, copyable = true)
-                    ovRowText("Name", application.name)
-                    if (application.description.isNullOrBlank()) {
-                        ovRowMuted("Description", "No description")
-                    } else {
-                        ovRowMuted("Description", application.description)
-                    }
-                    ovRow("Access Type") {
-                        when (application.accessType) {
-                            AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
-                            AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
-                            AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
-                        }
-                    }
-                    ovRow("Workspace") {
-                        a(
-                            href = "/admin/workspaces/${workspace.slug}",
-                            classes = "badge badge--id",
-                        ) { +workspace.slug }
-                    }
-                    ovRowInherited(
-                        "Token TTL, security and branding",
-                        "/admin/workspaces/${workspace.slug}/settings",
-                    )
+            // ── Overview ────────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Overview" }
+                ovRowMono("Client ID", application.clientId, copyable = true)
+                ovRowText("Name", application.name)
+                if (application.description.isNullOrBlank()) {
+                    ovRowMuted("Description", "No description")
+                } else {
+                    ovRowMuted("Description", application.description)
                 }
+                ovRow("Access Type") {
+                    when (application.accessType) {
+                        AccessType.PUBLIC -> span("badge badge--public") { +"Public" }
+                        AccessType.CONFIDENTIAL -> span("badge badge--confidential") { +"Confidential" }
+                        AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
+                    }
+                }
+                ovRow("Workspace") {
+                    a(
+                        href = "/admin/workspaces/${workspace.slug}",
+                        classes = "badge badge--id",
+                    ) { +workspace.slug }
+                }
+                ovRowInherited(
+                    "Token TTL, security and branding",
+                    "/admin/workspaces/${workspace.slug}/settings",
+                )
             }
 
-            // ── Redirect URIs section ────────────────────────────────
-            section(
-                title = "Redirect URIs",
-                action = {
+            // ── Redirect URIs ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") {
+                    +"Redirect URIs"
                     a(
                         href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
-                        classes = "section__action",
+                        classes = "btn btn--ghost btn--sm",
                     ) { +"+ Add URI" }
-                },
-            ) {
+                }
                 if (application.redirectUris.isEmpty()) {
                     emptyState(
                         iconName = "redirect",
@@ -141,20 +139,17 @@ internal fun applicationDetailPageImpl(
                         ) { +"+ Add Redirect URI" }
                     }
                 } else {
-                    ovCard {
-                        application.redirectUris.forEach { uri ->
-                            div("ov-card__row") {
-                                span("ov-card__value ov-card__value--mono") { +uri }
-                            }
+                    application.redirectUris.forEach { uri ->
+                        div("ov-card__row") {
+                            span("ov-card__value ov-card__value--mono") { +uri }
                         }
                     }
                 }
             }
 
-            divider()
-
             // ── Danger zone ──────────────────────────────────────────
-            section(title = "Danger zone", danger = true) {
+            div("ov-card") {
+                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
                 div("danger-zone") {
                     dangerZoneCard(
                         title = "Disable this application",
@@ -207,112 +202,127 @@ internal fun createApplicationPageImpl(
             apps = appPairs,
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"New Application" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                workspace.slug to "/admin/workspaces/${workspace.slug}",
+                "New Application" to null,
+            )
+
+            // ── Page header with external submit ───────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Create Application" }
-                    p("page-subtitle") {
+                div("page-header__left") {
+                    h1("page-header__title") { +"Create Application" }
+                    p("page-header__sub") {
                         +"Register a new OAuth2 / OIDC application in the "
                         strong { +workspace.displayName }
                         +" workspace."
                     }
                 }
+                div("page-header__actions") {
+                    a("/admin/workspaces/${workspace.slug}", classes = "btn btn--ghost") { +"Cancel" }
+                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                        attributes["form"] = "create-app-form"
+                        +"Create Application"
+                    }
+                }
             }
+
             if (error != null) {
-                div("alert alert-error") { +error }
+                div("notice notice--error") { +error }
             }
-            div("form-card") {
+
+            // ── Identity card ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/applications",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                     method = FormMethod.post,
                 ) {
-                    div("field") {
-                        label {
-                            htmlFor = "clientId"
-                            +"Client ID"
+                    id = "create-app-form"
+
+                    div("edit-row") {
+                        span("edit-row__label") { +"Client ID" }
+                        div {
+                            input(type = InputType.text, name = "clientId") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                this.id = "clientId"
+                                placeholder = "my-frontend"
+                                required = true
+                                value = prefill.clientId
+                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                            }
+                            div("edit-row__hint") {
+                                +"Unique identifier, e.g. my-frontend. Immutable after creation."
+                            }
                         }
-                        input(type = InputType.text, name = "clientId") {
-                            id = "clientId"
-                            placeholder = "my-frontend"
-                            required = true
-                            value = prefill.clientId
-                            attributes["pattern"] = "[a-zA-Z0-9._-]+"
-                        }
-                        p("field-hint") { +"Unique identifier, e.g. my-frontend. Immutable after creation." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "name"
-                            +"Name"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
                         input(type = InputType.text, name = "name") {
-                            id = "name"
+                            classes = setOf("edit-row__field")
+                            this.id = "name"
                             placeholder = "My Frontend App"
                             required = true
                             value = prefill.name
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "description"
-                            +"Description (optional)"
-                        }
-                        input(type = InputType.text, name = "description") {
-                            id = "description"
-                            placeholder = "Short description of this application"
-                            value = prefill.description
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
+                        div {
+                            input(type = InputType.text, name = "description") {
+                                classes = setOf("edit-row__field")
+                                this.id = "description"
+                                placeholder = "Short description of this application"
+                                value = prefill.description
+                            }
+                            div("edit-row__hint") { +"Optional." }
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "accessType"
-                            +"Access Type"
+                }
+            }
+
+            // ── Access card ────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Access" }
+                div("edit-row") {
+                    span("edit-row__label") { +"Access Type" }
+                    select {
+                        attributes["form"] = "create-app-form"
+                        name = "accessType"
+                        id = "accessType"
+                        classes = setOf("edit-row__field")
+                        option {
+                            value = "public"
+                            selected = (prefill.accessType == "public")
+                            +"Public — browser / SPA / mobile (no secret)"
                         }
-                        select {
-                            name = "accessType"
-                            id = "accessType"
-                            option {
-                                value = "public"
-                                selected = (prefill.accessType == "public")
-                                +"Public — browser / SPA / mobile (no secret)"
-                            }
-                            option {
-                                value = "confidential"
-                                selected = (prefill.accessType == "confidential")
-                                +"Confidential — server-side app with a secret"
-                            }
-                            option {
-                                value = "bearer_only"
-                                selected = (prefill.accessType == "bearer_only")
-                                +"Bearer Only — resource server (validates tokens only)"
-                            }
+                        option {
+                            value = "confidential"
+                            selected = (prefill.accessType == "confidential")
+                            +"Confidential — server-side app with a secret"
+                        }
+                        option {
+                            value = "bearer_only"
+                            selected = (prefill.accessType == "bearer_only")
+                            +"Bearer Only — resource server (validates tokens only)"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "redirectUris"
-                            +"Redirect URIs"
-                        }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Redirect URIs" }
+                    div {
                         textArea {
+                            attributes["form"] = "create-app-form"
                             name = "redirectUris"
                             id = "redirectUris"
                             rows = "4"
+                            classes = setOf("edit-row__field")
                             attributes["placeholder"] =
                                 "https://app.example.com/callback\nhttps://localhost:3000/callback"
                             +prefill.redirectUris
                         }
-                        p("field-hint") { +"One URI per line. These are allowed OAuth2 callback URLs." }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Create Application" }
-                        a("/admin/workspaces/${workspace.slug}", classes = "btn btn-ghost") { +"Cancel" }
+                        div("edit-row__hint") { +"One URI per line. These are allowed OAuth2 callback URLs." }
                     }
                 }
             }
@@ -341,114 +351,124 @@ internal fun editApplicationPageImpl(
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                a("/admin/workspaces/${workspace.slug}") { +workspace.slug }
-                span("breadcrumb-sep") { +"/" }
-                a(
+            breadcrumb(
+                "Workspaces" to "/admin",
+                workspace.slug to "/admin/workspaces/${workspace.slug}",
+                application.clientId to
                     "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
-                ) { +application.clientId }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"Edit" }
-            }
+                "Edit" to null,
+            )
+
+            // ── Page header with external submit ───────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Edit Application" }
-                    p("page-subtitle") { +"Update settings for ${application.name}." }
+                div("page-header__left") {
+                    h1("page-header__title") { +"Edit Application" }
+                    p("page-header__sub") { +"Update settings for ${application.name}." }
+                }
+                div("page-header__actions") {
+                    a(
+                        "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
+                        classes = "btn btn--ghost",
+                    ) { +"Cancel" }
+                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                        attributes["form"] = "edit-app-form"
+                        +"Save Changes"
+                    }
                 }
             }
+
             if (error != null) {
-                div("alert alert-error alert--constrained") {
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
-            div("form-card") {
+
+            // ── Identity card ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                     method = FormMethod.post,
                 ) {
-                    p("form-section-title") { +"Identity" }
-                    div("field") {
-                        label { +"Client ID" }
-                        input(type = InputType.text) {
-                            disabled = true
-                            value = application.clientId
+                    id = "edit-app-form"
+
+                    div("edit-row") {
+                        span("edit-row__label") { +"Client ID" }
+                        div {
+                            input(type = InputType.text) {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                disabled = true
+                                value = application.clientId
+                            }
+                            div("edit-row__hint") {
+                                +"Client ID is immutable — it may appear in issued tokens."
+                            }
                         }
-                        p("field-hint") { +"Client ID is immutable — it may appear in issued tokens." }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "name"
-                            +"Name"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Name" }
                         input(type = InputType.text, name = "name") {
-                            id = "name"
+                            classes = setOf("edit-row__field")
+                            this.id = "name"
                             required = true
                             value = application.name
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "description"
-                            +"Description (optional)"
-                        }
-                        input(type = InputType.text, name = "description") {
-                            id = "description"
-                            placeholder = "Short description of this application"
-                            value = application.description ?: ""
+                    div("edit-row") {
+                        span("edit-row__label") { +"Description" }
+                        div {
+                            input(type = InputType.text, name = "description") {
+                                classes = setOf("edit-row__field")
+                                this.id = "description"
+                                placeholder = "Short description of this application"
+                                value = application.description ?: ""
+                            }
+                            div("edit-row__hint") { +"Optional." }
                         }
                     }
+                }
+            }
 
-                    p("form-section-title") { +"Access" }
-                    div("field") {
-                        label {
-                            htmlFor = "accessType"
-                            +"Access Type"
+            // ── Access card ────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Access" }
+                div("edit-row") {
+                    span("edit-row__label") { +"Access Type" }
+                    select {
+                        attributes["form"] = "edit-app-form"
+                        name = "accessType"
+                        id = "accessType"
+                        classes = setOf("edit-row__field")
+                        option {
+                            value = "public"
+                            selected = (application.accessType == AccessType.PUBLIC)
+                            +"Public — browser / SPA / mobile (no secret)"
                         }
-                        select {
-                            name = "accessType"
-                            id = "accessType"
-                            option {
-                                value = "public"
-                                selected = (application.accessType == AccessType.PUBLIC)
-                                +"Public — browser / SPA / mobile (no secret)"
-                            }
-                            option {
-                                value = "confidential"
-                                selected = (application.accessType == AccessType.CONFIDENTIAL)
-                                +"Confidential — server-side app with a secret"
-                            }
-                            option {
-                                value = "bearer_only"
-                                selected = (application.accessType == AccessType.BEARER_ONLY)
-                                +"Bearer Only — resource server (validates tokens only)"
-                            }
+                        option {
+                            value = "confidential"
+                            selected = (application.accessType == AccessType.CONFIDENTIAL)
+                            +"Confidential — server-side app with a secret"
+                        }
+                        option {
+                            value = "bearer_only"
+                            selected = (application.accessType == AccessType.BEARER_ONLY)
+                            +"Bearer Only — resource server (validates tokens only)"
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "redirectUris"
-                            +"Redirect URIs"
-                        }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Redirect URIs" }
+                    div {
                         textArea {
+                            attributes["form"] = "edit-app-form"
                             name = "redirectUris"
                             id = "redirectUris"
                             rows = "4"
+                            classes = setOf("edit-row__field")
                             attributes["placeholder"] =
                                 "https://app.example.com/callback\nhttps://localhost:3000/callback"
                             +application.redirectUris.joinToString("\n")
                         }
-                        p("field-hint") { +"One URI per line." }
-                    }
-
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Save Changes" }
-                        a(
-                            "/admin/workspaces/${workspace.slug}/applications/${application.clientId}",
-                            classes = "btn btn-ghost",
-                        ) { +"Cancel" }
+                        div("edit-row__hint") { +"One URI per line." }
                     }
                 }
             }

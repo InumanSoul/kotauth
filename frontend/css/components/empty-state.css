@@ -76,6 +76,12 @@
   font-family: var(--font-sans);
 }
 
+.empty-state__cta svg {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+}
+
 .empty-state__cta:hover { background: rgba(31, 188, 255, 0.14); }
 
 /* ── Legacy classes (keep until Phase 2) ───────────────────────────────── */

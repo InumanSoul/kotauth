@@ -17,6 +17,9 @@
  */
 
 /* ── User header ───────────────────────────────────────────────────────── */
+#profile-section{
+  margin-bottom: 20px;
+}
 
 .user-header {
   display: flex;

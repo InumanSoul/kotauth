@@ -102,32 +102,6 @@ fun DIV.pageHeaderWithTitleRow(
     }
 }
 
-/**
- * Renders a content section with header (title + optional action).
- */
-fun DIV.section(
-    title: String,
-    description: String? = null,
-    danger: Boolean = false,
-    action: (DIV.() -> Unit)? = null,
-    content: DIV.() -> Unit,
-) {
-    div("section") {
-        div("section__header") {
-            div {
-                span("section__title${if (danger) " section__title--danger" else ""}") { +title }
-                if (description != null) {
-                    div("section__desc") { +description }
-                }
-            }
-            if (action != null) {
-                action()
-            }
-        }
-        content()
-    }
-}
-
 /** Starts an ov-card block. Content lambda receives the DIV to add rows. */
 fun DIV.ovCard(content: DIV.() -> Unit) {
     div("ov-card") { content() }
@@ -234,11 +208,6 @@ fun DIV.notice(
             }
         }
     }
-}
-
-/** Horizontal divider. */
-fun DIV.divider() {
-    div("divider") {}
 }
 
 /** BEM empty state with icon, title, description, and optional CTA. */

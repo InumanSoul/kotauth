@@ -9,7 +9,9 @@ import com.kauth.domain.model.WebhookEvent
 import kotlinx.html.*
 import java.time.format.DateTimeFormatter
 
-internal fun webhooksPageImpl(
+// ─── Webhooks List Page ─────────────────────────────────────────────────────
+
+internal fun webhooksListPageImpl(
     workspace: Tenant,
     endpoints: List<WebhookEndpoint>,
     deliveries: List<WebhookDelivery>,
@@ -20,7 +22,6 @@ internal fun webhooksPageImpl(
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
-        val totalEvents = WebhookEvent.ALL.size
 
         adminShell(
             pageTitle = "Webhooks — ${workspace.displayName}",
@@ -49,6 +50,13 @@ internal fun webhooksPageImpl(
                         }
                     }
                 }
+                div("page-header__actions") {
+                    primaryLink(
+                        "/admin/workspaces/$slug/settings/webhooks/new",
+                        "New Endpoint",
+                        "plus",
+                    )
+                }
             }
 
             // ── One-time secret reveal ───────────────────────────────
@@ -75,12 +83,22 @@ internal fun webhooksPageImpl(
                 div("notice notice--error") { +error }
             }
 
-            // ── Existing endpoints ───────────────────────────────────
-            if (endpoints.isEmpty()) {
-                div("empty-state") {
-                    p("empty-state__title") { +"No webhook endpoints yet" }
-                    p("empty-state__desc") { +"Add an endpoint below to start receiving event deliveries." }
-                }
+            // ── Endpoints table / empty state ────────────────────────
+            if (endpoints.isEmpty() && newSecret == null) {
+                emptyState(
+                    iconName = "pulse",
+                    title = "No webhook endpoints yet",
+                    description = "Add an endpoint to start receiving event deliveries.",
+                    cta = {
+                        a(
+                            href = "/admin/workspaces/$slug/settings/webhooks/new",
+                            classes = "empty-state__cta",
+                        ) {
+                            inlineSvgIcon("plus", "New")
+                            +"Add Endpoint"
+                        }
+                    },
+                )
             } else {
                 table("key-table") {
                     thead {
@@ -116,29 +134,31 @@ internal fun webhooksPageImpl(
                                     }
                                 }
                                 td {
-                                    // Toggle
-                                    form(
-                                        action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/toggle",
-                                        method = FormMethod.post,
-                                    ) {
-                                        input(type = InputType.hidden, name = "enabled") {
-                                            value = if (ep.enabled) "false" else "true"
+                                    div("data-table__actions") {
+                                        // Toggle
+                                        form(
+                                            action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/toggle",
+                                            method = FormMethod.post,
+                                        ) {
+                                            input(type = InputType.hidden, name = "enabled") {
+                                                value = if (ep.enabled) "false" else "true"
+                                            }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                +(if (ep.enabled) "Disable" else "Enable")
+                                            }
                                         }
-                                        button(type = ButtonType.submit) {
-                                            classes = setOf("btn", "btn--ghost", "btn--sm")
-                                            +(if (ep.enabled) "Disable" else "Enable")
-                                        }
-                                    }
-                                    // Delete
-                                    form(
-                                        action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/delete",
-                                        method = FormMethod.post,
-                                    ) {
-                                        button(type = ButtonType.submit) {
-                                            classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
-                                            attributes["data-confirm"] =
-                                                "Delete this webhook endpoint? All delivery history will be lost."
-                                            +"Delete"
+                                        // Delete
+                                        form(
+                                            action = "/admin/workspaces/$slug/settings/webhooks/${ep.id}/delete",
+                                            method = FormMethod.post,
+                                        ) {
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
+                                                attributes["data-confirm"] =
+                                                    "Delete this webhook endpoint? All delivery history will be lost."
+                                                +"Delete"
+                                            }
                                         }
                                     }
                                 }
@@ -148,14 +168,123 @@ internal fun webhooksPageImpl(
                 }
             }
 
-            // ── Add endpoint form ────────────────────────────────────
+            // ── Recent delivery history ──────────────────────────────
+            if (deliveries.isNotEmpty()) {
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Recent Delivery History" }
+                    table("key-table") {
+                        thead {
+                            tr {
+                                th { +"Event" }
+                                th { +"Endpoint" }
+                                th { +"Status" }
+                                th { +"HTTP" }
+                                th { +"Attempts" }
+                                th { +"Last attempt" }
+                            }
+                        }
+                        tbody {
+                            deliveries.take(50).forEach { d ->
+                                val ep = endpoints.firstOrNull { it.id == d.endpointId }
+                                tr {
+                                    td { span("key-table__meta") { +d.eventType } }
+                                    td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
+                                    td {
+                                        span(
+                                            when (d.status) {
+                                                WebhookDeliveryStatus.DELIVERED -> "badge badge--active"
+                                                WebhookDeliveryStatus.FAILED -> "badge badge--danger"
+                                                WebhookDeliveryStatus.PENDING -> "badge badge--inactive"
+                                            },
+                                        ) {
+                                            +d.status.value
+                                        }
+                                    }
+                                    td { span("key-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
+                                    td { span("key-table__meta") { +d.attempts.toString() } }
+                                    td {
+                                        span("key-table__meta") {
+                                            +(
+                                                d.lastAttemptAt?.let {
+                                                    DateTimeFormatter
+                                                        .ofPattern("MMM d HH:mm")
+                                                        .withZone(java.time.ZoneId.of("UTC"))
+                                                        .format(it)
+                                                } ?: "\u2014"
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+// ─── Create Webhook Endpoint Page ───────────────────────────────────────────
+
+internal fun createWebhookPageImpl(
+    workspace: Tenant,
+    allWorkspaces: List<Pair<String, String>>,
+    loggedInAs: String,
+    error: String? = null,
+): HTML.() -> Unit =
+    {
+        val slug = workspace.slug
+        val totalEvents = WebhookEvent.ALL.size
+
+        adminShell(
+            pageTitle = "New Endpoint — ${workspace.displayName}",
+            activeRail = "settings",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = slug,
+            loggedInAs = loggedInAs,
+            activeAppSection = "webhooks",
+        ) {
+            // ── Breadcrumb ───────────────────────────────────────────
+            breadcrumb(
+                "Workspaces" to "/admin",
+                slug to "/admin/workspaces/$slug",
+                "Settings" to "/admin/workspaces/$slug/settings",
+                "Webhooks" to "/admin/workspaces/$slug/settings/webhooks",
+                "New Endpoint" to null,
+            )
+
+            // ── Page header ──────────────────────────────────────────
+            div("page-header") {
+                div("page-header__left") {
+                    div("page-header__identity") {
+                        h1("page-header__title") { +"Add Webhook Endpoint" }
+                        p("page-header__sub") {
+                            +"KotAuth will POST signed JSON payloads to your endpoint."
+                        }
+                    }
+                }
+                div("page-header__actions") {
+                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                        attributes["form"] = "create-webhook-form"
+                        +"Add Endpoint"
+                    }
+                }
+            }
+
+            if (error != null) {
+                div("notice notice--error") { +error }
+            }
+
+            // ── Endpoint details ─────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") { +"Add Webhook Endpoint" }
+                div("ov-card__section-label") { +"Endpoint Details" }
                 form(
                     action = "/admin/workspaces/$slug/settings/webhooks",
                     method = FormMethod.post,
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                 ) {
+                    id = "create-webhook-form"
+
                     div("edit-row") {
                         span("edit-row__label") { +"Target URL" }
                         div {
@@ -165,7 +294,7 @@ internal fun webhooksPageImpl(
                                 required = true
                                 maxLength = "2048"
                             }
-                            div("edit-row__hint") { +"KotAuth will POST signed JSON payloads to this URL." }
+                            div("edit-row__hint") { +"Must be HTTPS for production use." }
                         }
                     }
                     div("edit-row") {
@@ -176,95 +305,41 @@ internal fun webhooksPageImpl(
                             maxLength = "256"
                         }
                     }
-
-                    // ── Events chip grid ─────────────────────────────
-                    div {
-                        div("chip-grid__header") {
-                            span("chip-grid__header-label") { +"Events" }
-                            div("chip-grid__header-actions") {
-                                span("chip-grid__count") {
-                                    id = "events-count"
-                                    +"0 / $totalEvents selected"
-                                }
-                                button(type = ButtonType.button) {
-                                    classes = setOf("chip-grid__toggle")
-                                    attributes["data-chips-all"] = "events-grid"
-                                    +"All"
-                                }
-                                button(type = ButtonType.button) {
-                                    classes = setOf("chip-grid__toggle")
-                                    attributes["data-chips-none"] = "events-grid"
-                                    +"None"
-                                }
-                            }
-                        }
-                        div("chip-grid") {
-                            id = "events-grid"
-                            WebhookEvent.ALL.forEach { event ->
-                                label("scope-chip") {
-                                    input(type = InputType.checkBox, name = "events") {
-                                        value = event
-                                    }
-                                    span("scope-chip__label") { +event }
-                                }
-                            }
-                        }
-                    }
-
-                    div("edit-actions") {
-                        button(type = ButtonType.submit) {
-                            classes = setOf("btn", "btn--primary")
-                            +"Add Endpoint"
-                        }
-                    }
                 }
             }
 
-            // ── Recent delivery history ──────────────────────────────
-            if (deliveries.isNotEmpty()) {
-                div("ov-card__section-label") { +"Recent Delivery History" }
-                table("key-table") {
-                    thead {
-                        tr {
-                            th { +"Event" }
-                            th { +"Endpoint" }
-                            th { +"Status" }
-                            th { +"HTTP" }
-                            th { +"Attempts" }
-                            th { +"Last attempt" }
+            // ── Events card ──────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Events" }
+                div {
+                    div("chip-grid__header") {
+                        span("chip-grid__header-label") { +"Select which events trigger this webhook" }
+                        div("chip-grid__header-actions") {
+                            span("chip-grid__count") {
+                                id = "events-count"
+                                +"0 / $totalEvents selected"
+                            }
+                            button(type = ButtonType.button) {
+                                classes = setOf("chip-grid__toggle")
+                                attributes["data-chips-all"] = "events-grid"
+                                +"All"
+                            }
+                            button(type = ButtonType.button) {
+                                classes = setOf("chip-grid__toggle")
+                                attributes["data-chips-none"] = "events-grid"
+                                +"None"
+                            }
                         }
                     }
-                    tbody {
-                        deliveries.take(50).forEach { d ->
-                            val ep = endpoints.firstOrNull { it.id == d.endpointId }
-                            tr {
-                                td { span("key-table__meta") { +d.eventType } }
-                                td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
-                                td {
-                                    span(
-                                        when (d.status) {
-                                            WebhookDeliveryStatus.DELIVERED -> "badge badge--active"
-                                            WebhookDeliveryStatus.FAILED -> "badge badge--danger"
-                                            WebhookDeliveryStatus.PENDING -> "badge badge--inactive"
-                                        },
-                                    ) {
-                                        +d.status.value
-                                    }
+                    div("chip-grid") {
+                        id = "events-grid"
+                        WebhookEvent.ALL.forEach { event ->
+                            label("scope-chip") {
+                                input(type = InputType.checkBox, name = "events") {
+                                    value = event
+                                    attributes["form"] = "create-webhook-form"
                                 }
-                                td { span("key-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
-                                td { span("key-table__meta") { +d.attempts.toString() } }
-                                td {
-                                    span("key-table__meta") {
-                                        +(
-                                            d.lastAttemptAt?.let {
-                                                DateTimeFormatter
-                                                    .ofPattern("MMM d HH:mm")
-                                                    .withZone(java.time.ZoneId.of("UTC"))
-                                                    .format(it)
-                                            } ?: "\u2014"
-                                        )
-                                    }
-                                }
+                                span("scope-chip__label") { +event }
                             }
                         }
                     }

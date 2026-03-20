@@ -159,79 +159,87 @@ internal fun workspaceDetailPageImpl(
                 }
             }
 
-            // ── Applications table ───────────────────────────────────
-            div("section__header") {
-                div {
-                    div("section__title") { +"Applications" }
-                    div("section__desc") { +"OAuth2 / OIDC clients registered in this workspace" }
-                }
-            }
-
-            if (apps.isEmpty()) {
-                emptyState(
-                    iconName = "redirect",
-                    title = "No applications yet",
-                    description = "Register your first OAuth2 / OIDC client to get started.",
-                ) {
+            // ── Applications ────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") {
+                    +"Applications"
                     a(
                         href = "/admin/workspaces/${workspace.slug}/applications/new",
-                        classes = "empty-state__cta",
+                        classes = "btn btn--ghost btn--sm",
                     ) { +"+ New Application" }
                 }
-            } else {
-                table("data-table") {
-                    thead {
-                        tr {
-                            th {
-                                style = "width:210px;"
-                                +"Client ID"
-                            }
-                            th { +"Name" }
-                            th {
-                                style = "width:110px;"
-                                +"Type"
-                            }
-                            th {
-                                style = "width:110px;"
-                                +"Status"
-                            }
-                            th { style = "width:70px;" }
-                        }
+
+                if (apps.isEmpty()) {
+                    emptyState(
+                        iconName = "redirect",
+                        title = "No applications yet",
+                        description = "Register your first OAuth2 / OIDC client to get started.",
+                    ) {
+                        a(
+                            href = "/admin/workspaces/${workspace.slug}/applications/new",
+                            classes = "empty-state__cta",
+                        ) { +"+ New Application" }
                     }
-                    tbody {
-                        apps.forEach { app ->
+                } else {
+                    table("data-table") {
+                        thead {
                             tr {
-                                td {
-                                    a(
-                                        href = "/admin/workspaces/${workspace.slug}/applications/${app.clientId}",
-                                        classes = "data-table__id",
-                                    ) { +app.clientId }
+                                th {
+                                    style = "width:210px;"
+                                    +"Client ID"
                                 }
-                                td { span("data-table__name") { +app.name } }
-                                td {
-                                    span("badge badge--public") { +app.accessType.label.uppercase() }
+                                th { +"Name" }
+                                th {
+                                    style = "width:110px;"
+                                    +"Type"
                                 }
-                                td {
-                                    if (app.enabled) {
-                                        span("badge badge--active") {
-                                            span("badge__dot") {}
-                                            +"ACTIVE"
-                                        }
-                                    } else {
-                                        span("badge badge--inactive") {
-                                            span("badge__dot") {}
-                                            +"DISABLED"
+                                th {
+                                    style = "width:110px;"
+                                    +"Status"
+                                }
+                                th { style = "width:70px;" }
+                            }
+                        }
+                        tbody {
+                            apps.forEach { app ->
+                                tr {
+                                    td {
+                                        a(
+                                            href =
+                                                "/admin/workspaces/${workspace.slug}/applications/${app.clientId}",
+                                            classes = "data-table__id",
+                                        ) { +app.clientId }
+                                    }
+                                    td { span("data-table__name") { +app.name } }
+                                    td {
+                                        span("badge badge--public") {
+                                            +app.accessType.label.uppercase()
                                         }
                                     }
-                                }
-                                td {
-                                    div("data-table__actions") {
-                                        a(
-                                            href = "/admin/workspaces/${workspace.slug}/applications/${app.clientId}",
-                                            classes = "btn btn--ghost btn--sm",
-                                        ) {
-                                            +"Open"
-                                            inlineSvgIcon("open-sm", "open")
+                                    td {
+                                        if (app.enabled) {
+                                            span("badge badge--active") {
+                                                span("badge__dot") {}
+                                                +"ACTIVE"
+                                            }
+                                        } else {
+                                            span("badge badge--inactive") {
+                                                span("badge__dot") {}
+                                                +"DISABLED"
+                                            }
+                                        }
+                                    }
+                                    td {
+                                        div("data-table__actions") {
+                                            a(
+                                                href =
+                                                    "/admin/workspaces/${workspace.slug}" +
+                                                        "/applications/${app.clientId}",
+                                                classes = "btn btn--ghost btn--sm",
+                                            ) {
+                                                +"Open"
+                                                inlineSvgIcon("open-sm", "open")
+                                            }
                                         }
                                     }
                                 }
@@ -283,119 +291,144 @@ internal fun createWorkspacePageImpl(
             workspaceSlug = null,
             loggedInAs = loggedInAs,
         ) {
-            div("breadcrumb") {
-                a("/admin") { +"Workspaces" }
-                span("breadcrumb-sep") { +"/" }
-                span("breadcrumb-current") { +"New Workspace" }
-            }
+            breadcrumb(
+                "Workspaces" to "/admin",
+                "New Workspace" to null,
+            )
+
+            // ── Page header with external submit ───────────────────
             div("page-header") {
-                div {
-                    p("page-title") { +"Create Workspace" }
-                    p("page-subtitle") {
+                div("page-header__left") {
+                    h1("page-header__title") { +"Create Workspace" }
+                    p("page-header__sub") {
                         +"A workspace is an isolated authorization boundary — like an Auth0 tenant."
                     }
                 }
+                div("page-header__actions") {
+                    a("/admin", classes = "btn btn--ghost") { +"Cancel" }
+                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                        attributes["form"] = "create-workspace-form"
+                        +"Create Workspace"
+                    }
+                }
             }
+
             if (error != null) {
-                div("alert alert-error") { +error }
+                div("notice notice--error") { +error }
             }
-            div("form-card") {
+
+            // ── Identity card ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Identity" }
                 form(
                     action = "/admin/workspaces",
                     encType = FormEncType.applicationXWwwFormUrlEncoded,
                     method = FormMethod.post,
                 ) {
-                    p("form-section-title") { +"Identity" }
-                    div("field") {
-                        label {
-                            htmlFor = "slug"
-                            +"Slug"
+                    id = "create-workspace-form"
+
+                    div("edit-row") {
+                        span("edit-row__label") { +"Slug" }
+                        div {
+                            input(type = InputType.text, name = "slug") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                this.id = "slug"
+                                placeholder = "my-company"
+                                value = prefill.slug
+                                required = true
+                                attributes["pattern"] = "[a-z0-9-]+"
+                            }
+                            div("edit-row__hint") {
+                                +"Lowercase letters, numbers, hyphens. Used in token URLs: /t/my-company/…"
+                            }
                         }
-                        input(type = InputType.text, name = "slug") {
-                            id = "slug"
-                            placeholder = "my-company"
-                            value = prefill.slug
-                            required = true
-                            attributes["pattern"] = "[a-z0-9-]+"
-                        }
-                        p(
-                            "field-hint",
-                        ) { +"Lowercase letters, numbers, hyphens. Used in token URLs: /t/my-company/…" }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "displayName"
-                            +"Display Name"
-                        }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Display Name" }
                         input(type = InputType.text, name = "displayName") {
-                            id = "displayName"
+                            classes = setOf("edit-row__field")
+                            this.id = "displayName"
                             placeholder = "Acme Inc"
                             value = prefill.displayName
                             required = true
                         }
                     }
-                    div("field") {
-                        label {
-                            htmlFor = "issuerUrl"
-                            +"Issuer URL (optional)"
-                        }
-                        input(type = InputType.url, name = "issuerUrl") {
-                            id = "issuerUrl"
-                            placeholder = "https://auth.acme.com"
-                            value = prefill.issuerUrl
-                        }
-                        p("field-hint") { +"The 'iss' claim in tokens. Defaults to /t/{slug} if blank." }
-                    }
-                    p("form-section-title") { +"Registration Policy" }
-                    div("checkbox-row") {
-                        input(type = InputType.checkBox, name = "registrationEnabled") {
-                            id = "registrationEnabled"
-                            if (prefill.registrationEnabled) checked = true
-                            attributes["value"] = "true"
-                        }
-                        label("checkbox-label") {
-                            htmlFor = "registrationEnabled"
-                            +"Allow public registration"
+                    div("edit-row") {
+                        span("edit-row__label") { +"Issuer URL" }
+                        div {
+                            input(type = InputType.url, name = "issuerUrl") {
+                                classes = setOf("edit-row__field")
+                                this.id = "issuerUrl"
+                                placeholder = "https://auth.acme.com"
+                                value = prefill.issuerUrl
+                            }
+                            div("edit-row__hint") {
+                                +"The 'iss' claim in tokens. Defaults to /t/{slug} if blank."
+                            }
                         }
                     }
-                    div("checkbox-row") {
-                        input(type = InputType.checkBox, name = "emailVerificationRequired") {
-                            id = "emailVerificationRequired"
-                            if (prefill.emailVerificationRequired) checked = true
-                            attributes["value"] = "true"
-                        }
-                        label("checkbox-label") {
-                            htmlFor = "emailVerificationRequired"
-                            +"Require email verification"
-                        }
+                }
+            }
+
+            // ── Registration Policy card ───────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Registration Policy" }
+                div("check-row") {
+                    input(type = InputType.checkBox, name = "registrationEnabled") {
+                        attributes["form"] = "create-workspace-form"
+                        this.id = "registrationEnabled"
+                        if (prefill.registrationEnabled) checked = true
+                        attributes["value"] = "true"
                     }
-                    p("form-section-title") { +"Branding" }
-                    div("field") {
-                        label {
-                            htmlFor = "themeAccentColor"
-                            +"Accent Color"
-                        }
+                    label {
+                        htmlFor = "registrationEnabled"
+                        +"Allow public registration"
+                    }
+                }
+                div("check-row") {
+                    input(type = InputType.checkBox, name = "emailVerificationRequired") {
+                        attributes["form"] = "create-workspace-form"
+                        this.id = "emailVerificationRequired"
+                        if (prefill.emailVerificationRequired) checked = true
+                        attributes["value"] = "true"
+                    }
+                    label {
+                        htmlFor = "emailVerificationRequired"
+                        +"Require email verification"
+                    }
+                }
+            }
+
+            // ── Branding card ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Branding" }
+                div("edit-row") {
+                    span("edit-row__label") { +"Accent Color" }
+                    div {
                         input(type = InputType.color, name = "themeAccentColor") {
-                            id = "themeAccentColor"
+                            attributes["form"] = "create-workspace-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "themeAccentColor"
                             value = prefill.themeAccentColor
                         }
-                        p("field-hint") { +"Primary brand color used on the tenant's login page." }
-                    }
-                    div("field") {
-                        label {
-                            htmlFor = "themeLogoUrl"
-                            +"Logo URL (optional)"
+                        div("edit-row__hint") {
+                            +"Primary brand color used on the tenant's login page."
                         }
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Logo URL" }
+                    div {
                         input(type = InputType.url, name = "themeLogoUrl") {
-                            id = "themeLogoUrl"
+                            attributes["form"] = "create-workspace-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "themeLogoUrl"
                             placeholder = "https://cdn.acme.com/logo.png"
                             value = prefill.themeLogoUrl
                         }
-                        p("field-hint") { +"Shown above the login card. Max 180×48px recommended." }
-                    }
-                    div("form-actions") {
-                        button(type = ButtonType.submit, classes = "btn") { +"Create Workspace" }
-                        a("/admin", classes = "btn btn-ghost") { +"Cancel" }
+                        div("edit-row__hint") {
+                            +"Shown above the login card. Max 180×48px recommended."
+                        }
                     }
                 }
             }
@@ -886,7 +919,6 @@ internal fun brandingPageImpl(
                                 value = t.borderRadius
                                 placeholder = "e.g. 0px, 6px, 12px"
                                 attributes["data-radius-input"] = ""
-                                style = "margin-top:6px; margin:6px 16px 14px;"
                             }
                         }
                     }

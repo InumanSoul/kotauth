@@ -254,17 +254,17 @@ internal fun identityProvidersPageImpl(
         }
     }
 
-internal fun apiKeysPageImpl(
+// ─── API Keys ───────────────────────────────────────────────────────────────
+
+internal fun apiKeysListPageImpl(
     workspace: Tenant,
     apiKeys: List<ApiKey>,
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
     newKeyRaw: String? = null,
     error: String? = null,
-    scopes: List<String> = ApiScope.ALL,
 ): HTML.() -> Unit = {
     val slug = workspace.slug
-    val totalScopes = scopes.size
 
     adminShell(
         pageTitle = "API Keys — ${workspace.displayName}",
@@ -293,6 +293,13 @@ internal fun apiKeysPageImpl(
                     }
                 }
             }
+            div("page-header__actions") {
+                primaryLink(
+                    "/admin/workspaces/$slug/settings/api-keys/new",
+                    "New API Key",
+                    "plus",
+                )
+            }
         }
 
         // ── One-time key reveal ──────────────────────────────────
@@ -315,12 +322,22 @@ internal fun apiKeysPageImpl(
             div("notice notice--error") { +error }
         }
 
-        // ── Existing keys table ──────────────────────────────────
-        if (apiKeys.isEmpty()) {
-            div("empty-state") {
-                p("empty-state__title") { +"No API keys yet" }
-                p("empty-state__desc") { +"Create a key below to enable machine-to-machine access." }
-            }
+        // ── Keys table / empty state ─────────────────────────────
+        if (apiKeys.isEmpty() && newKeyRaw == null) {
+            emptyState(
+                iconName = "code",
+                title = "No API keys yet",
+                description = "Create a key to enable machine-to-machine access to this workspace.",
+                cta = {
+                    a(
+                        href = "/admin/workspaces/$slug/settings/api-keys/new",
+                        classes = "empty-state__cta",
+                    ) {
+                        inlineSvgIcon("plus", "New")
+                        +"Create API Key"
+                    }
+                },
+            )
         } else {
             table("key-table") {
                 thead {
@@ -400,15 +417,69 @@ internal fun apiKeysPageImpl(
                 }
             }
         }
+    }
+}
 
-        // ── Create new key form ──────────────────────────────────
+internal fun createApiKeyPageImpl(
+    workspace: Tenant,
+    allWorkspaces: List<Pair<String, String>>,
+    loggedInAs: String,
+    error: String? = null,
+    scopes: List<String> = ApiScope.ALL,
+): HTML.() -> Unit = {
+    val slug = workspace.slug
+    val totalScopes = scopes.size
+
+    adminShell(
+        pageTitle = "New API Key — ${workspace.displayName}",
+        activeRail = "settings",
+        allWorkspaces = allWorkspaces,
+        workspaceName = workspace.displayName,
+        workspaceSlug = slug,
+        loggedInAs = loggedInAs,
+        activeAppSection = "api-keys",
+    ) {
+        // ── Breadcrumb ───────────────────────────────────────────
+        breadcrumb(
+            "Workspaces" to "/admin",
+            slug to "/admin/workspaces/$slug",
+            "Settings" to "/admin/workspaces/$slug/settings",
+            "API Keys" to "/admin/workspaces/$slug/settings/api-keys",
+            "New API Key" to null,
+        )
+
+        // ── Page header ──────────────────────────────────────────
+        div("page-header") {
+            div("page-header__left") {
+                div("page-header__identity") {
+                    h1("page-header__title") { +"Create API Key" }
+                    p("page-header__sub") {
+                        +"The key value is shown once after creation. Store it securely."
+                    }
+                }
+            }
+            div("page-header__actions") {
+                button(type = ButtonType.submit, classes = "btn btn--primary") {
+                    attributes["form"] = "create-api-key-form"
+                    +"Create API Key"
+                }
+            }
+        }
+
+        if (error != null) {
+            div("notice notice--error") { +error }
+        }
+
+        // ── Form ─────────────────────────────────────────────────
         div("ov-card") {
-            div("ov-card__section-label") { +"Create New API Key" }
+            div("ov-card__section-label") { +"Key Details" }
             form(
                 action = "/admin/workspaces/$slug/settings/api-keys",
                 method = FormMethod.post,
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
             ) {
+                id = "create-api-key-form"
+
                 div("edit-row") {
                     span("edit-row__label") { +"Name" }
                     div {
@@ -422,40 +493,6 @@ internal fun apiKeysPageImpl(
                     }
                 }
 
-                // ── Scopes chip grid ─────────────────────────────
-                div {
-                    div("chip-grid__header") {
-                        span("chip-grid__header-label") { +"Scopes" }
-                        div("chip-grid__header-actions") {
-                            span("chip-grid__count") {
-                                id = "scopes-count"
-                                +"0 / $totalScopes selected"
-                            }
-                            button(type = ButtonType.button) {
-                                classes = setOf("chip-grid__toggle")
-                                attributes["data-chips-all"] = "scopes-grid"
-                                +"All"
-                            }
-                            button(type = ButtonType.button) {
-                                classes = setOf("chip-grid__toggle")
-                                attributes["data-chips-none"] = "scopes-grid"
-                                +"None"
-                            }
-                        }
-                    }
-                    div("chip-grid") {
-                        id = "scopes-grid"
-                        scopes.forEach { scope ->
-                            label("scope-chip") {
-                                input(type = InputType.checkBox, name = "scopes") {
-                                    value = scope
-                                }
-                                span("scope-chip__label") { +scope }
-                            }
-                        }
-                    }
-                }
-
                 div("edit-row") {
                     span("edit-row__label") { +"Expiry" }
                     div {
@@ -465,11 +502,42 @@ internal fun apiKeysPageImpl(
                         div("edit-row__hint") { +"Leave blank for keys that never expire." }
                     }
                 }
+            }
+        }
 
-                div("edit-actions") {
-                    button(type = ButtonType.submit) {
-                        classes = setOf("btn", "btn--primary")
-                        +"Create API Key"
+        // ── Scopes card ──────────────────────────────────────────
+        div("ov-card") {
+            div("ov-card__section-label") { +"Scopes" }
+            div {
+                div("chip-grid__header") {
+                    span("chip-grid__header-label") { +"Select permissions for this key" }
+                    div("chip-grid__header-actions") {
+                        span("chip-grid__count") {
+                            id = "scopes-count"
+                            +"0 / $totalScopes selected"
+                        }
+                        button(type = ButtonType.button) {
+                            classes = setOf("chip-grid__toggle")
+                            attributes["data-chips-all"] = "scopes-grid"
+                            +"All"
+                        }
+                        button(type = ButtonType.button) {
+                            classes = setOf("chip-grid__toggle")
+                            attributes["data-chips-none"] = "scopes-grid"
+                            +"None"
+                        }
+                    }
+                }
+                div("chip-grid") {
+                    id = "scopes-grid"
+                    scopes.forEach { scope ->
+                        label("scope-chip") {
+                            input(type = InputType.checkBox, name = "scopes") {
+                                value = scope
+                                attributes["form"] = "create-api-key-form"
+                            }
+                            span("scope-chip__label") { +scope }
+                        }
                     }
                 }
             }
