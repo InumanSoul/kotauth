@@ -438,7 +438,6 @@ fun main() {
                 socialLoginService = socialLoginService,
                 identityProviderRepository = identityProviderRepository,
                 apiKeyService = apiKeyService,
-                apiKeyRepository = apiKeyRepository,
                 webhookService = webhookService,
                 appInfo = appInfo,
                 startTime = startTime,
@@ -493,7 +492,6 @@ fun Application.module(
     socialLoginService: SocialLoginService? = null, // Phase 2
     identityProviderRepository: com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
     apiKeyService: ApiKeyService? = null, // Phase 3a
-    apiKeyRepository: com.kauth.domain.port.ApiKeyRepository? = null, // Phase 3a
     webhookService: WebhookService? = null, // Phase 4
     appInfo: AppInfo,
     startTime: Long,

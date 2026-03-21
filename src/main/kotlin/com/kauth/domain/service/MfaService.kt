@@ -335,6 +335,7 @@ class MfaService(
      *                        if roles are not available — the policy will not block login in
      *                        that case (conservative fail-open for the required_admins check).
      */
+    @Suppress("UNUSED_PARAMETER")
     fun isMfaRequired(
         user: User,
         tenantMfaPolicy: String,

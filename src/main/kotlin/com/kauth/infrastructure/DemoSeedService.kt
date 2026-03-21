@@ -158,19 +158,19 @@ class DemoSeedService(
         )
 
         // Users
-        val sarah = saveUser(updated.id, "sarah.chen", "sarah@acme.example", "Sarah Chen", passwordHash)
-        val james = saveUser(updated.id, "james.wilson", "james@acme.example", "James Wilson", passwordHash)
-        val maria = saveUser(updated.id, "maria.garcia", "maria@acme.example", "Maria Garcia", passwordHash)
-        val alex = saveUser(updated.id, "alex.kumar", "alex@acme.example", "Alex Kumar", passwordHash)
-        val testUser = saveUser(updated.id, "test.user", "test@acme.example", "Test User", passwordHash)
+        val sarahId = saveUser(updated.id, "sarah.chen", "sarah@acme.example", "Sarah Chen", passwordHash).id!!
+        val jamesId = saveUser(updated.id, "james.wilson", "james@acme.example", "James Wilson", passwordHash).id!!
+        val mariaId = saveUser(updated.id, "maria.garcia", "maria@acme.example", "Maria Garcia", passwordHash).id!!
+        val alexId = saveUser(updated.id, "alex.kumar", "alex@acme.example", "Alex Kumar", passwordHash).id!!
+        val testUserId = saveUser(updated.id, "test.user", "test@acme.example", "Test User", passwordHash).id!!
 
         // Role assignments
-        assignRole(updated.id, sarah.id!!, "admin")
-        assignRole(updated.id, james.id!!, "user")
-        assignRole(updated.id, maria.id!!, "billing-admin")
-        assignRole(updated.id, alex.id!!, "user")
-        assignRole(updated.id, alex.id!!, "viewer")
-        assignRole(updated.id, testUser.id!!, "user")
+        assignRole(updated.id, sarahId, "admin")
+        assignRole(updated.id, jamesId, "user")
+        assignRole(updated.id, mariaId, "billing-admin")
+        assignRole(updated.id, alexId, "user")
+        assignRole(updated.id, alexId, "viewer")
+        assignRole(updated.id, testUserId, "user")
 
         // Groups
         val engineering =
@@ -190,13 +190,13 @@ class DemoSeedService(
 
         // Group memberships
         extractGroupId(engineering)?.let { gid ->
-            roleGroupService.addUserToGroup(james.id!!, gid, updated.id)
-            roleGroupService.addUserToGroup(alex.id!!, gid, updated.id)
+            roleGroupService.addUserToGroup(jamesId, gid, updated.id)
+            roleGroupService.addUserToGroup(alexId, gid, updated.id)
             assignGroupRole(updated.id, gid, "user")
             assignGroupRole(updated.id, gid, "viewer")
         }
         extractGroupId(operations)?.let { gid ->
-            roleGroupService.addUserToGroup(maria.id!!, gid, updated.id)
+            roleGroupService.addUserToGroup(mariaId, gid, updated.id)
             assignGroupRole(updated.id, gid, "billing-admin")
         }
 
@@ -213,7 +213,7 @@ class DemoSeedService(
 
         return SeedResult(
             tenantId = updated.id,
-            userIds = listOf(sarah.id!!, james.id!!, maria.id!!, alex.id!!, testUser.id!!),
+            userIds = listOf(sarahId, jamesId, mariaId, alexId, testUserId),
             appCount = 2,
             roleCount = 3,
             groupCount = 2,
@@ -273,15 +273,15 @@ class DemoSeedService(
         )
 
         // Users
-        val jordan = saveUser(updated.id, "jordan.lee", "jordan@startup.example", "Jordan Lee", passwordHash)
-        val casey = saveUser(updated.id, "casey.smith", "casey@startup.example", "Casey Smith", passwordHash)
-        val riley = saveUser(updated.id, "riley.jones", "riley@startup.example", "Riley Jones", passwordHash)
+        val jordanId = saveUser(updated.id, "jordan.lee", "jordan@startup.example", "Jordan Lee", passwordHash).id!!
+        val caseyId = saveUser(updated.id, "casey.smith", "casey@startup.example", "Casey Smith", passwordHash).id!!
+        val rileyId = saveUser(updated.id, "riley.jones", "riley@startup.example", "Riley Jones", passwordHash).id!!
 
         // Role assignments
-        assignRole(updated.id, jordan.id!!, "admin")
-        assignRole(updated.id, casey.id!!, "user")
-        assignRole(updated.id, casey.id!!, "developer")
-        assignRole(updated.id, riley.id!!, "user")
+        assignRole(updated.id, jordanId, "admin")
+        assignRole(updated.id, caseyId, "user")
+        assignRole(updated.id, caseyId, "developer")
+        assignRole(updated.id, rileyId, "user")
 
         // Group
         val coreTeam =
@@ -292,8 +292,8 @@ class DemoSeedService(
                 parentGroupId = null,
             )
         extractGroupId(coreTeam)?.let { gid ->
-            roleGroupService.addUserToGroup(jordan.id!!, gid, updated.id)
-            roleGroupService.addUserToGroup(casey.id!!, gid, updated.id)
+            roleGroupService.addUserToGroup(jordanId, gid, updated.id)
+            roleGroupService.addUserToGroup(caseyId, gid, updated.id)
             assignGroupRole(updated.id, gid, "admin")
             assignGroupRole(updated.id, gid, "developer")
         }
@@ -311,7 +311,7 @@ class DemoSeedService(
 
         return SeedResult(
             tenantId = updated.id,
-            userIds = listOf(jordan.id!!, casey.id!!, riley.id!!),
+            userIds = listOf(jordanId, caseyId, rileyId),
             appCount = 1,
             roleCount = 1,
             groupCount = 1,

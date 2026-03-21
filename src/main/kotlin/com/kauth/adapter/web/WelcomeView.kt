@@ -40,7 +40,7 @@ object WelcomeView {
     private fun HEAD.welcomeHead(
         pageTitle: String,
     ) {
-        title { +"Welcome to Kotauth" }
+        title { +pageTitle }
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         // Favicon
