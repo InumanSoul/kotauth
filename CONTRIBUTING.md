@@ -14,7 +14,7 @@ Thanks for considering a contribution. This document covers how to get the proje
 **Clone and start:**
 
 ```bash
-git clone https://github.com/your-org/kotauth.git
+git clone https://github.com/inumansoul/kotauth.git
 cd kotauth
 
 # Start the PostgreSQL dependency only
@@ -80,15 +80,47 @@ When adding a new feature:
 
 ---
 
-## Running Tests
+## Testing Philosophy and Conventions
 
 ```bash
 ./gradlew test
 ```
 
-The test suite uses in-memory fakes (not mocks) for all adapters — no database required. New domain logic should have unit tests using the fake adapters in `src/test/kotlin/fakes/`.
+The test suite runs entirely in-memory — no database, no network, no Docker. All tests should pass on a fresh clone with just `./gradlew test`.
 
-When adding a new repository, add a corresponding fake in `src/test/kotlin/fakes/` that implements the port interface with an in-memory `MutableMap`.
+### Fakes over mocks
+
+Every port interface has a corresponding in-memory fake in `src/test/kotlin/com/kauth/fakes/`. Fakes are deterministic `MutableMap`-backed implementations that behave like the real adapter minus the database. Use fakes for all dependencies the test exercises directly. Reserve `mockk(relaxed = true)` only for dependencies that are not the focus of the test and whose behavior is irrelevant (e.g., `KeyProvisioningService` when testing login).
+
+When adding a new repository port, add a matching fake with the same name prefixed with `Fake` (e.g., `UserRepository` → `FakeUserRepository`). The fake must implement `clear()` for `@BeforeTest` resets.
+
+### Test layers
+
+The test suite follows a two-layer pyramid.
+
+**Domain service unit tests** (`domain/service/*Test.kt`) — test business logic in isolation. Each service is constructed with fakes for all its ports. These validate rules, error paths, and edge cases. This is where the bulk of the logic coverage lives.
+
+**Route integration tests** (`adapter/web/**/*Test.kt`) — use Ktor's `testApplication` with real routing wired to fakes. These validate HTTP concerns that the domain layer cannot see: authentication guards, session cookies, scope enforcement, DTO serialization, status codes, redirect behavior, and cross-tenant isolation. They do not duplicate the domain logic tests — they test the wiring.
+
+### Writing a route integration test
+
+Follow the established pattern:
+
+1. Construct fakes and services as class-level properties.
+2. In `@BeforeTest`, call `clear()` on every fake and seed the minimum fixtures (tenant, user, API key or session).
+3. Write a private `installTestApp()` extension on `Application` that installs `ContentNegotiation { json() }`, any auth/session plugins, and the route module under test.
+4. Each test calls `testApplication { application { installTestApp() } ... }`.
+5. For admin routes behind a session guard, use `createClient { install(HttpCookies) }` and call a `login()` helper before hitting protected endpoints.
+6. For API routes behind bearer auth, use `bearerAuth(rawApiKey)` where `rawApiKey` comes from `ApiKeyService.create()` in `@BeforeTest`.
+7. When testing redirects, use `createClient { followRedirects = false }` and assert on `HttpStatusCode.Found` + the `Location` header.
+
+### Known serialization gotcha
+
+Ktor's `ContentNegotiation { json() }` uses kotlinx.serialization under the hood. Responding with `mapOf("key" to someBoolean)` produces `Map<String, Any>`, and kotlinx.serialization cannot serialize the polymorphic `Any` type. Always use `buildJsonObject { put("key", value) }` instead of `mapOf(...)` when the response contains mixed types (String, Boolean, Long). The OIDC discovery endpoint is the reference implementation of this pattern.
+
+### Test file organization
+
+Group tests by route module. One test class per route file is the default. Split into separate files when a single test class exceeds ~40 tests or when distinct concerns emerge (e.g., `AdminRoutesTest` for auth guard vs. `AdminSettingsTest` for workspace settings vs. `AdminApiKeysTest` for key management). Shared wiring duplication across sibling test classes is acceptable — prefer locality over DRY in tests.
 
 ---
 

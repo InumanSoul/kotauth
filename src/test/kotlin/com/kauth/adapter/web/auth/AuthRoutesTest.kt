@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
@@ -21,6 +23,7 @@ import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.RateLimiter
+import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -146,6 +149,7 @@ class AuthRoutesTest {
         authCodeRepo.clear()
         sessionRepo.clear()
         auditLog.clear()
+        tokenPort.reset()
         tenantRepo.add(tenant)
         userRepo.add(user)
         appRepo.add(publicApp)
@@ -715,9 +719,493 @@ class AuthRoutesTest {
             )
         }
 
+    // =========================================================================
+    // POST /t/{slug}/protocol/openid-connect/revoke — RFC 7009
+    // =========================================================================
+
+    @Test
+    fun `POST revoke returns 200 for a valid access token`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-revoke"
+            val hash = sha256Hex(accessToken)
+            sessionRepo.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = 1,
+                    accessTokenHash = hash,
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/revoke",
+                    formParameters = Parameters.build { append("token", accessToken) },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `POST revoke returns 200 even for unknown token (RFC 7009 compliance)`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/revoke",
+                    formParameters = Parameters.build { append("token", "completely-unknown-token") },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status, "RFC 7009: always return 200")
+        }
+
+    @Test
+    fun `POST revoke returns 400 when token param is missing`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/revoke",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/protocol/openid-connect/introspect — RFC 7662
+    // =========================================================================
+
+    @Test
+    fun `POST introspect returns active=true for a valid session with claims`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-introspect"
+            val hash = sha256Hex(accessToken)
+            sessionRepo.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = 1,
+                    accessTokenHash = hash,
+                    refreshTokenHash = null,
+                    scopes = "openid profile",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+            tokenPort.claimsToReturn =
+                AccessTokenClaims(
+                    sub = "10",
+                    iss = "http://localhost/t/acme",
+                    aud = "spa-app",
+                    tenantId = 1,
+                    username = "alice",
+                    email = "alice@example.com",
+                    scopes = listOf("openid", "profile"),
+                    issuedAt = Instant.now().epochSecond,
+                    expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+                    realmRoles = emptyList(),
+                )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters = Parameters.build { append("token", accessToken) },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"active\":true") || body.contains("\"active\": true"))
+            assertTrue(body.contains("\"sub\":\"10\"") || body.contains("\"sub\": \"10\""))
+        }
+
+    @Test
+    fun `POST introspect returns active=false for unknown token`() =
+        testApplication {
+            resetFixtures()
+            tokenPort.claimsToReturn = null
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters = Parameters.build { append("token", "unknown-token") },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"active\":false") || body.contains("\"active\": false"))
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/protocol/openid-connect/userinfo — OIDC Core §5.3
+    // =========================================================================
+
+    @Test
+    fun `GET userinfo returns user claims for valid bearer token`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-userinfo"
+            val hash = sha256Hex(accessToken)
+            sessionRepo.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = 1,
+                    accessTokenHash = hash,
+                    refreshTokenHash = null,
+                    scopes = "openid profile",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.get("/t/acme/protocol/openid-connect/userinfo") {
+                    bearerAuth(accessToken)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("alice"), "Must contain username")
+            assertTrue(body.contains("alice@example.com"), "Must contain email")
+        }
+
+    @Test
+    fun `GET userinfo returns 401 when no bearer token is provided`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/protocol/openid-connect/userinfo")
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    @Test
+    fun `GET userinfo returns 401 for expired session`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-expired"
+            val hash = sha256Hex(accessToken)
+            sessionRepo.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = 1,
+                    accessTokenHash = hash,
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().minusSeconds(3600),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.get("/t/acme/protocol/openid-connect/userinfo") {
+                    bearerAuth(accessToken)
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/register — registration flow
+    // =========================================================================
+
+    @Test
+    fun `POST register redirects to login with registered=true on success`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/register",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "newuser")
+                            append("email", "newuser@example.com")
+                            append("fullName", "New User")
+                            append("password", "StrongP@ss123")
+                            append("confirmPassword", "StrongP@ss123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.contains("registered=true"), "Must redirect with registered=true")
+        }
+
+    @Test
+    fun `POST register returns 422 for duplicate username`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/register",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("email", "different@example.com")
+                            append("fullName", "Alice Clone")
+                            append("password", "StrongP@ss123")
+                            append("confirmPassword", "StrongP@ss123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(response.bodyAsText().contains("already taken"))
+        }
+
+    @Test
+    fun `POST register returns 422 for mismatched passwords`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/register",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "newuser2")
+                            append("email", "newuser2@example.com")
+                            append("fullName", "New User 2")
+                            append("password", "StrongP@ss123")
+                            append("confirmPassword", "DifferentPass456")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST register returns 429 when rate limited`() =
+        testApplication {
+            resetFixtures()
+            val tightRegisterLimiter = RateLimiter(maxRequests = 1, windowSeconds = 60)
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = tightRegisterLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                    )
+                }
+            }
+
+            // First request consumes the quota
+            client.submitForm(
+                url = "/t/acme/register",
+                formParameters =
+                    Parameters.build {
+                        append("username", "first")
+                        append("email", "first@example.com")
+                        append("fullName", "First")
+                        append("password", "StrongP@ss123")
+                        append("confirmPassword", "StrongP@ss123")
+                    },
+            )
+
+            // Second request should be rate limited
+            val response =
+                client.submitForm(
+                    url = "/t/acme/register",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "second")
+                            append("email", "second@example.com")
+                            append("fullName", "Second")
+                            append("password", "StrongP@ss123")
+                            append("confirmPassword", "StrongP@ss123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.TooManyRequests, response.status)
+        }
+
     // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
+
+    private fun sha256Hex(input: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
 
     private fun sha256Base64Url(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
