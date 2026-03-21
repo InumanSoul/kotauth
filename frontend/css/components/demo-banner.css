@@ -1,0 +1,73 @@
+/* frontend/css/components/demo-banner.css
+ *
+ * Fixed top banner for demo/showcase deployments (KAUTH_DEMO_MODE=true).
+ *
+ * Rendered by DemoBanner.kt — only present when DemoConfig.enabled is true.
+ * Layout impact:
+ *   Admin shell — .demo-banner ~ .shell shrinks to fill remaining viewport
+ *   Auth pages  — body:has(.demo-banner) gets padding-top offset
+ */
+
+.demo-banner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2, 8px);
+  background: var(--color-amber-bg, rgba(251, 191, 36, 0.09));
+  border-bottom: 1px solid var(--color-amber-border, rgba(251, 191, 36, 0.22));
+  font-size: var(--text-sm, 12px);
+  color: var(--color-amber, #fbbf24);
+}
+
+/* Scoped badge — self-contained so it doesn't depend on badge.css loading */
+.demo-banner .badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2, 8px);
+  border-radius: 0;
+  font-size: var(--text-sm, 12px);
+  font-weight: var(--weight-medium, 500);
+  letter-spacing: var(--tracking-normal, 0);
+  border: 0.5px solid;
+  background: var(--color-amber-bg, rgba(251, 191, 36, 0.09));
+  color: var(--color-amber, #fbbf24);
+  border-color: var(--color-amber-border, rgba(251, 191, 36, 0.22));
+}
+
+.demo-banner code {
+  background: rgba(251, 191, 36, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono, 'Inconsolata', monospace);
+  font-size: var(--text-sm, 12px);
+  color: var(--color-amber, #fbbf24);
+}
+
+/* ── Layout offsets ──────────────────────────────────────────────────────── */
+
+/* Admin shell — sibling combinator shrinks the shell to remaining viewport */
+.demo-banner ~ .shell {
+  height: calc(100vh - 36px);
+}
+
+/* Portal shell — same sibling offset for the portal layout */
+.demo-banner ~ .portal-shell {
+  min-height: calc(100vh - 36px);
+}
+
+/* Auth / portal / welcome pages — push body content below the banner */
+body:has(.demo-banner) {
+  padding-top: 36px;
+}
+
+/* Prevent double offset on admin/portal pages (shells handle their own height) */
+body:has(.demo-banner ~ .shell),
+body:has(.demo-banner ~ .portal-shell) {
+  padding-top: 0;
+}

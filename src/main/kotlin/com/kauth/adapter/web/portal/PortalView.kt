@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -32,6 +33,7 @@ object PortalView {
         {
             head { authPageHead("$workspaceName | Sign In", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     div("brand-name") { +workspaceName }
                 }
@@ -281,6 +283,7 @@ object PortalView {
         {
             head { authPageHead("$workspaceName | Verify Identity", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     div("brand-name") { +workspaceName }
                 }
@@ -1122,6 +1125,7 @@ object PortalView {
         activePage: String,
         content: DIV.() -> Unit,
     ) {
+        demoBanner()
         div(classes = "portal-shell") {
             // ── Sticky sidebar ────────────────────────────────────────────
             nav(classes = "portal-nav") {

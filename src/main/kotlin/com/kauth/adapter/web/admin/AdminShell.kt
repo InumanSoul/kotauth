@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -90,6 +91,7 @@ internal fun HTML.adminShell(
 ) {
     head { adminHead(pageTitle) }
     body {
+        demoBanner()
         div("shell") {
             // ── Top bar ──────────────────────────────────────────────
             div("shell-topbar") {

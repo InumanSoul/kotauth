@@ -75,6 +75,7 @@ object WelcomeView {
             welcomeHead(pageTitle = "Welcome to Kotauth")
         }
         body {
+            demoBanner()
             div(classes = "welcome-shell") {
                 div(classes = "welcome-content") {
                     // -- Header --------------------------------------------------

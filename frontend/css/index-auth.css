@@ -29,3 +29,6 @@
 @import "./auth/alert.css";
 @import "./auth/social.css";
 @import "./auth/misc.css";
+
+/* ── Demo mode banner (shared with admin bundle) ─────────────────────────── */
+@import "./components/demo-banner.css";
