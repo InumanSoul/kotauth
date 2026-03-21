@@ -1,7 +1,7 @@
 # KotAuth — Implementation Status
 
-> Last updated: 2026-03-19
-> Current version: 1.0.0 (Phase 4 Webhooks complete — Phase 5 Documentation next)
+> Last updated: 2026-03-21
+> Current version: 1.0.3 (Phases 0–5 shipped)
 
 This document is the living record of what has been built, what compiles and runs, what is intentionally deferred, and what the next milestone requires. It supplements the strategic `ROADMAP.md`.
 
