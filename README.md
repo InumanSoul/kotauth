@@ -120,6 +120,7 @@ docker pull ghcr.io/inumansoul/kotauth:latest
 | `KAUTH_BASE_URL` | **Yes** | — | Public base URL. Used in OIDC tokens and discovery docs. Must be `https://` in production. |
 | `KAUTH_SECRET_KEY` | Recommended | Random (ephemeral) | 32+ char hex string. Used for AES-256-GCM encryption and session signing. If not set, SMTP config is unavailable and sessions don't survive restarts. |
 | `KAUTH_ENV` | No | `development` | Set to `production` to enable HTTPS enforcement and strict startup validation. |
+| `KAUTH_DEMO_MODE` | No | `false` | Set to `true` to seed demo data and show a demo banner. For showcase deployments. |
 | `DB_URL` | **Yes** | — | PostgreSQL JDBC URL. Example: `jdbc:postgresql://db:5432/kotauth_db` |
 | `DB_USER` | **Yes** | — | PostgreSQL username. |
 | `DB_PASSWORD` | **Yes** | — | PostgreSQL password. |
@@ -140,6 +141,23 @@ docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up
 ```
 
 Minimum requirements: 512 MB RAM, 1 vCPU, PostgreSQL 14+.
+
+---
+
+## Demo deployment
+
+Deploy a public showcase instance with pre-populated workspaces, users, roles, and applications. Ideal for `demo.yourdomain.com`.
+
+```bash
+# Set KAUTH_DEMO_MODE=true in .env (or use the demo overlay)
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.prod.yml \
+  -f docker/docker-compose.demo.yml \
+  up -d
+```
+
+The demo overlay sets `KAUTH_DEMO_MODE=true`, which seeds two workspaces ("Acme Corp" and "Startup Labs") with realistic data on startup and shows a credentials banner on every page. An hourly cron with `docker compose down -v && up -d` resets the data. See [docs/ENV_REFERENCE.md](docs/ENV_REFERENCE.md#demo-mode) for details.
 
 ---
 

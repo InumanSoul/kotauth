@@ -202,6 +202,53 @@ services:
 
 ---
 
+## 9. Demo deployment
+
+For a public showcase instance (e.g. `demo.kotauth.com`) that visitors can explore without signing up:
+
+**1. Add the demo overlay**
+
+Download the additional compose file:
+
+```bash
+curl --create-dirs -o docker/docker-compose.demo.yml \
+  https://raw.githubusercontent.com/inumansoul/kotauth/main/docker/docker-compose.demo.yml
+```
+
+**2. Start with all three compose files**
+
+```bash
+docker compose \
+  -f docker/docker-compose.yml \
+  -f docker/docker-compose.prod.yml \
+  -f docker/docker-compose.demo.yml \
+  up -d
+```
+
+The demo overlay sets `KAUTH_DEMO_MODE=true`. On startup, Kotauth seeds two workspaces ("Acme Corp" with a dark theme and "Startup Labs" with a light theme), pre-populated with users, applications, roles, groups, webhook endpoints, and audit log entries. A sticky amber banner appears on every page showing demo credentials.
+
+**3. Schedule hourly resets**
+
+Demo instances should reset periodically so visitors always see a clean state. Add a cron job:
+
+```bash
+crontab -e
+# Add:
+0 * * * * cd /opt/kotauth && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml down -v && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+```
+
+The `-v` flag destroys the database volume. On restart, Flyway re-migrates from scratch and `DemoSeedService` re-creates all demo data.
+
+**Demo credentials:**
+
+| Login page | Username | Password |
+|---|---|---|
+| `/admin` (master workspace) | `admin` | `changeme123!` |
+| `/t/acme/login` | `sarah.chen` | `Demo1234!` |
+| `/t/startup-labs/login` | `jordan.lee` | `Demo1234!` |
+
+---
+
 ## Environment variable reference
 
-See [docs/ENV_REFERENCE.md](../ENV_REFERENCE.md) for the complete list of variables, including per-tenant SMTP and MFA policy settings.
+See [docs/ENV_REFERENCE.md](../ENV_REFERENCE.md) for the complete list of variables, including per-tenant SMTP, MFA policy, and demo mode settings.
