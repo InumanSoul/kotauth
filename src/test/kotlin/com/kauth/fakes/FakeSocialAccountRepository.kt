@@ -27,8 +27,7 @@ class FakeSocialAccountRepository : SocialAccountRepository {
             it.tenantId == tenantId && it.provider == provider && it.providerUserId == providerUserId
         }
 
-    override fun findByUserId(userId: Int): List<SocialAccount> =
-        store.values.filter { it.userId == userId }
+    override fun findByUserId(userId: Int): List<SocialAccount> = store.values.filter { it.userId == userId }
 
     override fun save(account: SocialAccount): SocialAccount {
         val a = if (account.id == null) account.copy(id = nextId++) else account
@@ -36,7 +35,10 @@ class FakeSocialAccountRepository : SocialAccountRepository {
         return a
     }
 
-    override fun delete(userId: Int, provider: SocialProvider) {
+    override fun delete(
+        userId: Int,
+        provider: SocialProvider,
+    ) {
         store.entries.removeIf { it.value.userId == userId && it.value.provider == provider }
     }
 }

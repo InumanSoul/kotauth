@@ -82,7 +82,12 @@ class ApiKeyServiceTest {
 
     @Test
     fun `create - success returns raw key and persists hash`() {
-        val result = svc.create(tenantId = 1, name = "CI Pipeline", scopes = listOf(ApiScope.USERS_READ, ApiScope.USERS_WRITE))
+        val result =
+            svc.create(
+                tenantId = 1,
+                name = "CI Pipeline",
+                scopes = listOf(ApiScope.USERS_READ, ApiScope.USERS_WRITE),
+            )
         assertIs<ApiKeyResult.Success<CreatedApiKey>>(result)
 
         val created = result.value
@@ -101,7 +106,13 @@ class ApiKeyServiceTest {
     @Test
     fun `create - with expiry`() {
         val expiry = Instant.now().plusSeconds(86400)
-        val result = svc.create(tenantId = 1, name = "Temp Key", scopes = listOf(ApiScope.USERS_READ), expiresAt = expiry)
+        val result =
+            svc.create(
+                tenantId = 1,
+                name = "Temp Key",
+                scopes = listOf(ApiScope.USERS_READ),
+                expiresAt = expiry,
+            )
         assertIs<ApiKeyResult.Success<CreatedApiKey>>(result)
         assertEquals(expiry, result.value.apiKey.expiresAt)
     }

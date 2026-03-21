@@ -1,7 +1,5 @@
 package com.kauth.domain.service
 
-import com.kauth.domain.model.WebhookDeliveryStatus
-import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.model.WebhookEvent
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
@@ -26,10 +24,11 @@ class WebhookServiceTest {
     private val endpoints = FakeWebhookEndpointRepository()
     private val deliveries = FakeWebhookDeliveryRepository()
 
-    private val svc = WebhookService(
-        endpointRepository = endpoints,
-        deliveryRepository = deliveries,
-    )
+    private val svc =
+        WebhookService(
+            endpointRepository = endpoints,
+            deliveryRepository = deliveries,
+        )
 
     @BeforeTest
     fun setup() {
@@ -50,7 +49,12 @@ class WebhookServiceTest {
 
     @Test
     fun `createEndpoint - URL without http scheme`() {
-        val result = svc.createEndpoint(tenantId = 1, url = "ftp://example.com/hook", events = setOf(WebhookEvent.USER_CREATED))
+        val result =
+            svc.createEndpoint(
+                tenantId = 1,
+                url = "ftp://example.com/hook",
+                events = setOf(WebhookEvent.USER_CREATED),
+            )
         assertIs<WebhookResult.Failure>(result)
         assertTrue(result.error.contains("http"), "Error should mention http requirement")
     }
@@ -72,12 +76,13 @@ class WebhookServiceTest {
 
     @Test
     fun `createEndpoint - success returns endpoint and plaintext secret`() {
-        val result = svc.createEndpoint(
-            tenantId = 1,
-            url = "https://example.com/hook",
-            events = setOf(WebhookEvent.USER_CREATED, WebhookEvent.USER_DELETED),
-            description = "Test hook",
-        )
+        val result =
+            svc.createEndpoint(
+                tenantId = 1,
+                url = "https://example.com/hook",
+                events = setOf(WebhookEvent.USER_CREATED, WebhookEvent.USER_DELETED),
+                description = "Test hook",
+            )
         assertIs<WebhookResult.Success>(result)
         val ep = result.endpoint
         assertNotNull(ep.id)
@@ -91,7 +96,12 @@ class WebhookServiceTest {
 
     @Test
     fun `createEndpoint - http URL is accepted`() {
-        val result = svc.createEndpoint(tenantId = 1, url = "http://localhost:8080/hook", events = setOf(WebhookEvent.LOGIN_SUCCESS))
+        val result =
+            svc.createEndpoint(
+                tenantId = 1,
+                url = "http://localhost:8080/hook",
+                events = setOf(WebhookEvent.LOGIN_SUCCESS),
+            )
         assertIs<WebhookResult.Success>(result)
     }
 
@@ -116,7 +126,14 @@ class WebhookServiceTest {
 
     @Test
     fun `deleteEndpoint - removes endpoint for correct tenant`() {
-        val created = (svc.createEndpoint(1, "https://a.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
+        val created =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://a.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
         assertEquals(1, svc.listEndpoints(1).size)
 
         svc.deleteEndpoint(created.id!!, tenantId = 1)
@@ -125,7 +142,14 @@ class WebhookServiceTest {
 
     @Test
     fun `deleteEndpoint - wrong tenant does not delete`() {
-        val created = (svc.createEndpoint(1, "https://a.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
+        val created =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://a.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
 
         svc.deleteEndpoint(created.id!!, tenantId = 99)
         assertEquals(1, svc.listEndpoints(1).size, "Endpoint should not be deleted for wrong tenant")
@@ -137,7 +161,14 @@ class WebhookServiceTest {
 
     @Test
     fun `toggleEndpoint - disables and re-enables endpoint`() {
-        val created = (svc.createEndpoint(1, "https://a.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
+        val created =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://a.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
         assertTrue(created.enabled)
 
         svc.toggleEndpoint(created.id!!, tenantId = 1, enabled = false)
@@ -181,7 +212,14 @@ class WebhookServiceTest {
 
     @Test
     fun `dispatch - does not create deliveries for disabled endpoints`() {
-        val created = (svc.createEndpoint(1, "https://a.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
+        val created =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://a.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
         svc.toggleEndpoint(created.id!!, tenantId = 1, enabled = false)
 
         svc.dispatch(tenantId = 1, eventType = WebhookEvent.USER_CREATED, payloadData = emptyMap())
@@ -211,8 +249,22 @@ class WebhookServiceTest {
 
     @Test
     fun `deliveriesForEndpoint - scoped to specific endpoint`() {
-        val ep1 = (svc.createEndpoint(1, "https://a.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
-        val ep2 = (svc.createEndpoint(1, "https://b.com/hook", setOf(WebhookEvent.USER_CREATED)) as WebhookResult.Success).endpoint
+        val ep1 =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://a.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
+        val ep2 =
+            (
+                svc.createEndpoint(
+                    1,
+                    "https://b.com/hook",
+                    setOf(WebhookEvent.USER_CREATED),
+                ) as WebhookResult.Success
+            ).endpoint
 
         svc.dispatch(tenantId = 1, eventType = WebhookEvent.USER_CREATED, payloadData = mapOf("id" to 1))
 

@@ -32,16 +32,18 @@ class FakeGroupRepository : GroupRepository {
 
     override fun findById(id: Int): Group? = store[id]
 
-    override fun findByTenantId(tenantId: Int): List<Group> =
-        store.values.filter { it.tenantId == tenantId }
+    override fun findByTenantId(tenantId: Int): List<Group> = store.values.filter { it.tenantId == tenantId }
 
-    override fun findByName(tenantId: Int, name: String, parentGroupId: Int?): Group? =
+    override fun findByName(
+        tenantId: Int,
+        name: String,
+        parentGroupId: Int?,
+    ): Group? =
         store.values.find {
             it.tenantId == tenantId && it.name == name && it.parentGroupId == parentGroupId
         }
 
-    override fun findChildren(groupId: Int): List<Group> =
-        store.values.filter { it.parentGroupId == groupId }
+    override fun findChildren(groupId: Int): List<Group> = store.values.filter { it.parentGroupId == groupId }
 
     override fun save(group: Group): Group {
         val g = if (group.id == null) group.copy(id = nextId++) else group
@@ -60,32 +62,43 @@ class FakeGroupRepository : GroupRepository {
         groupMembers.remove(groupId)
     }
 
-    override fun assignRoleToGroup(groupId: Int, roleId: Int) {
+    override fun assignRoleToGroup(
+        groupId: Int,
+        roleId: Int,
+    ) {
         groupRoles.getOrPut(groupId) { mutableSetOf() }.add(roleId)
     }
 
-    override fun unassignRoleFromGroup(groupId: Int, roleId: Int) {
+    override fun unassignRoleFromGroup(
+        groupId: Int,
+        roleId: Int,
+    ) {
         groupRoles[groupId]?.remove(roleId)
     }
 
-    override fun findRoleIdsForGroup(groupId: Int): List<Int> =
-        groupRoles[groupId]?.toList() ?: emptyList()
+    override fun findRoleIdsForGroup(groupId: Int): List<Int> = groupRoles[groupId]?.toList() ?: emptyList()
 
-    override fun addUserToGroup(userId: Int, groupId: Int) {
+    override fun addUserToGroup(
+        userId: Int,
+        groupId: Int,
+    ) {
         groupMembers.getOrPut(groupId) { mutableSetOf() }.add(userId)
     }
 
-    override fun removeUserFromGroup(userId: Int, groupId: Int) {
+    override fun removeUserFromGroup(
+        userId: Int,
+        groupId: Int,
+    ) {
         groupMembers[groupId]?.remove(userId)
     }
 
     override fun findGroupsForUser(userId: Int): List<Group> =
-        groupMembers.filter { it.value.contains(userId) }
+        groupMembers
+            .filter { it.value.contains(userId) }
             .keys
             .mapNotNull { store[it] }
 
-    override fun findUserIdsInGroup(groupId: Int): List<Int> =
-        groupMembers[groupId]?.toList() ?: emptyList()
+    override fun findUserIdsInGroup(groupId: Int): List<Int> = groupMembers[groupId]?.toList() ?: emptyList()
 
     override fun findAncestorGroupIds(groupId: Int): List<Int> {
         val ancestors = mutableListOf<Int>()

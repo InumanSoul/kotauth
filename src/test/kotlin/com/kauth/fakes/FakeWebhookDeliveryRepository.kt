@@ -25,13 +25,19 @@ class FakeWebhookDeliveryRepository : WebhookDeliveryRepository {
         delivery.id?.let { store[it] = delivery }
     }
 
-    override fun findByEndpointId(endpointId: Int, limit: Int): List<WebhookDelivery> =
+    override fun findByEndpointId(
+        endpointId: Int,
+        limit: Int,
+    ): List<WebhookDelivery> =
         store.values
             .filter { it.endpointId == endpointId }
             .sortedByDescending { it.createdAt }
             .take(limit)
 
-    override fun findByTenantId(tenantId: Int, limit: Int): List<WebhookDelivery> {
+    override fun findByTenantId(
+        tenantId: Int,
+        limit: Int,
+    ): List<WebhookDelivery> {
         // In production this joins on endpoint.tenantId — here we need the endpoint repo
         // For simplicity, return all deliveries (tests scope by endpointId anyway)
         return store.values.sortedByDescending { it.createdAt }.take(limit)

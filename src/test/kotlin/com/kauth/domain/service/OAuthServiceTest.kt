@@ -544,17 +544,18 @@ class OAuthServiceTest {
             ),
         )
         val expiresAt = Instant.now().plusSeconds(3600).epochSecond
-        tokens.claimsToReturn = AccessTokenClaims(
-            sub = "10",
-            iss = "https://acme.example.com",
-            aud = "spa-app",
-            tenantId = 1,
-            username = "alice",
-            email = "alice@example.com",
-            scopes = listOf("openid", "profile"),
-            issuedAt = Instant.now().epochSecond,
-            expiresAt = expiresAt,
-        )
+        tokens.claimsToReturn =
+            AccessTokenClaims(
+                sub = "10",
+                iss = "https://acme.example.com",
+                aud = "spa-app",
+                tenantId = 1,
+                username = "alice",
+                email = "alice@example.com",
+                scopes = listOf("openid", "profile"),
+                issuedAt = Instant.now().epochSecond,
+                expiresAt = expiresAt,
+            )
 
         val result = svc.introspectToken(tenantSlug = "acme", token = accessToken)
         assertIs<IntrospectionResult.Active>(result)
@@ -578,17 +579,18 @@ class OAuthServiceTest {
     @Test
     fun `revokeToken - revokes session by access token`() {
         val accessToken = "access-to-revoke"
-        val session = sessions.save(
-            Session(
-                tenantId = 1,
-                userId = 10,
-                clientId = publicClient.id,
-                accessTokenHash = OAuthService.sha256(accessToken),
-                refreshTokenHash = null,
-                scopes = "openid",
-                expiresAt = Instant.now().plusSeconds(3600),
-            ),
-        )
+        val session =
+            sessions.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = publicClient.id,
+                    accessTokenHash = OAuthService.sha256(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
 
         svc.revokeToken(accessToken)
 
@@ -601,18 +603,19 @@ class OAuthServiceTest {
     @Test
     fun `revokeToken - revokes session by refresh token`() {
         val refreshToken = "refresh-to-revoke"
-        val session = sessions.save(
-            Session(
-                tenantId = 1,
-                userId = 10,
-                clientId = publicClient.id,
-                accessTokenHash = OAuthService.sha256("some-access"),
-                refreshTokenHash = OAuthService.sha256(refreshToken),
-                scopes = "openid",
-                expiresAt = Instant.now().plusSeconds(3600),
-                refreshExpiresAt = Instant.now().plusSeconds(86400),
-            ),
-        )
+        val session =
+            sessions.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = publicClient.id,
+                    accessTokenHash = OAuthService.sha256("some-access"),
+                    refreshTokenHash = OAuthService.sha256(refreshToken),
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                    refreshExpiresAt = Instant.now().plusSeconds(86400),
+                ),
+            )
 
         svc.revokeToken(refreshToken)
 
@@ -705,17 +708,18 @@ class OAuthServiceTest {
     @Test
     fun `endSession - revokes single session`() {
         val accessToken = "session-to-end"
-        val session = sessions.save(
-            Session(
-                tenantId = 1,
-                userId = 10,
-                clientId = publicClient.id,
-                accessTokenHash = OAuthService.sha256(accessToken),
-                refreshTokenHash = null,
-                scopes = "openid",
-                expiresAt = Instant.now().plusSeconds(3600),
-            ),
-        )
+        val session =
+            sessions.save(
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = publicClient.id,
+                    accessTokenHash = OAuthService.sha256(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
         // Create a second session that should NOT be revoked
         sessions.save(
             Session(

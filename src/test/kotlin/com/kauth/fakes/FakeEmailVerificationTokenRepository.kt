@@ -24,10 +24,12 @@ class FakeEmailVerificationTokenRepository : EmailVerificationTokenRepository {
         return t
     }
 
-    override fun findByTokenHash(hash: String): EmailVerificationToken? =
-        store.values.find { it.tokenHash == hash }
+    override fun findByTokenHash(hash: String): EmailVerificationToken? = store.values.find { it.tokenHash == hash }
 
-    override fun markUsed(tokenId: Int, usedAt: Instant) {
+    override fun markUsed(
+        tokenId: Int,
+        usedAt: Instant,
+    ) {
         store[tokenId]?.let { store[tokenId] = it.copy(usedAt = usedAt) }
     }
 

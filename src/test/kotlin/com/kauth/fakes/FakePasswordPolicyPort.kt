@@ -22,18 +22,33 @@ class FakePasswordPolicyPort : PasswordPolicyPort {
         blacklist.add(password)
     }
 
-    override fun validate(rawPassword: String, tenant: Tenant, userId: Int?): String? =
-        validationError
+    override fun validate(
+        rawPassword: String,
+        tenant: Tenant,
+        userId: Int?,
+    ): String? = validationError
 
-    override fun recordPasswordHistory(userId: Int, tenantId: Int, passwordHash: String) {
+    override fun recordPasswordHistory(
+        userId: Int,
+        tenantId: Int,
+        passwordHash: String,
+    ) {
         history.add(Triple(userId, tenantId, passwordHash))
     }
 
-    override fun isInHistory(userId: Int, tenantId: Int, rawPassword: String, historyCount: Int): Boolean =
-        history.filter { it.first == userId && it.second == tenantId }
+    override fun isInHistory(
+        userId: Int,
+        tenantId: Int,
+        rawPassword: String,
+        historyCount: Int,
+    ): Boolean =
+        history
+            .filter { it.first == userId && it.second == tenantId }
             .takeLast(historyCount)
             .any { it.third == "hashed:$rawPassword" }
 
-    override fun isBlacklisted(rawPassword: String, tenantId: Int): Boolean =
-        rawPassword in blacklist
+    override fun isBlacklisted(
+        rawPassword: String,
+        tenantId: Int,
+    ): Boolean = rawPassword in blacklist
 }

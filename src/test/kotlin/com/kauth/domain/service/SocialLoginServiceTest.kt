@@ -50,10 +50,11 @@ class SocialLoginServiceTest {
             tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
-            providerAdapters = mapOf(
-                SocialProvider.GOOGLE to googleAdapter,
-                SocialProvider.GITHUB to githubAdapter,
-            ),
+            providerAdapters =
+                mapOf(
+                    SocialProvider.GOOGLE to googleAdapter,
+                    SocialProvider.GITHUB to githubAdapter,
+                ),
         )
 
     private val tenant =
@@ -233,7 +234,8 @@ class SocialLoginServiceTest {
 
     @Test
     fun `handleCallback - disabled user returns UserDisabled`() {
-        googleAdapter.profileToReturn = googleProfile.copy(email = "disabled@example.com", providerUserId = "google-disabled")
+        googleAdapter.profileToReturn =
+            googleProfile.copy(email = "disabled@example.com", providerUserId = "google-disabled")
         val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.UserDisabled, result.error)
@@ -262,16 +264,17 @@ class SocialLoginServiceTest {
 
     @Test
     fun `completeSocialRegistration - tenant not found`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "unknown",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "uid",
-            email = "new@example.com",
-            providerName = "New",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "newuser",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "unknown",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "uid",
+                email = "new@example.com",
+                providerName = "New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "newuser",
+            )
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.TenantNotFound, result.error)
     }
@@ -280,48 +283,51 @@ class SocialLoginServiceTest {
     fun `completeSocialRegistration - registration disabled`() {
         tenants.clear()
         tenants.add(tenant.copy(registrationEnabled = false))
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "uid",
-            email = "new@example.com",
-            providerName = "New",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "newuser",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "uid",
+                email = "new@example.com",
+                providerName = "New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "newuser",
+            )
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.RegistrationDisabled, result.error)
     }
 
     @Test
     fun `completeSocialRegistration - username too short`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "uid",
-            email = "new@example.com",
-            providerName = "New",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "ab",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "uid",
+                email = "new@example.com",
+                providerName = "New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "ab",
+            )
         assertIs<SocialLoginResult.Failure>(result)
         assertIs<SocialLoginError.InvalidUsername>(result.error)
     }
 
     @Test
     fun `completeSocialRegistration - username with invalid characters`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "uid",
-            email = "new@example.com",
-            providerName = "New",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "bad user!",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "uid",
+                email = "new@example.com",
+                providerName = "New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "bad user!",
+            )
         assertIs<SocialLoginResult.Failure>(result)
         assertIs<SocialLoginError.InvalidUsername>(result.error)
     }
@@ -338,32 +344,34 @@ class SocialLoginServiceTest {
                 providerName = "Alice",
             ),
         )
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "race-uid",
-            email = "alice@example.com",
-            providerName = "Alice",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "newname",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "race-uid",
+                email = "alice@example.com",
+                providerName = "Alice",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "newname",
+            )
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username, "Should reuse existing user, not create new")
     }
 
     @Test
     fun `completeSocialRegistration - race condition email match auto-links`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "new-uid",
-            email = "alice@example.com",
-            providerName = "Alice",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "newname",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "new-uid",
+                email = "alice@example.com",
+                providerName = "Alice",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "newname",
+            )
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals("alice", result.value.user.username, "Should auto-link to existing user by email")
         assertEquals(1, socialAccounts.all().size)
@@ -371,34 +379,36 @@ class SocialLoginServiceTest {
 
     @Test
     fun `completeSocialRegistration - username conflict`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "brand-new-uid",
-            email = "brand-new@example.com",
-            providerName = "Brand New",
-            avatarUrl = null,
-            emailVerified = true,
-            chosenUsername = "alice", // already taken
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "brand-new-uid",
+                email = "brand-new@example.com",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "alice", // already taken
+            )
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.UsernameConflict, result.error)
     }
 
     @Test
     fun `completeSocialRegistration - success creates user and social link`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "new-uid-999",
-            email = "brand-new@example.com",
-            providerName = "Brand New User",
-            avatarUrl = "https://avatar.example.com/new.jpg",
-            emailVerified = true,
-            chosenUsername = "brandnew",
-            ipAddress = "1.2.3.4",
-            userAgent = "TestAgent",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "new-uid-999",
+                email = "brand-new@example.com",
+                providerName = "Brand New User",
+                avatarUrl = "https://avatar.example.com/new.jpg",
+                emailVerified = true,
+                chosenUsername = "brandnew",
+                ipAddress = "1.2.3.4",
+                userAgent = "TestAgent",
+            )
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertTrue(result.value.isNewUser)
         assertEquals("brandnew", result.value.user.username)
@@ -414,16 +424,17 @@ class SocialLoginServiceTest {
 
     @Test
     fun `completeSocialRegistration - unverified email propagated`() {
-        val result = svc.completeSocialRegistration(
-            tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
-            providerUserId = "unverified-uid",
-            email = "unverified@example.com",
-            providerName = "Unverified",
-            avatarUrl = null,
-            emailVerified = false,
-            chosenUsername = "unverified_user",
-        )
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "unverified-uid",
+                email = "unverified@example.com",
+                providerName = "Unverified",
+                avatarUrl = null,
+                emailVerified = false,
+                chosenUsername = "unverified_user",
+            )
         assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
         assertEquals(false, result.value.user.emailVerified, "Unverified email should not be marked as verified")
     }

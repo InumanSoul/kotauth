@@ -27,24 +27,36 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
     override fun findByTenantId(tenantId: Int): List<WebhookEndpoint> =
         store.values.filter { it.tenantId == tenantId }.sortedByDescending { it.createdAt }
 
-    override fun findEnabledByTenantAndEvent(tenantId: Int, eventType: String): List<WebhookEndpoint> =
+    override fun findEnabledByTenantAndEvent(
+        tenantId: Int,
+        eventType: String,
+    ): List<WebhookEndpoint> =
         store.values.filter {
             it.tenantId == tenantId && it.enabled && eventType in it.events
         }
 
-    override fun findById(id: Int, tenantId: Int): WebhookEndpoint? =
-        store[id]?.takeIf { it.tenantId == tenantId }
+    override fun findById(
+        id: Int,
+        tenantId: Int,
+    ): WebhookEndpoint? = store[id]?.takeIf { it.tenantId == tenantId }
 
     override fun update(endpoint: WebhookEndpoint) {
         endpoint.id?.let { store[it] = endpoint }
     }
 
-    override fun delete(id: Int, tenantId: Int) {
+    override fun delete(
+        id: Int,
+        tenantId: Int,
+    ) {
         val ep = store[id]
         if (ep != null && ep.tenantId == tenantId) store.remove(id)
     }
 
-    override fun setEnabled(id: Int, tenantId: Int, enabled: Boolean) {
+    override fun setEnabled(
+        id: Int,
+        tenantId: Int,
+        enabled: Boolean,
+    ) {
         val ep = store[id]
         if (ep != null && ep.tenantId == tenantId) {
             store[id] = ep.copy(enabled = enabled)

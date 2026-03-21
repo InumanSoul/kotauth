@@ -51,21 +51,36 @@ class RoleGroupServiceTest {
 
     private val testApp =
         Application(
-            id = 100, tenantId = 1, clientId = "my-app", name = "My App",
-            description = null, accessType = AccessType.CONFIDENTIAL, enabled = true,
+            id = 100,
+            tenantId = 1,
+            clientId = "my-app",
+            name = "My App",
+            description = null,
+            accessType = AccessType.CONFIDENTIAL,
+            enabled = true,
         )
 
     private val alice
-        get() = User(
-            id = 10, tenantId = 1, username = "alice", email = "alice@example.com",
-            fullName = "Alice", passwordHash = hasher.hash("pass"),
-        )
+        get() =
+            User(
+                id = 10,
+                tenantId = 1,
+                username = "alice",
+                email = "alice@example.com",
+                fullName = "Alice",
+                passwordHash = hasher.hash("pass"),
+            )
 
     private val bob
-        get() = User(
-            id = 11, tenantId = 1, username = "bob", email = "bob@example.com",
-            fullName = "Bob", passwordHash = hasher.hash("pass"),
-        )
+        get() =
+            User(
+                id = 11,
+                tenantId = 1,
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob",
+                passwordHash = hasher.hash("pass"),
+            )
 
     @BeforeTest
     fun setup() {
@@ -87,35 +102,70 @@ class RoleGroupServiceTest {
 
     @Test
     fun `createRole - blank name`() {
-        val result = svc.createRole(tenantId = 1, name = "  ", description = null, scope = RoleScope.TENANT, clientId = null)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "  ",
+                description = null,
+                scope = RoleScope.TENANT,
+                clientId = null,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createRole - invalid name characters`() {
-        val result = svc.createRole(tenantId = 1, name = "bad role!", description = null, scope = RoleScope.TENANT, clientId = null)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "bad role!",
+                description = null,
+                scope = RoleScope.TENANT,
+                clientId = null,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createRole - client scope without clientId`() {
-        val result = svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.CLIENT, clientId = null)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = null,
+                scope = RoleScope.CLIENT,
+                clientId = null,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createRole - tenant scope with clientId`() {
-        val result = svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.TENANT, clientId = 100)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = null,
+                scope = RoleScope.TENANT,
+                clientId = 100,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createRole - client scope with unknown app`() {
-        val result = svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.CLIENT, clientId = 999)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = null,
+                scope = RoleScope.CLIENT,
+                clientId = 999,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -123,7 +173,14 @@ class RoleGroupServiceTest {
     @Test
     fun `createRole - duplicate name`() {
         svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.TENANT, clientId = null)
-        val result = svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.TENANT, clientId = null)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = null,
+                scope = RoleScope.TENANT,
+                clientId = null,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Conflict>(result.error)
     }
@@ -131,13 +188,27 @@ class RoleGroupServiceTest {
     @Test
     fun `createRole - same name different scopes is allowed`() {
         svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.TENANT, clientId = null)
-        val result = svc.createRole(tenantId = 1, name = "admin", description = null, scope = RoleScope.CLIENT, clientId = 100)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = null,
+                scope = RoleScope.CLIENT,
+                clientId = 100,
+            )
         assertIs<AdminResult.Success<Role>>(result)
     }
 
     @Test
     fun `createRole - success tenant scoped`() {
-        val result = svc.createRole(tenantId = 1, name = "admin", description = "Admin role", scope = RoleScope.TENANT, clientId = null)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "admin",
+                description = "Admin role",
+                scope = RoleScope.TENANT,
+                clientId = null,
+            )
         assertIs<AdminResult.Success<Role>>(result)
         assertEquals("admin", result.value.name)
         assertEquals(RoleScope.TENANT, result.value.scope)
@@ -146,7 +217,14 @@ class RoleGroupServiceTest {
 
     @Test
     fun `createRole - success client scoped`() {
-        val result = svc.createRole(tenantId = 1, name = "editor", description = null, scope = RoleScope.CLIENT, clientId = 100)
+        val result =
+            svc.createRole(
+                tenantId = 1,
+                name = "editor",
+                description = null,
+                scope = RoleScope.CLIENT,
+                clientId = 100,
+            )
         assertIs<AdminResult.Success<Role>>(result)
         assertEquals(100, result.value.clientId)
     }

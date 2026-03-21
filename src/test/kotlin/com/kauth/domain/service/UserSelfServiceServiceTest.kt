@@ -172,7 +172,12 @@ class UserSelfServiceServiceTest {
                     passwordHash = hasher.hash("pass"),
                 ),
             )
-        val result = svc.initiateEmailVerification(userId = userInNoSmtp.id!!, tenantId = 2, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = userInNoSmtp.id!!,
+                tenantId = 2,
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.SmtpNotConfigured>(result.error)
     }
@@ -528,7 +533,13 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - email change resets emailVerified`() {
         // Start with verified user
-        val result = svc.updateProfile(userId = 11, tenantId = 1, email = "newemail@example.com", fullName = "Verified Alice")
+        val result =
+            svc.updateProfile(
+                userId = 11,
+                tenantId = 1,
+                email = "newemail@example.com",
+                fullName = "Verified Alice",
+            )
         assertIs<SelfServiceResult.Success<User>>(result)
         assertEquals(false, result.value.emailVerified, "Email change should reset verification")
         assertEquals("newemail@example.com", result.value.email)
@@ -554,28 +565,56 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `changePassword - tenant not found`() {
-        val result = svc.changePassword(userId = 10, tenantId = 999, currentPassword = "current-pass", newPassword = "new-pass-123", confirmPassword = "new-pass-123")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 999,
+                currentPassword = "current-pass",
+                newPassword = "new-pass-123",
+                confirmPassword = "new-pass-123",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
     fun `changePassword - user not found`() {
-        val result = svc.changePassword(userId = 999, tenantId = 1, currentPassword = "x", newPassword = "y", confirmPassword = "y")
+        val result =
+            svc.changePassword(
+                userId = 999,
+                tenantId = 1,
+                currentPassword = "x",
+                newPassword = "y",
+                confirmPassword = "y",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
     fun `changePassword - tenant mismatch`() {
-        val result = svc.changePassword(userId = 10, tenantId = 2, currentPassword = "current-pass", newPassword = "new-pass-123", confirmPassword = "new-pass-123")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 2,
+                currentPassword = "current-pass",
+                newPassword = "new-pass-123",
+                confirmPassword = "new-pass-123",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Unauthorized>(result.error)
     }
 
     @Test
     fun `changePassword - wrong current password`() {
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "wrong", newPassword = "new-pass-123", confirmPassword = "new-pass-123")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "wrong",
+                newPassword = "new-pass-123",
+                confirmPassword = "new-pass-123",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
         assertTrue(result.error.message.contains("incorrect"))
@@ -583,14 +622,28 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `changePassword - blank new password`() {
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "  ", confirmPassword = "  ")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "  ",
+                confirmPassword = "  ",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
     }
 
     @Test
     fun `changePassword - passwords do not match`() {
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "new-pass-123", confirmPassword = "different")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "new-pass-123",
+                confirmPassword = "different",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
     }
@@ -598,7 +651,14 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - policy violation`() {
         passwordPolicy.validationError = "Must include special char"
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "newpassword", confirmPassword = "newpassword")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "newpassword",
+                confirmPassword = "newpassword",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
     }
@@ -606,7 +666,14 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - password in history`() {
         passwordPolicy.recordPasswordHistory(10, 1, hasher.hash("reused-pass"))
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "reused-pass", confirmPassword = "reused-pass")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "reused-pass",
+                confirmPassword = "reused-pass",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
         assertTrue(result.error.message.contains("recently"))
@@ -614,7 +681,14 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `changePassword - no policy port falls back to minLength`() {
-        val result = svcNoPolicyPort.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "short", confirmPassword = "short")
+        val result =
+            svcNoPolicyPort.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "short",
+                confirmPassword = "short",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
         assertTrue(result.error.message.contains("at least"))
@@ -633,7 +707,14 @@ class UserSelfServiceServiceTest {
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
         )
-        val result = svc.changePassword(userId = 10, tenantId = 1, currentPassword = "current-pass", newPassword = "brand-new-pass", confirmPassword = "brand-new-pass")
+        val result =
+            svc.changePassword(
+                userId = 10,
+                tenantId = 1,
+                currentPassword = "current-pass",
+                newPassword = "brand-new-pass",
+                confirmPassword = "brand-new-pass",
+            )
         assertIs<SelfServiceResult.Success<Unit>>(result)
         assertEquals("hashed:brand-new-pass", users.findById(10)!!.passwordHash)
         assertTrue(sessions.findActiveByUser(1, 10).isEmpty(), "All sessions should be revoked")
@@ -647,13 +728,37 @@ class UserSelfServiceServiceTest {
     @Test
     fun `getActiveSessions - returns active sessions for user`() {
         sessions.save(
-            Session(tenantId = 1, userId = 10, clientId = null, accessTokenHash = "h1", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = null,
+                accessTokenHash = "h1",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
         )
         sessions.save(
-            Session(tenantId = 1, userId = 10, clientId = null, accessTokenHash = "h2", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = null,
+                accessTokenHash = "h2",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
         )
         sessions.save(
-            Session(tenantId = 1, userId = 11, clientId = null, accessTokenHash = "h3", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+            Session(
+                tenantId = 1,
+                userId = 11,
+                clientId = null,
+                accessTokenHash = "h3",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
         )
         val result = svc.getActiveSessions(userId = 10, tenantId = 1)
         assertEquals(2, result.size)
@@ -674,7 +779,15 @@ class UserSelfServiceServiceTest {
     fun `revokeSession - cannot revoke another users session`() {
         val session =
             sessions.save(
-                Session(tenantId = 1, userId = 11, clientId = null, accessTokenHash = "h1", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+                Session(
+                    tenantId = 1,
+                    userId = 11,
+                    clientId = null,
+                    accessTokenHash = "h1",
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
             )
         val result = svc.revokeSession(userId = 10, tenantId = 1, sessionId = session.id!!)
         assertIs<SelfServiceResult.Failure>(result)
@@ -685,7 +798,15 @@ class UserSelfServiceServiceTest {
     fun `revokeSession - cannot revoke session from different tenant`() {
         val session =
             sessions.save(
-                Session(tenantId = 1, userId = 10, clientId = null, accessTokenHash = "h1", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = null,
+                    accessTokenHash = "h1",
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
             )
         val result = svc.revokeSession(userId = 10, tenantId = 2, sessionId = session.id!!)
         assertIs<SelfServiceResult.Failure>(result)
@@ -696,7 +817,15 @@ class UserSelfServiceServiceTest {
     fun `revokeSession - success revokes and records audit`() {
         val session =
             sessions.save(
-                Session(tenantId = 1, userId = 10, clientId = null, accessTokenHash = "h1", refreshTokenHash = null, scopes = "openid", expiresAt = Instant.now().plusSeconds(3600)),
+                Session(
+                    tenantId = 1,
+                    userId = 10,
+                    clientId = null,
+                    accessTokenHash = "h1",
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
             )
         val result = svc.revokeSession(userId = 10, tenantId = 1, sessionId = session.id!!)
         assertIs<SelfServiceResult.Success<Unit>>(result)

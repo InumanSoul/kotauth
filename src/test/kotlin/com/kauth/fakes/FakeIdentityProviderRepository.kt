@@ -28,8 +28,10 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
     override fun findAllByTenant(tenantId: Int): List<IdentityProvider> =
         store.values.filter { it.tenantId == tenantId }
 
-    override fun findByTenantAndProvider(tenantId: Int, provider: SocialProvider): IdentityProvider? =
-        store.values.find { it.tenantId == tenantId && it.provider == provider }
+    override fun findByTenantAndProvider(
+        tenantId: Int,
+        provider: SocialProvider,
+    ): IdentityProvider? = store.values.find { it.tenantId == tenantId && it.provider == provider }
 
     override fun save(provider: IdentityProvider): IdentityProvider {
         val p = if (provider.id == null) provider.copy(id = nextId++) else provider
@@ -42,7 +44,10 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
         return provider
     }
 
-    override fun delete(tenantId: Int, provider: SocialProvider) {
+    override fun delete(
+        tenantId: Int,
+        provider: SocialProvider,
+    ) {
         store.entries.removeIf { it.value.tenantId == tenantId && it.value.provider == provider }
     }
 }

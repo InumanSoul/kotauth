@@ -96,11 +96,12 @@ class TotpUtilTest {
 
     @Test
     fun `generateUri - URL-encodes special characters in issuer and account`() {
-        val uri = TotpUtil.generateUri(
-            secret = "ABCDEF",
-            accountName = "user@example.com",
-            issuer = "My Company & Co",
-        )
+        val uri =
+            TotpUtil.generateUri(
+                secret = "ABCDEF",
+                accountName = "user@example.com",
+                issuer = "My Company & Co",
+            )
         assertTrue(uri.contains("My+Company"), "Spaces and special chars should be URL-encoded")
         assertTrue(uri.contains("user%40example.com"), "@ should be URL-encoded")
     }

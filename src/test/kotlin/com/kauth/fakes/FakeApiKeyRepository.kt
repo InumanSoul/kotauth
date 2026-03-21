@@ -24,26 +24,36 @@ class FakeApiKeyRepository : ApiKeyRepository {
         return k
     }
 
-    override fun findByHash(hash: String): ApiKey? =
-        store.values.find { it.keyHash == hash }
+    override fun findByHash(hash: String): ApiKey? = store.values.find { it.keyHash == hash }
 
     override fun findByTenantId(tenantId: Int): List<ApiKey> =
         store.values.filter { it.tenantId == tenantId }.sortedByDescending { it.createdAt }
 
-    override fun findById(id: Int, tenantId: Int): ApiKey? =
-        store[id]?.takeIf { it.tenantId == tenantId }
+    override fun findById(
+        id: Int,
+        tenantId: Int,
+    ): ApiKey? = store[id]?.takeIf { it.tenantId == tenantId }
 
-    override fun revoke(id: Int, tenantId: Int) {
+    override fun revoke(
+        id: Int,
+        tenantId: Int,
+    ) {
         store[id]?.takeIf { it.tenantId == tenantId }?.let {
             store[id] = it.copy(enabled = false)
         }
     }
 
-    override fun touchLastUsed(id: Int, at: Instant) {
+    override fun touchLastUsed(
+        id: Int,
+        at: Instant,
+    ) {
         store[id]?.let { store[id] = it.copy(lastUsedAt = at) }
     }
 
-    override fun delete(id: Int, tenantId: Int) {
+    override fun delete(
+        id: Int,
+        tenantId: Int,
+    ) {
         if (store[id]?.tenantId == tenantId) {
             store.remove(id)
         }
