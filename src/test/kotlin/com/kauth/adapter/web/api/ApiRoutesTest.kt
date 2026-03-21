@@ -1,8 +1,11 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
@@ -25,8 +28,10 @@ import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -39,6 +44,7 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -375,6 +381,299 @@ class ApiRoutesTest {
         assertEquals(HttpStatusCode.OK, response.status)
         val body = response.bodyAsText()
         assertTrue(body.contains("LOGIN_SUCCESS"))
+    }
+
+    // =========================================================================
+    // Roles CRUD
+    // =========================================================================
+
+    @Test
+    fun `POST roles creates a new role and returns 201`() = testApplication {
+        application { installTestApp() }
+
+        val response = client.post("/t/acme/api/v1/roles") {
+            bearerAuth(rawApiKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"editor","description":"Can edit content"}""")
+        }
+
+        assertEquals(HttpStatusCode.Created, response.status)
+        assertTrue(response.bodyAsText().contains("editor"))
+    }
+
+    @Test
+    fun `GET roles returns list of roles for tenant`() = testApplication {
+        application { installTestApp() }
+
+        roleGroupService.createRole(1, "viewer", "Read only", com.kauth.domain.model.RoleScope.TENANT, null)
+
+        val response = client.get("/t/acme/api/v1/roles") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("viewer"))
+    }
+
+    @Test
+    fun `PUT roles updates an existing role`() = testApplication {
+        application { installTestApp() }
+
+        val created = roleGroupService.createRole(1, "old-name", null, com.kauth.domain.model.RoleScope.TENANT, null)
+        val roleId = (created as com.kauth.domain.service.AdminResult.Success).value.id
+
+        val response = client.put("/t/acme/api/v1/roles/$roleId") {
+            bearerAuth(rawApiKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"new-name","description":"Updated"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("new-name"))
+    }
+
+    @Test
+    fun `DELETE roles removes a role and returns 204`() = testApplication {
+        application { installTestApp() }
+
+        val created = roleGroupService.createRole(1, "temp-role", null, com.kauth.domain.model.RoleScope.TENANT, null)
+        val roleId = (created as com.kauth.domain.service.AdminResult.Success).value.id
+
+        val response = client.delete("/t/acme/api/v1/roles/$roleId") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NoContent, response.status)
+    }
+
+    // =========================================================================
+    // Groups CRUD
+    // =========================================================================
+
+    @Test
+    fun `POST groups creates a new group and returns 201`() = testApplication {
+        application { installTestApp() }
+
+        val response = client.post("/t/acme/api/v1/groups") {
+            bearerAuth(rawApiKey)
+            contentType(ContentType.Application.Json)
+            setBody("""{"name":"engineering","description":"Eng team"}""")
+        }
+
+        assertEquals(HttpStatusCode.Created, response.status)
+        assertTrue(response.bodyAsText().contains("engineering"))
+    }
+
+    @Test
+    fun `GET group by id returns 404 for group in different tenant`() = testApplication {
+        application { installTestApp() }
+
+        groupRepo.add(
+            com.kauth.domain.model.Group(
+                id = 100,
+                tenantId = 50,
+                name = "other-group",
+            ),
+        )
+
+        val response = client.get("/t/acme/api/v1/groups/100") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
+    @Test
+    fun `DELETE groups removes a group and returns 204`() = testApplication {
+        application { installTestApp() }
+
+        val created = roleGroupService.createGroup(1, "temp-group", null, null)
+        val groupId = (created as com.kauth.domain.service.AdminResult.Success).value.id
+
+        val response = client.delete("/t/acme/api/v1/groups/$groupId") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NoContent, response.status)
+    }
+
+    @Test
+    fun `POST group member adds user to group and returns 204`() = testApplication {
+        application { installTestApp() }
+
+        val created = roleGroupService.createGroup(1, "dev-team", null, null)
+        val groupId = (created as com.kauth.domain.service.AdminResult.Success).value.id
+
+        val response = client.post("/t/acme/api/v1/groups/$groupId/members/10") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NoContent, response.status)
+    }
+
+    // =========================================================================
+    // Applications CRUD
+    // =========================================================================
+
+    @Test
+    fun `GET applications returns empty list when none exist`() = testApplication {
+        application { installTestApp() }
+
+        val response = client.get("/t/acme/api/v1/applications") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("\"data\""))
+    }
+
+    @Test
+    fun `GET application by id returns 200 for existing app`() = testApplication {
+        application { installTestApp() }
+
+        appRepo.add(
+            Application(
+                id = 1,
+                tenantId = 1,
+                clientId = "spa-app",
+                name = "SPA",
+                description = "Single page app",
+                accessType = AccessType.PUBLIC,
+                enabled = true,
+            ),
+        )
+
+        val response = client.get("/t/acme/api/v1/applications/1") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("spa-app"))
+    }
+
+    @Test
+    fun `GET application by id returns 404 for app in different tenant`() = testApplication {
+        application { installTestApp() }
+
+        appRepo.add(
+            Application(
+                id = 2,
+                tenantId = 50,
+                clientId = "other-app",
+                name = "Other",
+                description = null,
+                accessType = AccessType.CONFIDENTIAL,
+                enabled = true,
+            ),
+        )
+
+        val response = client.get("/t/acme/api/v1/applications/2") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
+    // =========================================================================
+    // Sessions
+    // =========================================================================
+
+    @Test
+    fun `GET sessions returns active sessions for tenant`() = testApplication {
+        application { installTestApp() }
+
+        sessionRepo.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = null,
+                accessTokenHash = "hash1",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        val response = client.get("/t/acme/api/v1/sessions") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("\"data\""))
+    }
+
+    @Test
+    fun `DELETE session revokes session and returns 204`() = testApplication {
+        application { installTestApp() }
+
+        val saved = sessionRepo.save(
+            Session(
+                tenantId = 1,
+                userId = 10,
+                clientId = null,
+                accessTokenHash = "hash-to-revoke",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        val response = client.delete("/t/acme/api/v1/sessions/${saved.id}") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NoContent, response.status)
+    }
+
+    @Test
+    fun `DELETE session returns 404 for session in different tenant`() = testApplication {
+        application { installTestApp() }
+
+        val saved = sessionRepo.save(
+            Session(
+                tenantId = 50,
+                userId = 99,
+                clientId = null,
+                accessTokenHash = "other-hash",
+                refreshTokenHash = null,
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        val response = client.delete("/t/acme/api/v1/sessions/${saved.id}") {
+            bearerAuth(rawApiKey)
+        }
+
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
+    // =========================================================================
+    // Audit logs — filtered query
+    // =========================================================================
+
+    @Test
+    fun `GET audit-logs with userId filter returns only matching events`() = testApplication {
+        application { installTestApp() }
+
+        auditLogRepo.add(
+            AuditEvent(tenantId = 1, userId = 10, clientId = null, eventType = AuditEventType.LOGIN_SUCCESS, ipAddress = "127.0.0.1", userAgent = "test"),
+        )
+        auditLogRepo.add(
+            AuditEvent(tenantId = 1, userId = 99, clientId = null, eventType = AuditEventType.LOGIN_FAILED, ipAddress = "127.0.0.1", userAgent = "test"),
+        )
+
+        val auditKey = apiKeyService.create(1, "Audit Key 2", listOf(ApiScope.AUDIT_LOGS_READ))
+        val auditRawKey = (auditKey as com.kauth.domain.service.ApiKeyResult.Success).value.rawKey
+
+        val response = client.get("/t/acme/api/v1/audit-logs?userId=10") {
+            bearerAuth(auditRawKey)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val body = response.bodyAsText()
+        assertTrue(body.contains("LOGIN_SUCCESS"))
+        assertTrue(!body.contains("LOGIN_FAILED"), "Must not include events for other users")
     }
 
     // =========================================================================
