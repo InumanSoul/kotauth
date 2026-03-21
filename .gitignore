@@ -47,3 +47,6 @@ src/main/resources/static/kotauth-auth.css
 
 # Version metadata — generated at build time by the generateVersionProperties Gradle task
 src/main/resources/version.properties
+
+# Internal development tracking — not for public consumption
+docs/IMPLEMENTATION_STATUS.md
