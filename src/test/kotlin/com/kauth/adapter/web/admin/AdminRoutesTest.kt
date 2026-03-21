@@ -58,64 +58,70 @@ class AdminRoutesTest {
     private val hasher = FakePasswordHasher()
     private val tokenPort = FakeTokenPort()
 
-    private val masterTenant = Tenant(
-        id = 1,
-        slug = "master",
-        displayName = "Master",
-        issuerUrl = null,
-        theme = TenantTheme.DEFAULT,
-    )
+    private val masterTenant =
+        Tenant(
+            id = 1,
+            slug = "master",
+            displayName = "Master",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val adminUser = User(
-        id = 1,
-        tenantId = 1,
-        username = "admin",
-        email = "admin@kotauth.dev",
-        fullName = "Admin",
-        passwordHash = hasher.hash("admin-pass"),
-        enabled = true,
-    )
+    private val adminUser =
+        User(
+            id = 1,
+            tenantId = 1,
+            username = "admin",
+            email = "admin@kotauth.dev",
+            fullName = "Admin",
+            passwordHash = hasher.hash("admin-pass"),
+            enabled = true,
+        )
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
 
-    private fun buildAuthService() = AuthService(
-        userRepository = userRepo,
-        tenantRepository = tenantRepo,
-        tokenPort = tokenPort,
-        passwordHasher = hasher,
-        auditLog = auditLogPort,
-        sessionRepository = sessionRepo,
-    )
+    private fun buildAuthService() =
+        AuthService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            tokenPort = tokenPort,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+        )
 
-    private fun buildSelfService() = UserSelfServiceService(
-        userRepository = userRepo,
-        tenantRepository = tenantRepo,
-        sessionRepository = sessionRepo,
-        passwordHasher = hasher,
-        auditLog = auditLogPort,
-        evTokenRepo = FakeEmailVerificationTokenRepository(),
-        prTokenRepo = FakePasswordResetTokenRepository(),
-        emailPort = FakeEmailPort(),
-    )
+    private fun buildSelfService() =
+        UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+        )
 
-    private fun buildAdminService() = AdminService(
-        tenantRepository = tenantRepo,
-        userRepository = userRepo,
-        applicationRepository = appRepo,
-        passwordHasher = hasher,
-        auditLog = auditLogPort,
-        sessionRepository = sessionRepo,
-        selfServiceService = buildSelfService(),
-    )
+    private fun buildAdminService() =
+        AdminService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+            selfServiceService = buildSelfService(),
+        )
 
-    private fun buildRoleGroupService() = RoleGroupService(
-        roleRepository = roleRepo,
-        groupRepository = groupRepo,
-        tenantRepository = tenantRepo,
-        userRepository = userRepo,
-        applicationRepository = appRepo,
-        auditLog = auditLogPort,
-    )
+    private fun buildRoleGroupService() =
+        RoleGroupService(
+            roleRepository = roleRepo,
+            groupRepository = groupRepo,
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+        )
 
     @BeforeTest
     fun setup() {
@@ -132,119 +138,133 @@ class AdminRoutesTest {
     // =========================================================================
 
     @Test
-    fun `GET admin redirects to login when no session cookie is present`() = testApplication {
-        application { installTestApp() }
+    fun `GET admin redirects to login when no session cookie is present`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.get("/admin")
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/admin")
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        val location = response.headers["Location"] ?: ""
-        assertTrue(location.contains("/admin/login"))
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.contains("/admin/login"))
+        }
 
     @Test
-    fun `GET admin settings redirects to login when unauthenticated`() = testApplication {
-        application { installTestApp() }
+    fun `GET admin settings redirects to login when unauthenticated`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.get("/admin/settings")
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/admin/settings")
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
+        }
 
     // =========================================================================
     // GET /admin/login
     // =========================================================================
 
     @Test
-    fun `GET admin login returns 200 with login form`() = testApplication {
-        application { installTestApp() }
+    fun `GET admin login returns 200 with login form`() =
+        testApplication {
+            application { installTestApp() }
 
-        val response = client.get("/admin/login")
+            val response = client.get("/admin/login")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText()
-        assertTrue(body.contains("login") || body.contains("Login") || body.contains("form"))
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("login") || body.contains("Login") || body.contains("form"))
+        }
 
     // =========================================================================
     // POST /admin/login
     // =========================================================================
 
     @Test
-    fun `POST admin login with valid credentials sets session and redirects`() = testApplication {
-        application { installTestApp() }
+    fun `POST admin login with valid credentials sets session and redirects`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.submitForm(
-            url = "/admin/login",
-            formParameters = Parameters.build {
-                append("username", "admin")
-                append("password", "admin-pass")
-            },
-        )
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/admin/login",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "admin")
+                            append("password", "admin-pass")
+                        },
+                )
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        val location = response.headers["Location"] ?: ""
-        assertTrue(location.endsWith("/admin") || location.contains("/admin"), "Must redirect to /admin")
-        // Session cookie must be set
-        val cookies = response.headers.getAll("Set-Cookie")
-        assertTrue(
-            cookies?.any { it.contains("KOTAUTH_ADMIN") } == true,
-            "KOTAUTH_ADMIN session cookie must be set on successful login",
-        )
-    }
-
-    @Test
-    fun `POST admin login with invalid credentials returns 401`() = testApplication {
-        application { installTestApp() }
-
-        val response = client.submitForm(
-            url = "/admin/login",
-            formParameters = Parameters.build {
-                append("username", "admin")
-                append("password", "wrong-password")
-            },
-        )
-
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-        assertTrue(response.bodyAsText().contains("Invalid credentials"))
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.endsWith("/admin") || location.contains("/admin"), "Must redirect to /admin")
+            // Session cookie must be set
+            val cookies = response.headers.getAll("Set-Cookie")
+            assertTrue(
+                cookies?.any { it.contains("KOTAUTH_ADMIN") } == true,
+                "KOTAUTH_ADMIN session cookie must be set on successful login",
+            )
+        }
 
     @Test
-    fun `POST admin login with blank username returns 401`() = testApplication {
-        application { installTestApp() }
+    fun `POST admin login with invalid credentials returns 401`() =
+        testApplication {
+            application { installTestApp() }
 
-        val response = client.submitForm(
-            url = "/admin/login",
-            formParameters = Parameters.build {
-                append("username", "")
-                append("password", "admin-pass")
-            },
-        )
+            val response =
+                client.submitForm(
+                    url = "/admin/login",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "admin")
+                            append("password", "wrong-password")
+                        },
+                )
 
-        assertEquals(HttpStatusCode.Unauthorized, response.status)
-    }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertTrue(response.bodyAsText().contains("Invalid credentials"))
+        }
+
+    @Test
+    fun `POST admin login with blank username returns 401`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.submitForm(
+                    url = "/admin/login",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "")
+                            append("password", "admin-pass")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
 
     // =========================================================================
     // POST /admin/logout
     // =========================================================================
 
     @Test
-    fun `POST admin logout redirects to login`() = testApplication {
-        application { installTestApp() }
+    fun `POST admin logout redirects to login`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.submitForm(
-            url = "/admin/logout",
-            formParameters = Parameters.build { },
-        )
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/admin/logout",
+                    formParameters = Parameters.build { },
+                )
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
+        }
 
     // =========================================================================
     // Test app wiring

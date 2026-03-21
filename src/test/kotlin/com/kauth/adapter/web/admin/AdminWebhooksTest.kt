@@ -62,52 +62,83 @@ class AdminWebhooksTest {
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
 
-    private val webhookService = WebhookService(
-        endpointRepository = webhookEndpointRepo,
-        deliveryRepository = webhookDeliveryRepo,
-    )
+    private val webhookService =
+        WebhookService(
+            endpointRepository = webhookEndpointRepo,
+            deliveryRepository = webhookDeliveryRepo,
+        )
 
-    private val masterTenant = Tenant(
-        id = 1, slug = "master", displayName = "Master",
-        issuerUrl = null, theme = TenantTheme.DEFAULT,
-    )
+    private val masterTenant =
+        Tenant(
+            id = 1,
+            slug = "master",
+            displayName = "Master",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val workspace = Tenant(
-        id = 2, slug = "acme", displayName = "Acme Corp",
-        issuerUrl = null, theme = TenantTheme.DEFAULT,
-    )
+    private val workspace =
+        Tenant(
+            id = 2,
+            slug = "acme",
+            displayName = "Acme Corp",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val adminUser = User(
-        id = 1, tenantId = 1, username = "admin",
-        email = "admin@kotauth.dev", fullName = "Admin",
-        passwordHash = hasher.hash("admin-pass"), enabled = true,
-    )
+    private val adminUser =
+        User(
+            id = 1,
+            tenantId = 1,
+            username = "admin",
+            email = "admin@kotauth.dev",
+            fullName = "Admin",
+            passwordHash = hasher.hash("admin-pass"),
+            enabled = true,
+        )
 
-    private fun buildAuthService() = AuthService(
-        userRepository = userRepo, tenantRepository = tenantRepo,
-        tokenPort = tokenPort, passwordHasher = hasher,
-        auditLog = auditLogPort, sessionRepository = sessionRepo,
-    )
+    private fun buildAuthService() =
+        AuthService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            tokenPort = tokenPort,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+        )
 
-    private fun buildSelfService() = UserSelfServiceService(
-        userRepository = userRepo, tenantRepository = tenantRepo,
-        sessionRepository = sessionRepo, passwordHasher = hasher,
-        auditLog = auditLogPort, evTokenRepo = FakeEmailVerificationTokenRepository(),
-        prTokenRepo = FakePasswordResetTokenRepository(), emailPort = FakeEmailPort(),
-    )
+    private fun buildSelfService() =
+        UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+        )
 
-    private fun buildAdminService() = AdminService(
-        tenantRepository = tenantRepo, userRepository = userRepo,
-        applicationRepository = appRepo, passwordHasher = hasher,
-        auditLog = auditLogPort, sessionRepository = sessionRepo,
-        selfServiceService = buildSelfService(),
-    )
+    private fun buildAdminService() =
+        AdminService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+            selfServiceService = buildSelfService(),
+        )
 
-    private fun buildRoleGroupService() = RoleGroupService(
-        roleRepository = roleRepo, groupRepository = groupRepo,
-        tenantRepository = tenantRepo, userRepository = userRepo,
-        applicationRepository = appRepo, auditLog = auditLogPort,
-    )
+    private fun buildRoleGroupService() =
+        RoleGroupService(
+            roleRepository = roleRepo,
+            groupRepository = groupRepo,
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+        )
 
     @BeforeTest
     fun setup() {
@@ -127,74 +158,88 @@ class AdminWebhooksTest {
     // =========================================================================
 
     @Test
-    fun `GET webhooks list returns 200`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `GET webhooks list returns 200`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/acme/settings/webhooks")
+            val response = authed.get("/admin/workspaces/acme/settings/webhooks")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-
-    @Test
-    fun `POST webhooks creates endpoint and returns 200`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
-
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings/webhooks",
-            formParameters = Parameters.build {
-                append("url", "https://hooks.example.com/kotauth")
-                append("description", "CI/CD hook")
-                append("events", "user.created")
-                append("events", "user.deleted")
-            },
-        )
-
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
-
-    @Test
-    fun `POST webhooks with blank URL returns 422`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
-
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings/webhooks",
-            formParameters = Parameters.build {
-                append("url", "")
-                append("events", "user.created")
-            },
-        )
-
-        assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-    }
-
-    @Test
-    fun `POST webhooks delete redirects back to list`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient {
-            install(HttpCookies)
-            followRedirects = false
+            assertEquals(HttpStatusCode.OK, response.status)
         }
-        login(authed)
 
-        val created = webhookService.createEndpoint(
-            2, "https://hooks.example.com/test", setOf("user.created"), "test",
-        )
-        val endpointId = (created as com.kauth.domain.service.WebhookResult.Success).endpoint.id!!
+    @Test
+    fun `POST webhooks creates endpoint and returns 200`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings/webhooks/$endpointId/delete",
-            formParameters = Parameters.build { },
-        )
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/webhooks",
+                    formParameters =
+                        Parameters.build {
+                            append("url", "https://hooks.example.com/kotauth")
+                            append("description", "CI/CD hook")
+                            append("events", "user.created")
+                            append("events", "user.deleted")
+                        },
+                )
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/settings/webhooks") == true)
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `POST webhooks with blank URL returns 422`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/webhooks",
+                    formParameters =
+                        Parameters.build {
+                            append("url", "")
+                            append("events", "user.created")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST webhooks delete redirects back to list`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created =
+                webhookService.createEndpoint(
+                    2,
+                    "https://hooks.example.com/test",
+                    setOf("user.created"),
+                    "test",
+                )
+            val endpointId = (created as com.kauth.domain.service.WebhookResult.Success).endpoint.id!!
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/webhooks/$endpointId/delete",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/settings/webhooks") == true)
+        }
 
     // =========================================================================
     // Helpers
@@ -203,10 +248,11 @@ class AdminWebhooksTest {
     private suspend fun login(client: io.ktor.client.HttpClient) {
         client.submitForm(
             url = "/admin/login",
-            formParameters = Parameters.build {
-                append("username", "admin")
-                append("password", "admin-pass")
-            },
+            formParameters =
+                Parameters.build {
+                    append("username", "admin")
+                    append("password", "admin-pass")
+                },
         )
     }
 

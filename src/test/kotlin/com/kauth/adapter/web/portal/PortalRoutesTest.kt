@@ -47,43 +47,47 @@ class PortalRoutesTest {
     private val hasher = FakePasswordHasher()
     private val tokenPort = FakeTokenPort()
 
-    private val tenant = Tenant(
-        id = 1,
-        slug = "acme",
-        displayName = "Acme Corp",
-        issuerUrl = null,
-        theme = TenantTheme.DEFAULT,
-    )
+    private val tenant =
+        Tenant(
+            id = 1,
+            slug = "acme",
+            displayName = "Acme Corp",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val user = User(
-        id = 10,
-        tenantId = 1,
-        username = "alice",
-        email = "alice@acme.dev",
-        fullName = "Alice",
-        passwordHash = hasher.hash("secret"),
-        enabled = true,
-    )
+    private val user =
+        User(
+            id = 10,
+            tenantId = 1,
+            username = "alice",
+            email = "alice@acme.dev",
+            fullName = "Alice",
+            passwordHash = hasher.hash("secret"),
+            enabled = true,
+        )
 
-    private fun buildAuthService() = AuthService(
-        userRepository = userRepo,
-        tenantRepository = tenantRepo,
-        tokenPort = tokenPort,
-        passwordHasher = hasher,
-        auditLog = auditLogPort,
-        sessionRepository = sessionRepo,
-    )
+    private fun buildAuthService() =
+        AuthService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            tokenPort = tokenPort,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+        )
 
-    private fun buildSelfService() = UserSelfServiceService(
-        userRepository = userRepo,
-        tenantRepository = tenantRepo,
-        sessionRepository = sessionRepo,
-        passwordHasher = hasher,
-        auditLog = auditLogPort,
-        evTokenRepo = FakeEmailVerificationTokenRepository(),
-        prTokenRepo = FakePasswordResetTokenRepository(),
-        emailPort = FakeEmailPort(),
-    )
+    private fun buildSelfService() =
+        UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+        )
 
     @BeforeTest
     fun setup() {
@@ -100,94 +104,103 @@ class PortalRoutesTest {
     // =========================================================================
 
     @Test
-    fun `GET profile redirects to login when no session cookie is present`() = testApplication {
-        application { installTestApp() }
+    fun `GET profile redirects to login when no session cookie is present`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.get("/t/acme/account/profile")
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/profile")
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        val location = response.headers["Location"] ?: ""
-        assertTrue(location.contains("/t/acme/account/login"), "Must redirect to portal login")
-    }
-
-    @Test
-    fun `GET security redirects to login when no session cookie is present`() = testApplication {
-        application { installTestApp() }
-
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.get("/t/acme/account/security")
-
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.contains("/t/acme/account/login"), "Must redirect to portal login")
+        }
 
     @Test
-    fun `POST change-password redirects to login when no session cookie is present`() = testApplication {
-        application { installTestApp() }
+    fun `GET security redirects to login when no session cookie is present`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.submitForm(
-            url = "/t/acme/account/change-password",
-            formParameters = Parameters.build {
-                append("current_password", "secret")
-                append("new_password", "new-secret")
-                append("confirm_password", "new-secret")
-            },
-        )
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/security")
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
+        }
+
+    @Test
+    fun `POST change-password redirects to login when no session cookie is present`() =
+        testApplication {
+            application { installTestApp() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/account/change-password",
+                    formParameters =
+                        Parameters.build {
+                            append("current_password", "secret")
+                            append("new_password", "new-secret")
+                            append("confirm_password", "new-secret")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
+        }
 
     // =========================================================================
     // GET /login (fallback — no oauthService wired)
     // =========================================================================
 
     @Test
-    fun `GET login returns 200 with login form when oauthService is null`() = testApplication {
-        application { installTestApp() }
+    fun `GET login returns 200 with login form when oauthService is null`() =
+        testApplication {
+            application { installTestApp() }
 
-        val response = client.get("/t/acme/account/login")
+            val response = client.get("/t/acme/account/login")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText()
-        assertTrue(body.contains("login") || body.contains("Login") || body.contains("form"))
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("login") || body.contains("Login") || body.contains("form"))
+        }
 
     // =========================================================================
     // GET /callback — error paths
     // =========================================================================
 
     @Test
-    fun `GET callback redirects to login when no code and no oauthService`() = testApplication {
-        application { installTestApp() }
+    fun `GET callback redirects to login when no code and no oauthService`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.get("/t/acme/account/callback")
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/callback")
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        val location = response.headers["Location"] ?: ""
-        assertTrue(location.contains("/t/acme/account/login"), "Must redirect to login on missing code")
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.contains("/t/acme/account/login"), "Must redirect to login on missing code")
+        }
 
     // =========================================================================
     // POST /logout
     // =========================================================================
 
     @Test
-    fun `POST logout redirects to login`() = testApplication {
-        application { installTestApp() }
+    fun `POST logout redirects to login`() =
+        testApplication {
+            application { installTestApp() }
 
-        val noFollow = createClient { followRedirects = false }
-        val response = noFollow.submitForm(
-            url = "/t/acme/account/logout",
-            formParameters = Parameters.build { },
-        )
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/account/logout",
+                    formParameters = Parameters.build { },
+                )
 
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
-    }
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
+        }
 
     // =========================================================================
     // Test app wiring

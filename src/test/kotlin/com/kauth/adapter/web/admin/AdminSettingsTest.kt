@@ -25,7 +25,6 @@ import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -62,47 +61,77 @@ class AdminSettingsTest {
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
 
-    private val masterTenant = Tenant(
-        id = 1, slug = "master", displayName = "Master",
-        issuerUrl = null, theme = TenantTheme.DEFAULT,
-    )
+    private val masterTenant =
+        Tenant(
+            id = 1,
+            slug = "master",
+            displayName = "Master",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val workspace = Tenant(
-        id = 2, slug = "acme", displayName = "Acme Corp",
-        issuerUrl = null, theme = TenantTheme.DEFAULT,
-    )
+    private val workspace =
+        Tenant(
+            id = 2,
+            slug = "acme",
+            displayName = "Acme Corp",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
 
-    private val adminUser = User(
-        id = 1, tenantId = 1, username = "admin",
-        email = "admin@kotauth.dev", fullName = "Admin",
-        passwordHash = hasher.hash("admin-pass"), enabled = true,
-    )
+    private val adminUser =
+        User(
+            id = 1,
+            tenantId = 1,
+            username = "admin",
+            email = "admin@kotauth.dev",
+            fullName = "Admin",
+            passwordHash = hasher.hash("admin-pass"),
+            enabled = true,
+        )
 
-    private fun buildAuthService() = AuthService(
-        userRepository = userRepo, tenantRepository = tenantRepo,
-        tokenPort = tokenPort, passwordHasher = hasher,
-        auditLog = auditLogPort, sessionRepository = sessionRepo,
-    )
+    private fun buildAuthService() =
+        AuthService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            tokenPort = tokenPort,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+        )
 
-    private fun buildSelfService() = UserSelfServiceService(
-        userRepository = userRepo, tenantRepository = tenantRepo,
-        sessionRepository = sessionRepo, passwordHasher = hasher,
-        auditLog = auditLogPort, evTokenRepo = FakeEmailVerificationTokenRepository(),
-        prTokenRepo = FakePasswordResetTokenRepository(), emailPort = FakeEmailPort(),
-    )
+    private fun buildSelfService() =
+        UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+        )
 
-    private fun buildAdminService() = AdminService(
-        tenantRepository = tenantRepo, userRepository = userRepo,
-        applicationRepository = appRepo, passwordHasher = hasher,
-        auditLog = auditLogPort, sessionRepository = sessionRepo,
-        selfServiceService = buildSelfService(),
-    )
+    private fun buildAdminService() =
+        AdminService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            sessionRepository = sessionRepo,
+            selfServiceService = buildSelfService(),
+        )
 
-    private fun buildRoleGroupService() = RoleGroupService(
-        roleRepository = roleRepo, groupRepository = groupRepo,
-        tenantRepository = tenantRepo, userRepository = userRepo,
-        applicationRepository = appRepo, auditLog = auditLogPort,
-    )
+    private fun buildRoleGroupService() =
+        RoleGroupService(
+            roleRepository = roleRepo,
+            groupRepository = groupRepo,
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+        )
 
     @BeforeTest
     fun setup() {
@@ -120,142 +149,159 @@ class AdminSettingsTest {
     // =========================================================================
 
     @Test
-    fun `GET workspace settings returns 200 for authenticated admin`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `GET workspace settings returns 200 for authenticated admin`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/acme/settings")
+            val response = authed.get("/admin/workspaces/acme/settings")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
 
     @Test
-    fun `POST workspace settings saves and redirects with saved flag`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient {
-            install(HttpCookies)
-            followRedirects = false
+    fun `POST workspace settings saves and redirects with saved flag`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings",
+                    formParameters =
+                        Parameters.build {
+                            append("displayName", "Acme Updated")
+                            append("tokenExpirySeconds", "7200")
+                            append("refreshTokenExpirySeconds", "172800")
+                            append("registrationEnabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
-        login(authed)
-
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings",
-            formParameters = Parameters.build {
-                append("displayName", "Acme Updated")
-                append("tokenExpirySeconds", "7200")
-                append("refreshTokenExpirySeconds", "172800")
-                append("registrationEnabled", "true")
-            },
-        )
-
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("saved=true") == true)
-    }
 
     // =========================================================================
     // SMTP settings
     // =========================================================================
 
     @Test
-    fun `GET smtp settings returns 200 for authenticated admin`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `GET smtp settings returns 200 for authenticated admin`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/acme/settings/smtp")
+            val response = authed.get("/admin/workspaces/acme/settings/smtp")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
 
     @Test
-    fun `POST smtp settings saves and redirects with saved flag`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient {
-            install(HttpCookies)
-            followRedirects = false
+    fun `POST smtp settings saves and redirects with saved flag`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/smtp",
+                    formParameters =
+                        Parameters.build {
+                            append("smtpHost", "smtp.example.com")
+                            append("smtpPort", "587")
+                            append("smtpFromAddress", "no-reply@acme.dev")
+                            append("smtpTlsEnabled", "true")
+                            append("smtpEnabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
-        login(authed)
-
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings/smtp",
-            formParameters = Parameters.build {
-                append("smtpHost", "smtp.example.com")
-                append("smtpPort", "587")
-                append("smtpFromAddress", "no-reply@acme.dev")
-                append("smtpTlsEnabled", "true")
-                append("smtpEnabled", "true")
-            },
-        )
-
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("saved=true") == true)
-    }
 
     // =========================================================================
     // Security policy settings
     // =========================================================================
 
     @Test
-    fun `GET security settings returns 200 for authenticated admin`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `GET security settings returns 200 for authenticated admin`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/acme/settings/security")
+            val response = authed.get("/admin/workspaces/acme/settings/security")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
 
     @Test
-    fun `POST security settings saves password policy and redirects`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient {
-            install(HttpCookies)
-            followRedirects = false
+    fun `POST security settings saves password policy and redirects`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passwordPolicyMinLength", "12")
+                            append("passwordPolicyRequireSpecial", "true")
+                            append("passwordPolicyRequireUppercase", "true")
+                            append("passwordPolicyRequireNumber", "true")
+                            append("mfaPolicy", "required")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
-        login(authed)
-
-        val response = authed.submitForm(
-            url = "/admin/workspaces/acme/settings/security",
-            formParameters = Parameters.build {
-                append("passwordPolicyMinLength", "12")
-                append("passwordPolicyRequireSpecial", "true")
-                append("passwordPolicyRequireUppercase", "true")
-                append("passwordPolicyRequireNumber", "true")
-                append("mfaPolicy", "required")
-            },
-        )
-
-        assertEquals(HttpStatusCode.Found, response.status)
-        assertTrue(response.headers["Location"]?.contains("saved=true") == true)
-    }
 
     // =========================================================================
     // Branding settings
     // =========================================================================
 
     @Test
-    fun `GET branding settings returns 200 for authenticated admin`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `GET branding settings returns 200 for authenticated admin`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/acme/settings/branding")
+            val response = authed.get("/admin/workspaces/acme/settings/branding")
 
-        assertEquals(HttpStatusCode.OK, response.status)
-    }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
 
     @Test
-    fun `POST workspace settings for unknown slug returns 404`() = testApplication {
-        application { installTestApp() }
-        val authed = createClient { install(HttpCookies) }
-        login(authed)
+    fun `POST workspace settings for unknown slug returns 404`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
 
-        val response = authed.get("/admin/workspaces/ghost/settings")
+            val response = authed.get("/admin/workspaces/ghost/settings")
 
-        assertEquals(HttpStatusCode.NotFound, response.status)
-    }
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
 
     // =========================================================================
     // Helpers
@@ -264,10 +310,11 @@ class AdminSettingsTest {
     private suspend fun login(client: io.ktor.client.HttpClient) {
         client.submitForm(
             url = "/admin/login",
-            formParameters = Parameters.build {
-                append("username", "admin")
-                append("password", "admin-pass")
-            },
+            formParameters =
+                Parameters.build {
+                    append("username", "admin")
+                    append("password", "admin-pass")
+                },
         )
     }
 

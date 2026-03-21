@@ -844,18 +844,19 @@ class AuthRoutesTest {
                     expiresAt = Instant.now().plusSeconds(3600),
                 ),
             )
-            tokenPort.claimsToReturn = AccessTokenClaims(
-                sub = "10",
-                iss = "http://localhost/t/acme",
-                aud = "spa-app",
-                tenantId = 1,
-                username = "alice",
-                email = "alice@example.com",
-                scopes = listOf("openid", "profile"),
-                issuedAt = Instant.now().epochSecond,
-                expiresAt = Instant.now().plusSeconds(3600).epochSecond,
-                realmRoles = emptyList(),
-            )
+            tokenPort.claimsToReturn =
+                AccessTokenClaims(
+                    sub = "10",
+                    iss = "http://localhost/t/acme",
+                    aud = "spa-app",
+                    tenantId = 1,
+                    username = "alice",
+                    email = "alice@example.com",
+                    scopes = listOf("openid", "profile"),
+                    issuedAt = Instant.now().epochSecond,
+                    expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+                    realmRoles = emptyList(),
+                )
 
             application {
                 install(ContentNegotiation) { json() }

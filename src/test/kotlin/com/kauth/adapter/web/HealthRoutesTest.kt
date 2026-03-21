@@ -27,68 +27,72 @@ class HealthRoutesTest {
     // =========================================================================
 
     @Test
-    fun `GET health returns 200 with status up`() = testApplication {
-        application {
-            install(ContentNegotiation) { json() }
-            routing { healthRoutes(baseUrl = "http://localhost:8080") }
+    fun `GET health returns 200 with status up`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
+            }
+
+            val response = client.get("/health")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"status\":\"up\"") || body.contains("\"status\": \"up\""))
         }
-
-        val response = client.get("/health")
-
-        assertEquals(HttpStatusCode.OK, response.status)
-        val body = response.bodyAsText()
-        assertTrue(body.contains("\"status\":\"up\"") || body.contains("\"status\": \"up\""))
-    }
 
     @Test
-    fun `GET health response contains ISO timestamp`() = testApplication {
-        application {
-            install(ContentNegotiation) { json() }
-            routing { healthRoutes(baseUrl = "http://localhost:8080") }
+    fun `GET health response contains ISO timestamp`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
+            }
+
+            val body = client.get("/health").bodyAsText()
+
+            assertTrue(body.contains("\"timestamp\""))
+            // ISO-8601 timestamps contain 'T' separator (e.g. 2026-03-21T12:00:00Z)
+            assertTrue(body.contains("T"), "Timestamp must be ISO-8601 format")
         }
-
-        val body = client.get("/health").bodyAsText()
-
-        assertTrue(body.contains("\"timestamp\""))
-        // ISO-8601 timestamps contain 'T' separator (e.g. 2026-03-21T12:00:00Z)
-        assertTrue(body.contains("T"), "Timestamp must be ISO-8601 format")
-    }
 
     // =========================================================================
     // GET /health/ready — readiness
     // =========================================================================
 
     @Test
-    fun `GET health ready returns 503 when database is not available`() = testApplication {
-        application {
-            install(ContentNegotiation) { json() }
-            routing { healthRoutes(baseUrl = "http://localhost:8080") }
+    fun `GET health ready returns 503 when database is not available`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
+            }
+
+            val response = client.get("/health/ready")
+
+            // No Exposed database is configured in the test engine, so
+            // pingDatabase() throws → dbCheck.status = "error" → 503
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("\"status\":\"not_ready\"") || body.contains("\"status\": \"not_ready\""),
+            )
         }
-
-        val response = client.get("/health/ready")
-
-        // No Exposed database is configured in the test engine, so
-        // pingDatabase() throws → dbCheck.status = "error" → 503
-        assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
-        val body = response.bodyAsText()
-        assertTrue(
-            body.contains("\"status\":\"not_ready\"") || body.contains("\"status\": \"not_ready\""),
-        )
-    }
 
     @Test
-    fun `GET health ready includes database check details`() = testApplication {
-        application {
-            install(ContentNegotiation) { json() }
-            routing { healthRoutes(baseUrl = "http://localhost:8080") }
+    fun `GET health ready includes database check details`() =
+        testApplication {
+            application {
+                install(ContentNegotiation) { json() }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
+            }
+
+            val body = client.get("/health/ready").bodyAsText()
+
+            assertTrue(body.contains("\"database\""), "Response must include database check")
+            assertTrue(body.contains("\"config\""), "Response must include config check")
+            assertTrue(body.contains("\"checks\""), "Response must include checks envelope")
         }
-
-        val body = client.get("/health/ready").bodyAsText()
-
-        assertTrue(body.contains("\"database\""), "Response must include database check")
-        assertTrue(body.contains("\"config\""), "Response must include config check")
-        assertTrue(body.contains("\"checks\""), "Response must include checks envelope")
-    }
 
     // =========================================================================
     // Config check — warnings for non-HTTPS, missing secret key
