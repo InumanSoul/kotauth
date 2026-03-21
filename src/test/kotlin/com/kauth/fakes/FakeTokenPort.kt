@@ -21,8 +21,13 @@ class FakeTokenPort : TokenPort {
     // session has a different refresh token hash.
     private var callCount = 0
 
+    var claimsToReturn: AccessTokenClaims? = null
+    var jwksToReturn: List<Map<String, Any>> = emptyList()
+
     fun reset() {
         callCount = 0
+        claimsToReturn = null
+        jwksToReturn = emptyList()
     }
 
     override fun issueUserTokens(
@@ -51,8 +56,7 @@ class FakeTokenPort : TokenPort {
         scopes: List<String>,
     ): String = "fake.m2m.${client.clientId}"
 
-    /** Not needed for domain service tests — return null. */
-    override fun decodeAccessToken(token: String): AccessTokenClaims? = null
+    override fun decodeAccessToken(token: String): AccessTokenClaims? = claimsToReturn
 
-    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> = emptyList()
+    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> = jwksToReturn
 }

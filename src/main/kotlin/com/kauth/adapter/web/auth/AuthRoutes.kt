@@ -1403,20 +1403,26 @@ fun Route.authRoutes(
         get("/protocol/openid-connect/userinfo") {
             val bearerToken =
                 extractBearerToken(call)
-                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        buildJsonObject { put("error", "invalid_token") },
+                    )
 
             val userInfo =
                 oauthService.getUserInfo(bearerToken)
-                    ?: return@get call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        buildJsonObject { put("error", "invalid_token") },
+                    )
 
             call.respond(
-                mapOf(
-                    "sub" to userInfo.sub,
-                    "preferred_username" to userInfo.username,
-                    "email" to userInfo.email,
-                    "email_verified" to userInfo.emailVerified,
-                    "name" to userInfo.name,
-                ),
+                buildJsonObject {
+                    put("sub", userInfo.sub)
+                    put("preferred_username", userInfo.username)
+                    put("email", userInfo.email)
+                    put("email_verified", userInfo.emailVerified)
+                    put("name", userInfo.name)
+                },
             )
         }
 
@@ -1429,10 +1435,10 @@ fun Route.authRoutes(
             val token =
                 params["token"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf(
-                        "error" to "invalid_request",
-                        "error_description" to "token parameter is required",
-                    ),
+                    buildJsonObject {
+                        put("error", "invalid_request")
+                        put("error_description", "token parameter is required")
+                    },
                 )
 
             oauthService.revokeToken(token)
@@ -1451,18 +1457,19 @@ fun Route.authRoutes(
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
 
             when (val result = oauthService.introspectToken(slug, token, typeHint)) {
-                is IntrospectionResult.Inactive -> call.respond(mapOf("active" to false))
+                is IntrospectionResult.Inactive ->
+                    call.respond(buildJsonObject { put("active", false) })
                 is IntrospectionResult.Active ->
                     call.respond(
-                        mapOf(
-                            "active" to true,
-                            "sub" to result.sub,
-                            "username" to (result.username ?: ""),
-                            "email" to (result.email ?: ""),
-                            "scope" to result.scopes.joinToString(" "),
-                            "exp" to result.expiresAt,
-                            "client_id" to (result.clientId ?: ""),
-                        ),
+                        buildJsonObject {
+                            put("active", true)
+                            put("sub", result.sub)
+                            put("username", result.username ?: "")
+                            put("email", result.email ?: "")
+                            put("scope", result.scopes.joinToString(" "))
+                            put("exp", result.expiresAt)
+                            put("client_id", result.clientId ?: "")
+                        },
                     )
             }
         }

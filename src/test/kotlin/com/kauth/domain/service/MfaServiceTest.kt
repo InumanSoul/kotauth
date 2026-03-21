@@ -4,6 +4,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
+import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.fakes.FakeAuditLogPort
@@ -314,5 +315,85 @@ class MfaServiceTest {
             ),
         )
         assertTrue(svc.shouldChallengeMfa(userId = 10))
+    }
+
+    // =========================================================================
+    // disableMfa
+    // =========================================================================
+
+    @Test
+    fun `disableMfa - removes enrollment and recovery codes`() {
+        val enrollResult = svc.beginEnrollment(userId = 10, tenantId = 1, issuer = "Acme")
+        val secret = (enrollResult as MfaResult.Success<EnrollmentResponse>).value.enrollment.secret
+        val validCode = TotpUtil.generateCode(secret)
+        svc.verifyEnrollment(userId = 10, code = validCode)
+
+        assertTrue(svc.shouldChallengeMfa(userId = 10), "MFA should be active before disable")
+
+        val result = svc.disableMfa(userId = 10, tenantId = 1)
+        assertIs<MfaResult.Success<Unit>>(result)
+
+        assertFalse(svc.shouldChallengeMfa(userId = 10), "MFA should not challenge after disable")
+        val updatedUser = users.findById(10)
+        assertNotNull(updatedUser)
+        assertFalse(updatedUser.mfaEnabled, "User.mfaEnabled should be false after disable")
+        assertTrue(auditLog.hasEvent(AuditEventType.MFA_DISABLED))
+    }
+
+    @Test
+    fun `disableMfa - succeeds even with no existing enrollment`() {
+        val result = svc.disableMfa(userId = 10, tenantId = 1)
+        assertIs<MfaResult.Success<Unit>>(result)
+        assertTrue(auditLog.hasEvent(AuditEventType.MFA_DISABLED))
+    }
+
+    @Test
+    fun `disableMfa - clears recovery codes so they cannot be used afterward`() {
+        svc.beginEnrollment(userId = 10, tenantId = 1, issuer = "Acme")
+        // Seed a known recovery code
+        mfaRepo.saveRecoveryCodes(
+            listOf(MfaRecoveryCode(userId = 10, tenantId = 1, codeHash = hasher.hash("RECOVERY1"))),
+        )
+
+        svc.disableMfa(userId = 10, tenantId = 1)
+
+        val recoveryResult = svc.verifyRecoveryCode(userId = 10, code = "RECOVERY1")
+        assertIs<MfaResult.Failure>(recoveryResult)
+        assertIs<MfaError.NoRecoveryCodesLeft>(recoveryResult.error)
+    }
+
+    // =========================================================================
+    // isMfaRequired
+    // =========================================================================
+
+    @Test
+    fun `isMfaRequired - optional policy returns false`() {
+        assertFalse(svc.isMfaRequired(testUser, tenantMfaPolicy = "optional"))
+    }
+
+    @Test
+    fun `isMfaRequired - required policy returns true for any user`() {
+        assertTrue(svc.isMfaRequired(testUser, tenantMfaPolicy = "required"))
+    }
+
+    @Test
+    fun `isMfaRequired - required_admins returns true only for users with admin role`() {
+        val adminRole = Role(id = 1, tenantId = 1, name = "admin")
+        val viewerRole = Role(id = 2, tenantId = 1, name = "viewer")
+
+        assertTrue(
+            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = listOf(adminRole)),
+        )
+        assertFalse(
+            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = listOf(viewerRole)),
+        )
+        assertFalse(
+            svc.isMfaRequired(testUser, tenantMfaPolicy = "required_admins", userRoles = emptyList()),
+        )
+    }
+
+    @Test
+    fun `isMfaRequired - unknown policy returns false (fail-open)`() {
+        assertFalse(svc.isMfaRequired(testUser, tenantMfaPolicy = "unknown_policy"))
     }
 }
