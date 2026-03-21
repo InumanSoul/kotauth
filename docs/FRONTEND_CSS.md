@@ -86,7 +86,8 @@ project-root/
 │       │   ├── toggle.css             ← .toggle switch component (BEM)
 │       │   ├── check-row.css          ← .check-row checkbox row (BEM)
 │       │   ├── radio-row.css          ← .radio-row radio button row (BEM)
-│       │   └── chip-grid.css          ← .chip-grid, .scope-chip multi-select chips (BEM)
+│       │   ├── chip-grid.css          ← .chip-grid, .scope-chip multi-select chips (BEM)
+│       │   └── demo-banner.css        ← .demo-banner fixed top bar (both bundles)
 │       │
 │       ├── pages/                     ← Page-specific styles
 │       │   ├── workspace-overview.css ← Workspace overview page
@@ -366,6 +367,7 @@ Most existing classes in the admin console use a single-dash modifier convention
 | `components/check-row.css` | Admin | `.check-row` labeled checkbox with global rule resets |
 | `components/radio-row.css` | Admin | `.radio-row` labeled radio with global rule resets |
 | `components/chip-grid.css` | Admin | `.chip-grid`, `.scope-chip` multi-select chip grid |
+| `components/demo-banner.css` | Both | `.demo-banner` sticky top bar for demo mode; scoped `.badge` + layout offsets for `.shell` and `.portal-shell` |
 | `pages/workspace-overview.css` | Admin | Workspace overview page |
 | `pages/app-detail.css` | Admin | Application detail page |
 | `pages/user-detail.css` | Admin | `.user-header`, `.lock-icon`, `.edit-row`, `.edit-actions` |

@@ -57,11 +57,11 @@ import java.util.Base64
  * if no valid PortalSession cookie is found.
  */
 fun Route.portalRoutes(
-    authService: AuthService,
+    @Suppress("UNUSED_PARAMETER") authService: AuthService,
     selfServiceService: UserSelfServiceService,
     tenantRepository: TenantRepository,
     mfaService: MfaService? = null,
-    userRepository: UserRepository? = null,
+    @Suppress("UNUSED_PARAMETER") userRepository: UserRepository? = null,
     oauthService: OAuthService? = null, // Phase 4: required for callback exchange
     baseUrl: String = "", // Phase 4: base URL for redirect URI construction
 ) {

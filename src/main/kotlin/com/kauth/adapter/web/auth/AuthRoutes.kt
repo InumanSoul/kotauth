@@ -538,7 +538,6 @@ fun Route.authRoutes(
             val params = call.receiveParameters()
             val code = params["code"]?.trim() ?: ""
             val ipAddress = call.request.local.remoteAddress
-            val userAgent = call.request.headers["User-Agent"]
             val oauthParams = params.toOAuthParams()
 
             // Verify and parse MFA pending cookie — signature check prevents forgery

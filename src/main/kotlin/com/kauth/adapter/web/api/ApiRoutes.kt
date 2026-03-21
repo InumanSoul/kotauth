@@ -60,7 +60,7 @@ fun Route.apiRoutes(
     /** GET /api/docs — Swagger UI for the REST API */
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
-            swaggerUiHtml(call.request.host())
+            swaggerUiHtml()
         }
     }
 
@@ -931,7 +931,7 @@ private fun com.kauth.domain.model.AuditEvent.toApiDto() =
 /** Object reference for classloader access to bundled resources. */
 private object ApiRoutes
 
-private fun swaggerUiHtml(host: String) =
+private fun swaggerUiHtml() =
     """
 <!DOCTYPE html>
 <html lang="en">

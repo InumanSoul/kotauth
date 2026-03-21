@@ -47,6 +47,7 @@ import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
+import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
@@ -370,6 +371,26 @@ fun main() {
         )
 
     // -------------------------------------------------------------------------
+    // Demo mode: seed realistic data for showcase deployments
+    // -------------------------------------------------------------------------
+    val isDemoMode = System.getenv("KAUTH_DEMO_MODE")?.lowercase() == "true"
+    if (isDemoMode) {
+        DemoSeedService(
+            tenantRepository = tenantRepository,
+            userRepository = userRepository,
+            applicationRepository = applicationRepository,
+            passwordHasher = passwordHasher,
+            keyProvisioningService = keyProvisioning,
+            portalClientProvisioning = portalClientProvisioning,
+            roleGroupService = roleGroupService,
+            roleRepository = roleRepository,
+            auditLog = auditLogAdapter,
+            webhookEndpointRepository = webhookEndpointRepository,
+            baseUrl = baseUrl,
+        ).seedIfEmpty()
+    }
+
+    // -------------------------------------------------------------------------
     // Rate limiters (Phase 0)
     // -------------------------------------------------------------------------
     val loginRateLimiter = RateLimiter(maxRequests = 5, windowSeconds = 60) // 5 attempts / minute per IP
@@ -417,11 +438,11 @@ fun main() {
                 socialLoginService = socialLoginService,
                 identityProviderRepository = identityProviderRepository,
                 apiKeyService = apiKeyService,
-                apiKeyRepository = apiKeyRepository,
                 webhookService = webhookService,
                 appInfo = appInfo,
                 startTime = startTime,
                 isDevelopment = isDevelopment,
+                isDemoMode = isDemoMode,
             )
         }
 
@@ -471,11 +492,11 @@ fun Application.module(
     socialLoginService: SocialLoginService? = null, // Phase 2
     identityProviderRepository: com.kauth.domain.port.IdentityProviderRepository? = null, // Phase 2
     apiKeyService: ApiKeyService? = null, // Phase 3a
-    apiKeyRepository: com.kauth.domain.port.ApiKeyRepository? = null, // Phase 3a
     webhookService: WebhookService? = null, // Phase 4
     appInfo: AppInfo,
     startTime: Long,
     isDevelopment: Boolean,
+    isDemoMode: Boolean = false,
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -603,6 +624,13 @@ fun Application.module(
                 )
             }
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Demo mode — set global flag for view layer banner rendering
+    // -------------------------------------------------------------------------
+    if (isDemoMode) {
+        com.kauth.adapter.web.DemoConfig.enabled = true
     }
 
     // -------------------------------------------------------------------------

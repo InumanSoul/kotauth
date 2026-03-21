@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.demoBanner
 import kotlinx.html.*
 
 // Login page — standalone, no admin shell.
@@ -7,6 +8,7 @@ internal fun loginPageImpl(error: String? = null): HTML.() -> Unit =
     {
         head { adminHead("Login") }
         body {
+            demoBanner()
             div("login-shell") {
                 div("brand") {
                     img(src = "/static/brand/kotauth-negative.svg", alt = "kotauth Brand") {}

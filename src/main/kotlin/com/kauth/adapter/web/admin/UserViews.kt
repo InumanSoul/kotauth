@@ -196,7 +196,7 @@ internal fun userDetailPageImpl(
  * Used both in the full page and returned standalone for htmx swaps.
  */
 internal fun DIV.userProfileReadFragment(
-    workspace: Tenant,
+    @Suppress("UNUSED_PARAMETER") _workspace: Tenant,
     user: User,
     successMessage: String? = null,
 ) {

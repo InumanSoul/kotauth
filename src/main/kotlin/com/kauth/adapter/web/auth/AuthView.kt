@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -106,6 +107,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Sign In", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
@@ -275,6 +277,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Create Account", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
@@ -412,6 +415,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Forgot Password", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
@@ -490,6 +494,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Reset Password", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
@@ -575,6 +580,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Email Verification", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
@@ -631,6 +637,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Create Account", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     div("brand-name") { +workspaceName }
                 }
@@ -717,6 +724,7 @@ object AuthView {
         {
             head { authHead("$workspaceName | Two-Factor Authentication", theme) }
             body {
+                demoBanner()
                 div("brand") {
                     if (theme.logoUrl != null) {
                         img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)

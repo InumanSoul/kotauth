@@ -49,17 +49,17 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
                 ?.toIdentityProvider()
         }
 
-    override fun save(idp: IdentityProvider): IdentityProvider =
+    override fun save(provider: IdentityProvider): IdentityProvider =
         transaction {
-            val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
+            val encryptedSecret = EncryptionService.encrypt(provider.clientSecret)
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             val insertedId =
                 IdentityProvidersTable.insert {
-                    it[tenantId] = idp.tenantId
-                    it[provider] = idp.provider.value
-                    it[clientId] = idp.clientId
+                    it[tenantId] = provider.tenantId
+                    it[IdentityProvidersTable.provider] = provider.provider.value
+                    it[clientId] = provider.clientId
                     it[clientSecret] = encryptedSecret
-                    it[enabled] = idp.enabled
+                    it[enabled] = provider.enabled
                     it[createdAt] = now
                     it[updatedAt] = now
                 } get IdentityProvidersTable.id
@@ -71,20 +71,20 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
                 .toIdentityProvider()!!
         }
 
-    override fun update(idp: IdentityProvider): IdentityProvider =
+    override fun update(provider: IdentityProvider): IdentityProvider =
         transaction {
-            val encryptedSecret = EncryptionService.encrypt(idp.clientSecret)
+            val encryptedSecret = EncryptionService.encrypt(provider.clientSecret)
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             IdentityProvidersTable.update({
-                (IdentityProvidersTable.tenantId eq idp.tenantId) and
-                    (IdentityProvidersTable.provider eq idp.provider.value)
+                (IdentityProvidersTable.tenantId eq provider.tenantId) and
+                    (IdentityProvidersTable.provider eq provider.provider.value)
             }) {
-                it[clientId] = idp.clientId
+                it[clientId] = provider.clientId
                 it[clientSecret] = encryptedSecret
-                it[enabled] = idp.enabled
+                it[enabled] = provider.enabled
                 it[updatedAt] = now
             }
-            findByTenantAndProvider(idp.tenantId, idp.provider)!!
+            findByTenantAndProvider(provider.tenantId, provider.provider)!!
         }
 
     override fun delete(

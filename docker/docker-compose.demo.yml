@@ -1,0 +1,16 @@
+# ─── Kotauth — demo mode overlay ──────────────────────────────────────────────
+# Activates KAUTH_DEMO_MODE to seed realistic demo data on startup.
+# Intended for public showcase deployments (e.g. demo.kotauth.com).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml up -d
+#
+# To reset demo data (hourly cron recommended):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml down -v
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.demo.yml up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+  app:
+    environment:
+      KAUTH_DEMO_MODE: "true"

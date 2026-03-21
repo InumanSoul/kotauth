@@ -140,6 +140,32 @@ DB_PASSWORD=changeme
 
 ---
 
+## Demo Mode
+
+### `KAUTH_DEMO_MODE`
+**Optional.** Default: `false` (disabled)
+
+When set to `true`, activates demo mode for public showcase deployments:
+
+1. **Seed data** — On startup, `DemoSeedService` creates two pre-populated workspaces ("Acme Corp" and "Startup Labs") with users, applications, roles, groups, webhooks, and audit log entries. Idempotent — skipped if the data already exists.
+2. **Demo banner** — A sticky amber banner is rendered on every page showing demo credentials and a reset notice.
+
+```
+KAUTH_DEMO_MODE=true
+```
+
+Intended for deployments like `demo.kotauth.com` where visitors should see a populated instance. Not intended for production. Pair with an hourly database reset (see [Demo deployment](#example-env--demo-deployment) below).
+
+**Seeded credentials:**
+
+| Workspace | Username | Password |
+|---|---|---|
+| Master (admin console) | `admin` | `changeme123!` |
+| Acme Corp | `sarah.chen` | `Demo1234!` |
+| Startup Labs | `jordan.lee` | `Demo1234!` |
+
+---
+
 ## Legacy / Internal
 
 ### `JWT_SECRET`
@@ -220,6 +246,34 @@ KAUTH_SECRET_KEY=        # generate: openssl rand -hex 32
 DB_URL=jdbc:postgresql://your-managed-host:5432/kotauth_db?sslmode=require
 DB_USER=kotauth
 DB_PASSWORD=             # use a strong, unique password
+```
+
+## Example `.env` — Demo deployment
+
+```env
+KAUTH_BASE_URL=https://demo.kotauth.com
+KAUTH_ENV=production
+KAUTH_SECRET_KEY=<any value — data is ephemeral>
+KAUTH_DEMO_MODE=true
+
+DB_NAME=kotauth_db
+DB_USER=kotauth
+DB_PASSWORD=demo
+
+DOMAIN=demo.kotauth.com
+ACME_EMAIL=you@yourdomain.com
+```
+
+Start with the demo overlay:
+
+```bash
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+```
+
+Hourly reset cron (wipes the database volume and re-seeds on restart):
+
+```bash
+0 * * * * cd /opt/kotauth && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml down -v && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
 ```
 
 See [docs/guides/production-deployment.md](guides/production-deployment.md) for the full deployment walkthrough.

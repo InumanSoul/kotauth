@@ -1663,7 +1663,6 @@ fun Route.adminRoutes(
                             )
                         }
                         is com.kauth.domain.service.ApiKeyResult.Failure -> {
-                            val keys = svc.listForTenant(workspace.id)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
                                 AdminView.createApiKeyPage(

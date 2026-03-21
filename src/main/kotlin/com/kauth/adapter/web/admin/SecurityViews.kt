@@ -238,7 +238,7 @@ internal fun identityProvidersPageImpl(
     providers: List<IdentityProvider>,
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
-    editProvider: SocialProvider? = null,
+    @Suppress("UNUSED_PARAMETER") _editProvider: SocialProvider? = null,
     error: String? = null,
     saved: Boolean = false,
 ): HTML.() -> Unit =

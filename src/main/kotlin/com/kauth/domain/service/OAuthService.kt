@@ -238,24 +238,23 @@ class OAuthService(
             )
 
         // Persist session
-        val session =
-            sessionRepository.save(
-                Session(
-                    tenantId = tenant.id,
-                    userId = user.id,
-                    clientId = client.id,
-                    accessTokenHash = sha256(tokenResponse.access_token),
-                    refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
-                    scopes = authCode.scopes,
-                    ipAddress = ipAddress,
-                    userAgent = userAgent,
-                    expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-                    refreshExpiresAt =
-                        tokenResponse.refresh_token?.let {
-                            Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-                        },
-                ),
-            )
+        sessionRepository.save(
+            Session(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = client.id,
+                accessTokenHash = sha256(tokenResponse.access_token),
+                refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
+                scopes = authCode.scopes,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                refreshExpiresAt =
+                    tokenResponse.refresh_token?.let {
+                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                    },
+            ),
+        )
 
         // Mark code as consumed
         authCodeRepository.markUsed(code)
@@ -403,6 +402,12 @@ class OAuthService(
 
         val client = session.clientId?.let { applicationRepository.findById(it) }
 
+        // RFC 6749 §10.4: verify the refresh token was issued to the requesting client
+        if (client != null && client.clientId != clientId) {
+            sessionRepository.revoke(session.id!!)
+            return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh token was not issued to this client"))
+        }
+
         val scopes = session.scopes.split(" ").filter { it.isNotBlank() }
 
         // Phase 3c: resolve effective roles for refresh
@@ -459,6 +464,7 @@ class OAuthService(
      * Returns active status and claims for a token.
      * Only accessible to authenticated clients (server-side only, not public).
      */
+    @Suppress("UNUSED_PARAMETER")
     fun introspectToken(
         tenantSlug: String,
         token: String,

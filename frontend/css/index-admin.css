@@ -39,6 +39,7 @@
 @import "./components/check-row.css";
 @import "./components/radio-row.css";
 @import "./components/chip-grid.css";
+@import "./components/demo-banner.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";
