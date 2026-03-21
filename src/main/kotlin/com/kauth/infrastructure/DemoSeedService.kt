@@ -1,6 +1,5 @@
 package com.kauth.infrastructure
 
-import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Group
@@ -10,6 +9,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
+import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -33,7 +33,7 @@ class DemoSeedService(
     private val tenantRepository: TenantRepository,
     private val userRepository: UserRepository,
     private val applicationRepository: ApplicationRepository,
-    private val passwordHasher: BcryptPasswordHasher,
+    private val passwordHasher: PasswordHasher,
     private val keyProvisioningService: KeyProvisioningService,
     private val portalClientProvisioning: PortalClientProvisioning,
     private val roleGroupService: RoleGroupService,
@@ -97,7 +97,23 @@ class DemoSeedService(
         keyProvisioningService.provisionForTenant(updated)
         portalClientProvisioning.provisionRedirectUris()
 
-        // Roles (default admin/user created automatically)
+        // Baseline roles (also seeded by V16 migration, but created here
+        // explicitly so DemoSeedService is self-contained and testable
+        // without migrations. createRole returns Conflict if already present.)
+        roleGroupService.createRole(
+            tenantId = updated.id,
+            name = "admin",
+            description = "Full administrative access",
+            scope = RoleScope.TENANT,
+            clientId = null,
+        )
+        roleGroupService.createRole(
+            tenantId = updated.id,
+            name = "user",
+            description = "Standard user access",
+            scope = RoleScope.TENANT,
+            clientId = null,
+        )
         roleGroupService.createRole(
             tenantId = updated.id,
             name = "billing-admin",
@@ -223,7 +239,21 @@ class DemoSeedService(
         keyProvisioningService.provisionForTenant(updated)
         portalClientProvisioning.provisionRedirectUris()
 
-        // Roles
+        // Baseline roles (same reasoning as Acme — self-contained seeding)
+        roleGroupService.createRole(
+            tenantId = updated.id,
+            name = "admin",
+            description = "Full administrative access",
+            scope = RoleScope.TENANT,
+            clientId = null,
+        )
+        roleGroupService.createRole(
+            tenantId = updated.id,
+            name = "user",
+            description = "Standard user access",
+            scope = RoleScope.TENANT,
+            clientId = null,
+        )
         roleGroupService.createRole(
             tenantId = updated.id,
             name = "developer",
