@@ -239,22 +239,22 @@ class OAuthService(
 
         // Persist session
         sessionRepository.save(
-                Session(
-                    tenantId = tenant.id,
-                    userId = user.id,
-                    clientId = client.id,
-                    accessTokenHash = sha256(tokenResponse.access_token),
-                    refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
-                    scopes = authCode.scopes,
-                    ipAddress = ipAddress,
-                    userAgent = userAgent,
-                    expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
-                    refreshExpiresAt =
-                        tokenResponse.refresh_token?.let {
-                            Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
-                        },
-                ),
-            )
+            Session(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = client.id,
+                accessTokenHash = sha256(tokenResponse.access_token),
+                refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
+                scopes = authCode.scopes,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
+                refreshExpiresAt =
+                    tokenResponse.refresh_token?.let {
+                        Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
+                    },
+            ),
+        )
 
         // Mark code as consumed
         authCodeRepository.markUsed(code)
