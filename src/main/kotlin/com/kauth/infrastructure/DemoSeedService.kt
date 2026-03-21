@@ -8,8 +8,8 @@ import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebhookEndpoint
-import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.ApplicationRepository
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -80,48 +80,65 @@ class DemoSeedService(
 
     private fun seedAcmeWorkspace(passwordHash: String): SeedResult {
         val tenant = tenantRepository.create("acme", "Acme Corp")
-        val updated = tenantRepository.update(
-            tenant.copy(
-                theme = TenantTheme.DEFAULT,
-                registrationEnabled = true,
-                emailVerificationRequired = false,
-                passwordPolicyMinLength = 8,
-                passwordPolicyRequireUppercase = true,
-                passwordPolicyRequireNumber = true,
-                mfaPolicy = "optional",
-                tokenExpirySeconds = 3600L,
-                refreshTokenExpirySeconds = 86400L,
-            ),
-        )
+        val updated =
+            tenantRepository.update(
+                tenant.copy(
+                    theme = TenantTheme.DEFAULT,
+                    registrationEnabled = true,
+                    emailVerificationRequired = false,
+                    passwordPolicyMinLength = 8,
+                    passwordPolicyRequireUppercase = true,
+                    passwordPolicyRequireNumber = true,
+                    mfaPolicy = "optional",
+                    tokenExpirySeconds = 3600L,
+                    refreshTokenExpirySeconds = 86400L,
+                ),
+            )
         keyProvisioningService.provisionForTenant(updated)
         portalClientProvisioning.provisionRedirectUris()
 
         // Roles (default admin/user created automatically)
         roleGroupService.createRole(
-            tenantId = updated.id, name = "billing-admin",
-            description = "Manage billing and invoices", scope = RoleScope.TENANT, clientId = null,
+            tenantId = updated.id,
+            name = "billing-admin",
+            description = "Manage billing and invoices",
+            scope = RoleScope.TENANT,
+            clientId = null,
         )
         roleGroupService.createRole(
-            tenantId = updated.id, name = "viewer",
-            description = "Read-only access to resources", scope = RoleScope.TENANT, clientId = null,
+            tenantId = updated.id,
+            name = "viewer",
+            description = "Read-only access to resources",
+            scope = RoleScope.TENANT,
+            clientId = null,
         )
 
         // Applications
-        val dashboard = applicationRepository.create(
-            tenantId = updated.id, clientId = "acme-dashboard", name = "Acme Dashboard",
-            description = "Internal admin dashboard", accessType = "confidential",
-            redirectUris = listOf("$baseUrl/callback", "http://localhost:3000/callback"),
-        )
+        val dashboard =
+            applicationRepository.create(
+                tenantId = updated.id,
+                clientId = "acme-dashboard",
+                name = "Acme Dashboard",
+                description = "Internal admin dashboard",
+                accessType = "confidential",
+                redirectUris = listOf("$baseUrl/callback", "http://localhost:3000/callback"),
+            )
         applicationRepository.create(
-            tenantId = updated.id, clientId = "acme-mobile", name = "Acme Mobile App",
-            description = "iOS and Android mobile application", accessType = "public",
+            tenantId = updated.id,
+            clientId = "acme-mobile",
+            name = "Acme Mobile App",
+            description = "iOS and Android mobile application",
+            accessType = "public",
             redirectUris = listOf("com.acme.mobile://callback"),
         )
 
         // Client-scoped role (requires app to exist first)
         roleGroupService.createRole(
-            tenantId = updated.id, name = "api-consumer",
-            description = "Programmatic API access", scope = RoleScope.CLIENT, clientId = dashboard.id,
+            tenantId = updated.id,
+            name = "api-consumer",
+            description = "Programmatic API access",
+            scope = RoleScope.CLIENT,
+            clientId = dashboard.id,
         )
 
         // Users
@@ -140,14 +157,20 @@ class DemoSeedService(
         assignRole(updated.id, testUser.id!!, "user")
 
         // Groups
-        val engineering = roleGroupService.createGroup(
-            tenantId = updated.id, name = "Engineering",
-            description = "Engineering department", parentGroupId = null,
-        )
-        val operations = roleGroupService.createGroup(
-            tenantId = updated.id, name = "Operations",
-            description = "Operations team", parentGroupId = null,
-        )
+        val engineering =
+            roleGroupService.createGroup(
+                tenantId = updated.id,
+                name = "Engineering",
+                description = "Engineering department",
+                parentGroupId = null,
+            )
+        val operations =
+            roleGroupService.createGroup(
+                tenantId = updated.id,
+                name = "Operations",
+                description = "Operations team",
+                parentGroupId = null,
+            )
 
         // Group memberships
         extractGroupId(engineering)?.let { gid ->
@@ -175,7 +198,9 @@ class DemoSeedService(
         return SeedResult(
             tenantId = updated.id,
             userIds = listOf(sarah.id!!, james.id!!, maria.id!!, alex.id!!, testUser.id!!),
-            appCount = 2, roleCount = 3, groupCount = 2,
+            appCount = 2,
+            roleCount = 3,
+            groupCount = 2,
         )
     }
 
@@ -183,30 +208,37 @@ class DemoSeedService(
 
     private fun seedStartupLabsWorkspace(passwordHash: String): SeedResult {
         val tenant = tenantRepository.create("startup-labs", "Startup Labs")
-        val updated = tenantRepository.update(
-            tenant.copy(
-                theme = TenantTheme.LIGHT,
-                registrationEnabled = true,
-                emailVerificationRequired = false,
-                passwordPolicyMinLength = 6,
-                mfaPolicy = "optional",
-                tokenExpirySeconds = 7200L,
-                refreshTokenExpirySeconds = 172800L,
-            ),
-        )
+        val updated =
+            tenantRepository.update(
+                tenant.copy(
+                    theme = TenantTheme.LIGHT,
+                    registrationEnabled = true,
+                    emailVerificationRequired = false,
+                    passwordPolicyMinLength = 6,
+                    mfaPolicy = "optional",
+                    tokenExpirySeconds = 7200L,
+                    refreshTokenExpirySeconds = 172800L,
+                ),
+            )
         keyProvisioningService.provisionForTenant(updated)
         portalClientProvisioning.provisionRedirectUris()
 
         // Roles
         roleGroupService.createRole(
-            tenantId = updated.id, name = "developer",
-            description = "Development team member", scope = RoleScope.TENANT, clientId = null,
+            tenantId = updated.id,
+            name = "developer",
+            description = "Development team member",
+            scope = RoleScope.TENANT,
+            clientId = null,
         )
 
         // Application
         applicationRepository.create(
-            tenantId = updated.id, clientId = "sl-webapp", name = "Startup Labs Web",
-            description = "Main web application", accessType = "confidential",
+            tenantId = updated.id,
+            clientId = "sl-webapp",
+            name = "Startup Labs Web",
+            description = "Main web application",
+            accessType = "confidential",
             redirectUris = listOf("$baseUrl/callback", "http://localhost:5173/callback"),
         )
 
@@ -222,10 +254,13 @@ class DemoSeedService(
         assignRole(updated.id, riley.id!!, "user")
 
         // Group
-        val coreTeam = roleGroupService.createGroup(
-            tenantId = updated.id, name = "Core Team",
-            description = "Founding team", parentGroupId = null,
-        )
+        val coreTeam =
+            roleGroupService.createGroup(
+                tenantId = updated.id,
+                name = "Core Team",
+                description = "Founding team",
+                parentGroupId = null,
+            )
         extractGroupId(coreTeam)?.let { gid ->
             roleGroupService.addUserToGroup(jordan.id!!, gid, updated.id)
             roleGroupService.addUserToGroup(casey.id!!, gid, updated.id)
@@ -247,28 +282,34 @@ class DemoSeedService(
         return SeedResult(
             tenantId = updated.id,
             userIds = listOf(jordan.id!!, casey.id!!, riley.id!!),
-            appCount = 1, roleCount = 1, groupCount = 1,
+            appCount = 1,
+            roleCount = 1,
+            groupCount = 1,
         )
     }
 
     // ── Audit log entries ────────────────────────────────────────────────
 
-    private fun seedAuditEntries(tenantId: Int, userIds: List<Int>) {
+    private fun seedAuditEntries(
+        tenantId: Int,
+        userIds: List<Int>,
+    ) {
         val now = Instant.now()
-        val events = listOf(
-            AuditEventType.REGISTER_SUCCESS to 7,
-            AuditEventType.LOGIN_SUCCESS to 6,
-            AuditEventType.LOGIN_SUCCESS to 5,
-            AuditEventType.TOKEN_ISSUED to 5,
-            AuditEventType.ADMIN_USER_CREATED to 4,
-            AuditEventType.LOGIN_SUCCESS to 3,
-            AuditEventType.TOKEN_ISSUED to 3,
-            AuditEventType.ADMIN_ROLE_ASSIGNED to 2,
-            AuditEventType.LOGIN_SUCCESS to 1,
-            AuditEventType.SESSION_CREATED to 1,
-            AuditEventType.TOKEN_ISSUED to 0,
-            AuditEventType.LOGIN_SUCCESS to 0,
-        )
+        val events =
+            listOf(
+                AuditEventType.REGISTER_SUCCESS to 7,
+                AuditEventType.LOGIN_SUCCESS to 6,
+                AuditEventType.LOGIN_SUCCESS to 5,
+                AuditEventType.TOKEN_ISSUED to 5,
+                AuditEventType.ADMIN_USER_CREATED to 4,
+                AuditEventType.LOGIN_SUCCESS to 3,
+                AuditEventType.TOKEN_ISSUED to 3,
+                AuditEventType.ADMIN_ROLE_ASSIGNED to 2,
+                AuditEventType.LOGIN_SUCCESS to 1,
+                AuditEventType.SESSION_CREATED to 1,
+                AuditEventType.TOKEN_ISSUED to 0,
+                AuditEventType.LOGIN_SUCCESS to 0,
+            )
 
         events.forEachIndexed { idx, (eventType, daysAgo) ->
             val userId = userIds[idx % userIds.size]
@@ -281,8 +322,10 @@ class DemoSeedService(
                     ipAddress = "203.0.113.${10 + idx}",
                     userAgent = "Mozilla/5.0 (demo seed)",
                     details = mapOf("source" to "demo-seed"),
-                    createdAt = now.minus(daysAgo.toLong(), ChronoUnit.DAYS)
-                        .minus((idx * 37L) % 720, ChronoUnit.MINUTES),
+                    createdAt =
+                        now
+                            .minus(daysAgo.toLong(), ChronoUnit.DAYS)
+                            .minus((idx * 37L) % 720, ChronoUnit.MINUTES),
                 ),
             )
         }
@@ -309,13 +352,21 @@ class DemoSeedService(
             ),
         )
 
-    private fun assignRole(tenantId: Int, userId: Int, roleName: String) {
+    private fun assignRole(
+        tenantId: Int,
+        userId: Int,
+        roleName: String,
+    ) {
         roleRepository.findByName(tenantId, roleName, RoleScope.TENANT)?.let { role ->
             roleGroupService.assignRoleToUser(userId, role.id!!, tenantId)
         }
     }
 
-    private fun assignGroupRole(tenantId: Int, groupId: Int, roleName: String) {
+    private fun assignGroupRole(
+        tenantId: Int,
+        groupId: Int,
+        roleName: String,
+    ) {
         roleRepository.findByName(tenantId, roleName, RoleScope.TENANT)?.let { role ->
             roleGroupService.assignRoleToGroup(groupId, role.id!!, tenantId)
         }
