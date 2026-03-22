@@ -9,7 +9,6 @@ import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebhookDelivery
@@ -151,7 +150,9 @@ object AdminView {
         loggedInAs: String,
         successMessage: String? = null,
         editError: String? = null,
-    ): HTML.() -> Unit = userDetailPageImpl(workspace, user, sessions, allWorkspaces, loggedInAs, successMessage, editError)
+        roles: List<Role> = emptyList(),
+        groups: List<Group> = emptyList(),
+    ): HTML.() -> Unit = userDetailPageImpl(workspace, user, sessions, allWorkspaces, loggedInAs, successMessage, editError, roles, groups)
 
     // ── User htmx fragments ──────────────────────────────────────────
 
@@ -160,7 +161,9 @@ object AdminView {
         workspace: Tenant,
         user: User,
         successMessage: String? = null,
-    ): String = renderFragment { userProfileReadFragment(workspace, user, successMessage) }
+        roles: List<Role> = emptyList(),
+        groups: List<Group> = emptyList(),
+    ): String = renderFragment { userProfileReadFragment(workspace, user, successMessage, roles, groups) }
 
     /** Returns the edit profile form section as an HTML fragment string. */
     fun userProfileEditFragment(
@@ -277,10 +280,9 @@ object AdminView {
         providers: List<IdentityProvider>,
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
-        editProvider: SocialProvider? = null,
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, editProvider, error, saved)
+    ): HTML.() -> Unit = identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, error, saved)
 
     fun apiKeysListPage(
         workspace: Tenant,

@@ -25,4 +25,5 @@ data class User(
     val lastPasswordChangeAt: Instant? = null,
     // Phase 3c: MFA — true once the user has a verified TOTP enrollment
     val mfaEnabled: Boolean = false,
+    val createdAt: Instant? = null,
 )

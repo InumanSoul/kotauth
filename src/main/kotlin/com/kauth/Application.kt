@@ -663,11 +663,9 @@ fun Application.module(
 
         // Self-service portal — /t/{slug}/account/* (Phase 4: OAuth-backed login)
         portalRoutes(
-            authService = authService,
             selfServiceService = selfServiceService,
             tenantRepository = tenantRepository,
             mfaService = mfaService,
-            userRepository = userRepository,
             oauthService = oauthService,
             baseUrl = baseUrl,
         )

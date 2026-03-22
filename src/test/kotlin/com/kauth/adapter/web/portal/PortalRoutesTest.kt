@@ -3,7 +3,6 @@ package com.kauth.adapter.web.portal
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
@@ -12,7 +11,6 @@ import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
-import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -45,7 +43,6 @@ class PortalRoutesTest {
     private val sessionRepo = FakeSessionRepository()
     private val auditLogPort = FakeAuditLogPort()
     private val hasher = FakePasswordHasher()
-    private val tokenPort = FakeTokenPort()
 
     private val tenant =
         Tenant(
@@ -67,16 +64,6 @@ class PortalRoutesTest {
             enabled = true,
         )
 
-    private fun buildAuthService() =
-        AuthService(
-            userRepository = userRepo,
-            tenantRepository = tenantRepo,
-            tokenPort = tokenPort,
-            passwordHasher = hasher,
-            auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
-        )
-
     private fun buildSelfService() =
         UserSelfServiceService(
             userRepository = userRepo,
@@ -94,7 +81,6 @@ class PortalRoutesTest {
         tenantRepo.clear()
         userRepo.clear()
         auditLogPort.clear()
-        tokenPort.reset()
         tenantRepo.add(tenant)
         userRepo.add(user)
     }
@@ -213,7 +199,6 @@ class PortalRoutesTest {
         }
         routing {
             portalRoutes(
-                authService = buildAuthService(),
                 selfServiceService = buildSelfService(),
                 tenantRepository = tenantRepo,
             )
