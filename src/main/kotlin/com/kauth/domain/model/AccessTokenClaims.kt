@@ -6,7 +6,7 @@ package com.kauth.domain.model
  *
  * [sub] is the user ID (for user tokens) or client_id (for M2M tokens).
  *
- * Phase 3c: [realmRoles] holds tenant-scoped role names,
+ * [realmRoles] holds tenant-scoped role names,
  * [resourceRoles] maps clientId → list of client-scoped role names.
  */
 data class AccessTokenClaims(

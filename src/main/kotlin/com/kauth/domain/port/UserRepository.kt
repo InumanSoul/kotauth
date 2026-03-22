@@ -34,7 +34,7 @@ interface UserRepository {
     /**
      * Updates a user's password hash and records the change timestamp.
      * Intentionally separate from [update] to keep the change explicit and auditable.
-     * Phase 3b: called by self-service password change and admin force-reset.
+     * Called by self-service password change and admin force-reset.
      */
     fun updatePassword(
         userId: Int,

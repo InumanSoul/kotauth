@@ -8,7 +8,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * Self-service portal HTML views — Phase 3b.
+ * Self-service portal HTML views.
  *
  * Reuses kotauth-auth.css tokens (--accent, --text, --muted, --bg-*, --border, --radius)
  * so the portal inherits per-tenant theming automatically.
@@ -271,7 +271,7 @@ object PortalView {
         }
 
     // =========================================================================
-    // MFA challenge — Phase 3c
+    // MFA challenge
     // =========================================================================
 
     fun mfaChallengePage(
@@ -375,7 +375,7 @@ object PortalView {
         }
 
     // =========================================================================
-    // MFA management page — Phase 3c
+    // MFA management page
     //   mfaEnabled = false  →  setup flow (QR + recovery codes + verification)
     //   mfaEnabled = true   →  active state + disable option
     // =========================================================================

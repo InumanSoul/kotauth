@@ -32,11 +32,11 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.*
 
 /**
- * Web adapter — HTTP routes for the auth module (Phase 2).
+ * Web adapter — HTTP routes for the auth module.
  *
  * Tenant-scoped endpoints under /t/{slug}/:
  *
- *   Browser flows (Phase 1, updated):
+ *   Browser flows:
  *     GET/POST /login
  *     GET/POST /register
  *
@@ -63,11 +63,11 @@ fun Route.authRoutes(
     registerRateLimiter: RateLimiterPort,
     tokenRateLimiter: RateLimiterPort,
     selfServiceService: UserSelfServiceService,
-    mfaService: MfaService? = null, // Phase 3c — nullable for backward compat
-    roleRepository: RoleRepository? = null, // Phase 1 fix — required_admins MFA check
-    socialLoginService: SocialLoginService? = null, // Phase 2 — Social Login
-    identityProviderRepository: IdentityProviderRepository? = null, // Phase 2 — load enabled providers
-    baseUrl: String = "", // Phase 2 — needed for callback URI
+    mfaService: MfaService? = null,
+    roleRepository: RoleRepository? = null,
+    socialLoginService: SocialLoginService? = null,
+    identityProviderRepository: IdentityProviderRepository? = null,
+    baseUrl: String = "",
     encryptionService: EncryptionService,
 ) {
     route("/t/{slug}") {
@@ -85,7 +85,6 @@ fun Route.authRoutes(
             // Preserve OAuth2 params from authorization endpoint redirect
             val oauthParams = call.request.queryParameters.toOAuthParams()
 
-            // Phase 2: load enabled social providers for this tenant
             val enabledProviders =
                 if (tenant != null && identityProviderRepository != null) {
                     identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -163,7 +162,7 @@ fun Route.authRoutes(
                 is AuthResult.Success -> {
                     val user = result.value
 
-                    // Phase 1 fix: enforce MFA enrollment requirement before the challenge check.
+                    // Enforce MFA enrollment requirement before the challenge check.
                     // If the tenant policy mandates MFA for this user (via "required" or
                     // "required_admins") and the user hasn't enrolled yet, block login with a
                     // clear error directing them to the user portal for enrollment.
@@ -207,7 +206,7 @@ fun Route.authRoutes(
                         }
                     }
 
-                    // Phase 3c: MFA challenge — if user has MFA enrolled, redirect to challenge page
+                    // MFA challenge — if user has MFA enrolled, redirect to challenge page
                     if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
                         // Store a short-lived MFA pending token in an HMAC-signed cookie so we can
                         // complete the flow after the user enters their TOTP code.
@@ -509,7 +508,7 @@ fun Route.authRoutes(
         }
 
         // ------------------------------------------------------------------
-        // MFA Challenge — Phase 3c TOTP verification during login
+        // MFA Challenge — TOTP verification during login
         // ------------------------------------------------------------------
 
         get("/mfa-challenge") {
@@ -737,7 +736,7 @@ fun Route.authRoutes(
         }
 
         // ==================================================================
-        // Social Login — Phase 2
+        // Social Login
         //
         // GET  /auth/social/{provider}/redirect  — initiate OAuth2 flow
         // GET  /auth/social/{provider}/callback  — receive code from provider

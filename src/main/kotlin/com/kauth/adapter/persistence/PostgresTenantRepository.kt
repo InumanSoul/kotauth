@@ -17,7 +17,7 @@ import org.jetbrains.exposed.sql.update
  * A simple in-process cache keyed by slug would be a worthwhile optimisation
  * once traffic warrants it — the port interface makes that swap transparent.
  *
- * Phase 3b: SMTP password is encrypted/decrypted transparently using [EncryptionService].
+ * SMTP password is encrypted/decrypted transparently using [EncryptionService].
  * If [EncryptionService] is unavailable (KAUTH_SECRET_KEY not set), the password field
  * is stored as null and SMTP config will not function.
  */
@@ -86,7 +86,6 @@ class PostgresTenantRepository(
                 it[themeTextMuted] = tenant.theme.textMuted
                 it[themeLogoUrl] = tenant.theme.logoUrl
                 it[themeFaviconUrl] = tenant.theme.faviconUrl
-                // Phase 3b SMTP fields
                 it[smtpHost] = tenant.smtpHost
                 it[smtpPort] = tenant.smtpPort
                 it[smtpUsername] = tenant.smtpUsername
@@ -96,13 +95,11 @@ class PostgresTenantRepository(
                 it[smtpTlsEnabled] = tenant.smtpTlsEnabled
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
-                // Phase 3c: expanded password policy
                 it[passwordPolicyHistoryCount] = tenant.passwordPolicyHistoryCount
                 it[passwordPolicyMaxAgeDays] = tenant.passwordPolicyMaxAgeDays
                 it[passwordPolicyRequireUppercase] = tenant.passwordPolicyRequireUppercase
                 it[passwordPolicyRequireNumber] = tenant.passwordPolicyRequireNumber
                 it[passwordPolicyBlacklistEnabled] = tenant.passwordPolicyBlacklistEnabled
-                // Phase 3c: MFA policy
                 it[mfaPolicy] = tenant.mfaPolicy
             }
             TenantsTable

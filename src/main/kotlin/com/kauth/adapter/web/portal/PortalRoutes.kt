@@ -26,7 +26,7 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * Self-service portal routes — Phase 4 (OAuth-backed login).
+ * Self-service portal routes.
  *
  * URL structure under /t/{slug}/account/:
  *   GET  /login            — initiates OAuth Authorization Code + PKCE flow
@@ -58,8 +58,8 @@ fun Route.portalRoutes(
     selfServiceService: UserSelfServiceService,
     tenantRepository: TenantRepository,
     mfaService: MfaService? = null,
-    oauthService: OAuthService? = null, // Phase 4: required for callback exchange
-    baseUrl: String = "", // Phase 4: base URL for redirect URI construction
+    oauthService: OAuthService? = null,
+    baseUrl: String = "",
     encryptionService: EncryptionService,
 ) {
     route("/t/{slug}/account") {
@@ -345,7 +345,7 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
-        // MFA management page — Phase 3c
+        // MFA management page
         // ------------------------------------------------------------------
 
         get("/mfa") {
@@ -374,7 +374,7 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
-        // MFA self-service — Phase 3c (JSON API, consumed by portal UI)
+        // MFA self-service (JSON API, consumed by portal UI)
         // ------------------------------------------------------------------
 
         // POST /t/{slug}/account/mfa/enroll — start TOTP enrollment

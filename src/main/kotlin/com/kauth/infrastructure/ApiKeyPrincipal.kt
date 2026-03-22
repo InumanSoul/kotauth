@@ -4,7 +4,7 @@ import com.kauth.domain.model.ApiKey
 import io.ktor.server.auth.*
 
 /**
- * Ktor authentication principal for API key requests (Phase 3a).
+ * Ktor authentication principal for API key requests.
  *
  * Set by the bearer auth provider after verifying the token starts with "kauth_".
  * Routes call [ApiKeyService.validate()] with tenant context to perform the full

@@ -28,7 +28,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 
 /**
- * REST API v1 routes — Phase 3b.
+ * REST API v1 routes.
  *
  * URL structure: /t/{tenantSlug}/api/v1/{resource}
  *
@@ -54,7 +54,7 @@ fun Route.apiRoutes(
     adminService: AdminService,
 ) {
     // -------------------------------------------------------------------------
-    // Swagger UI + OpenAPI spec — public, no auth required (Phase 3c)
+    // Swagger UI + OpenAPI spec — public, no auth required
     // -------------------------------------------------------------------------
 
     /** GET /api/docs — Swagger UI for the REST API */

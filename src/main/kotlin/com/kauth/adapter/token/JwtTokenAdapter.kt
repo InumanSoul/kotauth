@@ -31,7 +31,7 @@ import java.util.UUID
  *   - Clients verify tokens using the public key from the JWKS endpoint.
  *   - This enables offline token verification — no round-trip to KotAuth required.
  *
- * Phase 3c — Role claims:
+ * Role claims:
  *   - `realm_access` → { "roles": ["admin", "user"] } for tenant-scoped roles
  *   - `resource_access` → { "my-client": { "roles": ["editor"] } } for client-scoped roles
  *   These follow the Keycloak convention for maximum compatibility.
@@ -64,7 +64,6 @@ class JwtTokenAdapter(
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)
 
-        // Phase 3c: build role claim maps
         val tenantRoles = roles.filter { it.scope == RoleScope.TENANT }.map { it.name }
         val clientRolesMap =
             roles
@@ -196,7 +195,7 @@ class JwtTokenAdapter(
 
             val scopeStr = verified.getClaim("scope").asString() ?: ""
 
-            // Phase 3c: decode role claims
+            // Decode role claims
             val realmRoles =
                 try {
                     val realmAccess = verified.getClaim("realm_access").asMap()

@@ -101,7 +101,7 @@ class EncryptionService(
     }
 
     // -------------------------------------------------------------------------
-    // Cookie signing — MFA pending state protection (Phase 3c security fix)
+    // Cookie signing — MFA pending state protection
     // -------------------------------------------------------------------------
 
     /**

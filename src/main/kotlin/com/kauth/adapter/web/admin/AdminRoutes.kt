@@ -43,9 +43,9 @@ fun Route.adminRoutes(
     keyProvisioningService: KeyProvisioningService,
     mfaRepository: MfaRepository? = null,
     portalClientProvisioning: PortalClientProvisioning? = null,
-    identityProviderRepository: IdentityProviderRepository? = null, // Phase 2 — Social Login
-    apiKeyService: com.kauth.domain.service.ApiKeyService? = null, // Phase 3a — REST API keys
-    webhookService: com.kauth.domain.service.WebhookService? = null, // Phase 4 — Webhooks
+    identityProviderRepository: IdentityProviderRepository? = null,
+    apiKeyService: com.kauth.domain.service.ApiKeyService? = null,
+    webhookService: com.kauth.domain.service.WebhookService? = null,
     encryptionService: EncryptionService,
 ) {
     AdminView.setShellAppInfo(appInfo)
@@ -1101,7 +1101,6 @@ fun Route.adminRoutes(
                             call.respondRedirect("/admin/workspaces/$slug/users/$userId")
                         }
 
-                        // Phase 3b: resend email verification
                         post("/send-verification") {
                             val slug =
                                 call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -1115,7 +1114,6 @@ fun Route.adminRoutes(
                             call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
                         }
 
-                        // Phase 3c: send password-reset email instead of force-setting password
                         post("/send-reset-email") {
                             val slug =
                                 call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -1207,7 +1205,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // Roles (Phase 3c) — HTML pages
+                // Roles — HTML pages
                 // -------------------------------------------------------
 
                 route("/roles") {
@@ -1392,7 +1390,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // Groups (Phase 3c) — HTML pages
+                // Groups — HTML pages
                 // -------------------------------------------------------
 
                 route("/groups") {
@@ -1580,7 +1578,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // MFA settings (Phase 3c) — HTML page
+                // MFA settings — HTML page
                 // -------------------------------------------------------
 
                 get("/mfa") {
@@ -1611,7 +1609,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // API Keys (Phase 3a) — machine-to-machine REST API auth
+                // API Keys — machine-to-machine REST API auth
                 // -------------------------------------------------------
 
                 get("/settings/api-keys") {
@@ -1709,7 +1707,7 @@ fun Route.adminRoutes(
                 }
 
                 // -------------------------------------------------------
-                // Webhooks (Phase 4) — event-driven HTTP callbacks
+                // Webhooks — event-driven HTTP callbacks
                 // -------------------------------------------------------
 
                 get("/settings/webhooks") {

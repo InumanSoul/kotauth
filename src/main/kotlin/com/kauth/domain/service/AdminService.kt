@@ -34,7 +34,7 @@ class AdminService(
     private val auditLog: AuditLogPort,
     private val sessionRepository: SessionRepository,
     private val selfServiceService: UserSelfServiceService,
-    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c
+    private val passwordPolicy: PasswordPolicyPort? = null,
 ) {
     // =========================================================================
     // Workspace settings
@@ -426,7 +426,7 @@ class AdminService(
     }
 
     // =========================================================================
-    // SMTP configuration (Phase 3b)
+    // SMTP configuration
     // =========================================================================
 
     /**
@@ -493,7 +493,7 @@ class AdminService(
     }
 
     // =========================================================================
-    // Admin-initiated password reset (Phase 3b)
+    // Admin-initiated password reset
     // =========================================================================
 
     /**

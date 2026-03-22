@@ -37,8 +37,8 @@ class AuthService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val sessionRepository: SessionRepository,
-    private val selfServiceService: UserSelfServiceService? = null, // nullable — injected post Phase 3b
-    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c — nullable for backward compat
+    private val selfServiceService: UserSelfServiceService? = null,
+    private val passwordPolicy: PasswordPolicyPort? = null,
 ) {
     /**
      * Authenticates a user and returns the User domain object.
@@ -104,7 +104,7 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        // Phase 3c: enforce password expiry if configured and the user has a recorded
+        // Enforce password expiry if configured and the user has a recorded
         // last-change timestamp. Users created before expiry was enabled (null timestamp)
         // are not affected until they next change their password — prevents mass lockouts
         // when an admin first activates the policy on an existing tenant.
@@ -251,7 +251,6 @@ class AuthService(
 
         val savedUser = userRepository.save(newUser)
 
-        // Phase 3c: record initial password in history
         if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }

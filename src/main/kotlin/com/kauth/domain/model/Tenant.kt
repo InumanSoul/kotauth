@@ -9,10 +9,6 @@ package com.kauth.domain.model
  *
  * The 'master' tenant is reserved for platform administrators who manage
  * other tenants via the admin console.
- *
- * Phase 3b additions:
- *   - SMTP fields for transactional email (verification, password reset).
- *   - maxConcurrentSessions: optional cap on per-user active sessions (null = unlimited).
  */
 data class Tenant(
     val id: Int,
@@ -25,14 +21,13 @@ data class Tenant(
     val emailVerificationRequired: Boolean = false,
     val passwordPolicyMinLength: Int = 8,
     val passwordPolicyRequireSpecial: Boolean = false,
-    // Phase 3c: expanded password policy
     val passwordPolicyHistoryCount: Int = 0, // 0 = disabled
     val passwordPolicyMaxAgeDays: Int = 0, // 0 = never expires
     val passwordPolicyRequireUppercase: Boolean = false,
     val passwordPolicyRequireNumber: Boolean = false,
     val passwordPolicyBlacklistEnabled: Boolean = false,
     val theme: TenantTheme = TenantTheme.DEFAULT,
-    // ---- SMTP (Phase 3b) ----
+    // SMTP fields
     // smtp_password is stored AES-256-GCM encrypted in the DB (see EncryptionService).
     // This field holds the decrypted value at runtime — never persist the raw password.
     val smtpHost: String? = null,
@@ -43,11 +38,11 @@ data class Tenant(
     val smtpFromName: String? = null,
     val smtpTlsEnabled: Boolean = true,
     val smtpEnabled: Boolean = false,
-    // ---- MFA policy (Phase 3c) ----
+    // MFA policy
     // 'optional' = users can opt-in; 'required' = all users must enroll;
     // 'required_admins' = only admin-role users must enroll
     val mfaPolicy: String = "optional",
-    // ---- Session policy (Phase 3b) ----
+    // Session policy
     val maxConcurrentSessions: Int? = null, // null = unlimited
 ) {
     /** True for the built-in platform-admin tenant. */

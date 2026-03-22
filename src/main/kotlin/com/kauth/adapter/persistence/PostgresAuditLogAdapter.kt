@@ -17,7 +17,7 @@ import java.time.ZoneOffset
  * All exceptions are caught and logged locally.
  * Audit failures MUST NOT bubble up to callers (see [AuditLogPort] contract).
  *
- * Phase 4: optionally accepts a [WebhookService] and fans out webhook events
+ * Optionally accepts a [WebhookService] and fans out webhook events
  * after each successful audit write. The fan-out is fire-and-forget — webhook
  * failures never affect the audit write or the calling auth flow.
  */
@@ -52,7 +52,7 @@ class PostgresAuditLogAdapter(
             // Intentionally swallowed — audit failure must not disrupt auth flow
         }
 
-        // Phase 4: dispatch webhook event (fire-and-forget; exceptions never propagate)
+        // Dispatch webhook event (fire-and-forget; exceptions never propagate)
         val tenantId = event.tenantId ?: return
         val webhookEventType = auditTypeToWebhookEvent(event.eventType) ?: return
         try {

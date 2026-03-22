@@ -5,8 +5,8 @@ import java.time.Instant
 /**
  * Self-service portal session — stored as an HMAC-signed cookie per browser session.
  *
- * DESIGN NOTE (Phase 4):
- * The portal now authenticates through the standard OAuth 2.0 Authorization Code + PKCE
+ * DESIGN NOTE:
+ * The portal authenticates through the standard OAuth 2.0 Authorization Code + PKCE
  * flow using the built-in 'kotauth-portal' PUBLIC client provisioned per tenant.
  *
  * Login flow:
@@ -17,7 +17,7 @@ import java.time.Instant
  *   4. userId + username are decoded from the access token sub/preferred_username claims
  *   5. PortalSession is set and the user is redirected to /account/profile
  *
- * Benefits over the Phase 3b approach:
+ * Benefits:
  *   - Single authentication path (no parallel login code duplication)
  *   - MFA, password-expiry, and all future auth checks happen in one place (AuthRoutes)
  *   - Portal session is backed by a real OAuth token issuance
