@@ -976,7 +976,6 @@ fun Route.adminRoutes(
                             val userGroups = roleGroupService.getGroupsForUser(userId)
                             call.respondText(
                                 AdminView.userProfileReadFragment(
-                                    workspace,
                                     user,
                                     roles = userRoles,
                                     groups = userGroups,
@@ -1043,7 +1042,6 @@ fun Route.adminRoutes(
                                         val userGroups = roleGroupService.getGroupsForUser(userId)
                                         call.respondText(
                                             AdminView.userProfileReadFragment(
-                                                workspace,
                                                 updatedUser,
                                                 successMessage = "Profile saved.",
                                                 roles = userRoles,

@@ -108,7 +108,7 @@ internal fun userDetailPageImpl(
             }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
-            userProfileReadFragment(workspace, user, roles = roles, groups = groups)
+            userProfileReadFragment(user, roles = roles, groups = groups)
 
             // ── Active Sessions ──────────────────────────────────────
             div("ov-card") {
@@ -202,7 +202,6 @@ internal fun userDetailPageImpl(
  * Used both in the full page and returned standalone for htmx swaps.
  */
 internal fun DIV.userProfileReadFragment(
-    workspace: Tenant,
     user: User,
     successMessage: String? = null,
     roles: List<Role> = emptyList(),

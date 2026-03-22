@@ -158,12 +158,11 @@ object AdminView {
 
     /** Returns the read-only profile section as an HTML fragment string. */
     fun userProfileReadFragment(
-        workspace: Tenant,
         user: User,
         successMessage: String? = null,
         roles: List<Role> = emptyList(),
         groups: List<Group> = emptyList(),
-    ): String = renderFragment { userProfileReadFragment(workspace, user, successMessage, roles, groups) }
+    ): String = renderFragment { userProfileReadFragment(user, successMessage, roles, groups) }
 
     /** Returns the edit profile form section as an HTML fragment string. */
     fun userProfileEditFragment(
