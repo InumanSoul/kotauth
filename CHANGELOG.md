@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-03-22
+
+### Changed
+
+- **Split AdminRoutes.kt** (~1831 lines) into 7 focused route files under `adapter/web/admin/`: `AdminSettingsRoutes`, `AdminApplicationRoutes`, `AdminUserRoutes`, `AdminSessionAuditRoutes`, `AdminRbacRoutes`, `AdminApiKeyRoutes`, `AdminWebhookRoutes`. The orchestrator is now ~279 lines
+- **Split AuthRoutes.kt** (~1764 lines) into 7 focused route files under `adapter/web/auth/`: `LoginRoutes`, `RegisterRoutes`, `SelfServiceRoutes`, `MfaRoutes`, `SocialLoginRoutes`, `OAuthProtocolRoutes`, `AuthHelpers`. The orchestrator is now ~80 lines
+- **Extracted ServiceGraph** — composition root moved from `Application.kt` into `config/ServiceGraph.kt` with `EnvironmentConfig` for fail-fast env validation
+- **EncryptionService** converted from `object` singleton to injectable `class` — receives secret key via constructor, no more `System.getenv()` calls
+- **RateLimiter** extracted behind `RateLimiterPort` interface in domain layer — routes depend on port, not concrete implementation
+- **AuthService.login()** now delegates to `authenticate()` internally — eliminates duplicated validation logic
+
+### Removed
+
+- Legacy admin redirect routes (`/admin/settings`, `/admin/users`, etc.) — V1 has no backward-compat burden
+
+---
+
 ## [1.0.3] - 2026-03-19
 
 ### Added
@@ -103,7 +120,9 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/inumansoul/kotauth/compare/v1.0.3...v1.1.0
+[1.0.3]: https://github.com/inumansoul/kotauth/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/inumansoul/kotauth/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/inumansoul/kotauth/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/inumansoul/kotauth/releases/tag/v1.0.0

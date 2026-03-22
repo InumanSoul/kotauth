@@ -86,10 +86,10 @@ Images are published to GitHub Container Registry on every tagged release.
 |---|---|
 | `ghcr.io/inumansoul/kotauth:latest` | Latest stable release |
 | `ghcr.io/inumansoul/kotauth:1` | Latest patch in the `1.x` line |
-| `ghcr.io/inumansoul/kotauth:1.0` | Latest patch in `1.0.x` |
-| `ghcr.io/inumansoul/kotauth:1.0.1` | Exact version pin |
+| `ghcr.io/inumansoul/kotauth:1.1` | Latest patch in `1.1.x` |
+| `ghcr.io/inumansoul/kotauth:1.1.0` | Exact version pin |
 
-Pre-release tags (e.g. `1.0.1-rc1`) are published but do not move the `latest` or major/minor tags.
+Pre-release tags (e.g. `1.1.0-rc1`) are published but do not move the `latest` or major/minor tags.
 
 ```bash
 docker pull ghcr.io/inumansoul/kotauth:latest
