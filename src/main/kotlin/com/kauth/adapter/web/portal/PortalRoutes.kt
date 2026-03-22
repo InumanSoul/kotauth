@@ -1,8 +1,6 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.domain.port.TenantRepository
-import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
@@ -57,11 +55,9 @@ import java.util.Base64
  * if no valid PortalSession cookie is found.
  */
 fun Route.portalRoutes(
-    @Suppress("UNUSED_PARAMETER") authService: AuthService,
     selfServiceService: UserSelfServiceService,
     tenantRepository: TenantRepository,
     mfaService: MfaService? = null,
-    @Suppress("UNUSED_PARAMETER") userRepository: UserRepository? = null,
     oauthService: OAuthService? = null, // Phase 4: required for callback exchange
     baseUrl: String = "", // Phase 4: base URL for redirect URI construction
 ) {

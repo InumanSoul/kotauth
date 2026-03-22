@@ -307,8 +307,6 @@ fun Route.adminRoutes(
                         tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                     val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
-                    val editParam = call.request.queryParameters["edit"]
-                    val editProvider = editParam?.let { SocialProvider.fromValueOrNull(it) }
                     call.respondHtml(
                         HttpStatusCode.OK,
                         AdminView.identityProvidersPage(
@@ -316,7 +314,6 @@ fun Route.adminRoutes(
                             providers = providers,
                             allWorkspaces = wsPairs,
                             loggedInAs = session.username,
-                            editProvider = editProvider,
                         ),
                     )
                 }
@@ -347,7 +344,6 @@ fun Route.adminRoutes(
                                 providers = providers,
                                 allWorkspaces = wsPairs,
                                 loggedInAs = session.username,
-                                editProvider = provider,
                                 error = "Client ID is required.",
                             ),
                         )
@@ -368,7 +364,6 @@ fun Route.adminRoutes(
                                 providers = providers,
                                 allWorkspaces = wsPairs,
                                 loggedInAs = session.username,
-                                editProvider = provider,
                                 error = "KAUTH_SECRET_KEY must be set to store provider credentials securely.",
                             ),
                         )
@@ -386,7 +381,6 @@ fun Route.adminRoutes(
                                     providers = providers,
                                     allWorkspaces = wsPairs,
                                     loggedInAs = session.username,
-                                    editProvider = provider,
                                     error = "Client Secret is required when adding a new provider.",
                                 ),
                             )
@@ -940,6 +934,8 @@ fun Route.adminRoutes(
                             if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
                             val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
                             val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                            val userRoles = roleGroupService.getRolesForUser(userId)
+                            val userGroups = roleGroupService.getGroupsForUser(userId)
                             val savedParam = call.request.queryParameters["saved"]
                             val errorParam = call.request.queryParameters["error"]
                             val successMsg =
@@ -958,6 +954,8 @@ fun Route.adminRoutes(
                                     session.username,
                                     successMessage = successMsg,
                                     editError = errorParam,
+                                    roles = userRoles,
+                                    groups = userGroups,
                                 ),
                             )
                         }
@@ -974,8 +972,14 @@ fun Route.adminRoutes(
                             val user =
                                 userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
                             if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                            val userRoles = roleGroupService.getRolesForUser(userId)
+                            val userGroups = roleGroupService.getGroupsForUser(userId)
                             call.respondText(
-                                AdminView.userProfileReadFragment(workspace, user),
+                                AdminView.userProfileReadFragment(
+                                    user,
+                                    roles = userRoles,
+                                    groups = userGroups,
+                                ),
                                 ContentType.Text.Html,
                             )
                         }
@@ -1034,11 +1038,14 @@ fun Route.adminRoutes(
                                     if (isHtmx) {
                                         // Return updated read-only profile fragment
                                         val updatedUser = userRepository.findById(userId) ?: user
+                                        val userRoles = roleGroupService.getRolesForUser(userId)
+                                        val userGroups = roleGroupService.getGroupsForUser(userId)
                                         call.respondText(
                                             AdminView.userProfileReadFragment(
-                                                workspace,
                                                 updatedUser,
                                                 successMessage = "Profile saved.",
+                                                roles = userRoles,
+                                                groups = userGroups,
                                             ),
                                             ContentType.Text.Html,
                                         )
@@ -1061,6 +1068,8 @@ fun Route.adminRoutes(
                                     } else {
                                         val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
                                         val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                                        val userRoles = roleGroupService.getRolesForUser(userId)
+                                        val userGroups = roleGroupService.getGroupsForUser(userId)
                                         call.respondHtml(
                                             HttpStatusCode.UnprocessableEntity,
                                             AdminView.userDetailPage(
@@ -1070,6 +1079,8 @@ fun Route.adminRoutes(
                                                 wsPairs,
                                                 session.username,
                                                 editError = result.error.message,
+                                                roles = userRoles,
+                                                groups = userGroups,
                                             ),
                                         )
                                     }

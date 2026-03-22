@@ -464,16 +464,33 @@ class OAuthService(
      * Returns active status and claims for a token.
      * Only accessible to authenticated clients (server-side only, not public).
      */
-    @Suppress("UNUSED_PARAMETER")
     fun introspectToken(
         tenantSlug: String,
         token: String,
         tokenTypeHint: String? = null,
     ): IntrospectionResult {
-        val hash = sha256(token)
-        val session =
-            sessionRepository.findActiveByAccessTokenHash(hash)
+        // Resolve tenant — unknown slugs always return inactive per RFC 7662
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
                 ?: return IntrospectionResult.Inactive
+
+        val hash = sha256(token)
+
+        // RFC 7662 §2: use tokenTypeHint to optimise lookup order
+        val session =
+            when (tokenTypeHint) {
+                "refresh_token" ->
+                    sessionRepository.findActiveByRefreshTokenHash(hash)
+                        ?: sessionRepository.findActiveByAccessTokenHash(hash)
+                else ->
+                    sessionRepository.findActiveByAccessTokenHash(hash)
+                        ?: sessionRepository.findActiveByRefreshTokenHash(hash)
+            } ?: return IntrospectionResult.Inactive
+
+        // Tenant isolation: token must belong to the requesting tenant
+        if (session.tenantId != tenant.id) {
+            return IntrospectionResult.Inactive
+        }
 
         val claims =
             tokenPort.decodeAccessToken(token)

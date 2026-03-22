@@ -1,10 +1,14 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.Group
+import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import kotlinx.html.*
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 internal fun userDetailPageImpl(
     workspace: Tenant,
@@ -14,6 +18,8 @@ internal fun userDetailPageImpl(
     loggedInAs: String,
     successMessage: String? = null,
     editError: String? = null,
+    roles: List<Role> = emptyList(),
+    groups: List<Group> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -102,7 +108,7 @@ internal fun userDetailPageImpl(
             }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
-            userProfileReadFragment(workspace, user)
+            userProfileReadFragment(user, roles = roles, groups = groups)
 
             // ── Active Sessions ──────────────────────────────────────
             div("ov-card") {
@@ -196,10 +202,13 @@ internal fun userDetailPageImpl(
  * Used both in the full page and returned standalone for htmx swaps.
  */
 internal fun DIV.userProfileReadFragment(
-    @Suppress("UNUSED_PARAMETER") _workspace: Tenant,
     user: User,
     successMessage: String? = null,
+    roles: List<Role> = emptyList(),
+    groups: List<Group> = emptyList(),
 ) {
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+
     div {
         id = "profile-section"
         if (successMessage != null) {
@@ -229,7 +238,36 @@ internal fun DIV.userProfileReadFragment(
                 copyBtn(user.email)
             }
             ovRowText("Full Name", user.fullName.ifBlank { "—" })
-            ovRowMuted("Member since", "—")
+
+            val memberSince = user.createdAt
+                ?.atOffset(ZoneOffset.UTC)
+                ?.format(dateFormatter)
+                ?: "—"
+            ovRowMuted("Member since", memberSince)
+
+            if (roles.isNotEmpty()) {
+                div("ov-card__row") {
+                    span("ov-card__label") { +"Roles" }
+                    span("ov-card__value") {
+                        style = "display:flex;flex-wrap:wrap;gap:6px;"
+                        for (role in roles) {
+                            span("badge badge--id-muted") { +role.name }
+                        }
+                    }
+                }
+            }
+
+            if (groups.isNotEmpty()) {
+                div("ov-card__row") {
+                    span("ov-card__label") { +"Groups" }
+                    span("ov-card__value") {
+                        style = "display:flex;flex-wrap:wrap;gap:6px;"
+                        for (group in groups) {
+                            span("badge badge--id-muted") { +group.name }
+                        }
+                    }
+                }
+            }
         }
     }
 }

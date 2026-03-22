@@ -148,6 +148,7 @@ class PostgresUserRepository : UserRepository {
             enabled = this[UsersTable.enabled],
             lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
             mfaEnabled = this[UsersTable.mfaEnabled],
+            createdAt = this[UsersTable.createdAt].toInstant(),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
