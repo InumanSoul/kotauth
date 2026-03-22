@@ -643,7 +643,7 @@ fun Application.module(
         staticResources("/static", "static")
 
         // Welcome / status page — developer landing page at the root
-        welcomeRoutes(baseUrl, appInfo, startTime, isDevelopment)
+        welcomeRoutes(baseUrl, appInfo, startTime, isDevelopment, encryptionService.isAvailable)
 
         // Health probes — liveness (/health) + readiness (/health/ready)
         healthRoutes(baseUrl, encryptionService.isAvailable)
