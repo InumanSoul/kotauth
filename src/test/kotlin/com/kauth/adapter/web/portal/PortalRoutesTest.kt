@@ -12,6 +12,7 @@ import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.infrastructure.EncryptionService
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -34,10 +35,11 @@ import kotlin.test.assertTrue
  *
  * Focus: unauthenticated access redirects + logout + callback error paths.
  * The full OAuth PKCE exchange (EncryptionService.signCookie / verifyCookie)
- * depends on KAUTH_SECRET_KEY and is tested at the domain/infra layer.
+ * is tested at the domain/infra layer.
  * Here we verify the route wiring behaves correctly at the boundary.
  */
 class PortalRoutesTest {
+    private val encryptionService = EncryptionService("test-secret-key")
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val sessionRepo = FakeSessionRepository()
@@ -201,6 +203,7 @@ class PortalRoutesTest {
             portalRoutes(
                 selfServiceService = buildSelfService(),
                 tenantRepository = tenantRepo,
+                encryptionService = encryptionService,
             )
         }
     }

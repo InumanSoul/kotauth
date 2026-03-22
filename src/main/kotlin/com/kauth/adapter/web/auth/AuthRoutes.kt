@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthError
@@ -22,7 +23,6 @@ import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
-import com.kauth.domain.port.RateLimiterPort
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -68,6 +68,7 @@ fun Route.authRoutes(
     socialLoginService: SocialLoginService? = null, // Phase 2 — Social Login
     identityProviderRepository: IdentityProviderRepository? = null, // Phase 2 — load enabled providers
     baseUrl: String = "", // Phase 2 — needed for callback URI
+    encryptionService: EncryptionService,
 ) {
     route("/t/{slug}") {
         // ------------------------------------------------------------------
@@ -210,12 +211,12 @@ fun Route.authRoutes(
                     if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
                         // Store a short-lived MFA pending token in an HMAC-signed cookie so we can
                         // complete the flow after the user enters their TOTP code.
-                        // Signed with EncryptionService.signCookie() to prevent userId forgery
+                        // Signed with encryptionService.signCookie() to prevent userId forgery
                         // (an unsigned cookie lets any client claim they passed MFA as any user).
                         val mfaPending = "${user.id}|$slug|${System.currentTimeMillis()}"
                         call.response.cookies.append(
                             name = "KOTAUTH_MFA_PENDING",
-                            value = EncryptionService.signCookie(mfaPending),
+                            value = encryptionService.signCookie(mfaPending),
                             maxAge = 300L, // 5 minutes
                             httpOnly = true,
                             path = "/t/$slug",
@@ -520,7 +521,7 @@ fun Route.authRoutes(
 
             // Verify MFA pending cookie — must be present and signature must be valid
             val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
-            if (rawPendingGet.isNullOrBlank() || EncryptionService.verifyCookie(rawPendingGet) == null) {
+            if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
                 return@get call.respondRedirect("/t/$slug/login")
             }
 
@@ -545,7 +546,7 @@ fun Route.authRoutes(
             if (rawCookie.isNullOrBlank()) {
                 return@post call.respondRedirect("/t/$slug/login")
             }
-            val pending = EncryptionService.verifyCookie(rawCookie)
+            val pending = encryptionService.verifyCookie(rawCookie)
             if (pending == null) {
                 // Signature invalid — tampered cookie, force re-login
                 return@post call.respondRedirect("/t/$slug/login")
@@ -741,7 +742,7 @@ fun Route.authRoutes(
         // GET  /auth/social/{provider}/redirect  — initiate OAuth2 flow
         // GET  /auth/social/{provider}/callback  — receive code from provider
         //
-        // CSRF protection: state parameter is HMAC-signed via EncryptionService.signCookie().
+        // CSRF protection: state parameter is HMAC-signed via encryptionService.signCookie().
         // Format: "{provider}|{slug}|{nonce}|{oauthParamsBase64}"
         // On callback, signature is verified before processing the code.
         // ==================================================================
@@ -770,7 +771,7 @@ fun Route.authRoutes(
                     .withoutPadding()
                     .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
             val statePayload = "${provider.value}|$slug|$nonce|$oauthParamsB64"
-            val signedState = EncryptionService.signCookie(statePayload)
+            val signedState = encryptionService.signCookie(statePayload)
 
             when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
                 is SocialLoginResult.Success -> call.respondRedirect(result.value)
@@ -851,7 +852,7 @@ fun Route.authRoutes(
             }
 
             // Verify CSRF state signature
-            val verifiedPayload = EncryptionService.verifyCookie(state)
+            val verifiedPayload = encryptionService.verifyCookie(state)
             if (verifiedPayload == null) {
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
@@ -928,7 +929,7 @@ fun Route.authRoutes(
                     // and redirect to the registration completion page.
                     val pending = result.data
                     val cookieVal =
-                        EncryptionService.signCookie(
+                        encryptionService.signCookie(
                             buildSocialPendingPayload(pending, slug, oauthParamsRaw),
                         )
                     call.response.cookies.append(
@@ -1011,7 +1012,7 @@ fun Route.authRoutes(
             val workspaceName = tenant.displayName
 
             val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-            val pending = parseSocialPendingCookie(rawCookie)
+            val pending = parseSocialPendingCookie(rawCookie, encryptionService)
 
             if (pending == null) {
                 // Cookie missing, expired, or tampered — send back to login
@@ -1049,7 +1050,7 @@ fun Route.authRoutes(
             val workspaceName = tenant.displayName
 
             val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-            val pending = parseSocialPendingCookie(rawCookie)
+            val pending = parseSocialPendingCookie(rawCookie, encryptionService)
 
             if (pending == null) {
                 return@post call.respondRedirect(
@@ -1678,9 +1679,12 @@ private fun buildSocialPendingPayload(
  * Verifies and parses the KOTAUTH_SOCIAL_PENDING cookie.
  * Returns null if the cookie is missing, invalid, tampered, or expired (> 10 min).
  */
-private fun parseSocialPendingCookie(rawCookie: String?): SocialPendingData? {
+private fun parseSocialPendingCookie(
+    rawCookie: String?,
+    encryptionService: EncryptionService,
+): SocialPendingData? {
     if (rawCookie.isNullOrBlank()) return null
-    val payload = EncryptionService.verifyCookie(rawCookie) ?: return null
+    val payload = encryptionService.verifyCookie(rawCookie) ?: return null
     val parts = payload.split("|")
     if (parts.size < 9) return null
 

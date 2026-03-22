@@ -16,57 +16,53 @@ import javax.crypto.spec.SecretKeySpec
  *   2. Signing short-lived MFA pending cookies (HMAC-SHA256) — prevents userId
  *      forgery that would let an attacker bypass the MFA challenge step.
  *
- * Key derivation: Both keys are derived from [KAUTH_SECRET_KEY] env var using
- * SHA-256 with a domain-specific prefix. This means keys are deterministic and
- * do not need to be stored separately.
+ * Key derivation: Both keys are derived from [rawSecretKey] using SHA-256 with
+ * a domain-specific prefix. This means keys are deterministic and do not need
+ * to be stored separately.
  *
- * If KAUTH_SECRET_KEY is not set, a random HMAC key is generated at startup
- * (cookie signatures won't survive a restart, but they will always be valid
- * within a session — the 5-minute TTL makes this acceptable).
+ * If [rawSecretKey] is null or blank, a random HMAC key is generated at
+ * construction time (cookie signatures won't survive a restart, but they will
+ * always be valid within a session — the 5-minute TTL makes this acceptable).
  *
  * Cookie signing format: "{value}.{base64url(hmac)}"
  * Verification strips the signature, recomputes it, and compares in constant time.
+ *
+ * NOTE: A future follow-up will extract an EncryptionPort interface in the
+ * domain layer so persistence adapters depend on an abstraction rather than
+ * this concrete class. See KOTLIN_ADVANTAGE_ROADMAP.md for details.
  */
-object EncryptionService {
-    private const val ALGORITHM = "AES/GCM/NoPadding"
-    private const val KEY_ALGORITHM = "AES"
-    private const val GCM_IV_LENGTH = 12
-    private const val GCM_TAG_BITS = 128
-
-    private val secretKey: SecretKeySpec? by lazy {
-        val raw = System.getenv("KAUTH_SECRET_KEY")
-        if (raw.isNullOrBlank()) {
+class EncryptionService(
+    rawSecretKey: String?,
+) {
+    private val secretKey: SecretKeySpec? =
+        if (rawSecretKey.isNullOrBlank()) {
             null
         } else {
-            // Derive a 256-bit key from the env var via SHA-256
-            val keyBytes = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+            val keyBytes = MessageDigest.getInstance("SHA-256").digest(rawSecretKey.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, KEY_ALGORITHM)
         }
-    }
 
     /**
      * HMAC-SHA256 key for MFA pending cookie signing.
-     * Derived from KAUTH_SECRET_KEY with a domain prefix to isolate it from
-     * the AES key. Falls back to a random 32-byte key if the env var is not set
+     * Derived from [rawSecretKey] with a domain prefix to isolate it from
+     * the AES key. Falls back to a random 32-byte key if the secret is not set
      * (signatures valid only within a single process lifetime).
      */
-    private val hmacKey: ByteArray by lazy {
-        val raw = System.getenv("KAUTH_SECRET_KEY")
-        if (!raw.isNullOrBlank()) {
+    private val hmacKey: ByteArray =
+        if (!rawSecretKey.isNullOrBlank()) {
             MessageDigest
                 .getInstance("SHA-256")
-                .digest("mfa-cookie-signing:$raw".toByteArray(Charsets.UTF_8))
+                .digest("mfa-cookie-signing:$rawSecretKey".toByteArray(Charsets.UTF_8))
         } else {
             ByteArray(32).also { SecureRandom().nextBytes(it) }
         }
-    }
 
     val isAvailable: Boolean get() = secretKey != null
 
     /**
      * Encrypts [plaintext] using AES-256-GCM.
      * Returns a base64-encoded "iv.ciphertext" string suitable for DB storage.
-     * Throws [IllegalStateException] if KAUTH_SECRET_KEY is not set.
+     * Throws [IllegalStateException] if no secret key was provided.
      */
     fun encrypt(plaintext: String): String {
         val key =
@@ -85,7 +81,7 @@ object EncryptionService {
 
     /**
      * Decrypts an encrypted value produced by [encrypt].
-     * Returns null if decryption fails (wrong key, tampered data, or missing env var).
+     * Returns null if decryption fails (wrong key, tampered data, or missing secret key).
      */
     fun decrypt(encrypted: String): String? {
         val key = secretKey ?: return null
@@ -138,10 +134,16 @@ object EncryptionService {
         if (lastDot < 0) return null
         val value = signed.substring(0, lastDot)
         val expected = signCookie(value)
-        // Constant-time comparison — do not short-circuit on first mismatch
         if (signed.length != expected.length) return null
         var diff = 0
         for (i in signed.indices) diff = diff or (signed[i].code xor expected[i].code)
         return if (diff == 0) value else null
+    }
+
+    companion object {
+        private const val ALGORITHM = "AES/GCM/NoPadding"
+        private const val KEY_ALGORITHM = "AES"
+        private const val GCM_IV_LENGTH = 12
+        private const val GCM_TAG_BITS = 128
     }
 }

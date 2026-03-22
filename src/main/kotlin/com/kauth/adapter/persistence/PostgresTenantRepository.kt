@@ -21,7 +21,9 @@ import org.jetbrains.exposed.sql.update
  * If [EncryptionService] is unavailable (KAUTH_SECRET_KEY not set), the password field
  * is stored as null and SMTP config will not function.
  */
-class PostgresTenantRepository : TenantRepository {
+class PostgresTenantRepository(
+    private val encryptionService: EncryptionService,
+) : TenantRepository {
     override fun findBySlug(slug: String): Tenant? =
         transaction {
             TenantsTable
@@ -61,7 +63,7 @@ class PostgresTenantRepository : TenantRepository {
             // Encrypt SMTP password before persistence (only if it changed / is set)
             val encryptedPassword: String? =
                 tenant.smtpPassword?.let { raw ->
-                    if (EncryptionService.isAvailable) EncryptionService.encrypt(raw) else null
+                    if (encryptionService.isAvailable) encryptionService.encrypt(raw) else null
                 }
 
             TenantsTable.update({ TenantsTable.id eq tenant.id }) {
@@ -133,7 +135,7 @@ class PostgresTenantRepository : TenantRepository {
     private fun ResultRow.toTenant(): Tenant {
         // Decrypt SMTP password on read
         val encryptedPw = this[TenantsTable.smtpPassword]
-        val decryptedPw = encryptedPw?.let { EncryptionService.decrypt(it) }
+        val decryptedPw = encryptedPw?.let { encryptionService.decrypt(it) }
 
         return Tenant(
             id = this[TenantsTable.id],

@@ -49,9 +49,9 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
-import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -187,7 +187,8 @@ fun main() {
     // Phase 3b: KAUTH_SECRET_KEY — used for AES-256-GCM SMTP password encryption
     // and portal session signing. Non-fatal: app starts without it, but SMTP
     // config will be unavailable and portal sessions won't survive restarts.
-    if (!EncryptionService.isAvailable) {
+    val encryptionService = EncryptionService(System.getenv("KAUTH_SECRET_KEY"))
+    if (!encryptionService.isAvailable) {
         System.err.println(
             """
             [WARN] KAUTH_SECRET_KEY is not set.
@@ -210,7 +211,7 @@ fun main() {
     // Repositories (constructed once, shared across all requests)
     // -------------------------------------------------------------------------
     val userRepository = PostgresUserRepository()
-    val tenantRepository = PostgresTenantRepository()
+    val tenantRepository = PostgresTenantRepository(encryptionService)
     val applicationRepository = PostgresApplicationRepository()
     val tenantKeyRepository = PostgresTenantKeyRepository()
     val sessionRepository = PostgresSessionRepository()
@@ -225,7 +226,7 @@ fun main() {
     val groupRepository = PostgresGroupRepository()
     val passwordPolicyAdapter = PostgresPasswordPolicyAdapter(passwordHasher)
     // Phase 2: Social Login repositories
-    val identityProviderRepository = PostgresIdentityProviderRepository()
+    val identityProviderRepository = PostgresIdentityProviderRepository(encryptionService)
     val socialAccountRepository = PostgresSocialAccountRepository()
     // Phase 3a: API keys
     val apiKeyRepository = PostgresApiKeyRepository()
@@ -335,7 +336,7 @@ fun main() {
             auditLog = auditLogAdapter,
         )
     // Phase 3c: MFA / TOTP
-    val mfaRepository = PostgresMfaRepository()
+    val mfaRepository = PostgresMfaRepository(encryptionService)
     val mfaService =
         MfaService(
             mfaRepository = mfaRepository,
@@ -443,6 +444,7 @@ fun main() {
                 startTime = startTime,
                 isDevelopment = isDevelopment,
                 isDemoMode = isDemoMode,
+                encryptionService = encryptionService,
             )
         }
 
@@ -460,7 +462,7 @@ fun main() {
         appInfo.version,
         env,
         baseUrl,
-        EncryptionService.isAvailable,
+        encryptionService.isAvailable,
         System.getProperty("java.version"),
     )
 
@@ -497,6 +499,7 @@ fun Application.module(
     startTime: Long,
     isDevelopment: Boolean,
     isDemoMode: Boolean = false,
+    encryptionService: EncryptionService,
 ) {
     // -------------------------------------------------------------------------
     // Plugins
@@ -643,7 +646,7 @@ fun Application.module(
         welcomeRoutes(baseUrl, appInfo, startTime, isDevelopment)
 
         // Health probes — liveness (/health) + readiness (/health/ready)
-        healthRoutes(baseUrl)
+        healthRoutes(baseUrl, encryptionService.isAvailable)
 
         // All tenant auth + OIDC flows (Phase 1–2)
         authRoutes(
@@ -659,6 +662,7 @@ fun Application.module(
             socialLoginService = socialLoginService,
             identityProviderRepository = identityProviderRepository,
             baseUrl = baseUrl,
+            encryptionService = encryptionService,
         )
 
         // Self-service portal — /t/{slug}/account/* (Phase 4: OAuth-backed login)
@@ -668,6 +672,7 @@ fun Application.module(
             mfaService = mfaService,
             oauthService = oauthService,
             baseUrl = baseUrl,
+            encryptionService = encryptionService,
         )
 
         // REST API v1 — /t/{tenantSlug}/api/v1/** (Phase 3b)
@@ -703,6 +708,7 @@ fun Application.module(
             identityProviderRepository = identityProviderRepository,
             apiKeyService = apiKeyService,
             webhookService = webhookService,
+            encryptionService = encryptionService,
         )
     }
 }

@@ -18,7 +18,9 @@ import java.time.ZoneOffset
  * If encryption is unavailable, secrets are stored as plaintext — the
  * application warns about this at startup (see Application.kt).
  */
-class PostgresMfaRepository : MfaRepository {
+class PostgresMfaRepository(
+    private val encryptionService: EncryptionService,
+) : MfaRepository {
     // -----------------------------------------------------------------------
     // Enrollments
     // -----------------------------------------------------------------------
@@ -166,8 +168,8 @@ class PostgresMfaRepository : MfaRepository {
     // -----------------------------------------------------------------------
 
     private fun encryptSecret(plaintext: String): String =
-        if (EncryptionService.isAvailable) EncryptionService.encrypt(plaintext) else plaintext
+        if (encryptionService.isAvailable) encryptionService.encrypt(plaintext) else plaintext
 
     private fun decryptSecret(stored: String): String =
-        if (EncryptionService.isAvailable) EncryptionService.decrypt(stored) ?: stored else stored
+        if (encryptionService.isAvailable) encryptionService.decrypt(stored) ?: stored else stored
 }

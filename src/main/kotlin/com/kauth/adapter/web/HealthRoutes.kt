@@ -1,7 +1,6 @@
 package com.kauth.adapter.web
 
 import com.kauth.adapter.persistence.TenantsTable
-import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -66,7 +65,10 @@ data class ReadinessResponse(
  *                       Returns 200 when ready, 503 when not_ready.
  *                       Used by Docker depends_on / k8s readiness probe.
  */
-fun Route.healthRoutes(baseUrl: String) {
+fun Route.healthRoutes(
+    baseUrl: String,
+    encryptionAvailable: Boolean,
+) {
     // -- Liveness ------------------------------------------------------------
     get("/health") {
         call.respond(
@@ -80,7 +82,7 @@ fun Route.healthRoutes(baseUrl: String) {
     // -- Readiness -----------------------------------------------------------
     get("/health/ready") {
         val dbCheck = pingDatabase()
-        val configCheck = checkConfig(baseUrl)
+        val configCheck = checkConfig(baseUrl, encryptionAvailable)
 
         // The container is only "ready" when the DB is reachable.
         // Config issues are surfaced as warnings, not hard failures, so that
@@ -142,10 +144,12 @@ internal fun pingDatabase(): DbCheckResult {
  * Startup enforcement (exitProcess) handles hard failures; this surfaces
  * soft warnings for operators checking the health endpoint after deploy.
  */
-internal fun checkConfig(baseUrl: String): ConfigCheckResult {
+internal fun checkConfig(
+    baseUrl: String,
+    secretKeyPresent: Boolean,
+): ConfigCheckResult {
     val isHttps = baseUrl.startsWith("https://")
     val isLocalhost = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
-    val secretKeyPresent = EncryptionService.isAvailable
 
     val warnings =
         buildList {

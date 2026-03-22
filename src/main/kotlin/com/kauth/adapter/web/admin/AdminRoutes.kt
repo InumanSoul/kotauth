@@ -46,6 +46,7 @@ fun Route.adminRoutes(
     identityProviderRepository: IdentityProviderRepository? = null, // Phase 2 — Social Login
     apiKeyService: com.kauth.domain.service.ApiKeyService? = null, // Phase 3a — REST API keys
     webhookService: com.kauth.domain.service.WebhookService? = null, // Phase 4 — Webhooks
+    encryptionService: EncryptionService,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
@@ -355,7 +356,7 @@ fun Route.adminRoutes(
                             "Identity provider repository not configured",
                         )
 
-                    if (!EncryptionService.isAvailable && newSecret != null) {
+                    if (!encryptionService.isAvailable && newSecret != null) {
                         val providers = idpRepo.findAllByTenant(workspace.id)
                         return@post call.respondHtml(
                             HttpStatusCode.UnprocessableEntity,
