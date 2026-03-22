@@ -51,7 +51,7 @@ import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
-import com.kauth.infrastructure.RateLimiter
+import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -393,9 +393,9 @@ fun main() {
     // -------------------------------------------------------------------------
     // Rate limiters (Phase 0)
     // -------------------------------------------------------------------------
-    val loginRateLimiter = RateLimiter(maxRequests = 5, windowSeconds = 60) // 5 attempts / minute per IP
-    val registerRateLimiter = RateLimiter(maxRequests = 3, windowSeconds = 300) // 3 registrations / 5 min per IP
-    val tokenRateLimiter = RateLimiter(maxRequests = 20, windowSeconds = 60) // 20 token requests / minute per IP
+    val loginRateLimiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60) // 5 attempts / minute per IP
+    val registerRateLimiter = InMemoryRateLimiter(maxRequests = 3, windowSeconds = 300) // 3 registrations / 5 min per IP
+    val tokenRateLimiter = InMemoryRateLimiter(maxRequests = 20, windowSeconds = 60) // 20 token requests / minute per IP
 
     // Phase 3b: portal session signing key — derived from KAUTH_SECRET_KEY for persistence
     // across restarts. Random key is used as fallback (sessions are valid only until restart).
@@ -483,9 +483,9 @@ fun Application.module(
     mfaRepository: com.kauth.domain.port.MfaRepository,
     roleRepository: com.kauth.domain.port.RoleRepository,
     groupRepository: com.kauth.domain.port.GroupRepository,
-    loginRateLimiter: RateLimiter,
-    registerRateLimiter: RateLimiter,
-    tokenRateLimiter: RateLimiter,
+    loginRateLimiter: com.kauth.domain.port.RateLimiterPort,
+    registerRateLimiter: com.kauth.domain.port.RateLimiterPort,
+    tokenRateLimiter: com.kauth.domain.port.RateLimiterPort,
     portalSessionKey: ByteArray,
     baseUrl: String,
     portalClientProvisioning: PortalClientProvisioning,

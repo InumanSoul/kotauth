@@ -22,7 +22,7 @@ import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
-import com.kauth.infrastructure.RateLimiter
+import com.kauth.domain.port.RateLimiterPort
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
@@ -59,9 +59,9 @@ fun Route.authRoutes(
     authService: AuthService,
     oauthService: OAuthService,
     tenantRepository: TenantRepository,
-    loginRateLimiter: RateLimiter,
-    registerRateLimiter: RateLimiter,
-    tokenRateLimiter: RateLimiter,
+    loginRateLimiter: RateLimiterPort,
+    registerRateLimiter: RateLimiterPort,
+    tokenRateLimiter: RateLimiterPort,
     selfServiceService: UserSelfServiceService,
     mfaService: MfaService? = null, // Phase 3c — nullable for backward compat
     roleRepository: RoleRepository? = null, // Phase 1 fix — required_admins MFA check

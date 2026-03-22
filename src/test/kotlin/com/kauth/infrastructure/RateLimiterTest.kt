@@ -6,7 +6,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Unit tests for [RateLimiter] — in-memory sliding-window rate limiter.
+ * Unit tests for [InMemoryRateLimiter] — in-memory sliding-window rate limiter.
  *
  * These tests exercise the core contract: allow up to [maxRequests] within
  * [windowSeconds], then reject. Also tests key isolation, remaining count,
@@ -19,7 +19,7 @@ class RateLimiterTest {
 
     @Test
     fun `isAllowed - permits requests up to the limit`() {
-        val limiter = RateLimiter(maxRequests = 3, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 3, windowSeconds = 60)
 
         assertTrue(limiter.isAllowed("key1"), "1st request should be allowed")
         assertTrue(limiter.isAllowed("key1"), "2nd request should be allowed")
@@ -28,7 +28,7 @@ class RateLimiterTest {
 
     @Test
     fun `isAllowed - rejects requests beyond the limit`() {
-        val limiter = RateLimiter(maxRequests = 3, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 3, windowSeconds = 60)
 
         repeat(3) { limiter.isAllowed("key1") }
         assertFalse(limiter.isAllowed("key1"), "4th request should be rate-limited")
@@ -37,7 +37,7 @@ class RateLimiterTest {
 
     @Test
     fun `isAllowed - limit of 1 blocks immediately after first request`() {
-        val limiter = RateLimiter(maxRequests = 1, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
 
         assertTrue(limiter.isAllowed("key1"))
         assertFalse(limiter.isAllowed("key1"))
@@ -49,7 +49,7 @@ class RateLimiterTest {
 
     @Test
     fun `isAllowed - different keys have independent limits`() {
-        val limiter = RateLimiter(maxRequests = 2, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60)
 
         assertTrue(limiter.isAllowed("user:1"))
         assertTrue(limiter.isAllowed("user:1"))
@@ -65,13 +65,13 @@ class RateLimiterTest {
 
     @Test
     fun `remaining - returns maxRequests for unknown key`() {
-        val limiter = RateLimiter(maxRequests = 5, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60)
         assertEquals(5, limiter.remaining("never-seen"))
     }
 
     @Test
     fun `remaining - decrements with each allowed request`() {
-        val limiter = RateLimiter(maxRequests = 3, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 3, windowSeconds = 60)
 
         assertEquals(3, limiter.remaining("key1"))
         limiter.isAllowed("key1")
@@ -84,7 +84,7 @@ class RateLimiterTest {
 
     @Test
     fun `remaining - never goes below zero`() {
-        val limiter = RateLimiter(maxRequests = 1, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
         limiter.isAllowed("key1")
         limiter.isAllowed("key1") // rejected but shouldn't go negative
         assertEquals(0, limiter.remaining("key1"))
@@ -96,7 +96,7 @@ class RateLimiterTest {
 
     @Test
     fun `reset - restores full quota for the key`() {
-        val limiter = RateLimiter(maxRequests = 2, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60)
 
         limiter.isAllowed("key1")
         limiter.isAllowed("key1")
@@ -110,7 +110,7 @@ class RateLimiterTest {
 
     @Test
     fun `reset - does not affect other keys`() {
-        val limiter = RateLimiter(maxRequests = 2, windowSeconds = 60)
+        val limiter = InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60)
 
         limiter.isAllowed("key1")
         limiter.isAllowed("key2")
@@ -128,7 +128,7 @@ class RateLimiterTest {
 
     @Test
     fun `constructor properties are accessible`() {
-        val limiter = RateLimiter(maxRequests = 10, windowSeconds = 120)
+        val limiter = InMemoryRateLimiter(maxRequests = 10, windowSeconds = 120)
         assertEquals(10, limiter.maxRequests)
         assertEquals(120L, limiter.windowSeconds)
     }
