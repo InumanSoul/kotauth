@@ -26,5 +26,7 @@ object UsersTable : Table("users") {
     // Phase 3c: MFA — set to true when user has a verified TOTP enrollment
     val mfaEnabled = bool("mfa_enabled").default(false)
 
+    val createdAt = timestampWithTimeZone("created_at")
+
     override val primaryKey = PrimaryKey(id)
 }
