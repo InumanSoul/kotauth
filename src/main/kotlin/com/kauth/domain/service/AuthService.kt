@@ -37,8 +37,8 @@ class AuthService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val sessionRepository: SessionRepository,
-    private val selfServiceService: UserSelfServiceService? = null, // nullable — injected post Phase 3b
-    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c — nullable for backward compat
+    private val selfServiceService: UserSelfServiceService? = null,
+    private val passwordPolicy: PasswordPolicyPort? = null,
 ) {
     /**
      * Authenticates a user and returns the User domain object.
@@ -104,7 +104,7 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        // Phase 3c: enforce password expiry if configured and the user has a recorded
+        // Enforce password expiry if configured and the user has a recorded
         // last-change timestamp. Users created before expiry was enabled (null timestamp)
         // are not affected until they next change their password — prevents mass lockouts
         // when an admin first activates the policy on an existing tenant.
@@ -142,6 +142,9 @@ class AuthService(
      * Authenticates a user, issues a token set, and persists a server-side session.
      * Used for direct (non-OAuth) browser login and the admin console.
      *
+     * Delegates credential verification to [authenticate] so that validation logic,
+     * audit logging, and password expiry checks live in exactly one place.
+     *
      * For OAuth2 Authorization Code Flow, prefer [authenticate] + OAuthService
      * which handles client validation, PKCE, and proper redirect handling.
      */
@@ -152,36 +155,12 @@ class AuthService(
         ipAddress: String? = null,
         userAgent: String? = null,
     ): AuthResult<TokenResponse> {
-        val tenant =
-            tenantRepository.findBySlug(tenantSlug)
-                ?: return AuthResult.Failure(AuthError.TenantNotFound)
+        val authResult = authenticate(tenantSlug, username, rawPassword, ipAddress, userAgent)
+        if (authResult is AuthResult.Failure) return AuthResult.Failure(authResult.error)
 
-        if (username.isBlank() || rawPassword.isBlank()) {
-            return AuthResult.Failure(AuthError.InvalidCredentials)
-        }
-
-        val user =
-            userRepository.findByUsername(tenant.id, username)
-                ?: return AuthResult.Failure(AuthError.InvalidCredentials)
-
-        if (!user.enabled) {
-            return AuthResult.Failure(AuthError.InvalidCredentials)
-        }
-
-        if (!passwordHasher.verify(rawPassword, user.passwordHash)) {
-            return AuthResult.Failure(AuthError.InvalidCredentials)
-        }
-
-        // Enforce password expiry — mirrors the check in authenticate() so that login() is
-        // self-contained regardless of whether the caller invoked authenticate() first.
-        // Users without a recorded lastPasswordChangeAt are not affected (prevents mass lockouts
-        // when an admin first activates the policy on an existing tenant).
-        if (tenant.passwordPolicyMaxAgeDays > 0 && user.lastPasswordChangeAt != null) {
-            val ageDays = Duration.between(user.lastPasswordChangeAt, Instant.now()).toDays()
-            if (ageDays >= tenant.passwordPolicyMaxAgeDays) {
-                return AuthResult.Failure(AuthError.PasswordExpired)
-            }
-        }
+        val user = (authResult as AuthResult.Success).value
+        // Safe: authenticate() succeeded, so the tenant exists.
+        val tenant = tenantRepository.findBySlug(tenantSlug)!!
 
         val tokens =
             tokenPort.issueUserTokens(
@@ -191,8 +170,6 @@ class AuthService(
                 scopes = listOf("openid"),
             )
 
-        // Persist a server-side session so the admin console sessions page
-        // shows activity for direct logins, not only OAuth flows.
         sessionRepository.save(
             Session(
                 tenantId = tenant.id,
@@ -211,7 +188,6 @@ class AuthService(
             ),
         )
 
-        // Phase 3b: enforce concurrent session limit (evict oldest if over cap)
         enforceConcurrentSessionLimit(tenant.id, user.id!!, tenant.maxConcurrentSessions)
 
         return AuthResult.Success(tokens)
@@ -245,7 +221,6 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        // Phase 3c: full password policy validation (falls back to basic length check)
         val policyError = passwordPolicy?.validate(rawPassword, tenant)
         if (policyError != null) {
             return AuthResult.Failure(AuthError.ValidationError(policyError))
@@ -276,7 +251,6 @@ class AuthService(
 
         val savedUser = userRepository.save(newUser)
 
-        // Phase 3c: record initial password in history
         if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
@@ -292,9 +266,6 @@ class AuthService(
             ),
         )
 
-        // Phase 3b: if the tenant requires email verification and SMTP is ready,
-        // send a verification email immediately after registration.
-        // Failures here are logged and silently swallowed — they must not block registration.
         if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
             try {
                 selfServiceService.initiateEmailVerification(savedUser.id!!, tenant.id, "")
@@ -339,7 +310,6 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        // Phase 3c: full password policy validation (falls back to basic length check)
         val policyError = passwordPolicy?.validate(rawPassword, tenant)
         if (policyError != null) {
             return AuthResult.Failure(AuthError.ValidationError(policyError))
@@ -370,7 +340,6 @@ class AuthService(
 
         val savedUser = userRepository.save(newUser)
 
-        // Phase 3c: record initial password in history
         if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
@@ -400,11 +369,6 @@ class AuthService(
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Phase 3b: after persisting a new session, check if the user is over the
-     * concurrent session limit and revoke the oldest sessions if so.
-     */
     private fun enforceConcurrentSessionLimit(
         tenantId: Int,
         userId: Int,

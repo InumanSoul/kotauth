@@ -24,6 +24,7 @@ import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
+import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
@@ -61,6 +62,7 @@ class AdminWebhooksTest {
     private val tokenPort = FakeTokenPort()
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
+    private val encryptionService = EncryptionService("test-secret-key")
 
     private val webhookService =
         WebhookService(
@@ -274,6 +276,7 @@ class AdminWebhooksTest {
                 auditLogRepository = auditLogRepo,
                 keyProvisioningService = keyProvisioningService,
                 webhookService = webhookService,
+                encryptionService = encryptionService,
             )
         }
     }

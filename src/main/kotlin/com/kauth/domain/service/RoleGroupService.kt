@@ -13,7 +13,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 
 /**
- * Domain service for role and group management (Phase 3c).
+ * Domain service for role and group management.
  *
  * Handles CRUD, assignment, and validation for roles and groups.
  * Composite role cycle detection is enforced here.

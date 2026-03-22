@@ -1,0 +1,474 @@
+package com.kauth.adapter.web.admin
+
+import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.MfaRepository
+import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AdminResult
+import com.kauth.domain.service.AdminService
+import com.kauth.infrastructure.EncryptionService
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.call
+import io.ktor.server.html.respondHtml
+import io.ktor.server.request.receiveParameters
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondRedirect
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import io.ktor.server.sessions.get
+import io.ktor.server.sessions.sessions
+
+fun Route.adminSettingsRoutes(
+    adminService: AdminService,
+    tenantRepository: TenantRepository,
+    userRepository: UserRepository,
+    identityProviderRepository: IdentityProviderRepository?,
+    mfaRepository: MfaRepository?,
+    encryptionService: EncryptionService,
+) {
+    // -------------------------------------------------------------------
+    // General workspace settings
+    // -------------------------------------------------------------------
+
+    get("/settings") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val saved = call.request.queryParameters["saved"] == "true"
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.workspaceSettingsPage(workspace, wsPairs, session.username, saved = saved),
+        )
+    }
+
+    post("/settings") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val params = call.receiveParameters()
+        when (
+            val result =
+                adminService.updateWorkspaceSettings(
+                    slug = slug,
+                    displayName = params["displayName"]?.trim() ?: "",
+                    issuerUrl = params["issuerUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                    tokenExpirySeconds = params["tokenExpirySeconds"]?.toLongOrNull() ?: 3600L,
+                    refreshTokenExpirySeconds =
+                        params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
+                    registrationEnabled = params["registrationEnabled"] == "true",
+                    emailVerificationRequired = params["emailVerificationRequired"] == "true",
+                    passwordPolicyMinLength = workspace.passwordPolicyMinLength,
+                    passwordPolicyRequireSpecial = workspace.passwordPolicyRequireSpecial,
+                    passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
+                    passwordPolicyRequireNumber = workspace.passwordPolicyRequireNumber,
+                    passwordPolicyHistoryCount = workspace.passwordPolicyHistoryCount,
+                    passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
+                    passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
+                    mfaPolicy = workspace.mfaPolicy,
+                    themeAccentColor = workspace.theme.accentColor,
+                    themeAccentHover = workspace.theme.accentHoverColor,
+                    themeBgDeep = workspace.theme.bgDeep,
+                    themeBgCard = workspace.theme.bgCard,
+                    themeBgInput = workspace.theme.bgInput,
+                    themeBorderColor = workspace.theme.borderColor,
+                    themeBorderRadius = workspace.theme.borderRadius,
+                    themeTextPrimary = workspace.theme.textPrimary,
+                    themeTextMuted = workspace.theme.textMuted,
+                    themeLogoUrl = workspace.theme.logoUrl,
+                    themeFaviconUrl = workspace.theme.faviconUrl,
+                )
+        ) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
+            is AdminResult.Failure -> {
+                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.workspaceSettingsPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = result.error.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // SMTP settings
+    // -------------------------------------------------------------------
+
+    get("/settings/smtp") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val saved = call.request.queryParameters["saved"] == "true"
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.smtpSettingsPage(workspace, wsPairs, session.username, saved = saved),
+        )
+    }
+
+    post("/settings/smtp") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val params = call.receiveParameters()
+        when (
+            val result =
+                adminService.updateSmtpConfig(
+                    slug = slug,
+                    smtpHost = params["smtpHost"]?.trim()?.takeIf { it.isNotBlank() },
+                    smtpPort = params["smtpPort"]?.toIntOrNull() ?: 587,
+                    smtpUsername = params["smtpUsername"]?.trim()?.takeIf { it.isNotBlank() },
+                    smtpPassword = params["smtpPassword"]?.takeIf { it.isNotBlank() },
+                    smtpFromAddress = params["smtpFromAddress"]?.trim()?.takeIf { it.isNotBlank() },
+                    smtpFromName = params["smtpFromName"]?.trim()?.takeIf { it.isNotBlank() },
+                    smtpTlsEnabled = params["smtpTlsEnabled"] == "true",
+                    smtpEnabled = params["smtpEnabled"] == "true",
+                )
+        ) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=true")
+            is AdminResult.Failure -> {
+                val workspace =
+                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.smtpSettingsPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = result.error.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Identity Providers
+    // -------------------------------------------------------------------
+
+    get("/settings/identity-providers") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.identityProvidersPage(
+                workspace = workspace,
+                providers = providers,
+                allWorkspaces = wsPairs,
+                loggedInAs = session.username,
+            ),
+        )
+    }
+
+    post("/settings/identity-providers/{provider}") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provider =
+            SocialProvider.fromValueOrNull(provName)
+                ?: return@post call.respond(HttpStatusCode.BadRequest, "Unsupported provider: $provName")
+
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val params = call.receiveParameters()
+
+        val newClientId = params["clientId"]?.trim() ?: ""
+        val newSecret = params["clientSecret"]?.takeIf { it.isNotBlank() }
+        val enabled = params["enabled"] == "true"
+
+        if (newClientId.isBlank()) {
+            val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.identityProvidersPage(
+                    workspace = workspace,
+                    providers = providers,
+                    allWorkspaces = wsPairs,
+                    loggedInAs = session.username,
+                    error = "Client ID is required.",
+                ),
+            )
+        }
+
+        val idpRepo =
+            identityProviderRepository ?: return@post call.respond(
+                HttpStatusCode.NotImplemented,
+                "Identity provider repository not configured",
+            )
+
+        if (!encryptionService.isAvailable && newSecret != null) {
+            val providers = idpRepo.findAllByTenant(workspace.id)
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.identityProvidersPage(
+                    workspace = workspace,
+                    providers = providers,
+                    allWorkspaces = wsPairs,
+                    loggedInAs = session.username,
+                    error = "KAUTH_SECRET_KEY must be set to store provider credentials securely.",
+                ),
+            )
+        }
+
+        val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
+        if (existing == null) {
+            if (newSecret.isNullOrBlank()) {
+                val providers = idpRepo.findAllByTenant(workspace.id)
+                return@post call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.identityProvidersPage(
+                        workspace = workspace,
+                        providers = providers,
+                        allWorkspaces = wsPairs,
+                        loggedInAs = session.username,
+                        error = "Client Secret is required when adding a new provider.",
+                    ),
+                )
+            }
+            idpRepo.save(
+                IdentityProvider(
+                    tenantId = workspace.id,
+                    provider = provider,
+                    clientId = newClientId,
+                    clientSecret = newSecret,
+                    enabled = false,
+                ),
+            )
+        } else {
+            val secretToUse = newSecret ?: existing.clientSecret
+            idpRepo.update(
+                existing.copy(
+                    clientId = newClientId,
+                    clientSecret = secretToUse,
+                    enabled = enabled,
+                ),
+            )
+        }
+
+        call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers?saved=true")
+    }
+
+    post("/settings/identity-providers/{provider}/delete") {
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provider =
+            SocialProvider.fromValueOrNull(provName)
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        identityProviderRepository?.delete(workspace.id, provider)
+        call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers")
+    }
+
+    // -------------------------------------------------------------------
+    // Security policy
+    // -------------------------------------------------------------------
+
+    get("/settings/security") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val saved = call.request.queryParameters["saved"] == "true"
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.securityPolicyPage(workspace, wsPairs, session.username, saved = saved),
+        )
+    }
+
+    post("/settings/security") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val params = call.receiveParameters()
+        when (
+            val result =
+                adminService.updateWorkspaceSettings(
+                    slug = slug,
+                    displayName = workspace.displayName,
+                    issuerUrl = workspace.issuerUrl,
+                    tokenExpirySeconds = workspace.tokenExpirySeconds,
+                    refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
+                    registrationEnabled = workspace.registrationEnabled,
+                    emailVerificationRequired = workspace.emailVerificationRequired,
+                    passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
+                    passwordPolicyRequireSpecial = params["passwordPolicyRequireSpecial"] == "true",
+                    passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
+                    passwordPolicyRequireNumber = params["passwordPolicyRequireNumber"] == "true",
+                    passwordPolicyHistoryCount = params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: 0,
+                    passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
+                    passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
+                    mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
+                    themeAccentColor = workspace.theme.accentColor,
+                    themeAccentHover = workspace.theme.accentHoverColor,
+                    themeBgDeep = workspace.theme.bgDeep,
+                    themeBgCard = workspace.theme.bgCard,
+                    themeBgInput = workspace.theme.bgInput,
+                    themeBorderColor = workspace.theme.borderColor,
+                    themeBorderRadius = workspace.theme.borderRadius,
+                    themeTextPrimary = workspace.theme.textPrimary,
+                    themeTextMuted = workspace.theme.textMuted,
+                    themeLogoUrl = workspace.theme.logoUrl,
+                    themeFaviconUrl = workspace.theme.faviconUrl,
+                )
+        ) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
+            is AdminResult.Failure -> {
+                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.securityPolicyPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = result.error.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Branding
+    // -------------------------------------------------------------------
+
+    get("/settings/branding") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val saved = call.request.queryParameters["saved"] == "true"
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.brandingPage(workspace, wsPairs, session.username, saved = saved),
+        )
+    }
+
+    post("/settings/branding") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val params = call.receiveParameters()
+        when (
+            val result =
+                adminService.updateWorkspaceSettings(
+                    slug = slug,
+                    displayName = workspace.displayName,
+                    issuerUrl = workspace.issuerUrl,
+                    tokenExpirySeconds = workspace.tokenExpirySeconds,
+                    refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
+                    registrationEnabled = workspace.registrationEnabled,
+                    emailVerificationRequired = workspace.emailVerificationRequired,
+                    passwordPolicyMinLength = workspace.passwordPolicyMinLength,
+                    passwordPolicyRequireSpecial = workspace.passwordPolicyRequireSpecial,
+                    passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
+                    passwordPolicyRequireNumber = workspace.passwordPolicyRequireNumber,
+                    passwordPolicyHistoryCount = workspace.passwordPolicyHistoryCount,
+                    passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
+                    passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
+                    mfaPolicy = workspace.mfaPolicy,
+                    themeAccentColor =
+                        params["themeAccentColor"]?.trim()
+                            ?: workspace.theme.accentColor,
+                    themeAccentHover =
+                        params["themeAccentHover"]?.trim()
+                            ?: workspace.theme.accentHoverColor,
+                    themeBgDeep =
+                        params["themeBgDeep"]?.trim()
+                            ?: workspace.theme.bgDeep,
+                    themeBgCard =
+                        params["themeBgCard"]?.trim()
+                            ?: workspace.theme.bgCard,
+                    themeBgInput =
+                        params["themeBgInput"]?.trim()
+                            ?: workspace.theme.bgInput,
+                    themeBorderColor =
+                        params["themeBorderColor"]?.trim()
+                            ?: workspace.theme.borderColor,
+                    themeBorderRadius =
+                        params["themeBorderRadius"]?.trim()
+                            ?: workspace.theme.borderRadius,
+                    themeTextPrimary =
+                        params["themeTextPrimary"]?.trim()
+                            ?: workspace.theme.textPrimary,
+                    themeTextMuted =
+                        params["themeTextMuted"]?.trim()
+                            ?: workspace.theme.textMuted,
+                    themeLogoUrl =
+                        params["themeLogoUrl"]
+                            ?.trim()
+                            ?.takeIf { it.isNotBlank() },
+                    themeFaviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                )
+        ) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
+            is AdminResult.Failure -> {
+                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.brandingPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = result.error.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // MFA overview
+    // -------------------------------------------------------------------
+
+    get("/mfa") {
+        val session = call.sessions.get<AdminSession>()!!
+        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val workspace =
+            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val users = userRepository.findByTenantId(workspace.id, null)
+        val (enrolled, notEnrolled) =
+            if (mfaRepository != null) {
+                users.partition { u -> mfaRepository.findEnrollmentByUserId(u.id!!)?.verified == true }
+            } else {
+                emptyList<com.kauth.domain.model.User>() to users
+            }
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.mfaSettingsPage(
+                workspace,
+                wsPairs,
+                session.username,
+                totalUsers = users.size,
+                enrolledUsers = enrolled.size,
+                enrolledUserList = enrolled,
+                notEnrolledUserList = notEnrolled,
+            ),
+        )
+    }
+}

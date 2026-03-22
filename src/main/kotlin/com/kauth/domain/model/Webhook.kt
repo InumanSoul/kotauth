@@ -3,7 +3,7 @@ package com.kauth.domain.model
 import java.time.Instant
 
 // =============================================================================
-// Webhook domain models — Phase 4
+// Webhook domain models
 // =============================================================================
 
 /**

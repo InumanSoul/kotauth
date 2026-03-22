@@ -1,10 +1,11 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.port.RateLimiterPort
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * In-memory sliding-window rate limiter.
+ * In-memory sliding-window rate limiter — implements [RateLimiterPort].
  *
  * Keyed by an arbitrary string (e.g. "IP:endpoint"). Tracks how many requests
  * a key has made in the last [windowSeconds] seconds and rejects once it exceeds
@@ -16,14 +17,11 @@ import java.util.concurrent.atomic.AtomicInteger
  *     instance deployments; swap for a Redis-backed implementation if clustering.
  *   - Memory grows with unique keys. A cleanup job prunes idle buckets on each
  *     check (probabilistic, not scheduled) to keep footprint bounded.
- *
- * Phase 2 upgrade path: implement [RateLimiter] as an interface and swap to a
- * Redis adapter without touching any calling code.
  */
-class RateLimiter(
-    val maxRequests: Int,
-    val windowSeconds: Long,
-) {
+class InMemoryRateLimiter(
+    override val maxRequests: Int,
+    override val windowSeconds: Long,
+) : RateLimiterPort {
     private data class Bucket(
         val timestamps: ArrayDeque<Long> = ArrayDeque(),
         val hitCount: AtomicInteger = AtomicInteger(0),
@@ -34,7 +32,7 @@ class RateLimiter(
     /**
      * Returns true if the request is allowed, false if it has been rate-limited.
      */
-    fun isAllowed(key: String): Boolean {
+    override fun isAllowed(key: String): Boolean {
         val now = System.currentTimeMillis()
         val windowStart = now - (windowSeconds * 1_000L)
 
@@ -58,7 +56,7 @@ class RateLimiter(
     /**
      * Returns the number of remaining requests for the given key in the current window.
      */
-    fun remaining(key: String): Int {
+    override fun remaining(key: String): Int {
         val now = System.currentTimeMillis()
         val windowStart = now - (windowSeconds * 1_000L)
         val bucket = buckets[key] ?: return maxRequests
@@ -71,7 +69,7 @@ class RateLimiter(
     /**
      * Clears all state for a key — useful for tests or explicit user unlocking.
      */
-    fun reset(key: String) {
+    override fun reset(key: String) {
         buckets.remove(key)
     }
 }

@@ -22,7 +22,7 @@ import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
-import com.kauth.infrastructure.RateLimiter
+import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -72,14 +72,15 @@ class AuthRoutesTest {
     private val tokenPort = FakeTokenPort()
 
     // Rate limiters generous enough to never trip during tests
-    private val loginLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
-    private val registerLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
-    private val tokenLimiter = RateLimiter(maxRequests = 1000, windowSeconds = 60)
+    private val loginLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
+    private val registerLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
+    private val tokenLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
 
     // MockK mocks for services that aren't the focus of these tests
     private val selfService = mockk<UserSelfServiceService>(relaxed = true)
     private val mfaService = mockk<MfaService>(relaxed = true)
 
+    private val encryptionService = EncryptionService("test-secret-key")
     private val tenant =
         Tenant(
             id = 1,
@@ -177,6 +178,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         mfaService = mfaService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -237,6 +239,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         mfaService = mfaService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -278,6 +281,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         // mfaService intentionally omitted
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -311,6 +315,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -348,12 +353,13 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
 
             // Build a properly signed cookie
-            val cookieValue = EncryptionService.signCookie("10|acme|${System.currentTimeMillis()}")
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}")
 
             val response =
                 client.get("/t/acme/mfa-challenge") {
@@ -384,6 +390,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -416,6 +423,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -446,6 +454,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -505,6 +514,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -544,6 +554,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -581,6 +592,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -630,6 +642,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -662,6 +675,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -699,6 +713,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -752,6 +767,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -781,6 +797,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -810,6 +827,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -869,6 +887,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -902,6 +921,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -950,6 +970,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -981,6 +1002,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -1019,6 +1041,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -1051,6 +1074,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -1090,6 +1114,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -1127,6 +1152,7 @@ class AuthRoutesTest {
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }
@@ -1151,7 +1177,7 @@ class AuthRoutesTest {
     fun `POST register returns 429 when rate limited`() =
         testApplication {
             resetFixtures()
-            val tightRegisterLimiter = RateLimiter(maxRequests = 1, windowSeconds = 60)
+            val tightRegisterLimiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
 
             application {
                 install(ContentNegotiation) { json() }
@@ -1164,6 +1190,7 @@ class AuthRoutesTest {
                         registerRateLimiter = tightRegisterLimiter,
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
+                        encryptionService = encryptionService,
                     )
                 }
             }

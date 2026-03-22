@@ -3,7 +3,7 @@ package com.kauth.domain.port
 import com.kauth.domain.model.Tenant
 
 /**
- * Port for password policy enforcement (Phase 3c).
+ * Port for password policy enforcement.
  *
  * Provides validation against tenant-configured password policies including
  * complexity requirements, history checks, and blacklist lookups.

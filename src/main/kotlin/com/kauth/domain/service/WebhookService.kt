@@ -20,7 +20,7 @@ import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 /**
- * Webhook delivery service — Phase 4.
+ * Webhook delivery service.
  *
  * Responsibilities:
  *   1. Fan out an event to all enabled, subscribed endpoints for a tenant.

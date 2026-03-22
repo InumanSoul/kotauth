@@ -8,7 +8,7 @@ import org.postgresql.util.PGobject
  * Exposed ORM mapping for the 'clients' and 'client_redirect_uris' tables
  * created by V2 migration.
  *
- * Full client CRUD will be wired up in the admin console (Phase 1).
+ * Full client CRUD is wired up in the admin console.
  * Defined here so the schema is represented in code alongside the SQL.
  */
 object ClientsTable : Table("clients") {

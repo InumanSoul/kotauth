@@ -21,6 +21,7 @@ fun Route.welcomeRoutes(
     appInfo: AppInfo,
     startTime: Long,
     isDevelopment: Boolean,
+    encryptionAvailable: Boolean,
 ) {
     get("/") {
         val uptimeSeconds = (System.currentTimeMillis() - startTime) / 1000
@@ -28,7 +29,7 @@ fun Route.welcomeRoutes(
         val health =
             if (isDevelopment) {
                 val db = pingDatabase()
-                val config = checkConfig(baseUrl)
+                val config = checkConfig(baseUrl, encryptionAvailable)
                 WelcomeView.HealthInfo(
                     dbStatus = db.status,
                     dbLatencyMs = db.latencyMs,

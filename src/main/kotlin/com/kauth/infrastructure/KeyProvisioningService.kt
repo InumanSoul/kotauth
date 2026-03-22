@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
  *
  * Key ID format: "{tenantSlug}-{timestamp}" — human-readable, unique, traceable.
  *
- * This is a one-time provisioning step. Key rotation in Phase 3 will be a
+ * This is a one-time provisioning step. Key rotation will be a
  * deliberate admin action (not automatic startup behaviour).
  */
 class KeyProvisioningService(

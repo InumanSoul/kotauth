@@ -44,7 +44,7 @@ interface SessionRepository {
 
     /**
      * Counts active (non-revoked, non-expired) sessions for a user within a tenant.
-     * Phase 3b: used to enforce [Tenant.maxConcurrentSessions].
+     * Used to enforce [Tenant.maxConcurrentSessions].
      */
     fun countActiveByUser(
         tenantId: Int,
@@ -53,7 +53,7 @@ interface SessionRepository {
 
     /**
      * Revokes the oldest sessions for a user, keeping only [keepNewest] active.
-     * Phase 3b: called after login when the session count exceeds the tenant limit.
+     * Called after login when the session count exceeds the tenant limit.
      */
     fun revokeOldestForUser(
         tenantId: Int,

@@ -10,7 +10,7 @@ import java.time.Instant
 import java.util.Base64
 
 /**
- * Domain service — API key lifecycle management (Phase 3a).
+ * Domain service — API key lifecycle management.
  *
  * Responsibilities:
  *   - Generate new keys (raw value returned once, hash stored)

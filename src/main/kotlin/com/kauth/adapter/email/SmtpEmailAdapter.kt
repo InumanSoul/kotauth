@@ -26,7 +26,7 @@ import javax.mail.internet.MimeMultipart
  * These two modes are mutually exclusive. Conflating them is the most common JavaMail mistake.
  *
  * Emails use plain HTML with no template engine — workspace name only, no theme colors.
- * This is a deliberate KISS choice for Phase 3b. A templating engine can be added in Phase 5.
+ * This is a deliberate KISS choice to keep the implementation simple.
  *
  * The caller ([UserSelfServiceService]) is responsible for checking [Tenant.isSmtpReady]
  * before calling this adapter. If SMTP is not configured, this adapter will throw.

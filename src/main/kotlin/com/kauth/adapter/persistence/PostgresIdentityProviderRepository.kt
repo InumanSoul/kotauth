@@ -18,7 +18,9 @@ import java.time.ZoneOffset
  * If KAUTH_SECRET_KEY is not set, save() will throw IllegalStateException — this
  * is intentional: social login cannot be configured without encryption being available.
  */
-class PostgresIdentityProviderRepository : IdentityProviderRepository {
+class PostgresIdentityProviderRepository(
+    private val encryptionService: EncryptionService,
+) : IdentityProviderRepository {
     override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> =
         transaction {
             IdentityProvidersTable
@@ -51,7 +53,7 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
 
     override fun save(provider: IdentityProvider): IdentityProvider =
         transaction {
-            val encryptedSecret = EncryptionService.encrypt(provider.clientSecret)
+            val encryptedSecret = encryptionService.encrypt(provider.clientSecret)
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             val insertedId =
                 IdentityProvidersTable.insert {
@@ -73,7 +75,7 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
 
     override fun update(provider: IdentityProvider): IdentityProvider =
         transaction {
-            val encryptedSecret = EncryptionService.encrypt(provider.clientSecret)
+            val encryptedSecret = encryptionService.encrypt(provider.clientSecret)
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             IdentityProvidersTable.update({
                 (IdentityProvidersTable.tenantId eq provider.tenantId) and
@@ -107,7 +109,7 @@ class PostgresIdentityProviderRepository : IdentityProviderRepository {
             SocialProvider.fromValueOrNull(this[IdentityProvidersTable.provider])
                 ?: return null
         val decryptedSecret =
-            EncryptionService.decrypt(this[IdentityProvidersTable.clientSecret])
+            encryptionService.decrypt(this[IdentityProvidersTable.clientSecret])
                 ?: return null // cannot decrypt — encryption key may have changed; skip silently
         return IdentityProvider(
             id = this[IdentityProvidersTable.id],

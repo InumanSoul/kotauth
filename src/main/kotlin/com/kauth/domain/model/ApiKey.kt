@@ -3,7 +3,7 @@ package com.kauth.domain.model
 import java.time.Instant
 
 /**
- * Represents a machine-to-machine API key for REST API access (Phase 3a).
+ * Represents a machine-to-machine API key for REST API access.
  *
  * The raw key value is NEVER stored here — only the prefix (for display) and the
  * SHA-256 hash (for verification). The plaintext is generated once by [ApiKeyService]

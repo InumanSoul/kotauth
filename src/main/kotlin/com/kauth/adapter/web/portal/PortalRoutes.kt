@@ -26,7 +26,7 @@ import java.security.SecureRandom
 import java.util.Base64
 
 /**
- * Self-service portal routes — Phase 4 (OAuth-backed login).
+ * Self-service portal routes.
  *
  * URL structure under /t/{slug}/account/:
  *   GET  /login            — initiates OAuth Authorization Code + PKCE flow
@@ -58,8 +58,9 @@ fun Route.portalRoutes(
     selfServiceService: UserSelfServiceService,
     tenantRepository: TenantRepository,
     mfaService: MfaService? = null,
-    oauthService: OAuthService? = null, // Phase 4: required for callback exchange
-    baseUrl: String = "", // Phase 4: base URL for redirect URI construction
+    oauthService: OAuthService? = null,
+    baseUrl: String = "",
+    encryptionService: EncryptionService,
 ) {
     route("/t/{slug}/account") {
         // ------------------------------------------------------------------
@@ -86,7 +87,7 @@ fun Route.portalRoutes(
 
             // Store the verifier in a short-lived signed cookie (5 min) to survive
             // the round-trip through the auth server
-            val cookieVal = EncryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}")
+            val cookieVal = encryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}")
             call.response.cookies.append(
                 name = "KOTAUTH_PORTAL_PKCE",
                 value = cookieVal,
@@ -133,7 +134,7 @@ fun Route.portalRoutes(
                     "/t/$slug/account/login?error=${encodeParam("Session expired. Please try again.")}",
                 )
             }
-            val pkcePayload = EncryptionService.verifyCookie(rawPkce)
+            val pkcePayload = encryptionService.verifyCookie(rawPkce)
             if (pkcePayload == null) {
                 return@get call.respondRedirect(
                     "/t/$slug/account/login?error=${encodeParam("Invalid session. Please try again.")}",
@@ -344,7 +345,7 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
-        // MFA management page — Phase 3c
+        // MFA management page
         // ------------------------------------------------------------------
 
         get("/mfa") {
@@ -373,7 +374,7 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
-        // MFA self-service — Phase 3c (JSON API, consumed by portal UI)
+        // MFA self-service (JSON API, consumed by portal UI)
         // ------------------------------------------------------------------
 
         // POST /t/{slug}/account/mfa/enroll — start TOTP enrollment

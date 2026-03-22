@@ -34,6 +34,7 @@ class DemoBannerRoutesTest {
                         appInfo = testAppInfo(),
                         startTime = System.currentTimeMillis(),
                         isDevelopment = false,
+                        encryptionAvailable = true,
                     )
                 }
             }
@@ -58,6 +59,7 @@ class DemoBannerRoutesTest {
                         appInfo = testAppInfo(),
                         startTime = System.currentTimeMillis(),
                         isDevelopment = false,
+                        encryptionAvailable = true,
                     )
                 }
             }
@@ -80,6 +82,7 @@ class DemoBannerRoutesTest {
                         appInfo = testAppInfo(),
                         startTime = System.currentTimeMillis(),
                         isDevelopment = false,
+                        encryptionAvailable = true,
                     )
                 }
             }

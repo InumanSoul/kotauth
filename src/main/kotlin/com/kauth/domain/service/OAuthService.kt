@@ -23,7 +23,7 @@ import java.util.Base64
 /**
  * OAuth 2.0 / OIDC use cases — tenant-scoped.
  *
- * Implements the four core flows for Phase 2:
+ * Implements the four core flows:
  *   1. Authorization Code Flow + PKCE
  *   2. Client Credentials Flow (M2M)
  *   3. Refresh Token Flow with rotation
@@ -46,7 +46,7 @@ class OAuthService(
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val roleRepository: RoleRepository? = null, // Phase 3c — nullable for backward compat
+    private val roleRepository: RoleRepository? = null,
 ) {
     // -------------------------------------------------------------------------
     // Authorization Code Flow — Step 1: validate request, issue code
@@ -224,7 +224,7 @@ class OAuthService(
 
         val scopes = authCode.scopes.split(" ").filter { it.isNotBlank() }
 
-        // Phase 3c: resolve effective roles for the user
+        // Resolve effective roles for the user
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
 
         val tokenResponse =
@@ -410,7 +410,7 @@ class OAuthService(
 
         val scopes = session.scopes.split(" ").filter { it.isNotBlank() }
 
-        // Phase 3c: resolve effective roles for refresh
+        // Resolve effective roles for refresh
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
 
         val newTokens =

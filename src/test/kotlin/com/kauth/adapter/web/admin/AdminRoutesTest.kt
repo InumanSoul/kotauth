@@ -21,6 +21,7 @@ import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -79,6 +80,7 @@ class AdminRoutesTest {
         )
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
+    private val encryptionService = EncryptionService("test-secret-key")
 
     private fun buildAuthService() =
         AuthService(
@@ -151,12 +153,12 @@ class AdminRoutesTest {
         }
 
     @Test
-    fun `GET admin settings redirects to login when unauthenticated`() =
+    fun `GET admin workspaces redirects to login when unauthenticated`() =
         testApplication {
             application { installTestApp() }
 
             val noFollow = createClient { followRedirects = false }
-            val response = noFollow.get("/admin/settings")
+            val response = noFollow.get("/admin/workspaces")
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
@@ -287,6 +289,7 @@ class AdminRoutesTest {
                 sessionRepository = sessionRepo,
                 auditLogRepository = auditLogRepo,
                 keyProvisioningService = keyProvisioningService,
+                encryptionService = encryptionService,
             )
         }
     }

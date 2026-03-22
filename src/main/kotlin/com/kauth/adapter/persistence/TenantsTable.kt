@@ -18,7 +18,6 @@ object TenantsTable : Table("tenants") {
     val passwordPolicyMinLength = integer("password_policy_min_length").default(8)
     val passwordPolicyRequireSpecial = bool("password_policy_require_special").default(false)
 
-    // Phase 3c: expanded password policy columns (V13 migration)
     val passwordPolicyHistoryCount = integer("password_policy_history_count").default(0)
     val passwordPolicyMaxAgeDays = integer("password_policy_max_age_days").default(0)
     val passwordPolicyRequireUppercase = bool("password_policy_require_uppercase").default(false)
@@ -39,7 +38,7 @@ object TenantsTable : Table("tenants") {
     val themeLogoUrl = varchar("theme_logo_url", 500).nullable()
     val themeFaviconUrl = varchar("theme_favicon_url", 500).nullable()
 
-    // SMTP columns — added by V9 migration (Phase 3b)
+    // SMTP columns
     // smtp_password stores AES-256-GCM encrypted ciphertext (see EncryptionService)
     val smtpHost = varchar("smtp_host", 255).nullable()
     val smtpPort = integer("smtp_port").default(587)
@@ -51,7 +50,7 @@ object TenantsTable : Table("tenants") {
     val smtpEnabled = bool("smtp_enabled").default(false)
     val maxConcurrentSessions = integer("max_concurrent_sessions").nullable()
 
-    // Phase 3c: MFA policy — 'optional', 'required', 'required_admins'
+    // MFA policy — 'optional', 'required', 'required_admins'
     val mfaPolicy = varchar("mfa_policy", 20).default("optional")
 
     override val primaryKey = PrimaryKey(id)

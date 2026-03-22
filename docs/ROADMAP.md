@@ -1,7 +1,7 @@
 # Kotauth — Product Roadmap
 
 > Last updated: 2026-03-21
-> Status: V1.0.3 — Phases 0–5 shipped
+> Status: V1.1.0
 
 ---
 

@@ -53,22 +53,18 @@ enum class AuditEventType {
     ADMIN_USER_DISABLED,
     ADMIN_SESSION_REVOKED,
 
-    // Phase 3b — email flows
     EMAIL_VERIFICATION_SENT,
     EMAIL_VERIFIED,
     PASSWORD_RESET_REQUESTED,
     PASSWORD_RESET_COMPLETED,
 
-    // Phase 3b — self-service portal
     USER_PROFILE_UPDATED,
     USER_PASSWORD_CHANGED,
     USER_SESSION_REVOKED_SELF,
 
-    // Phase 3b — admin-initiated
     ADMIN_USER_PASSWORD_RESET,
     ADMIN_SMTP_UPDATED,
 
-    // Phase 3c — roles & groups
     ADMIN_ROLE_CREATED,
     ADMIN_ROLE_UPDATED,
     ADMIN_ROLE_DELETED,
@@ -82,7 +78,6 @@ enum class AuditEventType {
     ADMIN_GROUP_MEMBER_ADDED,
     ADMIN_GROUP_MEMBER_REMOVED,
 
-    // Phase 3c — MFA / TOTP
     MFA_ENROLLMENT_STARTED,
     MFA_ENROLLMENT_VERIFIED,
     MFA_CHALLENGE_SUCCESS,

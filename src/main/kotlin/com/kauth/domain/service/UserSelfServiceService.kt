@@ -22,7 +22,7 @@ import java.time.Instant
 import java.util.Base64
 
 /**
- * Domain service — user self-service use cases (Phase 3b).
+ * Domain service — user self-service use cases.
  *
  * Handles everything a logged-in user can do on their own account:
  *   - Email verification (initiate + confirm)
@@ -49,7 +49,7 @@ class UserSelfServiceService(
     private val evTokenRepo: EmailVerificationTokenRepository,
     private val prTokenRepo: PasswordResetTokenRepository,
     private val emailPort: EmailPort,
-    private val passwordPolicy: PasswordPolicyPort? = null, // Phase 3c
+    private val passwordPolicy: PasswordPolicyPort? = null,
 ) {
     private val log = LoggerFactory.getLogger(UserSelfServiceService::class.java)
 
