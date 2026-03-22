@@ -153,12 +153,12 @@ class AdminRoutesTest {
         }
 
     @Test
-    fun `GET admin settings redirects to login when unauthenticated`() =
+    fun `GET admin workspaces redirects to login when unauthenticated`() =
         testApplication {
             application { installTestApp() }
 
             val noFollow = createClient { followRedirects = false }
-            val response = noFollow.get("/admin/settings")
+            val response = noFollow.get("/admin/workspaces")
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
