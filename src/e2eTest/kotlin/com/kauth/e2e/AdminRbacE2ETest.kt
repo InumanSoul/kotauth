@@ -133,9 +133,10 @@ class AdminRbacE2ETest : E2ETestBase() {
     fun `audit log page does not show value class toString`() {
         loginAsAdmin()
 
-        navigateSafe("$baseUrl/admin/workspaces/master/audit")
+        navigateSafe("$baseUrl/admin/workspaces/master/logs")
         val content = page.content()
 
+        assertTrue(content.contains("Audit") || content.contains("Log"), "Must reach the audit log page")
         assertTrue(!content.contains("UserId(value="), "Must not show UserId toString")
         assertTrue(!content.contains("ApplicationId(value="), "Must not show ApplicationId toString")
     }
