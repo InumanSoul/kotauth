@@ -3,8 +3,8 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
+import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.MfaRepository
-import com.kauth.infrastructure.EncryptionService
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -19,7 +19,7 @@ import java.time.ZoneOffset
  * application warns about this at startup (see Application.kt).
  */
 class PostgresMfaRepository(
-    private val encryptionService: EncryptionService,
+    private val encryptionService: EncryptionPort,
 ) : MfaRepository {
     // -----------------------------------------------------------------------
     // Enrollments

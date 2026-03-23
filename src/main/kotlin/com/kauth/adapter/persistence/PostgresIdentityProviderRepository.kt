@@ -2,8 +2,8 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.IdentityProviderRepository
-import com.kauth.infrastructure.EncryptionService
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -19,7 +19,7 @@ import java.time.ZoneOffset
  * is intentional: social login cannot be configured without encryption being available.
  */
 class PostgresIdentityProviderRepository(
-    private val encryptionService: EncryptionService,
+    private val encryptionService: EncryptionPort,
 ) : IdentityProviderRepository {
     override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> =
         transaction {
