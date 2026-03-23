@@ -27,13 +27,12 @@ import javax.crypto.spec.SecretKeySpec
  * Cookie signing format: "{value}.{base64url(hmac)}"
  * Verification strips the signature, recomputes it, and compares in constant time.
  *
- * NOTE: A future follow-up will extract an EncryptionPort interface in the
- * domain layer so persistence adapters depend on an abstraction rather than
- * this concrete class. See KOTLIN_ADVANTAGE_ROADMAP.md for details.
+ * Persistence adapters depend on [com.kauth.domain.port.EncryptionPort] (encrypt/decrypt/isAvailable).
+ * Web adapters depend on the concrete class for cookie signing (signCookie/verifyCookie).
  */
 class EncryptionService(
     rawSecretKey: String?,
-) {
+) : com.kauth.domain.port.EncryptionPort {
     private val secretKey: SecretKeySpec? =
         if (rawSecretKey.isNullOrBlank()) {
             null
@@ -57,14 +56,14 @@ class EncryptionService(
             ByteArray(32).also { SecureRandom().nextBytes(it) }
         }
 
-    val isAvailable: Boolean get() = secretKey != null
+    override val isAvailable: Boolean get() = secretKey != null
 
     /**
      * Encrypts [plaintext] using AES-256-GCM.
      * Returns a base64-encoded "iv.ciphertext" string suitable for DB storage.
      * Throws [IllegalStateException] if no secret key was provided.
      */
-    fun encrypt(plaintext: String): String {
+    override fun encrypt(plaintext: String): String {
         val key =
             secretKey ?: error(
                 "KAUTH_SECRET_KEY env var is not set. Cannot encrypt SMTP password.",
@@ -83,7 +82,7 @@ class EncryptionService(
      * Decrypts an encrypted value produced by [encrypt].
      * Returns null if decryption fails (wrong key, tampered data, or missing secret key).
      */
-    fun decrypt(encrypted: String): String? {
+    override fun decrypt(encrypted: String): String? {
         val key = secretKey ?: return null
         return try {
             val parts = encrypted.split(".")

@@ -2,8 +2,8 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantRepository
-import com.kauth.infrastructure.EncryptionService
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -17,12 +17,12 @@ import org.jetbrains.exposed.sql.update
  * A simple in-process cache keyed by slug would be a worthwhile optimisation
  * once traffic warrants it — the port interface makes that swap transparent.
  *
- * SMTP password is encrypted/decrypted transparently using [EncryptionService].
- * If [EncryptionService] is unavailable (KAUTH_SECRET_KEY not set), the password field
+ * SMTP password is encrypted/decrypted transparently using [EncryptionPort].
+ * If encryption is unavailable (KAUTH_SECRET_KEY not set), the password field
  * is stored as null and SMTP config will not function.
  */
 class PostgresTenantRepository(
-    private val encryptionService: EncryptionService,
+    private val encryptionService: EncryptionPort,
 ) : TenantRepository {
     override fun findBySlug(slug: String): Tenant? =
         transaction {
