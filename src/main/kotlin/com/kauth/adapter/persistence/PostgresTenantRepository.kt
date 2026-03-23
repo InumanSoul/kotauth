@@ -1,6 +1,7 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantRepository
@@ -49,11 +50,11 @@ class PostgresTenantRepository(
                 .map { it.toTenant() }
         }
 
-    override fun findById(id: Int): Tenant? =
+    override fun findById(id: TenantId): Tenant? =
         transaction {
             TenantsTable
                 .selectAll()
-                .where { TenantsTable.id eq id }
+                .where { TenantsTable.id eq id.value }
                 .map { it.toTenant() }
                 .singleOrNull()
         }
@@ -66,7 +67,7 @@ class PostgresTenantRepository(
                     if (encryptionService.isAvailable) encryptionService.encrypt(raw) else null
                 }
 
-            TenantsTable.update({ TenantsTable.id eq tenant.id }) {
+            TenantsTable.update({ TenantsTable.id eq tenant.id.value }) {
                 it[displayName] = tenant.displayName
                 it[issuerUrl] = tenant.issuerUrl
                 it[tokenExpirySeconds] = tenant.tokenExpirySeconds.toInt()
@@ -104,7 +105,7 @@ class PostgresTenantRepository(
             }
             TenantsTable
                 .selectAll()
-                .where { TenantsTable.id eq tenant.id }
+                .where { TenantsTable.id eq tenant.id.value }
                 .single()
                 .toTenant()
         }
@@ -135,7 +136,7 @@ class PostgresTenantRepository(
         val decryptedPw = encryptedPw?.let { encryptionService.decrypt(it) }
 
         return Tenant(
-            id = this[TenantsTable.id],
+            id = TenantId(this[TenantsTable.id]),
             slug = this[TenantsTable.slug],
             displayName = this[TenantsTable.displayName],
             issuerUrl = this[TenantsTable.issuerUrl],

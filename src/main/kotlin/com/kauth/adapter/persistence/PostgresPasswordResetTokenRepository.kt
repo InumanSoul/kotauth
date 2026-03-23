@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.PasswordResetTokenRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -18,8 +20,8 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
         transaction {
             val insertedId =
                 PasswordResetTokensTable.insert {
-                    it[userId] = token.userId
-                    it[tenantId] = token.tenantId
+                    it[userId] = token.userId.value
+                    it[tenantId] = token.tenantId.value
                     it[tokenHash] = token.tokenHash
                     it[expiresAt] = token.expiresAt.toOffsetDateTime()
                     it[ipAddress] = token.ipAddress
@@ -48,10 +50,10 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
         Unit
     }
 
-    override fun deleteByUser(userId: Int) =
+    override fun deleteByUser(userId: UserId) =
         transaction {
             PasswordResetTokensTable.deleteWhere {
-                PasswordResetTokensTable.userId eq userId
+                PasswordResetTokensTable.userId eq userId.value
             }
             Unit
         }
@@ -59,8 +61,8 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
     private fun ResultRow.toToken() =
         PasswordResetToken(
             id = this[PasswordResetTokensTable.id],
-            userId = this[PasswordResetTokensTable.userId],
-            tenantId = this[PasswordResetTokensTable.tenantId],
+            userId = UserId(this[PasswordResetTokensTable.userId]),
+            tenantId = TenantId(this[PasswordResetTokensTable.tenantId]),
             tokenHash = this[PasswordResetTokensTable.tokenHash],
             expiresAt = this[PasswordResetTokensTable.expiresAt].toInstant(),
             usedAt = this[PasswordResetTokensTable.usedAt]?.toInstant(),

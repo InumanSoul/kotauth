@@ -2,10 +2,15 @@ package com.kauth.infrastructure
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -321,8 +326,8 @@ class DemoSeedService(
     // ── Audit log entries ────────────────────────────────────────────────
 
     private fun seedAuditEntries(
-        tenantId: Int,
-        userIds: List<Int>,
+        tenantId: TenantId,
+        userIds: List<UserId>,
     ) {
         val now = Instant.now()
         val events =
@@ -364,7 +369,7 @@ class DemoSeedService(
     // ── Helpers ──────────────────────────────────────────────────────────
 
     private fun saveUser(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
         email: String,
         fullName: String,
@@ -383,8 +388,8 @@ class DemoSeedService(
         )
 
     private fun assignRole(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         roleName: String,
     ) {
         roleRepository.findByName(tenantId, roleName, RoleScope.TENANT)?.let { role ->
@@ -393,8 +398,8 @@ class DemoSeedService(
     }
 
     private fun assignGroupRole(
-        tenantId: Int,
-        groupId: Int,
+        tenantId: TenantId,
+        groupId: GroupId,
         roleName: String,
     ) {
         roleRepository.findByName(tenantId, roleName, RoleScope.TENANT)?.let { role ->
@@ -402,7 +407,7 @@ class DemoSeedService(
         }
     }
 
-    private fun extractGroupId(result: AdminResult<Group>): Int? =
+    private fun extractGroupId(result: AdminResult<Group>): GroupId? =
         when (result) {
             is AdminResult.Success -> result.value.id
             is AdminResult.Failure -> {
@@ -412,8 +417,8 @@ class DemoSeedService(
         }
 
     private data class SeedResult(
-        val tenantId: Int,
-        val userIds: List<Int>,
+        val tenantId: TenantId,
+        val userIds: List<UserId>,
         val appCount: Int,
         val roleCount: Int,
         val groupCount: Int,

@@ -1,7 +1,10 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -13,9 +16,9 @@ import org.jetbrains.exposed.sql.transactions.transaction
  */
 class PostgresAuditLogRepository : AuditLogRepository {
     override fun findByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType?,
-        userId: Int?,
+        userId: UserId?,
         limit: Int,
         offset: Int,
     ): List<AuditEvent> =
@@ -23,9 +26,9 @@ class PostgresAuditLogRepository : AuditLogRepository {
             val query =
                 AuditLogTable
                     .selectAll()
-                    .where { AuditLogTable.tenantId eq tenantId }
+                    .where { AuditLogTable.tenantId eq tenantId.value }
             if (eventType != null) query.andWhere { AuditLogTable.eventType eq eventType.name }
-            if (userId != null) query.andWhere { AuditLogTable.userId eq userId }
+            if (userId != null) query.andWhere { AuditLogTable.userId eq userId.value }
             query
                 .orderBy(AuditLogTable.createdAt, SortOrder.DESC)
                 .limit(limit, offset.toLong())
@@ -33,25 +36,25 @@ class PostgresAuditLogRepository : AuditLogRepository {
         }
 
     override fun countByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType?,
-        userId: Int?,
+        userId: UserId?,
     ): Long =
         transaction {
             val query =
                 AuditLogTable
                     .selectAll()
-                    .where { AuditLogTable.tenantId eq tenantId }
+                    .where { AuditLogTable.tenantId eq tenantId.value }
             if (eventType != null) query.andWhere { AuditLogTable.eventType eq eventType.name }
-            if (userId != null) query.andWhere { AuditLogTable.userId eq userId }
+            if (userId != null) query.andWhere { AuditLogTable.userId eq userId.value }
             query.count()
         }
 
     private fun ResultRow.toAuditEvent(): AuditEvent =
         AuditEvent(
-            tenantId = this[AuditLogTable.tenantId],
-            userId = this[AuditLogTable.userId],
-            clientId = this[AuditLogTable.clientId],
+            tenantId = this[AuditLogTable.tenantId]?.let { TenantId(it) },
+            userId = this[AuditLogTable.userId]?.let { UserId(it) },
+            clientId = this[AuditLogTable.clientId]?.let { ApplicationId(it) },
             eventType =
                 runCatching { AuditEventType.valueOf(this[AuditLogTable.eventType]) }
                     .getOrDefault(AuditEventType.LOGIN_SUCCESS),

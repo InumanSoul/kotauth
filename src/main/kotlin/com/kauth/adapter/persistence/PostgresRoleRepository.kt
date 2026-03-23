@@ -1,7 +1,12 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.Role
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RoleRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -21,52 +26,52 @@ class PostgresRoleRepository : RoleRepository {
     // CRUD
     // -------------------------------------------------------------------------
 
-    override fun findById(id: Int): Role? =
+    override fun findById(id: RoleId): Role? =
         transaction {
             RolesTable
                 .selectAll()
-                .where { RolesTable.id eq id }
+                .where { RolesTable.id eq id.value }
                 .firstOrNull()
                 ?.toRole()
         }
 
     override fun findByName(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         scope: RoleScope,
-        clientId: Int?,
+        clientId: ApplicationId?,
     ): Role? =
         transaction {
             RolesTable
                 .selectAll()
                 .where {
-                    (RolesTable.tenantId eq tenantId) and
+                    (RolesTable.tenantId eq tenantId.value) and
                         (RolesTable.name eq name) and
                         (RolesTable.scope eq scope.value) and
-                        if (clientId != null) (RolesTable.clientId eq clientId) else (RolesTable.clientId.isNull())
+                        if (clientId != null) (RolesTable.clientId eq clientId.value) else (RolesTable.clientId.isNull())
                 }.firstOrNull()
                 ?.toRole()
         }
 
-    override fun findByTenantId(tenantId: Int): List<Role> =
+    override fun findByTenantId(tenantId: TenantId): List<Role> =
         transaction {
             RolesTable
                 .selectAll()
-                .where { RolesTable.tenantId eq tenantId }
+                .where { RolesTable.tenantId eq tenantId.value }
                 .orderBy(RolesTable.name)
                 .map { it.toRole() }
         }
 
     override fun findByClientId(
-        tenantId: Int,
-        clientId: Int,
+        tenantId: TenantId,
+        clientId: ApplicationId,
     ): List<Role> =
         transaction {
             RolesTable
                 .selectAll()
                 .where {
-                    (RolesTable.tenantId eq tenantId) and
-                        (RolesTable.clientId eq clientId) and
+                    (RolesTable.tenantId eq tenantId.value) and
+                        (RolesTable.clientId eq clientId.value) and
                         (RolesTable.scope eq RoleScope.CLIENT.value)
                 }.orderBy(RolesTable.name)
                 .map { it.toRole() }
@@ -76,30 +81,30 @@ class PostgresRoleRepository : RoleRepository {
         transaction {
             val id =
                 RolesTable.insert {
-                    it[tenantId] = role.tenantId
+                    it[tenantId] = role.tenantId.value
                     it[name] = role.name
                     it[description] = role.description
                     it[scope] = role.scope.value
-                    it[clientId] = role.clientId
+                    it[clientId] = role.clientId?.value
                     it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
                 } get RolesTable.id
 
-            role.copy(id = id)
+            role.copy(id = RoleId(id))
         }
 
     override fun update(role: Role): Role =
         transaction {
-            RolesTable.update({ RolesTable.id eq role.id!! }) {
+            RolesTable.update({ RolesTable.id eq role.id!!.value }) {
                 it[name] = role.name
                 it[description] = role.description
             }
             role
         }
 
-    override fun delete(roleId: Int): Unit =
+    override fun delete(roleId: RoleId): Unit =
         transaction {
             // Cascade handles composite_role_mappings, user_roles, group_roles via FK
-            RolesTable.deleteWhere { id eq roleId }
+            RolesTable.deleteWhere { id eq roleId.value }
         }
 
     // -------------------------------------------------------------------------
@@ -107,33 +112,33 @@ class PostgresRoleRepository : RoleRepository {
     // -------------------------------------------------------------------------
 
     override fun addChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     ): Unit =
         transaction {
             CompositeRoleMappingsTable.insert {
-                it[this.parentRoleId] = parentRoleId
-                it[this.childRoleId] = childRoleId
+                it[this.parentRoleId] = parentRoleId.value
+                it[this.childRoleId] = childRoleId.value
             }
         }
 
     override fun removeChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     ): Unit =
         transaction {
             CompositeRoleMappingsTable.deleteWhere {
-                (CompositeRoleMappingsTable.parentRoleId eq parentRoleId) and
-                    (CompositeRoleMappingsTable.childRoleId eq childRoleId)
+                (CompositeRoleMappingsTable.parentRoleId eq parentRoleId.value) and
+                    (CompositeRoleMappingsTable.childRoleId eq childRoleId.value)
             }
         }
 
-    override fun findChildRoleIds(roleId: Int): List<Int> =
+    override fun findChildRoleIds(roleId: RoleId): List<RoleId> =
         transaction {
             CompositeRoleMappingsTable
                 .selectAll()
-                .where { CompositeRoleMappingsTable.parentRoleId eq roleId }
-                .map { it[CompositeRoleMappingsTable.childRoleId] }
+                .where { CompositeRoleMappingsTable.parentRoleId eq roleId.value }
+                .map { RoleId(it[CompositeRoleMappingsTable.childRoleId]) }
         }
 
     // -------------------------------------------------------------------------
@@ -141,41 +146,41 @@ class PostgresRoleRepository : RoleRepository {
     // -------------------------------------------------------------------------
 
     override fun assignRoleToUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     ): Unit =
         transaction {
             UserRolesTable.insert {
-                it[this.userId] = userId
-                it[this.roleId] = roleId
+                it[this.userId] = userId.value
+                it[this.roleId] = roleId.value
                 it[this.assignedAt] = OffsetDateTime.now(ZoneOffset.UTC)
             }
         }
 
     override fun unassignRoleFromUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     ): Unit =
         transaction {
             UserRolesTable.deleteWhere {
-                (UserRolesTable.userId eq userId) and (UserRolesTable.roleId eq roleId)
+                (UserRolesTable.userId eq userId.value) and (UserRolesTable.roleId eq roleId.value)
             }
         }
 
-    override fun findRolesForUser(userId: Int): List<Role> =
+    override fun findRolesForUser(userId: UserId): List<Role> =
         transaction {
             (UserRolesTable innerJoin RolesTable)
                 .selectAll()
-                .where { UserRolesTable.userId eq userId }
+                .where { UserRolesTable.userId eq userId.value }
                 .map { it.toRole() }
         }
 
-    override fun findUserIdsForRole(roleId: Int): List<Int> =
+    override fun findUserIdsForRole(roleId: RoleId): List<UserId> =
         transaction {
             UserRolesTable
                 .selectAll()
-                .where { UserRolesTable.roleId eq roleId }
-                .map { it[UserRolesTable.userId] }
+                .where { UserRolesTable.roleId eq roleId.value }
+                .map { UserId(it[UserRolesTable.userId]) }
         }
 
     // -------------------------------------------------------------------------
@@ -183,15 +188,15 @@ class PostgresRoleRepository : RoleRepository {
     // -------------------------------------------------------------------------
 
     override fun resolveEffectiveRoles(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
     ): List<Role> =
         transaction {
             // Step 1: direct user roles
             val directRoleIds =
                 UserRolesTable
                     .selectAll()
-                    .where { UserRolesTable.userId eq userId }
+                    .where { UserRolesTable.userId eq userId.value }
                     .map { it[UserRolesTable.roleId] }
                     .toMutableSet()
 
@@ -199,7 +204,7 @@ class PostgresRoleRepository : RoleRepository {
             val userGroupIds =
                 UserGroupsTable
                     .selectAll()
-                    .where { UserGroupsTable.userId eq userId }
+                    .where { UserGroupsTable.userId eq userId.value }
                     .map { it[UserGroupsTable.groupId] }
 
             val allGroupIds = mutableSetOf<Int>()
@@ -225,7 +230,7 @@ class PostgresRoleRepository : RoleRepository {
 
             RolesTable
                 .selectAll()
-                .where { (RolesTable.id inList expandedRoleIds) and (RolesTable.tenantId eq tenantId) }
+                .where { (RolesTable.id inList expandedRoleIds) and (RolesTable.tenantId eq tenantId.value) }
                 .map { it.toRole() }
         }
 
@@ -285,17 +290,17 @@ class PostgresRoleRepository : RoleRepository {
     private fun ResultRow.toRole(): Role {
         val roleId = this[RolesTable.id]
         return Role(
-            id = roleId,
-            tenantId = this[RolesTable.tenantId],
+            id = RoleId(roleId),
+            tenantId = TenantId(this[RolesTable.tenantId]),
             name = this[RolesTable.name],
             description = this[RolesTable.description],
             scope = RoleScope.fromValue(this[RolesTable.scope]),
-            clientId = this[RolesTable.clientId],
+            clientId = this[RolesTable.clientId]?.let { ApplicationId(it) },
             childRoleIds =
                 CompositeRoleMappingsTable
                     .selectAll()
                     .where { CompositeRoleMappingsTable.parentRoleId eq roleId }
-                    .map { it[CompositeRoleMappingsTable.childRoleId] },
+                    .map { RoleId(it[CompositeRoleMappingsTable.childRoleId]) },
             createdAt = this[RolesTable.createdAt].toInstant(),
         )
     }

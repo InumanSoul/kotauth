@@ -2,6 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.IdentityProviderRepository
 import org.jetbrains.exposed.sql.*
@@ -21,31 +22,31 @@ import java.time.ZoneOffset
 class PostgresIdentityProviderRepository(
     private val encryptionService: EncryptionPort,
 ) : IdentityProviderRepository {
-    override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> =
+    override fun findEnabledByTenant(tenantId: TenantId): List<IdentityProvider> =
         transaction {
             IdentityProvidersTable
                 .selectAll()
-                .where { (IdentityProvidersTable.tenantId eq tenantId) and (IdentityProvidersTable.enabled eq true) }
+                .where { (IdentityProvidersTable.tenantId eq tenantId.value) and (IdentityProvidersTable.enabled eq true) }
                 .mapNotNull { it.toIdentityProvider() }
         }
 
-    override fun findAllByTenant(tenantId: Int): List<IdentityProvider> =
+    override fun findAllByTenant(tenantId: TenantId): List<IdentityProvider> =
         transaction {
             IdentityProvidersTable
                 .selectAll()
-                .where { IdentityProvidersTable.tenantId eq tenantId }
+                .where { IdentityProvidersTable.tenantId eq tenantId.value }
                 .mapNotNull { it.toIdentityProvider() }
         }
 
     override fun findByTenantAndProvider(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     ): IdentityProvider? =
         transaction {
             IdentityProvidersTable
                 .selectAll()
                 .where {
-                    (IdentityProvidersTable.tenantId eq tenantId) and
+                    (IdentityProvidersTable.tenantId eq tenantId.value) and
                         (IdentityProvidersTable.provider eq provider.value)
                 }.singleOrNull()
                 ?.toIdentityProvider()
@@ -57,7 +58,7 @@ class PostgresIdentityProviderRepository(
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             val insertedId =
                 IdentityProvidersTable.insert {
-                    it[tenantId] = provider.tenantId
+                    it[tenantId] = provider.tenantId.value
                     it[IdentityProvidersTable.provider] = provider.provider.value
                     it[clientId] = provider.clientId
                     it[clientSecret] = encryptedSecret
@@ -78,7 +79,7 @@ class PostgresIdentityProviderRepository(
             val encryptedSecret = encryptionService.encrypt(provider.clientSecret)
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             IdentityProvidersTable.update({
-                (IdentityProvidersTable.tenantId eq provider.tenantId) and
+                (IdentityProvidersTable.tenantId eq provider.tenantId.value) and
                     (IdentityProvidersTable.provider eq provider.provider.value)
             }) {
                 it[clientId] = provider.clientId
@@ -90,11 +91,11 @@ class PostgresIdentityProviderRepository(
         }
 
     override fun delete(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     ) = transaction {
         IdentityProvidersTable.deleteWhere {
-            (IdentityProvidersTable.tenantId eq tenantId) and
+            (IdentityProvidersTable.tenantId eq tenantId.value) and
                 (IdentityProvidersTable.provider eq provider.value)
         }
         Unit
@@ -113,7 +114,7 @@ class PostgresIdentityProviderRepository(
                 ?: return null // cannot decrypt — encryption key may have changed; skip silently
         return IdentityProvider(
             id = this[IdentityProvidersTable.id],
-            tenantId = this[IdentityProvidersTable.tenantId],
+            tenantId = TenantId(this[IdentityProvidersTable.tenantId]),
             provider = providerEnum,
             clientId = this[IdentityProvidersTable.clientId],
             clientSecret = decryptedSecret,

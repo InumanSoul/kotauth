@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.UserRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -15,48 +17,48 @@ import java.time.ZoneOffset
  * allows cross-tenant access — the constraint is structural, not convention.
  */
 class PostgresUserRepository : UserRepository {
-    override fun findById(id: Int): User? =
+    override fun findById(id: UserId): User? =
         transaction {
             UsersTable
                 .selectAll()
-                .where { UsersTable.id eq id }
+                .where { UsersTable.id eq id.value }
                 .map { it.toUser() }
                 .singleOrNull()
         }
 
     override fun findByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ): User? =
         transaction {
             UsersTable
                 .selectAll()
-                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
+                .where { (UsersTable.tenantId eq tenantId.value) and (UsersTable.username eq username) }
                 .map { it.toUser() }
                 .singleOrNull()
         }
 
     override fun findByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ): User? =
         transaction {
             UsersTable
                 .selectAll()
-                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
+                .where { (UsersTable.tenantId eq tenantId.value) and (UsersTable.email eq email.lowercase()) }
                 .map { it.toUser() }
                 .singleOrNull()
         }
 
     override fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         search: String?,
     ): List<User> =
         transaction {
             val query =
                 UsersTable
                     .selectAll()
-                    .where { UsersTable.tenantId eq tenantId }
+                    .where { UsersTable.tenantId eq tenantId.value }
             if (!search.isNullOrBlank()) {
                 val term = "%${search.lowercase()}%"
                 query.andWhere {
@@ -70,7 +72,7 @@ class PostgresUserRepository : UserRepository {
 
     override fun update(user: User): User =
         transaction {
-            UsersTable.update({ UsersTable.id eq user.id!! }) {
+            UsersTable.update({ UsersTable.id eq user.id!!.value }) {
                 it[email] = user.email.lowercase()
                 it[fullName] = user.fullName
                 it[emailVerified] = user.emailVerified
@@ -81,19 +83,19 @@ class PostgresUserRepository : UserRepository {
         }
 
     override fun updatePassword(
-        userId: Int,
+        userId: UserId,
         passwordHash: String,
         changedAt: Instant,
     ): User =
         transaction {
             val ts = changedAt.toOffsetDateTime()
-            UsersTable.update({ UsersTable.id eq userId }) {
+            UsersTable.update({ UsersTable.id eq userId.value }) {
                 it[UsersTable.passwordHash] = passwordHash
                 it[UsersTable.lastPasswordChangeAt] = ts
             }
             UsersTable
                 .selectAll()
-                .where { UsersTable.id eq userId }
+                .where { UsersTable.id eq userId.value }
                 .single()
                 .toUser()
         }
@@ -102,7 +104,7 @@ class PostgresUserRepository : UserRepository {
         transaction {
             val insertedId =
                 UsersTable.insert {
-                    it[tenantId] = user.tenantId
+                    it[tenantId] = user.tenantId.value
                     it[username] = user.username
                     it[email] = user.email.lowercase()
                     it[passwordHash] = user.passwordHash
@@ -111,35 +113,35 @@ class PostgresUserRepository : UserRepository {
                     it[enabled] = user.enabled
                 } get UsersTable.id
 
-            user.copy(id = insertedId)
+            user.copy(id = UserId(insertedId))
         }
 
     override fun existsByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ): Boolean =
         transaction {
             UsersTable
                 .selectAll()
-                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.username eq username) }
+                .where { (UsersTable.tenantId eq tenantId.value) and (UsersTable.username eq username) }
                 .count() > 0
         }
 
     override fun existsByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ): Boolean =
         transaction {
             UsersTable
                 .selectAll()
-                .where { (UsersTable.tenantId eq tenantId) and (UsersTable.email eq email.lowercase()) }
+                .where { (UsersTable.tenantId eq tenantId.value) and (UsersTable.email eq email.lowercase()) }
                 .count() > 0
         }
 
     private fun ResultRow.toUser(): User =
         User(
-            id = this[UsersTable.id],
-            tenantId = this[UsersTable.tenantId],
+            id = UserId(this[UsersTable.id]),
+            tenantId = TenantId(this[UsersTable.tenantId]),
             username = this[UsersTable.username],
             email = this[UsersTable.email],
             passwordHash = this[UsersTable.passwordHash],

@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantKey
 import com.kauth.domain.port.TenantKeyRepository
 import org.jetbrains.exposed.sql.*
@@ -10,22 +11,22 @@ import java.time.OffsetDateTime
  * Persistence adapter for tenant RSA signing keys.
  */
 class PostgresTenantKeyRepository : TenantKeyRepository {
-    override fun findActiveKey(tenantId: Int): TenantKey? =
+    override fun findActiveKey(tenantId: TenantId): TenantKey? =
         transaction {
             TenantKeysTable
                 .selectAll()
-                .where { (TenantKeysTable.tenantId eq tenantId) and (TenantKeysTable.enabled eq true) }
+                .where { (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.enabled eq true) }
                 .orderBy(TenantKeysTable.createdAt, SortOrder.DESC)
                 .limit(1)
                 .map { it.toTenantKey() }
                 .singleOrNull()
         }
 
-    override fun findEnabledKeys(tenantId: Int): List<TenantKey> =
+    override fun findEnabledKeys(tenantId: TenantId): List<TenantKey> =
         transaction {
             TenantKeysTable
                 .selectAll()
-                .where { (TenantKeysTable.tenantId eq tenantId) and (TenantKeysTable.enabled eq true) }
+                .where { (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.enabled eq true) }
                 .orderBy(TenantKeysTable.createdAt, SortOrder.DESC)
                 .map { it.toTenantKey() }
         }
@@ -34,7 +35,7 @@ class PostgresTenantKeyRepository : TenantKeyRepository {
         transaction {
             val insertedId =
                 TenantKeysTable.insert {
-                    it[tenantId] = key.tenantId
+                    it[tenantId] = key.tenantId.value
                     it[keyId] = key.keyId
                     it[algorithm] = key.algorithm
                     it[publicKey] = key.publicKeyPem
@@ -47,11 +48,11 @@ class PostgresTenantKeyRepository : TenantKeyRepository {
         }
 
     override fun disable(
-        tenantId: Int,
+        tenantId: TenantId,
         keyId: String,
     ) = transaction {
         TenantKeysTable.update({
-            (TenantKeysTable.tenantId eq tenantId) and (TenantKeysTable.keyId eq keyId)
+            (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.keyId eq keyId)
         }) {
             it[enabled] = false
         }
@@ -61,7 +62,7 @@ class PostgresTenantKeyRepository : TenantKeyRepository {
     private fun ResultRow.toTenantKey() =
         TenantKey(
             id = this[TenantKeysTable.id],
-            tenantId = this[TenantKeysTable.tenantId],
+            tenantId = TenantId(this[TenantKeysTable.tenantId]),
             keyId = this[TenantKeysTable.keyId],
             algorithm = this[TenantKeysTable.algorithm],
             publicKeyPem = this[TenantKeysTable.publicKey],

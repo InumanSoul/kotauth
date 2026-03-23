@@ -1,6 +1,9 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuthorizationCodeRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -17,9 +20,9 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
             val insertedId =
                 AuthorizationCodesTable.insert {
                     it[AuthorizationCodesTable.code] = code.code
-                    it[tenantId] = code.tenantId
-                    it[clientId] = code.clientId
-                    it[userId] = code.userId
+                    it[tenantId] = code.tenantId.value
+                    it[clientId] = code.clientId.value
+                    it[userId] = code.userId.value
                     it[redirectUri] = code.redirectUri
                     it[scopes] = code.scopes
                     it[codeChallenge] = code.codeChallenge
@@ -61,9 +64,9 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
         AuthorizationCode(
             id = this[AuthorizationCodesTable.id],
             code = this[AuthorizationCodesTable.code],
-            tenantId = this[AuthorizationCodesTable.tenantId],
-            clientId = this[AuthorizationCodesTable.clientId],
-            userId = this[AuthorizationCodesTable.userId],
+            tenantId = TenantId(this[AuthorizationCodesTable.tenantId]),
+            clientId = ApplicationId(this[AuthorizationCodesTable.clientId]),
+            userId = UserId(this[AuthorizationCodesTable.userId]),
             redirectUri = this[AuthorizationCodesTable.redirectUri],
             scopes = this[AuthorizationCodesTable.scopes],
             codeChallenge = this[AuthorizationCodesTable.codeChallenge],
