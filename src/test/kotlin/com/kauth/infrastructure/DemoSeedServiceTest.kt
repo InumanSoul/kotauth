@@ -2,6 +2,7 @@ package com.kauth.infrastructure
 
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -77,7 +78,7 @@ class DemoSeedServiceTest {
     fun `seedIfEmpty does nothing when acme tenant already exists`() {
         tenants.add(
             com.kauth.domain.model.Tenant(
-                id = 99,
+                id = TenantId(99),
                 slug = "acme",
                 displayName = "Existing Acme",
                 issuerUrl = null,
@@ -87,7 +88,7 @@ class DemoSeedServiceTest {
         svc.seedIfEmpty()
 
         assertEquals(1, tenants.findAll().size, "No new tenants should be created")
-        assertEquals(0, users.findByTenantId(99).size, "No users should be seeded")
+        assertEquals(0, users.findByTenantId(TenantId(99)).size, "No users should be seeded")
     }
 
     @Test

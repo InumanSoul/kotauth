@@ -1,7 +1,6 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.ApplicationId
-import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
@@ -48,7 +47,13 @@ class PostgresRoleRepository : RoleRepository {
                     (RolesTable.tenantId eq tenantId.value) and
                         (RolesTable.name eq name) and
                         (RolesTable.scope eq scope.value) and
-                        if (clientId != null) (RolesTable.clientId eq clientId.value) else (RolesTable.clientId.isNull())
+                        if (clientId !=
+                            null
+                        ) {
+                            (RolesTable.clientId eq clientId.value)
+                        } else {
+                            (RolesTable.clientId.isNull())
+                        }
                 }.firstOrNull()
                 ?.toRole()
         }

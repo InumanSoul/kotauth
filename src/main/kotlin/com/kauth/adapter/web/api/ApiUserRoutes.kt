@@ -1,6 +1,8 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.RoleId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -61,7 +63,7 @@ internal fun Route.apiUserRoutes(
                 requireScope(call, ApiScope.USERS_READ) ?: return@get
                 val tenantId = call.attributes[TenantIdAttr]
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid user ID",
@@ -88,7 +90,7 @@ internal fun Route.apiUserRoutes(
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@put
                 val tenantId = call.attributes[TenantIdAttr]
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@put call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid user ID",
@@ -106,7 +108,7 @@ internal fun Route.apiUserRoutes(
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
                 val tenantId = call.attributes[TenantIdAttr]
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@delete call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid user ID",
@@ -124,10 +126,10 @@ internal fun Route.apiUserRoutes(
                     requireScope(call, ApiScope.USERS_WRITE) ?: return@post
                     val tenantId = call.attributes[TenantIdAttr]
                     val userId =
-                        call.parameters["userId"]?.toIntOrNull()
+                        call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                             ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Invalid user ID", "")
                     val roleId =
-                        call.parameters["roleId"]?.toIntOrNull()
+                        call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                             ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Invalid role ID", "")
                     roleGroupService.assignRoleToUser(userId, roleId, tenantId)
                     call.respond(HttpStatusCode.NoContent, "")
@@ -137,14 +139,14 @@ internal fun Route.apiUserRoutes(
                     requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
                     val tenantId = call.attributes[TenantIdAttr]
                     val userId =
-                        call.parameters["userId"]?.toIntOrNull()
+                        call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                             ?: return@delete call.respondProblem(
                                 HttpStatusCode.BadRequest,
                                 "Invalid user ID",
                                 "",
                             )
                     val roleId =
-                        call.parameters["roleId"]?.toIntOrNull()
+                        call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                             ?: return@delete call.respondProblem(
                                 HttpStatusCode.BadRequest,
                                 "Invalid role ID",

@@ -105,7 +105,13 @@ class UserSelfServiceService(
         try {
             emailPort.sendVerificationEmail(user.email, user.fullName, verifyUrl, tenant.displayName, tenant)
         } catch (e: Exception) {
-            log.warn("Verification email delivery failed tenantId={} userId={}: {}", tenantId.value, userId.value, e.message, e)
+            log.warn(
+                "Verification email delivery failed tenantId={} userId={}: {}",
+                tenantId.value,
+                userId.value,
+                e.message,
+                e,
+            )
             return SelfServiceResult.Failure(
                 SelfServiceError.EmailDeliveryFailed(
                     "Failed to send verification email. Please try again later.",
@@ -215,7 +221,13 @@ class UserSelfServiceService(
             emailPort.sendPasswordResetEmail(user.email, user.fullName, resetUrl, tenant.displayName, tenant)
         } catch (e: Exception) {
             // Log but do NOT surface to caller — attacker must not learn the email exists
-            log.warn("Password reset email delivery failed tenantId={} userId={}: {}", tenant.id.value, user.id.value, e.message, e)
+            log.warn(
+                "Password reset email delivery failed tenantId={} userId={}: {}",
+                tenant.id.value,
+                user.id.value,
+                e.message,
+                e,
+            )
         }
 
         auditLog.record(

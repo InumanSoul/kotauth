@@ -2,10 +2,8 @@ package com.kauth.infrastructure
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
-import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupId
-import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme

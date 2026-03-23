@@ -75,7 +75,10 @@ class WebhookService(
             try {
                 endpointRepository.findEnabledByTenantAndEvent(tenantId, eventType)
             } catch (e: Exception) {
-                log.error("Webhook dispatch: failed to query endpoints for tenant=${tenantId.value} event=$eventType", e)
+                log.error(
+                    "Webhook dispatch: failed to query endpoints for tenant=${tenantId.value} event=$eventType",
+                    e,
+                )
                 return
             }
 

@@ -1,7 +1,10 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.GroupId
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.service.AdminResult
@@ -63,7 +66,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.ROLES_READ) ?: return@get
                 val tenantId = call.attributes[TenantIdAttr]
                 val roleId =
-                    call.parameters["roleId"]?.toIntOrNull()
+                    call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@get call.respondProblem(HttpStatusCode.BadRequest, "Invalid role ID", "")
                 val role =
                     roleRepository.findById(roleId)
@@ -82,7 +85,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.ROLES_WRITE) ?: return@put
                 val tenantId = call.attributes[TenantIdAttr]
                 val roleId =
-                    call.parameters["roleId"]?.toIntOrNull()
+                    call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@put call.respondProblem(HttpStatusCode.BadRequest, "Invalid role ID", "")
                 val body = call.receive<UpdateRoleRequest>()
                 when (val result = roleGroupService.updateRole(roleId, tenantId, body.name, body.description)) {
@@ -95,7 +98,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.ROLES_WRITE) ?: return@delete
                 val tenantId = call.attributes[TenantIdAttr]
                 val roleId =
-                    call.parameters["roleId"]?.toIntOrNull()
+                    call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@delete call.respondProblem(HttpStatusCode.BadRequest, "Invalid role ID", "")
                 when (val result = roleGroupService.deleteRole(roleId, tenantId)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
@@ -129,7 +132,7 @@ internal fun Route.apiRbacRoutes(
                         tenantId,
                         body.name,
                         body.description,
-                        body.parentGroupId,
+                        body.parentGroupId?.let { GroupId(it) },
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())
@@ -142,7 +145,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.GROUPS_READ) ?: return@get
                 val tenantId = call.attributes[TenantIdAttr]
                 val groupId =
-                    call.parameters["groupId"]?.toIntOrNull()
+                    call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@get call.respondProblem(HttpStatusCode.BadRequest, "Invalid group ID", "")
                 val group =
                     groupRepository.findById(groupId)
@@ -161,7 +164,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.GROUPS_WRITE) ?: return@put
                 val tenantId = call.attributes[TenantIdAttr]
                 val groupId =
-                    call.parameters["groupId"]?.toIntOrNull()
+                    call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@put call.respondProblem(HttpStatusCode.BadRequest, "Invalid group ID", "")
                 val body = call.receive<UpdateGroupRequest>()
                 when (
@@ -182,7 +185,7 @@ internal fun Route.apiRbacRoutes(
                 requireScope(call, ApiScope.GROUPS_WRITE) ?: return@delete
                 val tenantId = call.attributes[TenantIdAttr]
                 val groupId =
-                    call.parameters["groupId"]?.toIntOrNull()
+                    call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@delete call.respondProblem(HttpStatusCode.BadRequest, "Invalid group ID", "")
                 when (val result = roleGroupService.deleteGroup(groupId, tenantId)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
@@ -195,14 +198,14 @@ internal fun Route.apiRbacRoutes(
                     requireScope(call, ApiScope.GROUPS_WRITE) ?: return@post
                     val tenantId = call.attributes[TenantIdAttr]
                     val groupId =
-                        call.parameters["groupId"]?.toIntOrNull()
+                        call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                             ?: return@post call.respondProblem(
                                 HttpStatusCode.BadRequest,
                                 "Invalid group ID",
                                 "",
                             )
                     val userId =
-                        call.parameters["userId"]?.toIntOrNull()
+                        call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                             ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Invalid user ID", "")
                     roleGroupService.addUserToGroup(userId, groupId, tenantId)
                     call.respond(HttpStatusCode.NoContent, "")
@@ -212,14 +215,14 @@ internal fun Route.apiRbacRoutes(
                     requireScope(call, ApiScope.GROUPS_WRITE) ?: return@delete
                     val tenantId = call.attributes[TenantIdAttr]
                     val groupId =
-                        call.parameters["groupId"]?.toIntOrNull()
+                        call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                             ?: return@delete call.respondProblem(
                                 HttpStatusCode.BadRequest,
                                 "Invalid group ID",
                                 "",
                             )
                     val userId =
-                        call.parameters["userId"]?.toIntOrNull()
+                        call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                             ?: return@delete call.respondProblem(
                                 HttpStatusCode.BadRequest,
                                 "Invalid user ID",

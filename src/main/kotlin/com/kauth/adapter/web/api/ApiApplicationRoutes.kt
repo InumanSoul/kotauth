@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -36,7 +37,7 @@ internal fun Route.apiApplicationRoutes(
             requireScope(call, ApiScope.APPLICATIONS_READ) ?: return@get
             val tenantId = call.attributes[TenantIdAttr]
             val appId =
-                call.parameters["appId"]?.toIntOrNull()
+                call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
                     ?: return@get call.respondProblem(HttpStatusCode.BadRequest, "Invalid application ID", "")
             val app =
                 applicationRepository.findById(appId)
@@ -55,7 +56,7 @@ internal fun Route.apiApplicationRoutes(
             requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@put
             val tenantId = call.attributes[TenantIdAttr]
             val appId =
-                call.parameters["appId"]?.toIntOrNull()
+                call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
                     ?: return@put call.respondProblem(HttpStatusCode.BadRequest, "Invalid application ID", "")
             val body = call.receive<UpdateApplicationRequest>()
             when (
@@ -78,7 +79,7 @@ internal fun Route.apiApplicationRoutes(
             requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@delete
             val tenantId = call.attributes[TenantIdAttr]
             val appId =
-                call.parameters["appId"]?.toIntOrNull()
+                call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
                     ?: return@delete call.respondProblem(
                         HttpStatusCode.BadRequest,
                         "Invalid application ID",

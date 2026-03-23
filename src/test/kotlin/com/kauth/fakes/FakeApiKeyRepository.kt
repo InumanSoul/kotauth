@@ -1,6 +1,7 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.ApiKey
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApiKeyRepository
 import java.time.Instant
 
@@ -26,17 +27,17 @@ class FakeApiKeyRepository : ApiKeyRepository {
 
     override fun findByHash(hash: String): ApiKey? = store.values.find { it.keyHash == hash }
 
-    override fun findByTenantId(tenantId: Int): List<ApiKey> =
+    override fun findByTenantId(tenantId: TenantId): List<ApiKey> =
         store.values.filter { it.tenantId == tenantId }.sortedByDescending { it.createdAt }
 
     override fun findById(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): ApiKey? = store[id]?.takeIf { it.tenantId == tenantId }
 
     override fun revoke(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) {
         store[id]?.takeIf { it.tenantId == tenantId }?.let {
             store[id] = it.copy(enabled = false)
@@ -52,7 +53,7 @@ class FakeApiKeyRepository : ApiKeyRepository {
 
     override fun delete(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) {
         if (store[id]?.tenantId == tenantId) {
             store.remove(id)

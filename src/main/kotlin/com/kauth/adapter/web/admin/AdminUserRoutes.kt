@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -94,7 +95,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -133,7 +134,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -156,7 +157,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -173,7 +174,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -189,7 +190,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -257,7 +258,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -269,7 +270,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -282,7 +283,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)

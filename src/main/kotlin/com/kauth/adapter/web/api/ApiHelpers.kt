@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.service.AdminError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -10,7 +11,7 @@ import kotlinx.serialization.Serializable
 import java.time.format.DateTimeFormatter
 
 internal val ApiKeyAttr = AttributeKey<com.kauth.domain.model.ApiKey>("ApiKey")
-internal val TenantIdAttr = AttributeKey<Int>("TenantId")
+internal val TenantIdAttr = AttributeKey<TenantId>("TenantId")
 
 internal val isoFormatter: DateTimeFormatter = DateTimeFormatter.ISO_INSTANT
 
@@ -192,7 +193,7 @@ data class ProblemDetail(
 
 internal fun com.kauth.domain.model.User.toApiDto() =
     UserDto(
-        id = id!!,
+        id = id!!.value,
         username = username,
         email = email,
         fullName = fullName,
@@ -203,25 +204,25 @@ internal fun com.kauth.domain.model.User.toApiDto() =
 
 internal fun com.kauth.domain.model.Role.toApiDto() =
     RoleDto(
-        id = id!!,
+        id = id!!.value,
         name = name,
         description = description,
         scope = scope.name,
-        tenantId = tenantId,
+        tenantId = tenantId.value,
     )
 
 internal fun com.kauth.domain.model.Group.toApiDto() =
     GroupDto(
-        id = id!!,
+        id = id!!.value,
         name = name,
         description = description,
-        parentGroupId = parentGroupId,
-        tenantId = tenantId,
+        parentGroupId = parentGroupId?.value,
+        tenantId = tenantId.value,
     )
 
 internal fun com.kauth.domain.model.Application.toApiDto() =
     ApplicationDto(
-        id = id,
+        id = id.value,
         clientId = clientId,
         name = name,
         description = description,
@@ -232,9 +233,9 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
 
 internal fun com.kauth.domain.model.Session.toApiDto() =
     SessionDto(
-        id = id!!,
-        userId = userId,
-        clientId = clientId,
+        id = id!!.value,
+        userId = userId?.value,
+        clientId = clientId?.value,
         scopes = scopes,
         ipAddress = ipAddress,
         createdAt = isoFormatter.format(createdAt),
@@ -244,8 +245,8 @@ internal fun com.kauth.domain.model.Session.toApiDto() =
 internal fun com.kauth.domain.model.AuditEvent.toApiDto() =
     AuditEventDto(
         eventType = eventType.name,
-        userId = userId,
-        clientId = clientId,
+        userId = userId?.value,
+        clientId = clientId?.value,
         ipAddress = ipAddress,
         createdAt = isoFormatter.format(createdAt),
         details = details,

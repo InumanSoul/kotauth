@@ -3,12 +3,15 @@ package com.kauth.adapter.web.api
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
@@ -78,7 +81,7 @@ class ApiRoutesTest {
 
     private val tenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -87,7 +90,7 @@ class ApiRoutesTest {
 
     private val otherTenant =
         Tenant(
-            id = 50,
+            id = TenantId(50),
             slug = "other",
             displayName = "Other Corp",
             issuerUrl = null,
@@ -96,8 +99,8 @@ class ApiRoutesTest {
 
     private val user =
         User(
-            id = 10,
-            tenantId = 1,
+            id = UserId(10),
+            tenantId = TenantId(1),
             username = "alice",
             email = "alice@example.com",
             fullName = "Alice Smith",
@@ -171,7 +174,7 @@ class ApiRoutesTest {
 
         val created =
             apiKeyService.create(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 name = "Test Key",
                 scopes = ApiScope.ALL,
             )
@@ -227,7 +230,7 @@ class ApiRoutesTest {
 
             val otherKey =
                 apiKeyService.create(
-                    tenantId = 50,
+                    tenantId = TenantId(50),
                     name = "Other Tenant Key",
                     scopes = ApiScope.ALL,
                 )
@@ -248,12 +251,12 @@ class ApiRoutesTest {
 
             val revokedResult =
                 apiKeyService.create(
-                    tenantId = 1,
+                    tenantId = TenantId(1),
                     name = "Revoked Key",
                     scopes = ApiScope.ALL,
                 )
             val revokedKey = (revokedResult as com.kauth.domain.service.ApiKeyResult.Success).value
-            apiKeyService.revoke(revokedKey.apiKey.id!!, tenantId = 1)
+            apiKeyService.revoke(revokedKey.apiKey.id!!, tenantId = TenantId(1))
 
             val response =
                 client.get("/t/acme/api/v1/users") {
@@ -288,7 +291,7 @@ class ApiRoutesTest {
 
             val limitedResult =
                 apiKeyService.create(
-                    tenantId = 1,
+                    tenantId = TenantId(1),
                     name = "Roles Only Key",
                     scopes = listOf(ApiScope.ROLES_READ),
                 )
@@ -346,8 +349,8 @@ class ApiRoutesTest {
 
             userRepo.add(
                 User(
-                    id = 20,
-                    tenantId = 50,
+                    id = UserId(20),
+                    tenantId = TenantId(50),
                     username = "bob",
                     email = "bob@other.com",
                     fullName = "Bob",
@@ -374,7 +377,13 @@ class ApiRoutesTest {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
                     setBody(
-                        """{"username":"charlie","email":"charlie@example.com","fullName":"Charlie Brown","password":"StrongP@ss1"}""",
+                        """{
+                        |"username":"charlie",
+                        |"email":"charlie@example.com",
+                        |"fullName":"Charlie Brown",
+                        |"password":"StrongP@ss1"
+                        |}
+                        """.trimMargin(),
                     )
                 }
 
@@ -394,8 +403,8 @@ class ApiRoutesTest {
 
             auditLogRepo.add(
                 AuditEvent(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = null,
                     eventType = AuditEventType.LOGIN_SUCCESS,
                     ipAddress = "127.0.0.1",
@@ -405,7 +414,7 @@ class ApiRoutesTest {
 
             val limitedResult =
                 apiKeyService.create(
-                    tenantId = 1,
+                    tenantId = TenantId(1),
                     name = "Audit Key",
                     scopes = listOf(ApiScope.AUDIT_LOGS_READ),
                 )
@@ -446,7 +455,13 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
 
-            roleGroupService.createRole(1, "viewer", "Read only", com.kauth.domain.model.RoleScope.TENANT, null)
+            roleGroupService.createRole(
+                TenantId(1),
+                "viewer",
+                "Read only",
+                com.kauth.domain.model.RoleScope.TENANT,
+                null,
+            )
 
             val response =
                 client.get("/t/acme/api/v1/roles") {
@@ -464,7 +479,7 @@ class ApiRoutesTest {
 
             val created =
                 roleGroupService.createRole(
-                    1,
+                    TenantId(1),
                     "old-name",
                     null,
                     com.kauth.domain.model.RoleScope.TENANT,
@@ -473,7 +488,7 @@ class ApiRoutesTest {
             val roleId = (created as AdminResult.Success).value.id
 
             val response =
-                client.put("/t/acme/api/v1/roles/$roleId") {
+                client.put("/t/acme/api/v1/roles/${roleId!!.value}") {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"name":"new-name","description":"Updated"}""")
@@ -490,7 +505,7 @@ class ApiRoutesTest {
 
             val created =
                 roleGroupService.createRole(
-                    1,
+                    TenantId(1),
                     "temp-role",
                     null,
                     com.kauth.domain.model.RoleScope.TENANT,
@@ -499,7 +514,7 @@ class ApiRoutesTest {
             val roleId = (created as AdminResult.Success).value.id
 
             val response =
-                client.delete("/t/acme/api/v1/roles/$roleId") {
+                client.delete("/t/acme/api/v1/roles/${roleId!!.value}") {
                     bearerAuth(rawApiKey)
                 }
 
@@ -533,8 +548,10 @@ class ApiRoutesTest {
 
             groupRepo.add(
                 com.kauth.domain.model.Group(
-                    id = 100,
-                    tenantId = 50,
+                    id =
+                        com.kauth.domain.model
+                            .GroupId(100),
+                    tenantId = TenantId(50),
                     name = "other-group",
                 ),
             )
@@ -552,11 +569,11 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
 
-            val created = roleGroupService.createGroup(1, "temp-group", null, null)
+            val created = roleGroupService.createGroup(TenantId(1), "temp-group", null, null)
             val groupId = (created as AdminResult.Success).value.id
 
             val response =
-                client.delete("/t/acme/api/v1/groups/$groupId") {
+                client.delete("/t/acme/api/v1/groups/${groupId!!.value}") {
                     bearerAuth(rawApiKey)
                 }
 
@@ -568,11 +585,11 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
 
-            val created = roleGroupService.createGroup(1, "dev-team", null, null)
+            val created = roleGroupService.createGroup(TenantId(1), "dev-team", null, null)
             val groupId = (created as AdminResult.Success).value.id
 
             val response =
-                client.post("/t/acme/api/v1/groups/$groupId/members/10") {
+                client.post("/t/acme/api/v1/groups/${groupId!!.value}/members/10") {
                     bearerAuth(rawApiKey)
                 }
 
@@ -604,8 +621,8 @@ class ApiRoutesTest {
 
             appRepo.add(
                 Application(
-                    id = 1,
-                    tenantId = 1,
+                    id = ApplicationId(1),
+                    tenantId = TenantId(1),
                     clientId = "spa-app",
                     name = "SPA",
                     description = "Single page app",
@@ -630,8 +647,8 @@ class ApiRoutesTest {
 
             appRepo.add(
                 Application(
-                    id = 2,
-                    tenantId = 50,
+                    id = ApplicationId(2),
+                    tenantId = TenantId(50),
                     clientId = "other-app",
                     name = "Other",
                     description = null,
@@ -659,8 +676,8 @@ class ApiRoutesTest {
 
             sessionRepo.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = null,
                     accessTokenHash = "hash1",
                     refreshTokenHash = null,
@@ -686,8 +703,8 @@ class ApiRoutesTest {
             val saved =
                 sessionRepo.save(
                     Session(
-                        tenantId = 1,
-                        userId = 10,
+                        tenantId = TenantId(1),
+                        userId = UserId(10),
                         clientId = null,
                         accessTokenHash = "hash-to-revoke",
                         refreshTokenHash = null,
@@ -697,7 +714,7 @@ class ApiRoutesTest {
                 )
 
             val response =
-                client.delete("/t/acme/api/v1/sessions/${saved.id}") {
+                client.delete("/t/acme/api/v1/sessions/${saved.id!!.value}") {
                     bearerAuth(rawApiKey)
                 }
 
@@ -712,8 +729,8 @@ class ApiRoutesTest {
             val saved =
                 sessionRepo.save(
                     Session(
-                        tenantId = 50,
-                        userId = 99,
+                        tenantId = TenantId(50),
+                        userId = UserId(99),
                         clientId = null,
                         accessTokenHash = "other-hash",
                         refreshTokenHash = null,
@@ -723,7 +740,7 @@ class ApiRoutesTest {
                 )
 
             val response =
-                client.delete("/t/acme/api/v1/sessions/${saved.id}") {
+                client.delete("/t/acme/api/v1/sessions/${saved.id!!.value}") {
                     bearerAuth(rawApiKey)
                 }
 
@@ -741,8 +758,8 @@ class ApiRoutesTest {
 
             auditLogRepo.add(
                 AuditEvent(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = null,
                     eventType = AuditEventType.LOGIN_SUCCESS,
                     ipAddress = "127.0.0.1",
@@ -751,8 +768,8 @@ class ApiRoutesTest {
             )
             auditLogRepo.add(
                 AuditEvent(
-                    tenantId = 1,
-                    userId = 99,
+                    tenantId = TenantId(1),
+                    userId = UserId(99),
                     clientId = null,
                     eventType = AuditEventType.LOGIN_FAILED,
                     ipAddress = "127.0.0.1",
@@ -760,7 +777,7 @@ class ApiRoutesTest {
                 ),
             )
 
-            val auditKey = apiKeyService.create(1, "Audit Key 2", listOf(ApiScope.AUDIT_LOGS_READ))
+            val auditKey = apiKeyService.create(TenantId(1), "Audit Key 2", listOf(ApiScope.AUDIT_LOGS_READ))
             val auditRawKey = (auditKey as com.kauth.domain.service.ApiKeyResult.Success).value.rawKey
 
             val response =

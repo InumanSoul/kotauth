@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.TokenPort
@@ -58,5 +59,5 @@ class FakeTokenPort : TokenPort {
 
     override fun decodeAccessToken(token: String): AccessTokenClaims? = claimsToReturn
 
-    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> = jwksToReturn
+    override fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>> = jwksToReturn
 }

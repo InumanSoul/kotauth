@@ -26,8 +26,10 @@ class PostgresIdentityProviderRepository(
         transaction {
             IdentityProvidersTable
                 .selectAll()
-                .where { (IdentityProvidersTable.tenantId eq tenantId.value) and (IdentityProvidersTable.enabled eq true) }
-                .mapNotNull { it.toIdentityProvider() }
+                .where {
+                    (IdentityProvidersTable.tenantId eq tenantId.value) and
+                        (IdentityProvidersTable.enabled eq true)
+                }.mapNotNull { it.toIdentityProvider() }
         }
 
     override fun findAllByTenant(tenantId: TenantId): List<IdentityProvider> =

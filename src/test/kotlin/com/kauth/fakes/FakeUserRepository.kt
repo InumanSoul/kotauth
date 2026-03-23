@@ -1,6 +1,8 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.UserRepository
 import java.time.Instant
 
@@ -13,8 +15,8 @@ class FakeUserRepository : UserRepository {
     private var nextId = 1
 
     fun add(user: User): User {
-        val u = if (user.id == null) user.copy(id = nextId++) else user
-        store[u.id!!] = u
+        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        store[u.id!!.value] = u
         return u
     }
 
@@ -23,20 +25,20 @@ class FakeUserRepository : UserRepository {
         nextId = 1
     }
 
-    override fun findById(id: Int) = store[id]
+    override fun findById(id: UserId) = store[id.value]
 
     override fun findByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ) = store.values.find { it.tenantId == tenantId && it.username == username }
 
     override fun findByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ) = store.values.find { it.tenantId == tenantId && it.email == email }
 
     override fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         search: String?,
     ): List<User> {
         val all = store.values.filter { it.tenantId == tenantId }
@@ -50,33 +52,33 @@ class FakeUserRepository : UserRepository {
     }
 
     override fun save(user: User): User {
-        val u = if (user.id == null) user.copy(id = nextId++) else user
-        store[u.id!!] = u
+        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        store[u.id!!.value] = u
         return u
     }
 
     override fun update(user: User): User {
-        store[user.id!!] = user
+        store[user.id!!.value] = user
         return user
     }
 
     override fun updatePassword(
-        userId: Int,
+        userId: UserId,
         passwordHash: String,
         changedAt: Instant,
     ): User {
-        val updated = store[userId]!!.copy(passwordHash = passwordHash, lastPasswordChangeAt = changedAt)
-        store[userId] = updated
+        val updated = store[userId.value]!!.copy(passwordHash = passwordHash, lastPasswordChangeAt = changedAt)
+        store[userId.value] = updated
         return updated
     }
 
     override fun existsByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ) = store.values.any { it.tenantId == tenantId && it.username == username }
 
     override fun existsByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ) = store.values.any { it.tenantId == tenantId && it.email == email }
 }

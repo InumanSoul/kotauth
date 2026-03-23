@@ -60,7 +60,7 @@ class PostgresPasswordPolicyAdapter(
 
         // History check (only for existing users changing password)
         if (userId != null && tenant.passwordPolicyHistoryCount > 0) {
-            if (isInHistory(userId, tenant.id as TenantId, rawPassword, tenant.passwordPolicyHistoryCount)) {
+            if (isInHistory(userId, tenant.id, rawPassword, tenant.passwordPolicyHistoryCount)) {
                 return "You cannot reuse any of your last ${tenant.passwordPolicyHistoryCount} passwords."
             }
         }
@@ -111,8 +111,10 @@ class PostgresPasswordPolicyAdapter(
             PasswordBlacklistTable
                 .selectAll()
                 .where {
-                    (PasswordBlacklistTable.password eq normalised) and
-                        (PasswordBlacklistTable.tenantId.isNull() or (PasswordBlacklistTable.tenantId eq tenantId.value))
+                    (PasswordBlacklistTable.password eq normalised) and (
+                        PasswordBlacklistTable.tenantId.isNull() or
+                            (PasswordBlacklistTable.tenantId eq tenantId.value)
+                    )
                 }.count() > 0
         }
 }

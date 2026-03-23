@@ -3,8 +3,10 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
@@ -72,7 +74,7 @@ class AdminApiKeysTest {
 
     private val masterTenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "master",
             displayName = "Master",
             issuerUrl = null,
@@ -81,7 +83,7 @@ class AdminApiKeysTest {
 
     private val workspace =
         Tenant(
-            id = 2,
+            id = TenantId(2),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -90,8 +92,8 @@ class AdminApiKeysTest {
 
     private val adminUser =
         User(
-            id = 1,
-            tenantId = 1,
+            id = UserId(1),
+            tenantId = TenantId(1),
             username = "admin",
             email = "admin@kotauth.dev",
             fullName = "Admin",
@@ -204,7 +206,7 @@ class AdminApiKeysTest {
                 }
             login(authed)
 
-            val created = apiKeyService.create(2, "Revokable", listOf(ApiScope.USERS_READ))
+            val created = apiKeyService.create(TenantId(2), "Revokable", listOf(ApiScope.USERS_READ))
             val keyId = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey.id!!
 
             val response =
@@ -228,7 +230,7 @@ class AdminApiKeysTest {
                 }
             login(authed)
 
-            val created = apiKeyService.create(2, "Deletable", listOf(ApiScope.ROLES_READ))
+            val created = apiKeyService.create(TenantId(2), "Deletable", listOf(ApiScope.ROLES_READ))
             val keyId = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey.id!!
 
             val response =

@@ -4,8 +4,11 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
@@ -70,7 +73,7 @@ class UserSelfServiceServiceTest {
 
     private val smtpTenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -83,7 +86,7 @@ class UserSelfServiceServiceTest {
 
     private val noSmtpTenant =
         Tenant(
-            id = 2,
+            id = TenantId(2),
             slug = "no-smtp",
             displayName = "No SMTP",
             issuerUrl = null,
@@ -92,8 +95,8 @@ class UserSelfServiceServiceTest {
     private val alice
         get() =
             User(
-                id = 10,
-                tenantId = 1,
+                id = UserId(10),
+                tenantId = TenantId(1),
                 username = "alice",
                 email = "alice@example.com",
                 fullName = "Alice Test",
@@ -104,8 +107,8 @@ class UserSelfServiceServiceTest {
     private val verifiedAlice
         get() =
             User(
-                id = 11,
-                tenantId = 1,
+                id = UserId(11),
+                tenantId = TenantId(1),
                 username = "verified-alice",
                 email = "verified@example.com",
                 fullName = "Verified Alice",
@@ -116,8 +119,8 @@ class UserSelfServiceServiceTest {
     private val disabledUser
         get() =
             User(
-                id = 12,
-                tenantId = 1,
+                id = UserId(12),
+                tenantId = TenantId(1),
                 username = "disabled",
                 email = "disabled@example.com",
                 fullName = "Disabled User",
@@ -148,14 +151,24 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `initiateEmailVerification - tenant not found`() {
-        val result = svc.initiateEmailVerification(userId = 10, tenantId = 999, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = UserId(10),
+                tenantId = TenantId(999),
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
     fun `initiateEmailVerification - user not found`() {
-        val result = svc.initiateEmailVerification(userId = 999, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = UserId(999),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
@@ -165,7 +178,7 @@ class UserSelfServiceServiceTest {
         val userInNoSmtp =
             users.add(
                 User(
-                    tenantId = 2,
+                    tenantId = TenantId(2),
                     username = "bob",
                     email = "bob@example.com",
                     fullName = "Bob",
@@ -175,7 +188,7 @@ class UserSelfServiceServiceTest {
         val result =
             svc.initiateEmailVerification(
                 userId = userInNoSmtp.id!!,
-                tenantId = 2,
+                tenantId = TenantId(2),
                 baseUrl = "http://localhost",
             )
         assertIs<SelfServiceResult.Failure>(result)
@@ -184,14 +197,27 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `initiateEmailVerification - already verified returns success noop`() {
-        val result = svc.initiateEmailVerification(userId = 11, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = UserId(11),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Success<Unit>>(result)
-        assertTrue(emailPort.sent.isEmpty(), "No email should be sent for already-verified user")
+        assertTrue(
+            emailPort.sent.isEmpty(),
+            "No email should be sent for already-verified user",
+        )
     }
 
     @Test
     fun `initiateEmailVerification - sends verification email and creates token`() {
-        val result = svc.initiateEmailVerification(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Success<Unit>>(result)
         assertEquals(1, emailPort.sent.size)
         assertEquals("verification", emailPort.sent[0].type)
@@ -203,9 +229,17 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `initiateEmailVerification - deletes unused tokens before creating new one`() {
-        svc.initiateEmailVerification(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        svc.initiateEmailVerification(
+            userId = UserId(10),
+            tenantId = TenantId(1),
+            baseUrl = "http://localhost",
+        )
         assertEquals(1, evTokenRepo.all().size)
-        svc.initiateEmailVerification(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        svc.initiateEmailVerification(
+            userId = UserId(10),
+            tenantId = TenantId(1),
+            baseUrl = "http://localhost",
+        )
         // Old unused token should be deleted, new one created
         assertEquals(1, evTokenRepo.all().size)
     }
@@ -213,7 +247,12 @@ class UserSelfServiceServiceTest {
     @Test
     fun `initiateEmailVerification - smtp failure returns EmailDeliveryFailed`() {
         emailPort.shouldFail = true
-        val result = svc.initiateEmailVerification(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.initiateEmailVerification(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.EmailDeliveryFailed>(result.error)
     }
@@ -234,8 +273,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-token")
         evTokenRepo.create(
             EmailVerificationToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().minusSeconds(3600),
             ),
@@ -250,8 +289,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-token")
         evTokenRepo.create(
             EmailVerificationToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(86400),
                 usedAt = Instant.now().minusSeconds(100),
@@ -267,15 +306,18 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-token")
         evTokenRepo.create(
             EmailVerificationToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(86400),
             ),
         )
         val result = svc.confirmEmailVerification("raw-token")
         assertIs<SelfServiceResult.Success<Unit>>(result)
-        assertTrue(users.findById(10)!!.emailVerified, "User should be marked as email-verified")
+        assertTrue(
+            users.findById(UserId(10))!!.emailVerified,
+            "User should be marked as email-verified",
+        )
         assertNotNull(evTokenRepo.all().first().usedAt, "Token should be marked as used")
         assertTrue(auditLog.hasEvent(AuditEventType.EMAIL_VERIFIED))
     }
@@ -346,8 +388,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().minusSeconds(3600),
             ),
@@ -362,8 +404,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
                 usedAt = Instant.now().minusSeconds(60),
@@ -379,8 +421,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
@@ -395,8 +437,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
@@ -413,8 +455,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
@@ -427,12 +469,16 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `confirmPasswordReset - password in history`() {
-        passwordPolicy.recordPasswordHistory(10, 1, hasher.hash("old-pass"))
+        passwordPolicy.recordPasswordHistory(
+            UserId(10),
+            TenantId(1),
+            hasher.hash("old-pass"),
+        )
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
@@ -447,8 +493,8 @@ class UserSelfServiceServiceTest {
     fun `confirmPasswordReset - success updates password and revokes sessions`() {
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = null,
                 accessTokenHash = "hash1",
                 refreshTokenHash = null,
@@ -459,16 +505,27 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
         )
-        val result = svc.confirmPasswordReset("raw-reset", "new-secure-password", "new-secure-password")
+        val result =
+            svc.confirmPasswordReset(
+                "raw-reset",
+                "new-secure-password",
+                "new-secure-password",
+            )
         assertIs<SelfServiceResult.Success<Unit>>(result)
-        assertEquals("hashed:new-secure-password", users.findById(10)!!.passwordHash)
-        assertTrue(sessions.findActiveByUser(1, 10).isEmpty(), "All sessions should be revoked")
+        assertEquals(
+            "hashed:new-secure-password",
+            users.findById(UserId(10))!!.passwordHash,
+        )
+        assertTrue(
+            sessions.findActiveByUser(TenantId(1), UserId(10)).isEmpty(),
+            "All sessions should be revoked",
+        )
         assertNotNull(prTokenRepo.all().first().usedAt)
         assertTrue(auditLog.hasEvent(AuditEventType.PASSWORD_RESET_COMPLETED))
     }
@@ -478,8 +535,8 @@ class UserSelfServiceServiceTest {
         val hash = sha256("raw-reset")
         prTokenRepo.create(
             PasswordResetToken(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 tokenHash = hash,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
@@ -496,35 +553,65 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `updateProfile - user not found`() {
-        val result = svc.updateProfile(userId = 999, tenantId = 1, email = "x@x.com", fullName = "X")
+        val result =
+            svc.updateProfile(
+                userId = UserId(999),
+                tenantId = TenantId(1),
+                email = "x@x.com",
+                fullName = "X",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
     fun `updateProfile - tenant mismatch`() {
-        val result = svc.updateProfile(userId = 10, tenantId = 99, email = "x@x.com", fullName = "X")
+        val result =
+            svc.updateProfile(
+                userId = UserId(10),
+                tenantId = TenantId(99),
+                email = "x@x.com",
+                fullName = "X",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Unauthorized>(result.error)
     }
 
     @Test
     fun `updateProfile - invalid email`() {
-        val result = svc.updateProfile(userId = 10, tenantId = 1, email = "not-an-email", fullName = "Alice")
+        val result =
+            svc.updateProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "not-an-email",
+                fullName = "Alice",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
     }
 
     @Test
     fun `updateProfile - blank full name`() {
-        val result = svc.updateProfile(userId = 10, tenantId = 1, email = "alice@example.com", fullName = "  ")
+        val result =
+            svc.updateProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "  ",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
     }
 
     @Test
     fun `updateProfile - duplicate email`() {
-        val result = svc.updateProfile(userId = 10, tenantId = 1, email = "verified@example.com", fullName = "Alice")
+        val result =
+            svc.updateProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "verified@example.com",
+                fullName = "Alice",
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Validation>(result.error)
         assertTrue(result.error.message.contains("already in use"))
@@ -535,27 +622,46 @@ class UserSelfServiceServiceTest {
         // Start with verified user
         val result =
             svc.updateProfile(
-                userId = 11,
-                tenantId = 1,
+                userId = UserId(11),
+                tenantId = TenantId(1),
                 email = "newemail@example.com",
                 fullName = "Verified Alice",
             )
         assertIs<SelfServiceResult.Success<User>>(result)
-        assertEquals(false, result.value.emailVerified, "Email change should reset verification")
+        assertEquals(
+            false,
+            result.value.emailVerified,
+            "Email change should reset verification",
+        )
         assertEquals("newemail@example.com", result.value.email)
     }
 
     @Test
     fun `updateProfile - same email does not reset emailVerified`() {
-        val result = svc.updateProfile(userId = 11, tenantId = 1, email = "verified@example.com", fullName = "New Name")
+        val result =
+            svc.updateProfile(
+                userId = UserId(11),
+                tenantId = TenantId(1),
+                email = "verified@example.com",
+                fullName = "New Name",
+            )
         assertIs<SelfServiceResult.Success<User>>(result)
-        assertEquals(true, result.value.emailVerified, "Same email should keep verification")
+        assertEquals(
+            true,
+            result.value.emailVerified,
+            "Same email should keep verification",
+        )
         assertEquals("New Name", result.value.fullName)
     }
 
     @Test
     fun `updateProfile - success records audit event`() {
-        svc.updateProfile(userId = 10, tenantId = 1, email = "alice@example.com", fullName = "Alice Updated")
+        svc.updateProfile(
+            userId = UserId(10),
+            tenantId = TenantId(1),
+            email = "alice@example.com",
+            fullName = "Alice Updated",
+        )
         assertTrue(auditLog.hasEvent(AuditEventType.USER_PROFILE_UPDATED))
     }
 
@@ -567,8 +673,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - tenant not found`() {
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 999,
+                userId = UserId(10),
+                tenantId = TenantId(999),
                 currentPassword = "current-pass",
                 newPassword = "new-pass-123",
                 confirmPassword = "new-pass-123",
@@ -581,8 +687,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - user not found`() {
         val result =
             svc.changePassword(
-                userId = 999,
-                tenantId = 1,
+                userId = UserId(999),
+                tenantId = TenantId(1),
                 currentPassword = "x",
                 newPassword = "y",
                 confirmPassword = "y",
@@ -595,8 +701,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - tenant mismatch`() {
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 2,
+                userId = UserId(10),
+                tenantId = TenantId(2),
                 currentPassword = "current-pass",
                 newPassword = "new-pass-123",
                 confirmPassword = "new-pass-123",
@@ -609,8 +715,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - wrong current password`() {
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "wrong",
                 newPassword = "new-pass-123",
                 confirmPassword = "new-pass-123",
@@ -624,8 +730,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - blank new password`() {
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "  ",
                 confirmPassword = "  ",
@@ -638,8 +744,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - passwords do not match`() {
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "new-pass-123",
                 confirmPassword = "different",
@@ -653,8 +759,8 @@ class UserSelfServiceServiceTest {
         passwordPolicy.validationError = "Must include special char"
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "newpassword",
                 confirmPassword = "newpassword",
@@ -665,11 +771,15 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `changePassword - password in history`() {
-        passwordPolicy.recordPasswordHistory(10, 1, hasher.hash("reused-pass"))
+        passwordPolicy.recordPasswordHistory(
+            UserId(10),
+            TenantId(1),
+            hasher.hash("reused-pass"),
+        )
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "reused-pass",
                 confirmPassword = "reused-pass",
@@ -683,8 +793,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - no policy port falls back to minLength`() {
         val result =
             svcNoPolicyPort.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "short",
                 confirmPassword = "short",
@@ -698,8 +808,8 @@ class UserSelfServiceServiceTest {
     fun `changePassword - success updates password and revokes sessions`() {
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = null,
                 accessTokenHash = "hash1",
                 refreshTokenHash = null,
@@ -709,15 +819,21 @@ class UserSelfServiceServiceTest {
         )
         val result =
             svc.changePassword(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 currentPassword = "current-pass",
                 newPassword = "brand-new-pass",
                 confirmPassword = "brand-new-pass",
             )
         assertIs<SelfServiceResult.Success<Unit>>(result)
-        assertEquals("hashed:brand-new-pass", users.findById(10)!!.passwordHash)
-        assertTrue(sessions.findActiveByUser(1, 10).isEmpty(), "All sessions should be revoked")
+        assertEquals(
+            "hashed:brand-new-pass",
+            users.findById(UserId(10))!!.passwordHash,
+        )
+        assertTrue(
+            sessions.findActiveByUser(TenantId(1), UserId(10)).isEmpty(),
+            "All sessions should be revoked",
+        )
         assertTrue(auditLog.hasEvent(AuditEventType.USER_PASSWORD_CHANGED))
     }
 
@@ -729,8 +845,8 @@ class UserSelfServiceServiceTest {
     fun `getActiveSessions - returns active sessions for user`() {
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = null,
                 accessTokenHash = "h1",
                 refreshTokenHash = null,
@@ -740,8 +856,8 @@ class UserSelfServiceServiceTest {
         )
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = null,
                 accessTokenHash = "h2",
                 refreshTokenHash = null,
@@ -751,8 +867,8 @@ class UserSelfServiceServiceTest {
         )
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 11,
+                tenantId = TenantId(1),
+                userId = UserId(11),
                 clientId = null,
                 accessTokenHash = "h3",
                 refreshTokenHash = null,
@@ -760,7 +876,7 @@ class UserSelfServiceServiceTest {
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
         )
-        val result = svc.getActiveSessions(userId = 10, tenantId = 1)
+        val result = svc.getActiveSessions(userId = UserId(10), tenantId = TenantId(1))
         assertEquals(2, result.size)
     }
 
@@ -770,7 +886,12 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `revokeSession - session not found`() {
-        val result = svc.revokeSession(userId = 10, tenantId = 1, sessionId = 999)
+        val result =
+            svc.revokeSession(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                sessionId = SessionId(999),
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.NotFound>(result.error)
     }
@@ -780,8 +901,8 @@ class UserSelfServiceServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 11,
+                    tenantId = TenantId(1),
+                    userId = UserId(11),
                     clientId = null,
                     accessTokenHash = "h1",
                     refreshTokenHash = null,
@@ -789,7 +910,12 @@ class UserSelfServiceServiceTest {
                     expiresAt = Instant.now().plusSeconds(3600),
                 ),
             )
-        val result = svc.revokeSession(userId = 10, tenantId = 1, sessionId = session.id!!)
+        val result =
+            svc.revokeSession(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                sessionId = session.id!!,
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Unauthorized>(result.error)
     }
@@ -799,8 +925,8 @@ class UserSelfServiceServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = null,
                     accessTokenHash = "h1",
                     refreshTokenHash = null,
@@ -808,7 +934,12 @@ class UserSelfServiceServiceTest {
                     expiresAt = Instant.now().plusSeconds(3600),
                 ),
             )
-        val result = svc.revokeSession(userId = 10, tenantId = 2, sessionId = session.id!!)
+        val result =
+            svc.revokeSession(
+                userId = UserId(10),
+                tenantId = TenantId(2),
+                sessionId = session.id!!,
+            )
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.Unauthorized>(result.error)
     }
@@ -818,8 +949,8 @@ class UserSelfServiceServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = null,
                     accessTokenHash = "h1",
                     refreshTokenHash = null,
@@ -827,9 +958,14 @@ class UserSelfServiceServiceTest {
                     expiresAt = Instant.now().plusSeconds(3600),
                 ),
             )
-        val result = svc.revokeSession(userId = 10, tenantId = 1, sessionId = session.id!!)
+        val result =
+            svc.revokeSession(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                sessionId = session.id!!,
+            )
         assertIs<SelfServiceResult.Success<Unit>>(result)
-        assertTrue(sessions.findActiveByUser(1, 10).isEmpty())
+        assertTrue(sessions.findActiveByUser(TenantId(1), UserId(10)).isEmpty())
         assertTrue(auditLog.hasEvent(AuditEventType.USER_SESSION_REVOKED_SELF))
     }
 

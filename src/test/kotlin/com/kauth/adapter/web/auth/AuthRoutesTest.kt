@@ -3,11 +3,14 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
@@ -83,7 +86,7 @@ class AuthRoutesTest {
     private val encryptionService = EncryptionService("test-secret-key")
     private val tenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -92,8 +95,8 @@ class AuthRoutesTest {
 
     private val user =
         User(
-            id = 10,
-            tenantId = 1,
+            id = UserId(10),
+            tenantId = TenantId(1),
             username = "alice",
             email = "alice@example.com",
             fullName = "Alice",
@@ -103,8 +106,8 @@ class AuthRoutesTest {
 
     private val publicApp =
         Application(
-            id = 1,
-            tenantId = 1,
+            id = ApplicationId(1),
+            tenantId = TenantId(1),
             clientId = "spa-app",
             name = "SPA",
             description = null,
@@ -164,7 +167,7 @@ class AuthRoutesTest {
     fun `POST login redirects to mfa-challenge when user has MFA enabled`() =
         testApplication {
             resetFixtures()
-            every { mfaService.shouldChallengeMfa(10) } returns true
+            every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
 
             application {
                 install(ContentNegotiation) { json() }
@@ -492,7 +495,7 @@ class AuthRoutesTest {
             val issueResult =
                 oauthSvc.issueAuthorizationCode(
                     tenantSlug = "acme",
-                    userId = 10,
+                    userId = UserId(10),
                     clientId = "spa-app",
                     redirectUri = "https://app.example.com/callback",
                     scopes = "openid",
@@ -746,9 +749,9 @@ class AuthRoutesTest {
             val hash = sha256Hex(accessToken)
             sessionRepo.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = 1,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
                     accessTokenHash = hash,
                     refreshTokenHash = null,
                     scopes = "openid",
@@ -853,9 +856,9 @@ class AuthRoutesTest {
             val hash = sha256Hex(accessToken)
             sessionRepo.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = 1,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
                     accessTokenHash = hash,
                     refreshTokenHash = null,
                     scopes = "openid profile",
@@ -867,7 +870,7 @@ class AuthRoutesTest {
                     sub = "10",
                     iss = "http://localhost/t/acme",
                     aud = "spa-app",
-                    tenantId = 1,
+                    tenantId = TenantId(1),
                     username = "alice",
                     email = "alice@example.com",
                     scopes = listOf("openid", "profile"),
@@ -949,9 +952,9 @@ class AuthRoutesTest {
             val hash = sha256Hex(accessToken)
             sessionRepo.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = 1,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
                     accessTokenHash = hash,
                     refreshTokenHash = null,
                     scopes = "openid profile",
@@ -1020,9 +1023,9 @@ class AuthRoutesTest {
             val hash = sha256Hex(accessToken)
             sessionRepo.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = 1,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
                     accessTokenHash = hash,
                     refreshTokenHash = null,
                     scopes = "openid",

@@ -2,6 +2,8 @@ package com.kauth.fakes
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
 
 /**
@@ -20,9 +22,9 @@ class FakeAuditLogRepository : AuditLogRepository {
     }
 
     override fun findByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType?,
-        userId: Int?,
+        userId: UserId?,
         limit: Int,
         offset: Int,
     ): List<AuditEvent> =
@@ -35,9 +37,9 @@ class FakeAuditLogRepository : AuditLogRepository {
             .take(limit)
 
     override fun countByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType?,
-        userId: Int?,
+        userId: UserId?,
     ): Long =
         store
             .filter { it.tenantId == tenantId }

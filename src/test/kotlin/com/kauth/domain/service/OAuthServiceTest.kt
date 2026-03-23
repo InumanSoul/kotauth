@@ -3,11 +3,14 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -66,11 +69,11 @@ class OAuthServiceTest {
     // Fixtures
     // -------------------------------------------------------------------------
 
-    private val testTenant = Tenant(id = 1, slug = "acme", displayName = "Acme", issuerUrl = null)
+    private val testTenant = Tenant(id = TenantId(1), slug = "acme", displayName = "Acme", issuerUrl = null)
     private val testUser =
         User(
-            id = 10,
-            tenantId = 1,
+            id = UserId(10),
+            tenantId = TenantId(1),
             username = "alice",
             email = "alice@example.com",
             fullName = "Alice",
@@ -81,8 +84,8 @@ class OAuthServiceTest {
     /** Public client — PKCE required. */
     private val publicClient =
         Application(
-            id = 1,
-            tenantId = 1,
+            id = ApplicationId(1),
+            tenantId = TenantId(1),
             clientId = "spa-app",
             name = "SPA",
             description = null,
@@ -94,8 +97,8 @@ class OAuthServiceTest {
     /** Confidential client — secret required, PKCE optional. */
     private val confidentialClient =
         Application(
-            id = 2,
-            tenantId = 1,
+            id = ApplicationId(2),
+            tenantId = TenantId(1),
             clientId = "backend-app",
             name = "Backend",
             description = null,
@@ -133,7 +136,7 @@ class OAuthServiceTest {
         val result =
             svc.issueAuthorizationCode(
                 tenantSlug = "no-such",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -151,7 +154,7 @@ class OAuthServiceTest {
         val result =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "ghost-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -169,7 +172,7 @@ class OAuthServiceTest {
         val result =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://evil.attacker.com/steal",
                 scopes = "openid",
@@ -187,7 +190,7 @@ class OAuthServiceTest {
         val result =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -205,7 +208,7 @@ class OAuthServiceTest {
         val result =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid profile",
@@ -247,9 +250,9 @@ class OAuthServiceTest {
         val expiredCode =
             AuthorizationCode(
                 code = "expired-code",
-                tenantId = 1,
+                tenantId = TenantId(1),
                 clientId = publicClient.id,
-                userId = 10,
+                userId = UserId(10),
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
                 codeChallenge = pkceChallenge,
@@ -276,7 +279,7 @@ class OAuthServiceTest {
         val issueResult =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -307,7 +310,7 @@ class OAuthServiceTest {
         val issueResult =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -349,7 +352,7 @@ class OAuthServiceTest {
         val issueResult =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -378,7 +381,7 @@ class OAuthServiceTest {
             clientSecret = null,
         )
 
-        val activeSessions = sessions.findActiveByUser(1, 10)
+        val activeSessions = sessions.findActiveByUser(TenantId(1), UserId(10))
         assertEquals(0, activeSessions.size, "All sessions must be revoked after a replay attack")
         assertTrue(auditLog.hasEvent(AuditEventType.SESSION_REVOKED))
     }
@@ -452,7 +455,7 @@ class OAuthServiceTest {
         val issueResult =
             svc.issueAuthorizationCode(
                 tenantSlug = "acme",
-                userId = 10,
+                userId = UserId(10),
                 clientId = "spa-app",
                 redirectUri = "https://app.example.com/callback",
                 scopes = "openid",
@@ -513,8 +516,8 @@ class OAuthServiceTest {
         val accessToken = "valid-access-token"
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
                 refreshTokenHash = null,
@@ -534,8 +537,8 @@ class OAuthServiceTest {
         val accessToken = "valid-access-token"
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
                 refreshTokenHash = null,
@@ -549,7 +552,7 @@ class OAuthServiceTest {
                 sub = "10",
                 iss = "https://acme.example.com",
                 aud = "spa-app",
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "alice",
                 email = "alice@example.com",
                 scopes = listOf("openid", "profile"),
@@ -582,8 +585,8 @@ class OAuthServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = publicClient.id,
                     accessTokenHash = OAuthService.sha256(accessToken),
                     refreshTokenHash = null,
@@ -606,8 +609,8 @@ class OAuthServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = publicClient.id,
                     accessTokenHash = OAuthService.sha256("some-access"),
                     refreshTokenHash = OAuthService.sha256(refreshToken),
@@ -638,7 +641,7 @@ class OAuthServiceTest {
         val accessToken = "m2m-access"
         sessions.save(
             Session(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 userId = null,
                 clientId = confidentialClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
@@ -653,13 +656,13 @@ class OAuthServiceTest {
 
     @Test
     fun `getUserInfo - returns null for disabled user`() {
-        val disabledUser = testUser.copy(id = 20, username = "bob", email = "bob@example.com", enabled = false)
+        val disabledUser = testUser.copy(id = UserId(20), username = "bob", email = "bob@example.com", enabled = false)
         users.add(disabledUser)
         val accessToken = "disabled-user-access"
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 20,
+                tenantId = TenantId(1),
+                userId = UserId(20),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
                 refreshTokenHash = null,
@@ -676,8 +679,8 @@ class OAuthServiceTest {
         val accessToken = "valid-userinfo-token"
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
                 refreshTokenHash = null,
@@ -711,8 +714,8 @@ class OAuthServiceTest {
         val session =
             sessions.save(
                 Session(
-                    tenantId = 1,
-                    userId = 10,
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
                     clientId = publicClient.id,
                     accessTokenHash = OAuthService.sha256(accessToken),
                     refreshTokenHash = null,
@@ -723,8 +726,8 @@ class OAuthServiceTest {
         // Create a second session that should NOT be revoked
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256("other-access"),
                 refreshTokenHash = null,
@@ -736,7 +739,7 @@ class OAuthServiceTest {
         svc.endSession(accessToken = accessToken)
 
         assertNotNull(sessions.findById(session.id!!)?.revokedAt, "Target session should be revoked")
-        assertEquals(1, sessions.findActiveByUser(1, 10).size, "Other session should remain active")
+        assertEquals(1, sessions.findActiveByUser(TenantId(1), UserId(10)).size, "Other session should remain active")
         assertTrue(auditLog.hasEvent(AuditEventType.SESSION_REVOKED))
     }
 
@@ -745,8 +748,8 @@ class OAuthServiceTest {
         val accessToken = "session-global-logout"
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256(accessToken),
                 refreshTokenHash = null,
@@ -756,8 +759,8 @@ class OAuthServiceTest {
         )
         sessions.save(
             Session(
-                tenantId = 1,
-                userId = 10,
+                tenantId = TenantId(1),
+                userId = UserId(10),
                 clientId = publicClient.id,
                 accessTokenHash = OAuthService.sha256("other-access-2"),
                 refreshTokenHash = null,
@@ -768,7 +771,11 @@ class OAuthServiceTest {
 
         svc.endSession(accessToken = accessToken, revokeAll = true)
 
-        assertEquals(0, sessions.findActiveByUser(1, 10).size, "All sessions should be revoked for global logout")
+        assertEquals(
+            0,
+            sessions.findActiveByUser(TenantId(1), UserId(10)).size,
+            "All sessions should be revoked for global logout",
+        )
     }
 
     // =========================================================================
@@ -777,14 +784,14 @@ class OAuthServiceTest {
 
     @Test
     fun `getJwks - delegates to tokenPort and returns empty by default`() {
-        val jwks = svc.getJwks(tenantId = 1)
+        val jwks = svc.getJwks(tenantId = TenantId(1))
         assertTrue(jwks.isEmpty())
     }
 
     @Test
     fun `getJwks - returns configured JWKS from tokenPort`() {
         tokens.jwksToReturn = listOf(mapOf("kty" to "RSA", "kid" to "key-1", "use" to "sig"))
-        val jwks = svc.getJwks(tenantId = 1)
+        val jwks = svc.getJwks(tenantId = TenantId(1))
         assertEquals(1, jwks.size)
         assertEquals("RSA", jwks[0]["kty"])
         assertEquals("key-1", jwks[0]["kid"])

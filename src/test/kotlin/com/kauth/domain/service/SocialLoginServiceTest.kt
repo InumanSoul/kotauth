@@ -4,7 +4,9 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeIdentityProviderRepository
@@ -59,7 +61,7 @@ class SocialLoginServiceTest {
 
     private val tenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -68,7 +70,7 @@ class SocialLoginServiceTest {
 
     private val googleIdp =
         IdentityProvider(
-            tenantId = 1,
+            tenantId = TenantId(1),
             provider = SocialProvider.GOOGLE,
             clientId = "google-client-id",
             clientSecret = "google-secret",
@@ -78,8 +80,8 @@ class SocialLoginServiceTest {
     private val alice
         get() =
             User(
-                id = 10,
-                tenantId = 1,
+                id = UserId(10),
+                tenantId = TenantId(1),
                 username = "alice",
                 email = "alice@example.com",
                 fullName = "Alice Test",
@@ -91,8 +93,8 @@ class SocialLoginServiceTest {
     private val disabledUser
         get() =
             User(
-                id = 11,
-                tenantId = 1,
+                id = UserId(11),
+                tenantId = TenantId(1),
                 username = "disabled",
                 email = "disabled@example.com",
                 fullName = "Disabled",
@@ -149,7 +151,7 @@ class SocialLoginServiceTest {
     fun `buildRedirectUrl - disabled provider`() {
         idpRepo.add(
             IdentityProvider(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 provider = SocialProvider.GITHUB,
                 clientId = "gh-id",
                 clientSecret = "gh-secret",
@@ -219,8 +221,8 @@ class SocialLoginServiceTest {
     fun `handleCallback - existing user via social account link`() {
         socialAccounts.save(
             com.kauth.domain.model.SocialAccount(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 provider = SocialProvider.GOOGLE,
                 providerUserId = "google-uid-123",
                 providerEmail = "alice@example.com",
@@ -336,8 +338,8 @@ class SocialLoginServiceTest {
     fun `completeSocialRegistration - race condition existing link reuses user`() {
         socialAccounts.save(
             com.kauth.domain.model.SocialAccount(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 provider = SocialProvider.GOOGLE,
                 providerUserId = "race-uid",
                 providerEmail = "alice@example.com",

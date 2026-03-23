@@ -1,5 +1,8 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
@@ -201,7 +204,7 @@ fun Route.portalRoutes(
             call.sessions.set(
                 PortalSession(
                     userId = userId,
-                    tenantId = tenantObj.id,
+                    tenantId = tenantObj.id.value,
                     tenantSlug = slug,
                     username = username,
                 ),
@@ -215,7 +218,7 @@ fun Route.portalRoutes(
             val mfaSetupNeeded =
                 mfaService != null &&
                     tenantObj.mfaPolicy != "optional" &&
-                    !mfaService.shouldChallengeMfa(userId)
+                    !mfaService.shouldChallengeMfa(UserId(userId))
 
             if (mfaSetupNeeded) {
                 val notice =
@@ -269,7 +272,15 @@ fun Route.portalRoutes(
             val email = params["email"]?.trim() ?: ""
             val fullName = params["full_name"]?.trim() ?: ""
 
-            when (val result = selfServiceService.updateProfile(session.userId, session.tenantId, email, fullName)) {
+            when (
+                val result =
+                    selfServiceService.updateProfile(
+                        UserId(session.userId),
+                        TenantId(session.tenantId),
+                        email,
+                        fullName,
+                    )
+            ) {
                 is SelfServiceResult.Success ->
                     call.respondRedirect("/t/$slug/account/profile?saved=true")
                 is SelfServiceResult.Failure ->
@@ -285,7 +296,7 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val sessions = selfServiceService.getActiveSessions(session.userId, session.tenantId)
+            val sessions = selfServiceService.getActiveSessions(UserId(session.userId), TenantId(session.tenantId))
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]
 
@@ -314,8 +325,8 @@ fun Route.portalRoutes(
             when (
                 val result =
                     selfServiceService.changePassword(
-                        session.userId,
-                        session.tenantId,
+                        UserId(session.userId),
+                        TenantId(session.tenantId),
                         current,
                         newPw,
                         confirm,
@@ -337,10 +348,10 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
             val sessionId =
-                call.parameters["sessionId"]?.toIntOrNull()
+                call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                     ?: return@post call.respond(HttpStatusCode.BadRequest)
 
-            selfServiceService.revokeSession(session.userId, session.tenantId, sessionId)
+            selfServiceService.revokeSession(UserId(session.userId), TenantId(session.tenantId), sessionId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
         }
 
@@ -352,7 +363,7 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val mfaEnabled = mfaService?.shouldChallengeMfa(session.userId) ?: false
+            val mfaEnabled = mfaService?.shouldChallengeMfa(UserId(session.userId)) ?: false
             val successMsg = call.request.queryParameters["success"]
             val errorMsg = call.request.queryParameters["error"]
             // notice = shown when the user was redirected here because MFA setup is required
@@ -385,10 +396,10 @@ fun Route.portalRoutes(
                     ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
             if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
 
-            val tenant = tenantRepository.findById(session.tenantId)
+            val tenant = tenantRepository.findById(TenantId(session.tenantId))
             val issuer = tenant?.displayName ?: "KotAuth"
 
-            when (val result = mfaService.beginEnrollment(session.userId, session.tenantId, issuer)) {
+            when (val result = mfaService.beginEnrollment(UserId(session.userId), TenantId(session.tenantId), issuer)) {
                 is MfaResult.Success ->
                     call.respond(
                         buildJsonObject {
@@ -419,7 +430,7 @@ fun Route.portalRoutes(
             val params = call.receiveParameters()
             val code = params["code"]?.trim() ?: ""
 
-            when (val result = mfaService.verifyEnrollment(session.userId, code)) {
+            when (val result = mfaService.verifyEnrollment(UserId(session.userId), code)) {
                 is MfaResult.Success -> call.respond(mapOf("status" to "verified"))
                 is MfaResult.Failure ->
                     call.respond(
@@ -439,7 +450,7 @@ fun Route.portalRoutes(
                     ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
             if (mfaService == null) return@post call.respond(HttpStatusCode.NotFound)
 
-            mfaService.disableMfa(session.userId, session.tenantId)
+            mfaService.disableMfa(UserId(session.userId), TenantId(session.tenantId))
             call.respond(mapOf("status" to "disabled"))
         }
     }

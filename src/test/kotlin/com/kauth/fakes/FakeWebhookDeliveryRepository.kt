@@ -1,5 +1,6 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 import com.kauth.domain.port.WebhookDeliveryRepository
@@ -35,7 +36,7 @@ class FakeWebhookDeliveryRepository : WebhookDeliveryRepository {
             .take(limit)
 
     override fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         limit: Int,
     ): List<WebhookDelivery> {
         // In production this joins on endpoint.tenantId — here we need the endpoint repo
