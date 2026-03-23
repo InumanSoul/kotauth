@@ -55,17 +55,17 @@
 
 /* Admin shell — sibling combinator shrinks the shell to remaining viewport */
 .demo-banner ~ .shell {
-  height: calc(100vh - 36px);
+  height: calc(100dvh - 36px);
 }
 
 /* Portal shell — same sibling offset for the portal layout */
 .demo-banner ~ .portal-shell {
-  min-height: calc(100vh - 36px);
+  min-height: calc(100dvh - 36px);
 }
 
 /* Welcome shell — same sibling offset for the welcome page */
 .demo-banner ~ .welcome-shell {
-  min-height: calc(100vh - 36px);
+  min-height: calc(100dvh - 36px);
 }
 
 /* Auth / portal / welcome pages — push body content below the banner */

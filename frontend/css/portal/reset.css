@@ -1,0 +1,14 @@
+/* Reset auth page body centering for portal layout */
+body {
+  display: block;
+  padding: 0;
+  min-height: 100dvh;
+}
+
+/* ── Shell ───────────────────────────────────────────── */
+.portal-shell {
+  display: flex;
+  min-height: 100dvh;
+  width: 100%;
+  background: var(--bg-deep);
+}

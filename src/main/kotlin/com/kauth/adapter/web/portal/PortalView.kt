@@ -947,21 +947,6 @@ object PortalView {
             unsafe {
                 raw(
                     """
-                    /* Reset auth page body centering for portal layout */
-                    body {
-                        display: block;
-                        padding: 0;
-                        min-height: 100vh;
-                    }
-
-                    /* ── Shell ───────────────────────────────────────────── */
-                    .portal-shell {
-                        display: flex;
-                        min-height: 100vh;
-                        width: 100%;
-                        background: var(--bg-deep);
-                    }
-
                     /* ── Sidebar ─────────────────────────────────────────── */
                     .portal-nav {
                         width: 220px;
