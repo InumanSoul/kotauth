@@ -6,6 +6,7 @@ import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.AuditLogPort
@@ -266,7 +267,7 @@ class SocialLoginService(
      *   else -> return null (caller decides what to do — typically: show registration page).
      */
     private fun findExistingUser(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
         profile: SocialUserProfile,
     ): User? {

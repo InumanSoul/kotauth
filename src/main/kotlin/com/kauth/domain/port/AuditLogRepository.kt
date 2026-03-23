@@ -2,6 +2,8 @@ package com.kauth.domain.port
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 
 /**
  * Port (outbound) — read side of the audit log.
@@ -21,17 +23,17 @@ interface AuditLogRepository {
      * @param offset    pagination offset
      */
     fun findByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType? = null,
-        userId: Int? = null,
+        userId: UserId? = null,
         limit: Int = 50,
         offset: Int = 0,
     ): List<AuditEvent>
 
     /** Returns the total count for the given filters (for pagination UI). */
     fun countByTenant(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: AuditEventType? = null,
-        userId: Int? = null,
+        userId: UserId? = null,
     ): Long
 }

@@ -1,6 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.ApiKey
+import com.kauth.domain.model.TenantId
 import java.time.Instant
 
 /**
@@ -15,18 +16,18 @@ interface ApiKeyRepository {
     fun findByHash(hash: String): ApiKey?
 
     /** Returns all keys for a tenant ordered by createdAt DESC. Includes disabled keys. */
-    fun findByTenantId(tenantId: Int): List<ApiKey>
+    fun findByTenantId(tenantId: TenantId): List<ApiKey>
 
     /** Finds a specific key by id, scoped to tenant. */
     fun findById(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): ApiKey?
 
     /** Soft-revokes a key (sets enabled = false). */
     fun revoke(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     )
 
     /** Updates last_used_at. Best-effort — called after successful auth, outside main transaction. */
@@ -38,6 +39,6 @@ interface ApiKeyRepository {
     /** Hard-deletes a key. Only used for cleanup; prefer revoke for audit trail. */
     fun delete(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     )
 }

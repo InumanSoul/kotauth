@@ -1,7 +1,11 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Role
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 
 /**
  * Port for role persistence — tenant-scoped CRUD + assignment operations.
@@ -9,55 +13,55 @@ import com.kauth.domain.model.RoleScope
  * All queries are scoped to a tenant. Cross-tenant role access is architecturally impossible.
  */
 interface RoleRepository {
-    fun findById(id: Int): Role?
+    fun findById(id: RoleId): Role?
 
     fun findByName(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         scope: RoleScope,
-        clientId: Int? = null,
+        clientId: ApplicationId? = null,
     ): Role?
 
-    fun findByTenantId(tenantId: Int): List<Role>
+    fun findByTenantId(tenantId: TenantId): List<Role>
 
     fun findByClientId(
-        tenantId: Int,
-        clientId: Int,
+        tenantId: TenantId,
+        clientId: ApplicationId,
     ): List<Role>
 
     fun save(role: Role): Role
 
     fun update(role: Role): Role
 
-    fun delete(roleId: Int)
+    fun delete(roleId: RoleId)
 
     // Composite role management
     fun addChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     )
 
     fun removeChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     )
 
-    fun findChildRoleIds(roleId: Int): List<Int>
+    fun findChildRoleIds(roleId: RoleId): List<RoleId>
 
     // User ↔ Role assignment
     fun assignRoleToUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     )
 
     fun unassignRoleFromUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     )
 
-    fun findRolesForUser(userId: Int): List<Role>
+    fun findRolesForUser(userId: UserId): List<Role>
 
-    fun findUserIdsForRole(roleId: Int): List<Int>
+    fun findUserIdsForRole(roleId: RoleId): List<UserId>
 
     /**
      * Resolves all effective roles for a user, including:
@@ -68,7 +72,7 @@ interface RoleRepository {
      * This is the method that [TokenPort] should use when building token claims.
      */
     fun resolveEffectiveRoles(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
     ): List<Role>
 }

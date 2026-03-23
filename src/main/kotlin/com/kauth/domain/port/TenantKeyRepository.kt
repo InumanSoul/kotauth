@@ -1,5 +1,6 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantKey
 
 /**
@@ -8,17 +9,17 @@ import com.kauth.domain.model.TenantKey
  */
 interface TenantKeyRepository {
     /** Returns the active signing key for a tenant, or null if none exists. */
-    fun findActiveKey(tenantId: Int): TenantKey?
+    fun findActiveKey(tenantId: TenantId): TenantKey?
 
     /** Returns all enabled keys for a tenant (used by the JWKS endpoint). */
-    fun findEnabledKeys(tenantId: Int): List<TenantKey>
+    fun findEnabledKeys(tenantId: TenantId): List<TenantKey>
 
     /** Persists a newly generated key pair. */
     fun save(key: TenantKey): TenantKey
 
     /** Disables a specific key (soft rotation — does not delete). */
     fun disable(
-        tenantId: Int,
+        tenantId: TenantId,
         keyId: String,
     )
 }

@@ -2,6 +2,7 @@ package com.kauth.domain.port
 
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaRecoveryCode
+import com.kauth.domain.model.UserId
 
 /**
  * Port for MFA persistence — enrollments and recovery codes.
@@ -14,7 +15,7 @@ interface MfaRepository {
     // ---- Enrollments ----
 
     fun findEnrollmentByUserId(
-        userId: Int,
+        userId: UserId,
         method: String = "totp",
     ): MfaEnrollment?
 
@@ -24,15 +25,15 @@ interface MfaRepository {
 
     fun updateEnrollment(enrollment: MfaEnrollment): MfaEnrollment
 
-    fun deleteEnrollmentsByUser(userId: Int)
+    fun deleteEnrollmentsByUser(userId: UserId)
 
     // ---- Recovery Codes ----
 
-    fun findUnusedRecoveryCodes(userId: Int): List<MfaRecoveryCode>
+    fun findUnusedRecoveryCodes(userId: UserId): List<MfaRecoveryCode>
 
     fun saveRecoveryCodes(codes: List<MfaRecoveryCode>)
 
     fun markRecoveryCodeUsed(codeId: Int)
 
-    fun deleteRecoveryCodesByUser(userId: Int)
+    fun deleteRecoveryCodesByUser(userId: UserId)
 }

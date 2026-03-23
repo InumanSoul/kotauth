@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApiKeyRepository
 import com.kauth.domain.port.TenantRepository
 import java.security.MessageDigest
@@ -43,7 +44,7 @@ class ApiKeyService(
      *         The [rawKey] is never stored — the caller MUST surface it to the user immediately.
      */
     fun create(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         scopes: List<String>,
         expiresAt: Instant? = null,
@@ -57,7 +58,7 @@ class ApiKeyService(
 
         val tenant =
             tenantRepository.findById(tenantId)
-                ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("Tenant $tenantId not found."))
+                ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("Tenant ${tenantId.value} not found."))
 
         // Validate and filter scopes
         val validScopes = scopes.filter { it in ApiScope.ALL }
@@ -108,7 +109,7 @@ class ApiKeyService(
      */
     fun validate(
         rawKey: String,
-        expectedTenantId: Int,
+        expectedTenantId: TenantId,
     ): ApiKey? {
         val hash = sha256Hex(rawKey)
         val apiKey = apiKeyRepository.findByHash(hash) ?: return null
@@ -127,11 +128,11 @@ class ApiKeyService(
     // Admin operations
     // =========================================================================
 
-    fun listForTenant(tenantId: Int): List<ApiKey> = apiKeyRepository.findByTenantId(tenantId)
+    fun listForTenant(tenantId: TenantId): List<ApiKey> = apiKeyRepository.findByTenantId(tenantId)
 
     fun revoke(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): ApiKeyResult<Unit> {
         apiKeyRepository.findById(id, tenantId)
             ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
@@ -141,7 +142,7 @@ class ApiKeyService(
 
     fun delete(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): ApiKeyResult<Unit> {
         apiKeyRepository.findById(id, tenantId)
             ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))

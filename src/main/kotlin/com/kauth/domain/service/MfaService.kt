@@ -6,7 +6,9 @@ import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
 import com.kauth.domain.model.Role
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PasswordHasher
@@ -58,8 +60,8 @@ class MfaService(
      * If the user already has a verified enrollment, this fails.
      */
     fun beginEnrollment(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         issuer: String,
         ipAddress: String? = null,
         userAgent: String? = null,
@@ -140,7 +142,7 @@ class MfaService(
      * After this, the enrollment is active and MFA is enforced for the user.
      */
     fun verifyEnrollment(
-        userId: Int,
+        userId: UserId,
         code: String,
         ipAddress: String? = null,
         userAgent: String? = null,
@@ -194,7 +196,7 @@ class MfaService(
      * Verifies a TOTP code during login. Returns true if valid.
      */
     fun verifyTotp(
-        userId: Int,
+        userId: UserId,
         code: String,
         ipAddress: String? = null,
         userAgent: String? = null,
@@ -237,7 +239,7 @@ class MfaService(
      * authenticator device). The code is consumed and cannot be reused.
      */
     fun verifyRecoveryCode(
-        userId: Int,
+        userId: UserId,
         code: String,
         ipAddress: String? = null,
         userAgent: String? = null,
@@ -292,8 +294,8 @@ class MfaService(
      * Typically invoked by an admin or during account recovery.
      */
     fun disableMfa(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         ipAddress: String? = null,
         userAgent: String? = null,
     ): MfaResult<Unit> {
@@ -354,7 +356,7 @@ class MfaService(
      * Checks if a user needs to be challenged for MFA during login.
      * True if the user has an active, verified TOTP enrollment.
      */
-    fun shouldChallengeMfa(userId: Int): Boolean {
+    fun shouldChallengeMfa(userId: UserId): Boolean {
         val enrollment = mfaRepository.findEnrollmentByUserId(userId)
         return enrollment != null && enrollment.verified && enrollment.enabled
     }

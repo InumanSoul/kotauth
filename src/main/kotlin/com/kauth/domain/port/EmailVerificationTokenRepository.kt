@@ -1,6 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.EmailVerificationToken
+import com.kauth.domain.model.UserId
 import java.time.Instant
 
 /**
@@ -26,5 +27,5 @@ interface EmailVerificationTokenRepository {
      * Deletes all unused (not yet verified) tokens for a user.
      * Called before issuing a new token to prevent accumulation.
      */
-    fun deleteUnusedByUser(userId: Int)
+    fun deleteUnusedByUser(userId: UserId)
 }

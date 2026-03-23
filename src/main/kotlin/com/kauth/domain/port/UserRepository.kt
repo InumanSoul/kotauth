@@ -1,6 +1,8 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import java.time.Instant
 
 /**
@@ -8,21 +10,21 @@ import java.time.Instant
  * All queries are scoped by [tenantId] — there are no cross-tenant lookups.
  */
 interface UserRepository {
-    fun findById(id: Int): User?
+    fun findById(id: UserId): User?
 
     fun findByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ): User?
 
     fun findByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ): User?
 
     /** Returns all users in a tenant, optionally filtered by a search term (username/email/name prefix). */
     fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         search: String? = null,
     ): List<User>
 
@@ -37,18 +39,18 @@ interface UserRepository {
      * Called by self-service password change and admin force-reset.
      */
     fun updatePassword(
-        userId: Int,
+        userId: UserId,
         passwordHash: String,
         changedAt: Instant,
     ): User
 
     fun existsByUsername(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
     ): Boolean
 
     fun existsByEmail(
-        tenantId: Int,
+        tenantId: TenantId,
         email: String,
     ): Boolean
 }

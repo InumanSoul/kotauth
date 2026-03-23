@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 
@@ -52,5 +53,5 @@ interface TokenPort {
     /**
      * Returns the JWKS (JSON Web Key Set) for a tenant's active signing keys.
      */
-    fun getTenantJwks(tenantId: Int): List<Map<String, Any>>
+    fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>>
 }

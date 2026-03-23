@@ -1,6 +1,9 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import java.time.Instant
 
 /**
@@ -19,36 +22,36 @@ interface SessionRepository {
 
     /** Marks a session as revoked. No-op if already revoked. */
     fun revoke(
-        sessionId: Int,
+        sessionId: SessionId,
         revokedAt: Instant = Instant.now(),
     )
 
     /** Revokes all active sessions for a user within a tenant. */
     fun revokeAllForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         revokedAt: Instant = Instant.now(),
     )
 
     /** Returns all active sessions for a user (for the self-service portal). */
     fun findActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ): List<Session>
 
     /** Returns a session by its DB id, regardless of state. */
-    fun findById(id: Int): Session?
+    fun findById(id: SessionId): Session?
 
     /** Returns all active (non-revoked, non-expired) sessions across all users in a tenant. */
-    fun findActiveByTenant(tenantId: Int): List<Session>
+    fun findActiveByTenant(tenantId: TenantId): List<Session>
 
     /**
      * Counts active (non-revoked, non-expired) sessions for a user within a tenant.
      * Used to enforce [Tenant.maxConcurrentSessions].
      */
     fun countActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ): Int
 
     /**
@@ -56,8 +59,8 @@ interface SessionRepository {
      * Called after login when the session count exceeds the tenant limit.
      */
     fun revokeOldestForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         keepNewest: Int,
     )
 }

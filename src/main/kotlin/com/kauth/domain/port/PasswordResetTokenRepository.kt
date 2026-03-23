@@ -1,6 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.UserId
 import java.time.Instant
 
 /**
@@ -27,5 +28,5 @@ interface PasswordResetTokenRepository {
      * Called before issuing a new one (prevents multiple valid reset links in flight)
      * and after a successful reset (cleanup).
      */
-    fun deleteByUser(userId: Int)
+    fun deleteByUser(userId: UserId)
 }

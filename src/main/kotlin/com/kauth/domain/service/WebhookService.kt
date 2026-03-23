@@ -1,5 +1,6 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 import com.kauth.domain.model.WebhookEndpoint
@@ -66,7 +67,7 @@ class WebhookService(
      * @param payloadData Key-value pairs to include in the `data` object of the payload.
      */
     fun dispatch(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: String,
         payloadData: Map<String, Any?> = emptyMap(),
     ) {
@@ -74,7 +75,7 @@ class WebhookService(
             try {
                 endpointRepository.findEnabledByTenantAndEvent(tenantId, eventType)
             } catch (e: Exception) {
-                log.error("Webhook dispatch: failed to query endpoints for tenant=$tenantId event=$eventType", e)
+                log.error("Webhook dispatch: failed to query endpoints for tenant=${tenantId.value} event=$eventType", e)
                 return
             }
 
@@ -112,7 +113,7 @@ class WebhookService(
      * @return [WebhookResult.Success] with the saved endpoint, or [WebhookResult.Failure]
      */
     fun createEndpoint(
-        tenantId: Int,
+        tenantId: TenantId,
         url: String,
         events: Set<String>,
         description: String = "",
@@ -141,21 +142,21 @@ class WebhookService(
         return WebhookResult.Success(saved, plaintextSecret = secret)
     }
 
-    fun listEndpoints(tenantId: Int): List<WebhookEndpoint> = endpointRepository.findByTenantId(tenantId)
+    fun listEndpoints(tenantId: TenantId): List<WebhookEndpoint> = endpointRepository.findByTenantId(tenantId)
 
     fun deleteEndpoint(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) = endpointRepository.delete(id, tenantId)
 
     fun toggleEndpoint(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
         enabled: Boolean,
     ) = endpointRepository.setEnabled(id, tenantId, enabled)
 
     fun recentDeliveries(
-        tenantId: Int,
+        tenantId: TenantId,
         limit: Int = 50,
     ): List<WebhookDelivery> = deliveryRepository.findByTenantId(tenantId, limit)
 

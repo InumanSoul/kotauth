@@ -1,60 +1,64 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
+import com.kauth.domain.model.RoleId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 
 /**
  * Port for group persistence — tenant-scoped CRUD + membership operations.
  */
 interface GroupRepository {
-    fun findById(id: Int): Group?
+    fun findById(id: GroupId): Group?
 
-    fun findByTenantId(tenantId: Int): List<Group>
+    fun findByTenantId(tenantId: TenantId): List<Group>
 
     fun findByName(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
-        parentGroupId: Int? = null,
+        parentGroupId: GroupId? = null,
     ): Group?
 
-    fun findChildren(groupId: Int): List<Group>
+    fun findChildren(groupId: GroupId): List<Group>
 
     fun save(group: Group): Group
 
     fun update(group: Group): Group
 
-    fun delete(groupId: Int)
+    fun delete(groupId: GroupId)
 
     // Group ↔ Role assignment
     fun assignRoleToGroup(
-        groupId: Int,
-        roleId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
     )
 
     fun unassignRoleFromGroup(
-        groupId: Int,
-        roleId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
     )
 
-    fun findRoleIdsForGroup(groupId: Int): List<Int>
+    fun findRoleIdsForGroup(groupId: GroupId): List<RoleId>
 
     // User ↔ Group membership
     fun addUserToGroup(
-        userId: Int,
-        groupId: Int,
+        userId: UserId,
+        groupId: GroupId,
     )
 
     fun removeUserFromGroup(
-        userId: Int,
-        groupId: Int,
+        userId: UserId,
+        groupId: GroupId,
     )
 
-    fun findGroupsForUser(userId: Int): List<Group>
+    fun findGroupsForUser(userId: UserId): List<Group>
 
-    fun findUserIdsInGroup(groupId: Int): List<Int>
+    fun findUserIdsInGroup(groupId: GroupId): List<UserId>
 
     /**
      * Returns all ancestor group IDs for a group (walking up the hierarchy).
      * Used for role inheritance resolution.
      */
-    fun findAncestorGroupIds(groupId: Int): List<Int>
+    fun findAncestorGroupIds(groupId: GroupId): List<GroupId>
 }

@@ -3,8 +3,10 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
@@ -370,8 +372,8 @@ class AuthService(
     // Helpers
     // -------------------------------------------------------------------------
     private fun enforceConcurrentSessionLimit(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         maxSessions: Int?,
     ) {
         if (maxSessions == null || maxSessions <= 0) return

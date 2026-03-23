@@ -5,7 +5,9 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuthorizationCodeRepository
@@ -69,7 +71,7 @@ class OAuthService(
      */
     fun issueAuthorizationCode(
         tenantSlug: String,
-        userId: Int,
+        userId: UserId,
         clientId: String,
         redirectUri: String,
         scopes: String,
@@ -563,7 +565,7 @@ class OAuthService(
         if (!user.enabled) return null
 
         return UserInfoResult(
-            sub = user.id.toString(),
+            sub = user.id!!.value.toString(),
             username = user.username,
             email = user.email,
             emailVerified = user.emailVerified,
@@ -610,7 +612,7 @@ class OAuthService(
     // JWKS delegation (called from OIDC certs endpoint)
     // -------------------------------------------------------------------------
 
-    fun getJwks(tenantId: Int): List<Map<String, Any>> = tokenPort.getTenantJwks(tenantId)
+    fun getJwks(tenantId: TenantId): List<Map<String, Any>> = tokenPort.getTenantJwks(tenantId)
 
     // -------------------------------------------------------------------------
     // Internal utilities

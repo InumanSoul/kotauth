@@ -5,7 +5,10 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.EmailVerificationTokenRepository
@@ -63,8 +66,8 @@ class UserSelfServiceService(
      * Returns [SelfServiceError.SmtpNotConfigured] if the tenant has no SMTP.
      */
     fun initiateEmailVerification(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         baseUrl: String,
     ): SelfServiceResult<Unit> {
         val tenant =
@@ -102,7 +105,7 @@ class UserSelfServiceService(
         try {
             emailPort.sendVerificationEmail(user.email, user.fullName, verifyUrl, tenant.displayName, tenant)
         } catch (e: Exception) {
-            log.warn("Verification email delivery failed tenantId={} userId={}: {}", tenantId, userId, e.message, e)
+            log.warn("Verification email delivery failed tenantId={} userId={}: {}", tenantId.value, userId.value, e.message, e)
             return SelfServiceResult.Failure(
                 SelfServiceError.EmailDeliveryFailed(
                     "Failed to send verification email. Please try again later.",
@@ -212,7 +215,7 @@ class UserSelfServiceService(
             emailPort.sendPasswordResetEmail(user.email, user.fullName, resetUrl, tenant.displayName, tenant)
         } catch (e: Exception) {
             // Log but do NOT surface to caller — attacker must not learn the email exists
-            log.warn("Password reset email delivery failed tenantId={} userId={}: {}", tenant.id, user.id, e.message, e)
+            log.warn("Password reset email delivery failed tenantId={} userId={}: {}", tenant.id.value, user.id.value, e.message, e)
         }
 
         auditLog.record(
@@ -324,8 +327,8 @@ class UserSelfServiceService(
      * Email uniqueness is re-checked if it changed.
      */
     fun updateProfile(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         email: String,
         fullName: String,
     ): SelfServiceResult<User> {
@@ -378,8 +381,8 @@ class UserSelfServiceService(
      * Requires current password verification. Revokes all active sessions on success.
      */
     fun changePassword(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         currentPassword: String,
         newPassword: String,
         confirmPassword: String,
@@ -456,8 +459,8 @@ class UserSelfServiceService(
 
     /** Returns all active sessions for the given user. */
     fun getActiveSessions(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
     ): List<Session> = sessionRepository.findActiveByUser(tenantId, userId)
 
     /**
@@ -465,9 +468,9 @@ class UserSelfServiceService(
      * another user's session through this path.
      */
     fun revokeSession(
-        userId: Int,
-        tenantId: Int,
-        sessionId: Int,
+        userId: UserId,
+        tenantId: TenantId,
+        sessionId: SessionId,
     ): SelfServiceResult<Unit> {
         val session =
             sessionRepository.findById(sessionId)
@@ -487,7 +490,7 @@ class UserSelfServiceService(
                 eventType = AuditEventType.USER_SESSION_REVOKED_SELF,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("sessionId" to sessionId.toString()),
+                details = mapOf("sessionId" to sessionId.value.toString()),
             ),
         )
 
