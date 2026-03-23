@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -70,7 +71,7 @@ fun Route.adminUserRoutes(
             val password = params["password"] ?: ""
             when (val result = adminService.createUser(workspace.id, username, email, fullName, password)) {
                 is AdminResult.Success ->
-                    call.respondRedirect("/admin/workspaces/$slug/users/${result.value.id}")
+                    call.respondRedirect("/admin/workspaces/$slug/users/${result.value.id?.value}")
                 is AdminResult.Failure -> {
                     val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     val prefill = UserPrefill(username = username, email = email, fullName = fullName)
@@ -94,7 +95,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -133,7 +134,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -156,7 +157,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -173,7 +174,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -181,7 +182,7 @@ fun Route.adminUserRoutes(
                     userRepository.findById(userId) ?: return@post call.respond(HttpStatusCode.NotFound)
                 if (user.tenantId != workspace.id) return@post call.respond(HttpStatusCode.NotFound)
                 adminService.setUserEnabled(userId, workspace.id, !user.enabled)
-                call.respondRedirect("/admin/workspaces/$slug/users/$userId")
+                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
             }
 
             post("/edit") {
@@ -189,7 +190,7 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -216,7 +217,7 @@ fun Route.adminUserRoutes(
                                 ContentType.Text.Html,
                             )
                         } else {
-                            call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                            call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=true")
                         }
                     }
                     is AdminResult.Failure -> {
@@ -257,42 +258,42 @@ fun Route.adminUserRoutes(
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 sessionRepository.revokeAllForUser(workspace.id, userId)
-                call.respondRedirect("/admin/workspaces/$slug/users/$userId")
+                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
             }
 
             post("/send-verification") {
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
                 adminService.resendVerificationEmail(userId, workspace.id, baseUrl)
-                call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=true")
+                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=true")
             }
 
             post("/send-reset-email") {
                 val slug =
                     call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace =
                     tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
                 when (val result = adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
-                        call.respondRedirect("/admin/workspaces/$slug/users/$userId?saved=reset_email_sent")
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
                     is AdminResult.Failure ->
                         call.respondRedirect(
-                            "/admin/workspaces/$slug/users/$userId?error=${java.net.URLEncoder.encode(
+                            "/admin/workspaces/$slug/users/${userId.value}?error=${java.net.URLEncoder.encode(
                                 result.error.message,
                                 "UTF-8",
                             )}",

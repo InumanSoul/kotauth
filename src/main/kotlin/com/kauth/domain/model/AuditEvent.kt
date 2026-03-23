@@ -10,9 +10,9 @@ import java.time.Instant
  * reasons, client names, etc.) serialized to JSONB in the database.
  */
 data class AuditEvent(
-    val tenantId: Int?,
-    val userId: Int?,
-    val clientId: Int?,
+    val tenantId: TenantId?,
+    val userId: UserId?,
+    val clientId: ApplicationId?,
     val eventType: AuditEventType,
     val ipAddress: String?,
     val userAgent: String?,

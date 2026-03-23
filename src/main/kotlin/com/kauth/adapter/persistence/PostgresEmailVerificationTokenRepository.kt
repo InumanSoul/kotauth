@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.EmailVerificationToken
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.EmailVerificationTokenRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -19,8 +21,8 @@ class PostgresEmailVerificationTokenRepository : EmailVerificationTokenRepositor
         transaction {
             val insertedId =
                 EmailVerificationTokensTable.insert {
-                    it[userId] = token.userId
-                    it[tenantId] = token.tenantId
+                    it[userId] = token.userId.value
+                    it[tenantId] = token.tenantId.value
                     it[tokenHash] = token.tokenHash
                     it[expiresAt] = token.expiresAt.toOffsetDateTime()
                     it[createdAt] = token.createdAt.toOffsetDateTime()
@@ -48,10 +50,10 @@ class PostgresEmailVerificationTokenRepository : EmailVerificationTokenRepositor
         Unit
     }
 
-    override fun deleteUnusedByUser(userId: Int) =
+    override fun deleteUnusedByUser(userId: UserId) =
         transaction {
             EmailVerificationTokensTable.deleteWhere {
-                (EmailVerificationTokensTable.userId eq userId) and
+                (EmailVerificationTokensTable.userId eq userId.value) and
                     (EmailVerificationTokensTable.usedAt.isNull())
             }
             Unit
@@ -60,8 +62,8 @@ class PostgresEmailVerificationTokenRepository : EmailVerificationTokenRepositor
     private fun ResultRow.toToken() =
         EmailVerificationToken(
             id = this[EmailVerificationTokensTable.id],
-            userId = this[EmailVerificationTokensTable.userId],
-            tenantId = this[EmailVerificationTokensTable.tenantId],
+            userId = UserId(this[EmailVerificationTokensTable.userId]),
+            tenantId = TenantId(this[EmailVerificationTokensTable.tenantId]),
             tokenHash = this[EmailVerificationTokensTable.tokenHash],
             expiresAt = this[EmailVerificationTokensTable.expiresAt].toInstant(),
             usedAt = this[EmailVerificationTokensTable.usedAt]?.toInstant(),

@@ -2,6 +2,7 @@ package com.kauth.fakes
 
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.IdentityProviderRepository
 
 /**
@@ -22,14 +23,14 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
         nextId = 1
     }
 
-    override fun findEnabledByTenant(tenantId: Int): List<IdentityProvider> =
+    override fun findEnabledByTenant(tenantId: TenantId): List<IdentityProvider> =
         store.values.filter { it.tenantId == tenantId && it.enabled }
 
-    override fun findAllByTenant(tenantId: Int): List<IdentityProvider> =
+    override fun findAllByTenant(tenantId: TenantId): List<IdentityProvider> =
         store.values.filter { it.tenantId == tenantId }
 
     override fun findByTenantAndProvider(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     ): IdentityProvider? = store.values.find { it.tenantId == tenantId && it.provider == provider }
 
@@ -45,7 +46,7 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
     }
 
     override fun delete(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     ) {
         store.entries.removeIf { it.value.tenantId == tenantId && it.value.provider == provider }

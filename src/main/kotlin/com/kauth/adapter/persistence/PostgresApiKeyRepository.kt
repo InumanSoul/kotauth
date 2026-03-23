@@ -1,6 +1,7 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.ApiKey
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApiKeyRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -38,7 +39,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         transaction {
             val insertedId =
                 ApiKeysTable.insert {
-                    it[tenantId] = apiKey.tenantId
+                    it[tenantId] = apiKey.tenantId.value
                     it[name] = apiKey.name
                     it[keyPrefix] = apiKey.keyPrefix
                     it[keyHash] = apiKey.keyHash
@@ -60,33 +61,33 @@ class PostgresApiKeyRepository : ApiKeyRepository {
                 .singleOrNull()
         }
 
-    override fun findByTenantId(tenantId: Int): List<ApiKey> =
+    override fun findByTenantId(tenantId: TenantId): List<ApiKey> =
         transaction {
             ApiKeysTable
                 .selectAll()
-                .where { ApiKeysTable.tenantId eq tenantId }
+                .where { ApiKeysTable.tenantId eq tenantId.value }
                 .orderBy(ApiKeysTable.createdAt, SortOrder.DESC)
                 .map { it.toApiKey() }
         }
 
     override fun findById(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): ApiKey? =
         transaction {
             ApiKeysTable
                 .selectAll()
-                .where { (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId) }
+                .where { (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value) }
                 .map { it.toApiKey() }
                 .singleOrNull()
         }
 
     override fun revoke(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) = transaction {
         ApiKeysTable.update({
-            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId)
+            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value)
         }) {
             it[enabled] = false
         }
@@ -106,10 +107,10 @@ class PostgresApiKeyRepository : ApiKeyRepository {
 
     override fun delete(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) = transaction {
         ApiKeysTable.deleteWhere {
-            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId)
+            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value)
         }
         Unit
     }
@@ -124,7 +125,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         val created: OffsetDateTime = this[ApiKeysTable.createdAt]
         return ApiKey(
             id = this[ApiKeysTable.id],
-            tenantId = this[ApiKeysTable.tenantId],
+            tenantId = TenantId(this[ApiKeysTable.tenantId]),
             name = this[ApiKeysTable.name],
             keyPrefix = this[ApiKeysTable.keyPrefix],
             keyHash = this[ApiKeysTable.keyHash],

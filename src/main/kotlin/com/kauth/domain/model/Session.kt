@@ -14,10 +14,10 @@ import java.time.Instant
  * [userId] is null for client_credentials sessions (machine-to-machine).
  */
 data class Session(
-    val id: Int? = null,
-    val tenantId: Int,
-    val userId: Int?, // null for M2M (client_credentials)
-    val clientId: Int?,
+    val id: SessionId? = null,
+    val tenantId: TenantId,
+    val userId: UserId?,
+    val clientId: ApplicationId?,
     val accessTokenHash: String,
     val refreshTokenHash: String?,
     val scopes: String = "openid",

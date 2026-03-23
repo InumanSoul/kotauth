@@ -13,7 +13,7 @@ data class AccessTokenClaims(
     val sub: String,
     val iss: String,
     val aud: String,
-    val tenantId: Int,
+    val tenantId: TenantId,
     val username: String?,
     val email: String?,
     val scopes: List<String>,

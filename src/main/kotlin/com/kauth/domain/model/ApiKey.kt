@@ -14,7 +14,7 @@ import java.time.Instant
  */
 data class ApiKey(
     val id: Int? = null,
-    val tenantId: Int,
+    val tenantId: TenantId,
     val name: String,
     /** First 8 chars of the raw key — shown in the admin UI as a hint (e.g. "kauth_my…"). */
     val keyPrefix: String,

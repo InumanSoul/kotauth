@@ -2,6 +2,8 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApplicationRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -14,11 +16,11 @@ import org.jetbrains.exposed.sql.transactions.transaction
  * Follows the same pattern as PostgresTenantRepository.
  */
 class PostgresApplicationRepository : ApplicationRepository {
-    override fun findByTenantId(tenantId: Int): List<Application> =
+    override fun findByTenantId(tenantId: TenantId): List<Application> =
         transaction {
             ClientsTable
                 .selectAll()
-                .where { ClientsTable.tenantId eq tenantId }
+                .where { ClientsTable.tenantId eq tenantId.value }
                 .orderBy(ClientsTable.id)
                 .map { row ->
                     val uris = urisForClientPk(row[ClientsTable.id])
@@ -27,62 +29,62 @@ class PostgresApplicationRepository : ApplicationRepository {
         }
 
     override fun findByClientId(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
     ): Application? =
         transaction {
             val row =
                 ClientsTable
                     .selectAll()
-                    .where { (ClientsTable.tenantId eq tenantId) and (ClientsTable.clientId eq clientId) }
+                    .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.clientId eq clientId) }
                     .singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
             row.toApplication(uris)
         }
 
-    override fun findById(id: Int): Application? =
+    override fun findById(id: ApplicationId): Application? =
         transaction {
             val row =
                 ClientsTable
                     .selectAll()
-                    .where { ClientsTable.id eq id }
+                    .where { ClientsTable.id eq id.value }
                     .singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
             row.toApplication(uris)
         }
 
-    override fun findClientSecretHash(clientPk: Int): String? =
+    override fun findClientSecretHash(clientPk: ApplicationId): String? =
         transaction {
             ClientsTable
                 .selectAll()
-                .where { ClientsTable.id eq clientPk }
+                .where { ClientsTable.id eq clientPk.value }
                 .map { it[ClientsTable.clientSecretHash] }
                 .singleOrNull()
         }
 
     override fun setClientSecretHash(
-        clientPk: Int,
+        clientPk: ApplicationId,
         secretHash: String,
     ) = transaction {
-        ClientsTable.update({ ClientsTable.id eq clientPk }) {
+        ClientsTable.update({ ClientsTable.id eq clientPk.value }) {
             it[clientSecretHash] = secretHash
         }
         Unit
     }
 
     override fun existsByClientId(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
     ): Boolean =
         transaction {
             ClientsTable
                 .selectAll()
-                .where { (ClientsTable.tenantId eq tenantId) and (ClientsTable.clientId eq clientId) }
+                .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.clientId eq clientId) }
                 .count() > 0
         }
 
     override fun create(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
         name: String,
         description: String?,
@@ -92,7 +94,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         transaction {
             val insertedPk =
                 ClientsTable.insert {
-                    it[ClientsTable.tenantId] = tenantId
+                    it[ClientsTable.tenantId] = tenantId.value
                     it[ClientsTable.clientId] = clientId
                     it[ClientsTable.name] = name
                     it[ClientsTable.description] = description
@@ -112,35 +114,35 @@ class PostgresApplicationRepository : ApplicationRepository {
         }
 
     override fun update(
-        appId: Int,
+        appId: ApplicationId,
         name: String,
         description: String?,
         accessType: String,
         redirectUris: List<String>,
     ): Application =
         transaction {
-            ClientsTable.update({ ClientsTable.id eq appId }) {
+            ClientsTable.update({ ClientsTable.id eq appId.value }) {
                 it[ClientsTable.name] = name
                 it[ClientsTable.description] = description
                 it[ClientsTable.accessType] = AccessType.fromValue(accessType)
             }
             // Replace all redirect URIs atomically
-            ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId }
+            ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId.value }
             if (redirectUris.isNotEmpty()) {
                 ClientRedirectUrisTable.batchInsert(redirectUris) { uri ->
-                    this[ClientRedirectUrisTable.clientId] = appId
+                    this[ClientRedirectUrisTable.clientId] = appId.value
                     this[ClientRedirectUrisTable.uri] = uri
                 }
             }
-            val row = ClientsTable.selectAll().where { ClientsTable.id eq appId }.single()
-            row.toApplication(urisForClientPk(appId))
+            val row = ClientsTable.selectAll().where { ClientsTable.id eq appId.value }.single()
+            row.toApplication(urisForClientPk(appId.value))
         }
 
     override fun setEnabled(
-        appId: Int,
+        appId: ApplicationId,
         enabled: Boolean,
     ) = transaction {
-        ClientsTable.update({ ClientsTable.id eq appId }) {
+        ClientsTable.update({ ClientsTable.id eq appId.value }) {
             it[ClientsTable.enabled] = enabled
         }
         Unit
@@ -158,8 +160,8 @@ class PostgresApplicationRepository : ApplicationRepository {
 
     private fun ResultRow.toApplication(uris: List<String> = emptyList()): Application =
         Application(
-            id = this[ClientsTable.id],
-            tenantId = this[ClientsTable.tenantId],
+            id = ApplicationId(this[ClientsTable.id]),
+            tenantId = TenantId(this[ClientsTable.tenantId]),
             clientId = this[ClientsTable.clientId],
             name = this[ClientsTable.name],
             description = this[ClientsTable.description],

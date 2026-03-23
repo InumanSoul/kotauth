@@ -1,6 +1,10 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -16,9 +20,9 @@ class PostgresSessionRepository : SessionRepository {
         transaction {
             val insertedId =
                 SessionsTable.insert {
-                    it[tenantId] = session.tenantId
-                    it[userId] = session.userId
-                    it[clientId] = session.clientId
+                    it[tenantId] = session.tenantId.value
+                    it[userId] = session.userId?.value
+                    it[clientId] = session.clientId?.value
                     it[accessTokenHash] = session.accessTokenHash
                     it[refreshTokenHash] = session.refreshTokenHash
                     it[scopes] = session.scopes
@@ -31,7 +35,7 @@ class PostgresSessionRepository : SessionRepository {
                     it[revokedAt] = session.revokedAt?.toOffsetDateTime()
                 } get SessionsTable.id
 
-            session.copy(id = insertedId)
+            session.copy(id = SessionId(insertedId))
         }
 
     override fun findActiveByAccessTokenHash(hash: String): Session? =
@@ -62,24 +66,24 @@ class PostgresSessionRepository : SessionRepository {
         }
 
     override fun revoke(
-        sessionId: Int,
+        sessionId: SessionId,
         revokedAt: Instant,
     ) = transaction {
-        SessionsTable.update({ SessionsTable.id eq sessionId }) {
+        SessionsTable.update({ SessionsTable.id eq sessionId.value }) {
             it[SessionsTable.revokedAt] = revokedAt.toOffsetDateTime()
         }
         Unit
     }
 
     override fun revokeAllForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         revokedAt: Instant,
     ) = transaction {
         val ts = revokedAt.toOffsetDateTime()
         SessionsTable.update({
-            (SessionsTable.tenantId eq tenantId) and
-                (SessionsTable.userId eq userId) and
+            (SessionsTable.tenantId eq tenantId.value) and
+                (SessionsTable.userId eq userId.value) and
                 (SessionsTable.revokedAt.isNull())
         }) {
             it[SessionsTable.revokedAt] = ts
@@ -88,38 +92,38 @@ class PostgresSessionRepository : SessionRepository {
     }
 
     override fun findActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ): List<Session> =
         transaction {
             val now = OffsetDateTime.now()
             SessionsTable
                 .selectAll()
                 .where {
-                    (SessionsTable.tenantId eq tenantId) and
-                        (SessionsTable.userId eq userId) and
+                    (SessionsTable.tenantId eq tenantId.value) and
+                        (SessionsTable.userId eq userId.value) and
                         (SessionsTable.revokedAt.isNull()) and
                         (SessionsTable.expiresAt greater now)
                 }.orderBy(SessionsTable.createdAt, SortOrder.DESC)
                 .map { it.toSession() }
         }
 
-    override fun findById(id: Int): Session? =
+    override fun findById(id: SessionId): Session? =
         transaction {
             SessionsTable
                 .selectAll()
-                .where { SessionsTable.id eq id }
+                .where { SessionsTable.id eq id.value }
                 .map { it.toSession() }
                 .singleOrNull()
         }
 
-    override fun findActiveByTenant(tenantId: Int): List<Session> =
+    override fun findActiveByTenant(tenantId: TenantId): List<Session> =
         transaction {
             val now = OffsetDateTime.now()
             SessionsTable
                 .selectAll()
                 .where {
-                    (SessionsTable.tenantId eq tenantId) and
+                    (SessionsTable.tenantId eq tenantId.value) and
                         (SessionsTable.revokedAt.isNull()) and
                         (SessionsTable.expiresAt greater now)
                 }.orderBy(SessionsTable.createdAt, SortOrder.DESC)
@@ -127,16 +131,16 @@ class PostgresSessionRepository : SessionRepository {
         }
 
     override fun countActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ): Int =
         transaction {
             val now = OffsetDateTime.now()
             SessionsTable
                 .selectAll()
                 .where {
-                    (SessionsTable.tenantId eq tenantId) and
-                        (SessionsTable.userId eq userId) and
+                    (SessionsTable.tenantId eq tenantId.value) and
+                        (SessionsTable.userId eq userId.value) and
                         (SessionsTable.revokedAt.isNull()) and
                         (SessionsTable.expiresAt greater now)
                 }.count()
@@ -144,8 +148,8 @@ class PostgresSessionRepository : SessionRepository {
         }
 
     override fun revokeOldestForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         keepNewest: Int,
     ) = transaction {
         val now = OffsetDateTime.now()
@@ -156,8 +160,8 @@ class PostgresSessionRepository : SessionRepository {
             SessionsTable
                 .select(SessionsTable.id)
                 .where {
-                    (SessionsTable.tenantId eq tenantId) and
-                        (SessionsTable.userId eq userId) and
+                    (SessionsTable.tenantId eq tenantId.value) and
+                        (SessionsTable.userId eq userId.value) and
                         (SessionsTable.revokedAt.isNull()) and
                         (SessionsTable.expiresAt greater now)
                 }.orderBy(SessionsTable.createdAt, SortOrder.ASC)
@@ -181,10 +185,10 @@ class PostgresSessionRepository : SessionRepository {
 
     private fun ResultRow.toSession() =
         Session(
-            id = this[SessionsTable.id],
-            tenantId = this[SessionsTable.tenantId],
-            userId = this[SessionsTable.userId],
-            clientId = this[SessionsTable.clientId],
+            id = SessionId(this[SessionsTable.id]),
+            tenantId = TenantId(this[SessionsTable.tenantId]),
+            userId = this[SessionsTable.userId]?.let { UserId(it) },
+            clientId = this[SessionsTable.clientId]?.let { ApplicationId(it) },
             accessTokenHash = this[SessionsTable.accessTokenHash],
             refreshTokenHash = this[SessionsTable.refreshTokenHash],
             scopes = this[SessionsTable.scopes],

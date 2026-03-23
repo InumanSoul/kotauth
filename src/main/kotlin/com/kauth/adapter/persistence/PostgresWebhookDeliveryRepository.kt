@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 import com.kauth.domain.port.WebhookDeliveryRepository
@@ -81,7 +82,7 @@ class PostgresWebhookDeliveryRepository : WebhookDeliveryRepository {
         }
 
     override fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         limit: Int,
     ): List<WebhookDelivery> =
         transaction {
@@ -89,7 +90,7 @@ class PostgresWebhookDeliveryRepository : WebhookDeliveryRepository {
             // toDelivery() only reads WebhookDeliveriesTable columns so the extra endpoint columns are safe.
             (WebhookDeliveriesTable innerJoin WebhookEndpointsTable)
                 .selectAll()
-                .where { WebhookEndpointsTable.tenantId eq tenantId }
+                .where { WebhookEndpointsTable.tenantId eq tenantId.value }
                 .orderBy(WebhookDeliveriesTable.createdAt, SortOrder.DESC)
                 .limit(limit)
                 .map { it.toDelivery() }

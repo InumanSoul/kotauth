@@ -1,5 +1,6 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.port.WebhookEndpointRepository
 
@@ -24,11 +25,11 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
         return e
     }
 
-    override fun findByTenantId(tenantId: Int): List<WebhookEndpoint> =
+    override fun findByTenantId(tenantId: TenantId): List<WebhookEndpoint> =
         store.values.filter { it.tenantId == tenantId }.sortedByDescending { it.createdAt }
 
     override fun findEnabledByTenantAndEvent(
-        tenantId: Int,
+        tenantId: TenantId,
         eventType: String,
     ): List<WebhookEndpoint> =
         store.values.filter {
@@ -37,7 +38,7 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
 
     override fun findById(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ): WebhookEndpoint? = store[id]?.takeIf { it.tenantId == tenantId }
 
     override fun update(endpoint: WebhookEndpoint) {
@@ -46,7 +47,7 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
 
     override fun delete(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
     ) {
         val ep = store[id]
         if (ep != null && ep.tenantId == tenantId) store.remove(id)
@@ -54,7 +55,7 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
 
     override fun setEnabled(
         id: Int,
-        tenantId: Int,
+        tenantId: TenantId,
         enabled: Boolean,
     ) {
         val ep = store[id]

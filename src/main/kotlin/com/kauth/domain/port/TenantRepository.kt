@@ -1,6 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 
 /**
  * Port (outbound) — defines what the domain needs from tenant persistence.
@@ -8,7 +9,7 @@ import com.kauth.domain.model.Tenant
 interface TenantRepository {
     fun findBySlug(slug: String): Tenant?
 
-    fun findById(id: Int): Tenant?
+    fun findById(id: TenantId): Tenant?
 
     fun existsBySlug(slug: String): Boolean
 

@@ -43,7 +43,7 @@ class KeyProvisioningService(
     fun provisionForTenant(tenant: Tenant) {
         val existingKey = tenantKeyRepository.findActiveKey(tenant.id)
         if (existingKey == null) {
-            log.info("Generating RS256 key pair for tenant '${tenant.slug}' (id=${tenant.id})")
+            log.info("Generating RS256 key pair for tenant '${tenant.slug}' (id=${tenant.id.value})")
             val keyPair =
                 KeyGenerator.generateRsaKeyPair(
                     keyId = "${tenant.slug}-${System.currentTimeMillis()}",

@@ -3,6 +3,8 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.MfaEnrollment
 import com.kauth.domain.model.MfaMethod
 import com.kauth.domain.model.MfaRecoveryCode
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.MfaRepository
 import org.jetbrains.exposed.sql.*
@@ -26,14 +28,14 @@ class PostgresMfaRepository(
     // -----------------------------------------------------------------------
 
     override fun findEnrollmentByUserId(
-        userId: Int,
+        userId: UserId,
         method: String,
     ): MfaEnrollment? =
         transaction {
             MfaEnrollmentsTable
                 .selectAll()
                 .where {
-                    (MfaEnrollmentsTable.userId eq userId) and
+                    (MfaEnrollmentsTable.userId eq userId.value) and
                         (MfaEnrollmentsTable.method eq method)
                 }.map { it.toEnrollment() }
                 .singleOrNull()
@@ -55,8 +57,8 @@ class PostgresMfaRepository(
 
             val insertedId =
                 MfaEnrollmentsTable.insert {
-                    it[userId] = enrollment.userId
-                    it[tenantId] = enrollment.tenantId
+                    it[userId] = enrollment.userId.value
+                    it[tenantId] = enrollment.tenantId.value
                     it[method] = enrollment.method.value
                     it[secret] = encryptedSecret
                     it[verified] = enrollment.verified
@@ -89,21 +91,21 @@ class PostgresMfaRepository(
                 .toEnrollment()
         }
 
-    override fun deleteEnrollmentsByUser(userId: Int): Unit =
+    override fun deleteEnrollmentsByUser(userId: UserId): Unit =
         transaction {
-            MfaEnrollmentsTable.deleteWhere { MfaEnrollmentsTable.userId eq userId }
+            MfaEnrollmentsTable.deleteWhere { MfaEnrollmentsTable.userId eq userId.value }
         }
 
     // -----------------------------------------------------------------------
     // Recovery Codes
     // -----------------------------------------------------------------------
 
-    override fun findUnusedRecoveryCodes(userId: Int): List<MfaRecoveryCode> =
+    override fun findUnusedRecoveryCodes(userId: UserId): List<MfaRecoveryCode> =
         transaction {
             MfaRecoveryCodesTable
                 .selectAll()
                 .where {
-                    (MfaRecoveryCodesTable.userId eq userId) and
+                    (MfaRecoveryCodesTable.userId eq userId.value) and
                         (MfaRecoveryCodesTable.usedAt.isNull())
                 }.map { it.toRecoveryCode() }
         }
@@ -112,8 +114,8 @@ class PostgresMfaRepository(
         transaction {
             val now = OffsetDateTime.now(ZoneOffset.UTC)
             MfaRecoveryCodesTable.batchInsert(codes) { code ->
-                this[MfaRecoveryCodesTable.userId] = code.userId
-                this[MfaRecoveryCodesTable.tenantId] = code.tenantId
+                this[MfaRecoveryCodesTable.userId] = code.userId.value
+                this[MfaRecoveryCodesTable.tenantId] = code.tenantId.value
                 this[MfaRecoveryCodesTable.codeHash] = code.codeHash
                 this[MfaRecoveryCodesTable.usedAt] = null
                 this[MfaRecoveryCodesTable.createdAt] = now
@@ -127,9 +129,9 @@ class PostgresMfaRepository(
             }
         }
 
-    override fun deleteRecoveryCodesByUser(userId: Int): Unit =
+    override fun deleteRecoveryCodesByUser(userId: UserId): Unit =
         transaction {
-            MfaRecoveryCodesTable.deleteWhere { MfaRecoveryCodesTable.userId eq userId }
+            MfaRecoveryCodesTable.deleteWhere { MfaRecoveryCodesTable.userId eq userId.value }
         }
 
     // -----------------------------------------------------------------------
@@ -142,8 +144,8 @@ class PostgresMfaRepository(
 
         return MfaEnrollment(
             id = this[MfaEnrollmentsTable.id],
-            userId = this[MfaEnrollmentsTable.userId],
-            tenantId = this[MfaEnrollmentsTable.tenantId],
+            userId = UserId(this[MfaEnrollmentsTable.userId]),
+            tenantId = TenantId(this[MfaEnrollmentsTable.tenantId]),
             method = MfaMethod.fromValue(this[MfaEnrollmentsTable.method]),
             secret = decryptedSecret,
             verified = this[MfaEnrollmentsTable.verified],
@@ -156,8 +158,8 @@ class PostgresMfaRepository(
     private fun ResultRow.toRecoveryCode(): MfaRecoveryCode =
         MfaRecoveryCode(
             id = this[MfaRecoveryCodesTable.id],
-            userId = this[MfaRecoveryCodesTable.userId],
-            tenantId = this[MfaRecoveryCodesTable.tenantId],
+            userId = UserId(this[MfaRecoveryCodesTable.userId]),
+            tenantId = TenantId(this[MfaRecoveryCodesTable.tenantId]),
             codeHash = this[MfaRecoveryCodesTable.codeHash],
             usedAt = this[MfaRecoveryCodesTable.usedAt]?.toInstant(),
             createdAt = this[MfaRecoveryCodesTable.createdAt].toInstant(),

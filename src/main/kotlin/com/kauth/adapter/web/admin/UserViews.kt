@@ -70,7 +70,7 @@ internal fun userDetailPageImpl(
                 div("user-header__actions") {
                     if (workspace.isSmtpReady) {
                         postButton(
-                            action = "/admin/workspaces/${workspace.slug}/users/${user.id}/send-reset-email",
+                            action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/send-reset-email",
                             label = "Send Reset Email",
                             btnClass = "btn btn--ghost btn--sm",
                         )
@@ -83,7 +83,7 @@ internal fun userDetailPageImpl(
                     }
                     button(classes = "btn btn--ghost btn--sm") {
                         attributes["hx-get"] =
-                            "/admin/workspaces/${workspace.slug}/users/${user.id}/edit-fragment"
+                            "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit-fragment"
                         attributes["hx-target"] = "#profile-section"
                         attributes["hx-swap"] = "outerHTML"
                         +"Edit Profile"
@@ -122,7 +122,7 @@ internal fun userDetailPageImpl(
                         }
                         if (sessions.isNotEmpty()) {
                             postButton(
-                                action = "/admin/workspaces/${workspace.slug}/users/${user.id}/revoke-sessions",
+                                action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/revoke-sessions",
                                 label = "Revoke all",
                                 btnClass = "btn btn--warning btn--sm",
                             )
@@ -162,7 +162,7 @@ internal fun userDetailPageImpl(
                                     td {
                                         div("data-table__actions") {
                                             postButton(
-                                                action = "/admin/workspaces/${workspace.slug}/sessions/${s.id}/revoke",
+                                                action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
                                                 label = "Revoke",
                                                 btnClass = "btn btn--ghost btn--sm",
                                             )
@@ -184,7 +184,7 @@ internal fun userDetailPageImpl(
                         description = "Blocks all login attempts. Account data is preserved and this can be reversed.",
                     ) {
                         postButton(
-                            action = "/admin/workspaces/${workspace.slug}/users/${user.id}/toggle",
+                            action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/toggle",
                             label = if (user.enabled) "Disable" else "Enable",
                             btnClass = "btn btn--danger btn--sm",
                         )
@@ -292,11 +292,11 @@ internal fun DIV.userProfileEditFragment(
         div("ov-card") {
             div("ov-card__section-label") { +"Edit Profile" }
             form(
-                action = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit",
+                action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit",
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
                 method = FormMethod.post,
             ) {
-                attributes["hx-post"] = "/admin/workspaces/${workspace.slug}/users/${user.id}/edit"
+                attributes["hx-post"] = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit"
                 attributes["hx-target"] = "#profile-section"
                 attributes["hx-swap"] = "outerHTML"
                 div("edit-row") {
@@ -333,7 +333,7 @@ internal fun DIV.userProfileEditFragment(
                     button(classes = "btn btn--ghost btn--sm") {
                         type = ButtonType.button
                         attributes["hx-get"] =
-                            "/admin/workspaces/${workspace.slug}/users/${user.id}/profile-fragment"
+                            "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/profile-fragment"
                         attributes["hx-target"] = "#profile-section"
                         attributes["hx-swap"] = "outerHTML"
                         +"Cancel"
@@ -465,7 +465,7 @@ internal fun userListPageImpl(
                             tr {
                                 td {
                                     a(
-                                        href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
+                                        href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
                                         classes = "data-table__id",
                                     ) { +user.username }
                                 }
@@ -491,7 +491,7 @@ internal fun userListPageImpl(
                                 td {
                                     div("data-table__actions") {
                                         a(
-                                            href = "/admin/workspaces/${workspace.slug}/users/${user.id}",
+                                            href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
                                         ) {
                                             +"Open"

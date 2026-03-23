@@ -19,7 +19,7 @@ import java.time.Instant
  */
 data class WebhookEndpoint(
     val id: Int? = null,
-    val tenantId: Int,
+    val tenantId: TenantId,
     val url: String,
     /** HMAC-SHA256 signing key — returned once at creation, never shown again in the UI. */
     val secret: String,

@@ -1,6 +1,9 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import java.time.Instant
 
@@ -20,8 +23,8 @@ class FakeSessionRepository : SessionRepository {
     fun all(): List<Session> = store.values.toList()
 
     override fun save(session: Session): Session {
-        val s = session.copy(id = nextId++)
-        store[s.id!!] = s
+        val s = session.copy(id = SessionId(nextId++))
+        store[s.id!!.value] = s
         return s
     }
 
@@ -32,39 +35,39 @@ class FakeSessionRepository : SessionRepository {
         store.values.find { it.refreshTokenHash == hash && it.isActive }
 
     override fun revoke(
-        sessionId: Int,
+        sessionId: SessionId,
         revokedAt: Instant,
     ) {
-        store[sessionId]?.let { store[sessionId] = it.copy(revokedAt = revokedAt) }
+        store[sessionId.value]?.let { store[sessionId.value] = it.copy(revokedAt = revokedAt) }
     }
 
     override fun revokeAllForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         revokedAt: Instant,
     ) {
         store.values
             .filter { it.tenantId == tenantId && it.userId == userId && it.isActive }
-            .forEach { store[it.id!!] = it.copy(revokedAt = revokedAt) }
+            .forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
     }
 
     override fun findActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ) = store.values.filter { it.tenantId == tenantId && it.userId == userId && it.isActive }
 
-    override fun findById(id: Int) = store[id]
+    override fun findById(id: SessionId) = store[id.value]
 
-    override fun findActiveByTenant(tenantId: Int) = store.values.filter { it.tenantId == tenantId && it.isActive }
+    override fun findActiveByTenant(tenantId: TenantId) = store.values.filter { it.tenantId == tenantId && it.isActive }
 
     override fun countActiveByUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
     ) = store.values.count { it.tenantId == tenantId && it.userId == userId && it.isActive }
 
     override fun revokeOldestForUser(
-        tenantId: Int,
-        userId: Int,
+        tenantId: TenantId,
+        userId: UserId,
         keepNewest: Int,
     ) {
         val active =

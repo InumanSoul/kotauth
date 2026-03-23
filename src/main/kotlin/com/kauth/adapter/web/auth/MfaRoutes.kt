@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
@@ -85,9 +86,9 @@ internal fun Route.mfaRoutes(
 
         val mfaResult =
             if (code.length == 6 && code.all { it.isDigit() }) {
-                mfaService.verifyTotp(userId, code)
+                mfaService.verifyTotp(UserId(userId), code)
             } else {
-                mfaService.verifyRecoveryCode(userId, code)
+                mfaService.verifyRecoveryCode(UserId(userId), code)
             }
 
         when (mfaResult) {
@@ -124,7 +125,7 @@ internal fun Route.mfaRoutes(
                         val codeResult =
                             oauthService.issueAuthorizationCode(
                                 tenantSlug = slug,
-                                userId = userId,
+                                userId = UserId(userId),
                                 clientId = clientId,
                                 redirectUri = redirectUri,
                                 scopes = oauthParams.scope ?: "openid",

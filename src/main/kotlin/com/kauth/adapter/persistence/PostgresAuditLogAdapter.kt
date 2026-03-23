@@ -30,9 +30,9 @@ class PostgresAuditLogAdapter(
         try {
             transaction {
                 AuditLogTable.insert {
-                    it[tenantId] = event.tenantId
-                    it[userId] = event.userId
-                    it[clientId] = event.clientId
+                    it[tenantId] = event.tenantId?.value
+                    it[userId] = event.userId?.value
+                    it[clientId] = event.clientId?.value
                     it[eventType] = event.eventType.name
                     it[ipAddress] = event.ipAddress
                     it[userAgent] = event.userAgent
@@ -105,8 +105,8 @@ class PostgresAuditLogAdapter(
     /** Extracts a flat map of useful fields from an [AuditEvent] for the webhook payload. */
     private fun buildPayloadData(event: AuditEvent): Map<String, Any?> =
         buildMap {
-            event.userId?.let { put("userId", it) }
-            event.clientId?.let { put("clientId", it) }
+            event.userId?.let { put("userId", it.value) }
+            event.clientId?.let { put("clientId", it.value) }
             event.ipAddress?.let { put("ipAddress", it) }
             putAll(event.details)
         }

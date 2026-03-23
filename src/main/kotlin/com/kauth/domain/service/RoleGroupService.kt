@@ -1,10 +1,15 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.Role
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.GroupRepository
@@ -32,11 +37,11 @@ class RoleGroupService(
     // =========================================================================
 
     fun createRole(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         description: String?,
         scope: RoleScope,
-        clientId: Int?,
+        clientId: ApplicationId?,
     ): AdminResult<Role> {
         if (name.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Role name is required."))
@@ -93,8 +98,8 @@ class RoleGroupService(
     }
 
     fun updateRole(
-        roleId: Int,
-        tenantId: Int,
+        roleId: RoleId,
+        tenantId: TenantId,
         name: String,
         description: String?,
     ): AdminResult<Role> {
@@ -136,7 +141,7 @@ class RoleGroupService(
                 eventType = AuditEventType.ADMIN_ROLE_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("roleId" to roleId.toString(), "roleName" to name),
+                details = mapOf("roleId" to roleId.value.toString(), "roleName" to name),
             ),
         )
 
@@ -144,8 +149,8 @@ class RoleGroupService(
     }
 
     fun deleteRole(
-        roleId: Int,
-        tenantId: Int,
+        roleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val role =
             roleRepository.findById(roleId)
@@ -171,11 +176,11 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
-    fun listRoles(tenantId: Int): List<Role> = roleRepository.findByTenantId(tenantId)
+    fun listRoles(tenantId: TenantId): List<Role> = roleRepository.findByTenantId(tenantId)
 
     fun listClientRoles(
-        tenantId: Int,
-        clientId: Int,
+        tenantId: TenantId,
+        clientId: ApplicationId,
     ): List<Role> = roleRepository.findByClientId(tenantId, clientId)
 
     // =========================================================================
@@ -183,9 +188,9 @@ class RoleGroupService(
     // =========================================================================
 
     fun addChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
-        tenantId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val parent =
             roleRepository.findById(parentRoleId)
@@ -212,9 +217,9 @@ class RoleGroupService(
     }
 
     fun removeChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
-        tenantId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val parent =
             roleRepository.findById(parentRoleId)
@@ -232,8 +237,8 @@ class RoleGroupService(
      * Walks the existing children of [childRoleId] to see if [parentRoleId] is reachable.
      */
     private fun wouldCreateCycle(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     ): Boolean {
         val visited = mutableSetOf(parentRoleId)
         val queue = ArrayDeque(listOf(childRoleId))
@@ -251,9 +256,9 @@ class RoleGroupService(
     // =========================================================================
 
     fun assignRoleToUser(
-        userId: Int,
-        roleId: Int,
-        tenantId: Int,
+        userId: UserId,
+        roleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
             userRepository.findById(userId)
@@ -283,9 +288,9 @@ class RoleGroupService(
     }
 
     fun unassignRoleFromUser(
-        userId: Int,
-        roleId: Int,
-        tenantId: Int,
+        userId: UserId,
+        roleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
             userRepository.findById(userId)
@@ -314,11 +319,11 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
-    fun getRolesForUser(userId: Int): List<Role> = roleRepository.findRolesForUser(userId)
+    fun getRolesForUser(userId: UserId): List<Role> = roleRepository.findRolesForUser(userId)
 
     fun getEffectiveRolesForUser(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
     ): List<Role> = roleRepository.resolveEffectiveRoles(userId, tenantId)
 
     // =========================================================================
@@ -326,10 +331,10 @@ class RoleGroupService(
     // =========================================================================
 
     fun createGroup(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         description: String?,
-        parentGroupId: Int?,
+        parentGroupId: GroupId?,
     ): AdminResult<Group> {
         if (name.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Group name is required."))
@@ -374,8 +379,8 @@ class RoleGroupService(
     }
 
     fun updateGroup(
-        groupId: Int,
-        tenantId: Int,
+        groupId: GroupId,
+        tenantId: TenantId,
         name: String,
         description: String?,
     ): AdminResult<Group> {
@@ -411,7 +416,7 @@ class RoleGroupService(
                 eventType = AuditEventType.ADMIN_GROUP_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("groupId" to groupId.toString(), "groupName" to name),
+                details = mapOf("groupId" to groupId.value.toString(), "groupName" to name),
             ),
         )
 
@@ -419,8 +424,8 @@ class RoleGroupService(
     }
 
     fun deleteGroup(
-        groupId: Int,
-        tenantId: Int,
+        groupId: GroupId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val group =
             groupRepository.findById(groupId)
@@ -446,16 +451,16 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
-    fun listGroups(tenantId: Int): List<Group> = groupRepository.findByTenantId(tenantId)
+    fun listGroups(tenantId: TenantId): List<Group> = groupRepository.findByTenantId(tenantId)
 
     // =========================================================================
     // Group ↔ Role assignment
     // =========================================================================
 
     fun assignRoleToGroup(
-        groupId: Int,
-        roleId: Int,
-        tenantId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val group =
             groupRepository.findById(groupId)
@@ -485,9 +490,9 @@ class RoleGroupService(
     }
 
     fun unassignRoleFromGroup(
-        groupId: Int,
-        roleId: Int,
-        tenantId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val group =
             groupRepository.findById(groupId)
@@ -505,9 +510,9 @@ class RoleGroupService(
     // =========================================================================
 
     fun addUserToGroup(
-        userId: Int,
-        groupId: Int,
-        tenantId: Int,
+        userId: UserId,
+        groupId: GroupId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
             userRepository.findById(userId)
@@ -537,9 +542,9 @@ class RoleGroupService(
     }
 
     fun removeUserFromGroup(
-        userId: Int,
-        groupId: Int,
-        tenantId: Int,
+        userId: UserId,
+        groupId: GroupId,
+        tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
             userRepository.findById(userId)
@@ -568,7 +573,7 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
-    fun getGroupsForUser(userId: Int): List<Group> = groupRepository.findGroupsForUser(userId)
+    fun getGroupsForUser(userId: UserId): List<Group> = groupRepository.findGroupsForUser(userId)
 
-    fun getUserIdsInGroup(groupId: Int): List<Int> = groupRepository.findUserIdsInGroup(groupId)
+    fun getUserIdsInGroup(groupId: GroupId): List<UserId> = groupRepository.findUserIdsInGroup(groupId)
 }

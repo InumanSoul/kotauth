@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import org.jetbrains.exposed.sql.SortOrder
@@ -29,7 +31,7 @@ class PostgresPasswordPolicyAdapter(
     override fun validate(
         rawPassword: String,
         tenant: Tenant,
-        userId: Int?,
+        userId: UserId?,
     ): String? {
         // Length check
         if (rawPassword.length < tenant.passwordPolicyMinLength) {
@@ -67,22 +69,22 @@ class PostgresPasswordPolicyAdapter(
     }
 
     override fun recordPasswordHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         passwordHash: String,
     ): Unit =
         transaction {
             PasswordHistoryTable.insert {
-                it[this.userId] = userId
-                it[this.tenantId] = tenantId
+                it[this.userId] = userId.value
+                it[this.tenantId] = tenantId.value
                 it[this.passwordHash] = passwordHash
                 it[this.createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
             }
         }
 
     override fun isInHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         rawPassword: String,
         historyCount: Int,
     ): Boolean =
@@ -91,8 +93,8 @@ class PostgresPasswordPolicyAdapter(
                 PasswordHistoryTable
                     .selectAll()
                     .where {
-                        (PasswordHistoryTable.userId eq userId) and
-                            (PasswordHistoryTable.tenantId eq tenantId)
+                        (PasswordHistoryTable.userId eq userId.value) and
+                            (PasswordHistoryTable.tenantId eq tenantId.value)
                     }.orderBy(PasswordHistoryTable.createdAt, SortOrder.DESC)
                     .limit(historyCount)
                     .map { it[PasswordHistoryTable.passwordHash] }
@@ -102,15 +104,17 @@ class PostgresPasswordPolicyAdapter(
 
     override fun isBlacklisted(
         rawPassword: String,
-        tenantId: Int,
+        tenantId: TenantId,
     ): Boolean =
         transaction {
             val normalised = rawPassword.lowercase()
             PasswordBlacklistTable
                 .selectAll()
                 .where {
-                    (PasswordBlacklistTable.password eq normalised) and
-                        (PasswordBlacklistTable.tenantId.isNull() or (PasswordBlacklistTable.tenantId eq tenantId))
+                    (PasswordBlacklistTable.password eq normalised) and (
+                        PasswordBlacklistTable.tenantId.isNull() or
+                            (PasswordBlacklistTable.tenantId eq tenantId.value)
+                    )
                 }.count() > 0
         }
 }

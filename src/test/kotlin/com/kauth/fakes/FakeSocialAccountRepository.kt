@@ -2,6 +2,8 @@ package com.kauth.fakes
 
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SocialAccountRepository
 
 /**
@@ -19,7 +21,7 @@ class FakeSocialAccountRepository : SocialAccountRepository {
     fun all(): List<SocialAccount> = store.values.toList()
 
     override fun findByProviderIdentity(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
         providerUserId: String,
     ): SocialAccount? =
@@ -27,7 +29,7 @@ class FakeSocialAccountRepository : SocialAccountRepository {
             it.tenantId == tenantId && it.provider == provider && it.providerUserId == providerUserId
         }
 
-    override fun findByUserId(userId: Int): List<SocialAccount> = store.values.filter { it.userId == userId }
+    override fun findByUserId(userId: UserId): List<SocialAccount> = store.values.filter { it.userId == userId }
 
     override fun save(account: SocialAccount): SocialAccount {
         val a = if (account.id == null) account.copy(id = nextId++) else account
@@ -36,7 +38,7 @@ class FakeSocialAccountRepository : SocialAccountRepository {
     }
 
     override fun delete(
-        userId: Int,
+        userId: UserId,
         provider: SocialProvider,
     ) {
         store.entries.removeIf { it.value.userId == userId && it.value.provider == provider }

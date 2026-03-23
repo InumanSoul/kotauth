@@ -2,6 +2,8 @@ package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import io.ktor.http.HttpStatusCode
@@ -35,7 +37,7 @@ internal fun Route.apiSessionAuditRoutes(
             requireScope(call, ApiScope.SESSIONS_WRITE) ?: return@delete
             val tenantId = call.attributes[TenantIdAttr]
             val sessionId =
-                call.parameters["sessionId"]?.toIntOrNull()
+                call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                     ?: return@delete call.respondProblem(HttpStatusCode.BadRequest, "Invalid session ID", "")
             val session =
                 sessionRepository.findById(sessionId)
@@ -59,7 +61,7 @@ internal fun Route.apiSessionAuditRoutes(
             val params = call.request.queryParameters
             val limit = (params["limit"]?.toIntOrNull() ?: 50).coerceIn(1, 200)
             val offset = (params["offset"]?.toIntOrNull() ?: 0).coerceAtLeast(0)
-            val userId = params["userId"]?.toIntOrNull()
+            val userId = params["userId"]?.toIntOrNull()?.let { UserId(it) }
             val eventType =
                 params["eventType"]?.let { name ->
                     runCatching { AuditEventType.valueOf(name) }.getOrNull()

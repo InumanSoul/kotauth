@@ -1,5 +1,6 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 
@@ -22,7 +23,7 @@ interface WebhookDeliveryRepository {
 
     /** Returns recent deliveries across all endpoints for a tenant (for the admin overview). */
     fun findByTenantId(
-        tenantId: Int,
+        tenantId: TenantId,
         limit: Int = 100,
     ): List<WebhookDelivery>
 

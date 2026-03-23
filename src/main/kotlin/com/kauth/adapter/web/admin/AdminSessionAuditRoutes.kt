@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.SessionId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
@@ -41,7 +42,7 @@ fun Route.adminSessionAuditRoutes(
     post("/sessions/{sessionId}/revoke") {
         val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val sessionId =
-            call.parameters["sessionId"]?.toIntOrNull()
+            call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         sessionRepository.revoke(sessionId, Instant.now())
         call.respondRedirect("/admin/workspaces/$slug/sessions")

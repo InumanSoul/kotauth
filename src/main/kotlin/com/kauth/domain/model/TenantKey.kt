@@ -16,7 +16,7 @@ package com.kauth.domain.model
  */
 data class TenantKey(
     val id: Int? = null,
-    val tenantId: Int,
+    val tenantId: TenantId,
     val keyId: String,
     val algorithm: String = "RS256",
     val publicKeyPem: String,

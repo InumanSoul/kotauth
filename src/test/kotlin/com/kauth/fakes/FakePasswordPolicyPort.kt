@@ -1,6 +1,8 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.PasswordPolicyPort
 
 /**
@@ -9,7 +11,7 @@ import com.kauth.domain.port.PasswordPolicyPort
  */
 class FakePasswordPolicyPort : PasswordPolicyPort {
     var validationError: String? = null
-    private val history = mutableListOf<Triple<Int, Int, String>>() // userId, tenantId, hash
+    private val history = mutableListOf<Triple<UserId, TenantId, String>>() // userId, tenantId, hash
     private val blacklist = mutableSetOf<String>()
 
     fun clear() {
@@ -25,20 +27,20 @@ class FakePasswordPolicyPort : PasswordPolicyPort {
     override fun validate(
         rawPassword: String,
         tenant: Tenant,
-        userId: Int?,
+        userId: UserId?,
     ): String? = validationError
 
     override fun recordPasswordHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         passwordHash: String,
     ) {
         history.add(Triple(userId, tenantId, passwordHash))
     }
 
     override fun isInHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         rawPassword: String,
         historyCount: Int,
     ): Boolean =
@@ -49,6 +51,6 @@ class FakePasswordPolicyPort : PasswordPolicyPort {
 
     override fun isBlacklisted(
         rawPassword: String,
-        tenantId: Int,
+        tenantId: TenantId,
     ): Boolean = rawPassword in blacklist
 }

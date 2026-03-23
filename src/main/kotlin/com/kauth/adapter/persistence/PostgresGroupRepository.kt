@@ -1,6 +1,10 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
+import com.kauth.domain.model.RoleId
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.GroupRepository
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -21,37 +25,37 @@ class PostgresGroupRepository : GroupRepository {
     // CRUD
     // -------------------------------------------------------------------------
 
-    override fun findById(id: Int): Group? =
+    override fun findById(id: GroupId): Group? =
         transaction {
             GroupsTable
                 .selectAll()
-                .where { GroupsTable.id eq id }
+                .where { GroupsTable.id eq id.value }
                 .firstOrNull()
                 ?.toGroup()
         }
 
-    override fun findByTenantId(tenantId: Int): List<Group> =
+    override fun findByTenantId(tenantId: TenantId): List<Group> =
         transaction {
             GroupsTable
                 .selectAll()
-                .where { GroupsTable.tenantId eq tenantId }
+                .where { GroupsTable.tenantId eq tenantId.value }
                 .orderBy(GroupsTable.name)
                 .map { it.toGroup() }
         }
 
     override fun findByName(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
-        parentGroupId: Int?,
+        parentGroupId: GroupId?,
     ): Group? =
         transaction {
             GroupsTable
                 .selectAll()
                 .where {
-                    (GroupsTable.tenantId eq tenantId) and
+                    (GroupsTable.tenantId eq tenantId.value) and
                         (GroupsTable.name eq name) and
                         if (parentGroupId != null) {
-                            (GroupsTable.parentGroupId eq parentGroupId)
+                            (GroupsTable.parentGroupId eq parentGroupId.value)
                         } else {
                             (GroupsTable.parentGroupId.isNull())
                         }
@@ -59,11 +63,11 @@ class PostgresGroupRepository : GroupRepository {
                 ?.toGroup()
         }
 
-    override fun findChildren(groupId: Int): List<Group> =
+    override fun findChildren(groupId: GroupId): List<Group> =
         transaction {
             GroupsTable
                 .selectAll()
-                .where { GroupsTable.parentGroupId eq groupId }
+                .where { GroupsTable.parentGroupId eq groupId.value }
                 .orderBy(GroupsTable.name)
                 .map { it.toGroup() }
         }
@@ -72,31 +76,31 @@ class PostgresGroupRepository : GroupRepository {
         transaction {
             val id =
                 GroupsTable.insert {
-                    it[tenantId] = group.tenantId
+                    it[tenantId] = group.tenantId.value
                     it[name] = group.name
                     it[description] = group.description
-                    it[parentGroupId] = group.parentGroupId
+                    it[parentGroupId] = group.parentGroupId?.value
                     it[attributes] = serializeAttributes(group.attributes)
                     it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
                 } get GroupsTable.id
 
-            group.copy(id = id)
+            group.copy(id = GroupId(id))
         }
 
     override fun update(group: Group): Group =
         transaction {
-            GroupsTable.update({ GroupsTable.id eq group.id!! }) {
+            GroupsTable.update({ GroupsTable.id eq group.id!!.value }) {
                 it[name] = group.name
                 it[description] = group.description
-                it[parentGroupId] = group.parentGroupId
+                it[parentGroupId] = group.parentGroupId?.value
                 it[attributes] = serializeAttributes(group.attributes)
             }
             group
         }
 
-    override fun delete(groupId: Int): Unit =
+    override fun delete(groupId: GroupId): Unit =
         transaction {
-            GroupsTable.deleteWhere { id eq groupId }
+            GroupsTable.deleteWhere { id eq groupId.value }
         }
 
     // -------------------------------------------------------------------------
@@ -104,33 +108,33 @@ class PostgresGroupRepository : GroupRepository {
     // -------------------------------------------------------------------------
 
     override fun assignRoleToGroup(
-        groupId: Int,
-        roleId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
     ): Unit =
         transaction {
             GroupRolesTable.insert {
-                it[this.groupId] = groupId
-                it[this.roleId] = roleId
+                it[this.groupId] = groupId.value
+                it[this.roleId] = roleId.value
                 it[this.assignedAt] = OffsetDateTime.now(ZoneOffset.UTC)
             }
         }
 
     override fun unassignRoleFromGroup(
-        groupId: Int,
-        roleId: Int,
+        groupId: GroupId,
+        roleId: RoleId,
     ): Unit =
         transaction {
             GroupRolesTable.deleteWhere {
-                (GroupRolesTable.groupId eq groupId) and (GroupRolesTable.roleId eq roleId)
+                (GroupRolesTable.groupId eq groupId.value) and (GroupRolesTable.roleId eq roleId.value)
             }
         }
 
-    override fun findRoleIdsForGroup(groupId: Int): List<Int> =
+    override fun findRoleIdsForGroup(groupId: GroupId): List<RoleId> =
         transaction {
             GroupRolesTable
                 .selectAll()
-                .where { GroupRolesTable.groupId eq groupId }
-                .map { it[GroupRolesTable.roleId] }
+                .where { GroupRolesTable.groupId eq groupId.value }
+                .map { RoleId(it[GroupRolesTable.roleId]) }
         }
 
     // -------------------------------------------------------------------------
@@ -138,55 +142,55 @@ class PostgresGroupRepository : GroupRepository {
     // -------------------------------------------------------------------------
 
     override fun addUserToGroup(
-        userId: Int,
-        groupId: Int,
+        userId: UserId,
+        groupId: GroupId,
     ): Unit =
         transaction {
             UserGroupsTable.insert {
-                it[this.userId] = userId
-                it[this.groupId] = groupId
+                it[this.userId] = userId.value
+                it[this.groupId] = groupId.value
                 it[this.joinedAt] = OffsetDateTime.now(ZoneOffset.UTC)
             }
         }
 
     override fun removeUserFromGroup(
-        userId: Int,
-        groupId: Int,
+        userId: UserId,
+        groupId: GroupId,
     ): Unit =
         transaction {
             UserGroupsTable.deleteWhere {
-                (UserGroupsTable.userId eq userId) and (UserGroupsTable.groupId eq groupId)
+                (UserGroupsTable.userId eq userId.value) and (UserGroupsTable.groupId eq groupId.value)
             }
         }
 
-    override fun findGroupsForUser(userId: Int): List<Group> =
+    override fun findGroupsForUser(userId: UserId): List<Group> =
         transaction {
             (UserGroupsTable innerJoin GroupsTable)
                 .selectAll()
-                .where { UserGroupsTable.userId eq userId }
+                .where { UserGroupsTable.userId eq userId.value }
                 .map { it.toGroup() }
         }
 
-    override fun findUserIdsInGroup(groupId: Int): List<Int> =
+    override fun findUserIdsInGroup(groupId: GroupId): List<UserId> =
         transaction {
             UserGroupsTable
                 .selectAll()
-                .where { UserGroupsTable.groupId eq groupId }
-                .map { it[UserGroupsTable.userId] }
+                .where { UserGroupsTable.groupId eq groupId.value }
+                .map { UserId(it[UserGroupsTable.userId]) }
         }
 
     // -------------------------------------------------------------------------
     // Hierarchy traversal
     // -------------------------------------------------------------------------
 
-    override fun findAncestorGroupIds(groupId: Int): List<Int> =
+    override fun findAncestorGroupIds(groupId: GroupId): List<GroupId> =
         transaction {
             val ancestors = mutableListOf<Int>()
-            val visited = mutableSetOf(groupId)
+            val visited = mutableSetOf(groupId.value)
             var currentId: Int? =
                 GroupsTable
                     .selectAll()
-                    .where { GroupsTable.id eq groupId }
+                    .where { GroupsTable.id eq groupId.value }
                     .firstOrNull()
                     ?.get(GroupsTable.parentGroupId)
 
@@ -199,7 +203,7 @@ class PostgresGroupRepository : GroupRepository {
                         .firstOrNull()
                         ?.get(GroupsTable.parentGroupId)
             }
-            return@transaction ancestors
+            return@transaction ancestors.map { GroupId(it) }
         }
 
     // -------------------------------------------------------------------------
@@ -209,17 +213,17 @@ class PostgresGroupRepository : GroupRepository {
     private fun ResultRow.toGroup(): Group {
         val gid = this[GroupsTable.id]
         return Group(
-            id = gid,
-            tenantId = this[GroupsTable.tenantId],
+            id = GroupId(gid),
+            tenantId = TenantId(this[GroupsTable.tenantId]),
             name = this[GroupsTable.name],
             description = this[GroupsTable.description],
-            parentGroupId = this[GroupsTable.parentGroupId],
+            parentGroupId = this[GroupsTable.parentGroupId]?.let { GroupId(it) },
             attributes = parseAttributes(this[GroupsTable.attributes]),
             roleIds =
                 GroupRolesTable
                     .selectAll()
                     .where { GroupRolesTable.groupId eq gid }
-                    .map { it[GroupRolesTable.roleId] },
+                    .map { RoleId(it[GroupRolesTable.roleId]) },
             createdAt = this[GroupsTable.createdAt].toInstant(),
         )
     }

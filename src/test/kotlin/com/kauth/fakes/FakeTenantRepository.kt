@@ -1,6 +1,7 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.TenantRepository
 
 /**
@@ -12,8 +13,9 @@ class FakeTenantRepository : TenantRepository {
     private var nextId = 1
 
     fun add(tenant: Tenant): Tenant {
-        val t = if (tenant.id == 0) tenant.copy(id = nextId++) else tenant
-        store[t.id] = t
+        val nextIdValue = if (tenant.id.value == 0) nextId++ else tenant.id.value
+        val t = if (tenant.id.value == 0) tenant.copy(id = TenantId(nextIdValue)) else tenant
+        store[t.id.value] = t
         return t
     }
 
@@ -24,7 +26,7 @@ class FakeTenantRepository : TenantRepository {
 
     override fun findBySlug(slug: String) = store.values.find { it.slug == slug }
 
-    override fun findById(id: Int) = store[id]
+    override fun findById(id: TenantId) = store[id.value]
 
     override fun existsBySlug(slug: String) = store.values.any { it.slug == slug }
 
@@ -35,13 +37,13 @@ class FakeTenantRepository : TenantRepository {
         displayName: String,
         issuerUrl: String?,
     ): Tenant {
-        val t = Tenant(id = nextId++, slug = slug, displayName = displayName, issuerUrl = issuerUrl)
-        store[t.id] = t
+        val t = Tenant(id = TenantId(nextId++), slug = slug, displayName = displayName, issuerUrl = issuerUrl)
+        store[t.id.value] = t
         return t
     }
 
     override fun update(tenant: Tenant): Tenant {
-        store[tenant.id] = tenant
+        store[tenant.id.value] = tenant
         return tenant
     }
 }

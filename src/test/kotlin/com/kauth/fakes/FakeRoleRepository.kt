@@ -1,7 +1,11 @@
 package com.kauth.fakes
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Role
+import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RoleRepository
 
 /**
@@ -19,8 +23,8 @@ class FakeRoleRepository : RoleRepository {
     private val userRoles = mutableMapOf<Int, MutableSet<Int>>()
 
     fun add(role: Role): Role {
-        val r = if (role.id == null) role.copy(id = nextId++) else role
-        store[r.id!!] = r
+        val r = if (role.id == null) role.copy(id = RoleId(nextId++)) else role
+        store[r.id!!.value] = r
         return r
     }
 
@@ -31,83 +35,89 @@ class FakeRoleRepository : RoleRepository {
         nextId = 1
     }
 
-    override fun findById(id: Int): Role? = store[id]
+    override fun findById(id: RoleId): Role? = store[id.value]
 
     override fun findByName(
-        tenantId: Int,
+        tenantId: TenantId,
         name: String,
         scope: RoleScope,
-        clientId: Int?,
+        clientId: ApplicationId?,
     ): Role? =
         store.values.find {
             it.tenantId == tenantId && it.name == name && it.scope == scope && it.clientId == clientId
         }
 
-    override fun findByTenantId(tenantId: Int): List<Role> = store.values.filter { it.tenantId == tenantId }
+    override fun findByTenantId(tenantId: TenantId): List<Role> = store.values.filter { it.tenantId == tenantId }
 
     override fun findByClientId(
-        tenantId: Int,
-        clientId: Int,
+        tenantId: TenantId,
+        clientId: ApplicationId,
     ): List<Role> = store.values.filter { it.tenantId == tenantId && it.clientId == clientId }
 
     override fun save(role: Role): Role {
-        val r = if (role.id == null) role.copy(id = nextId++) else role
-        store[r.id!!] = r
+        val r = if (role.id == null) role.copy(id = RoleId(nextId++)) else role
+        store[r.id!!.value] = r
         return r
     }
 
     override fun update(role: Role): Role {
-        store[role.id!!] = role
+        store[role.id!!.value] = role
         return role
     }
 
-    override fun delete(roleId: Int) {
-        store.remove(roleId)
-        composites.remove(roleId)
-        composites.values.forEach { it.remove(roleId) }
-        userRoles.values.forEach { it.remove(roleId) }
+    override fun delete(roleId: RoleId) {
+        store.remove(roleId.value)
+        composites.remove(roleId.value)
+        composites.values.forEach { it.remove(roleId.value) }
+        userRoles.values.forEach { it.remove(roleId.value) }
     }
 
     override fun addChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     ) {
-        composites.getOrPut(parentRoleId) { mutableSetOf() }.add(childRoleId)
+        composites.getOrPut(parentRoleId.value) { mutableSetOf() }.add(childRoleId.value)
     }
 
     override fun removeChildRole(
-        parentRoleId: Int,
-        childRoleId: Int,
+        parentRoleId: RoleId,
+        childRoleId: RoleId,
     ) {
-        composites[parentRoleId]?.remove(childRoleId)
+        composites[parentRoleId.value]?.remove(childRoleId.value)
     }
 
-    override fun findChildRoleIds(roleId: Int): List<Int> = composites[roleId]?.toList() ?: emptyList()
+    override fun findChildRoleIds(roleId: RoleId): List<RoleId> =
+        composites[roleId.value]?.map { RoleId(it) } ?: emptyList()
 
     override fun assignRoleToUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     ) {
-        userRoles.getOrPut(userId) { mutableSetOf() }.add(roleId)
+        userRoles.getOrPut(userId.value) { mutableSetOf() }.add(roleId.value)
     }
 
     override fun unassignRoleFromUser(
-        userId: Int,
-        roleId: Int,
+        userId: UserId,
+        roleId: RoleId,
     ) {
-        userRoles[userId]?.remove(roleId)
+        userRoles[userId.value]?.remove(roleId.value)
     }
 
-    override fun findRolesForUser(userId: Int): List<Role> = userRoles[userId]?.mapNotNull { store[it] } ?: emptyList()
+    override fun findRolesForUser(userId: UserId): List<Role> =
+        userRoles[userId.value]?.mapNotNull { store[it] } ?: emptyList()
 
-    override fun findUserIdsForRole(roleId: Int): List<Int> =
-        userRoles.filter { it.value.contains(roleId) }.keys.toList()
+    override fun findUserIdsForRole(roleId: RoleId): List<UserId> =
+        userRoles
+            .filter { it.value.contains(roleId.value) }
+            .keys
+            .map { UserId(it) }
+            .toList()
 
     override fun resolveEffectiveRoles(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
     ): List<Role> {
-        val directRoleIds = userRoles[userId] ?: emptySet()
+        val directRoleIds = userRoles[userId.value] ?: emptySet()
         val allRoleIds = mutableSetOf<Int>()
         val queue = ArrayDeque(directRoleIds.toList())
         while (queue.isNotEmpty()) {

@@ -2,8 +2,10 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
@@ -72,7 +74,7 @@ class AdminWebhooksTest {
 
     private val masterTenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "master",
             displayName = "Master",
             issuerUrl = null,
@@ -81,7 +83,7 @@ class AdminWebhooksTest {
 
     private val workspace =
         Tenant(
-            id = 2,
+            id = TenantId(2),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -90,8 +92,8 @@ class AdminWebhooksTest {
 
     private val adminUser =
         User(
-            id = 1,
-            tenantId = 1,
+            id = UserId(1),
+            tenantId = TenantId(1),
             username = "admin",
             email = "admin@kotauth.dev",
             fullName = "Admin",
@@ -226,7 +228,7 @@ class AdminWebhooksTest {
 
             val created =
                 webhookService.createEndpoint(
-                    2,
+                    TenantId(2),
                     "https://hooks.example.com/test",
                     setOf("user.created"),
                     "test",

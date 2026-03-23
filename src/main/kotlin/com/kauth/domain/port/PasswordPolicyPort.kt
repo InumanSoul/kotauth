@@ -1,6 +1,8 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 
 /**
  * Port for password policy enforcement.
@@ -16,7 +18,7 @@ interface PasswordPolicyPort {
     fun validate(
         rawPassword: String,
         tenant: Tenant,
-        userId: Int? = null,
+        userId: UserId? = null,
     ): String?
 
     /**
@@ -24,8 +26,8 @@ interface PasswordPolicyPort {
      * Should be called after every successful password change.
      */
     fun recordPasswordHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         passwordHash: String,
     )
 
@@ -33,8 +35,8 @@ interface PasswordPolicyPort {
      * Checks if the given raw password matches any of the user's last N passwords.
      */
     fun isInHistory(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         rawPassword: String,
         historyCount: Int,
     ): Boolean
@@ -44,6 +46,6 @@ interface PasswordPolicyPort {
      */
     fun isBlacklisted(
         rawPassword: String,
-        tenantId: Int,
+        tenantId: TenantId,
     ): Boolean
 }

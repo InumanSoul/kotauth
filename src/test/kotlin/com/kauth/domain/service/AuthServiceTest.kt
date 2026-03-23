@@ -2,7 +2,9 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakeSessionRepository
@@ -51,7 +53,7 @@ class AuthServiceTest {
 
     private val testTenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -60,8 +62,8 @@ class AuthServiceTest {
 
     private val activeUser get() =
         User(
-            id = 10,
-            tenantId = 1,
+            id = UserId(10),
+            tenantId = TenantId(1),
             username = "alice",
             email = "alice@example.com",
             fullName = "Alice Test",
@@ -147,7 +149,7 @@ class AuthServiceTest {
         val result = svc.authenticate("acme", "alice", "correct-pass")
         assertIs<AuthResult.Success<User>>(result)
         assertEquals("alice", result.value.username)
-        assertEquals(1, result.value.tenantId)
+        assertEquals(TenantId(1), result.value.tenantId)
     }
 
     // -------------------------------------------------------------------------
@@ -319,7 +321,7 @@ class AuthServiceTest {
 
         assertIs<AuthResult.Success<*>>(result)
         // A session must have been persisted
-        val activeSessions = sessions.findActiveByUser(1, 10)
+        val activeSessions = sessions.findActiveByUser(TenantId(1), UserId(10))
         assertEquals(1, activeSessions.size)
     }
 
@@ -334,7 +336,7 @@ class AuthServiceTest {
         svc.login("acme", "alice", "correct-pass")
         svc.login("acme", "alice", "correct-pass")
 
-        val active = sessions.findActiveByUser(1, 10)
+        val active = sessions.findActiveByUser(TenantId(1), UserId(10))
         assertEquals(2, active.size, "Only 2 sessions should remain active after the limit enforcement")
     }
 }

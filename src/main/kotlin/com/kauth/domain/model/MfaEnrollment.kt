@@ -16,8 +16,8 @@ import java.time.Instant
  */
 data class MfaEnrollment(
     val id: Int? = null,
-    val userId: Int,
-    val tenantId: Int,
+    val userId: UserId,
+    val tenantId: TenantId,
     val method: MfaMethod = MfaMethod.TOTP,
     val secret: String,
     val verified: Boolean = false,

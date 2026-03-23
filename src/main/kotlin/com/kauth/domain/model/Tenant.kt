@@ -11,7 +11,7 @@ package com.kauth.domain.model
  * other tenants via the admin console.
  */
 data class Tenant(
-    val id: Int,
+    val id: TenantId,
     val slug: String,
     val displayName: String,
     val issuerUrl: String?,

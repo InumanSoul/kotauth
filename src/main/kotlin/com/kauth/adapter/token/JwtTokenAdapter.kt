@@ -7,6 +7,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.TenantKeyRepository
@@ -57,10 +58,10 @@ class JwtTokenAdapter(
         nonce: String?,
         roles: List<Role>,
     ): TokenResponse {
-        val (algorithm, _) = getOrCreateAlgorithm(tenant.id)
+        val (algorithm, _) = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val audience = client?.clientId ?: tenant.slug
-        val subject = user.id.toString()
+        val subject = user.id!!.value.toString()
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)
 
@@ -76,7 +77,7 @@ class JwtTokenAdapter(
                 .withIssuer(issuer)
                 .withAudience(audience)
                 .withSubject(subject)
-                .withClaim("tenant_id", tenant.id)
+                .withClaim("tenant_id", tenant.id.value)
                 .withClaim("username", user.username)
                 .withClaim("email", user.email)
                 .withClaim("email_verified", user.emailVerified)
@@ -162,7 +163,7 @@ class JwtTokenAdapter(
         client: Application,
         scopes: List<String>,
     ): String {
-        val (algorithm, _) = getOrCreateAlgorithm(tenant.id)
+        val (algorithm, _) = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val expiryMs = (client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
 
@@ -171,7 +172,7 @@ class JwtTokenAdapter(
             .withIssuer(issuer)
             .withAudience(client.clientId)
             .withSubject(client.clientId) // sub = client_id for M2M
-            .withClaim("tenant_id", tenant.id)
+            .withClaim("tenant_id", tenant.id.value)
             .withClaim("client_id", client.clientId)
             .withClaim("scope", scopes.joinToString(" "))
             .withIssuedAt(Date())
@@ -187,8 +188,8 @@ class JwtTokenAdapter(
     override fun decodeAccessToken(token: String): AccessTokenClaims? {
         return try {
             val decoded = JWT.decode(token)
-            val tenantId = decoded.getClaim("tenant_id").asInt() ?: return null
-            val (algorithm, _) = getOrCreateAlgorithm(tenantId)
+            val tenantIdRaw = decoded.getClaim("tenant_id").asInt() ?: return null
+            val (algorithm, _) = getOrCreateAlgorithm(tenantIdRaw)
 
             val verifier = JWT.require(algorithm).build()
             val verified = verifier.verify(token)
@@ -222,7 +223,7 @@ class JwtTokenAdapter(
                 sub = verified.subject ?: "",
                 iss = verified.issuer ?: "",
                 aud = verified.audience?.firstOrNull() ?: "",
-                tenantId = tenantId,
+                tenantId = TenantId(tenantIdRaw),
                 username = verified.getClaim("username").asString(),
                 email = verified.getClaim("email").asString(),
                 scopes = scopeStr.split(" ").filter { it.isNotBlank() },
@@ -241,7 +242,7 @@ class JwtTokenAdapter(
     // TokenPort — JWKS
     // -------------------------------------------------------------------------
 
-    override fun getTenantJwks(tenantId: Int): List<Map<String, Any>> =
+    override fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>> =
         tenantKeyRepository.findEnabledKeys(tenantId).map { key ->
             val publicKey = KeyGenerator.decodePublicKey(key.publicKeyPem)
             buildJwk(key.keyId, publicKey)
@@ -255,7 +256,7 @@ class JwtTokenAdapter(
         algorithmCache[tenantId]?.let { return it }
 
         val key =
-            tenantKeyRepository.findActiveKey(tenantId)
+            tenantKeyRepository.findActiveKey(TenantId(tenantId))
                 ?: run {
                     log.warn(
                         "No active key found for tenant $tenantId — key generation should happen at startup via KeyProvisioningService",

@@ -1,11 +1,14 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
@@ -152,7 +155,7 @@ class AdminService(
      * Password must meet the tenant's full password policy.
      */
     fun createUser(
-        tenantId: Int,
+        tenantId: TenantId,
         username: String,
         email: String,
         fullName: String,
@@ -232,17 +235,17 @@ class AdminService(
      * Username is intentionally immutable — it may appear in tokens already issued.
      */
     fun updateUser(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         email: String,
         fullName: String,
     ): AdminResult<User> {
         val user =
             userRepository.findById(userId)
-                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
 
         if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
+            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
         }
         if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
@@ -275,16 +278,16 @@ class AdminService(
      * Enables or disables a user account.
      */
     fun setUserEnabled(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         enabled: Boolean,
     ): AdminResult<Unit> {
         val user =
             userRepository.findById(userId)
-                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
 
         if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
+            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
         }
 
         userRepository.update(user.copy(enabled = enabled))
@@ -312,8 +315,8 @@ class AdminService(
      * Updates mutable application fields. clientId is immutable.
      */
     fun updateApplication(
-        appId: Int,
-        tenantId: Int,
+        appId: ApplicationId,
+        tenantId: TenantId,
         name: String,
         description: String?,
         accessType: String,
@@ -358,8 +361,8 @@ class AdminService(
      * Enables or disables an application.
      */
     fun setApplicationEnabled(
-        appId: Int,
-        tenantId: Int,
+        appId: ApplicationId,
+        tenantId: TenantId,
         enabled: Boolean,
     ): AdminResult<Unit> {
         val app =
@@ -393,8 +396,8 @@ class AdminService(
      * Only the bcrypt hash is persisted.
      */
     fun regenerateClientSecret(
-        appId: Int,
-        tenantId: Int,
+        appId: ApplicationId,
+        tenantId: TenantId,
     ): AdminResult<String> {
         val app =
             applicationRepository.findById(appId)
@@ -502,8 +505,8 @@ class AdminService(
      * configured on the tenant.
      */
     fun sendPasswordResetEmail(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         baseUrl: String,
     ): AdminResult<Unit> {
         val tenant =
@@ -511,9 +514,9 @@ class AdminService(
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
         val user =
             userRepository.findById(userId)
-                ?: return AdminResult.Failure(AdminError.NotFound("User $userId not found."))
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
         if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User $userId not found in this workspace."))
+            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
         }
         if (!tenant.isSmtpReady) {
             return AdminResult.Failure(
@@ -556,8 +559,8 @@ class AdminService(
      * Delegates to [UserSelfServiceService] to keep the email flow in one place.
      */
     fun resendVerificationEmail(
-        userId: Int,
-        tenantId: Int,
+        userId: UserId,
+        tenantId: TenantId,
         baseUrl: String,
     ): AdminResult<Unit> =
         when (val result = selfServiceService.initiateEmailVerification(userId, tenantId, baseUrl)) {

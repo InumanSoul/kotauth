@@ -252,7 +252,7 @@ object PortalView {
                                         td { +dtf.format(s.expiresAt) }
                                         td {
                                             form(
-                                                action = "/t/$slug/account/sessions/${s.id}/revoke",
+                                                action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
                                                 method = FormMethod.post,
                                             ) {
                                                 button(

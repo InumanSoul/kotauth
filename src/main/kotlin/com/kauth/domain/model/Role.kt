@@ -13,13 +13,13 @@ import java.time.Instant
  * they effectively hold all child roles as well. Cycle prevention is enforced at the service layer.
  */
 data class Role(
-    val id: Int? = null,
-    val tenantId: Int,
+    val id: RoleId? = null,
+    val tenantId: TenantId,
     val name: String,
     val description: String? = null,
     val scope: RoleScope = RoleScope.TENANT,
-    val clientId: Int? = null,
-    val childRoleIds: List<Int> = emptyList(),
+    val clientId: ApplicationId? = null,
+    val childRoleIds: List<RoleId> = emptyList(),
     val createdAt: Instant = Instant.now(),
 )
 

@@ -2,6 +2,7 @@ package com.kauth.domain.port
 
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantId
 
 /**
  * Port — persistence contract for identity provider configurations.
@@ -9,14 +10,14 @@ import com.kauth.domain.model.SocialProvider
  */
 interface IdentityProviderRepository {
     /** Returns all configured (and enabled) providers for the given tenant. */
-    fun findEnabledByTenant(tenantId: Int): List<IdentityProvider>
+    fun findEnabledByTenant(tenantId: TenantId): List<IdentityProvider>
 
     /** Returns all providers for the given tenant (including disabled). */
-    fun findAllByTenant(tenantId: Int): List<IdentityProvider>
+    fun findAllByTenant(tenantId: TenantId): List<IdentityProvider>
 
     /** Finds a specific provider config, or null if not configured. */
     fun findByTenantAndProvider(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     ): IdentityProvider?
 
@@ -28,7 +29,7 @@ interface IdentityProviderRepository {
 
     /** Deletes a provider configuration. */
     fun delete(
-        tenantId: Int,
+        tenantId: TenantId,
         provider: SocialProvider,
     )
 }

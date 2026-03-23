@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
@@ -48,7 +50,7 @@ class PortalRoutesTest {
 
     private val tenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -57,8 +59,8 @@ class PortalRoutesTest {
 
     private val user =
         User(
-            id = 10,
-            tenantId = 1,
+            id = UserId(10),
+            tenantId = TenantId(1),
             username = "alice",
             email = "alice@acme.dev",
             fullName = "Alice",

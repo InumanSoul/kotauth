@@ -1,6 +1,7 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.EmailVerificationToken
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.EmailVerificationTokenRepository
 import java.time.Instant
 
@@ -33,7 +34,7 @@ class FakeEmailVerificationTokenRepository : EmailVerificationTokenRepository {
         store[tokenId]?.let { store[tokenId] = it.copy(usedAt = usedAt) }
     }
 
-    override fun deleteUnusedByUser(userId: Int) {
+    override fun deleteUnusedByUser(userId: UserId) {
         store.entries.removeIf { it.value.userId == userId && it.value.usedAt == null }
     }
 }

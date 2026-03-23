@@ -11,7 +11,7 @@ import java.time.Instant
  */
 data class IdentityProvider(
     val id: Int? = null,
-    val tenantId: Int,
+    val tenantId: TenantId,
     val provider: SocialProvider,
     val clientId: String,
     val clientSecret: String, // decrypted at runtime — AES-256-GCM in DB

@@ -2,6 +2,8 @@ package com.kauth.fakes
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApplicationRepository
 
 /**
@@ -24,37 +26,37 @@ class FakeApplicationRepository : ApplicationRepository {
         app: Application,
         secretHash: String? = null,
     ): Application {
-        val a = if (app.id == 0) app.copy(id = nextId++) else app
-        store[a.id] = a
-        if (secretHash != null) secretHashes[a.id] = secretHash
+        val a = if (app.id.value == 0) app.copy(id = ApplicationId(nextId++)) else app
+        store[a.id.value] = a
+        if (secretHash != null) secretHashes[a.id.value] = secretHash
         return a
     }
 
-    override fun findByTenantId(tenantId: Int) = store.values.filter { it.tenantId == tenantId }
+    override fun findByTenantId(tenantId: TenantId) = store.values.filter { it.tenantId == tenantId }
 
     override fun findByClientId(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
     ) = store.values.find { it.tenantId == tenantId && it.clientId == clientId }
 
-    override fun findById(id: Int) = store[id]
+    override fun findById(id: ApplicationId) = store[id.value]
 
     override fun existsByClientId(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
     ) = store.values.any { it.tenantId == tenantId && it.clientId == clientId }
 
-    override fun findClientSecretHash(clientPk: Int) = secretHashes[clientPk]
+    override fun findClientSecretHash(clientPk: ApplicationId) = secretHashes[clientPk.value]
 
     override fun setClientSecretHash(
-        clientPk: Int,
+        clientPk: ApplicationId,
         secretHash: String,
     ) {
-        secretHashes[clientPk] = secretHash
+        secretHashes[clientPk.value] = secretHash
     }
 
     override fun create(
-        tenantId: Int,
+        tenantId: TenantId,
         clientId: String,
         name: String,
         description: String?,
@@ -63,7 +65,7 @@ class FakeApplicationRepository : ApplicationRepository {
     ): Application {
         val app =
             Application(
-                id = nextId++,
+                id = ApplicationId(nextId++),
                 tenantId = tenantId,
                 clientId = clientId,
                 name = name,
@@ -72,32 +74,32 @@ class FakeApplicationRepository : ApplicationRepository {
                 enabled = true,
                 redirectUris = redirectUris,
             )
-        store[app.id] = app
+        store[app.id.value] = app
         return app
     }
 
     override fun update(
-        appId: Int,
+        appId: ApplicationId,
         name: String,
         description: String?,
         accessType: String,
         redirectUris: List<String>,
     ): Application {
         val updated =
-            store[appId]!!.copy(
+            store[appId.value]!!.copy(
                 name = name,
                 description = description,
                 accessType = AccessType.fromValue(accessType),
                 redirectUris = redirectUris,
             )
-        store[appId] = updated
+        store[appId.value] = updated
         return updated
     }
 
     override fun setEnabled(
-        appId: Int,
+        appId: ApplicationId,
         enabled: Boolean,
     ) {
-        store[appId]?.let { store[appId] = it.copy(enabled = enabled) }
+        store[appId.value]?.let { store[appId.value] = it.copy(enabled = enabled) }
     }
 }

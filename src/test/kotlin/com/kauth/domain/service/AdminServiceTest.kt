@@ -2,10 +2,13 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
@@ -67,7 +70,7 @@ class AdminServiceTest {
 
     private val tenant =
         Tenant(
-            id = 1,
+            id = TenantId(1),
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
@@ -80,8 +83,8 @@ class AdminServiceTest {
     private val alice
         get() =
             User(
-                id = 10,
-                tenantId = 1,
+                id = UserId(10),
+                tenantId = TenantId(1),
                 username = "alice",
                 email = "alice@example.com",
                 fullName = "Alice Test",
@@ -91,8 +94,8 @@ class AdminServiceTest {
 
     private val testApp =
         Application(
-            id = 100,
-            tenantId = 1,
+            id = ApplicationId(100),
+            tenantId = TenantId(1),
             clientId = "my-app",
             name = "My App",
             description = "Test app",
@@ -182,7 +185,7 @@ class AdminServiceTest {
     fun `createUser - tenant not found`() {
         val result =
             svc.createUser(
-                tenantId = 999,
+                tenantId = TenantId(999),
                 username = "bob",
                 email = "bob@x.com",
                 fullName = "Bob",
@@ -196,7 +199,7 @@ class AdminServiceTest {
     fun `createUser - blank username`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "  ",
                 email = "bob@x.com",
                 fullName = "Bob",
@@ -210,7 +213,7 @@ class AdminServiceTest {
     fun `createUser - invalid username characters`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "bad user!",
                 email = "bob@x.com",
                 fullName = "Bob",
@@ -224,7 +227,7 @@ class AdminServiceTest {
     fun `createUser - invalid email`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "bob",
                 email = "not-email",
                 fullName = "Bob",
@@ -238,7 +241,7 @@ class AdminServiceTest {
     fun `createUser - duplicate username`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "alice",
                 email = "new@x.com",
                 fullName = "Alice 2",
@@ -252,7 +255,7 @@ class AdminServiceTest {
     fun `createUser - duplicate email`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "newuser",
                 email = "alice@example.com",
                 fullName = "New",
@@ -267,7 +270,7 @@ class AdminServiceTest {
         passwordPolicy.validationError = "Too weak"
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@x.com",
                 fullName = "Bob",
@@ -281,7 +284,7 @@ class AdminServiceTest {
     fun `createUser - success`() {
         val result =
             svc.createUser(
-                tenantId = 1,
+                tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
                 fullName = "Bob Test",
@@ -299,14 +302,14 @@ class AdminServiceTest {
 
     @Test
     fun `updateUser - user not found`() {
-        val result = svc.updateUser(userId = 999, tenantId = 1, email = "x@x.com", fullName = "X")
+        val result = svc.updateUser(userId = UserId(999), tenantId = TenantId(1), email = "x@x.com", fullName = "X")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
     fun `updateUser - tenant mismatch`() {
-        val result = svc.updateUser(userId = 10, tenantId = 99, email = "x@x.com", fullName = "X")
+        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(99), email = "x@x.com", fullName = "X")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -315,8 +318,8 @@ class AdminServiceTest {
     fun `updateUser - success`() {
         val result =
             svc.updateUser(
-                userId = 10,
-                tenantId = 1,
+                userId = UserId(10),
+                tenantId = TenantId(1),
                 email = "newalice@example.com",
                 fullName = "Alice Updated",
             )
@@ -332,15 +335,15 @@ class AdminServiceTest {
 
     @Test
     fun `setUserEnabled - user not found`() {
-        val result = svc.setUserEnabled(userId = 999, tenantId = 1, enabled = false)
+        val result = svc.setUserEnabled(userId = UserId(999), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Failure>(result)
     }
 
     @Test
     fun `setUserEnabled - disables user`() {
-        val result = svc.setUserEnabled(userId = 10, tenantId = 1, enabled = false)
+        val result = svc.setUserEnabled(userId = UserId(10), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
-        assertEquals(false, users.findById(10)!!.enabled)
+        assertEquals(false, users.findById(UserId(10))!!.enabled)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_DISABLED))
     }
 
@@ -352,8 +355,8 @@ class AdminServiceTest {
     fun `updateApplication - app not found`() {
         val result =
             svc.updateApplication(
-                appId = 999,
-                tenantId = 1,
+                appId = ApplicationId(999),
+                tenantId = TenantId(1),
                 name = "X",
                 description = null,
                 accessType = "public",
@@ -367,8 +370,8 @@ class AdminServiceTest {
     fun `updateApplication - tenant mismatch`() {
         val result =
             svc.updateApplication(
-                appId = 100,
-                tenantId = 99,
+                appId = ApplicationId(100),
+                tenantId = TenantId(99),
                 name = "X",
                 description = null,
                 accessType = "public",
@@ -382,8 +385,8 @@ class AdminServiceTest {
     fun `updateApplication - blank name`() {
         val result =
             svc.updateApplication(
-                appId = 100,
-                tenantId = 1,
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
                 name = "  ",
                 description = null,
                 accessType = "public",
@@ -397,8 +400,8 @@ class AdminServiceTest {
     fun `updateApplication - success`() {
         val result =
             svc.updateApplication(
-                appId = 100,
-                tenantId = 1,
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
                 name = "Renamed App",
                 description = "Updated",
                 accessType = "public",
@@ -415,7 +418,7 @@ class AdminServiceTest {
 
     @Test
     fun `setApplicationEnabled - disables app`() {
-        val result = svc.setApplicationEnabled(appId = 100, tenantId = 1, enabled = false)
+        val result = svc.setApplicationEnabled(appId = ApplicationId(100), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_DISABLED))
     }
@@ -426,13 +429,13 @@ class AdminServiceTest {
 
     @Test
     fun `regenerateClientSecret - app not found`() {
-        val result = svc.regenerateClientSecret(appId = 999, tenantId = 1)
+        val result = svc.regenerateClientSecret(appId = ApplicationId(999), tenantId = TenantId(1))
         assertIs<AdminResult.Failure>(result)
     }
 
     @Test
     fun `regenerateClientSecret - success returns raw secret`() {
-        val result = svc.regenerateClientSecret(appId = 100, tenantId = 1)
+        val result = svc.regenerateClientSecret(appId = ApplicationId(100), tenantId = TenantId(1))
         assertIs<AdminResult.Success<String>>(result)
         assertTrue(result.value.isNotBlank())
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED))
@@ -503,14 +506,24 @@ class AdminServiceTest {
 
     @Test
     fun `sendPasswordResetEmail - user not found`() {
-        val result = svc.sendPasswordResetEmail(userId = 999, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.sendPasswordResetEmail(
+                userId = UserId(999),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
     fun `sendPasswordResetEmail - success delegates to self-service`() {
-        val result = svc.sendPasswordResetEmail(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.sendPasswordResetEmail(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(1, emailPort.sent.size)
         assertEquals("password_reset", emailPort.sent[0].type)
@@ -523,7 +536,12 @@ class AdminServiceTest {
 
     @Test
     fun `resendVerificationEmail - success`() {
-        val result = svc.resendVerificationEmail(userId = 10, tenantId = 1, baseUrl = "http://localhost")
+        val result =
+            svc.resendVerificationEmail(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                baseUrl = "http://localhost",
+            )
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(1, emailPort.sent.size)
         assertEquals("verification", emailPort.sent[0].type)
