@@ -9,9 +9,12 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.WebhookService
+import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuditLogRepository
@@ -25,6 +28,8 @@ import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebhookDeliveryRepository
+import com.kauth.fakes.FakeWebhookEndpointRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.microsoft.playwright.Browser
@@ -69,6 +74,9 @@ abstract class E2ETestBase {
         val groupRepo = FakeGroupRepository()
         val auditLogRepo = FakeAuditLogRepository()
         val auditLogPort = FakeAuditLogPort()
+        val apiKeyRepo = FakeApiKeyRepository()
+        val webhookEndpointRepo = FakeWebhookEndpointRepository()
+        val webhookDeliveryRepo = FakeWebhookDeliveryRepository()
         val hasher = FakePasswordHasher()
         val tokenPort = FakeTokenPort()
         val encryptionService = EncryptionService("e2e-test-secret-key-32chars!!")
@@ -137,6 +145,18 @@ abstract class E2ETestBase {
                 auditLog = auditLogPort,
             )
 
+        private fun buildApiKeyService() =
+            ApiKeyService(
+                apiKeyRepository = apiKeyRepo,
+                tenantRepository = tenantRepo,
+            )
+
+        private fun buildWebhookService() =
+            WebhookService(
+                endpointRepository = webhookEndpointRepo,
+                deliveryRepository = webhookDeliveryRepo,
+            )
+
         private fun findFreePort(): Int = ServerSocket(0).use { it.localPort }
 
         @JvmStatic
@@ -171,6 +191,8 @@ abstract class E2ETestBase {
                             sessionRepository = sessionRepo,
                             auditLogRepository = auditLogRepo,
                             keyProvisioningService = keyProvisioningService,
+                            apiKeyService = buildApiKeyService(),
+                            webhookService = buildWebhookService(),
                             encryptionService = encryptionService,
                         )
                     }
@@ -229,6 +251,9 @@ abstract class E2ETestBase {
         roleRepo.clear()
         groupRepo.clear()
         auditLogPort.clear()
+        apiKeyRepo.clear()
+        webhookEndpointRepo.clear()
+        webhookDeliveryRepo.clear()
         tokenPort.reset()
 
         tenantRepo.add(masterTenant)
