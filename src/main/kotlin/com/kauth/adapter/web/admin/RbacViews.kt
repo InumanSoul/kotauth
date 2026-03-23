@@ -216,7 +216,7 @@ internal fun createRolePageImpl(
                                 }
                                 apps.forEach { app ->
                                     option {
-                                        value = app.id.toString()
+                                        value = app.id.value.toString()
                                         +app.name
                                     }
                                 }
@@ -332,14 +332,14 @@ internal fun roleDetailPageImpl(
                             role.childRoleIds.forEach { childId ->
                                 val child = allRoles.find { it.id == childId }
                                 tr {
-                                    td { span("key-table__name") { +(child?.name ?: "#$childId") } }
+                                    td { span("key-table__name") { +(child?.name ?: "#${childId.value}") } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/roles/${role.id?.value}/remove-child",
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "childRoleId") {
-                                                value = childId.toString()
+                                                value = childId.value.toString()
                                             }
                                             button(type = ButtonType.submit) {
                                                 classes = setOf("btn", "btn--ghost", "btn--sm")
@@ -365,7 +365,7 @@ internal fun roleDetailPageImpl(
                                 name = "childRoleId"
                                 availableChildren.forEach { r ->
                                     option {
-                                        value = r.id.toString()
+                                        value = r.id?.value.toString()
                                         +r.name
                                     }
                                 }
@@ -393,7 +393,7 @@ internal fun roleDetailPageImpl(
                             name = "userId"
                             allUsers.forEach { u ->
                                 option {
-                                    value = u.id.toString()
+                                    value = u.id?.value.toString()
                                     +"${u.username} (${u.email})"
                                 }
                             }
@@ -589,7 +589,7 @@ internal fun createGroupPageImpl(
                                 }
                                 groups.forEach { g ->
                                     option {
-                                        value = g.id.toString()
+                                        value = g.id?.value.toString()
                                         +g.name
                                     }
                                 }
@@ -713,7 +713,7 @@ internal fun groupDetailPageImpl(
                             group.roleIds.forEach { rid ->
                                 val r = allRoles.find { it.id == rid }
                                 tr {
-                                    td { span("key-table__name") { +(r?.name ?: "#$rid") } }
+                                    td { span("key-table__name") { +(r?.name ?: "#${rid.value}") } }
                                     td {
                                         span("badge badge--active") { +(r?.scope?.value ?: "?") }
                                     }
@@ -723,7 +723,7 @@ internal fun groupDetailPageImpl(
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "roleId") {
-                                                value = rid.toString()
+                                                value = rid.value.toString()
                                             }
                                             button(type = ButtonType.submit) {
                                                 classes = setOf("btn", "btn--ghost", "btn--sm")
@@ -749,7 +749,7 @@ internal fun groupDetailPageImpl(
                                 name = "roleId"
                                 availableRoles.forEach { r ->
                                     option {
-                                        value = r.id.toString()
+                                        value = r.id?.value.toString()
                                         +r.name
                                     }
                                 }
@@ -791,7 +791,7 @@ internal fun groupDetailPageImpl(
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "userId") {
-                                                value = u.id.toString()
+                                                value = u.id?.value.toString()
                                             }
                                             button(type = ButtonType.submit) {
                                                 classes = setOf("btn", "btn--ghost", "btn--sm")
@@ -817,7 +817,7 @@ internal fun groupDetailPageImpl(
                                 name = "userId"
                                 nonMembers.forEach { u ->
                                     option {
-                                        value = u.id.toString()
+                                        value = u.id?.value.toString()
                                         +"${u.username} (${u.email})"
                                     }
                                 }

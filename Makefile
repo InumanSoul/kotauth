@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth lint lint-fix test build jar version up up-fresh down nuke logs health
+.PHONY: help css css-admin css-auth lint lint-fix test e2e build jar version up up-fresh down nuke logs health
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,12 @@ lint-fix: ## Auto-fix lint issues with ktlintFormat
 
 test: ## Run the test suite
 	./gradlew test
+
+e2e: ## Run E2E browser smoke tests (Playwright, headless)
+	./gradlew e2eTest
+
+e2e-headed: ## Run E2E tests with visible browser (debugging)
+	./gradlew e2eTest -Dplaywright.headless=false
 
 build: ## Full build — CSS + lint + tests + fat JAR (CI-equivalent)
 	./gradlew build
