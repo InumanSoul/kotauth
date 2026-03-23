@@ -565,7 +565,7 @@ class OAuthService(
         if (!user.enabled) return null
 
         return UserInfoResult(
-            sub = user.id!!.value.toString(),
+            sub = userId.value.toString(),
             username = user.username,
             email = user.email,
             emailVerified = user.emailVerified,

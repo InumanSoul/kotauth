@@ -169,7 +169,7 @@ internal fun mfaSettingsPageImpl(
                                     tr {
                                         td {
                                             a(
-                                                "/admin/workspaces/${workspace.slug}/users/${u.id}",
+                                                "/admin/workspaces/${workspace.slug}/users/${u.id?.value}",
                                                 classes = "mfa-user-id",
                                             ) { +u.username }
                                         }
@@ -212,7 +212,7 @@ internal fun mfaSettingsPageImpl(
                                     tr {
                                         td {
                                             a(
-                                                "/admin/workspaces/${workspace.slug}/users/${u.id}",
+                                                "/admin/workspaces/${workspace.slug}/users/${u.id?.value}",
                                                 classes = "mfa-user-id",
                                             ) { +u.username }
                                         }

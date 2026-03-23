@@ -59,7 +59,7 @@ internal fun activeSessionsPageImpl(
                         tbody {
                             sessions.forEach { s ->
                                 tr {
-                                    td { span("data-table__id") { +"#${s.id}" } }
+                                    td { span("data-table__id") { +"#${s.id?.value}" } }
                                     td { +(s.userId?.toString() ?: "M2M") }
                                     td { +(s.clientId?.toString() ?: "—") }
                                     td { span("data-table__email") { +(s.ipAddress ?: "—") } }
@@ -67,7 +67,7 @@ internal fun activeSessionsPageImpl(
                                     td { +s.expiresAt.toDisplayString() }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/${workspace.slug}/sessions/${s.id}/revoke",
+                                            action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
                                             method = FormMethod.post,
                                             classes = "inline-form",
                                         ) {

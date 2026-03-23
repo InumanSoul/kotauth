@@ -69,7 +69,7 @@ internal fun rolesListPageImpl(
                             tr {
                                 td {
                                     a(
-                                        href = "/admin/workspaces/$slug/roles/${role.id}",
+                                        href = "/admin/workspaces/$slug/roles/${role.id?.value}",
                                         classes = "data-table__id",
                                     ) { +role.name }
                                 }
@@ -88,7 +88,7 @@ internal fun rolesListPageImpl(
                                 td {
                                     div("data-table__actions") {
                                         a(
-                                            href = "/admin/workspaces/$slug/roles/${role.id}",
+                                            href = "/admin/workspaces/$slug/roles/${role.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
                                         ) { +"Open" }
                                     }
@@ -272,7 +272,7 @@ internal fun roleDetailPageImpl(
                         +"Save"
                     }
                     form(
-                        action = "/admin/workspaces/$slug/roles/${role.id}/delete",
+                        action = "/admin/workspaces/$slug/roles/${role.id?.value}/delete",
                         method = FormMethod.post,
                     ) {
                         button(type = ButtonType.submit) {
@@ -286,7 +286,7 @@ internal fun roleDetailPageImpl(
 
             // ── Edit name/description ────────────────────────────────
             form(
-                action = "/admin/workspaces/$slug/roles/${role.id}/edit",
+                action = "/admin/workspaces/$slug/roles/${role.id?.value}/edit",
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
                 method = FormMethod.post,
             ) {
@@ -335,7 +335,7 @@ internal fun roleDetailPageImpl(
                                     td { span("key-table__name") { +(child?.name ?: "#$childId") } }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/$slug/roles/${role.id}/remove-child",
+                                            action = "/admin/workspaces/$slug/roles/${role.id?.value}/remove-child",
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "childRoleId") {
@@ -356,7 +356,7 @@ internal fun roleDetailPageImpl(
                 if (availableChildren.isNotEmpty()) {
                     div("edit-actions") {
                         form(
-                            action = "/admin/workspaces/$slug/roles/${role.id}/children",
+                            action = "/admin/workspaces/$slug/roles/${role.id?.value}/children",
                             method = FormMethod.post,
                         ) {
                             style = "display:flex; align-items:center; gap:8px;"
@@ -384,7 +384,7 @@ internal fun roleDetailPageImpl(
                 div("ov-card__section-label") { +"Assigned Users" }
                 div("edit-actions") {
                     form(
-                        action = "/admin/workspaces/$slug/roles/${role.id}/assign-user",
+                        action = "/admin/workspaces/$slug/roles/${role.id?.value}/assign-user",
                         method = FormMethod.post,
                     ) {
                         style = "display:flex; align-items:center; gap:8px;"
@@ -477,7 +477,7 @@ internal fun groupsListPageImpl(
                             tr {
                                 td {
                                     a(
-                                        href = "/admin/workspaces/$slug/groups/${group.id}",
+                                        href = "/admin/workspaces/$slug/groups/${group.id?.value}",
                                         classes = "data-table__id",
                                     ) { +group.name }
                                 }
@@ -491,7 +491,7 @@ internal fun groupsListPageImpl(
                                 td {
                                     div("data-table__actions") {
                                         a(
-                                            href = "/admin/workspaces/$slug/groups/${group.id}",
+                                            href = "/admin/workspaces/$slug/groups/${group.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
                                         ) { +"Open" }
                                     }
@@ -652,7 +652,7 @@ internal fun groupDetailPageImpl(
                         +"Save"
                     }
                     form(
-                        action = "/admin/workspaces/$slug/groups/${group.id}/delete",
+                        action = "/admin/workspaces/$slug/groups/${group.id?.value}/delete",
                         method = FormMethod.post,
                     ) {
                         button(type = ButtonType.submit) {
@@ -666,7 +666,7 @@ internal fun groupDetailPageImpl(
 
             // ── Edit name/description ────────────────────────────────
             form(
-                action = "/admin/workspaces/$slug/groups/${group.id}/edit",
+                action = "/admin/workspaces/$slug/groups/${group.id?.value}/edit",
                 encType = FormEncType.applicationXWwwFormUrlEncoded,
                 method = FormMethod.post,
             ) {
@@ -719,7 +719,7 @@ internal fun groupDetailPageImpl(
                                     }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/$slug/groups/${group.id}/unassign-role",
+                                            action = "/admin/workspaces/$slug/groups/${group.id?.value}/unassign-role",
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "roleId") {
@@ -740,7 +740,7 @@ internal fun groupDetailPageImpl(
                 if (availableRoles.isNotEmpty()) {
                     div("edit-actions") {
                         form(
-                            action = "/admin/workspaces/$slug/groups/${group.id}/assign-role",
+                            action = "/admin/workspaces/$slug/groups/${group.id?.value}/assign-role",
                             method = FormMethod.post,
                         ) {
                             style = "display:flex; align-items:center; gap:8px;"
@@ -787,7 +787,7 @@ internal fun groupDetailPageImpl(
                                     td { span("key-table__meta") { +u.email } }
                                     td {
                                         form(
-                                            action = "/admin/workspaces/$slug/groups/${group.id}/remove-member",
+                                            action = "/admin/workspaces/$slug/groups/${group.id?.value}/remove-member",
                                             method = FormMethod.post,
                                         ) {
                                             input(type = InputType.hidden, name = "userId") {
@@ -808,7 +808,7 @@ internal fun groupDetailPageImpl(
                 if (nonMembers.isNotEmpty()) {
                     div("edit-actions") {
                         form(
-                            action = "/admin/workspaces/$slug/groups/${group.id}/add-member",
+                            action = "/admin/workspaces/$slug/groups/${group.id?.value}/add-member",
                             method = FormMethod.post,
                         ) {
                             style = "display:flex; align-items:center; gap:8px;"

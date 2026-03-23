@@ -136,7 +136,7 @@ fun Route.adminRbacRoutes(
                     params["name"]?.trim() ?: "",
                     params["description"]?.trim()?.takeIf { it.isNotBlank() },
                 )
-                call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
             }
 
             post("/delete") {
@@ -163,7 +163,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["childRoleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.addChildRole(roleId, childId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
             }
 
             post("/remove-child") {
@@ -178,7 +178,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["childRoleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.removeChildRole(roleId, childId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
             }
 
             post("/assign-user") {
@@ -193,7 +193,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.assignRoleToUser(userId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
             }
 
             post("/unassign-user") {
@@ -208,7 +208,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.unassignRoleFromUser(userId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/$roleId")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
             }
         }
     }
@@ -323,7 +323,7 @@ fun Route.adminRbacRoutes(
                     name = params["name"]?.trim() ?: "",
                     description = params["description"]?.trim()?.takeIf { it.isNotBlank() },
                 )
-                call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
             }
 
             post("/delete") {
@@ -350,7 +350,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.assignRoleToGroup(groupId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
             }
 
             post("/unassign-role") {
@@ -365,7 +365,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.unassignRoleFromGroup(groupId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
             }
 
             post("/add-member") {
@@ -380,7 +380,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.addUserToGroup(userId, groupId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
             }
 
             post("/remove-member") {
@@ -395,7 +395,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.removeUserFromGroup(userId, groupId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/$groupId")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
             }
         }
     }
