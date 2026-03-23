@@ -13,12 +13,12 @@ import java.time.Instant
  * [attributes] stores arbitrary key-value metadata (JSONB in Postgres).
  */
 data class Group(
-    val id: Int? = null,
-    val tenantId: Int,
+    val id: GroupId? = null,
+    val tenantId: TenantId,
     val name: String,
     val description: String? = null,
-    val parentGroupId: Int? = null,
+    val parentGroupId: GroupId? = null,
     val attributes: Map<String, String> = emptyMap(),
-    val roleIds: List<Int> = emptyList(),
+    val roleIds: List<RoleId> = emptyList(),
     val createdAt: Instant = Instant.now(),
 )

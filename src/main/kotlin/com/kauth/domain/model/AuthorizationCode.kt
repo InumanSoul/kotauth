@@ -20,9 +20,9 @@ import java.time.Instant
 data class AuthorizationCode(
     val id: Int? = null,
     val code: String,
-    val tenantId: Int,
-    val clientId: Int,
-    val userId: Int,
+    val tenantId: TenantId,
+    val clientId: ApplicationId,
+    val userId: UserId,
     val redirectUri: String,
     val scopes: String = "openid",
     val codeChallenge: String? = null,

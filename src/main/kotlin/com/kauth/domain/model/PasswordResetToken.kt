@@ -19,8 +19,8 @@ import java.time.Instant
  */
 data class PasswordResetToken(
     val id: Int? = null,
-    val userId: Int,
-    val tenantId: Int,
+    val userId: UserId,
+    val tenantId: TenantId,
     val tokenHash: String,
     val expiresAt: Instant,
     val usedAt: Instant? = null,

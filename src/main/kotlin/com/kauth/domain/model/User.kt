@@ -10,8 +10,8 @@ import java.time.Instant
  * authenticate against a different tenant's clients.
  */
 data class User(
-    val id: Int? = null,
-    val tenantId: Int,
+    val id: UserId? = null,
+    val tenantId: TenantId,
     val username: String,
     val email: String,
     val fullName: String,

@@ -10,8 +10,8 @@ import java.time.Instant
  */
 data class SocialAccount(
     val id: Int? = null,
-    val userId: Int,
-    val tenantId: Int,
+    val userId: UserId,
+    val tenantId: TenantId,
     val provider: SocialProvider,
     /** The stable unique identifier from the provider (Google sub, GitHub id). */
     val providerUserId: String,

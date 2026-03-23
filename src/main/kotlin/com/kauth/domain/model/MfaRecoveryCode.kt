@@ -13,8 +13,8 @@ import java.time.Instant
  */
 data class MfaRecoveryCode(
     val id: Int? = null,
-    val userId: Int,
-    val tenantId: Int,
+    val userId: UserId,
+    val tenantId: TenantId,
     val codeHash: String,
     val usedAt: Instant? = null,
     val createdAt: Instant = Instant.now(),

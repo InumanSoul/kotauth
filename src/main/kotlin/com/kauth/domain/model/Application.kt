@@ -12,8 +12,8 @@ package com.kauth.domain.model
  *   BEARER_ONLY  — resource servers that only validate tokens, never initiate flows
  */
 data class Application(
-    val id: Int,
-    val tenantId: Int,
+    val id: ApplicationId,
+    val tenantId: TenantId,
     val clientId: String,
     val name: String,
     val description: String?,
