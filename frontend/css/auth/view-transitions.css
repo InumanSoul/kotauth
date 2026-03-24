@@ -1,0 +1,39 @@
+/* View transitions for portal */
+
+@view-transition { navigation: auto; }
+
+/* ── TOPBAR TAB INDICATOR ───────────────────────────────────────────────────────────── */
+::view-transition-new(auth-card) {
+  animation-name: auth-card-fade-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(auth-card) {
+  animation-name: auth-card-fade-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-direction: reverse;
+}
+
+/* SHARED KEYFRAME */
+
+@keyframes auth-card-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── RESETS TO NONE ──────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+   ::view-transition-new(auth-card),
+   ::view-transition-old(auth-card) {
+    animation: none;
+  }
+}

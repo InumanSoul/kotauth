@@ -103,11 +103,12 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-block: 12px;
+  margin-block: 24px;
 
   p {
     font-size: 0.875rem;
     text-transform: uppercase;
+    font-weight: 600;
     color: var(--color-muted);
   }
 }
@@ -119,13 +120,14 @@
 }
 
 .compatible-apps__item {
-  display: flex;
+  background: var(--color-accent-bg);
+  border: .5px solid var(--color-accent-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: var(--color-accent);
-  border: 0.5px solid var(--color-accent-border);
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  color: var(--color-amber);
+  font-size: .875rem;
+  font-family: var(--font-mono);
+  display: flex;
 }

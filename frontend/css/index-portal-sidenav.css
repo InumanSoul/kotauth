@@ -15,6 +15,7 @@
 
 /* ── Portal body override ──────────────────────────────────────────────── */
 @import "./portal/reset.css";
+@import "./portal/view-transitions.css";
 
 /* ── Portal components (form, button, alert, badge) ────────────────────── */
 @import "./portal/form.css";

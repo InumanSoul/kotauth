@@ -19,7 +19,7 @@ body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  min-height: 100dvh;
   height: 100dvh;
   overflow: hidden;
+  view-transition-name: auth-card;
 }

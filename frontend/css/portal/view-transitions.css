@@ -2,13 +2,60 @@
 
 @view-transition { navigation: auto; }
 
+/* ── TOPBAR TAB INDICATOR ───────────────────────────────────────────────────────────── */
 ::view-transition-group(tab-indicator) {
   animation-duration: 0.25s;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+::view-transition-new(tab-portal-content) {
+  animation-name: portal-content-fade-in-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(tab-portal-content) {
+  animation-name: portal-content-fade-in-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-direction: reverse;
+}
+
+/* ── SIDENAV ──────────────────────────────────────────────────────────── */
+::view-transition-new(side-portal-main){
+  animation-name: portal-content-fade-in-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+::view-transition-old(side-portal-main) {
+  animation-name: portal-content-fade-in-up;
+  animation-duration: 0.25s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-direction: reverse;
+}
+
+/* SHARED KEYFRAME */
+
+@keyframes portal-content-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── RESETS TO NONE ──────────────────────────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
-   ::view-transition-group(tab-indicator) {
-    animation-duration: 0.01s;
+   ::view-transition-group(tab-indicator),
+   ::view-transition-new(tab-portal-content),
+   ::view-transition-old(tab-portal-content),
+   ::view-transition-new(side-portal-main),
+   ::view-transition-old(side-portal-main) {
+    animation: none;
   }
 }

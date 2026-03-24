@@ -274,121 +274,123 @@ object AuthView {
             head { authHead("$workspaceName | Create Account", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    if (theme.logoUrl != null) {
-                        img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
-                    } else {
-                        div("brand-name") { +workspaceName }
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
                     }
-                }
-                div("card") {
-                    h1("card-title") { +"Create account" }
-                    p("card-subtitle") { +"Fill in your details to get started" }
+                    div("card") {
+                        h1("card-title") { +"Create account" }
+                        p("card-subtitle") { +"Fill in your details to get started" }
 
-                    if (error != null) {
-                        div("alert alert-error") { +error }
-                    }
+                        if (error != null) {
+                            div("alert alert-error") { +error }
+                        }
 
-                    form(
-                        action = "/t/$tenantSlug/register",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "fullName"
-                                +"Full Name"
+                        form(
+                            action = "/t/$tenantSlug/register",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method = FormMethod.post,
+                        ) {
+                            div("field") {
+                                label {
+                                    htmlFor = "fullName"
+                                    +"Full Name"
+                                }
+                                input(type = InputType.text, name = "fullName") {
+                                    id = "fullName"
+                                    placeholder = "Your full name"
+                                    attributes["autocomplete"] = "name"
+                                    value = prefill.fullName
+                                    required = true
+                                }
                             }
-                            input(type = InputType.text, name = "fullName") {
-                                id = "fullName"
-                                placeholder = "Your full name"
-                                attributes["autocomplete"] = "name"
-                                value = prefill.fullName
-                                required = true
+                            div("field") {
+                                label {
+                                    htmlFor = "email"
+                                    +"Email Address"
+                                }
+                                input(type = InputType.email, name = "email") {
+                                    id = "email"
+                                    placeholder = "you@example.com"
+                                    attributes["autocomplete"] = "email"
+                                    value = prefill.email
+                                    required = true
+                                }
                             }
+                            div("field") {
+                                label {
+                                    htmlFor = "username"
+                                    +"Username"
+                                }
+                                input(type = InputType.text, name = "username") {
+                                    id = "username"
+                                    placeholder = "Choose a username"
+                                    attributes["autocomplete"] = "username"
+                                    value = prefill.username
+                                    required = true
+                                }
+                            }
+                            div("divider") {}
+                            div("field") {
+                                label {
+                                    htmlFor = "password"
+                                    +"Password"
+                                }
+                                input(type = InputType.password, name = "password") {
+                                    id = "password"
+                                    placeholder = "Minimum 8 characters"
+                                    attributes["autocomplete"] = "new-password"
+                                    required = true
+                                }
+                            }
+                            div("field") {
+                                label {
+                                    htmlFor = "confirmPassword"
+                                    +"Confirm Password"
+                                }
+                                input(type = InputType.password, name = "confirmPassword") {
+                                    id = "confirmPassword"
+                                    placeholder = "Repeat your password"
+                                    attributes["autocomplete"] = "new-password"
+                                    required = true
+                                }
+                            }
+                            button(type = ButtonType.submit, classes = "btn") { +"Create Account" }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "email"
-                                +"Email Address"
-                            }
-                            input(type = InputType.email, name = "email") {
-                                id = "email"
-                                placeholder = "you@example.com"
-                                attributes["autocomplete"] = "email"
-                                value = prefill.email
-                                required = true
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "username"
-                                +"Username"
-                            }
-                            input(type = InputType.text, name = "username") {
-                                id = "username"
-                                placeholder = "Choose a username"
-                                attributes["autocomplete"] = "username"
-                                value = prefill.username
-                                required = true
-                            }
-                        }
-                        div("divider") {}
-                        div("field") {
-                            label {
-                                htmlFor = "password"
-                                +"Password"
-                            }
-                            input(type = InputType.password, name = "password") {
-                                id = "password"
-                                placeholder = "Minimum 8 characters"
-                                attributes["autocomplete"] = "new-password"
-                                required = true
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "confirmPassword"
-                                +"Confirm Password"
-                            }
-                            input(type = InputType.password, name = "confirmPassword") {
-                                id = "confirmPassword"
-                                placeholder = "Repeat your password"
-                                attributes["autocomplete"] = "new-password"
-                                required = true
-                            }
-                        }
-                        button(type = ButtonType.submit, classes = "btn") { +"Create Account" }
-                    }
 
-                    div("footer-link") {
-                        +"Already have an account? "
-                        a(href = "/t/$tenantSlug/login") { +"Sign in" }
-                    }
-
-                    // Social login buttons — same providers as the login page.
-                    // Clicking one initiates the OAuth flow; if the account doesn't exist
-                    // yet the callback redirects to complete-registration automatically.
-                    if (enabledProviders.isNotEmpty()) {
-                        div("social-divider") {
-                            span { +"or sign up with" }
+                        div("footer-link") {
+                            +"Already have an account? "
+                            a(href = "/t/$tenantSlug/login") { +"Sign in" }
                         }
-                        div("social-buttons") {
-                            for (prov in enabledProviders) {
-                                a(
-                                    href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
-                                    classes = "btn-social",
-                                ) {
-                                    span("social-icon") {}
-                                    +prov.displayName
+
+                        // Social login buttons — same providers as the login page.
+                        // Clicking one initiates the OAuth flow; if the account doesn't exist
+                        // yet the callback redirects to complete-registration automatically.
+                        if (enabledProviders.isNotEmpty()) {
+                            div("social-divider") {
+                                span { +"or sign up with" }
+                            }
+                            div("social-buttons") {
+                                for (prov in enabledProviders) {
+                                    a(
+                                        href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
+                                        classes = "btn-social",
+                                    ) {
+                                        span("social-icon") {}
+                                        +prov.displayName
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
                 }
             }
         }
@@ -412,61 +414,63 @@ object AuthView {
             head { authHead("$workspaceName | Forgot Password", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    if (theme.logoUrl != null) {
-                        img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
-                    } else {
-                        div("brand-name") { +workspaceName }
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
                     }
-                }
-                div("card") {
-                    h1("card-title") { +"Forgot password" }
+                    div("card") {
+                        h1("card-title") { +"Forgot password" }
 
-                    if (sent) {
-                        p("card-subtitle") {
-                            +"If an account exists for that email address, you'll receive a reset link shortly. Check your spam folder if you don't see it."
-                        }
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
-                        }
-                    } else {
-                        p(
-                            "card-subtitle",
-                        ) { +"Enter your email address and we'll send you a link to reset your password." }
-
-                        if (error != null) {
-                            div("alert alert-error") { +error }
-                        }
-
-                        form(
-                            action = "/t/$tenantSlug/forgot-password",
-                            encType = FormEncType.applicationXWwwFormUrlEncoded,
-                            method = FormMethod.post,
-                        ) {
-                            div("field") {
-                                label {
-                                    htmlFor = "email"
-                                    +"Email address"
-                                }
-                                input(type = InputType.email, name = "email") {
-                                    id = "email"
-                                    placeholder = "you@example.com"
-                                    attributes["autocomplete"] = "email"
-                                    required = true
-                                    attributes["autofocus"] = "true"
-                                }
+                        if (sent) {
+                            p("card-subtitle") {
+                                +"If an account exists for that email address, you'll receive a reset link shortly. Check your spam folder if you don't see it."
                             }
-                            button(type = ButtonType.submit, classes = "btn") { +"Send reset link" }
-                        }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                            }
+                        } else {
+                            p(
+                                "card-subtitle",
+                            ) { +"Enter your email address and we'll send you a link to reset your password." }
 
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                            if (error != null) {
+                                div("alert alert-error") { +error }
+                            }
+
+                            form(
+                                action = "/t/$tenantSlug/forgot-password",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                div("field") {
+                                    label {
+                                        htmlFor = "email"
+                                        +"Email address"
+                                    }
+                                    input(type = InputType.email, name = "email") {
+                                        id = "email"
+                                        placeholder = "you@example.com"
+                                        attributes["autocomplete"] = "email"
+                                        required = true
+                                        attributes["autofocus"] = "true"
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") { +"Send reset link" }
+                            }
+
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                            }
                         }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
                 }
             }
         }
@@ -491,69 +495,71 @@ object AuthView {
             head { authHead("$workspaceName | Reset Password", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    if (theme.logoUrl != null) {
-                        img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
-                    } else {
-                        div("brand-name") { +workspaceName }
-                    }
-                }
-                div("card") {
-                    h1("card-title") { +"Reset password" }
-
-                    if (success) {
-                        div("alert alert-success") {
-                            +"Password changed successfully."
-                        }
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Sign in with your new password" }
-                        }
-                    } else {
-                        p("card-subtitle") { +"Enter your new password below." }
-
-                        if (error != null) {
-                            div("alert alert-error") { +error }
-                        }
-
-                        form(
-                            action = "/t/$tenantSlug/reset-password",
-                            encType = FormEncType.applicationXWwwFormUrlEncoded,
-                            method = FormMethod.post,
-                        ) {
-                            input(type = InputType.hidden, name = "token") { value = token }
-
-                            div("field") {
-                                label {
-                                    htmlFor = "new_password"
-                                    +"New password"
-                                }
-                                input(type = InputType.password, name = "new_password") {
-                                    id = "new_password"
-                                    placeholder = "Minimum 8 characters"
-                                    attributes["autocomplete"] = "new-password"
-                                    required = true
-                                    attributes["autofocus"] = "true"
-                                }
-                            }
-                            div("field") {
-                                label {
-                                    htmlFor = "confirm_password"
-                                    +"Confirm new password"
-                                }
-                                input(type = InputType.password, name = "confirm_password") {
-                                    id = "confirm_password"
-                                    placeholder = "Repeat your new password"
-                                    attributes["autocomplete"] = "new-password"
-                                    required = true
-                                }
-                            }
-                            button(type = ButtonType.submit, classes = "btn") { +"Change password" }
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                        } else {
+                            div("brand-name") { +workspaceName }
                         }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    div("card") {
+                        h1("card-title") { +"Reset password" }
+
+                        if (success) {
+                            div("alert alert-success") {
+                                +"Password changed successfully."
+                            }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/login") { +"Sign in with your new password" }
+                            }
+                        } else {
+                            p("card-subtitle") { +"Enter your new password below." }
+
+                            if (error != null) {
+                                div("alert alert-error") { +error }
+                            }
+
+                            form(
+                                action = "/t/$tenantSlug/reset-password",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                input(type = InputType.hidden, name = "token") { value = token }
+
+                                div("field") {
+                                    label {
+                                        htmlFor = "new_password"
+                                        +"New password"
+                                    }
+                                    input(type = InputType.password, name = "new_password") {
+                                        id = "new_password"
+                                        placeholder = "Minimum 8 characters"
+                                        attributes["autocomplete"] = "new-password"
+                                        required = true
+                                        attributes["autofocus"] = "true"
+                                    }
+                                }
+                                div("field") {
+                                    label {
+                                        htmlFor = "confirm_password"
+                                        +"Confirm new password"
+                                    }
+                                    input(type = InputType.password, name = "confirm_password") {
+                                        id = "confirm_password"
+                                        placeholder = "Repeat your new password"
+                                        attributes["autocomplete"] = "new-password"
+                                        required = true
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") { +"Change password" }
+                            }
+                        }
+                    }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
                 }
             }
         }
@@ -577,32 +583,34 @@ object AuthView {
             head { authHead("$workspaceName | Email Verification", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    if (theme.logoUrl != null) {
-                        img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
-                    } else {
-                        div("brand-name") { +workspaceName }
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
                     }
-                }
-                div("card") {
-                    h1("card-title") { +"Email verification" }
+                    div("card") {
+                        h1("card-title") { +"Email verification" }
 
-                    if (success) {
-                        div("alert alert-success") { +message }
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Sign in to your account" }
-                        }
-                    } else {
-                        p("card-subtitle") { +"There was a problem with your verification link." }
-                        div("alert alert-error") { +message }
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                        if (success) {
+                            div("alert alert-success") { +message }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/login") { +"Sign in to your account" }
+                            }
+                        } else {
+                            p("card-subtitle") { +"There was a problem with your verification link." }
+                            div("alert alert-error") { +message }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                            }
                         }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
                 }
             }
         }
@@ -634,74 +642,76 @@ object AuthView {
             head { authHead("$workspaceName | Create Account", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    div("brand-name") { +workspaceName }
-                }
-                div("card") {
-                    h1("card-title") { +"One last step" }
-                    p("card-subtitle") {
-                        +"You're signing in with $providerName. Choose a username to complete your account."
+                div("shell") {
+                    div("brand") {
+                        div("brand-name") { +workspaceName }
                     }
-
-                    if (error != null) {
-                        div("alert alert-error") { +error }
-                    }
-
-                    form(
-                        action = "complete-registration",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                    ) {
-                        // Email is read-only — it comes from the provider and is shown for context
-                        div("field") {
-                            label {
-                                htmlFor = "email_display"
-                                +"Email (from $providerName)"
-                            }
-                            input(type = InputType.email, name = "email_display") {
-                                id = "email_display"
-                                value = email
-                                disabled = true
-                            }
+                    div("card") {
+                        h1("card-title") { +"One last step" }
+                        p("card-subtitle") {
+                            +"You're signing in with $providerName. Choose a username to complete your account."
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "full_name"
-                                +"Full Name"
-                            }
-                            input(type = InputType.text, name = "full_name") {
-                                id = "full_name"
-                                placeholder = "Your display name"
-                                value = prefillFullName
-                                attributes["autocomplete"] = "name"
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "username"
-                                +"Username"
-                            }
-                            input(type = InputType.text, name = "username") {
-                                id = "username"
-                                placeholder = "letters, numbers, underscores"
-                                value = prefillUsername
-                                attributes["autocomplete"] = "username"
-                                attributes["autofocus"] = "true"
-                                attributes["pattern"] = "[a-zA-Z0-9_]+"
-                                required = true
-                            }
-                        }
-                        button(type = ButtonType.submit, classes = "btn") { +"Create account" }
-                    }
 
-                    div("footer-link") {
-                        +"Already have an account? "
-                        a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                        if (error != null) {
+                            div("alert alert-error") { +error }
+                        }
+
+                        form(
+                            action = "complete-registration",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method = FormMethod.post,
+                        ) {
+                            // Email is read-only — it comes from the provider and is shown for context
+                            div("field") {
+                                label {
+                                    htmlFor = "email_display"
+                                    +"Email (from $providerName)"
+                                }
+                                input(type = InputType.email, name = "email_display") {
+                                    id = "email_display"
+                                    value = email
+                                    disabled = true
+                                }
+                            }
+                            div("field") {
+                                label {
+                                    htmlFor = "full_name"
+                                    +"Full Name"
+                                }
+                                input(type = InputType.text, name = "full_name") {
+                                    id = "full_name"
+                                    placeholder = "Your display name"
+                                    value = prefillFullName
+                                    attributes["autocomplete"] = "name"
+                                }
+                            }
+                            div("field") {
+                                label {
+                                    htmlFor = "username"
+                                    +"Username"
+                                }
+                                input(type = InputType.text, name = "username") {
+                                    id = "username"
+                                    placeholder = "letters, numbers, underscores"
+                                    value = prefillUsername
+                                    attributes["autocomplete"] = "username"
+                                    attributes["autofocus"] = "true"
+                                    attributes["pattern"] = "[a-zA-Z0-9_]+"
+                                    required = true
+                                }
+                            }
+                            button(type = ButtonType.submit, classes = "btn") { +"Create account" }
+                        }
+
+                        div("footer-link") {
+                            +"Already have an account? "
+                            a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                        }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
                 }
             }
         }
@@ -721,85 +731,87 @@ object AuthView {
             head { authHead("$workspaceName | Two-Factor Authentication", theme) }
             body {
                 demoBanner()
-                div("brand") {
-                    if (theme.logoUrl != null) {
-                        img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
-                    } else {
-                        div("brand-name") { +workspaceName }
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
+                        div("brand-tagline") { +"Two-factor authentication" }
                     }
-                    div("brand-tagline") { +"Two-factor authentication" }
-                }
-                div("card") {
-                    h1("card-title") { +"Verify your identity" }
-                    p("card-subtitle") { +"Enter the 6-digit code from your authenticator app, or a recovery code." }
+                    div("card") {
+                        h1("card-title") { +"Verify your identity" }
+                        p("card-subtitle") { +"Enter the 6-digit code from your authenticator app, or a recovery code." }
 
-                    if (error != null) {
-                        div("alert alert-error") { +error }
-                    }
-
-                    form(action = "/t/$tenantSlug/mfa-challenge", method = FormMethod.post) {
-                        // Preserve OAuth params through the MFA form submission
-                        if (oauthParams.isOAuthFlow) {
-                            oauthParams.responseType?.let {
-                                input(type = InputType.hidden, name = "response_type") {
-                                    value =
-                                        it
-                                }
-                            }
-                            oauthParams.clientId?.let {
-                                input(type = InputType.hidden, name = "oauth_client_id") {
-                                    value =
-                                        it
-                                }
-                            }
-                            oauthParams.redirectUri?.let {
-                                input(type = InputType.hidden, name = "redirect_uri") {
-                                    value =
-                                        it
-                                }
-                            }
-                            oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
-                            oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
-                            oauthParams.codeChallenge?.let {
-                                input(type = InputType.hidden, name = "code_challenge") {
-                                    value =
-                                        it
-                                }
-                            }
-                            oauthParams.codeChallengeMethod?.let {
-                                input(type = InputType.hidden, name = "code_challenge_method") {
-                                    value =
-                                        it
-                                }
-                            }
-                            oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
+                        if (error != null) {
+                            div("alert alert-error") { +error }
                         }
 
-                        div("field") {
-                            label {
-                                htmlFor = "code"
-                                +"Authentication code"
+                        form(action = "/t/$tenantSlug/mfa-challenge", method = FormMethod.post) {
+                            // Preserve OAuth params through the MFA form submission
+                            if (oauthParams.isOAuthFlow) {
+                                oauthParams.responseType?.let {
+                                    input(type = InputType.hidden, name = "response_type") {
+                                        value =
+                                            it
+                                    }
+                                }
+                                oauthParams.clientId?.let {
+                                    input(type = InputType.hidden, name = "oauth_client_id") {
+                                        value =
+                                            it
+                                    }
+                                }
+                                oauthParams.redirectUri?.let {
+                                    input(type = InputType.hidden, name = "redirect_uri") {
+                                        value =
+                                            it
+                                    }
+                                }
+                                oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
+                                oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
+                                oauthParams.codeChallenge?.let {
+                                    input(type = InputType.hidden, name = "code_challenge") {
+                                        value =
+                                            it
+                                    }
+                                }
+                                oauthParams.codeChallengeMethod?.let {
+                                    input(type = InputType.hidden, name = "code_challenge_method") {
+                                        value =
+                                            it
+                                    }
+                                }
+                                oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
                             }
-                            input(type = InputType.text, name = "code") {
-                                id = "code"
-                                placeholder = "Enter 6-digit code or recovery code"
-                                autoComplete = false
-                                autoFocus = true
-                                attributes["inputmode"] = "numeric"
-                                attributes["pattern"] = "[0-9a-fA-F]*"
+
+                            div("field") {
+                                label {
+                                    htmlFor = "code"
+                                    +"Authentication code"
+                                }
+                                input(type = InputType.text, name = "code") {
+                                    id = "code"
+                                    placeholder = "Enter 6-digit code or recovery code"
+                                    autoComplete = false
+                                    autoFocus = true
+                                    attributes["inputmode"] = "numeric"
+                                    attributes["pattern"] = "[0-9a-fA-F]*"
+                                }
                             }
+
+                            button(type = ButtonType.submit, classes = "btn") { +"Verify" }
                         }
 
-                        button(type = ButtonType.submit, classes = "btn") { +"Verify" }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                        }
                     }
-
-                    div("footer-link") {
-                        a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
                     }
-                }
-                p("copyright") {
-                    +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                    a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
                 }
             }
         }

@@ -16,4 +16,5 @@
 .portal-main {
   width: 100%;
   max-width: 600px;
+  view-transition-name: side-portal-main;
 }
