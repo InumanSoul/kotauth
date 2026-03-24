@@ -334,10 +334,19 @@ class UserSelfServiceService(
     // Self-service profile management
     // =========================================================================
 
-    /**
-     * Updates the user's own profile (email, full name).
-     * Email uniqueness is re-checked if it changed.
-     */
+    fun getProfile(
+        userId: UserId,
+        tenantId: TenantId,
+    ): SelfServiceResult<User> {
+        val user =
+            userRepository.findById(userId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        if (user.tenantId != tenantId) {
+            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
+        }
+        return SelfServiceResult.Success(user)
+    }
+
     fun updateProfile(
         userId: UserId,
         tenantId: TenantId,
@@ -503,6 +512,66 @@ class UserSelfServiceService(
                 ipAddress = null,
                 userAgent = null,
                 details = mapOf("sessionId" to sessionId.value.toString()),
+            ),
+        )
+
+        return SelfServiceResult.Success(Unit)
+    }
+
+    fun revokeOtherSessions(
+        userId: UserId,
+        tenantId: TenantId,
+        keepSessionId: SessionId,
+    ): SelfServiceResult<Int> {
+        val active = sessionRepository.findActiveByUser(tenantId, userId)
+        var revoked = 0
+        for (s in active) {
+            if (s.id != null && s.id != keepSessionId) {
+                sessionRepository.revoke(s.id)
+                revoked++
+            }
+        }
+
+        if (revoked > 0) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenantId,
+                    userId = userId,
+                    clientId = null,
+                    eventType = AuditEventType.USER_SESSION_REVOKED_SELF,
+                    ipAddress = null,
+                    userAgent = null,
+                    details = mapOf("action" to "revoke_others", "count" to revoked.toString()),
+                ),
+            )
+        }
+
+        return SelfServiceResult.Success(revoked)
+    }
+
+    fun disableAccount(
+        userId: UserId,
+        tenantId: TenantId,
+    ): SelfServiceResult<Unit> {
+        val user =
+            userRepository.findById(userId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        if (user.tenantId != tenantId) {
+            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
+        }
+
+        userRepository.update(user.copy(enabled = false))
+        sessionRepository.revokeAllForUser(tenantId, userId)
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.USER_ACCOUNT_DISABLED_SELF,
+                ipAddress = null,
+                userAgent = null,
+                details = emptyMap(),
             ),
         )
 

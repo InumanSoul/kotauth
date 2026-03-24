@@ -1,0 +1,132 @@
+/* frontend/css/portal/mfa.css
+ *
+ * MFA management page components — step headings, QR container,
+ * recovery codes grid, confirmation checkbox, action row, warning alert.
+ *
+ * Badge and buttons are now handled by portal/badge.css and portal/button.css.
+ */
+
+/* ── Step headings ─────────────────────────────────────────────────────── */
+.mfa-step-heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 6px 0;
+}
+
+/* ── QR container ──────────────────────────────────────────────────────── */
+.qr-container {
+  display: inline-block;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid var(--color-border);
+  margin: 12px 0 8px;
+  line-height: 0;
+}
+
+/* ── Manual setup key ──────────────────────────────────────────────────── */
+.mfa-secret-key {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: var(--color-input);
+  border: 0.5px solid var(--color-border-md);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: .08em;
+  color: var(--color-text);
+  word-break: break-all;
+  user-select: all;
+}
+
+/* ── Recovery codes grid ───────────────────────────────────────────────── */
+.recovery-codes-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 12px 0 10px;
+}
+
+.recovery-code {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  background: var(--color-input);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  text-align: center;
+  color: var(--color-text);
+  letter-spacing: .06em;
+}
+
+/* ── "I've saved" checkbox ─────────────────────────────────────────────── */
+.mfa-confirm-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  cursor: pointer;
+  margin: 14px 0 0;
+}
+
+.mfa-confirm-label input[type=checkbox] {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+}
+
+/* ── Action row (disable confirm) ──────────────────────────────────────── */
+.mfa-action-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ── Warning alert ─────────────────────────────────────────────────────── */
+.alert-warning {
+  background: var(--color-amber-bg);
+  border: 0.5px solid var(--color-amber-border);
+  color: var(--color-amber);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  margin: 12px 0 0;
+}
+
+.compatible-apps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block: 24px;
+
+  p {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+}
+
+.compatible-apps__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.compatible-apps__item {
+  background: var(--color-accent-bg);
+  border: .5px solid var(--color-accent-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: .875rem;
+  font-family: var(--font-mono);
+  display: flex;
+}

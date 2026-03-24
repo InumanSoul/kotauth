@@ -1,0 +1,64 @@
+/* frontend/css/portal/table.css
+ *
+ * Sessions table — security page active-sessions list.
+ */
+
+.sessions-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sessions-table th {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  text-align: left;
+  padding: 10px;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.sessions-table th:last-child  { text-align: right; }
+
+.sessions-table td {
+  padding: 10px;
+  vertical-align: middle;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.sessions-table tr:last-child td { border-bottom: none; }
+.sessions-table td:last-child  { text-align: right; }
+
+/* ── Session row helpers ────────────────────────────────────────────────── */
+
+.session-device-label {
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.session-current-pill {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.03em;
+}
+
+.session-ip {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.session-time {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}

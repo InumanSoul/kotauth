@@ -1,11 +1,7 @@
-/* ── Branding page ─────────────────────────────────────────────
-   Two-column layout: scrollable form (left) + sticky preview (right).
-   ────────────────────────────────────────────────────────────── */
-
 /* ── two-column branding layout ── */
 .branding-layout {
   display: grid;
-  grid-template-columns: 1fr 35dvw;
+  grid-template-columns: 1fr 35%;
   gap: var(--space-6);
   align-items: start;
 }

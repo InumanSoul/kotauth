@@ -1,0 +1,28 @@
+/* frontend/css/shared/button.css
+ *
+ * Primary action button shared by auth pages and portal.
+ * Uses --color-accent-fg for text color to ensure contrast regardless of
+ * the tenant's chosen accent color.
+ */
+
+.btn {
+  width: 100%;
+  padding: 0.85rem;
+  background: var(--color-accent);
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--color-accent-fg);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  margin-top: 0.5rem;
+  letter-spacing: 0.02em;
+  font-family: inherit;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+}
+
+.btn:hover  { background: var(--color-accent-hover); }
+.btn:active { transform: scale(0.98); }

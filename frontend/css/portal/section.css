@@ -1,0 +1,262 @@
+/* frontend/css/portal/section.css
+ *
+ * Content primitives for portal pages — section cards, page headers,
+ * profile identity block, dividers, and empty states.
+ *
+ * Section cards (.portal-section) wrap every form group with a surface-bg
+ * card, header/body separation, and 0.5px borders.
+ */
+
+/* ── Section card ─────────────────────────────────────────────────────── */
+
+.portal-section {
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.portal-section__header {
+  padding: 13px 18px;
+  border-bottom: 0.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.portal-section__title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.portal-section__subtitle {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin-top: 1px;
+}
+
+.portal-section__header-left {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.portal-section__body {
+  padding: 18px;
+}
+
+/* ── Page header ──────────────────────────────────────────────────────── */
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-header__title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--color-text);
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.page-header__subtitle {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin-top: 3px;
+}
+
+/* ── Profile identity block ───────────────────────────────────────────── */
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.profile-identity__avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1875rem;
+  font-weight: 400;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.profile-identity__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-identity__name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.profile-identity__username {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  margin-top: 2px;
+}
+
+.profile-identity__avatar-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.6875rem;
+  color: var(--color-subtle);
+  margin-top: 5px;
+}
+
+/* ── Divider ──────────────────────────────────────────────────────────── */
+
+.divider {
+  height: 0.5px;
+  background: var(--color-border);
+  margin: 20px 0;
+  border: none;
+}
+
+/* ── Confirm block (danger zone expand pattern) ───────────────────────── */
+
+.confirm-block {
+  display: none;
+  padding: 14px 18px;
+  border-top: 0.5px solid var(--color-red-border);
+  background: rgba(248, 113, 113, 0.04);
+}
+
+.confirm-block.is-open {
+  display: block;
+}
+
+.confirm-block__label {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.confirm-block__label code {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border-md);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+}
+
+.confirm-block__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.confirm-block__input {
+  flex: 1;
+  height: 32px;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-red-border);
+  border-radius: var(--radius-sm);
+  padding: 0 10px;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  outline: none;
+  transition: box-shadow 0.15s;
+}
+
+.confirm-block__input:focus {
+  box-shadow: 0 0 0 3px var(--color-red-bg);
+}
+
+/* ── Danger zone ─────────────────────────────────────────────────────── */
+
+.danger-zone {
+  border: 0.5px solid var(--color-red-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.danger-zone__header {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid var(--color-red-border);
+  background: var(--color-red-bg);
+}
+
+.danger-zone__header-title {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-red);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.danger-zone__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+}
+
+.danger-zone__item-info {
+  flex: 1;
+}
+
+.danger-zone__item-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.danger-zone__item-desc {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}
+
+/* ── Form layout inside section cards ─────────────────────────────────── */
+
+.portal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-hint {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  margin: 2px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────── */
+
+.portal-empty {
+  color: var(--color-muted);
+  font-size: 0.875rem;
+  margin-top: 8px;
+}

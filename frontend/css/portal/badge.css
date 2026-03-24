@@ -1,0 +1,38 @@
+/* frontend/css/portal/badge.css
+ *
+ * Generic badge component for status indicators.
+ * Variants: --active (green), --warning (amber).
+ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  border-radius: var(--radius-sm);
+  border: 0.5px solid transparent;
+}
+
+.badge--active {
+  color: var(--color-green);
+  background: var(--color-green-bg);
+  border-color: var(--color-green-border);
+}
+
+.badge--warning {
+  color: var(--color-amber);
+  background: var(--color-amber-bg);
+  border-color: var(--color-amber-border);
+}
+
+.badge__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}

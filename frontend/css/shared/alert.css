@@ -1,0 +1,23 @@
+/* frontend/css/shared/alert.css
+ *
+ * Feedback banners shared by auth pages and portal.
+ * Functional colors are intentionally hardcoded — these must remain legible
+ * regardless of tenant branding. A red error banner must always look red.
+ *
+ * .alert         — base banner
+ * .alert-error   — validation / auth failure feedback
+ * .alert-success — confirmation (email sent, password changed, etc.)
+ */
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 0.85rem;
+  margin-bottom: 1.25rem;
+  border-width: 1px;
+  border-style: solid;
+}
+
+/* Hardcoded functional colors — never use theme tokens for semantic feedback */
+.alert-error   { background: #2a1a1a; border-color: #cf6679; color: #ff8a9b; }
+.alert-success { background: #1a2a1a; border-color: #4caf50; color: #81c784; }

@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.adapter.web.demoBanner
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -10,12 +11,14 @@ import java.time.format.DateTimeFormatter
 /**
  * Self-service portal HTML views.
  *
- * Reuses kotauth-auth.css tokens (--accent, --text, --muted, --bg-*, --border, --radius)
- * so the portal inherits per-tenant theming automatically.
+ * Theme tokens (--color-accent, --color-text, etc.) are injected at runtime by
+ * TenantTheme.toCssVars() before the portal CSS bundle is linked.
  *
- * Layout:
- *   Login page  — same card/centered layout as AuthView (same CSS classes)
- *   Authenticated pages — fixed sidebar left, scrollable content centered in remaining space
+ * Layout variants (selected per-tenant via PortalConfig.layout):
+ *   SIDEBAR  — fixed 220px sidebar left, scrollable centered content right
+ *   CENTERED — sticky topbar with horizontal tab strip, content below
+ *
+ * Login / MFA-challenge pages always use the auth card layout (kotauth-auth.css).
  */
 object PortalView {
     private val dtf = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm").withZone(ZoneOffset.UTC)
@@ -94,14 +97,20 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         successMsg: String?,
         errorMsg: String?,
+        email: String = "",
+        fullName: String = "",
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Profile — $workspaceName", theme) }
+            head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "profile") {
-                    h2(classes = "portal-section-title") { +"Profile" }
+                portalShell(slug, workspaceName, session.username, "profile", layout) {
+                    div(classes = "page-header") {
+                        h1(classes = "page-header__title") { +"Profile" }
+                        p(classes = "page-header__subtitle") { +"Manage your personal information" }
+                    }
 
                     if (successMsg != null) {
                         div(classes = "alert alert-success") { +"Profile updated successfully." }
@@ -110,49 +119,115 @@ object PortalView {
                         div(classes = "alert alert-error") { +errorMsg }
                     }
 
-                    form(
-                        action = "/t/$slug/account/profile",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                        classes = "portal-form",
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "username"
-                                +"Username"
+                    div(classes = "portal-section") {
+                        div(classes = "profile-identity") {
+                            div(classes = "profile-identity__avatar") {
+                                +(fullName.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
                             }
-                            input(type = InputType.text, name = "username") {
-                                id = "username"
-                                value = session.username
-                                disabled = true
-                                title = "Username cannot be changed"
-                            }
-                            p(classes = "form-hint") { +"Username cannot be changed after account creation." }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "email"
-                                +"Email address"
-                            }
-                            input(type = InputType.email, name = "email") {
-                                id = "email"
-                                placeholder = "you@example.com"
-                                attributes["autocomplete"] = "email"
-                                required = true
+                            div(classes = "profile-identity__info") {
+                                div(classes = "profile-identity__name") { +fullName }
+                                div(classes = "profile-identity__username") { +"@${session.username}" }
                             }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "full_name"
-                                +"Full name"
-                            }
-                            input(type = InputType.text, name = "full_name") {
-                                id = "full_name"
-                                placeholder = "Your full name"
-                                required = true
+                        div(classes = "portal-section__body") {
+                            form(
+                                action = "/t/$slug/account/profile",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                                classes = "portal-form",
+                            ) {
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "username"
+                                        +"Username"
+                                    }
+                                    input(type = InputType.text, name = "username") {
+                                        classes = setOf("edit-field__input", "edit-field__input--mono", "edit-field__input--disabled")
+                                        id = "username"
+                                        value = session.username
+                                        disabled = true
+                                        title = "Username cannot be changed"
+                                    }
+                                    p(classes = "edit-field__hint") { +"Username cannot be changed after account creation." }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "email"
+                                        +"Email address"
+                                    }
+                                    input(type = InputType.email, name = "email") {
+                                        classes = setOf("edit-field__input")
+                                        id = "email"
+                                        value = email
+                                        placeholder = "you@example.com"
+                                        attributes["autocomplete"] = "email"
+                                        required = true
+                                    }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "full_name"
+                                        +"Full name"
+                                    }
+                                    input(type = InputType.text, name = "full_name") {
+                                        classes = setOf("edit-field__input")
+                                        id = "full_name"
+                                        value = fullName
+                                        placeholder = "Your full name"
+                                        required = true
+                                    }
+                                }
+                                div(classes = "edit-actions") {
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
+                                }
                             }
                         }
-                        button(type = ButtonType.submit, classes = "btn") { +"Save changes" }
+                    }
+
+                    div(classes = "danger-zone") {
+                        div(classes = "danger-zone__header") {
+                            span(classes = "danger-zone__header-title") { +"Danger zone" }
+                        }
+                        div(classes = "danger-zone__item") {
+                            div(classes = "danger-zone__item-info") {
+                                div(classes = "danger-zone__item-title") { +"Delete account" }
+                                div(classes = "danger-zone__item-desc") {
+                                    +"Permanently deletes your account, profile, and all associated data. This cannot be undone."
+                                }
+                            }
+                            button(
+                                type = ButtonType.button,
+                                classes = "btn btn--danger",
+                            ) {
+                                attributes["onclick"] = "document.getElementById('delete-confirm').classList.toggle('is-open')"
+                                +"Delete account"
+                            }
+                        }
+                        div(classes = "confirm-block") {
+                            id = "delete-confirm"
+                            p(classes = "confirm-block__label") {
+                                +"Type "
+                                code { +session.username }
+                                +" to confirm deletion"
+                            }
+                            form(
+                                action = "/t/$slug/account/delete",
+                                method = FormMethod.post,
+                            ) {
+                                div(classes = "confirm-block__row") {
+                                    input(type = InputType.text, name = "confirm_username") {
+                                        classes = setOf("confirm-block__input")
+                                        placeholder = session.username
+                                        required = true
+                                        attributes["autocomplete"] = "off"
+                                    }
+                                    button(
+                                        type = ButtonType.submit,
+                                        classes = "btn btn--danger",
+                                    ) { +"Confirm delete" }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -167,15 +242,20 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         sessions: List<Session>,
+        currentSessionId: Int? = null,
         successMsg: String?,
         errorMsg: String?,
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Security — $workspaceName", theme) }
+            head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "security") {
-                    h2(classes = "portal-section-title") { +"Change password" }
+                portalShell(slug, workspaceName, session.username, "security", layout) {
+                    div(classes = "page-header") {
+                        h1(classes = "page-header__title") { +"Security" }
+                        p(classes = "page-header__subtitle") { +"Password and active sessions" }
+                    }
 
                     if (successMsg != null) {
                         div(classes = "alert alert-success") { +"Password changed successfully." }
@@ -184,86 +264,145 @@ object PortalView {
                         div(classes = "alert alert-error") { +errorMsg }
                     }
 
-                    form(
-                        action = "/t/$slug/account/change-password",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                        classes = "portal-form",
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "current_password"
-                                +"Current password"
-                            }
-                            input(type = InputType.password, name = "current_password") {
-                                id = "current_password"
-                                required = true
-                                attributes["autocomplete"] = "current-password"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div(classes = "portal-section__header-left") {
+                                span(classes = "portal-section__title") { +"Change password" }
                             }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "new_password"
-                                +"New password"
-                            }
-                            input(type = InputType.password, name = "new_password") {
-                                id = "new_password"
-                                placeholder = "Minimum 8 characters"
-                                required = true
-                                attributes["autocomplete"] = "new-password"
-                            }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "confirm_password"
-                                +"Confirm new password"
-                            }
-                            input(type = InputType.password, name = "confirm_password") {
-                                id = "confirm_password"
-                                placeholder = "Repeat your new password"
-                                required = true
-                                attributes["autocomplete"] = "new-password"
-                            }
-                        }
-                        p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
-                        button(type = ButtonType.submit, classes = "btn") { +"Change password" }
-                    }
-
-                    hr(classes = "portal-divider")
-
-                    h2(classes = "portal-section-title") { +"Active sessions" }
-                    if (sessions.isEmpty()) {
-                        p(classes = "portal-empty") { +"No active sessions found." }
-                    } else {
-                        table(classes = "portal-table") {
-                            thead {
-                                tr {
-                                    th { +"Device / IP" }
-                                    th { +"Started" }
-                                    th { +"Expires" }
-                                    th { +"" }
+                        div(classes = "portal-section__body") {
+                            form(
+                                action = "/t/$slug/account/change-password",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                                classes = "portal-form",
+                            ) {
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "current_password"
+                                        +"Current password"
+                                    }
+                                    input(type = InputType.password, name = "current_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "current_password"
+                                        required = true
+                                        attributes["autocomplete"] = "current-password"
+                                    }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "new_password"
+                                        +"New password"
+                                    }
+                                    input(type = InputType.password, name = "new_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "new_password"
+                                        placeholder = "Minimum 8 characters"
+                                        required = true
+                                        attributes["autocomplete"] = "new-password"
+                                    }
+                                    span(classes = "edit-field__hint") { +"Must be at least 8 characters" }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "confirm_password"
+                                        +"Confirm new password"
+                                    }
+                                    input(type = InputType.password, name = "confirm_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "confirm_password"
+                                        placeholder = "Repeat your new password"
+                                        required = true
+                                        attributes["autocomplete"] = "new-password"
+                                    }
+                                }
+                                div(classes = "edit-actions") {
+                                    span(classes = "edit-actions__note") {
+                                        +"Changing your password signs you out of all active sessions"
+                                    }
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Change password" }
                                 }
                             }
-                            tbody {
-                                for (s in sessions) {
+                        }
+                    }
+
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div(classes = "portal-section__header-left") {
+                                span(classes = "portal-section__title") { +"Active sessions" }
+                                span(classes = "portal-section__subtitle") { +"Devices currently signed into your account" }
+                            }
+                            if (sessions.size > 1) {
+                                form(
+                                    action = "/t/$slug/account/sessions/revoke-others",
+                                    method = FormMethod.post,
+                                ) {
+                                    button(
+                                        type = ButtonType.submit,
+                                        classes = "btn btn--danger btn--sm",
+                                    ) { +"Revoke all others" }
+                                }
+                            }
+                        }
+                        if (sessions.isEmpty()) {
+                            div(classes = "portal-section__body") {
+                                p(classes = "portal-empty") { +"No active sessions found." }
+                            }
+                        } else {
+                            table(classes = "sessions-table") {
+                                thead {
                                     tr {
-                                        td { +(s.ipAddress ?: "—") }
-                                        td { +dtf.format(s.createdAt) }
-                                        td { +dtf.format(s.expiresAt) }
-                                        td {
-                                            form(
-                                                action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
-                                                method = FormMethod.post,
-                                            ) {
-                                                button(
-                                                    type = ButtonType.submit,
-                                                    classes = "btn-danger-sm",
-                                                ) { +"Revoke" }
+                                        th { +"Device / IP" }
+                                        th { +"Started" }
+                                        th { +"Expires" }
+                                        th { +"" }
+                                    }
+                                }
+                                tbody {
+                                    for (s in sessions) {
+                                        val isCurrent = currentSessionId != null && s.id?.value == currentSessionId
+                                        tr {
+                                            td {
+                                                div(classes = "session-device-label") {
+                                                    +UserAgentParser.parse(s.userAgent)
+                                                    if (isCurrent) {
+                                                        span(classes = "session-current-pill") { +"Current" }
+                                                    }
+                                                }
+                                                span(classes = "session-ip") { +(s.ipAddress ?: "—") }
+                                            }
+                                            td {
+                                                span(classes = "session-time") { +dtf.format(s.createdAt) }
+                                            }
+                                            td {
+                                                span(classes = "session-time") { +dtf.format(s.expiresAt) }
+                                            }
+                                            td {
+                                                if (isCurrent) {
+                                                    button(
+                                                        type = ButtonType.button,
+                                                        classes = "btn btn--danger btn--sm btn--disabled",
+                                                    ) {
+                                                        disabled = true
+                                                        +"Revoke"
+                                                    }
+                                                } else {
+                                                    form(
+                                                        action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
+                                                        method = FormMethod.post,
+                                                    ) {
+                                                        button(
+                                                            type = ButtonType.submit,
+                                                            classes = "btn btn--danger btn--sm",
+                                                        ) { +"Revoke" }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+
                         }
                     }
                 }
@@ -385,195 +524,25 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         mfaEnabled: Boolean,
         successMsg: String? = null,
         errorMsg: String? = null,
-        noticeMsg: String? = null, // prominent banner used when MFA setup is required
+        noticeMsg: String? = null,
     ): HTML.() -> Unit = {
         head {
-            portalPageHead("Two-Factor Auth — $workspaceName", theme)
-            // QR code renderer — only loaded on this page, only needed during setup
+            portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
             if (!mfaEnabled) {
                 script(src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js") {}
             }
-            style {
-                unsafe {
-                    raw(
-                        """
-                        /* ── MFA status badge ──────────────────────────────── */
-                        .mfa-status-row {
-                            display: flex;
-                            align-items: center;
-                            gap: 12px;
-                            margin-bottom: 20px;
-                        }
-                        .mfa-status-row p { margin: 0; color: var(--muted); font-size: 14px; }
-                        .mfa-badge {
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding: 3px 10px;
-                            border-radius: 999px;
-                            font-size: 12px;
-                            font-weight: 600;
-                            white-space: nowrap;
-                            flex-shrink: 0;
-                        }
-                        .mfa-badge.active {
-                            background: rgba(34,197,94,.12);
-                            color: #4ade80;
-                            border: 1px solid rgba(34,197,94,.25);
-                        }
-                        .mfa-badge.active::before {
-                            content: '';
-                            display: inline-block;
-                            width: 6px; height: 6px;
-                            border-radius: 50%;
-                            background: #4ade80;
-                        }
-                        .mfa-badge.inactive {
-                            background: rgba(148,163,184,.08);
-                            color: var(--muted);
-                            border: 1px solid var(--border);
-                        }
-                        /* ── Step headings ─────────────────────────────────── */
-                        .mfa-step-heading {
-                            font-size: 14px;
-                            font-weight: 600;
-                            color: var(--text);
-                            margin: 0 0 6px 0;
-                        }
-                        /* ── QR container ──────────────────────────────────── */
-                        .qr-container {
-                            display: inline-block;
-                            padding: 12px;
-                            background: #ffffff;
-                            border-radius: var(--radius);
-                            border: 1px solid var(--border);
-                            margin: 12px 0 8px;
-                            line-height: 0;
-                        }
-                        /* ── Manual setup key ──────────────────────────────── */
-                        .mfa-secret-key {
-                            font-family: monospace;
-                            font-size: 13px;
-                            background: var(--bg-input);
-                            border: 1px solid var(--border);
-                            padding: 2px 6px;
-                            border-radius: 4px;
-                            letter-spacing: .08em;
-                            color: var(--text);
-                            word-break: break-all;
-                            user-select: all;
-                        }
-                        /* ── Recovery codes grid ───────────────────────────── */
-                        .recovery-codes-grid {
-                            display: grid;
-                            grid-template-columns: repeat(4, 1fr);
-                            gap: 8px;
-                            margin: 12px 0 10px;
-                            max-width: 440px;
-                        }
-                        .recovery-code {
-                            font-family: monospace;
-                            font-size: 13px;
-                            background: var(--bg-input);
-                            border: 1px solid var(--border);
-                            border-radius: var(--radius);
-                            padding: 8px 6px;
-                            text-align: center;
-                            color: var(--text);
-                            letter-spacing: .06em;
-                        }
-                        /* ── "I've saved" checkbox ─────────────────────────── */
-                        .mfa-confirm-label {
-                            display: flex;
-                            align-items: center;
-                            gap: 8px;
-                            font-size: 13px;
-                            color: var(--text);
-                            cursor: pointer;
-                            margin: 14px 0 0;
-                        }
-                        .mfa-confirm-label input[type=checkbox] {
-                            width: 15px; height: 15px;
-                            flex-shrink: 0;
-                            cursor: pointer;
-                            accent-color: var(--accent);
-                        }
-                        /* ── Action row (disable confirm) ──────────────────── */
-                        .mfa-action-row {
-                            display: flex;
-                            gap: 10px;
-                            margin-top: 16px;
-                            align-items: center;
-                            flex-wrap: wrap;
-                        }
-                        /* ── Warning alert ─────────────────────────────────── */
-                        .alert-warning {
-                            background: rgba(234,179,8,.08);
-                            border: 1px solid rgba(234,179,8,.25);
-                            color: #fbbf24;
-                            padding: 10px 14px;
-                            border-radius: var(--radius);
-                            font-size: 13px;
-                            margin: 12px 0 0;
-                        }
-                        /* ── Buttons ───────────────────────────────────────── */
-                        .btn-danger {
-                            background: #dc2626;
-                            color: #fff;
-                            border: none;
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-danger:hover    { background: #b91c1c; }
-                        .btn-danger:disabled { opacity: .55; cursor: not-allowed; }
-                        .btn-danger-outline {
-                            background: transparent;
-                            color: #f87171;
-                            border: 1px solid rgba(220,38,38,.6);
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-danger-outline:hover { background: rgba(220,38,38,.08); }
-                        .btn-outline {
-                            background: transparent;
-                            color: var(--text);
-                            border: 1px solid var(--border);
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-outline:hover    { background: var(--bg-input); }
-                        .btn-outline:disabled { opacity: .55; cursor: not-allowed; }
-                        /* ── Secondary spacing helper ──────────────────────── */
-                        .mfa-hint-row { margin-top: 6px; }
-                        """.trimIndent(),
-                    )
-                }
-            }
         }
         body {
-            portalShell(slug, workspaceName, session.username, "mfa") {
-                h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
+            portalShell(slug, workspaceName, session.username, "mfa", layout) {
+                div(classes = "page-header") {
+                    h1(classes = "page-header__title") { +"Two-Factor Authentication" }
+                    p(classes = "page-header__subtitle") { +"Protect your account with an authenticator app" }
+                }
 
-                // Prominent notice — shown when the user is redirected here because MFA
-                // enrollment is required by the tenant policy but not yet configured.
                 if (!noticeMsg.isNullOrBlank()) {
                     div(classes = "alert alert-warning") {
                         style = "font-size:14px; padding:12px 16px;"
@@ -591,163 +560,183 @@ object PortalView {
                 }
 
                 if (mfaEnabled) {
-                    // ── Active state ──────────────────────────────────────────────
-                    div(classes = "mfa-status-row") {
-                        span(classes = "mfa-badge active") { +"Active" }
-                        p { +"Two-factor authentication is protecting your account." }
-                    }
-                    p { +"When you sign in you'll be asked for a 6-digit code from your authenticator app." }
-                    p(classes = "form-hint mfa-hint-row") {
-                        +(
-                            "Recovery codes were displayed once when you set up two-factor authentication. " +
-                                "To generate new codes, remove and re-enable two-factor authentication."
-                        )
-                    }
-
-                    hr(classes = "portal-divider")
-
-                    div {
-                        id = "disable-btn-row"
-                        button(classes = "btn-danger-outline") {
-                            attributes["onclick"] =
-                                """
-                                document.getElementById('disable-confirm').style.display='block';
-                                document.getElementById('disable-btn-row').style.display='none';
-                                """.trimIndent()
-                            +"Remove authenticator"
-                        }
-                    }
-                    div {
-                        id = "disable-confirm"
-                        style = "display:none"
-                        div(classes = "alert-warning") {
-                            +(
-                                "This will remove your authenticator app and disable two-factor authentication. " +
-                                    "Your account will only be protected by your password."
-                            )
-                        }
-                        div(classes = "mfa-action-row") {
-                            button(classes = "btn-danger") {
-                                id = "disable-btn"
-                                attributes["onclick"] = "disableMfa('$slug')"
-                                +"Yes, remove authenticator"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Authenticator app" }
                             }
-                            button(classes = "btn-outline") {
-                                attributes["onclick"] =
-                                    """
-                                    document.getElementById('disable-confirm').style.display='none';
-                                    document.getElementById('disable-btn-row').style.display='block';
-                                    """.trimIndent()
-                                +"Cancel"
+                            span(classes = "badge badge--active") {
+                                span(classes = "badge__dot") {}
+                                +"Active"
+                            }
+                        }
+                        div(classes = "portal-section__body") {
+                            p { +"Two-factor authentication is protecting your account." }
+                            p {
+                                style = "margin-top:6px"
+                                +"When you sign in you'll be asked for a 6-digit code from your authenticator app."
+                            }
+                            p(classes = "form-hint") {
+                                style = "margin-top:8px"
+                                +(
+                                    "Recovery codes were displayed once when you set up two-factor authentication. " +
+                                        "To generate new codes, remove and re-enable two-factor authentication."
+                                )
+                            }
+
+                            div(classes = "divider") {}
+
+                            div {
+                                id = "disable-btn-row"
+                                button(classes = "btn btn--danger") {
+                                    attributes["onclick"] =
+                                        """
+                                        document.getElementById('disable-confirm').style.display='block';
+                                        document.getElementById('disable-btn-row').style.display='none';
+                                        """.trimIndent()
+                                    +"Remove authenticator"
+                                }
+                            }
+                            div {
+                                id = "disable-confirm"
+                                style = "display:none"
+                                div(classes = "alert-warning") {
+                                    +(
+                                        "This will remove your authenticator app and disable two-factor authentication. " +
+                                            "Your account will only be protected by your password."
+                                    )
+                                }
+                                div(classes = "mfa-action-row") {
+                                    button(classes = "btn btn--danger") {
+                                        id = "disable-btn"
+                                        attributes["onclick"] = "disableMfa('$slug')"
+                                        +"Yes, remove authenticator"
+                                    }
+                                    button(classes = "btn btn--ghost") {
+                                        attributes["onclick"] =
+                                            """
+                                            document.getElementById('disable-confirm').style.display='none';
+                                            document.getElementById('disable-btn-row').style.display='block';
+                                            """.trimIndent()
+                                        +"Cancel"
+                                    }
+                                }
                             }
                         }
                     }
                 } else {
-                    // ── Setup state ───────────────────────────────────────────────
-                    div(classes = "mfa-status-row") {
-                        span(classes = "mfa-badge inactive") { +"Not configured" }
-                        p { +"Add an extra layer of security to your account." }
-                    }
-
-                    // Step 1 — intro
-                    div {
-                        id = "mfa-step-1"
-                        p {
-                            +"You'll need an authenticator app such as "
-                            strong { +"Google Authenticator" }
-                            +", "
-                            strong { +"Authy" }
-                            +", or "
-                            strong { +"1Password" }
-                            +" to get started."
-                        }
-                        p(classes = "form-hint") {
-                            style = "margin-bottom: 20px;"
-                            +"Once enabled, you'll need your phone to sign in. Make sure you save the recovery codes somewhere safe."
-                        }
-                        button(classes = "btn") {
-                            id = "start-btn"
-                            attributes["onclick"] = "startEnrollment('$slug')"
-                            +"Set up authenticator"
-                        }
-                        div(classes = "alert alert-error") {
-                            id = "enroll-error"
-                            style = "display:none;margin-top:14px"
-                        }
-                    }
-
-                    // Step 2 — QR code + recovery codes + verification
-                    div {
-                        id = "mfa-step-2"
-                        style = "display:none"
-
-                        p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
-                        p(
-                            classes = "form-hint",
-                        ) { +"Open your authenticator app and scan the QR code below to add your account." }
-                        div(classes = "qr-container") { id = "qr-code" }
-                        p(classes = "form-hint") {
-                            +"Can't scan? Enter this key manually: "
-                            span(classes = "mfa-secret-key") { id = "setup-key" }
-                        }
-
-                        hr(classes = "portal-divider")
-
-                        p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
-                        p {
-                            +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
-                        }
-                        div(
-                            classes = "alert-warning",
-                        ) { +"Save these codes now — they won't be shown again after you leave this page." }
-                        div(classes = "recovery-codes-grid") { id = "recovery-codes" }
-                        button(classes = "btn-outline") {
-                            id = "copy-codes-btn"
-                            style = "margin-bottom: 4px;"
-                            attributes["onclick"] = "copyCodes()"
-                            +"Copy codes"
-                        }
-
-                        label(classes = "mfa-confirm-label") {
-                            input(type = InputType.checkBox) {
-                                id = "codes-saved"
-                                attributes["onchange"] =
-                                    "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Authenticator app" }
                             }
-                            +" I've saved my recovery codes in a safe place"
-                        }
-
-                        // Step 2b — verification (gated behind the checkbox)
-                        div {
-                            id = "mfa-step-2b"
-                            style = "display:none"
-                            hr(classes = "portal-divider")
-                            p(classes = "mfa-step-heading") { +"3. Verify your setup" }
-                            p {
-                                +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                            span(classes = "badge badge--warning") {
+                                span(classes = "badge__dot") {}
+                                +"Not configured"
                             }
-                            div("field") {
-                                label {
-                                    htmlFor = "totp-code"
-                                    +"Verification code"
+                        }
+                        div(classes = "portal-section__body") {
+                            div {
+                                id = "mfa-step-1"
+                                p(classes = "form-hint") {
+                                    +"Use an authenticator app to generate one-time codes. Once enabled, you'll need your phone every time you sign in. Save your recovery codes somewhere safe before finishing setup."
                                 }
-                                input(type = InputType.text, name = "code") {
-                                    id = "totp-code"
-                                    placeholder = "000000"
-                                    attributes["inputmode"] = "numeric"
-                                    attributes["pattern"] = "[0-9]*"
-                                    maxLength = "6"
-                                    attributes["autocomplete"] = "one-time-code"
+                                div( classes = "compatible-apps" ) {
+                                    p {
+                                        +"Compatible Apps"
+                                    }
+                                    ul(classes = "compatible-apps__list") {
+                                        span(classes = "compatible-apps__item") { +"Google Authenticator" }
+                                        span(classes = "compatible-apps__item") { +"Authy" }
+                                        span(classes = "compatible-apps__item") { +"Microsoft Authenticator" }
+                                        span(classes = "compatible-apps__item") { +"1Password" }
+                                        span(classes = "compatible-apps__item") { +"Bitwarden" }
+                                    }
+                                }
+                                button(classes = "btn btn--primary") {
+                                    id = "start-btn"
+                                    attributes["onclick"] = "startEnrollment('$slug')"
+                                    +"Set up authenticator"
+                                }
+                                div(classes = "alert alert-error") {
+                                    id = "enroll-error"
+                                    style = "display:none;margin-top:14px"
                                 }
                             }
-                            div(classes = "alert alert-error") {
-                                id = "verify-error"
+
+                            div {
+                                id = "mfa-step-2"
                                 style = "display:none"
-                            }
-                            button(classes = "btn") {
-                                id = "verify-btn"
-                                attributes["onclick"] = "verifyEnrollment('$slug')"
-                                +"Confirm setup"
+
+                                p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
+                                p(classes = "form-hint") {
+                                    +"Open your authenticator app and scan the QR code below to add your account."
+                                }
+                                div(classes = "qr-container") { id = "qr-code" }
+                                p(classes = "form-hint") {
+                                    +"Can't scan? Enter this key manually: "
+                                    span(classes = "mfa-secret-key") { id = "setup-key" }
+                                }
+
+                                div(classes = "divider") {}
+
+                                p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
+                                p {
+                                    +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
+                                }
+                                div(classes = "alert-warning") {
+                                    +"Save these codes now — they won't be shown again after you leave this page."
+                                }
+                                div(classes = "recovery-codes-grid") { id = "recovery-codes" }
+                                button(classes = "btn btn--ghost") {
+                                    id = "copy-codes-btn"
+                                    style = "margin-bottom: 4px;"
+                                    attributes["onclick"] = "copyCodes()"
+                                    +"Copy codes"
+                                }
+
+                                label(classes = "mfa-confirm-label") {
+                                    input(type = InputType.checkBox) {
+                                        id = "codes-saved"
+                                        attributes["onchange"] =
+                                            "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                                    }
+                                    +" I've saved my recovery codes in a safe place"
+                                }
+
+                                div {
+                                    id = "mfa-step-2b"
+                                    style = "display:none"
+                                    div(classes = "divider") {}
+                                    p(classes = "mfa-step-heading") { +"3. Verify your setup" }
+                                    p {
+                                        +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                                    }
+                                    div(classes = "edit-field") {
+                                        label(classes = "edit-field__label") {
+                                            htmlFor = "totp-code"
+                                            +"Verification code"
+                                        }
+                                        input(type = InputType.text, name = "code") {
+                                            classes = setOf("edit-field__input", "edit-field__input--mono")
+                                            id = "totp-code"
+                                            placeholder = "000000"
+                                            attributes["inputmode"] = "numeric"
+                                            attributes["pattern"] = "[0-9]*"
+                                            maxLength = "6"
+                                            attributes["autocomplete"] = "one-time-code"
+                                        }
+                                    }
+                                    div(classes = "alert alert-error") {
+                                        id = "verify-error"
+                                        style = "display:none"
+                                    }
+                                    button(classes = "btn btn--primary") {
+                                        id = "verify-btn"
+                                        attributes["onclick"] = "verifyEnrollment('$slug')"
+                                        +"Confirm setup"
+                                    }
+                                }
                             }
                         }
                     }
@@ -905,217 +894,49 @@ object PortalView {
                     "16x16"
             }
         }
-        // Theme vars first — stylesheet reads from these
+        link(rel = "preconnect", href = "https://fonts.googleapis.com")
+        link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
+        link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
     }
 
     // =========================================================================
-    // Shared <head> — authenticated portal pages (sidebar layout)
+    // Shared <head> — authenticated portal pages
     // =========================================================================
 
-    /**
-     * Used for authenticated portal pages. Extends the auth stylesheet with
-     * portal-specific layout classes while keeping all token references consistent.
-     */
     private fun HEAD.portalPageHead(
         title: String,
         theme: TenantTheme,
+        layout: PortalLayout,
     ) {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
-        // Favicon
         if (theme.faviconUrl != null) {
             link(rel = "icon", href = theme.faviconUrl)
         } else {
             link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
             link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-32x32.png") {
-                attributes["sizes"] =
-                    "32x32"
+                attributes["sizes"] = "32x32"
             }
             link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-16x16.png") {
-                attributes["sizes"] =
-                    "16x16"
+                attributes["sizes"] = "16x16"
             }
         }
-        // Theme vars first — both auth.css and portal inline CSS read from these
+        link(rel = "preconnect", href = "https://fonts.googleapis.com")
+        link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
+        link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
-        link(rel = "stylesheet", href = "/static/kotauth-auth.css")
-        // Portal-specific overrides — extend, not replace, the auth stylesheet
-        style {
-            unsafe {
-                raw(
-                    """
-                    /* Reset auth page body centering for portal layout */
-                    body {
-                        display: block;
-                        padding: 0;
-                        min-height: 100vh;
-                    }
-
-                    /* ── Shell ───────────────────────────────────────────── */
-                    .portal-shell {
-                        display: flex;
-                        min-height: 100vh;
-                        width: 100%;
-                        background: var(--bg-deep);
-                    }
-
-                    /* ── Sidebar ─────────────────────────────────────────── */
-                    .portal-nav {
-                        width: 220px;
-                        flex-shrink: 0;
-                        position: sticky;
-                        top: 0;
-                        height: 100vh;
-                        overflow-y: auto;
-                        background: var(--bg-card);
-                        border-right: 1px solid var(--border);
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .portal-nav-header {
-                        padding: 24px 20px 20px;
-                        border-bottom: 1px solid var(--border);
-                    }
-                    .portal-nav-workspace {
-                        font-size: 10px;
-                        text-transform: uppercase;
-                        letter-spacing: .1em;
-                        color: var(--muted);
-                        margin: 0 0 4px 0;
-                    }
-                    .portal-nav-user {
-                        font-size: 13px;
-                        font-weight: 600;
-                        color: var(--text);
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    }
-                    .portal-nav-links {
-                        padding: 12px 0;
-                        flex: 1;
-                    }
-                    .portal-nav-link {
-                        display: block;
-                        padding: 9px 20px;
-                        font-size: 13px;
-                        color: var(--muted);
-                        text-decoration: none;
-                        transition: color .15s, background .15s;
-                    }
-                    .portal-nav-link:hover {
-                        color: var(--text);
-                        background: var(--bg-input);
-                    }
-                    .portal-nav-link.active {
-                        color: var(--text);
-                        background: var(--bg-input);
-                        font-weight: 500;
-                    }
-                    .portal-nav-footer {
-                        padding: 16px 20px;
-                        border-top: 1px solid var(--border);
-                    }
-
-                    /* ── Main content area ───────────────────────────────── */
-                    .portal-main-wrap {
-                        flex: 1;
-                        overflow-y: auto;
-                        display: flex;
-                        justify-content: center;
-                        padding: 48px 40px;
-                    }
-                    .portal-main {
-                        width: 100%;
-                        max-width: 600px;
-                    }
-
-                    /* ── Content primitives ──────────────────────────────── */
-                    .portal-section-title {
-                        font-size: 18px;
-                        font-weight: 600;
-                        color: var(--text);
-                        margin: 0 0 24px 0;
-                    }
-                    .portal-form {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 4px;
-                        max-width: 440px;
-                    }
-                    .form-hint {
-                        font-size: 12px;
-                        color: var(--muted);
-                        margin: 3px 0 0 0;
-                    }
-                    .portal-divider {
-                        border: none;
-                        border-top: 1px solid var(--border);
-                        margin: 36px 0;
-                    }
-                    .portal-empty {
-                        color: var(--muted);
-                        font-size: 13px;
-                        margin-top: 8px;
-                    }
-
-                    /* ── Sessions table ──────────────────────────────────── */
-                    .portal-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 13px;
-                        color: var(--text);
-                        margin-top: 8px;
-                    }
-                    .portal-table th {
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: var(--muted);
-                        border-bottom: 1px solid var(--border);
-                        font-weight: 500;
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        letter-spacing: .05em;
-                    }
-                    .portal-table td {
-                        padding: 11px 12px;
-                        border-bottom: 1px solid var(--border);
-                        vertical-align: middle;
-                    }
-
-                    /* ── Danger button (session revoke) ──────────────────── */
-                    .btn-danger-sm {
-                        background: transparent;
-                        border: 1px solid #dc2626;
-                        color: #f87171;
-                        padding: 4px 12px;
-                        border-radius: calc(var(--radius) - 2px);
-                        cursor: pointer;
-                        font-size: 12px;
-                        font-family: inherit;
-                        transition: background .15s;
-                    }
-                    .btn-danger-sm:hover {
-                        background: rgba(220, 38, 38, .15);
-                    }
-
-                    /* ── btn width override inside portal forms ──────────── */
-                    .portal-form .btn {
-                        width: auto;
-                        padding: 0.75rem 1.5rem;
-                        margin-top: 8px;
-                    }
-                    """.trimIndent(),
-                )
-            }
+        val cssBundle = when (layout) {
+            PortalLayout.SIDEBAR -> "/static/kotauth-portal-sidenav.css"
+            PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
         }
+        link(rel = "stylesheet", href = cssBundle)
     }
 
     // =========================================================================
-    // Shared layout — authenticated page shell
+    // Shared layout — authenticated page shell (dispatches by layout)
     // =========================================================================
 
     private fun BODY.portalShell(
@@ -1123,47 +944,136 @@ object PortalView {
         workspaceName: String,
         username: String,
         activePage: String,
+        layout: PortalLayout,
         content: DIV.() -> Unit,
     ) {
         demoBanner()
-        div(classes = "portal-shell") {
-            // ── Sticky sidebar ────────────────────────────────────────────
+        when (layout) {
+            PortalLayout.SIDEBAR -> portalShellSidenav(slug, workspaceName, username, activePage, content)
+            PortalLayout.CENTERED -> portalShellTabnav(slug, workspaceName, username, activePage, content)
+        }
+    }
+
+    private fun BODY.portalShellSidenav(
+        slug: String,
+        workspaceName: String,
+        username: String,
+        activePage: String,
+        content: DIV.() -> Unit,
+    ) {
+        aside(classes = "portal-sidebar") {
+            div(classes = "portal-sidebar__brand") {
+                div(classes = "portal-sidebar__brand-mark") {
+                    +workspaceName.split(" ")
+                        .take(2)
+                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                        .joinToString("")
+                        .ifEmpty { "K" }
+                }
+                div(classes = "portal-sidebar__brand-info") {
+                    span(classes = "portal-sidebar__org") { +workspaceName }
+                    span(classes = "portal-sidebar__app") { +"My Account" }
+                }
+            }
             nav(classes = "portal-nav") {
-                div(classes = "portal-nav-header") {
-                    p(classes = "portal-nav-workspace") { +workspaceName }
-                    p(classes = "portal-nav-user") { +username }
+                attributes["role"] = "navigation"
+                attributes["aria-label"] = "Account settings"
+                span(classes = "portal-nav__label") { +"Account" }
+                portalNavItems(slug, activePage, "portal-nav__item")
+            }
+            div(classes = "portal-sidebar__footer") {
+                div(classes = "portal-user") {
+                    div(classes = "portal-user__avatar") {
+                        attributes["aria-hidden"] = "true"
+                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                    }
+                    div(classes = "portal-user__info") {
+                        span(classes = "portal-user__name") { +username }
+                        span(classes = "portal-user__email") { +"@$username" }
+                    }
                 }
-                div(classes = "portal-nav-links") {
-                    a(
-                        href = "/t/$slug/account/profile",
-                        classes = "portal-nav-link${if (activePage == "profile") " active" else ""}",
-                    ) { +"Profile" }
-                    a(
-                        href = "/t/$slug/account/security",
-                        classes = "portal-nav-link${if (activePage == "security") " active" else ""}",
-                    ) { +"Security" }
-                    a(
-                        href = "/t/$slug/account/mfa",
-                        classes = "portal-nav-link${if (activePage == "mfa") " active" else ""}",
-                    ) { +"Two-Factor Auth" }
-                }
-                div(classes = "portal-nav-footer") {
-                    form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-                        button(type = ButtonType.submit, classes = "portal-nav-link") {
-                            style =
-                                "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
-                            +"Sign out"
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-signout") {
+                        attributes["aria-label"] = "Sign out"
+                        consumer.onTagContentUnsafe {
+                            +"""<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
                         }
+                        +"Sign out"
                     }
                 }
             }
+        }
+        div(classes = "portal-main-wrap") {
+            div(classes = "portal-main") { content() }
+        }
+    }
 
-            // ── Centered content area ─────────────────────────────────────
-            div(classes = "portal-main-wrap") {
-                div(classes = "portal-main") {
-                    content()
+    private fun BODY.portalShellTabnav(
+        slug: String,
+        workspaceName: String,
+        username: String,
+        activePage: String,
+        content: DIV.() -> Unit,
+    ) {
+        val initials = workspaceName.split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .joinToString("")
+            .ifEmpty { "K" }
+
+        header(classes = "portal-topbar") {
+            div(classes = "portal-topbar__inner") {
+                div(classes = "portal-topbar__brand") {
+                    div(classes = "portal-topbar__brand-mark") { +initials }
+                    span(classes = "portal-topbar__org") { +workspaceName }
+                }
+                div(classes = "portal-topbar__sep") { attributes["aria-hidden"] = "true" }
+                span(classes = "portal-topbar__page-title") { +"Account settings" }
+                div(classes = "portal-topbar__spacer") {}
+                div(classes = "portal-topbar__user") {
+                    div(classes = "portal-topbar__avatar") {
+                        attributes["aria-label"] = "Signed in as $username"
+                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                    }
+                    span(classes = "portal-topbar__username") { +username }
+                }
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-topbar__signout") {
+                        attributes["aria-label"] = "Sign out"
+                        consumer.onTagContentUnsafe {
+                            +"""<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
+                        }
+                        +"Sign out"
+                    }
                 }
             }
         }
+        nav(classes = "portal-tabnav") {
+            attributes["role"] = "navigation"
+            attributes["aria-label"] = "Account sections"
+            div(classes = "portal-tabnav__inner") {
+                portalNavItems(slug, activePage, "portal-tabnav__item")
+            }
+        }
+        div(classes = "portal-content") { content() }
+    }
+
+    private fun FlowContent.portalNavItems(
+        slug: String,
+        activePage: String,
+        linkClass: String,
+    ) {
+        a(
+            href = "/t/$slug/account/profile",
+            classes = "$linkClass${if (activePage == "profile") " is-active" else ""}",
+        ) { +"Profile" }
+        a(
+            href = "/t/$slug/account/security",
+            classes = "$linkClass${if (activePage == "security") " is-active" else ""}",
+        ) { +"Security" }
+        a(
+            href = "/t/$slug/account/mfa",
+            classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
+        ) { +"Two-Factor Auth" }
     }
 }

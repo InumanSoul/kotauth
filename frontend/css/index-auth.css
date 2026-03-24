@@ -21,6 +21,7 @@
 @import "./base/reset.css";
 
 /* ── Auth layout and components ──────────────────────────────────────────── */
+@import "./auth/view-transitions.css";
 @import "./auth/shell.css";
 @import "./auth/brand.css";
 @import "./auth/card.css";

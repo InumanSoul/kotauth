@@ -1,0 +1,173 @@
+/* frontend/css/portal/tabnav.css
+ *
+ * Centered layout — two-bar header.
+ * Bar 1: sticky topbar with brand mark, page title, user identity, sign-out.
+ * Bar 2: sticky tab strip below the topbar.
+ */
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────────── */
+
+.portal-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--color-surface);
+}
+
+.portal-topbar__inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.portal-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.portal-topbar__brand-mark {
+  width: 40px;
+  height: 40px;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.portal-topbar__org {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.portal-topbar__sep {
+  width: 0.5px;
+  height: 16px;
+  background: var(--color-border-em);
+  flex-shrink: 0;
+}
+
+.portal-topbar__page-title {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}
+
+.portal-topbar__spacer {
+  flex: 1;
+}
+
+.portal-topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-topbar__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.portal-topbar__username {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.portal-topbar__signout {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  margin-left: 4px;
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  border: 0.5px solid var(--color-border-md);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
+}
+
+.portal-topbar__signout:hover {
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+  background: var(--color-red-bg);
+}
+
+/* ── TAB STRIP ──────────────────────────────────────────────────────────── */
+
+.portal-tabnav {
+  border-bottom: 0.5px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 48px;
+  z-index: 10;
+}
+
+.portal-tabnav__inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  gap: 0;
+}
+
+.portal-tabnav__item {
+  position: relative;
+  padding: 10px 14px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--color-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  transition: color 0.1s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.portal-tabnav__item:hover {
+  color: var(--color-text);
+}
+
+.portal-tabnav__item.is-active {
+  color: var(--color-text);
+}
+
+.portal-tabnav__item.is-active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -0.5px;
+  height: 1.5px;
+  background: var(--color-accent);
+  border-radius: 2px 2px 0 0;
+  view-transition-name: tab-indicator;
+}

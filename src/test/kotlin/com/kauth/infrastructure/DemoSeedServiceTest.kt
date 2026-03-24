@@ -46,6 +46,8 @@ class DemoSeedServiceTest {
             auditLog = auditLog,
         )
 
+    private val themes = com.kauth.fakes.FakeThemeRepository()
+
     private val svc =
         DemoSeedService(
             tenantRepository = tenants,
@@ -58,6 +60,7 @@ class DemoSeedServiceTest {
             roleRepository = roles,
             auditLog = auditLog,
             webhookEndpointRepository = webhooks,
+            themeRepository = themes,
             baseUrl = "http://localhost:8080",
         )
 

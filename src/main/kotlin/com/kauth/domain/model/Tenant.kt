@@ -44,6 +44,8 @@ data class Tenant(
     val mfaPolicy: String = "optional",
     // Session policy
     val maxConcurrentSessions: Int? = null, // null = unlimited
+    // Portal UI configuration (loaded from workspace_portal_config via LEFT JOIN)
+    val portalConfig: PortalConfig = PortalConfig(),
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG

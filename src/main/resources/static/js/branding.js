@@ -21,12 +21,13 @@
 
   /* ── preview CSS variable map ── */
   var previewVars = {
-    'accent':   '--pm-accent',
-    'card-bg':  '--pm-card',
-    'input-bg': '--pm-input',
-    'border':   '--pm-border',
-    'text':     '--pm-text',
-    'muted':    '--pm-muted'
+    'accent':    '--pm-accent',
+    'accent-fg': '--pm-accent-fg',
+    'surface':   '--pm-card',
+    'input-bg':  '--pm-input',
+    'border':    '--pm-border',
+    'text':      '--pm-text',
+    'muted':     '--pm-muted'
   };
 
   var previewEl   = document.getElementById('preview-card');
@@ -39,6 +40,7 @@
     if (v) previewEl.style.setProperty(v, value);
     if (key === 'page-bg') previewBody.style.background = value;
     if (key === 'accent') document.getElementById('preview-btn').style.background = value;
+    if (key === 'accent-fg') document.getElementById('preview-btn').style.color = value;
   }
 
   function syncColor(key, value) {
@@ -80,20 +82,20 @@
   /* ── preset definitions ── */
   var presets = {
     dark: {
-      accent: '#1FBCFF', 'accent-hover': '#0AAEE8',
-      'page-bg': '#0C0C0E', 'card-bg': '#1E1E24',
+      accent: '#1FBCFF', 'accent-hover': '#0AAEE8', 'accent-fg': '#05080a',
+      'page-bg': '#0C0C0E', 'surface': '#1E1E24',
       'input-bg': '#2A2A32', border: '#2E2E36',
       text: '#EDEDEF', muted: '#6B6B75', radius: '8px'
     },
     light: {
-      accent: '#0A6EBD', 'accent-hover': '#085FA3',
-      'page-bg': '#F4F5F7', 'card-bg': '#FFFFFF',
+      accent: '#0A6EBD', 'accent-hover': '#085FA3', 'accent-fg': '#FFFFFF',
+      'page-bg': '#F4F5F7', 'surface': '#FFFFFF',
       'input-bg': '#F0F1F3', border: '#E0E1E4',
       text: '#111114', muted: '#7A7A85', radius: '8px'
     },
     simple: {
-      accent: '#111114', 'accent-hover': '#333336',
-      'page-bg': '#FFFFFF', 'card-bg': '#FAFAFA',
+      accent: '#111114', 'accent-hover': '#333336', 'accent-fg': '#FFFFFF',
+      'page-bg': '#FFFFFF', 'surface': '#FAFAFA',
       'input-bg': '#F4F4F6', border: '#DDDDE0',
       text: '#111114', muted: '#6B6B75', radius: '0px'
     }

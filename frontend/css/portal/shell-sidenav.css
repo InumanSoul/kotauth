@@ -1,0 +1,20 @@
+/* frontend/css/portal/shell-sidenav.css
+ *
+ * Shell layout for portal sidebar variant.
+ * Sidebar is position:fixed (defined in nav.css), so main content
+ * offsets via margin-left instead of flex.
+ */
+
+.portal-main-wrap {
+  margin-left: 220px;
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  padding: 48px 40px;
+}
+
+.portal-main {
+  width: 100%;
+  max-width: 600px;
+  view-transition-name: side-portal-main;
+}

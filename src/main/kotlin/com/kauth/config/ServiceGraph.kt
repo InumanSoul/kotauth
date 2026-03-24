@@ -12,11 +12,13 @@ import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
 import com.kauth.adapter.persistence.PostgresMfaRepository
 import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
+import com.kauth.adapter.persistence.PostgresPortalConfigRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
+import com.kauth.adapter.persistence.PostgresThemeRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
@@ -30,10 +32,12 @@ import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
+import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
@@ -73,6 +77,8 @@ data class ServiceGraph(
     val roleRepository: RoleRepository,
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
+    val portalConfigRepository: PortalConfigRepository,
+    val themeRepository: ThemeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
     val loginRateLimiter: RateLimiterPort,
@@ -102,6 +108,8 @@ data class ServiceGraph(
             val identityProviderRepository =
                 PostgresIdentityProviderRepository(encryptionService)
             val socialAccountRepository = PostgresSocialAccountRepository()
+            val portalConfigRepository = PostgresPortalConfigRepository()
+            val themeRepository = PostgresThemeRepository()
             val apiKeyRepository = PostgresApiKeyRepository()
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
@@ -183,6 +191,8 @@ data class ServiceGraph(
                     sessionRepository = sessionRepository,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                    themeRepository = themeRepository,
+                    portalConfigRepository = portalConfigRepository,
                 )
             val roleGroupService =
                 RoleGroupService(
@@ -236,6 +246,7 @@ data class ServiceGraph(
                     roleRepository = roleRepository,
                     auditLog = auditLogAdapter,
                     webhookEndpointRepository = webhookEndpointRepository,
+                    themeRepository = themeRepository,
                     baseUrl = config.baseUrl,
                 ).seedIfEmpty()
             }
@@ -294,6 +305,8 @@ data class ServiceGraph(
                 roleRepository = roleRepository,
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
+                portalConfigRepository = portalConfigRepository,
+                themeRepository = themeRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
                 loginRateLimiter = loginLimiter,

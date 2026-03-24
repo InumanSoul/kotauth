@@ -6,7 +6,6 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeApplicationRepository
@@ -103,8 +102,6 @@ class AdminServiceTest {
             enabled = true,
             redirectUris = listOf("http://localhost/callback"),
         )
-
-    private val defaultTheme = TenantTheme.DEFAULT
 
     @BeforeTest
     fun setup() {
@@ -573,16 +570,5 @@ class AdminServiceTest {
         passwordPolicyMinLength = passwordPolicyMinLength,
         passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
         mfaPolicy = mfaPolicy,
-        themeAccentColor = defaultTheme.accentColor,
-        themeAccentHover = defaultTheme.accentHoverColor,
-        themeBgDeep = defaultTheme.bgDeep,
-        themeBgCard = defaultTheme.bgCard,
-        themeBgInput = defaultTheme.bgInput,
-        themeBorderColor = defaultTheme.borderColor,
-        themeBorderRadius = defaultTheme.borderRadius,
-        themeTextPrimary = defaultTheme.textPrimary,
-        themeTextMuted = defaultTheme.textMuted,
-        themeLogoUrl = null,
-        themeFaviconUrl = null,
     )
 }
