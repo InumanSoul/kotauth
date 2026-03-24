@@ -45,7 +45,6 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin: 12px 0 10px;
-  max-width: 440px;
 }
 
 .recovery-code {

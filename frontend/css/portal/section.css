@@ -248,6 +248,9 @@
   font-size: 0.875rem;
   color: var(--color-muted);
   margin: 2px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────── */
