@@ -1,0 +1,56 @@
+# ─── Kotauth — try it locally in one command ─────────────────────────────────
+#
+#   docker compose -f docker-compose.quickstart.yml up -d
+#
+# Opens http://localhost:8080/admin — no .env file, no configuration needed.
+# PostgreSQL is bundled. Demo data is seeded automatically.
+#
+# This file is for local evaluation only. For production, see docker/docker-compose.yml
+# and the deployment guide: https://kotauth.com/deployment/production/
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: kotauth-quickstart
+
+services:
+  db:
+    image: postgres:15
+    container_name: kotauth-qs-db
+    environment:
+      POSTGRES_DB: kotauth_db
+      POSTGRES_USER: kotauth
+      POSTGRES_PASSWORD: localonly
+    volumes:
+      - kotauth_qs_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kotauth -d kotauth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    image: ghcr.io/inumansoul/kotauth:latest
+    container_name: kotauth-qs
+    environment:
+      KAUTH_BASE_URL: http://localhost:8080
+      KAUTH_ENV: development
+      KAUTH_SECRET_KEY: a]1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4
+      KAUTH_DEMO_MODE: "true"
+      DB_URL: jdbc:postgresql://db:5432/kotauth_db
+      DB_USER: kotauth
+      DB_PASSWORD: localonly
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  kotauth_qs_data:
