@@ -1,0 +1,37 @@
+/* frontend/css/index-portal-tabnav.css
+ *
+ * Portal bundle — centered/tab layout variant.
+ * LightningCSS resolves all @import statements into a single
+ * minified file: src/main/resources/static/kotauth-portal-tabnav.css
+ *
+ * Token values (--color-bg, --color-accent, --radius, etc.) are injected
+ * at runtime by TenantTheme.toCssVars() before this stylesheet is linked.
+ *
+ * Import order: base reset → portal reset → shared components → portal shell → tabnav → content
+ */
+
+/* ── Base reset ────────────────────────────────────────────────────────── */
+@import "./base/reset.css";
+
+/* ── Portal body override ──────────────────────────────────────────────── */
+@import "./portal/reset.css";
+
+/* ── Shared components (form, button, alert) ───────────────────────────── */
+@import "./shared/form.css";
+@import "./shared/button.css";
+@import "./shared/alert.css";
+
+/* ── Portal layout: centered tabs ──────────────────────────────────────── */
+@import "./portal/shell-tabnav.css";
+@import "./portal/tabnav.css";
+
+/* ── Portal content components ─────────────────────────────────────────── */
+@import "./portal/section.css";
+@import "./portal/table.css";
+@import "./portal/danger.css";
+
+/* ── MFA management page ─────────────────────────────────────────────── */
+@import "./portal/mfa.css";
+
+/* ── Demo mode banner ──────────────────────────────────────────────────── */
+@import "./components/demo-banner.css";

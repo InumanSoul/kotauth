@@ -1,0 +1,21 @@
+/* frontend/css/portal/shell-tabnav.css
+ *
+ * Shell layout for portal centered/tab variant.
+ * Sticky topbar with tab strip, content centered below.
+ */
+
+.portal-shell {
+  min-height: 100dvh;
+  width: 100%;
+}
+
+.portal-main-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.portal-main {
+  width: 100%;
+  max-width: 600px;
+}

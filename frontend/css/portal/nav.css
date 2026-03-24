@@ -1,0 +1,70 @@
+/* frontend/css/portal/nav.css
+ *
+ * Sidebar navigation component for the portal sidenav layout.
+ * Fixed 220px left panel with workspace name, username, nav links, and sign-out.
+ */
+
+.portal-nav {
+  width: 220px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  background: var(--color-card);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-nav-header {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-nav-workspace {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--color-muted);
+  margin: 0 0 4px 0;
+}
+
+.portal-nav-user {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.portal-nav-links {
+  padding: 12px 0;
+  flex: 1;
+}
+
+.portal-nav-link {
+  display: block;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: none;
+  transition: color .15s, background .15s;
+}
+
+.portal-nav-link:hover {
+  color: var(--color-text);
+  background: var(--color-input);
+}
+
+.portal-nav-link.active {
+  color: var(--color-text);
+  background: var(--color-input);
+  font-weight: 500;
+}
+
+.portal-nav-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+}

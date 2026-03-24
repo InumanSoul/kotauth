@@ -1,0 +1,78 @@
+/* frontend/css/portal/tabnav.css
+ *
+ * Tab navigation component for the portal centered layout.
+ * Sticky topbar with workspace name + horizontal tab strip.
+ */
+
+.portal-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-topbar-inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 24px 0;
+}
+
+.portal-topbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.portal-topbar-workspace {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--color-muted);
+  margin: 0 0 2px 0;
+}
+
+.portal-topbar-user {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.portal-tabs {
+  display: flex;
+  gap: 0;
+}
+
+.portal-tab {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--color-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, border-color .15s;
+}
+
+.portal-tab:hover {
+  color: var(--color-text);
+}
+
+.portal-tab.active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+  font-weight: 500;
+}
+
+.portal-topbar-signout {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--color-muted);
+  font-family: inherit;
+  transition: color .15s;
+}
+
+.portal-topbar-signout:hover {
+  color: var(--color-text);
+}

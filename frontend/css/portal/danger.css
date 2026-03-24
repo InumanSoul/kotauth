@@ -1,0 +1,20 @@
+/* frontend/css/portal/danger.css
+ *
+ * Danger-styled buttons for destructive actions (session revoke, etc.).
+ */
+
+.btn-danger-sm {
+  background: transparent;
+  border: 1px solid #dc2626;
+  color: #f87171;
+  padding: 4px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: background .15s;
+}
+
+.btn-danger-sm:hover {
+  background: rgba(220, 38, 38, .15);
+}

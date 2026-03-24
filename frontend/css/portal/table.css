@@ -1,0 +1,29 @@
+/* frontend/css/portal/table.css
+ *
+ * Sessions table in the portal security page.
+ */
+
+.portal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--color-text);
+  margin-top: 8px;
+}
+
+.portal-table th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.portal-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}

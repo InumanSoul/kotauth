@@ -1,0 +1,43 @@
+/* frontend/css/portal/section.css
+ *
+ * Content primitives for portal pages — titles, forms, dividers, empty states.
+ */
+
+.portal-section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 24px 0;
+}
+
+.portal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 440px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin: 3px 0 0 0;
+}
+
+.portal-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 36px 0;
+}
+
+.portal-empty {
+  color: var(--color-muted);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* Override button width inside portal forms */
+.portal-form .btn {
+  width: auto;
+  padding: 0.75rem 1.5rem;
+  margin-top: 8px;
+}
