@@ -9,11 +9,28 @@
 
 Kotauth is an open-source authentication and identity platform that bridges the gap between enterprise IAM systems (Keycloak, Okta) and developer-friendly SaaS tools (Clerk, Auth0). Full OAuth2/OIDC compliance. Runs in Docker. Up in minutes.
 
+**[Live demo](https://demo.kotauth.com)** · **[Documentation](https://kotauth.com)** · **[Roadmap](docs/ROADMAP.md)**
+
 ---
 
-## Quickstart — pre-built image (fastest)
+## Try it — one command
 
-You need Docker and Docker Compose. Nothing else — no repo clone, no build step.
+You need Docker and Docker Compose. Nothing else.
+
+```bash
+curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker-compose.quickstart.yml
+docker compose -f docker-compose.quickstart.yml up -d
+```
+
+Open **http://localhost:8080/admin** — demo data is pre-loaded with two workspaces, users, roles, and applications. Credentials are shown in the banner.
+
+That's it. When you're ready to customize, see the next section.
+
+---
+
+## Quickstart — configure your own instance
+
+For running Kotauth with your own settings. No repo clone required.
 
 **1. Grab the compose file and env template**
 
@@ -26,15 +43,16 @@ curl -o .env.example \
 cp .env.example .env
 ```
 
-**2. Set your secret key and base URL**
+**2. Set your secret key**
 
-Open `.env` and fill in the two required values:
+Open `.env` and generate a secret key:
 
 ```bash
 # In .env:
-KAUTH_BASE_URL=http://localhost:8080
 KAUTH_SECRET_KEY=$(openssl rand -hex 32)
 ```
+
+`KAUTH_BASE_URL` defaults to `http://localhost:8080`. Change it if deploying remotely.
 
 **3. Start**
 
@@ -50,7 +68,11 @@ Kotauth starts on port `8080`. PostgreSQL is bundled — no separate database se
 http://localhost:8080/admin
 ```
 
-Default master workspace credentials are printed in the startup log on first run. Change them immediately.
+Master workspace admin credentials are printed in the startup log on first run. Change them immediately:
+
+```bash
+docker compose -f docker/docker-compose.yml logs kotauth | grep "Admin credentials"
+```
 
 **5. Create a workspace**
 
@@ -62,7 +84,7 @@ http://localhost:8080/t/my-app/.well-known/openid-configuration
 
 ---
 
-## Quickstart — build from source
+## Build from source
 
 For contributors or anyone who wants to run from the cloned repo.
 
@@ -70,7 +92,7 @@ For contributors or anyone who wants to run from the cloned repo.
 git clone https://github.com/inumansoul/kotauth.git
 cd kotauth
 cp .env.example .env
-# Edit .env: set KAUTH_SECRET_KEY and KAUTH_BASE_URL
+# Edit .env: set KAUTH_SECRET_KEY
 make up
 ```
 
@@ -87,7 +109,7 @@ Images are published to GitHub Container Registry on every tagged release.
 | `ghcr.io/inumansoul/kotauth:latest` | Latest stable release |
 | `ghcr.io/inumansoul/kotauth:1` | Latest patch in the `1.x` line |
 | `ghcr.io/inumansoul/kotauth:1.1` | Latest patch in `1.1.x` |
-| `ghcr.io/inumansoul/kotauth:1.1.0` | Exact version pin |
+| `ghcr.io/inumansoul/kotauth:1.1.1` | Exact version pin |
 
 Pre-release tags (e.g. `1.1.0-rc1`) are published but do not move the `latest` or major/minor tags.
 
@@ -121,7 +143,7 @@ docker pull ghcr.io/inumansoul/kotauth:latest
 | `KAUTH_SECRET_KEY` | Recommended | Random (ephemeral) | 32+ char hex string. Used for AES-256-GCM encryption and session signing. If not set, SMTP config is unavailable and sessions don't survive restarts. |
 | `KAUTH_ENV` | No | `development` | Set to `production` to enable HTTPS enforcement and strict startup validation. |
 | `KAUTH_DEMO_MODE` | No | `false` | Set to `true` to seed demo data and show a demo banner. For showcase deployments. |
-| `DB_URL` | **Yes** | — | PostgreSQL JDBC URL. Example: `jdbc:postgresql://db:5432/kotauth_db` |
+| `DB_URL` | No | Auto-constructed | PostgreSQL JDBC URL. When not set, constructed from `DB_HOST`, `DB_PORT`, and `DB_NAME`. Set directly for external/managed databases (RDS, Supabase, Neon). |
 | `DB_USER` | **Yes** | — | PostgreSQL username. |
 | `DB_PASSWORD` | **Yes** | — | PostgreSQL password. |
 
@@ -218,7 +240,7 @@ infrastructure/
               — Cross-cutting: key provisioning, rate limiting, encryption
 ```
 
-Key decisions are documented as ADRs in [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md#architecture-decision-records).
+Key decisions are documented as ADRs in [docs/adr/](docs/adr/).
 
 ---
 

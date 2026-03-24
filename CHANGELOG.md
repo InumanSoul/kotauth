@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.1] - 2026-03-24
+
+### Added
+
+- **Zero-config quickstart** — `docker-compose.quickstart.yml` at repo root for one-command local evaluation with demo data pre-loaded
+- **Live demo and docs links** in README header
+
+### Changed
+
+- **README restructured** — "Try it — one command" section leads the quickstart; existing configurable setup moved to second section
+- **DB_URL marked optional** in environment variable table — auto-constructed from `DB_HOST`/`DB_PORT`/`DB_NAME` when not set
+- **PostgreSQL port no longer exposed** to host in `docker/docker-compose.yml` — only accessible within the Docker network
+
+### Fixed
+
+- Broken link to `docs/IMPLEMENTATION_STATUS.md` in README — now points to `docs/adr/`
+- Missing `-o` flags in kotauth-docs quickstart curl commands — files were printed to stdout instead of saved
+- Stale Docker image tag examples (`1.0.1` → `1.1.1`) in documentation site
+- Incorrect CSS bundle count in docs ("two" → "four": admin, auth, portal-sidenav, portal-tabnav)
+
+---
+
 ## [1.1.0] - 2026-03-22
 
 ### Changed
@@ -120,7 +142,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/inumansoul/kotauth/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/inumansoul/kotauth/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/inumansoul/kotauth/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/inumansoul/kotauth/compare/v1.0.1...v1.0.2
