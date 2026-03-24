@@ -51,7 +51,9 @@ data class TenantTheme(
             appendLine("  --color-text:         $textPrimary;")
             appendLine("  --color-muted:        $textMuted;")
             appendLine("  --radius:             $borderRadius;")
-            appendLine("  --font-sans:          '$fontFamily', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;")
+            appendLine(
+                "  --font-sans:          '$fontFamily', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;",
+            )
             append("}")
         }
 

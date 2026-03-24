@@ -32,5 +32,6 @@ data class PortalSession(
     val tenantId: Int,
     val tenantSlug: String,
     val username: String,
+    val portalSessionId: Int? = null,
     val createdAt: Long = Instant.now().epochSecond,
 )

@@ -201,12 +201,18 @@ fun Route.portalRoutes(
                 )
             }
 
+            val latestSession =
+                selfServiceService
+                    .getActiveSessions(UserId(userId), tenantObj.id)
+                    .maxByOrNull { it.createdAt }
+
             call.sessions.set(
                 PortalSession(
                     userId = userId,
                     tenantId = tenantObj.id.value,
                     tenantSlug = slug,
                     username = username,
+                    portalSessionId = latestSession?.id?.value,
                 ),
             )
 
@@ -259,6 +265,12 @@ fun Route.portalRoutes(
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]
 
+            val user =
+                when (val r = selfServiceService.getProfile(UserId(session.userId), TenantId(session.tenantId))) {
+                    is SelfServiceResult.Success -> r.value
+                    is SelfServiceResult.Failure -> null
+                }
+
             call.respondHtml(
                 HttpStatusCode.OK,
                 PortalView.profilePage(
@@ -269,6 +281,8 @@ fun Route.portalRoutes(
                     layout = tenant.portalConfig.layout,
                     successMsg = successMsg,
                     errorMsg = errorMsg,
+                    email = user?.email ?: "",
+                    fullName = user?.fullName ?: "",
                 ),
             )
         }
@@ -296,6 +310,29 @@ fun Route.portalRoutes(
             }
         }
 
+        post("/delete") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val confirmUsername = call.receiveParameters()["confirm_username"]?.trim() ?: ""
+
+            if (!confirmUsername.equals(session.username, ignoreCase = true)) {
+                return@post call.respondRedirect(
+                    "/t/$slug/account/profile?error=${encodeParam("Username confirmation does not match.")}",
+                )
+            }
+
+            when (val result = selfServiceService.disableAccount(UserId(session.userId), TenantId(session.tenantId))) {
+                is SelfServiceResult.Success -> {
+                    call.sessions.clear<PortalSession>()
+                    call.respondRedirect(
+                        "/t/$slug/account/login?error=${encodeParam("Your account has been deleted.")}",
+                    )
+                }
+                is SelfServiceResult.Failure ->
+                    call.respondRedirect("/t/$slug/account/profile?error=${encodeParam(result.error.message)}")
+            }
+        }
+
         // ------------------------------------------------------------------
         // Security (change password + sessions)
         // ------------------------------------------------------------------
@@ -317,6 +354,7 @@ fun Route.portalRoutes(
                     tenant.displayName,
                     layout = tenant.portalConfig.layout,
                     sessions = sessions,
+                    currentSessionId = session.portalSessionId,
                     successMsg = successMsg,
                     errorMsg = errorMsg,
                 ),
@@ -361,6 +399,19 @@ fun Route.portalRoutes(
                     ?: return@post call.respond(HttpStatusCode.BadRequest)
 
             selfServiceService.revokeSession(UserId(session.userId), TenantId(session.tenantId), sessionId)
+            call.respondRedirect("/t/$slug/account/security?saved=true")
+        }
+
+        post("/sessions/revoke-others") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            val keepId = session.portalSessionId?.let { SessionId(it) }
+            if (keepId == null) {
+                return@post call.respondRedirect(
+                    "/t/$slug/account/security?error=${encodeParam("Could not identify current session.")}",
+                )
+            }
+            selfServiceService.revokeOtherSessions(UserId(session.userId), TenantId(session.tenantId), keepId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
         }
 

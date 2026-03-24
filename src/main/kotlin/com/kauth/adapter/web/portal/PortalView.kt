@@ -100,6 +100,8 @@ object PortalView {
         layout: PortalLayout = PortalLayout.SIDEBAR,
         successMsg: String?,
         errorMsg: String?,
+        email: String = "",
+        fullName: String = "",
     ): HTML.() -> Unit =
         {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
@@ -156,6 +158,7 @@ object PortalView {
                                     input(type = InputType.email, name = "email") {
                                         classes = setOf("edit-field__input")
                                         id = "email"
+                                        value = email
                                         placeholder = "you@example.com"
                                         attributes["autocomplete"] = "email"
                                         required = true
@@ -169,6 +172,7 @@ object PortalView {
                                     input(type = InputType.text, name = "full_name") {
                                         classes = setOf("edit-field__input")
                                         id = "full_name"
+                                        value = fullName
                                         placeholder = "Your full name"
                                         required = true
                                     }
@@ -240,6 +244,7 @@ object PortalView {
         workspaceName: String,
         layout: PortalLayout = PortalLayout.SIDEBAR,
         sessions: List<Session>,
+        currentSessionId: Int? = null,
         successMsg: String?,
         errorMsg: String?,
     ): HTML.() -> Unit =
@@ -356,10 +361,14 @@ object PortalView {
                                     }
                                     tbody {
                                         for (s in sessions) {
+                                            val isCurrent = currentSessionId != null && s.id?.value == currentSessionId
                                             tr {
                                                 td {
                                                     div(classes = "session-device-label") {
-                                                        +(s.userAgent?.take(60) ?: "Unknown device")
+                                                        +UserAgentParser.parse(s.userAgent)
+                                                        if (isCurrent) {
+                                                            span(classes = "session-current-pill") { +"Current" }
+                                                        }
                                                     }
                                                     span(classes = "session-ip") { +(s.ipAddress ?: "—") }
                                                 }
@@ -370,14 +379,24 @@ object PortalView {
                                                     span(classes = "session-time") { +dtf.format(s.expiresAt) }
                                                 }
                                                 td {
-                                                    form(
-                                                        action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
-                                                        method = FormMethod.post,
-                                                    ) {
+                                                    if (isCurrent) {
                                                         button(
-                                                            type = ButtonType.submit,
-                                                            classes = "btn btn--danger btn--sm",
-                                                        ) { +"Revoke" }
+                                                            type = ButtonType.button,
+                                                            classes = "btn btn--danger btn--sm btn--disabled",
+                                                        ) {
+                                                            disabled = true
+                                                            +"Revoke"
+                                                        }
+                                                    } else {
+                                                        form(
+                                                            action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
+                                                            method = FormMethod.post,
+                                                        ) {
+                                                            button(
+                                                                type = ButtonType.submit,
+                                                                classes = "btn btn--danger btn--sm",
+                                                            ) { +"Revoke" }
+                                                        }
                                                     }
                                                 }
                                             }
