@@ -5,8 +5,8 @@ import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
 
 /**
  * Exposed mapping for 'audit_log' (V8 migration).
- * JSONB is read/written as text — Exposed doesn't have native JSONB support
- * without an extension. Text serialization is safe and forward-compatible.
+ * The [details] column uses [JsonbColumnType] to send values as PGobject(type="jsonb"),
+ * matching the JSONB column type in PostgreSQL.
  */
 object AuditLogTable : Table("audit_log") {
     val id = integer("id").autoIncrement()
@@ -16,7 +16,7 @@ object AuditLogTable : Table("audit_log") {
     val eventType = varchar("event_type", 64)
     val ipAddress = varchar("ip_address", 45).nullable()
     val userAgent = text("user_agent").nullable()
-    val details = text("details").nullable() // JSONB stored as text
+    val details = jsonb("details").nullable()
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

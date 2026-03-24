@@ -218,7 +218,7 @@ class DemoSeedService(
             tenantId = updated.id,
             userIds = listOf(sarahId, jamesId, mariaId, alexId, testUserId),
             appCount = 2,
-            roleCount = 3,
+            roleCount = 5,
             groupCount = 2,
         )
     }
@@ -316,7 +316,7 @@ class DemoSeedService(
             tenantId = updated.id,
             userIds = listOf(jordanId, caseyId, rileyId),
             appCount = 1,
-            roleCount = 1,
+            roleCount = 3,
             groupCount = 1,
         )
     }
