@@ -18,7 +18,7 @@
 }
 
 .edit-field__label {
-  font-size: 10px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--color-muted);
   text-transform: uppercase;
@@ -32,7 +32,7 @@
   border: 0.5px solid var(--color-border-md);
   border-radius: var(--radius-sm);
   padding: 0 10px;
-  font-size: 13px;
+  font-size: 0.875rem;
   color: var(--color-text);
   font-family: var(--font-sans);
   outline: none;
@@ -50,7 +50,7 @@
 
 .edit-field__input--mono {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 0.8125rem;
 }
 
 .edit-field__input--disabled {
@@ -60,7 +60,7 @@
 }
 
 .edit-field__hint {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-muted);
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
 }
 
 .edit-actions__note {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-muted);
   flex: 1;
 }

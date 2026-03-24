@@ -638,18 +638,20 @@ object PortalView {
                         div(classes = "portal-section__body") {
                             div {
                                 id = "mfa-step-1"
-                                p {
-                                    +"You'll need an authenticator app such as "
-                                    strong { +"Google Authenticator" }
-                                    +", "
-                                    strong { +"Authy" }
-                                    +", or "
-                                    strong { +"1Password" }
-                                    +" to get started."
-                                }
                                 p(classes = "form-hint") {
-                                    style = "margin-bottom: 20px;"
-                                    +"Once enabled, you'll need your phone to sign in. Make sure you save the recovery codes somewhere safe."
+                                    +"Use an authenticator app to generate one-time codes. Once enabled, you'll need your phone every time you sign in. Save your recovery codes somewhere safe before finishing setup."
+                                }
+                                div( classes = "compatible-apps" ) {
+                                    p {
+                                        +"Compatible Apps"
+                                    }
+                                    ul(classes = "compatible-apps__list") {
+                                        span(classes = "compatible-apps__item") { +"Google Authenticator" }
+                                        span(classes = "compatible-apps__item") { +"Authy" }
+                                        span(classes = "compatible-apps__item") { +"Microsoft Authenticator" }
+                                        span(classes = "compatible-apps__item") { +"1Password" }
+                                        span(classes = "compatible-apps__item") { +"Bitwarden" }
+                                    }
                                 }
                                 button(classes = "btn btn--primary") {
                                     id = "start-btn"

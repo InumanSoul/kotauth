@@ -65,7 +65,6 @@ internal fun workspaceDetailPageImpl(
                         h1("page-header__title") { +workspace.displayName }
                         div("page-header__meta") {
                             span("page-header__slug") {
-                                inlineSvgIcon("slug", "slug")
                                 +workspace.slug
                             }
                         }

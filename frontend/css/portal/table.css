@@ -9,7 +9,7 @@
 }
 
 .sessions-table th {
-  font-size: 10px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--color-muted);
   text-transform: uppercase;
@@ -33,7 +33,7 @@
 /* ── Session row helpers ────────────────────────────────────────────────── */
 
 .session-device-label {
-  font-size: 12px;
+  font-size: 0.8125rem;
   color: var(--color-text);
   display: flex;
   align-items: center;
@@ -42,7 +42,7 @@
 }
 
 .session-current-pill {
-  font-size: 10px;
+  font-size: 0.6875rem;
   font-weight: 500;
   color: var(--color-accent);
   background: var(--color-accent-bg);
@@ -54,11 +54,11 @@
 
 .session-ip {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-muted);
 }
 
 .session-time {
-  font-size: 11px;
+  font-size: 0.75rem;
   color: var(--color-muted);
 }
