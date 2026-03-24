@@ -201,19 +201,3 @@
   font-size: 13px;
   margin-top: 8px;
 }
-
-/* ── Legacy aliases (removed in Phase 6 when HTML classes are updated) ── */
-
-.portal-section-title {
-  font-size: 18px;
-  font-weight: 500;
-  color: var(--color-text);
-  margin: 0 0 24px 0;
-}
-
-.portal-divider {
-  height: 0.5px;
-  background: var(--color-border);
-  margin: 20px 0;
-  border: none;
-}

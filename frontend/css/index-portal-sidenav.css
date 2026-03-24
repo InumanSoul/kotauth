@@ -29,7 +29,6 @@
 /* ── Portal content components ─────────────────────────────────────────── */
 @import "./portal/section.css";
 @import "./portal/table.css";
-@import "./portal/danger.css";
 
 /* ── MFA management page ─────────────────────────────────────────────── */
 @import "./portal/mfa.css";

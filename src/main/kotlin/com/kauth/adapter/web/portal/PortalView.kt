@@ -105,7 +105,10 @@ object PortalView {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
                 portalShell(slug, workspaceName, session.username, "profile", layout) {
-                    h2(classes = "portal-section-title") { +"Profile" }
+                    div(classes = "page-header") {
+                        h1(classes = "page-header__title") { +"Profile" }
+                        p(classes = "page-header__subtitle") { +"Manage your personal information" }
+                    }
 
                     if (successMsg != null) {
                         div(classes = "alert alert-success") { +"Profile updated successfully." }
@@ -114,49 +117,65 @@ object PortalView {
                         div(classes = "alert alert-error") { +errorMsg }
                     }
 
-                    form(
-                        action = "/t/$slug/account/profile",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                        classes = "portal-form",
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "username"
-                                +"Username"
+                    div(classes = "portal-section") {
+                        div(classes = "profile-identity") {
+                            div(classes = "profile-identity__avatar") {
+                                +(session.username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
                             }
-                            input(type = InputType.text, name = "username") {
-                                id = "username"
-                                value = session.username
-                                disabled = true
-                                title = "Username cannot be changed"
-                            }
-                            p(classes = "form-hint") { +"Username cannot be changed after account creation." }
-                        }
-                        div("field") {
-                            label {
-                                htmlFor = "email"
-                                +"Email address"
-                            }
-                            input(type = InputType.email, name = "email") {
-                                id = "email"
-                                placeholder = "you@example.com"
-                                attributes["autocomplete"] = "email"
-                                required = true
+                            div(classes = "profile-identity__info") {
+                                div(classes = "profile-identity__name") { +session.username }
+                                div(classes = "profile-identity__username") { +"@${session.username}" }
                             }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "full_name"
-                                +"Full name"
-                            }
-                            input(type = InputType.text, name = "full_name") {
-                                id = "full_name"
-                                placeholder = "Your full name"
-                                required = true
+                        div(classes = "portal-section__body") {
+                            form(
+                                action = "/t/$slug/account/profile",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                                classes = "portal-form",
+                            ) {
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "username"
+                                        +"Username"
+                                    }
+                                    input(type = InputType.text, name = "username") {
+                                        classes = setOf("edit-field__input", "edit-field__input--mono", "edit-field__input--disabled")
+                                        id = "username"
+                                        value = session.username
+                                        disabled = true
+                                        title = "Username cannot be changed"
+                                    }
+                                    p(classes = "edit-field__hint") { +"Username cannot be changed after account creation." }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "email"
+                                        +"Email address"
+                                    }
+                                    input(type = InputType.email, name = "email") {
+                                        classes = setOf("edit-field__input")
+                                        id = "email"
+                                        placeholder = "you@example.com"
+                                        attributes["autocomplete"] = "email"
+                                        required = true
+                                    }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "full_name"
+                                        +"Full name"
+                                    }
+                                    input(type = InputType.text, name = "full_name") {
+                                        classes = setOf("edit-field__input")
+                                        id = "full_name"
+                                        placeholder = "Your full name"
+                                        required = true
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
                             }
                         }
-                        button(type = ButtonType.submit, classes = "btn") { +"Save changes" }
                     }
                 }
             }
@@ -180,7 +199,10 @@ object PortalView {
             head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
                 portalShell(slug, workspaceName, session.username, "security", layout) {
-                    h2(classes = "portal-section-title") { +"Change password" }
+                    div(classes = "page-header") {
+                        h1(classes = "page-header__title") { +"Security" }
+                        p(classes = "page-header__subtitle") { +"Password and active sessions" }
+                    }
 
                     if (successMsg != null) {
                         div(classes = "alert alert-success") { +"Password changed successfully." }
@@ -189,81 +211,100 @@ object PortalView {
                         div(classes = "alert alert-error") { +errorMsg }
                     }
 
-                    form(
-                        action = "/t/$slug/account/change-password",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                        classes = "portal-form",
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "current_password"
-                                +"Current password"
-                            }
-                            input(type = InputType.password, name = "current_password") {
-                                id = "current_password"
-                                required = true
-                                attributes["autocomplete"] = "current-password"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Change password" }
                             }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "new_password"
-                                +"New password"
-                            }
-                            input(type = InputType.password, name = "new_password") {
-                                id = "new_password"
-                                placeholder = "Minimum 8 characters"
-                                required = true
-                                attributes["autocomplete"] = "new-password"
+                        div(classes = "portal-section__body") {
+                            form(
+                                action = "/t/$slug/account/change-password",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                                classes = "portal-form",
+                            ) {
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "current_password"
+                                        +"Current password"
+                                    }
+                                    input(type = InputType.password, name = "current_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "current_password"
+                                        required = true
+                                        attributes["autocomplete"] = "current-password"
+                                    }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "new_password"
+                                        +"New password"
+                                    }
+                                    input(type = InputType.password, name = "new_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "new_password"
+                                        placeholder = "Minimum 8 characters"
+                                        required = true
+                                        attributes["autocomplete"] = "new-password"
+                                    }
+                                }
+                                div(classes = "edit-field") {
+                                    label(classes = "edit-field__label") {
+                                        htmlFor = "confirm_password"
+                                        +"Confirm new password"
+                                    }
+                                    input(type = InputType.password, name = "confirm_password") {
+                                        classes = setOf("edit-field__input")
+                                        id = "confirm_password"
+                                        placeholder = "Repeat your new password"
+                                        required = true
+                                        attributes["autocomplete"] = "new-password"
+                                    }
+                                }
+                                p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
+                                button(type = ButtonType.submit, classes = "btn btn--primary") { +"Change password" }
                             }
                         }
-                        div("field") {
-                            label {
-                                htmlFor = "confirm_password"
-                                +"Confirm new password"
-                            }
-                            input(type = InputType.password, name = "confirm_password") {
-                                id = "confirm_password"
-                                placeholder = "Repeat your new password"
-                                required = true
-                                attributes["autocomplete"] = "new-password"
-                            }
-                        }
-                        p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
-                        button(type = ButtonType.submit, classes = "btn") { +"Change password" }
                     }
 
-                    hr(classes = "portal-divider")
-
-                    h2(classes = "portal-section-title") { +"Active sessions" }
-                    if (sessions.isEmpty()) {
-                        p(classes = "portal-empty") { +"No active sessions found." }
-                    } else {
-                        table(classes = "portal-table") {
-                            thead {
-                                tr {
-                                    th { +"Device / IP" }
-                                    th { +"Started" }
-                                    th { +"Expires" }
-                                    th { +"" }
-                                }
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Active sessions" }
+                                div(classes = "portal-section__subtitle") { +"Devices currently signed in to your account" }
                             }
-                            tbody {
-                                for (s in sessions) {
-                                    tr {
-                                        td { +(s.ipAddress ?: "—") }
-                                        td { +dtf.format(s.createdAt) }
-                                        td { +dtf.format(s.expiresAt) }
-                                        td {
-                                            form(
-                                                action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
-                                                method = FormMethod.post,
-                                            ) {
-                                                button(
-                                                    type = ButtonType.submit,
-                                                    classes = "btn-danger-sm",
-                                                ) { +"Revoke" }
+                        }
+                        div(classes = "portal-section__body") {
+                            if (sessions.isEmpty()) {
+                                p(classes = "portal-empty") { +"No active sessions found." }
+                            } else {
+                                table(classes = "portal-table") {
+                                    thead {
+                                        tr {
+                                            th { +"Device / IP" }
+                                            th { +"Started" }
+                                            th { +"Expires" }
+                                            th { +"" }
+                                        }
+                                    }
+                                    tbody {
+                                        for (s in sessions) {
+                                            tr {
+                                                td { +(s.ipAddress ?: "—") }
+                                                td { +dtf.format(s.createdAt) }
+                                                td { +dtf.format(s.expiresAt) }
+                                                td {
+                                                    form(
+                                                        action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
+                                                        method = FormMethod.post,
+                                                    ) {
+                                                        button(
+                                                            type = ButtonType.submit,
+                                                            classes = "btn btn--danger btn--sm",
+                                                        ) { +"Revoke" }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -404,10 +445,11 @@ object PortalView {
         }
         body {
             portalShell(slug, workspaceName, session.username, "mfa", layout) {
-                h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
+                div(classes = "page-header") {
+                    h1(classes = "page-header__title") { +"Two-Factor Authentication" }
+                    p(classes = "page-header__subtitle") { +"Protect your account with an authenticator app" }
+                }
 
-                // Prominent notice — shown when the user is redirected here because MFA
-                // enrollment is required by the tenant policy but not yet configured.
                 if (!noticeMsg.isNullOrBlank()) {
                     div(classes = "alert alert-warning") {
                         style = "font-size:14px; padding:12px 16px;"
@@ -425,163 +467,181 @@ object PortalView {
                 }
 
                 if (mfaEnabled) {
-                    // ── Active state ──────────────────────────────────────────────
-                    div(classes = "mfa-status-row") {
-                        span(classes = "mfa-badge active") { +"Active" }
-                        p { +"Two-factor authentication is protecting your account." }
-                    }
-                    p { +"When you sign in you'll be asked for a 6-digit code from your authenticator app." }
-                    p(classes = "form-hint mfa-hint-row") {
-                        +(
-                            "Recovery codes were displayed once when you set up two-factor authentication. " +
-                                "To generate new codes, remove and re-enable two-factor authentication."
-                        )
-                    }
-
-                    hr(classes = "portal-divider")
-
-                    div {
-                        id = "disable-btn-row"
-                        button(classes = "btn-danger-outline") {
-                            attributes["onclick"] =
-                                """
-                                document.getElementById('disable-confirm').style.display='block';
-                                document.getElementById('disable-btn-row').style.display='none';
-                                """.trimIndent()
-                            +"Remove authenticator"
-                        }
-                    }
-                    div {
-                        id = "disable-confirm"
-                        style = "display:none"
-                        div(classes = "alert-warning") {
-                            +(
-                                "This will remove your authenticator app and disable two-factor authentication. " +
-                                    "Your account will only be protected by your password."
-                            )
-                        }
-                        div(classes = "mfa-action-row") {
-                            button(classes = "btn-danger") {
-                                id = "disable-btn"
-                                attributes["onclick"] = "disableMfa('$slug')"
-                                +"Yes, remove authenticator"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Authenticator app" }
                             }
-                            button(classes = "btn-outline") {
-                                attributes["onclick"] =
-                                    """
-                                    document.getElementById('disable-confirm').style.display='none';
-                                    document.getElementById('disable-btn-row').style.display='block';
-                                    """.trimIndent()
-                                +"Cancel"
+                            span(classes = "badge badge--active") {
+                                span(classes = "badge__dot") {}
+                                +"Active"
+                            }
+                        }
+                        div(classes = "portal-section__body") {
+                            p { +"Two-factor authentication is protecting your account." }
+                            p {
+                                style = "margin-top:6px"
+                                +"When you sign in you'll be asked for a 6-digit code from your authenticator app."
+                            }
+                            p(classes = "form-hint") {
+                                style = "margin-top:8px"
+                                +(
+                                    "Recovery codes were displayed once when you set up two-factor authentication. " +
+                                        "To generate new codes, remove and re-enable two-factor authentication."
+                                )
+                            }
+
+                            div(classes = "divider") {}
+
+                            div {
+                                id = "disable-btn-row"
+                                button(classes = "btn btn--danger") {
+                                    attributes["onclick"] =
+                                        """
+                                        document.getElementById('disable-confirm').style.display='block';
+                                        document.getElementById('disable-btn-row').style.display='none';
+                                        """.trimIndent()
+                                    +"Remove authenticator"
+                                }
+                            }
+                            div {
+                                id = "disable-confirm"
+                                style = "display:none"
+                                div(classes = "alert-warning") {
+                                    +(
+                                        "This will remove your authenticator app and disable two-factor authentication. " +
+                                            "Your account will only be protected by your password."
+                                    )
+                                }
+                                div(classes = "mfa-action-row") {
+                                    button(classes = "btn btn--danger") {
+                                        id = "disable-btn"
+                                        attributes["onclick"] = "disableMfa('$slug')"
+                                        +"Yes, remove authenticator"
+                                    }
+                                    button(classes = "btn btn--ghost") {
+                                        attributes["onclick"] =
+                                            """
+                                            document.getElementById('disable-confirm').style.display='none';
+                                            document.getElementById('disable-btn-row').style.display='block';
+                                            """.trimIndent()
+                                        +"Cancel"
+                                    }
+                                }
                             }
                         }
                     }
                 } else {
-                    // ── Setup state ───────────────────────────────────────────────
-                    div(classes = "mfa-status-row") {
-                        span(classes = "mfa-badge inactive") { +"Not configured" }
-                        p { +"Add an extra layer of security to your account." }
-                    }
-
-                    // Step 1 — intro
-                    div {
-                        id = "mfa-step-1"
-                        p {
-                            +"You'll need an authenticator app such as "
-                            strong { +"Google Authenticator" }
-                            +", "
-                            strong { +"Authy" }
-                            +", or "
-                            strong { +"1Password" }
-                            +" to get started."
-                        }
-                        p(classes = "form-hint") {
-                            style = "margin-bottom: 20px;"
-                            +"Once enabled, you'll need your phone to sign in. Make sure you save the recovery codes somewhere safe."
-                        }
-                        button(classes = "btn") {
-                            id = "start-btn"
-                            attributes["onclick"] = "startEnrollment('$slug')"
-                            +"Set up authenticator"
-                        }
-                        div(classes = "alert alert-error") {
-                            id = "enroll-error"
-                            style = "display:none;margin-top:14px"
-                        }
-                    }
-
-                    // Step 2 — QR code + recovery codes + verification
-                    div {
-                        id = "mfa-step-2"
-                        style = "display:none"
-
-                        p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
-                        p(
-                            classes = "form-hint",
-                        ) { +"Open your authenticator app and scan the QR code below to add your account." }
-                        div(classes = "qr-container") { id = "qr-code" }
-                        p(classes = "form-hint") {
-                            +"Can't scan? Enter this key manually: "
-                            span(classes = "mfa-secret-key") { id = "setup-key" }
-                        }
-
-                        hr(classes = "portal-divider")
-
-                        p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
-                        p {
-                            +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
-                        }
-                        div(
-                            classes = "alert-warning",
-                        ) { +"Save these codes now — they won't be shown again after you leave this page." }
-                        div(classes = "recovery-codes-grid") { id = "recovery-codes" }
-                        button(classes = "btn-outline") {
-                            id = "copy-codes-btn"
-                            style = "margin-bottom: 4px;"
-                            attributes["onclick"] = "copyCodes()"
-                            +"Copy codes"
-                        }
-
-                        label(classes = "mfa-confirm-label") {
-                            input(type = InputType.checkBox) {
-                                id = "codes-saved"
-                                attributes["onchange"] =
-                                    "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                    div(classes = "portal-section") {
+                        div(classes = "portal-section__header") {
+                            div {
+                                div(classes = "portal-section__title") { +"Authenticator app" }
                             }
-                            +" I've saved my recovery codes in a safe place"
-                        }
-
-                        // Step 2b — verification (gated behind the checkbox)
-                        div {
-                            id = "mfa-step-2b"
-                            style = "display:none"
-                            hr(classes = "portal-divider")
-                            p(classes = "mfa-step-heading") { +"3. Verify your setup" }
-                            p {
-                                +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                            span(classes = "badge badge--warning") {
+                                span(classes = "badge__dot") {}
+                                +"Not configured"
                             }
-                            div("field") {
-                                label {
-                                    htmlFor = "totp-code"
-                                    +"Verification code"
+                        }
+                        div(classes = "portal-section__body") {
+                            div {
+                                id = "mfa-step-1"
+                                p {
+                                    +"You'll need an authenticator app such as "
+                                    strong { +"Google Authenticator" }
+                                    +", "
+                                    strong { +"Authy" }
+                                    +", or "
+                                    strong { +"1Password" }
+                                    +" to get started."
                                 }
-                                input(type = InputType.text, name = "code") {
-                                    id = "totp-code"
-                                    placeholder = "000000"
-                                    attributes["inputmode"] = "numeric"
-                                    attributes["pattern"] = "[0-9]*"
-                                    maxLength = "6"
-                                    attributes["autocomplete"] = "one-time-code"
+                                p(classes = "form-hint") {
+                                    style = "margin-bottom: 20px;"
+                                    +"Once enabled, you'll need your phone to sign in. Make sure you save the recovery codes somewhere safe."
+                                }
+                                button(classes = "btn btn--primary") {
+                                    id = "start-btn"
+                                    attributes["onclick"] = "startEnrollment('$slug')"
+                                    +"Set up authenticator"
+                                }
+                                div(classes = "alert alert-error") {
+                                    id = "enroll-error"
+                                    style = "display:none;margin-top:14px"
                                 }
                             }
-                            div(classes = "alert alert-error") {
-                                id = "verify-error"
+
+                            div {
+                                id = "mfa-step-2"
                                 style = "display:none"
-                            }
-                            button(classes = "btn") {
-                                id = "verify-btn"
-                                attributes["onclick"] = "verifyEnrollment('$slug')"
-                                +"Confirm setup"
+
+                                p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
+                                p(classes = "form-hint") {
+                                    +"Open your authenticator app and scan the QR code below to add your account."
+                                }
+                                div(classes = "qr-container") { id = "qr-code" }
+                                p(classes = "form-hint") {
+                                    +"Can't scan? Enter this key manually: "
+                                    span(classes = "mfa-secret-key") { id = "setup-key" }
+                                }
+
+                                div(classes = "divider") {}
+
+                                p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
+                                p {
+                                    +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
+                                }
+                                div(classes = "alert-warning") {
+                                    +"Save these codes now — they won't be shown again after you leave this page."
+                                }
+                                div(classes = "recovery-codes-grid") { id = "recovery-codes" }
+                                button(classes = "btn btn--ghost") {
+                                    id = "copy-codes-btn"
+                                    style = "margin-bottom: 4px;"
+                                    attributes["onclick"] = "copyCodes()"
+                                    +"Copy codes"
+                                }
+
+                                label(classes = "mfa-confirm-label") {
+                                    input(type = InputType.checkBox) {
+                                        id = "codes-saved"
+                                        attributes["onchange"] =
+                                            "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                                    }
+                                    +" I've saved my recovery codes in a safe place"
+                                }
+
+                                div {
+                                    id = "mfa-step-2b"
+                                    style = "display:none"
+                                    div(classes = "divider") {}
+                                    p(classes = "mfa-step-heading") { +"3. Verify your setup" }
+                                    p {
+                                        +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                                    }
+                                    div(classes = "edit-field") {
+                                        label(classes = "edit-field__label") {
+                                            htmlFor = "totp-code"
+                                            +"Verification code"
+                                        }
+                                        input(type = InputType.text, name = "code") {
+                                            classes = setOf("edit-field__input", "edit-field__input--mono")
+                                            id = "totp-code"
+                                            placeholder = "000000"
+                                            attributes["inputmode"] = "numeric"
+                                            attributes["pattern"] = "[0-9]*"
+                                            maxLength = "6"
+                                            attributes["autocomplete"] = "one-time-code"
+                                        }
+                                    }
+                                    div(classes = "alert alert-error") {
+                                        id = "verify-error"
+                                        style = "display:none"
+                                    }
+                                    button(classes = "btn btn--primary") {
+                                        id = "verify-btn"
+                                        attributes["onclick"] = "verifyEnrollment('$slug')"
+                                        +"Confirm setup"
+                                    }
+                                }
                             }
                         }
                     }

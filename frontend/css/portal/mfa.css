@@ -1,55 +1,10 @@
 /* frontend/css/portal/mfa.css
  *
- * MFA management page components — status badge, setup steps, QR container,
- * recovery codes grid, danger/outline buttons, and action helpers.
+ * MFA management page components — step headings, QR container,
+ * recovery codes grid, confirmation checkbox, action row, warning alert.
+ *
+ * Badge and buttons are now handled by portal/badge.css and portal/button.css.
  */
-
-/* ── MFA status badge ──────────────────────────────────────────────────── */
-.mfa-status-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.mfa-status-row p {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 14px;
-}
-
-.mfa-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.mfa-badge.active {
-  background: rgba(34, 197, 94, .12);
-  color: #4ade80;
-  border: 1px solid rgba(34, 197, 94, .25);
-}
-
-.mfa-badge.active::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #4ade80;
-}
-
-.mfa-badge.inactive {
-  background: rgba(148, 163, 184, .08);
-  color: var(--color-muted);
-  border: 1px solid var(--color-border);
-}
 
 /* ── Step headings ─────────────────────────────────────────────────────── */
 .mfa-step-heading {
@@ -64,20 +19,20 @@
   display: inline-block;
   padding: 12px;
   background: #ffffff;
-  border-radius: var(--radius);
-  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  border: 0.5px solid var(--color-border);
   margin: 12px 0 8px;
   line-height: 0;
 }
 
 /* ── Manual setup key ──────────────────────────────────────────────────── */
 .mfa-secret-key {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   background: var(--color-input);
-  border: 1px solid var(--color-border);
+  border: 0.5px solid var(--color-border-md);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 3px;
   letter-spacing: .08em;
   color: var(--color-text);
   word-break: break-all;
@@ -94,11 +49,11 @@
 }
 
 .recovery-code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   background: var(--color-input);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: 4px;
   padding: 8px 6px;
   text-align: center;
   color: var(--color-text);
@@ -135,62 +90,11 @@
 
 /* ── Warning alert ─────────────────────────────────────────────────────── */
 .alert-warning {
-  background: rgba(234, 179, 8, .08);
-  border: 1px solid rgba(234, 179, 8, .25);
-  color: #fbbf24;
+  background: var(--color-amber-bg);
+  border: 0.5px solid var(--color-amber-border);
+  color: var(--color-amber);
   padding: 10px 14px;
-  border-radius: var(--radius);
+  border-radius: 4px;
   font-size: 13px;
   margin: 12px 0 0;
 }
-
-/* ── Buttons ───────────────────────────────────────────────────────────── */
-.btn-danger {
-  background: #dc2626;
-  color: #fff;
-  border: none;
-  padding: 0.65rem 1.25rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 500;
-  transition: background .15s;
-}
-
-.btn-danger:hover { background: #b91c1c; }
-.btn-danger:disabled { opacity: .55; cursor: not-allowed; }
-
-.btn-danger-outline {
-  background: transparent;
-  color: #f87171;
-  border: 1px solid rgba(220, 38, 38, .6);
-  padding: 0.65rem 1.25rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 500;
-  transition: background .15s;
-}
-
-.btn-danger-outline:hover { background: rgba(220, 38, 38, .08); }
-
-.btn-outline {
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  padding: 0.65rem 1.25rem;
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 500;
-  transition: background .15s;
-}
-
-.btn-outline:hover { background: var(--color-input); }
-.btn-outline:disabled { opacity: .55; cursor: not-allowed; }
-
-/* ── Secondary spacing helper ──────────────────────────────────────────── */
-.mfa-hint-row { margin-top: 6px; }
