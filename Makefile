@@ -11,7 +11,7 @@
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
 css: ## Compile both CSS bundles (admin + auth)
-	./gradlew compileCssAdmin compileCssAuth
+	./gradlew compileCssAdmin compileCssAuth compileCssPortalSidenav compileCssPortalTabnav
 
 css-admin: ## Compile the admin console CSS bundle only
 	./gradlew compileCssAdmin
@@ -19,6 +19,8 @@ css-admin: ## Compile the admin console CSS bundle only
 css-auth: ## Compile the auth pages CSS bundle only
 	./gradlew compileCssAuth
 
+css-portal: ## Compile the portal CSS bundles (sidenav + tabnav)
+	./gradlew compileCssPortalSidenav compileCssPortalTabnav
 # ── Kotlin ────────────────────────────────────────────────────────────────────
 
 version: ## Generate version.properties resource (required before running from IDE)

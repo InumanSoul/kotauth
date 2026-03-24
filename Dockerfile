@@ -1,7 +1,7 @@
 # ── Stage 1: CSS compilation ──────────────────────────────────────────────
 # Uses Node.js only to install lightningcss-cli (an npm package that ships
 # a native Rust binary). Node is not present in the runtime image.
-# Output: kotauth-admin.css and kotauth-auth.css written to /build/
+# Output: four CSS bundles written to /build/
 FROM node:20-slim AS css-build
 
 WORKDIR /build
@@ -10,7 +10,7 @@ WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
-# Copy CSS source and compile both bundles
+# Copy CSS source and compile all bundles
 COPY frontend/css ./css
 
 # Admin console bundle (fixed dark theme — tokens.css provides all defaults)
@@ -29,6 +29,22 @@ RUN ./node_modules/.bin/lightningcss \
       css/index-auth.css \
       -o /build/kotauth-auth.css
 
+# Portal sidebar layout bundle
+RUN ./node_modules/.bin/lightningcss \
+      --bundle \
+      --minify \
+      --targets '>= 0.5%' \
+      css/index-portal-sidenav.css \
+      -o /build/kotauth-portal-sidenav.css
+
+# Portal centered/tab layout bundle
+RUN ./node_modules/.bin/lightningcss \
+      --bundle \
+      --minify \
+      --targets '>= 0.5%' \
+      css/index-portal-tabnav.css \
+      -o /build/kotauth-portal-tabnav.css
+
 
 # ── Stage 2: Kotlin / Gradle build ────────────────────────────────────────
 FROM gradle:8-jdk17 AS kotlin-build
@@ -37,12 +53,19 @@ WORKDIR /home/gradle/src
 COPY --chown=gradle:gradle . .
 
 # Inject the compiled CSS bundles so Gradle embeds them in the JAR.
-# The installCssDeps / compileCssAdmin / compileCssAuth tasks are skipped
-# because the output files are already present from Stage 1.
-COPY --from=css-build /build/kotauth-admin.css src/main/resources/static/kotauth-admin.css
-COPY --from=css-build /build/kotauth-auth.css  src/main/resources/static/kotauth-auth.css
+# All CSS tasks are skipped because the output files are already present from Stage 1.
+COPY --from=css-build /build/kotauth-admin.css          src/main/resources/static/kotauth-admin.css
+COPY --from=css-build /build/kotauth-auth.css           src/main/resources/static/kotauth-auth.css
+COPY --from=css-build /build/kotauth-portal-sidenav.css src/main/resources/static/kotauth-portal-sidenav.css
+COPY --from=css-build /build/kotauth-portal-tabnav.css  src/main/resources/static/kotauth-portal-tabnav.css
 
-RUN gradle buildFatJar -x installCssDeps -x compileCssAdmin -x compileCssAuth --no-daemon
+RUN gradle buildFatJar \
+      -x installCssDeps \
+      -x compileCssAdmin \
+      -x compileCssAuth \
+      -x compileCssPortalSidenav \
+      -x compileCssPortalTabnav \
+      --no-daemon
 
 
 # ── Stage 3: Runtime ───────────────────────────────────────────────────────

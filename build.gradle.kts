@@ -154,6 +154,52 @@ val compileCssAuth =
         outputs.file("src/main/resources/static/kotauth-auth.css")
     }
 
+// Step 2c: compile portal-sidenav bundle
+val compileCssPortalSidenav =
+    tasks.register<Exec>("compileCssPortalSidenav") {
+        description =
+            "Compiles the portal sidebar CSS bundle (frontend/css/index-portal-sidenav.css → kotauth-portal-sidenav.css)"
+        group = "build"
+        dependsOn(installCssDeps)
+
+        commandLine(
+            lightningCssBin,
+            "--bundle",
+            "--minify",
+            "--targets",
+            ">= 0.5%",
+            "frontend/css/index-portal-sidenav.css",
+            "-o",
+            "src/main/resources/static/kotauth-portal-sidenav.css",
+        )
+
+        inputs.dir("frontend/css")
+        outputs.file("src/main/resources/static/kotauth-portal-sidenav.css")
+    }
+
+// Step 2d: compile portal-tabnav bundle
+val compileCssPortalTabnav =
+    tasks.register<Exec>("compileCssPortalTabnav") {
+        description =
+            "Compiles the portal centered-tabs CSS bundle (frontend/css/index-portal-tabnav.css → kotauth-portal-tabnav.css)"
+        group = "build"
+        dependsOn(installCssDeps)
+
+        commandLine(
+            lightningCssBin,
+            "--bundle",
+            "--minify",
+            "--targets",
+            ">= 0.5%",
+            "frontend/css/index-portal-tabnav.css",
+            "-o",
+            "src/main/resources/static/kotauth-portal-tabnav.css",
+        )
+
+        inputs.dir("frontend/css")
+        outputs.file("src/main/resources/static/kotauth-portal-tabnav.css")
+    }
+
 // ── Version properties ────────────────────────────────────────────────────
 // Generates src/main/resources/version.properties so the running application
 // can report its own version without parsing build files at runtime.
@@ -178,9 +224,15 @@ val generateVersionProperties =
         }
     }
 
-// Both CSS bundles and version properties must be ready before resources are packaged into the JAR
+// All CSS bundles and version properties must be ready before resources are packaged into the JAR
 tasks.named("processResources") {
-    dependsOn(compileCssAdmin, compileCssAuth, generateVersionProperties)
+    dependsOn(
+        compileCssAdmin,
+        compileCssAuth,
+        compileCssPortalSidenav,
+        compileCssPortalTabnav,
+        generateVersionProperties,
+    )
 }
 
 ktlint {
