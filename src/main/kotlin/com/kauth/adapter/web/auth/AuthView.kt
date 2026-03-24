@@ -46,10 +46,15 @@ object AuthView {
             }
         }
 
-        // 1. Inject theme variables first — base CSS reads from these
+        // 1. Google Fonts for the tenant's chosen font family
+        link(rel = "preconnect", href = "https://fonts.googleapis.com")
+        link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
+        link(rel = "stylesheet", href = theme.googleFontsUrl)
+
+        // 2. Inject theme variables — base CSS reads from these
         style { unsafe { +theme.toCssVars() } }
 
-        // 2. Base stylesheet that uses var(--token) exclusively
+        // 3. Base stylesheet that uses var(--token) exclusively
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
     }
 

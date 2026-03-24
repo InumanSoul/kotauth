@@ -19,12 +19,13 @@ data class TenantTheme(
     val accentHoverColor: String = "#0AAEE8",
     val accentForeground: String = "#05080a",
     val bgDeep: String = "#0C0C0E",
-    val bgCard: String = "#1E1E24",
+    val surface: String = "#1E1E24",
     val bgInput: String = "#2A2A32",
     val borderColor: String = "#2E2E36",
     val borderRadius: String = "8px",
     val textPrimary: String = "#EDEDEF",
     val textMuted: String = "#6B6B75",
+    val fontFamily: String = "Inter",
     val logoUrl: String? = null,
     val faviconUrl: String? = null,
 ) {
@@ -44,13 +45,20 @@ data class TenantTheme(
             appendLine("  --color-accent-hover: $accentHoverColor;")
             appendLine("  --color-accent-fg:    $accentForeground;")
             appendLine("  --color-bg:           $bgDeep;")
-            appendLine("  --color-card:         $bgCard;")
+            appendLine("  --color-surface:      $surface;")
             appendLine("  --color-input:        $bgInput;")
             appendLine("  --color-border:       $borderColor;")
             appendLine("  --color-text:         $textPrimary;")
             appendLine("  --color-muted:        $textMuted;")
             appendLine("  --radius:             $borderRadius;")
+            appendLine("  --font-sans:          '$fontFamily', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;")
             append("}")
+        }
+
+    val googleFontsUrl: String
+        get() {
+            val family = fontFamily.replace(" ", "+")
+            return "https://fonts.googleapis.com/css2?family=$family:wght@400;500;600&display=swap"
         }
 
     companion object {
@@ -61,7 +69,7 @@ data class TenantTheme(
                 accentHoverColor = "#0AAEE8",
                 accentForeground = "#05080a",
                 bgDeep = "#0C0C0E",
-                bgCard = "#1E1E24",
+                surface = "#1E1E24",
                 bgInput = "#2A2A32",
                 borderColor = "#2E2E36",
                 borderRadius = "8px",
@@ -76,7 +84,7 @@ data class TenantTheme(
                 accentHoverColor = "#085FA3",
                 accentForeground = "#FFFFFF",
                 bgDeep = "#F4F5F7",
-                bgCard = "#FFFFFF",
+                surface = "#FFFFFF",
                 bgInput = "#F0F1F3",
                 borderColor = "#E0E1E4",
                 borderRadius = "8px",
@@ -91,7 +99,7 @@ data class TenantTheme(
                 accentHoverColor = "#333336",
                 accentForeground = "#FFFFFF",
                 bgDeep = "#FFFFFF",
-                bgCard = "#FAFAFA",
+                surface = "#FAFAFA",
                 bgInput = "#F4F4F6",
                 borderColor = "#DDDDE0",
                 borderRadius = "0px",

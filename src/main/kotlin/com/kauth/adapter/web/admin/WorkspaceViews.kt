@@ -933,7 +933,7 @@ internal fun brandingPageImpl(
                                 colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
                                 colorField("Accent Text", "accent-fg", "themeAccentForeground", t.accentForeground)
                                 colorField("Page Background", "page-bg", "themeBgDeep", t.bgDeep)
-                                colorField("Card Background", "card-bg", "themeBgCard", t.bgCard)
+                                colorField("Surface", "surface", "themeSurface", t.surface)
                                 colorField("Input Background", "input-bg", "themeBgInput", t.bgInput)
                                 colorField("Border", "border", "themeBorderColor", t.borderColor)
                                 colorField("Text Primary", "text", "themeTextPrimary", t.textPrimary)
@@ -966,6 +966,29 @@ internal fun brandingPageImpl(
                                 attributes["data-radius-input"] = ""
                             }
                         }
+
+                        // ── Font Family ───────────────────────────
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Font Family" }
+                            val fontOptions = listOf(
+                                "Inter",
+                                "Montserrat",
+                                "IBM Plex Sans",
+                                "DM Sans",
+                                "Source Sans 3",
+                            )
+                            select {
+                                name = "themeFontFamily"
+                                classes = setOf("edit-row__field")
+                                for (f in fontOptions) {
+                                    option {
+                                        value = f
+                                        if (t.fontFamily == f) selected = true
+                                        +f
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // ══════════════════════════════════════════════
@@ -984,7 +1007,7 @@ internal fun brandingPageImpl(
                                 div("auth-mock") {
                                     div("auth-mock__card") {
                                         id = "preview-card"
-                                        style = "--pm-accent:${t.accentColor};--pm-card:${t.bgCard};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"
+                                        style = "--pm-accent:${t.accentColor};--pm-accent-fg:${t.accentForeground};--pm-card:${t.surface};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"
 
                                         div("auth-mock__logo-area") {
                                             div("auth-mock__logo-placeholder") {
@@ -1006,7 +1029,7 @@ internal fun brandingPageImpl(
                                         }
                                         div("auth-mock__btn") {
                                             id = "preview-btn"
-                                            style = "background:${t.accentColor};border-radius:${t.borderRadius};"
+                                            style = "background:${t.accentColor};color:${t.accentForeground};border-radius:${t.borderRadius};"
                                             +"Sign in"
                                         }
                                         div("auth-mock__footer") {

@@ -42,7 +42,8 @@ class PostgresThemeRepository : ThemeRepository {
                     it[accentHover] = theme.accentHoverColor
                     it[accentForeground] = theme.accentForeground
                     it[bgDeep] = theme.bgDeep
-                    it[bgCard] = theme.bgCard
+                    it[surface] = theme.surface
+                    it[fontFamily] = theme.fontFamily
                     it[bgInput] = theme.bgInput
                     it[borderColor] = theme.borderColor
                     it[borderRadius] = theme.borderRadius
@@ -59,7 +60,8 @@ class PostgresThemeRepository : ThemeRepository {
                     it[accentHover] = theme.accentHoverColor
                     it[accentForeground] = theme.accentForeground
                     it[bgDeep] = theme.bgDeep
-                    it[bgCard] = theme.bgCard
+                    it[surface] = theme.surface
+                    it[fontFamily] = theme.fontFamily
                     it[bgInput] = theme.bgInput
                     it[borderColor] = theme.borderColor
                     it[borderRadius] = theme.borderRadius
@@ -80,7 +82,8 @@ class PostgresThemeRepository : ThemeRepository {
             accentHoverColor = this[WorkspaceThemeTable.accentHover],
             accentForeground = this[WorkspaceThemeTable.accentForeground],
             bgDeep = this[WorkspaceThemeTable.bgDeep],
-            bgCard = this[WorkspaceThemeTable.bgCard],
+            surface = this[WorkspaceThemeTable.surface],
+            fontFamily = this[WorkspaceThemeTable.fontFamily],
             bgInput = this[WorkspaceThemeTable.bgInput],
             borderColor = this[WorkspaceThemeTable.borderColor],
             borderRadius = this[WorkspaceThemeTable.borderRadius],

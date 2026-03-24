@@ -2,7 +2,40 @@
  *
  * Reset auth page body centering for portal layout.
  * Portal pages use their own shell layout instead of the auth centered card.
+ *
+ * Derived tokens: CSS-only defaults that build on the tenant-injected :root
+ * tokens (--color-accent, --color-border, etc.) without adding DB columns.
  */
+
+:root {
+  /* Borders — opacity variants for different emphasis levels */
+  --color-border-md: color-mix(in srgb, var(--color-text) 11%, transparent);
+  --color-border-em: color-mix(in srgb, var(--color-text) 18%, transparent);
+  --color-row-hover: color-mix(in srgb, var(--color-text) 3%, transparent);
+  --color-subtle: color-mix(in srgb, var(--color-muted) 60%, transparent);
+
+  /* Accent-derived */
+  --color-accent-bg: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  --color-accent-border: color-mix(in srgb, var(--color-accent) 22%, transparent);
+
+  /* Semantic: success */
+  --color-green: #4ade80;
+  --color-green-bg: rgba(74, 222, 128, 0.09);
+  --color-green-border: rgba(74, 222, 128, 0.22);
+
+  /* Semantic: danger */
+  --color-red: #f87171;
+  --color-red-bg: rgba(248, 113, 113, 0.09);
+  --color-red-border: rgba(248, 113, 113, 0.22);
+
+  /* Semantic: warning */
+  --color-amber: #fbbf24;
+  --color-amber-bg: rgba(251, 191, 36, 0.09);
+  --color-amber-border: rgba(251, 191, 36, 0.22);
+
+  /* Monospace fallback */
+  --font-mono: 'Inconsolata', 'SF Mono', 'Fira Code', monospace;
+}
 
 body {
   display: block;
@@ -10,6 +43,6 @@ body {
   min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans, 'Inter'), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 14px;
 }

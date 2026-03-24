@@ -739,7 +739,9 @@ object PortalView {
                     "16x16"
             }
         }
-        // Theme vars first — stylesheet reads from these
+        link(rel = "preconnect", href = "https://fonts.googleapis.com")
+        link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
+        link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
     }
@@ -767,6 +769,9 @@ object PortalView {
                 attributes["sizes"] = "16x16"
             }
         }
+        link(rel = "preconnect", href = "https://fonts.googleapis.com")
+        link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
+        link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
         val cssBundle = when (layout) {
             PortalLayout.SIDEBAR -> "/static/kotauth-portal-sidenav.css"
