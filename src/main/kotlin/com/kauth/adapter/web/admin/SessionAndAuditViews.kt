@@ -60,8 +60,8 @@ internal fun activeSessionsPageImpl(
                             sessions.forEach { s ->
                                 tr {
                                     td { span("data-table__id") { +"#${s.id?.value}" } }
-                                    td { +(s.userId?.toString() ?: "M2M") }
-                                    td { +(s.clientId?.toString() ?: "—") }
+                                    td { +(s.userId?.value?.toString() ?: "M2M") }
+                                    td { +(s.clientId?.value?.toString() ?: "—") }
                                     td { span("data-table__email") { +(s.ipAddress ?: "—") } }
                                     td { +s.createdAt.toDisplayString() }
                                     td { +s.expiresAt.toDisplayString() }
@@ -189,8 +189,8 @@ internal fun auditLogPageImpl(
                                     tr {
                                         td { +e.createdAt.toDisplayString() }
                                         td { span("data-table__id") { +e.eventType.name } }
-                                        td { +(e.userId?.toString() ?: "—") }
-                                        td { +(e.clientId?.toString() ?: "—") }
+                                        td { +(e.userId?.value?.toString() ?: "—") }
+                                        td { +(e.clientId?.value?.toString() ?: "—") }
                                         td {
                                             span("data-table__email") { +(e.ipAddress ?: "—") }
                                         }
