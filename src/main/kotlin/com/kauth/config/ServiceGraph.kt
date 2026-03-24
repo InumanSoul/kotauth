@@ -5,6 +5,7 @@ import com.kauth.adapter.persistence.PostgresApiKeyRepository
 import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresPortalConfigRepository
+import com.kauth.adapter.persistence.PostgresThemeRepository
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
@@ -33,6 +34,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
@@ -76,6 +78,7 @@ data class ServiceGraph(
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
     val portalConfigRepository: PortalConfigRepository,
+    val themeRepository: ThemeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
     val loginRateLimiter: RateLimiterPort,
@@ -106,6 +109,7 @@ data class ServiceGraph(
                 PostgresIdentityProviderRepository(encryptionService)
             val socialAccountRepository = PostgresSocialAccountRepository()
             val portalConfigRepository = PostgresPortalConfigRepository()
+            val themeRepository = PostgresThemeRepository()
             val apiKeyRepository = PostgresApiKeyRepository()
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
@@ -187,6 +191,7 @@ data class ServiceGraph(
                     sessionRepository = sessionRepository,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                    themeRepository = themeRepository,
                 )
             val roleGroupService =
                 RoleGroupService(
@@ -240,6 +245,7 @@ data class ServiceGraph(
                     roleRepository = roleRepository,
                     auditLog = auditLogAdapter,
                     webhookEndpointRepository = webhookEndpointRepository,
+                    themeRepository = themeRepository,
                     baseUrl = config.baseUrl,
                 ).seedIfEmpty()
             }
@@ -299,6 +305,7 @@ data class ServiceGraph(
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
                 portalConfigRepository = portalConfigRepository,
+                themeRepository = themeRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
                 loginRateLimiter = loginLimiter,

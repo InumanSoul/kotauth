@@ -15,6 +15,7 @@ import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
 import java.security.SecureRandom
 import java.util.Base64
@@ -38,6 +39,7 @@ class AdminService(
     private val sessionRepository: SessionRepository,
     private val selfServiceService: UserSelfServiceService,
     private val passwordPolicy: PasswordPolicyPort? = null,
+    private val themeRepository: ThemeRepository? = null,
 ) {
     // =========================================================================
     // Workspace settings
@@ -63,17 +65,6 @@ class AdminService(
         passwordPolicyMaxAgeDays: Int = 0,
         passwordPolicyBlacklistEnabled: Boolean = false,
         mfaPolicy: String = "optional",
-        themeAccentColor: String,
-        themeAccentHover: String,
-        themeBgDeep: String,
-        themeBgCard: String,
-        themeBgInput: String,
-        themeBorderColor: String,
-        themeBorderRadius: String,
-        themeTextPrimary: String,
-        themeTextMuted: String,
-        themeLogoUrl: String?,
-        themeFaviconUrl: String?,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -113,20 +104,6 @@ class AdminService(
                 passwordPolicyMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
                 passwordPolicyBlacklistEnabled = passwordPolicyBlacklistEnabled,
                 mfaPolicy = mfaPolicy,
-                theme =
-                    TenantTheme(
-                        accentColor = themeAccentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
-                        accentHoverColor = themeAccentHover.trim().ifBlank { TenantTheme.DEFAULT.accentHoverColor },
-                        bgDeep = themeBgDeep.trim().ifBlank { TenantTheme.DEFAULT.bgDeep },
-                        bgCard = themeBgCard.trim().ifBlank { TenantTheme.DEFAULT.bgCard },
-                        bgInput = themeBgInput.trim().ifBlank { TenantTheme.DEFAULT.bgInput },
-                        borderColor = themeBorderColor.trim().ifBlank { TenantTheme.DEFAULT.borderColor },
-                        borderRadius = themeBorderRadius.trim().ifBlank { TenantTheme.DEFAULT.borderRadius },
-                        textPrimary = themeTextPrimary.trim().ifBlank { TenantTheme.DEFAULT.textPrimary },
-                        textMuted = themeTextMuted.trim().ifBlank { TenantTheme.DEFAULT.textMuted },
-                        logoUrl = themeLogoUrl?.trim()?.takeIf { it.isNotBlank() },
-                        faviconUrl = themeFaviconUrl?.trim()?.takeIf { it.isNotBlank() },
-                    ),
             )
 
         val saved = tenantRepository.update(updated)
@@ -140,6 +117,53 @@ class AdminService(
                 ipAddress = null,
                 userAgent = null,
                 details = mapOf("slug" to slug, "displayName" to displayName),
+            ),
+        )
+
+        return AdminResult.Success(saved)
+    }
+
+    /**
+     * Updates the visual theme for a workspace. Persisted to workspace_theme table.
+     */
+    fun updateTheme(
+        slug: String,
+        theme: TenantTheme,
+    ): AdminResult<TenantTheme> {
+        val repo =
+            themeRepository
+                ?: return AdminResult.Failure(AdminError.Validation("Theme repository not configured."))
+        val tenant =
+            tenantRepository.findBySlug(slug)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+
+        val sanitized =
+            TenantTheme(
+                accentColor = theme.accentColor.trim().ifBlank { TenantTheme.DEFAULT.accentColor },
+                accentHoverColor = theme.accentHoverColor.trim().ifBlank { TenantTheme.DEFAULT.accentHoverColor },
+                accentForeground = theme.accentForeground.trim().ifBlank { TenantTheme.DEFAULT.accentForeground },
+                bgDeep = theme.bgDeep.trim().ifBlank { TenantTheme.DEFAULT.bgDeep },
+                bgCard = theme.bgCard.trim().ifBlank { TenantTheme.DEFAULT.bgCard },
+                bgInput = theme.bgInput.trim().ifBlank { TenantTheme.DEFAULT.bgInput },
+                borderColor = theme.borderColor.trim().ifBlank { TenantTheme.DEFAULT.borderColor },
+                borderRadius = theme.borderRadius.trim().ifBlank { TenantTheme.DEFAULT.borderRadius },
+                textPrimary = theme.textPrimary.trim().ifBlank { TenantTheme.DEFAULT.textPrimary },
+                textMuted = theme.textMuted.trim().ifBlank { TenantTheme.DEFAULT.textMuted },
+                logoUrl = theme.logoUrl?.trim()?.takeIf { it.isNotBlank() },
+                faviconUrl = theme.faviconUrl?.trim()?.takeIf { it.isNotBlank() },
+            )
+
+        val saved = repo.upsert(tenant.id, sanitized)
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_TENANT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "action" to "theme_updated"),
             ),
         )
 

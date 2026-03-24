@@ -3,8 +3,11 @@ package com.kauth.adapter.persistence
 import org.jetbrains.exposed.sql.Table
 
 /**
- * Exposed ORM mapping for the 'tenants' table (V1 + V3 + V9 migrations).
+ * Exposed ORM mapping for the 'tenants' table (V1 + V9 + V23 migrations).
  * Schema is Flyway-owned — no uniqueIndex() or constraint declarations here.
+ *
+ * Theme columns were extracted to workspace_theme (V23).
+ * Portal config lives in workspace_portal_config (V22).
  */
 object TenantsTable : Table("tenants") {
     val id = integer("id").autoIncrement()
@@ -23,20 +26,6 @@ object TenantsTable : Table("tenants") {
     val passwordPolicyRequireUppercase = bool("password_policy_require_uppercase").default(false)
     val passwordPolicyRequireNumber = bool("password_policy_require_number").default(false)
     val passwordPolicyBlacklistEnabled = bool("password_policy_blacklist_enabled").default(false)
-
-    // Theme columns — added by V3 migration, defaults match TenantTheme.DEFAULT
-    // Zinc-dark palette with brand cyan accent (#1FBCFF) — updated from legacy purple
-    val themeAccentColor = varchar("theme_accent_color", 30).default("#1FBCFF")
-    val themeAccentHover = varchar("theme_accent_hover", 30).default("#0ea5d9")
-    val themeBgDeep = varchar("theme_bg_deep", 30).default("#09090b")
-    val themeBgCard = varchar("theme_bg_card", 30).default("#18181b")
-    val themeBgInput = varchar("theme_bg_input", 30).default("#27272a")
-    val themeBorderColor = varchar("theme_border_color", 30).default("#3f3f46")
-    val themeBorderRadius = varchar("theme_border_radius", 20).default("8px")
-    val themeTextPrimary = varchar("theme_text_primary", 30).default("#fafafa")
-    val themeTextMuted = varchar("theme_text_muted", 30).default("#a1a1aa")
-    val themeLogoUrl = varchar("theme_logo_url", 500).nullable()
-    val themeFaviconUrl = varchar("theme_favicon_url", 500).nullable()
 
     // SMTP columns
     // smtp_password stores AES-256-GCM encrypted ciphertext (see EncryptionService)

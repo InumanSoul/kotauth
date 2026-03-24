@@ -2,6 +2,7 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TenantRepository
@@ -71,17 +72,6 @@ fun Route.adminSettingsRoutes(
                     passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
                     passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
                     mfaPolicy = workspace.mfaPolicy,
-                    themeAccentColor = workspace.theme.accentColor,
-                    themeAccentHover = workspace.theme.accentHoverColor,
-                    themeBgDeep = workspace.theme.bgDeep,
-                    themeBgCard = workspace.theme.bgCard,
-                    themeBgInput = workspace.theme.bgInput,
-                    themeBorderColor = workspace.theme.borderColor,
-                    themeBorderRadius = workspace.theme.borderRadius,
-                    themeTextPrimary = workspace.theme.textPrimary,
-                    themeTextMuted = workspace.theme.textMuted,
-                    themeLogoUrl = workspace.theme.logoUrl,
-                    themeFaviconUrl = workspace.theme.faviconUrl,
                 )
         ) {
             is AdminResult.Success ->
@@ -319,17 +309,6 @@ fun Route.adminSettingsRoutes(
                     passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
                     passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
                     mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
-                    themeAccentColor = workspace.theme.accentColor,
-                    themeAccentHover = workspace.theme.accentHoverColor,
-                    themeBgDeep = workspace.theme.bgDeep,
-                    themeBgCard = workspace.theme.bgCard,
-                    themeBgInput = workspace.theme.bgInput,
-                    themeBorderColor = workspace.theme.borderColor,
-                    themeBorderRadius = workspace.theme.borderRadius,
-                    themeTextPrimary = workspace.theme.textPrimary,
-                    themeTextMuted = workspace.theme.textMuted,
-                    themeLogoUrl = workspace.theme.logoUrl,
-                    themeFaviconUrl = workspace.theme.faviconUrl,
                 )
         ) {
             is AdminResult.Success ->
@@ -372,58 +351,22 @@ fun Route.adminSettingsRoutes(
         val workspace =
             tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
         val params = call.receiveParameters()
-        when (
-            val result =
-                adminService.updateWorkspaceSettings(
-                    slug = slug,
-                    displayName = workspace.displayName,
-                    issuerUrl = workspace.issuerUrl,
-                    tokenExpirySeconds = workspace.tokenExpirySeconds,
-                    refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
-                    registrationEnabled = workspace.registrationEnabled,
-                    emailVerificationRequired = workspace.emailVerificationRequired,
-                    passwordPolicyMinLength = workspace.passwordPolicyMinLength,
-                    passwordPolicyRequireSpecial = workspace.passwordPolicyRequireSpecial,
-                    passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
-                    passwordPolicyRequireNumber = workspace.passwordPolicyRequireNumber,
-                    passwordPolicyHistoryCount = workspace.passwordPolicyHistoryCount,
-                    passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
-                    passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
-                    mfaPolicy = workspace.mfaPolicy,
-                    themeAccentColor =
-                        params["themeAccentColor"]?.trim()
-                            ?: workspace.theme.accentColor,
-                    themeAccentHover =
-                        params["themeAccentHover"]?.trim()
-                            ?: workspace.theme.accentHoverColor,
-                    themeBgDeep =
-                        params["themeBgDeep"]?.trim()
-                            ?: workspace.theme.bgDeep,
-                    themeBgCard =
-                        params["themeBgCard"]?.trim()
-                            ?: workspace.theme.bgCard,
-                    themeBgInput =
-                        params["themeBgInput"]?.trim()
-                            ?: workspace.theme.bgInput,
-                    themeBorderColor =
-                        params["themeBorderColor"]?.trim()
-                            ?: workspace.theme.borderColor,
-                    themeBorderRadius =
-                        params["themeBorderRadius"]?.trim()
-                            ?: workspace.theme.borderRadius,
-                    themeTextPrimary =
-                        params["themeTextPrimary"]?.trim()
-                            ?: workspace.theme.textPrimary,
-                    themeTextMuted =
-                        params["themeTextMuted"]?.trim()
-                            ?: workspace.theme.textMuted,
-                    themeLogoUrl =
-                        params["themeLogoUrl"]
-                            ?.trim()
-                            ?.takeIf { it.isNotBlank() },
-                    themeFaviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
-                )
-        ) {
+        val theme =
+            TenantTheme(
+                accentColor = params["themeAccentColor"]?.trim() ?: workspace.theme.accentColor,
+                accentHoverColor = params["themeAccentHover"]?.trim() ?: workspace.theme.accentHoverColor,
+                accentForeground = params["themeAccentForeground"]?.trim() ?: workspace.theme.accentForeground,
+                bgDeep = params["themeBgDeep"]?.trim() ?: workspace.theme.bgDeep,
+                bgCard = params["themeBgCard"]?.trim() ?: workspace.theme.bgCard,
+                bgInput = params["themeBgInput"]?.trim() ?: workspace.theme.bgInput,
+                borderColor = params["themeBorderColor"]?.trim() ?: workspace.theme.borderColor,
+                borderRadius = params["themeBorderRadius"]?.trim() ?: workspace.theme.borderRadius,
+                textPrimary = params["themeTextPrimary"]?.trim() ?: workspace.theme.textPrimary,
+                textMuted = params["themeTextMuted"]?.trim() ?: workspace.theme.textMuted,
+                logoUrl = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                faviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
+            )
+        when (val result = adminService.updateTheme(slug, theme)) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
             is AdminResult.Failure -> {

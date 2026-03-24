@@ -15,6 +15,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebhookEndpointRepository
 import com.kauth.domain.service.AdminResult
@@ -43,6 +44,7 @@ class DemoSeedService(
     private val roleRepository: RoleRepository,
     private val auditLog: AuditLogPort,
     private val webhookEndpointRepository: WebhookEndpointRepository,
+    private val themeRepository: ThemeRepository,
     private val baseUrl: String,
 ) {
     private val log = LoggerFactory.getLogger("com.kauth.demo")
@@ -83,10 +85,10 @@ class DemoSeedService(
 
     private fun seedAcmeWorkspace(passwordHash: String): SeedResult {
         val tenant = tenantRepository.create("acme", "Acme Corp")
+        themeRepository.upsert(tenant.id, TenantTheme.DEFAULT)
         val updated =
             tenantRepository.update(
                 tenant.copy(
-                    theme = TenantTheme.DEFAULT,
                     registrationEnabled = true,
                     emailVerificationRequired = false,
                     passwordPolicyMinLength = 8,
@@ -227,10 +229,10 @@ class DemoSeedService(
 
     private fun seedStartupLabsWorkspace(passwordHash: String): SeedResult {
         val tenant = tenantRepository.create("startup-labs", "Startup Labs")
+        themeRepository.upsert(tenant.id, TenantTheme.LIGHT)
         val updated =
             tenantRepository.update(
                 tenant.copy(
-                    theme = TenantTheme.LIGHT,
                     registrationEnabled = true,
                     emailVerificationRequired = false,
                     passwordPolicyMinLength = 6,

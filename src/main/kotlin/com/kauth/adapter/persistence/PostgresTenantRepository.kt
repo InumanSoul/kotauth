@@ -17,28 +17,37 @@ import org.jetbrains.exposed.sql.update
 /**
  * Persistence adapter — implements TenantRepository using PostgreSQL + Exposed.
  *
- * Tenant lookups are frequent (every auth request) and read-heavy.
- * A simple in-process cache keyed by slug would be a worthwhile optimisation
- * once traffic warrants it — the port interface makes that swap transparent.
+ * Reads compose the full [Tenant] aggregate via LEFT JOINs to workspace_theme
+ * and workspace_portal_config. Theme and portal config are separate tables but
+ * exposed as composed value objects on [Tenant] to keep all existing call sites
+ * working without changes.
+ *
+ * Writes only touch the tenants table — theme updates go through [ThemeRepository]
+ * and portal config through [PortalConfigRepository].
  *
  * SMTP password is encrypted/decrypted transparently using [EncryptionPort].
- * If encryption is unavailable (KAUTH_SECRET_KEY not set), the password field
- * is stored as null and SMTP config will not function.
  */
 class PostgresTenantRepository(
     private val encryptionService: EncryptionPort,
 ) : TenantRepository {
-    private val tenantWithPortalConfig =
-        TenantsTable.join(
-            WorkspacePortalConfigTable,
-            JoinType.LEFT,
-            onColumn = TenantsTable.id,
-            otherColumn = WorkspacePortalConfigTable.tenantId,
-        )
+    private val tenantJoined =
+        TenantsTable
+            .join(
+                WorkspaceThemeTable,
+                JoinType.LEFT,
+                onColumn = TenantsTable.id,
+                otherColumn = WorkspaceThemeTable.tenantId,
+            )
+            .join(
+                WorkspacePortalConfigTable,
+                JoinType.LEFT,
+                onColumn = TenantsTable.id,
+                otherColumn = WorkspacePortalConfigTable.tenantId,
+            )
 
     override fun findBySlug(slug: String): Tenant? =
         transaction {
-            tenantWithPortalConfig
+            tenantJoined
                 .selectAll()
                 .where { TenantsTable.slug eq slug }
                 .map { it.toTenant() }
@@ -55,7 +64,7 @@ class PostgresTenantRepository(
 
     override fun findAll(): List<Tenant> =
         transaction {
-            tenantWithPortalConfig
+            tenantJoined
                 .selectAll()
                 .orderBy(TenantsTable.id)
                 .map { it.toTenant() }
@@ -63,7 +72,7 @@ class PostgresTenantRepository(
 
     override fun findById(id: TenantId): Tenant? =
         transaction {
-            tenantWithPortalConfig
+            tenantJoined
                 .selectAll()
                 .where { TenantsTable.id eq id.value }
                 .map { it.toTenant() }
@@ -72,7 +81,6 @@ class PostgresTenantRepository(
 
     override fun update(tenant: Tenant): Tenant =
         transaction {
-            // Encrypt SMTP password before persistence (only if it changed / is set)
             val encryptedPassword: String? =
                 tenant.smtpPassword?.let { raw ->
                     if (encryptionService.isAvailable) encryptionService.encrypt(raw) else null
@@ -87,17 +95,6 @@ class PostgresTenantRepository(
                 it[emailVerificationRequired] = tenant.emailVerificationRequired
                 it[passwordPolicyMinLength] = tenant.passwordPolicyMinLength
                 it[passwordPolicyRequireSpecial] = tenant.passwordPolicyRequireSpecial
-                it[themeAccentColor] = tenant.theme.accentColor
-                it[themeAccentHover] = tenant.theme.accentHoverColor
-                it[themeBgDeep] = tenant.theme.bgDeep
-                it[themeBgCard] = tenant.theme.bgCard
-                it[themeBgInput] = tenant.theme.bgInput
-                it[themeBorderColor] = tenant.theme.borderColor
-                it[themeBorderRadius] = tenant.theme.borderRadius
-                it[themeTextPrimary] = tenant.theme.textPrimary
-                it[themeTextMuted] = tenant.theme.textMuted
-                it[themeLogoUrl] = tenant.theme.logoUrl
-                it[themeFaviconUrl] = tenant.theme.faviconUrl
                 it[smtpHost] = tenant.smtpHost
                 it[smtpPort] = tenant.smtpPort
                 it[smtpUsername] = tenant.smtpUsername
@@ -114,7 +111,7 @@ class PostgresTenantRepository(
                 it[passwordPolicyBlacklistEnabled] = tenant.passwordPolicyBlacklistEnabled
                 it[mfaPolicy] = tenant.mfaPolicy
             }
-            tenantWithPortalConfig
+            tenantJoined
                 .selectAll()
                 .where { TenantsTable.id eq tenant.id.value }
                 .single()
@@ -134,7 +131,7 @@ class PostgresTenantRepository(
                     it[TenantsTable.issuerUrl] = issuerUrl
                 } get TenantsTable.id
 
-            tenantWithPortalConfig
+            tenantJoined
                 .selectAll()
                 .where { TenantsTable.id eq insertedId }
                 .single()
@@ -142,7 +139,6 @@ class PostgresTenantRepository(
         }
 
     private fun ResultRow.toTenant(): Tenant {
-        // Decrypt SMTP password on read
         val encryptedPw = this[TenantsTable.smtpPassword]
         val decryptedPw = encryptedPw?.let { encryptionService.decrypt(it) }
 
@@ -162,20 +158,7 @@ class PostgresTenantRepository(
             passwordPolicyRequireUppercase = this[TenantsTable.passwordPolicyRequireUppercase],
             passwordPolicyRequireNumber = this[TenantsTable.passwordPolicyRequireNumber],
             passwordPolicyBlacklistEnabled = this[TenantsTable.passwordPolicyBlacklistEnabled],
-            theme =
-                TenantTheme(
-                    accentColor = this[TenantsTable.themeAccentColor],
-                    accentHoverColor = this[TenantsTable.themeAccentHover],
-                    bgDeep = this[TenantsTable.themeBgDeep],
-                    bgCard = this[TenantsTable.themeBgCard],
-                    bgInput = this[TenantsTable.themeBgInput],
-                    borderColor = this[TenantsTable.themeBorderColor],
-                    borderRadius = this[TenantsTable.themeBorderRadius],
-                    textPrimary = this[TenantsTable.themeTextPrimary],
-                    textMuted = this[TenantsTable.themeTextMuted],
-                    logoUrl = this[TenantsTable.themeLogoUrl],
-                    faviconUrl = this[TenantsTable.themeFaviconUrl],
-                ),
+            theme = toTheme(),
             smtpHost = this[TenantsTable.smtpHost],
             smtpPort = this[TenantsTable.smtpPort],
             smtpUsername = this[TenantsTable.smtpUsername],
@@ -187,6 +170,24 @@ class PostgresTenantRepository(
             mfaPolicy = this[TenantsTable.mfaPolicy],
             maxConcurrentSessions = this[TenantsTable.maxConcurrentSessions],
             portalConfig = toPortalConfig(),
+        )
+    }
+
+    private fun ResultRow.toTheme(): TenantTheme {
+        val accent = getOrNull(WorkspaceThemeTable.accentColor) ?: return TenantTheme.DEFAULT
+        return TenantTheme(
+            accentColor = accent,
+            accentHoverColor = this[WorkspaceThemeTable.accentHover],
+            accentForeground = this[WorkspaceThemeTable.accentForeground],
+            bgDeep = this[WorkspaceThemeTable.bgDeep],
+            bgCard = this[WorkspaceThemeTable.bgCard],
+            bgInput = this[WorkspaceThemeTable.bgInput],
+            borderColor = this[WorkspaceThemeTable.borderColor],
+            borderRadius = this[WorkspaceThemeTable.borderRadius],
+            textPrimary = this[WorkspaceThemeTable.textPrimary],
+            textMuted = this[WorkspaceThemeTable.textMuted],
+            logoUrl = this[WorkspaceThemeTable.logoUrl],
+            faviconUrl = this[WorkspaceThemeTable.faviconUrl],
         )
     }
 

@@ -17,6 +17,7 @@ package com.kauth.domain.model
 data class TenantTheme(
     val accentColor: String = "#1FBCFF",
     val accentHoverColor: String = "#0AAEE8",
+    val accentForeground: String = "#05080a",
     val bgDeep: String = "#0C0C0E",
     val bgCard: String = "#1E1E24",
     val bgInput: String = "#2A2A32",
@@ -41,6 +42,7 @@ data class TenantTheme(
             appendLine(":root {")
             appendLine("  --color-accent:       $accentColor;")
             appendLine("  --color-accent-hover: $accentHoverColor;")
+            appendLine("  --color-accent-fg:    $accentForeground;")
             appendLine("  --color-bg:           $bgDeep;")
             appendLine("  --color-card:         $bgCard;")
             appendLine("  --color-input:        $bgInput;")
@@ -57,6 +59,7 @@ data class TenantTheme(
             TenantTheme(
                 accentColor = "#1FBCFF",
                 accentHoverColor = "#0AAEE8",
+                accentForeground = "#05080a",
                 bgDeep = "#0C0C0E",
                 bgCard = "#1E1E24",
                 bgInput = "#2A2A32",
@@ -71,6 +74,7 @@ data class TenantTheme(
             TenantTheme(
                 accentColor = "#0A6EBD",
                 accentHoverColor = "#085FA3",
+                accentForeground = "#FFFFFF",
                 bgDeep = "#F4F5F7",
                 bgCard = "#FFFFFF",
                 bgInput = "#F0F1F3",
@@ -85,6 +89,7 @@ data class TenantTheme(
             TenantTheme(
                 accentColor = "#111114",
                 accentHoverColor = "#333336",
+                accentForeground = "#FFFFFF",
                 bgDeep = "#FFFFFF",
                 bgCard = "#FAFAFA",
                 bgInput = "#F4F4F6",
