@@ -122,10 +122,10 @@ object PortalView {
                     div(classes = "portal-section") {
                         div(classes = "profile-identity") {
                             div(classes = "profile-identity__avatar") {
-                                +(session.username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                                +(fullName.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
                             }
                             div(classes = "profile-identity__info") {
-                                div(classes = "profile-identity__name") { +session.username }
+                                div(classes = "profile-identity__name") { +fullName }
                                 div(classes = "profile-identity__username") { +"@${session.username}" }
                             }
                         }
@@ -349,54 +349,52 @@ object PortalView {
                                 p(classes = "portal-empty") { +"No active sessions found." }
                             }
                         } else {
-                            div { style = "padding: 0 18px 6px;"
-                                table(classes = "sessions-table") {
-                                    thead {
-                                        tr {
-                                            th { +"Device / IP" }
-                                            th { +"Started" }
-                                            th { +"Expires" }
-                                            th { +"" }
-                                        }
+                            table(classes = "sessions-table") {
+                                thead {
+                                    tr {
+                                        th { +"Device / IP" }
+                                        th { +"Started" }
+                                        th { +"Expires" }
+                                        th { +"" }
                                     }
-                                    tbody {
-                                        for (s in sessions) {
-                                            val isCurrent = currentSessionId != null && s.id?.value == currentSessionId
-                                            tr {
-                                                td {
-                                                    div(classes = "session-device-label") {
-                                                        +UserAgentParser.parse(s.userAgent)
-                                                        if (isCurrent) {
-                                                            span(classes = "session-current-pill") { +"Current" }
-                                                        }
-                                                    }
-                                                    span(classes = "session-ip") { +(s.ipAddress ?: "—") }
-                                                }
-                                                td {
-                                                    span(classes = "session-time") { +dtf.format(s.createdAt) }
-                                                }
-                                                td {
-                                                    span(classes = "session-time") { +dtf.format(s.expiresAt) }
-                                                }
-                                                td {
+                                }
+                                tbody {
+                                    for (s in sessions) {
+                                        val isCurrent = currentSessionId != null && s.id?.value == currentSessionId
+                                        tr {
+                                            td {
+                                                div(classes = "session-device-label") {
+                                                    +UserAgentParser.parse(s.userAgent)
                                                     if (isCurrent) {
+                                                        span(classes = "session-current-pill") { +"Current" }
+                                                    }
+                                                }
+                                                span(classes = "session-ip") { +(s.ipAddress ?: "—") }
+                                            }
+                                            td {
+                                                span(classes = "session-time") { +dtf.format(s.createdAt) }
+                                            }
+                                            td {
+                                                span(classes = "session-time") { +dtf.format(s.expiresAt) }
+                                            }
+                                            td {
+                                                if (isCurrent) {
+                                                    button(
+                                                        type = ButtonType.button,
+                                                        classes = "btn btn--danger btn--sm btn--disabled",
+                                                    ) {
+                                                        disabled = true
+                                                        +"Revoke"
+                                                    }
+                                                } else {
+                                                    form(
+                                                        action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
+                                                        method = FormMethod.post,
+                                                    ) {
                                                         button(
-                                                            type = ButtonType.button,
-                                                            classes = "btn btn--danger btn--sm btn--disabled",
-                                                        ) {
-                                                            disabled = true
-                                                            +"Revoke"
-                                                        }
-                                                    } else {
-                                                        form(
-                                                            action = "/t/$slug/account/sessions/${s.id?.value}/revoke",
-                                                            method = FormMethod.post,
-                                                        ) {
-                                                            button(
-                                                                type = ButtonType.submit,
-                                                                classes = "btn btn--danger btn--sm",
-                                                            ) { +"Revoke" }
-                                                        }
+                                                            type = ButtonType.submit,
+                                                            classes = "btn btn--danger btn--sm",
+                                                        ) { +"Revoke" }
                                                     }
                                                 }
                                             }
@@ -404,6 +402,7 @@ object PortalView {
                                     }
                                 }
                             }
+
                         }
                     }
                 }

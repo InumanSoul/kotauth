@@ -15,22 +15,20 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   text-align: left;
-  padding: 0 10px 10px;
+  padding: 10px;
   border-bottom: 0.5px solid var(--color-border);
 }
 
-.sessions-table th:first-child { padding-left: 0; }
-.sessions-table th:last-child  { text-align: right; padding-right: 0; }
+.sessions-table th:last-child  { text-align: right; }
 
 .sessions-table td {
-  padding: 11px 10px;
+  padding: 10px;
   vertical-align: middle;
   border-bottom: 0.5px solid var(--color-border);
 }
 
 .sessions-table tr:last-child td { border-bottom: none; }
-.sessions-table td:first-child { padding-left: 0; }
-.sessions-table td:last-child  { text-align: right; padding-right: 0; }
+.sessions-table td:last-child  { text-align: right; }
 
 /* ── Session row helpers ────────────────────────────────────────────────── */
 
@@ -50,7 +48,7 @@
   background: var(--color-accent-bg);
   border: 0.5px solid var(--color-accent-border);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   letter-spacing: 0.03em;
 }
 

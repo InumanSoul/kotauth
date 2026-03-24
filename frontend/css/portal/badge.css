@@ -13,7 +13,7 @@
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.03em;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   border: 0.5px solid transparent;
 }
 

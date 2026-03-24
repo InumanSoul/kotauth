@@ -33,6 +33,9 @@
   --color-amber-bg: rgba(251, 191, 36, 0.09);
   --color-amber-border: rgba(251, 191, 36, 0.22);
 
+  /* Radius — derived small variant for inputs, buttons, badges */
+  --radius-sm: calc(var(--radius) / 2);
+
   /* Monospace fallback */
   --font-mono: 'Inconsolata', 'SF Mono', 'Fira Code', monospace;
 }

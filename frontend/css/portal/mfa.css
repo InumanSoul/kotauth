@@ -19,7 +19,7 @@
   display: inline-block;
   padding: 12px;
   background: #ffffff;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 0.5px solid var(--color-border);
   margin: 12px 0 8px;
   line-height: 0;
@@ -32,7 +32,7 @@
   background: var(--color-input);
   border: 0.5px solid var(--color-border-md);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   letter-spacing: .08em;
   color: var(--color-text);
   word-break: break-all;
@@ -53,7 +53,7 @@
   font-size: 13px;
   background: var(--color-input);
   border: 0.5px solid var(--color-border-md);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 8px 6px;
   text-align: center;
   color: var(--color-text);
@@ -94,7 +94,7 @@
   border: 0.5px solid var(--color-amber-border);
   color: var(--color-amber);
   padding: 10px 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   margin: 12px 0 0;
 }
