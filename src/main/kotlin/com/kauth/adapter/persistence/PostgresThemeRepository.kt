@@ -23,7 +23,10 @@ class PostgresThemeRepository : ThemeRepository {
                 .singleOrNull()
         }
 
-    override fun upsert(tenantId: TenantId, theme: TenantTheme): TenantTheme =
+    override fun upsert(
+        tenantId: TenantId,
+        theme: TenantTheme,
+    ): TenantTheme =
         transaction {
             val exists =
                 WorkspaceThemeTable

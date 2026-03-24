@@ -12,7 +12,10 @@ class FakeThemeRepository : ThemeRepository {
 
     override fun findByTenantId(tenantId: TenantId): TenantTheme? = store[tenantId.value]
 
-    override fun upsert(tenantId: TenantId, theme: TenantTheme): TenantTheme {
+    override fun upsert(
+        tenantId: TenantId,
+        theme: TenantTheme,
+    ): TenantTheme {
         store[tenantId.value] = theme
         return theme
     }

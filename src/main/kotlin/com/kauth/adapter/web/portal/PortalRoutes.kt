@@ -261,7 +261,15 @@ fun Route.portalRoutes(
 
             call.respondHtml(
                 HttpStatusCode.OK,
-                PortalView.profilePage(slug, session, tenant.theme, tenant.displayName, successMsg, errorMsg),
+                PortalView.profilePage(
+                    slug,
+                    session,
+                    tenant.theme,
+                    tenant.displayName,
+                    layout = tenant.portalConfig.layout,
+                    successMsg = successMsg,
+                    errorMsg = errorMsg,
+                ),
             )
         }
 
@@ -307,9 +315,10 @@ fun Route.portalRoutes(
                     session,
                     tenant.theme,
                     tenant.displayName,
-                    sessions,
-                    successMsg,
-                    errorMsg,
+                    layout = tenant.portalConfig.layout,
+                    sessions = sessions,
+                    successMsg = successMsg,
+                    errorMsg = errorMsg,
                 ),
             )
         }
@@ -376,6 +385,7 @@ fun Route.portalRoutes(
                     session = session,
                     theme = tenant.theme,
                     workspaceName = tenant.displayName,
+                    layout = tenant.portalConfig.layout,
                     mfaEnabled = mfaEnabled,
                     successMsg = successMsg,
                     errorMsg = errorMsg,

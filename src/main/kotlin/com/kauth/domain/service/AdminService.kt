@@ -4,6 +4,8 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.PortalConfig
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -13,6 +15,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
+import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
@@ -40,6 +43,7 @@ class AdminService(
     private val selfServiceService: UserSelfServiceService,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val themeRepository: ThemeRepository? = null,
+    private val portalConfigRepository: PortalConfigRepository? = null,
 ) {
     // =========================================================================
     // Workspace settings
@@ -164,6 +168,37 @@ class AdminService(
                 ipAddress = null,
                 userAgent = null,
                 details = mapOf("slug" to slug, "action" to "theme_updated"),
+            ),
+        )
+
+        return AdminResult.Success(saved)
+    }
+
+    /**
+     * Updates the portal layout for a workspace. Persisted to workspace_portal_config table.
+     */
+    fun updatePortalLayout(
+        slug: String,
+        layout: PortalLayout,
+    ): AdminResult<PortalConfig> {
+        val repo =
+            portalConfigRepository
+                ?: return AdminResult.Failure(AdminError.Validation("Portal config repository not configured."))
+        val tenant =
+            tenantRepository.findBySlug(slug)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+
+        val saved = repo.upsert(tenant.id, PortalConfig(layout = layout))
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_TENANT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "action" to "portal_layout_updated", "layout" to layout.name),
             ),
         )
 

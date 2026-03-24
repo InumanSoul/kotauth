@@ -4,8 +4,6 @@ import com.kauth.adapter.email.SmtpEmailAdapter
 import com.kauth.adapter.persistence.PostgresApiKeyRepository
 import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
-import com.kauth.adapter.persistence.PostgresPortalConfigRepository
-import com.kauth.adapter.persistence.PostgresThemeRepository
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
@@ -14,11 +12,13 @@ import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
 import com.kauth.adapter.persistence.PostgresMfaRepository
 import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
+import com.kauth.adapter.persistence.PostgresPortalConfigRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
+import com.kauth.adapter.persistence.PostgresThemeRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
@@ -34,10 +34,10 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
-import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
@@ -192,6 +192,7 @@ data class ServiceGraph(
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
                     themeRepository = themeRepository,
+                    portalConfigRepository = portalConfigRepository,
                 )
             val roleGroupService =
                 RoleGroupService(

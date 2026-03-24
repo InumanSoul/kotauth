@@ -9,5 +9,8 @@ import com.kauth.domain.model.TenantId
 interface PortalConfigRepository {
     fun findByTenantId(tenantId: TenantId): PortalConfig?
 
-    fun upsert(tenantId: TenantId, config: PortalConfig): PortalConfig
+    fun upsert(
+        tenantId: TenantId,
+        config: PortalConfig,
+    ): PortalConfig
 }

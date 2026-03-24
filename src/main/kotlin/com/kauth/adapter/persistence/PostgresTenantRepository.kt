@@ -37,8 +37,7 @@ class PostgresTenantRepository(
                 JoinType.LEFT,
                 onColumn = TenantsTable.id,
                 otherColumn = WorkspaceThemeTable.tenantId,
-            )
-            .join(
+            ).join(
                 WorkspacePortalConfigTable,
                 JoinType.LEFT,
                 onColumn = TenantsTable.id,

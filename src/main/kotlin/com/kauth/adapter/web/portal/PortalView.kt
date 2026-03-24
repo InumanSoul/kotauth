@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.adapter.web.demoBanner
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -10,12 +11,14 @@ import java.time.format.DateTimeFormatter
 /**
  * Self-service portal HTML views.
  *
- * Reuses kotauth-auth.css tokens (--accent, --text, --muted, --bg-*, --border, --radius)
- * so the portal inherits per-tenant theming automatically.
+ * Theme tokens (--color-accent, --color-text, etc.) are injected at runtime by
+ * TenantTheme.toCssVars() before the portal CSS bundle is linked.
  *
- * Layout:
- *   Login page  — same card/centered layout as AuthView (same CSS classes)
- *   Authenticated pages — fixed sidebar left, scrollable content centered in remaining space
+ * Layout variants (selected per-tenant via PortalConfig.layout):
+ *   SIDEBAR  — fixed 220px sidebar left, scrollable centered content right
+ *   CENTERED — sticky topbar with horizontal tab strip, content below
+ *
+ * Login / MFA-challenge pages always use the auth card layout (kotauth-auth.css).
  */
 object PortalView {
     private val dtf = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm").withZone(ZoneOffset.UTC)
@@ -94,13 +97,14 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         successMsg: String?,
         errorMsg: String?,
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Profile — $workspaceName", theme) }
+            head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "profile") {
+                portalShell(slug, workspaceName, session.username, "profile", layout) {
                     h2(classes = "portal-section-title") { +"Profile" }
 
                     if (successMsg != null) {
@@ -167,14 +171,15 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         sessions: List<Session>,
         successMsg: String?,
         errorMsg: String?,
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Security — $workspaceName", theme) }
+            head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "security") {
+                portalShell(slug, workspaceName, session.username, "security", layout) {
                     h2(classes = "portal-section-title") { +"Change password" }
 
                     if (successMsg != null) {
@@ -385,191 +390,20 @@ object PortalView {
         session: PortalSession,
         theme: TenantTheme,
         workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
         mfaEnabled: Boolean,
         successMsg: String? = null,
         errorMsg: String? = null,
-        noticeMsg: String? = null, // prominent banner used when MFA setup is required
+        noticeMsg: String? = null,
     ): HTML.() -> Unit = {
         head {
-            portalPageHead("Two-Factor Auth — $workspaceName", theme)
-            // QR code renderer — only loaded on this page, only needed during setup
+            portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
             if (!mfaEnabled) {
                 script(src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js") {}
             }
-            style {
-                unsafe {
-                    raw(
-                        """
-                        /* ── MFA status badge ──────────────────────────────── */
-                        .mfa-status-row {
-                            display: flex;
-                            align-items: center;
-                            gap: 12px;
-                            margin-bottom: 20px;
-                        }
-                        .mfa-status-row p { margin: 0; color: var(--muted); font-size: 14px; }
-                        .mfa-badge {
-                            display: inline-flex;
-                            align-items: center;
-                            gap: 6px;
-                            padding: 3px 10px;
-                            border-radius: 999px;
-                            font-size: 12px;
-                            font-weight: 600;
-                            white-space: nowrap;
-                            flex-shrink: 0;
-                        }
-                        .mfa-badge.active {
-                            background: rgba(34,197,94,.12);
-                            color: #4ade80;
-                            border: 1px solid rgba(34,197,94,.25);
-                        }
-                        .mfa-badge.active::before {
-                            content: '';
-                            display: inline-block;
-                            width: 6px; height: 6px;
-                            border-radius: 50%;
-                            background: #4ade80;
-                        }
-                        .mfa-badge.inactive {
-                            background: rgba(148,163,184,.08);
-                            color: var(--muted);
-                            border: 1px solid var(--border);
-                        }
-                        /* ── Step headings ─────────────────────────────────── */
-                        .mfa-step-heading {
-                            font-size: 14px;
-                            font-weight: 600;
-                            color: var(--text);
-                            margin: 0 0 6px 0;
-                        }
-                        /* ── QR container ──────────────────────────────────── */
-                        .qr-container {
-                            display: inline-block;
-                            padding: 12px;
-                            background: #ffffff;
-                            border-radius: var(--radius);
-                            border: 1px solid var(--border);
-                            margin: 12px 0 8px;
-                            line-height: 0;
-                        }
-                        /* ── Manual setup key ──────────────────────────────── */
-                        .mfa-secret-key {
-                            font-family: monospace;
-                            font-size: 13px;
-                            background: var(--bg-input);
-                            border: 1px solid var(--border);
-                            padding: 2px 6px;
-                            border-radius: 4px;
-                            letter-spacing: .08em;
-                            color: var(--text);
-                            word-break: break-all;
-                            user-select: all;
-                        }
-                        /* ── Recovery codes grid ───────────────────────────── */
-                        .recovery-codes-grid {
-                            display: grid;
-                            grid-template-columns: repeat(4, 1fr);
-                            gap: 8px;
-                            margin: 12px 0 10px;
-                            max-width: 440px;
-                        }
-                        .recovery-code {
-                            font-family: monospace;
-                            font-size: 13px;
-                            background: var(--bg-input);
-                            border: 1px solid var(--border);
-                            border-radius: var(--radius);
-                            padding: 8px 6px;
-                            text-align: center;
-                            color: var(--text);
-                            letter-spacing: .06em;
-                        }
-                        /* ── "I've saved" checkbox ─────────────────────────── */
-                        .mfa-confirm-label {
-                            display: flex;
-                            align-items: center;
-                            gap: 8px;
-                            font-size: 13px;
-                            color: var(--text);
-                            cursor: pointer;
-                            margin: 14px 0 0;
-                        }
-                        .mfa-confirm-label input[type=checkbox] {
-                            width: 15px; height: 15px;
-                            flex-shrink: 0;
-                            cursor: pointer;
-                            accent-color: var(--accent);
-                        }
-                        /* ── Action row (disable confirm) ──────────────────── */
-                        .mfa-action-row {
-                            display: flex;
-                            gap: 10px;
-                            margin-top: 16px;
-                            align-items: center;
-                            flex-wrap: wrap;
-                        }
-                        /* ── Warning alert ─────────────────────────────────── */
-                        .alert-warning {
-                            background: rgba(234,179,8,.08);
-                            border: 1px solid rgba(234,179,8,.25);
-                            color: #fbbf24;
-                            padding: 10px 14px;
-                            border-radius: var(--radius);
-                            font-size: 13px;
-                            margin: 12px 0 0;
-                        }
-                        /* ── Buttons ───────────────────────────────────────── */
-                        .btn-danger {
-                            background: #dc2626;
-                            color: #fff;
-                            border: none;
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-danger:hover    { background: #b91c1c; }
-                        .btn-danger:disabled { opacity: .55; cursor: not-allowed; }
-                        .btn-danger-outline {
-                            background: transparent;
-                            color: #f87171;
-                            border: 1px solid rgba(220,38,38,.6);
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-danger-outline:hover { background: rgba(220,38,38,.08); }
-                        .btn-outline {
-                            background: transparent;
-                            color: var(--text);
-                            border: 1px solid var(--border);
-                            padding: 0.65rem 1.25rem;
-                            border-radius: var(--radius);
-                            cursor: pointer;
-                            font-size: 14px;
-                            font-family: inherit;
-                            font-weight: 500;
-                            transition: background .15s;
-                        }
-                        .btn-outline:hover    { background: var(--bg-input); }
-                        .btn-outline:disabled { opacity: .55; cursor: not-allowed; }
-                        /* ── Secondary spacing helper ──────────────────────── */
-                        .mfa-hint-row { margin-top: 6px; }
-                        """.trimIndent(),
-                    )
-                }
-            }
         }
         body {
-            portalShell(slug, workspaceName, session.username, "mfa") {
+            portalShell(slug, workspaceName, session.username, "mfa", layout) {
                 h2(classes = "portal-section-title") { +"Two-Factor Authentication" }
 
                 // Prominent notice — shown when the user is redirected here because MFA
@@ -911,196 +745,38 @@ object PortalView {
     }
 
     // =========================================================================
-    // Shared <head> — authenticated portal pages (sidebar layout)
+    // Shared <head> — authenticated portal pages
     // =========================================================================
 
-    /**
-     * Used for authenticated portal pages. Extends the auth stylesheet with
-     * portal-specific layout classes while keeping all token references consistent.
-     */
     private fun HEAD.portalPageHead(
         title: String,
         theme: TenantTheme,
+        layout: PortalLayout,
     ) {
         meta(charset = "UTF-8")
         meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
         title { +title }
-        // Favicon
         if (theme.faviconUrl != null) {
             link(rel = "icon", href = theme.faviconUrl)
         } else {
             link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
             link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-32x32.png") {
-                attributes["sizes"] =
-                    "32x32"
+                attributes["sizes"] = "32x32"
             }
             link(rel = "icon", type = "image/png", href = "/static/favicon/favicon-16x16.png") {
-                attributes["sizes"] =
-                    "16x16"
+                attributes["sizes"] = "16x16"
             }
         }
-        // Theme vars first — both auth.css and portal inline CSS read from these
         style { unsafe { +theme.toCssVars() } }
-        link(rel = "stylesheet", href = "/static/kotauth-auth.css")
-        // Portal-specific overrides — extend, not replace, the auth stylesheet
-        style {
-            unsafe {
-                raw(
-                    """
-                    /* ── Sidebar ─────────────────────────────────────────── */
-                    .portal-nav {
-                        width: 220px;
-                        flex-shrink: 0;
-                        position: sticky;
-                        top: 0;
-                        height: 100vh;
-                        overflow-y: auto;
-                        background: var(--bg-card);
-                        border-right: 1px solid var(--border);
-                        display: flex;
-                        flex-direction: column;
-                    }
-                    .portal-nav-header {
-                        padding: 24px 20px 20px;
-                        border-bottom: 1px solid var(--border);
-                    }
-                    .portal-nav-workspace {
-                        font-size: 10px;
-                        text-transform: uppercase;
-                        letter-spacing: .1em;
-                        color: var(--muted);
-                        margin: 0 0 4px 0;
-                    }
-                    .portal-nav-user {
-                        font-size: 13px;
-                        font-weight: 600;
-                        color: var(--text);
-                        white-space: nowrap;
-                        overflow: hidden;
-                        text-overflow: ellipsis;
-                    }
-                    .portal-nav-links {
-                        padding: 12px 0;
-                        flex: 1;
-                    }
-                    .portal-nav-link {
-                        display: block;
-                        padding: 9px 20px;
-                        font-size: 13px;
-                        color: var(--muted);
-                        text-decoration: none;
-                        transition: color .15s, background .15s;
-                    }
-                    .portal-nav-link:hover {
-                        color: var(--text);
-                        background: var(--bg-input);
-                    }
-                    .portal-nav-link.active {
-                        color: var(--text);
-                        background: var(--bg-input);
-                        font-weight: 500;
-                    }
-                    .portal-nav-footer {
-                        padding: 16px 20px;
-                        border-top: 1px solid var(--border);
-                    }
-
-                    /* ── Main content area ───────────────────────────────── */
-                    .portal-main-wrap {
-                        flex: 1;
-                        overflow-y: auto;
-                        display: flex;
-                        justify-content: center;
-                        padding: 48px 40px;
-                    }
-                    .portal-main {
-                        width: 100%;
-                        max-width: 600px;
-                    }
-
-                    /* ── Content primitives ──────────────────────────────── */
-                    .portal-section-title {
-                        font-size: 18px;
-                        font-weight: 600;
-                        color: var(--text);
-                        margin: 0 0 24px 0;
-                    }
-                    .portal-form {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 4px;
-                        max-width: 440px;
-                    }
-                    .form-hint {
-                        font-size: 12px;
-                        color: var(--muted);
-                        margin: 3px 0 0 0;
-                    }
-                    .portal-divider {
-                        border: none;
-                        border-top: 1px solid var(--border);
-                        margin: 36px 0;
-                    }
-                    .portal-empty {
-                        color: var(--muted);
-                        font-size: 13px;
-                        margin-top: 8px;
-                    }
-
-                    /* ── Sessions table ──────────────────────────────────── */
-                    .portal-table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        font-size: 13px;
-                        color: var(--text);
-                        margin-top: 8px;
-                    }
-                    .portal-table th {
-                        text-align: left;
-                        padding: 8px 12px;
-                        color: var(--muted);
-                        border-bottom: 1px solid var(--border);
-                        font-weight: 500;
-                        font-size: 11px;
-                        text-transform: uppercase;
-                        letter-spacing: .05em;
-                    }
-                    .portal-table td {
-                        padding: 11px 12px;
-                        border-bottom: 1px solid var(--border);
-                        vertical-align: middle;
-                    }
-
-                    /* ── Danger button (session revoke) ──────────────────── */
-                    .btn-danger-sm {
-                        background: transparent;
-                        border: 1px solid #dc2626;
-                        color: #f87171;
-                        padding: 4px 12px;
-                        border-radius: calc(var(--radius) - 2px);
-                        cursor: pointer;
-                        font-size: 12px;
-                        font-family: inherit;
-                        transition: background .15s;
-                    }
-                    .btn-danger-sm:hover {
-                        background: rgba(220, 38, 38, .15);
-                    }
-
-                    /* ── btn width override inside portal forms ──────────── */
-                    .portal-form .btn {
-                        width: auto;
-                        padding: 0.75rem 1.5rem;
-                        margin-top: 8px;
-                    }
-                    """.trimIndent(),
-                )
-            }
+        val cssBundle = when (layout) {
+            PortalLayout.SIDEBAR -> "/static/kotauth-portal-sidenav.css"
+            PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
         }
+        link(rel = "stylesheet", href = cssBundle)
     }
 
     // =========================================================================
-    // Shared layout — authenticated page shell
+    // Shared layout — authenticated page shell (dispatches by layout)
     // =========================================================================
 
     private fun BODY.portalShell(
@@ -1108,47 +784,93 @@ object PortalView {
         workspaceName: String,
         username: String,
         activePage: String,
+        layout: PortalLayout,
         content: DIV.() -> Unit,
     ) {
         demoBanner()
+        when (layout) {
+            PortalLayout.SIDEBAR -> portalShellSidenav(slug, workspaceName, username, activePage, content)
+            PortalLayout.CENTERED -> portalShellTabnav(slug, workspaceName, username, activePage, content)
+        }
+    }
+
+    private fun BODY.portalShellSidenav(
+        slug: String,
+        workspaceName: String,
+        username: String,
+        activePage: String,
+        content: DIV.() -> Unit,
+    ) {
         div(classes = "portal-shell") {
-            // ── Sticky sidebar ────────────────────────────────────────────
             nav(classes = "portal-nav") {
                 div(classes = "portal-nav-header") {
                     p(classes = "portal-nav-workspace") { +workspaceName }
                     p(classes = "portal-nav-user") { +username }
                 }
                 div(classes = "portal-nav-links") {
-                    a(
-                        href = "/t/$slug/account/profile",
-                        classes = "portal-nav-link${if (activePage == "profile") " active" else ""}",
-                    ) { +"Profile" }
-                    a(
-                        href = "/t/$slug/account/security",
-                        classes = "portal-nav-link${if (activePage == "security") " active" else ""}",
-                    ) { +"Security" }
-                    a(
-                        href = "/t/$slug/account/mfa",
-                        classes = "portal-nav-link${if (activePage == "mfa") " active" else ""}",
-                    ) { +"Two-Factor Auth" }
+                    portalNavItems(slug, activePage, "portal-nav-link")
                 }
                 div(classes = "portal-nav-footer") {
                     form(action = "/t/$slug/account/logout", method = FormMethod.post) {
                         button(type = ButtonType.submit, classes = "portal-nav-link") {
-                            style =
-                                "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
+                            style = "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
                             +"Sign out"
                         }
                     }
                 }
             }
-
-            // ── Centered content area ─────────────────────────────────────
             div(classes = "portal-main-wrap") {
-                div(classes = "portal-main") {
-                    content()
-                }
+                div(classes = "portal-main") { content() }
             }
         }
+    }
+
+    private fun BODY.portalShellTabnav(
+        slug: String,
+        workspaceName: String,
+        username: String,
+        activePage: String,
+        content: DIV.() -> Unit,
+    ) {
+        div(classes = "portal-shell") {
+            div(classes = "portal-topbar") {
+                div(classes = "portal-topbar-inner") {
+                    div(classes = "portal-topbar-header") {
+                        div {
+                            p(classes = "portal-topbar-workspace") { +workspaceName }
+                            p(classes = "portal-topbar-user") { +username }
+                        }
+                        form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                            button(type = ButtonType.submit, classes = "portal-topbar-signout") { +"Sign out" }
+                        }
+                    }
+                    nav(classes = "portal-tabs") {
+                        portalNavItems(slug, activePage, "portal-tab")
+                    }
+                }
+            }
+            div(classes = "portal-main-wrap") {
+                div(classes = "portal-main") { content() }
+            }
+        }
+    }
+
+    private fun FlowContent.portalNavItems(
+        slug: String,
+        activePage: String,
+        linkClass: String,
+    ) {
+        a(
+            href = "/t/$slug/account/profile",
+            classes = "$linkClass${if (activePage == "profile") " active" else ""}",
+        ) { +"Profile" }
+        a(
+            href = "/t/$slug/account/security",
+            classes = "$linkClass${if (activePage == "security") " active" else ""}",
+        ) { +"Security" }
+        a(
+            href = "/t/$slug/account/mfa",
+            classes = "$linkClass${if (activePage == "mfa") " active" else ""}",
+        ) { +"Two-Factor Auth" }
     }
 }

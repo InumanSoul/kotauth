@@ -2,6 +2,7 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -580,6 +581,33 @@ internal fun workspaceSettingsPageImpl(
                         span("check-row__label") { +"Require email verification" }
                     }
                 }
+
+                // ── Portal Layout ────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Self-Service Portal" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Layout" }
+                        div {
+                            select {
+                                name = "portalLayout"
+                                classes = setOf("edit-row__field")
+                                for (layout in PortalLayout.entries) {
+                                    option {
+                                        value = layout.name
+                                        if (workspace.portalConfig.layout == layout) selected = true
+                                        +when (layout) {
+                                            PortalLayout.SIDEBAR -> "Sidebar"
+                                            PortalLayout.CENTERED -> "Centered Tabs"
+                                        }
+                                    }
+                                }
+                            }
+                            div("edit-row__hint") {
+                                +"Controls the navigation style of the user self-service portal."
+                            }
+                        }
+                    }
+                }
             }
                     }
 }
@@ -903,6 +931,7 @@ internal fun brandingPageImpl(
                             div("color-grid") {
                                 colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
+                                colorField("Accent Text", "accent-fg", "themeAccentForeground", t.accentForeground)
                                 colorField("Page Background", "page-bg", "themeBgDeep", t.bgDeep)
                                 colorField("Card Background", "card-bg", "themeBgCard", t.bgCard)
                                 colorField("Input Background", "input-bg", "themeBgInput", t.bgInput)

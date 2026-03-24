@@ -24,7 +24,10 @@ class PostgresPortalConfigRepository : PortalConfigRepository {
                 .singleOrNull()
         }
 
-    override fun upsert(tenantId: TenantId, config: PortalConfig): PortalConfig =
+    override fun upsert(
+        tenantId: TenantId,
+        config: PortalConfig,
+    ): PortalConfig =
         transaction {
             val exists =
                 WorkspacePortalConfigTable

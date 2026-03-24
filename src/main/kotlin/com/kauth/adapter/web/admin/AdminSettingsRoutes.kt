@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
@@ -74,8 +75,14 @@ fun Route.adminSettingsRoutes(
                     mfaPolicy = workspace.mfaPolicy,
                 )
         ) {
-            is AdminResult.Success ->
+            is AdminResult.Success -> {
+                val portalLayout =
+                    params["portalLayout"]?.let { runCatching { PortalLayout.valueOf(it) }.getOrNull() }
+                if (portalLayout != null) {
+                    adminService.updatePortalLayout(slug, portalLayout)
+                }
                 call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
+            }
             is AdminResult.Failure -> {
                 val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                 call.respondHtml(

@@ -9,5 +9,8 @@ import com.kauth.domain.model.TenantTheme
 interface ThemeRepository {
     fun findByTenantId(tenantId: TenantId): TenantTheme?
 
-    fun upsert(tenantId: TenantId, theme: TenantTheme): TenantTheme
+    fun upsert(
+        tenantId: TenantId,
+        theme: TenantTheme,
+    ): TenantTheme
 }
