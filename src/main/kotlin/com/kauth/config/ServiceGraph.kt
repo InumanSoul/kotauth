@@ -4,6 +4,7 @@ import com.kauth.adapter.email.SmtpEmailAdapter
 import com.kauth.adapter.persistence.PostgresApiKeyRepository
 import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
+import com.kauth.adapter.persistence.PostgresPortalConfigRepository
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
@@ -30,6 +31,7 @@ import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
+import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
@@ -73,6 +75,7 @@ data class ServiceGraph(
     val roleRepository: RoleRepository,
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
+    val portalConfigRepository: PortalConfigRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
     val loginRateLimiter: RateLimiterPort,
@@ -102,6 +105,7 @@ data class ServiceGraph(
             val identityProviderRepository =
                 PostgresIdentityProviderRepository(encryptionService)
             val socialAccountRepository = PostgresSocialAccountRepository()
+            val portalConfigRepository = PostgresPortalConfigRepository()
             val apiKeyRepository = PostgresApiKeyRepository()
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
@@ -294,6 +298,7 @@ data class ServiceGraph(
                 roleRepository = roleRepository,
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
+                portalConfigRepository = portalConfigRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
                 loginRateLimiter = loginLimiter,

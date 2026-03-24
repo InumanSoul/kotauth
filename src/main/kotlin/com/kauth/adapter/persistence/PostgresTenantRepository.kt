@@ -1,10 +1,13 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.PortalConfig
+import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantRepository
+import org.jetbrains.exposed.sql.JoinType
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
@@ -25,9 +28,17 @@ import org.jetbrains.exposed.sql.update
 class PostgresTenantRepository(
     private val encryptionService: EncryptionPort,
 ) : TenantRepository {
+    private val tenantWithPortalConfig =
+        TenantsTable.join(
+            WorkspacePortalConfigTable,
+            JoinType.LEFT,
+            onColumn = TenantsTable.id,
+            otherColumn = WorkspacePortalConfigTable.tenantId,
+        )
+
     override fun findBySlug(slug: String): Tenant? =
         transaction {
-            TenantsTable
+            tenantWithPortalConfig
                 .selectAll()
                 .where { TenantsTable.slug eq slug }
                 .map { it.toTenant() }
@@ -44,7 +55,7 @@ class PostgresTenantRepository(
 
     override fun findAll(): List<Tenant> =
         transaction {
-            TenantsTable
+            tenantWithPortalConfig
                 .selectAll()
                 .orderBy(TenantsTable.id)
                 .map { it.toTenant() }
@@ -52,7 +63,7 @@ class PostgresTenantRepository(
 
     override fun findById(id: TenantId): Tenant? =
         transaction {
-            TenantsTable
+            tenantWithPortalConfig
                 .selectAll()
                 .where { TenantsTable.id eq id.value }
                 .map { it.toTenant() }
@@ -103,7 +114,7 @@ class PostgresTenantRepository(
                 it[passwordPolicyBlacklistEnabled] = tenant.passwordPolicyBlacklistEnabled
                 it[mfaPolicy] = tenant.mfaPolicy
             }
-            TenantsTable
+            tenantWithPortalConfig
                 .selectAll()
                 .where { TenantsTable.id eq tenant.id.value }
                 .single()
@@ -123,7 +134,7 @@ class PostgresTenantRepository(
                     it[TenantsTable.issuerUrl] = issuerUrl
                 } get TenantsTable.id
 
-            TenantsTable
+            tenantWithPortalConfig
                 .selectAll()
                 .where { TenantsTable.id eq insertedId }
                 .single()
@@ -175,6 +186,17 @@ class PostgresTenantRepository(
             smtpEnabled = this[TenantsTable.smtpEnabled],
             mfaPolicy = this[TenantsTable.mfaPolicy],
             maxConcurrentSessions = this[TenantsTable.maxConcurrentSessions],
+            portalConfig = toPortalConfig(),
+        )
+    }
+
+    private fun ResultRow.toPortalConfig(): PortalConfig {
+        val layoutStr = getOrNull(WorkspacePortalConfigTable.layout) ?: return PortalConfig()
+        return PortalConfig(
+            layout =
+                runCatching {
+                    PortalLayout.valueOf(layoutStr)
+                }.getOrDefault(PortalLayout.SIDEBAR),
         )
     }
 }
