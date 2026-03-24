@@ -150,7 +150,7 @@ internal fun Route.loginRoutes(
 
                 // MFA challenge redirect
                 if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
-                    val mfaPending = "${user.id?.value}|$slug|${System.currentTimeMillis()}"
+                    val mfaPending = "${user.id.value}|$slug|${System.currentTimeMillis()}"
                     call.response.cookies.append(
                         name = "KOTAUTH_MFA_PENDING",
                         value = encryptionService.signCookie(mfaPending),

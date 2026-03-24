@@ -64,6 +64,37 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// ── E2E smoke tests (Playwright) ─────────────────────────────────────────
+sourceSets {
+    create("e2eTest") {
+        kotlin.srcDir("src/e2eTest/kotlin")
+        resources.srcDir("src/e2eTest/resources")
+        compileClasspath += sourceSets["main"].output + sourceSets["test"].output
+        runtimeClasspath += sourceSets["main"].output + sourceSets["test"].output
+    }
+}
+
+val e2eTestImplementation by configurations.getting {
+    extendsFrom(configurations.testImplementation.get())
+}
+val e2eTestRuntimeOnly by configurations.getting {
+    extendsFrom(configurations.testRuntimeOnly.get())
+}
+
+dependencies {
+    e2eTestImplementation("com.microsoft.playwright:playwright:1.44.0")
+}
+
+tasks.register<Test>("e2eTest") {
+    description = "Runs E2E browser smoke tests (Playwright)"
+    group = "verification"
+    testClassesDirs = sourceSets["e2eTest"].output.classesDirs
+    classpath = sourceSets["e2eTest"].runtimeClasspath
+    useJUnitPlatform()
+    maxParallelForks = 1
+    systemProperty("playwright.headless", System.getProperty("playwright.headless", "true"))
+}
+
 // ── CSS compilation ───────────────────────────────────────────────────────
 val lightningCssBin = "frontend/node_modules/.bin/lightningcss"
 
