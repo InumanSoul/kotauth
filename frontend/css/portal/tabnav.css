@@ -1,78 +1,173 @@
 /* frontend/css/portal/tabnav.css
  *
- * Tab navigation component for the portal centered layout.
- * Sticky topbar with workspace name + horizontal tab strip.
+ * Centered layout — two-bar header.
+ * Bar 1: sticky topbar with brand mark, page title, user identity, sign-out.
+ * Bar 2: sticky tab strip below the topbar.
  */
+
+/* ── TOPBAR ─────────────────────────────────────────────────────────────── */
 
 .portal-topbar {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 0.5px solid var(--color-border);
 }
 
-.portal-topbar-inner {
+.portal-topbar__inner {
   max-width: 640px;
   margin: 0 auto;
-  padding: 20px 24px 0;
-}
-
-.portal-topbar-header {
+  padding: 0 24px;
+  height: 48px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+  gap: 12px;
 }
 
-.portal-topbar-workspace {
+.portal-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+}
+
+.portal-topbar__brand-mark {
+  width: 26px;
+  height: 26px;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
   font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: .1em;
-  color: var(--color-muted);
-  margin: 0 0 2px 0;
+  font-weight: 500;
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 
-.portal-topbar-user {
-  font-size: 14px;
-  font-weight: 600;
+.portal-topbar__org {
+  font-size: 13px;
+  font-weight: 500;
   color: var(--color-text);
 }
 
-.portal-tabs {
+.portal-topbar__sep {
+  width: 0.5px;
+  height: 16px;
+  background: var(--color-border-em);
+  flex-shrink: 0;
+}
+
+.portal-topbar__page-title {
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.portal-topbar__spacer {
+  flex: 1;
+}
+
+.portal-topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-topbar__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.portal-topbar__username {
+  font-size: 12px;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+}
+
+.portal-topbar__signout {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  margin-left: 4px;
+  font-size: 11px;
+  color: var(--color-muted);
+  border: 0.5px solid var(--color-border-md);
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: color 0.1s, border-color 0.1s, background 0.1s;
+}
+
+.portal-topbar__signout:hover {
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+  background: var(--color-red-bg);
+}
+
+/* ── TAB STRIP ──────────────────────────────────────────────────────────── */
+
+.portal-tabnav {
+  border-bottom: 0.5px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 48px;
+  z-index: 10;
+}
+
+.portal-tabnav__inner {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 0 24px;
   display: flex;
   gap: 0;
 }
 
-.portal-tab {
-  padding: 10px 16px;
-  font-size: 13px;
+.portal-tabnav__item {
+  position: relative;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--color-muted);
-  text-decoration: none;
-  border-bottom: 2px solid transparent;
-  transition: color .15s, border-color .15s;
-}
-
-.portal-tab:hover {
-  color: var(--color-text);
-}
-
-.portal-tab.active {
-  color: var(--color-text);
-  border-bottom-color: var(--color-accent);
-  font-weight: 500;
-}
-
-.portal-topbar-signout {
-  background: none;
-  border: none;
   cursor: pointer;
-  font-size: 13px;
-  color: var(--color-muted);
-  font-family: inherit;
-  transition: color .15s;
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  transition: color 0.1s;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
-.portal-topbar-signout:hover {
+.portal-tabnav__item:hover {
   color: var(--color-text);
+}
+
+.portal-tabnav__item.is-active {
+  color: var(--color-text);
+}
+
+.portal-tabnav__item.is-active::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -0.5px;
+  height: 1.5px;
+  background: var(--color-accent);
+  border-radius: 2px 2px 0 0;
 }

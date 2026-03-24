@@ -866,27 +866,50 @@ object PortalView {
         activePage: String,
         content: DIV.() -> Unit,
     ) {
-        div(classes = "portal-shell") {
+        aside(classes = "portal-sidebar") {
+            div(classes = "portal-sidebar__brand") {
+                div(classes = "portal-sidebar__brand-mark") {
+                    +workspaceName.split(" ")
+                        .take(2)
+                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                        .joinToString("")
+                        .ifEmpty { "K" }
+                }
+                div(classes = "portal-sidebar__brand-info") {
+                    span(classes = "portal-sidebar__org") { +workspaceName }
+                    span(classes = "portal-sidebar__app") { +"My Account" }
+                }
+            }
             nav(classes = "portal-nav") {
-                div(classes = "portal-nav-header") {
-                    p(classes = "portal-nav-workspace") { +workspaceName }
-                    p(classes = "portal-nav-user") { +username }
+                attributes["role"] = "navigation"
+                attributes["aria-label"] = "Account settings"
+                span(classes = "portal-nav__label") { +"Account" }
+                portalNavItems(slug, activePage, "portal-nav__item")
+            }
+            div(classes = "portal-sidebar__footer") {
+                div(classes = "portal-user") {
+                    div(classes = "portal-user__avatar") {
+                        attributes["aria-hidden"] = "true"
+                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                    }
+                    div(classes = "portal-user__info") {
+                        span(classes = "portal-user__name") { +username }
+                        span(classes = "portal-user__email") { +"@$username" }
+                    }
                 }
-                div(classes = "portal-nav-links") {
-                    portalNavItems(slug, activePage, "portal-nav-link")
-                }
-                div(classes = "portal-nav-footer") {
-                    form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-                        button(type = ButtonType.submit, classes = "portal-nav-link") {
-                            style = "background:none;border:none;cursor:pointer;width:100%;text-align:left;font-size:13px;"
-                            +"Sign out"
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-signout") {
+                        attributes["aria-label"] = "Sign out"
+                        consumer.onTagContentUnsafe {
+                            +"""<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
                         }
+                        +"Sign out"
                     }
                 }
             }
-            div(classes = "portal-main-wrap") {
-                div(classes = "portal-main") { content() }
-            }
+        }
+        div(classes = "portal-main-wrap") {
+            div(classes = "portal-main") { content() }
         }
     }
 
@@ -897,27 +920,47 @@ object PortalView {
         activePage: String,
         content: DIV.() -> Unit,
     ) {
-        div(classes = "portal-shell") {
-            div(classes = "portal-topbar") {
-                div(classes = "portal-topbar-inner") {
-                    div(classes = "portal-topbar-header") {
-                        div {
-                            p(classes = "portal-topbar-workspace") { +workspaceName }
-                            p(classes = "portal-topbar-user") { +username }
-                        }
-                        form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-                            button(type = ButtonType.submit, classes = "portal-topbar-signout") { +"Sign out" }
-                        }
+        val initials = workspaceName.split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .joinToString("")
+            .ifEmpty { "K" }
+
+        header(classes = "portal-topbar") {
+            div(classes = "portal-topbar__inner") {
+                div(classes = "portal-topbar__brand") {
+                    div(classes = "portal-topbar__brand-mark") { +initials }
+                    span(classes = "portal-topbar__org") { +workspaceName }
+                }
+                div(classes = "portal-topbar__sep") { attributes["aria-hidden"] = "true" }
+                span(classes = "portal-topbar__page-title") { +"Account settings" }
+                div(classes = "portal-topbar__spacer") {}
+                div(classes = "portal-topbar__user") {
+                    div(classes = "portal-topbar__avatar") {
+                        attributes["aria-label"] = "Signed in as $username"
+                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
                     }
-                    nav(classes = "portal-tabs") {
-                        portalNavItems(slug, activePage, "portal-tab")
+                    span(classes = "portal-topbar__username") { +username }
+                }
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-topbar__signout") {
+                        attributes["aria-label"] = "Sign out"
+                        consumer.onTagContentUnsafe {
+                            +"""<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
+                        }
+                        +"Sign out"
                     }
                 }
             }
-            div(classes = "portal-main-wrap") {
-                div(classes = "portal-main") { content() }
+        }
+        nav(classes = "portal-tabnav") {
+            attributes["role"] = "navigation"
+            attributes["aria-label"] = "Account sections"
+            div(classes = "portal-tabnav__inner") {
+                portalNavItems(slug, activePage, "portal-tabnav__item")
             }
         }
+        div(classes = "portal-content") { content() }
     }
 
     private fun FlowContent.portalNavItems(
@@ -927,15 +970,15 @@ object PortalView {
     ) {
         a(
             href = "/t/$slug/account/profile",
-            classes = "$linkClass${if (activePage == "profile") " active" else ""}",
+            classes = "$linkClass${if (activePage == "profile") " is-active" else ""}",
         ) { +"Profile" }
         a(
             href = "/t/$slug/account/security",
-            classes = "$linkClass${if (activePage == "security") " active" else ""}",
+            classes = "$linkClass${if (activePage == "security") " is-active" else ""}",
         ) { +"Security" }
         a(
             href = "/t/$slug/account/mfa",
-            classes = "$linkClass${if (activePage == "mfa") " active" else ""}",
+            classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
         ) { +"Two-Factor Auth" }
     }
 }

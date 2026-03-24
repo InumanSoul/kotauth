@@ -1,18 +1,13 @@
 /* frontend/css/portal/shell-sidenav.css
  *
  * Shell layout for portal sidebar variant.
- * Flex row: fixed sidebar left + scrollable centered content right.
+ * Sidebar is position:fixed (defined in nav.css), so main content
+ * offsets via margin-left instead of flex.
  */
 
-.portal-shell {
-  display: flex;
-  min-height: 100dvh;
-  width: 100%;
-}
-
 .portal-main-wrap {
-  flex: 1;
-  overflow-y: auto;
+  margin-left: 220px;
+  min-height: 100dvh;
   display: flex;
   justify-content: center;
   padding: 48px 40px;

@@ -1,70 +1,214 @@
 /* frontend/css/portal/nav.css
  *
  * Sidebar navigation component for the portal sidenav layout.
- * Fixed 220px left panel with workspace name, username, nav links, and sign-out.
+ * Fixed 220px left panel with brand mark, nav items, user avatar, and sign-out.
+ *
+ * Uses .portal-sidebar as the root — fixed positioning with main content
+ * offset via margin-left in shell-sidenav.css.
  */
 
-.portal-nav {
+/* ── Sidebar root ─────────────────────────────────────────────────────── */
+
+.portal-sidebar {
   width: 220px;
   flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  overflow-y: auto;
   background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  border-right: 0.5px solid var(--color-border);
   display: flex;
   flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 10;
 }
 
-.portal-nav-header {
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid var(--color-border);
+/* ── Brand block ──────────────────────────────────────────────────────── */
+
+.portal-sidebar__brand {
+  padding: 16px;
+  border-bottom: 0.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
-.portal-nav-workspace {
+.portal-sidebar__brand-mark {
+  width: 28px;
+  height: 28px;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.portal-sidebar__brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.portal-sidebar__org {
   font-size: 10px;
+  font-weight: 500;
+  color: var(--color-subtle);
   text-transform: uppercase;
-  letter-spacing: .1em;
-  color: var(--color-muted);
-  margin: 0 0 4px 0;
+  letter-spacing: 0.07em;
+  line-height: 1;
+  margin-bottom: 3px;
 }
 
-.portal-nav-user {
+.portal-sidebar__app {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--color-text);
+  line-height: 1.2;
+}
+
+/* ── Navigation ───────────────────────────────────────────────────────── */
+
+.portal-nav {
+  flex: 1;
+  padding: 8px;
+  overflow-y: auto;
+}
+
+.portal-nav__label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 10px 8px 4px;
+}
+
+.portal-nav__item {
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-sans);
+  position: relative;
+  transition: color 0.1s, background 0.1s;
+  text-decoration: none;
+}
+
+.portal-nav__item:hover {
+  color: var(--color-text);
+  background: var(--color-row-hover);
+}
+
+.portal-nav__item.is-active {
+  color: var(--color-text);
+  background: var(--color-accent-bg);
+}
+
+.portal-nav__item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 5px;
+  bottom: 5px;
+  width: 2px;
+  background: var(--color-accent);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ── Footer: user identity + sign out ─────────────────────────────────── */
+
+.portal-sidebar__footer {
+  padding: 8px;
+  border-top: 0.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.portal-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.portal-user__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  letter-spacing: 0.03em;
+}
+
+.portal-user__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.portal-user__name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.portal-user__email {
+  font-size: 11px;
+  color: var(--color-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.portal-nav-links {
-  padding: 12px 0;
-  flex: 1;
-}
-
-.portal-nav-link {
-  display: block;
-  padding: 9px 20px;
-  font-size: 13px;
+.portal-signout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
   color: var(--color-muted);
-  text-decoration: none;
-  transition: color .15s, background .15s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  transition: color 0.1s, background 0.1s;
 }
 
-.portal-nav-link:hover {
-  color: var(--color-text);
-  background: var(--color-input);
+.portal-signout:hover {
+  color: var(--color-red);
+  background: var(--color-red-bg);
 }
 
-.portal-nav-link.active {
-  color: var(--color-text);
-  background: var(--color-input);
-  font-weight: 500;
-}
-
-.portal-nav-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--color-border);
+.portal-signout svg {
+  flex-shrink: 0;
 }
