@@ -173,7 +173,55 @@ object PortalView {
                                         required = true
                                     }
                                 }
-                                button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
+                                div(classes = "edit-actions") {
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
+                                }
+                            }
+                        }
+                    }
+
+                    div(classes = "danger-zone") {
+                        div(classes = "danger-zone__header") {
+                            span(classes = "danger-zone__header-title") { +"Danger zone" }
+                        }
+                        div(classes = "danger-zone__item") {
+                            div(classes = "danger-zone__item-info") {
+                                div(classes = "danger-zone__item-title") { +"Delete account" }
+                                div(classes = "danger-zone__item-desc") {
+                                    +"Permanently deletes your account, profile, and all associated data. This cannot be undone."
+                                }
+                            }
+                            button(
+                                type = ButtonType.button,
+                                classes = "btn btn--danger",
+                            ) {
+                                attributes["onclick"] = "document.getElementById('delete-confirm').classList.toggle('is-open')"
+                                +"Delete account"
+                            }
+                        }
+                        div(classes = "confirm-block") {
+                            id = "delete-confirm"
+                            p(classes = "confirm-block__label") {
+                                +"Type "
+                                code { +session.username }
+                                +" to confirm deletion"
+                            }
+                            form(
+                                action = "/t/$slug/account/delete",
+                                method = FormMethod.post,
+                            ) {
+                                div(classes = "confirm-block__row") {
+                                    input(type = InputType.text, name = "confirm_username") {
+                                        classes = setOf("confirm-block__input")
+                                        placeholder = session.username
+                                        required = true
+                                        attributes["autocomplete"] = "off"
+                                    }
+                                    button(
+                                        type = ButtonType.submit,
+                                        classes = "btn btn--danger",
+                                    ) { +"Confirm delete" }
+                                }
                             }
                         }
                     }
@@ -213,8 +261,8 @@ object PortalView {
 
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
-                            div {
-                                div(classes = "portal-section__title") { +"Change password" }
+                            div(classes = "portal-section__header-left") {
+                                span(classes = "portal-section__title") { +"Change password" }
                             }
                         }
                         div(classes = "portal-section__body") {
@@ -248,6 +296,7 @@ object PortalView {
                                         required = true
                                         attributes["autocomplete"] = "new-password"
                                     }
+                                    span(classes = "edit-field__hint") { +"Must be at least 8 characters" }
                                 }
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
@@ -262,24 +311,41 @@ object PortalView {
                                         attributes["autocomplete"] = "new-password"
                                     }
                                 }
-                                p(classes = "form-hint") { +"Changing your password will sign you out of all active sessions." }
-                                button(type = ButtonType.submit, classes = "btn btn--primary") { +"Change password" }
+                                div(classes = "edit-actions") {
+                                    span(classes = "edit-actions__note") {
+                                        +"Changing your password signs you out of all active sessions"
+                                    }
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Change password" }
+                                }
                             }
                         }
                     }
 
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
-                            div {
-                                div(classes = "portal-section__title") { +"Active sessions" }
-                                div(classes = "portal-section__subtitle") { +"Devices currently signed in to your account" }
+                            div(classes = "portal-section__header-left") {
+                                span(classes = "portal-section__title") { +"Active sessions" }
+                                span(classes = "portal-section__subtitle") { +"Devices currently signed into your account" }
+                            }
+                            if (sessions.size > 1) {
+                                form(
+                                    action = "/t/$slug/account/sessions/revoke-others",
+                                    method = FormMethod.post,
+                                ) {
+                                    button(
+                                        type = ButtonType.submit,
+                                        classes = "btn btn--danger btn--sm",
+                                    ) { +"Revoke all others" }
+                                }
                             }
                         }
-                        div(classes = "portal-section__body") {
-                            if (sessions.isEmpty()) {
+                        if (sessions.isEmpty()) {
+                            div(classes = "portal-section__body") {
                                 p(classes = "portal-empty") { +"No active sessions found." }
-                            } else {
-                                table(classes = "portal-table") {
+                            }
+                        } else {
+                            div { style = "padding: 0 18px 6px;"
+                                table(classes = "sessions-table") {
                                     thead {
                                         tr {
                                             th { +"Device / IP" }
@@ -291,9 +357,18 @@ object PortalView {
                                     tbody {
                                         for (s in sessions) {
                                             tr {
-                                                td { +(s.ipAddress ?: "—") }
-                                                td { +dtf.format(s.createdAt) }
-                                                td { +dtf.format(s.expiresAt) }
+                                                td {
+                                                    div(classes = "session-device-label") {
+                                                        +(s.userAgent?.take(60) ?: "Unknown device")
+                                                    }
+                                                    span(classes = "session-ip") { +(s.ipAddress ?: "—") }
+                                                }
+                                                td {
+                                                    span(classes = "session-time") { +dtf.format(s.createdAt) }
+                                                }
+                                                td {
+                                                    span(classes = "session-time") { +dtf.format(s.expiresAt) }
+                                                }
                                                 td {
                                                     form(
                                                         action = "/t/$slug/account/sessions/${s.id?.value}/revoke",

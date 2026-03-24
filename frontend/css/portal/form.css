@@ -66,3 +66,19 @@
   align-items: center;
   gap: 5px;
 }
+
+/* ── Form action row ─────────────────────────────────────────────────── */
+
+.edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.edit-actions__note {
+  font-size: 11px;
+  color: var(--color-muted);
+  flex: 1;
+}

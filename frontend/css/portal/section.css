@@ -39,6 +39,11 @@
   margin-top: 1px;
 }
 
+.portal-section__header-left {
+  flex: 1;
+  min-width: 0;
+}
+
 .portal-section__body {
   padding: 18px;
 }
@@ -178,6 +183,54 @@
 
 .confirm-block__input:focus {
   box-shadow: 0 0 0 3px var(--color-red-bg);
+}
+
+/* ── Danger zone ─────────────────────────────────────────────────────── */
+
+.danger-zone {
+  border: 0.5px solid var(--color-red-border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.danger-zone__header {
+  padding: 10px 18px;
+  border-bottom: 0.5px solid var(--color-red-border);
+  background: var(--color-red-bg);
+}
+
+.danger-zone__header-title {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--color-red);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.danger-zone__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+}
+
+.danger-zone__item-info {
+  flex: 1;
+}
+
+.danger-zone__item-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.danger-zone__item-desc {
+  font-size: 11px;
+  color: var(--color-muted);
+  line-height: 1.5;
 }
 
 /* ── Form layout inside section cards ─────────────────────────────────── */
