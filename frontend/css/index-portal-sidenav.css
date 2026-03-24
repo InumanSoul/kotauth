@@ -16,9 +16,10 @@
 /* ── Portal body override ──────────────────────────────────────────────── */
 @import "./portal/reset.css";
 
-/* ── Shared components (form, button, alert) ───────────────────────────── */
-@import "./shared/form.css";
-@import "./shared/button.css";
+/* ── Portal components (form, button, alert, badge) ────────────────────── */
+@import "./portal/form.css";
+@import "./portal/button.css";
+@import "./portal/badge.css";
 @import "./shared/alert.css";
 
 /* ── Portal layout: sidebar ────────────────────────────────────────────── */
