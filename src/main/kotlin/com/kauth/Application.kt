@@ -56,6 +56,8 @@ fun main() {
         url = config.dbUrl,
         user = config.dbUser,
         password = config.dbPassword,
+        poolMaxSize = config.dbPoolMaxSize,
+        poolMinIdle = config.dbPoolMinIdle,
     )
 
     val services = ServiceGraph.create(config)

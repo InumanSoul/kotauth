@@ -3,6 +3,8 @@ package com.kauth.infrastructure
 import com.kauth.adapter.persistence.TenantsTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.adapter.token.BcryptPasswordHasher
+import com.zaxxer.hikari.HikariConfig
+import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.insert
@@ -10,11 +12,11 @@ import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
 /**
- * Infrastructure concern: database connection and schema initialization.
+ * Infrastructure concern: database connection pool and schema initialization.
  *
  * Initialization order:
  *   1. Run Flyway migrations — creates / evolves the schema in a versioned, auditable way.
- *   2. Connect Exposed to the same datasource.
+ *   2. Create a HikariCP connection pool and connect Exposed to it.
  *   3. Seed the master-tenant admin user only on a fresh database.
  *
  * SchemaUtils.createMissingTablesAndColumns is intentionally removed — it is
@@ -26,6 +28,8 @@ object DatabaseFactory {
         url: String,
         user: String,
         password: String,
+        poolMaxSize: Int = 10,
+        poolMinIdle: Int = 2,
     ) {
         // Step 1: run versioned SQL migrations from src/main/resources/db/migration/
         Flyway
@@ -35,18 +39,62 @@ object DatabaseFactory {
             .load()
             .migrate()
 
-        // Step 2: connect Exposed (query DSL) — Flyway already created the schema
-        Database.connect(
-            url = url,
-            driver = "org.postgresql.Driver",
-            user = user,
-            password = password,
-        )
+        // Step 2: create HikariCP pool and connect Exposed
+        val dataSource = createDataSource(url, user, password, poolMaxSize, poolMinIdle)
+        Database.connect(dataSource)
 
         // Step 3: seed the default admin user inside the master tenant (first boot only)
         transaction {
             seedAdminIfEmpty()
         }
+    }
+
+    private fun createDataSource(
+        url: String,
+        user: String,
+        password: String,
+        poolMaxSize: Int,
+        poolMinIdle: Int,
+    ): HikariDataSource {
+        val config =
+            HikariConfig().apply {
+                jdbcUrl = url
+                username = user
+                this.password = password
+                driverClassName = "org.postgresql.Driver"
+
+                // Pool sizing — for coroutine-based apps, size to actual DB concurrency
+                // needs (CPU cores × 2), not thread count. Default 10 is safe for
+                // single-instance and small multi-instance deployments (4 × 10 = 40,
+                // well within PostgreSQL's default max_connections = 100).
+                maximumPoolSize = poolMaxSize
+                minimumIdle = poolMinIdle
+
+                // How long a caller waits for a connection from the pool before timing out.
+                connectionTimeout = 3_000
+
+                // How long an idle connection stays in the pool before eviction.
+                idleTimeout = 300_000 // 5 minutes
+
+                // Hard ceiling on connection age — prevents stale connections that were
+                // silently terminated by firewalls or network devices.
+                maxLifetime = 600_000 // 10 minutes
+
+                // Periodic keepalive prevents idle connections from being killed by
+                // cloud load balancers or PG idle_in_transaction_session_timeout.
+                keepaliveTime = 60_000 // 1 minute
+
+                // Logs a warning with stack trace if a connection is held longer than
+                // this — invaluable for catching N+1 queries and slow admin operations.
+                leakDetectionThreshold = 4_000 // 4 seconds
+
+                // Connection validation
+                connectionTestQuery = "SELECT 1"
+
+                // Pool name for logging and JMX
+                poolName = "kotauth-pg"
+            }
+        return HikariDataSource(config)
     }
 
     /**

@@ -18,6 +18,8 @@ data class EnvironmentConfig(
     val dbUser: String,
     val dbPassword: String,
     val isDemoMode: Boolean,
+    val dbPoolMaxSize: Int,
+    val dbPoolMinIdle: Int,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
 
@@ -55,6 +57,8 @@ data class EnvironmentConfig(
                     System
                         .getenv("KAUTH_DEMO_MODE")
                         ?.lowercase() == "true",
+                dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
+                dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
             )
         }
 
