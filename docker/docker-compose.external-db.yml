@@ -1,0 +1,38 @@
+# ─── Kotauth — bring your own database ───────────────────────────────────────
+# Runs only the Kotauth container. No bundled PostgreSQL — you provide the
+# database via DB_URL, DB_USER, and DB_PASSWORD in .env.
+#
+# Use this when connecting to a managed provider (RDS, Supabase, Neon, etc.)
+# or any existing PostgreSQL instance.
+#
+# Quickstart:
+#   1. Copy .env.example to .env
+#   2. Set DB_URL, DB_USER, DB_PASSWORD (and KAUTH_SECRET_KEY, KAUTH_BASE_URL)
+#   3. docker compose -f docker/docker-compose.external-db.yml up -d
+#
+# For the bundled PostgreSQL path, use docker/docker-compose.yml instead.
+# For production with TLS, layer docker/docker-compose.prod.yml on top:
+#   docker compose -f docker/docker-compose.external-db.yml -f docker/docker-compose.prod.yml up -d
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: kotauth
+
+services:
+  app:
+    image: ghcr.io/inumansoul/kotauth:latest
+    container_name: kotauth
+    env_file:
+      - .env
+    environment:
+      DB_URL: ${DB_URL:?DB_URL is required — set it in .env to your PostgreSQL connection string}
+      DB_USER: ${DB_USER:?DB_USER is required — set it in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required — set it in .env}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped

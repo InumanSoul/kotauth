@@ -96,7 +96,7 @@ cp .env.example .env
 make up
 ```
 
-`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
+`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. Run `make help` to see all available targets (test, lint, logs, nuke, etc.). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ---
 
@@ -109,7 +109,7 @@ Images are published to GitHub Container Registry on every tagged release.
 | `ghcr.io/inumansoul/kotauth:latest` | Latest stable release |
 | `ghcr.io/inumansoul/kotauth:1` | Latest patch in the `1.x` line |
 | `ghcr.io/inumansoul/kotauth:1.1` | Latest patch in `1.1.x` |
-| `ghcr.io/inumansoul/kotauth:1.1.1` | Exact version pin |
+| `ghcr.io/inumansoul/kotauth:1.1.2` | Exact version pin |
 
 Pre-release tags (e.g. `1.1.0-rc1`) are published but do not move the `latest` or major/minor tags.
 
@@ -151,6 +151,34 @@ For the full reference including per-tenant SMTP and security policy configurati
 
 ---
 
+## Bring your own database
+
+Already have PostgreSQL (or using a managed provider like RDS, Supabase, Neon)? Skip the bundled database entirely:
+
+```bash
+docker compose -f docker/docker-compose.external-db.yml up -d
+```
+
+Set these in `.env`:
+
+```bash
+DB_URL=jdbc:postgresql://your-host:5432/kotauth_db?sslmode=require
+DB_USER=kotauth
+DB_PASSWORD=your-password
+KAUTH_BASE_URL=https://auth.yourdomain.com
+KAUTH_SECRET_KEY=$(openssl rand -hex 32)
+```
+
+Flyway runs all migrations automatically — just point it at an empty database.
+
+For production with TLS, layer the Caddy overlay on top:
+
+```bash
+docker compose -f docker/docker-compose.external-db.yml -f docker/docker-compose.prod.yml up -d
+```
+
+---
+
 ## Production deployment
 
 See the full guide: [docs/guides/production-deployment.md](docs/guides/production-deployment.md).
@@ -158,6 +186,7 @@ See the full guide: [docs/guides/production-deployment.md](docs/guides/productio
 The short version: TLS is required. Use `docker/docker-compose.prod.yml` which adds a Caddy sidecar for automatic Let's Encrypt certificates.
 
 ```bash
+# Bundled database + Caddy TLS
 # Requires: DOMAIN and ACME_EMAIL set in .env, ports 80/443 open
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
 ```

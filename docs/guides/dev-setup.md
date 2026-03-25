@@ -32,20 +32,23 @@ Run `make help` from the project root to see all targets with descriptions. Summ
 
 ```
 CSS
-  css            Compile both CSS bundles (admin + auth)
+  css            Compile all four CSS bundles (admin, auth, portal-sidenav, portal-tabnav)
   css-admin      Compile the admin console bundle only
   css-auth       Compile the auth pages bundle only
+  css-portal     Compile the portal bundles (sidenav + tabnav)
 
 Kotlin
   lint           Run ktlint check
   lint-fix       Auto-fix lint issues
-  test           Run the test suite
-  build          Full build — CSS + lint + tests + fat JAR
-  jar            Fat JAR only, skipping tests
+  test           Run the unit/integration test suite
+  e2e            Run E2E browser smoke tests (Playwright, headless)
+  e2e-headed     Run E2E tests with visible browser (debugging)
+  build          Full build — CSS + lint + tests + fat JAR (CI-equivalent)
+  jar            Fat JAR only, skipping tests (faster iteration)
   version        Generate version.properties resource (required before running from IDE)
 
 Docker
-  up             Build images and start all services
+  up             Build images from source and start all services (dev)
   up-fresh       Rebuild from scratch (no layer cache)
   down           Stop and remove containers
   nuke           Wipe containers and volumes (destroys DB)
@@ -87,11 +90,11 @@ kotauth help         # list all targets
 
 ## CSS pipeline notes
 
-The two compiled CSS bundles are written to `src/main/resources/static/` and embedded in the fat JAR by `processResources`. You rarely need to run the CSS tasks manually — `make build` handles everything.
+The four compiled CSS bundles (`kotauth-admin.css`, `kotauth-auth.css`, `kotauth-portal-sidenav.css`, `kotauth-portal-tabnav.css`) are written to `src/main/resources/static/` and embedded in the fat JAR by `processResources`. You rarely need to run the CSS tasks manually — `make build` handles everything.
 
 When iterating on frontend styles locally:
 1. Edit files under `frontend/css/`
-2. Run `make css` (or `make css-admin` / `make css-auth` for a single bundle)
+2. Run `make css` (or `make css-admin` / `make css-auth` / `make css-portal` for individual bundles)
 3. Restart the app — the updated bundle is picked up immediately if you are running outside Docker, or rebuild the container if running inside
 
 In Docker builds the CSS stage is handled by a dedicated `node:20-slim` layer before Gradle runs, so the Gradle CSS tasks are skipped with `-x` flags. See `Dockerfile` for details.

@@ -144,7 +144,7 @@ To pin to a specific version instead of tracking `latest`:
 # In docker-compose.yml, change:
 image: ghcr.io/inumansoul/kotauth:latest
 # To:
-image: ghcr.io/inumansoul/kotauth:1.1.0
+image: ghcr.io/inumansoul/kotauth:1.1.2
 ```
 
 ---

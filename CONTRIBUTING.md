@@ -7,6 +7,7 @@ Thanks for considering a contribution. This document covers how to get the proje
 ## Setting Up Your Development Environment
 
 **Prerequisites:**
+
 - JDK 17+ (we recommend [Eclipse Temurin](https://adoptium.net/))
 - Docker and Docker Compose
 - Kotlin-aware IDE — [IntelliJ IDEA](https://www.jetbrains.com/idea/) Community or Ultimate
@@ -16,30 +17,63 @@ Thanks for considering a contribution. This document covers how to get the proje
 ```bash
 git clone https://github.com/inumansoul/kotauth.git
 cd kotauth
-
-# Start the PostgreSQL dependency only
-docker compose up db -d
-
-# Copy the development env file
 cp .env.example .env
+# Edit .env: set KAUTH_SECRET_KEY (openssl rand -hex 32)
+make up
+```
 
-# Run the app from your IDE or with Gradle
-./gradlew run
+This builds the image from source, starts PostgreSQL and the app. Kotauth is available at `http://localhost:8080`. Database migrations run automatically on first boot via Flyway.
+
+To run the app from your IDE instead (useful for hot-reload during development):
+
+```bash
+make up              # start the full stack once
+make down            # stop everything
+make version         # generate version.properties (required before IDE run)
+make css             # compile CSS bundles (required before IDE run)
+docker compose -f docker/docker-compose.dev.yml up db -d   # start only PostgreSQL
 ```
 
 The application starts on `http://localhost:8080`. Database migrations run automatically on startup via Flyway.
 
-Alternatively, run everything in Docker:
+### Makefile targets
+
+All developer workflows are available via `make`. Run `make help` to see the full list.
+
+| Target | What it does |
+| --- | --- |
+| `make up` | Build from source and start all services (dev) |
+| `make up-fresh` | Rebuild from scratch, no layer cache |
+| `make down` | Stop and remove containers |
+| `make nuke` | Stop containers and wipe volumes (destroys the database) |
+| `make logs` | Follow app container logs |
+| `make health` | Probe the local health endpoint |
+| `make test` | Run the unit/integration test suite |
+| `make e2e` | Run E2E browser smoke tests (Playwright, headless) |
+| `make e2e-headed` | Run E2E tests with a visible browser (debugging) |
+| `make lint` | Run ktlint check |
+| `make lint-fix` | Auto-fix lint issues |
+| `make css` | Compile all four CSS bundles (admin, auth, portal-sidenav, portal-tabnav) |
+| `make build` | Full CI-equivalent build — CSS + lint + tests + fat JAR |
+| `make jar` | Build fat JAR only, skipping tests (faster iteration) |
+| `make version` | Generate `version.properties` (required before running from IDE) |
+
+### Typical dev loop
 
 ```bash
-docker compose up
+make up              # start the stack
+# make changes...
+make test            # run tests
+make lint            # check formatting
+make logs            # tail the app logs
+make nuke && make up # reset everything from scratch
 ```
 
 ---
 
 ## Project Structure
 
-```
+```bash
 src/main/kotlin/com/kauth/
   Application.kt          — Entry point and composition root
   domain/
@@ -83,10 +117,10 @@ When adding a new feature:
 ## Testing Philosophy and Conventions
 
 ```bash
-./gradlew test
+make test
 ```
 
-The test suite runs entirely in-memory — no database, no network, no Docker. All tests should pass on a fresh clone with just `./gradlew test`.
+The test suite runs entirely in-memory — no database, no network, no Docker. All tests should pass on a fresh clone with just `make test`.
 
 ### Fakes over mocks
 
@@ -133,6 +167,7 @@ Naming convention: `V{next_number}__{Description_with_underscores}.sql`
 Example: `V22__Add_magic_link_tokens.sql`
 
 Rules:
+
 - Never edit an existing migration — Flyway will reject a modified checksum
 - Write idempotent migrations where possible (`CREATE TABLE IF NOT EXISTS`, etc.)
 - Each migration should do one logical thing
@@ -156,6 +191,7 @@ Rules:
 ## Submitting a Pull Request
 
 1. Fork the repository and create a branch from `main`:
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
@@ -164,9 +200,11 @@ Rules:
 
 3. Add or update tests. New domain logic should have unit test coverage. New HTTP endpoints should at minimum have a happy-path integration test.
 
-4. Run the full test suite:
+4. Run the full test suite and linter:
+
    ```bash
-   ./gradlew test
+   make test
+   make lint
    ```
 
 5. Open a pull request against `main`. Include:
@@ -174,13 +212,14 @@ Rules:
    - Any relevant migration files
    - If you're changing auth flows or security behavior, note that explicitly — it gets closer review
 
-6. If your change adds a new architectural decision, document it as an ADR in `docs/IMPLEMENTATION_STATUS.md` under the ADR section.
+6. If your change adds a new architectural decision, document it as an ADR in `docs/adr/`.
 
 ---
 
 ## Reporting Bugs
 
 Open a GitHub issue with:
+
 - Steps to reproduce
 - Expected vs actual behavior
 - Kotauth version or commit hash
@@ -194,10 +233,9 @@ For security vulnerabilities, please do not open a public issue. Email the maint
 
 Good areas to contribute:
 
-- **Admin HTML UI** for role and group management — the REST API is complete, the HTML pages aren't built yet
-- **CI/CD pipeline** — GitHub Actions for test + build on PR
-- **Integration guides** — any OIDC-compatible framework or language
-- **Test coverage** for admin, portal, and API routes
+- **Integration guides** — any OIDC-compatible framework or language (we have React SPA; Next.js, SvelteKit, Go, and others are welcome)
+- **Test coverage** — route integration tests for admin, portal, and API endpoints
+- **Documentation improvements** — typos, clarity, new deployment guides
 - **Bug fixes** — always welcome
 
 Out of scope for V1 (don't start these without discussion first):
