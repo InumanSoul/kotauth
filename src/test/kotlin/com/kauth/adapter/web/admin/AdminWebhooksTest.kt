@@ -41,6 +41,8 @@ import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
 import io.ktor.server.testing.testApplication
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -121,6 +123,7 @@ class AdminWebhooksTest {
             evTokenRepo = FakeEmailVerificationTokenRepository(),
             prTokenRepo = FakePasswordResetTokenRepository(),
             emailPort = FakeEmailPort(),
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     private fun buildAdminService() =

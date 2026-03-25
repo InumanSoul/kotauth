@@ -18,6 +18,8 @@ import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -53,6 +55,7 @@ class AdminServiceTest {
             prTokenRepo = prTokenRepo,
             emailPort = emailPort,
             passwordPolicy = passwordPolicy,
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     private val svc =

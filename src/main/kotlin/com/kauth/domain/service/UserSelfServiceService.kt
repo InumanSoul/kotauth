@@ -18,6 +18,10 @@ import com.kauth.domain.port.PasswordResetTokenRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -53,6 +57,7 @@ class UserSelfServiceService(
     private val prTokenRepo: PasswordResetTokenRepository,
     private val emailPort: EmailPort,
     private val passwordPolicy: PasswordPolicyPort? = null,
+    private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val log = LoggerFactory.getLogger(UserSelfServiceService::class.java)
 
@@ -102,21 +107,18 @@ class UserSelfServiceService(
         )
 
         val verifyUrl = "$baseUrl/t/${tenant.slug}/verify-email?token=$rawToken"
-        try {
-            emailPort.sendVerificationEmail(user.email, user.fullName, verifyUrl, tenant.displayName, tenant)
-        } catch (e: Exception) {
-            log.warn(
-                "Verification email delivery failed tenantId={} userId={}: {}",
-                tenantId.value,
-                userId.value,
-                e.message,
-                e,
-            )
-            return SelfServiceResult.Failure(
-                SelfServiceError.EmailDeliveryFailed(
-                    "Failed to send verification email. Please try again later.",
-                ),
-            )
+        emailScope.launch {
+            try {
+                emailPort.sendVerificationEmail(user.email, user.fullName, verifyUrl, tenant.displayName, tenant)
+            } catch (e: Exception) {
+                log.warn(
+                    "Verification email delivery failed tenantId={} userId={}: {}",
+                    tenantId.value,
+                    userId.value,
+                    e.message,
+                    e,
+                )
+            }
         }
 
         auditLog.record(
@@ -217,17 +219,18 @@ class UserSelfServiceService(
         )
 
         val resetUrl = "$baseUrl/t/${tenant.slug}/reset-password?token=$rawToken"
-        try {
-            emailPort.sendPasswordResetEmail(user.email, user.fullName, resetUrl, tenant.displayName, tenant)
-        } catch (e: Exception) {
-            // Log but do NOT surface to caller — attacker must not learn the email exists
-            log.warn(
-                "Password reset email delivery failed tenantId={} userId={}: {}",
-                tenant.id.value,
-                user.id.value,
-                e.message,
-                e,
-            )
+        emailScope.launch {
+            try {
+                emailPort.sendPasswordResetEmail(user.email, user.fullName, resetUrl, tenant.displayName, tenant)
+            } catch (e: Exception) {
+                log.warn(
+                    "Password reset email delivery failed tenantId={} userId={}: {}",
+                    tenant.id.value,
+                    user.id.value,
+                    e.message,
+                    e,
+                )
+            }
         }
 
         auditLog.record(

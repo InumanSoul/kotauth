@@ -18,6 +18,8 @@ import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import java.security.MessageDigest
 import java.time.Instant
 import kotlin.test.BeforeTest
@@ -44,6 +46,8 @@ class UserSelfServiceServiceTest {
     private val emailPort = FakeEmailPort()
     private val passwordPolicy = FakePasswordPolicyPort()
 
+    private val testEmailScope = CoroutineScope(Dispatchers.Unconfined)
+
     private val svc =
         UserSelfServiceService(
             userRepository = users,
@@ -55,6 +59,7 @@ class UserSelfServiceServiceTest {
             prTokenRepo = prTokenRepo,
             emailPort = emailPort,
             passwordPolicy = passwordPolicy,
+            emailScope = testEmailScope,
         )
 
     // Service instance WITHOUT password policy (fallback to minLength check)
@@ -69,6 +74,7 @@ class UserSelfServiceServiceTest {
             prTokenRepo = prTokenRepo,
             emailPort = emailPort,
             passwordPolicy = null,
+            emailScope = testEmailScope,
         )
 
     private val smtpTenant =
@@ -245,7 +251,7 @@ class UserSelfServiceServiceTest {
     }
 
     @Test
-    fun `initiateEmailVerification - smtp failure returns EmailDeliveryFailed`() {
+    fun `initiateEmailVerification - smtp failure still returns success`() {
         emailPort.shouldFail = true
         val result =
             svc.initiateEmailVerification(
@@ -253,8 +259,7 @@ class UserSelfServiceServiceTest {
                 tenantId = TenantId(1),
                 baseUrl = "http://localhost",
             )
-        assertIs<SelfServiceResult.Failure>(result)
-        assertIs<SelfServiceError.EmailDeliveryFailed>(result.error)
+        assertIs<SelfServiceResult.Success<Unit>>(result)
     }
 
     // =========================================================================
