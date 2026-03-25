@@ -96,7 +96,7 @@ cp .env.example .env
 make up
 ```
 
-`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
+`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. Run `make help` to see all available targets (test, lint, logs, nuke, etc.). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ---
 
