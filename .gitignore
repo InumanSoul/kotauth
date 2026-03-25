@@ -54,5 +54,4 @@ ai-tools/
 .cursor/
 
 # Internal development tracking — not for public consumption
-docs/IMPLEMENTATION_STATUS.md
-docs/KOTLIN_ADVANTAGE_ROADMAP.md
+docs/internal/
