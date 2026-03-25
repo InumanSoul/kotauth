@@ -48,6 +48,8 @@ import io.ktor.server.auth.bearer
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -128,6 +130,7 @@ class ApiRoutesTest {
             evTokenRepo = evTokenRepo,
             prTokenRepo = prTokenRepo,
             emailPort = emailPort,
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
     private val adminService =
