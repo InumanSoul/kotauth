@@ -162,6 +162,7 @@ internal fun Route.oauthProtocolRoutes(
                 workspaceName = tenant.displayName,
                 oauthParams = oauthParams,
                 enabledProviders = enabledProviders,
+                registrationEnabled = tenant.registrationEnabled,
             ),
         )
     }

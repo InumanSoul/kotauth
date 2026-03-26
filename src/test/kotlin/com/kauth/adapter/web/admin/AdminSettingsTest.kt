@@ -34,6 +34,7 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.routing.routing
+import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
 import io.ktor.server.testing.testApplication
@@ -144,11 +145,27 @@ class AdminSettingsTest {
     fun setup() {
         tenantRepo.clear()
         userRepo.clear()
+        roleRepo.clear()
         auditLogPort.clear()
         tokenPort.reset()
         tenantRepo.add(masterTenant)
         tenantRepo.add(workspace)
         userRepo.add(adminUser)
+        val adminRole =
+            roleRepo.add(
+                com.kauth.domain.model.Role(
+                    tenantId =
+                        com.kauth.domain.model
+                            .TenantId(1),
+                    name = "admin",
+                    scope = com.kauth.domain.model.RoleScope.TENANT,
+                ),
+            )
+        roleRepo.assignRoleToUser(
+            com.kauth.domain.model
+                .UserId(1),
+            adminRole.id!!,
+        )
     }
 
     // =========================================================================
@@ -328,7 +345,9 @@ class AdminSettingsTest {
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Sessions) {
-            cookie<AdminSession>("KOTAUTH_ADMIN")
+            cookie<AdminSession>("KOTAUTH_ADMIN") {
+                transform(SessionTransportTransformerMessageAuthentication(ByteArray(32)))
+            }
         }
         routing {
             adminRoutes(
@@ -343,6 +362,8 @@ class AdminSettingsTest {
                 auditLogRepository = auditLogRepo,
                 keyProvisioningService = keyProvisioningService,
                 encryptionService = encryptionService,
+                roleRepository = roleRepo,
+                adminBypass = true,
             )
         }
     }

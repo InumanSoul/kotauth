@@ -35,8 +35,17 @@ object AdminView {
 
     // ── Auth ────────────────────────────────────────────────────────────
 
-    fun loginPage(error: String? = null): HTML.() -> Unit =
-        loginPageImpl(error)
+    fun loginPage(
+        error: String? = null,
+        bypassNotice: String? = null,
+    ): HTML.() -> Unit =
+        loginPageImpl(error, bypassNotice)
+
+    fun errorPage(
+        message: String,
+        retryUrl: String,
+    ): HTML.() -> Unit =
+        adminOAuthErrorPageImpl(message, retryUrl)
 
     fun adminErrorPage(
         message: String,
