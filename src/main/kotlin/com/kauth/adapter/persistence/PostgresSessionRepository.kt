@@ -179,6 +179,22 @@ class PostgresSessionRepository : SessionRepository {
         Unit
     }
 
+    override fun deleteExpired(retentionDays: Int): Int =
+        transaction {
+            val cutoff = OffsetDateTime.now().minusDays(retentionDays.toLong())
+            val expiredIds =
+                SessionsTable
+                    .select(SessionsTable.id)
+                    .where {
+                        (SessionsTable.expiresAt less cutoff) or
+                            ((SessionsTable.revokedAt.isNotNull()) and (SessionsTable.revokedAt less cutoff))
+                    }.map { it[SessionsTable.id] }
+            if (expiredIds.isEmpty()) return@transaction 0
+            expiredIds.chunked(500).sumOf { batch ->
+                SessionsTable.deleteWhere { Op.build { SessionsTable.id inList batch } }
+            }
+        }
+
     // -------------------------------------------------------------------------
     // Mappers
     // -------------------------------------------------------------------------

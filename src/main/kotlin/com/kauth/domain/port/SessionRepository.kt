@@ -63,4 +63,10 @@ interface SessionRepository {
         userId: UserId,
         keepNewest: Int,
     )
+
+    /**
+     * Deletes sessions that are both expired and revoked (or expired for over [retentionDays]).
+     * Returns the number of rows deleted. Used by the background cleanup job.
+     */
+    fun deleteExpired(retentionDays: Int = 7): Int
 }

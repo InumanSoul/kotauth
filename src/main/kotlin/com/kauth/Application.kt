@@ -33,6 +33,9 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
@@ -67,6 +70,21 @@ fun main() {
         embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
             module(services, appInfo, config, startTime)
         }
+
+    // Background cleanup: purge expired sessions every hour
+    services.applicationScope.launch {
+        while (isActive) {
+            delay(3_600_000) // 1 hour
+            try {
+                val deleted = services.sessionRepository.deleteExpired()
+                if (deleted > 0) {
+                    startupLog.info("Session cleanup: deleted {} expired rows", deleted)
+                }
+            } catch (e: Exception) {
+                startupLog.warn("Session cleanup failed: {}", e.message)
+            }
+        }
+    }
 
     Runtime.getRuntime().addShutdownHook(
         Thread {

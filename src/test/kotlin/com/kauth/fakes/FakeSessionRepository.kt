@@ -76,4 +76,11 @@ class FakeSessionRepository : SessionRepository {
                 .sortedBy { it.createdAt }
         active.dropLast(keepNewest).forEach { revoke(it.id!!, Instant.now()) }
     }
+
+    override fun deleteExpired(retentionDays: Int): Int {
+        val cutoff = Instant.now().minusSeconds(retentionDays * 86400L)
+        val toDelete = store.values.filter { it.expiresAt.isBefore(cutoff) || (it.revokedAt?.isBefore(cutoff) == true) }
+        toDelete.forEach { store.remove(it.id?.value) }
+        return toDelete.size
+    }
 }

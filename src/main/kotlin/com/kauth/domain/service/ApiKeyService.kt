@@ -5,7 +5,7 @@ import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApiKeyRepository
 import com.kauth.domain.port.TenantRepository
-import java.security.MessageDigest
+import com.kauth.domain.util.sha256Hex
 import java.security.SecureRandom
 import java.time.Instant
 import java.util.Base64
@@ -148,15 +148,6 @@ class ApiKeyService(
             ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
         apiKeyRepository.delete(id, tenantId)
         return ApiKeyResult.Success(Unit)
-    }
-
-    // =========================================================================
-    // Utilities
-    // =========================================================================
-
-    private fun sha256Hex(input: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
-        return digest.joinToString("") { "%02x".format(it) }
     }
 }
 
