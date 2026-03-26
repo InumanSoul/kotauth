@@ -19,7 +19,7 @@ import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
-import java.security.MessageDigest
+import com.kauth.domain.util.sha256Hex
 import java.security.SecureRandom
 import java.time.Instant
 
@@ -340,8 +340,8 @@ class SocialLoginService(
                 tenantId = tenant.id,
                 userId = user.id!!,
                 clientId = null,
-                accessTokenHash = sha256(tokens.access_token),
-                refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
+                accessTokenHash = sha256Hex(tokens.access_token),
+                refreshTokenHash = tokens.refresh_token?.let { sha256Hex(it) },
                 scopes = "openid",
                 ipAddress = ipAddress,
                 userAgent = userAgent,
@@ -385,11 +385,6 @@ class SocialLoginService(
         tenantSlug: String,
         provider: SocialProvider,
     ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
-
-    private fun sha256(input: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
 }
 
 // ---------------------------------------------------------------------------

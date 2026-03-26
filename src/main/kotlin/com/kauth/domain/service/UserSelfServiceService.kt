@@ -18,12 +18,12 @@ import com.kauth.domain.port.PasswordResetTokenRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.sha256Hex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
 import java.util.Base64
@@ -140,7 +140,7 @@ class UserSelfServiceService(
      * Marks the token as used and flips [User.emailVerified].
      */
     fun confirmEmailVerification(rawToken: String): SelfServiceResult<Unit> {
-        val hash = sha256(rawToken)
+        val hash = sha256Hex(rawToken)
         val token =
             evTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Verification link is invalid."))
@@ -256,7 +256,7 @@ class UserSelfServiceService(
         newPassword: String,
         confirmPassword: String,
     ): SelfServiceResult<Unit> {
-        val hash = sha256(rawToken)
+        val hash = sha256Hex(rawToken)
         val token =
             prTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
@@ -593,12 +593,7 @@ class UserSelfServiceService(
     private fun generateToken(): Pair<String, String> {
         val raw = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
-        return token to sha256(token)
-    }
-
-    private fun sha256(input: String): String {
-        val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
+        return token to sha256Hex(token)
     }
 }
 

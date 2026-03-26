@@ -14,7 +14,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
-import java.security.MessageDigest
+import com.kauth.domain.util.sha256Hex
 import java.time.Duration
 import java.time.Instant
 
@@ -177,8 +177,8 @@ class AuthService(
                 tenantId = tenant.id,
                 userId = user.id,
                 clientId = null,
-                accessTokenHash = sha256(tokens.access_token),
-                refreshTokenHash = tokens.refresh_token?.let { sha256(it) },
+                accessTokenHash = sha256Hex(tokens.access_token),
+                refreshTokenHash = tokens.refresh_token?.let { sha256Hex(it) },
                 scopes = "openid",
                 ipAddress = ipAddress,
                 userAgent = userAgent,
@@ -294,12 +294,6 @@ class AuthService(
         if (active > maxSessions) {
             sessionRepository.revokeOldestForUser(tenantId, userId, keepNewest = maxSessions)
         }
-    }
-
-    private fun sha256(input: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
-        return bytes.joinToString("") { "%02x".format(it) }
     }
 }
 

@@ -17,6 +17,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.sha256Hex
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Instant
@@ -245,8 +246,8 @@ class OAuthService(
                 tenantId = tenant.id,
                 userId = user.id,
                 clientId = client.id,
-                accessTokenHash = sha256(tokenResponse.access_token),
-                refreshTokenHash = tokenResponse.refresh_token?.let { sha256(it) },
+                accessTokenHash = sha256Hex(tokenResponse.access_token),
+                refreshTokenHash = tokenResponse.refresh_token?.let { sha256Hex(it) },
                 scopes = authCode.scopes,
                 ipAddress = ipAddress,
                 userAgent = userAgent,
@@ -327,7 +328,7 @@ class OAuthService(
                 tenantId = tenant.id,
                 userId = null,
                 clientId = client.id,
-                accessTokenHash = sha256(accessToken),
+                accessTokenHash = sha256Hex(accessToken),
                 refreshTokenHash = null,
                 scopes = requestedScopes.joinToString(" "),
                 ipAddress = ipAddress,
@@ -381,7 +382,7 @@ class OAuthService(
             tenantRepository.findBySlug(tenantSlug)
                 ?: return OAuthResult.Failure(OAuthError.TenantNotFound)
 
-        val hash = sha256(refreshToken)
+        val hash = sha256Hex(refreshToken)
         val session = sessionRepository.findActiveByRefreshTokenHash(hash)
 
         if (session == null) {
@@ -431,8 +432,8 @@ class OAuthService(
                 tenantId = tenant.id,
                 userId = user.id,
                 clientId = session.clientId,
-                accessTokenHash = sha256(newTokens.access_token),
-                refreshTokenHash = newTokens.refresh_token?.let { sha256(it) },
+                accessTokenHash = sha256Hex(newTokens.access_token),
+                refreshTokenHash = newTokens.refresh_token?.let { sha256Hex(it) },
                 scopes = session.scopes,
                 ipAddress = ipAddress,
                 userAgent = userAgent,
@@ -476,7 +477,7 @@ class OAuthService(
             tenantRepository.findBySlug(tenantSlug)
                 ?: return IntrospectionResult.Inactive
 
-        val hash = sha256(token)
+        val hash = sha256Hex(token)
 
         // RFC 7662 §2: use tokenTypeHint to optimise lookup order
         val session =
@@ -520,7 +521,7 @@ class OAuthService(
      * Always returns success per RFC 7009 (don't leak token validity).
      */
     fun revokeToken(token: String) {
-        val hash = sha256(token)
+        val hash = sha256Hex(token)
         val byAccess = sessionRepository.findActiveByAccessTokenHash(hash)
         val byRefresh = sessionRepository.findActiveByRefreshTokenHash(hash)
         val session = byAccess ?: byRefresh ?: return // No-op per spec
@@ -557,7 +558,7 @@ class OAuthService(
     )
 
     fun getUserInfo(accessToken: String): UserInfoResult? {
-        val hash = sha256(accessToken)
+        val hash = sha256Hex(accessToken)
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return null
         val userId = session.userId ?: return null // No userinfo for M2M tokens
 
@@ -586,7 +587,7 @@ class OAuthService(
         revokeAll: Boolean = false,
         ipAddress: String? = null,
     ) {
-        val hash = sha256(accessToken)
+        val hash = sha256Hex(accessToken)
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return
 
         if (revokeAll && session.userId != null) {
@@ -639,16 +640,6 @@ class OAuthService(
 
     companion object {
         private const val CODE_EXPIRY_SECONDS = 300L // 5 minutes
-
-        /**
-         * SHA-256 hex digest of a string. Used for token hashing in session storage.
-         * Never store raw tokens — only their hashes.
-         */
-        fun sha256(input: String): String {
-            val digest = MessageDigest.getInstance("SHA-256")
-            val bytes = digest.digest(input.toByteArray(Charsets.UTF_8))
-            return bytes.joinToString("") { "%02x".format(it) }
-        }
     }
 }
 
