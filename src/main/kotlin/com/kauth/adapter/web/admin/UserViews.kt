@@ -65,7 +65,7 @@ internal fun userDetailPageImpl(
                                 span("badge badge--inactive") { +"Email unverified" }
                             }
                             if (user.isLocked) {
-                                span("badge badge--inactive") {
+                                span("badge badge--warn") {
                                     span("badge__dot") {}
                                     +"Locked"
                                 }
@@ -500,15 +500,20 @@ internal fun userListPageImpl(
                                     span("data-table__email") { +user.email }
                                 }
                                 td {
-                                    if (user.enabled) {
-                                        span("badge badge--active") {
-                                            span("badge__dot") {}
-                                            +"Active"
-                                        }
-                                    } else {
+                                    if (!user.enabled) {
                                         span("badge badge--inactive") {
                                             span("badge__dot") {}
                                             +"Disabled"
+                                        }
+                                    } else if (user.isLocked) {
+                                        span("badge badge--warn") {
+                                            span("badge__dot") {}
+                                            +"Locked"
+                                        }
+                                    } else {
+                                        span("badge badge--active") {
+                                            span("badge__dot") {}
+                                            +"Active"
                                         }
                                     }
                                 }
