@@ -176,7 +176,14 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
-    fun listRoles(tenantId: TenantId): List<Role> = roleRepository.findByTenantId(tenantId)
+    fun listRoles(tenantId: TenantId): List<Role> {
+        val roles = roleRepository.findByTenantId(tenantId)
+        val childMappings = roleRepository.findAllChildMappings(tenantId)
+        return roles.map { role ->
+            val children = childMappings[role.id]
+            if (children != null) role.copy(childRoleIds = children) else role
+        }
+    }
 
     fun listClientRoles(
         tenantId: TenantId,

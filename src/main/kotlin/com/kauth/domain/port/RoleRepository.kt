@@ -48,6 +48,9 @@ interface RoleRepository {
 
     fun findChildRoleIds(roleId: RoleId): List<RoleId>
 
+    /** Returns all parent→children composite mappings for roles in the given tenant (single query). */
+    fun findAllChildMappings(tenantId: TenantId): Map<RoleId, List<RoleId>>
+
     // User ↔ Role assignment
     fun assignRoleToUser(
         userId: UserId,
