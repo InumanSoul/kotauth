@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
@@ -86,8 +87,7 @@ class UserSelfServiceServiceTest {
             smtpHost = "smtp.example.com",
             smtpFromAddress = "no-reply@acme.com",
             smtpEnabled = true,
-            passwordPolicyMinLength = 8,
-            passwordPolicyHistoryCount = 3,
+            securityConfig = SecurityConfig(passwordMinLength = 8, passwordHistoryCount = 3),
         )
 
     private val noSmtpTenant =

@@ -91,10 +91,13 @@ class DemoSeedService(
                 tenant.copy(
                     registrationEnabled = true,
                     emailVerificationRequired = false,
-                    passwordPolicyMinLength = 8,
-                    passwordPolicyRequireUppercase = true,
-                    passwordPolicyRequireNumber = true,
-                    mfaPolicy = "optional",
+                    securityConfig =
+                        tenant.securityConfig.copy(
+                            passwordMinLength = 8,
+                            passwordRequireUppercase = true,
+                            passwordRequireNumber = true,
+                            mfaPolicy = "optional",
+                        ),
                     tokenExpirySeconds = 3600L,
                     refreshTokenExpirySeconds = 86400L,
                 ),
@@ -235,8 +238,11 @@ class DemoSeedService(
                 tenant.copy(
                     registrationEnabled = true,
                     emailVerificationRequired = false,
-                    passwordPolicyMinLength = 6,
-                    mfaPolicy = "optional",
+                    securityConfig =
+                        tenant.securityConfig.copy(
+                            passwordMinLength = 6,
+                            mfaPolicy = "optional",
+                        ),
                     tokenExpirySeconds = 7200L,
                     refreshTokenExpirySeconds = 172800L,
                 ),

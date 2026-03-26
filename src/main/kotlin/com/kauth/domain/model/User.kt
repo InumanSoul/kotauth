@@ -20,5 +20,10 @@ data class User(
     val enabled: Boolean = true,
     val lastPasswordChangeAt: Instant? = null,
     val mfaEnabled: Boolean = false,
+    val failedLoginAttempts: Int = 0,
+    val lockedUntil: Instant? = null,
     val createdAt: Instant? = null,
-)
+) {
+    /** True when the account is currently locked out (lockout window has not yet expired). */
+    val isLocked: Boolean get() = lockedUntil != null && lockedUntil.isAfter(Instant.now())
+}

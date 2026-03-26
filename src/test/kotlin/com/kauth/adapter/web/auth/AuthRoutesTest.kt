@@ -225,7 +225,7 @@ class AuthRoutesTest {
                     lastPasswordChangeAt = Instant.now().minusSeconds(100L * 86_400),
                 ),
             )
-            val expiredTenant = tenant.copy(passwordPolicyMaxAgeDays = 90)
+            val expiredTenant = tenant.copy(securityConfig = tenant.securityConfig.copy(passwordMaxAgeDays = 90))
             tenantRepo.clear()
             tenantRepo.add(expiredTenant)
             every { mfaService.shouldChallengeMfa(any()) } returns false

@@ -138,6 +138,27 @@ class PostgresUserRepository : UserRepository {
                 .count() > 0
         }
 
+    override fun recordFailedLogin(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    ) = transaction {
+        UsersTable.update({ UsersTable.id eq userId.value }) {
+            it[failedLoginAttempts] = newCount
+            it[UsersTable.lockedUntil] = lockedUntil?.let { ts -> OffsetDateTime.ofInstant(ts, ZoneOffset.UTC) }
+        }
+        Unit
+    }
+
+    override fun resetFailedLogins(userId: UserId) =
+        transaction {
+            UsersTable.update({ UsersTable.id eq userId.value }) {
+                it[failedLoginAttempts] = 0
+                it[lockedUntil] = null
+            }
+            Unit
+        }
+
     private fun ResultRow.toUser(): User =
         User(
             id = UserId(this[UsersTable.id]),
@@ -150,6 +171,8 @@ class PostgresUserRepository : UserRepository {
             enabled = this[UsersTable.enabled],
             lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
             mfaEnabled = this[UsersTable.mfaEnabled],
+            failedLoginAttempts = this[UsersTable.failedLoginAttempts],
+            lockedUntil = this[UsersTable.lockedUntil]?.toInstant(),
             createdAt = this[UsersTable.createdAt].toInstant(),
         )
 

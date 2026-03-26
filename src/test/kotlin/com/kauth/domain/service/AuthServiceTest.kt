@@ -158,7 +158,7 @@ class AuthServiceTest {
 
     @Test
     fun `authenticate returns PasswordExpired when policy is set and password age exceeds limit`() {
-        val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 90)
+        val tenant = testTenant.copy(securityConfig = testTenant.securityConfig.copy(passwordMaxAgeDays = 90))
         tenants.clear()
         tenants.add(tenant)
 
@@ -179,7 +179,7 @@ class AuthServiceTest {
 
     @Test
     fun `authenticate returns Success when password age is within policy limit`() {
-        val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 90)
+        val tenant = testTenant.copy(securityConfig = testTenant.securityConfig.copy(passwordMaxAgeDays = 90))
         tenants.clear()
         tenants.add(tenant)
 
@@ -200,7 +200,7 @@ class AuthServiceTest {
     fun `authenticate does NOT enforce expiry when lastPasswordChangeAt is null`() {
         // Null timestamp = user created before expiry policy was enabled.
         // We must NOT lock them out to prevent mass lockouts when policy is first activated.
-        val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 30)
+        val tenant = testTenant.copy(securityConfig = testTenant.securityConfig.copy(passwordMaxAgeDays = 30))
         tenants.clear()
         tenants.add(tenant)
 
@@ -216,8 +216,8 @@ class AuthServiceTest {
 
     @Test
     fun `authenticate does NOT enforce expiry when policy is zero (disabled)`() {
-        // passwordPolicyMaxAgeDays = 0 means "never expires"
-        val tenant = testTenant.copy(passwordPolicyMaxAgeDays = 0)
+        // passwordMaxAgeDays = 0 means "never expires"
+        val tenant = testTenant.copy(securityConfig = testTenant.securityConfig.copy(passwordMaxAgeDays = 0))
         tenants.clear()
         tenants.add(tenant)
 

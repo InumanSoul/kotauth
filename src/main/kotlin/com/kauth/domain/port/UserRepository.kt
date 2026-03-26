@@ -53,4 +53,17 @@ interface UserRepository {
         tenantId: TenantId,
         email: String,
     ): Boolean
+
+    /**
+     * Increments the failed login counter and optionally locks the account until [lockedUntil].
+     * Pass `lockedUntil = null` to increment without triggering a lockout.
+     */
+    fun recordFailedLogin(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    )
+
+    /** Clears the failed login counter and removes any active lockout on [userId]. */
+    fun resetFailedLogins(userId: UserId)
 }

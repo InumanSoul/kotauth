@@ -24,6 +24,9 @@ object UsersTable : Table("users") {
 
     val mfaEnabled = bool("mfa_enabled").default(false)
 
+    val failedLoginAttempts = integer("failed_login_attempts").default(0)
+    val lockedUntil = timestampWithTimeZone("locked_until").nullable()
+
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

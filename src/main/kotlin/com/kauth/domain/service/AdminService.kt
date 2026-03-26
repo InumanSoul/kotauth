@@ -100,14 +100,17 @@ class AdminService(
                 refreshTokenExpirySeconds = refreshTokenExpirySeconds,
                 registrationEnabled = registrationEnabled,
                 emailVerificationRequired = emailVerificationRequired,
-                passwordPolicyMinLength = passwordPolicyMinLength,
-                passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
-                passwordPolicyRequireUppercase = passwordPolicyRequireUppercase,
-                passwordPolicyRequireNumber = passwordPolicyRequireNumber,
-                passwordPolicyHistoryCount = passwordPolicyHistoryCount.coerceIn(0, 24),
-                passwordPolicyMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
-                passwordPolicyBlacklistEnabled = passwordPolicyBlacklistEnabled,
-                mfaPolicy = mfaPolicy,
+                securityConfig =
+                    tenant.securityConfig.copy(
+                        passwordMinLength = passwordPolicyMinLength,
+                        passwordRequireSpecial = passwordPolicyRequireSpecial,
+                        passwordRequireUppercase = passwordPolicyRequireUppercase,
+                        passwordRequireNumber = passwordPolicyRequireNumber,
+                        passwordHistoryCount = passwordPolicyHistoryCount.coerceIn(0, 24),
+                        passwordMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
+                        passwordBlacklistEnabled = passwordPolicyBlacklistEnabled,
+                        mfaPolicy = mfaPolicy,
+                    ),
             )
 
         val saved = tenantRepository.update(updated)
@@ -627,6 +630,34 @@ class AdminService(
             is SelfServiceResult.Success -> AdminResult.Success(Unit)
             is SelfServiceResult.Failure -> AdminResult.Failure(AdminError.Validation(result.error.message))
         }
+
+    /**
+     * Unlocks a user account that was locked due to excessive failed login attempts.
+     * Resets the failed attempt counter and clears the lock timestamp.
+     */
+    fun unlockUser(
+        userId: UserId,
+        tenantId: TenantId,
+    ): AdminResult<Unit> {
+        val user =
+            userRepository.findById(userId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
+        if (user.tenantId != tenantId) {
+            return AdminResult.Failure(AdminError.NotFound("User not found."))
+        }
+        userRepository.resetFailedLogins(userId)
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.ACCOUNT_UNLOCKED,
+                ipAddress = null,
+                userAgent = null,
+            ),
+        )
+        return AdminResult.Success(Unit)
+    }
 }
 
 // =============================================================================

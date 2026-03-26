@@ -311,6 +311,7 @@ class UserSelfServiceService(
         val now = Instant.now()
         val hashedPassword = passwordHasher.hash(newPassword)
         userRepository.updatePassword(token.userId, hashedPassword, now)
+        userRepository.resetFailedLogins(token.userId) // clear lockout on password reset
         sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
         prTokenRepo.markUsed(token.id!!, now)
 
