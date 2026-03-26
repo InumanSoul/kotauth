@@ -51,7 +51,7 @@ internal fun Route.registerRoutes(
             }
         val ipAddress = call.request.local.remoteAddress
 
-        val rateLimitKey = "register:$ipAddress"
+        val rateLimitKey = "register:$ipAddress:$slug"
         if (!registerRateLimiter.isAllowed(rateLimitKey)) {
             return@post call.respondHtml(
                 HttpStatusCode.TooManyRequests,

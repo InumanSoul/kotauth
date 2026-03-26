@@ -42,7 +42,7 @@ internal fun Route.selfServiceRoutes(
         val ipAddress = call.request.local.remoteAddress
         val callbackBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
 
-        val rateLimitKey = "forgot:$ipAddress"
+        val rateLimitKey = "forgot:$ipAddress:$slug"
         if (!registerRateLimiter.isAllowed(rateLimitKey)) {
             return@post call.respondRedirect("/t/$slug/forgot-password?sent=true")
         }
