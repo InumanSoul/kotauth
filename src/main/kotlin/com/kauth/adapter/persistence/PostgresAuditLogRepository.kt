@@ -31,7 +31,8 @@ class PostgresAuditLogRepository : AuditLogRepository {
             if (userId != null) query.andWhere { AuditLogTable.userId eq userId.value }
             query
                 .orderBy(AuditLogTable.createdAt, SortOrder.DESC)
-                .limit(limit, offset.toLong())
+                .limit(limit)
+                .offset(offset.toLong())
                 .map { it.toAuditEvent() }
         }
 
