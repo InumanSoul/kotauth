@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.5] - 2026-03-26
+
+### Fixed
+
+- **Broken verification email links** — `AuthService.register()` passed an empty `baseUrl` to email verification, producing relative URLs that don't work in email clients. Deleted the duplicate 6-param overload, wired `baseUrl` through the route layer
+- **Audit log details always empty** — `PostgresAuditLogRepository.toAuditEvent()` now parses the JSONB `details` column via `kotlinx.serialization.json.Json`. API consumers and admin UI now see actual audit event details (IP changes, session IDs, etc.)
+- **OAuth context lost on password expired redirect** — password expired redirect during an OAuth flow now preserves all OAuth params in the query string
+- **CSP violation on admin redirect** — replaced inline JS workspace redirector with server-side cookie (`kotauth_last_ws`) + direct redirect. Replaced inline `onchange` handler with `data-autosubmit` attribute
+- **Rate limit keys now tenant-scoped** — changed from `login:$ip` to `login:$ip:$slug` across all 4 rate-limited endpoints. One tenant's traffic no longer affects another's budget
+- **Rate limiter memory leak** — `InMemoryRateLimiter` now prunes idle buckets when the map exceeds 1,000 keys
+- **`toRole()` N+1 query** — removed per-row composite child query from the role mapper. `RoleGroupService.listRoles()` now batch-fetches all child mappings in one query via `findAllChildMappings()`
+
+### Added
+
+- **Composite database indexes** (V25 migration) — `idx_sessions_tenant_user_active` for session lookups and `idx_audit_tenant_created` for audit log queries. Covers the most frequent query patterns
+- **Shared `applicationScope`** — coroutine scope in `ServiceGraph` shared by `WebhookService` and `UserSelfServiceService`. Cancelled on shutdown to allow in-flight work to complete
+- **Session cleanup job** — background coroutine runs hourly, purging expired and revoked sessions older than 7 days
+- **`sha256Hex` shared utility** — extracted from 5 duplicate private functions into `domain/util/Hashing.kt`
+
+---
+
 ## [1.1.4] - 2026-03-26
 
 ### Security
@@ -210,7 +231,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/inumansoul/kotauth/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/inumansoul/kotauth/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/inumansoul/kotauth/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/inumansoul/kotauth/compare/v1.1.1...v1.1.2
