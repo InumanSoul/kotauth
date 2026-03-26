@@ -103,6 +103,10 @@ fun Application.module(
         header("X-Content-Type-Options", "nosniff")
         header("X-Frame-Options", "DENY")
         header("Referrer-Policy", "strict-origin-when-cross-origin")
+        header(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'",
+        )
         header(HttpHeaders.Server, "KotAuth")
         if (config.isHttps) {
             header(
@@ -154,11 +158,13 @@ fun Application.module(
             cookie.httpOnly = true
             cookie.secure = secureCookies
             cookie.maxAgeInSeconds = 3600 * 8
+            cookie.extensions["SameSite"] = "Lax"
         }
         cookie<PortalSession>("KOTAUTH_PORTAL") {
             cookie.httpOnly = true
             cookie.secure = secureCookies
             cookie.maxAgeInSeconds = 3600 * 4
+            cookie.extensions["SameSite"] = "Lax"
             transform(
                 SessionTransportTransformerMessageAuthentication(
                     s.portalSessionKey,

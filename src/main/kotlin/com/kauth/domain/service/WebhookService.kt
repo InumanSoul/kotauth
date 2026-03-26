@@ -182,7 +182,7 @@ class WebhookService(
         val delayMs = retryDelaysMs[attemptNumber]
         if (delayMs > 0) delay(delayMs)
 
-        val (responseStatus, success) = sendRequest(endpoint, delivery.payload)
+        val (responseStatus, success) = sendRequest(endpoint, delivery.payload, delivery.eventType)
         val now = Instant.now()
         val newAttempts = delivery.attempts + 1
         val newStatus =
@@ -232,6 +232,7 @@ class WebhookService(
     private fun sendRequest(
         endpoint: WebhookEndpoint,
         payload: String,
+        eventType: String,
     ): Pair<Int?, Boolean> =
         try {
             val url = URI(endpoint.url).toURL()
@@ -242,7 +243,7 @@ class WebhookService(
             conn.readTimeout = readTimeoutMs
             conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
             conn.setRequestProperty("User-Agent", "KotAuth-Webhook/1.0")
-            conn.setRequestProperty("X-KotAuth-Event", endpoint.url)
+            conn.setRequestProperty("X-KotAuth-Event", eventType)
             conn.setRequestProperty("X-KotAuth-Signature", computeSignature(endpoint.secret, payload))
 
             OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(payload) }

@@ -23,6 +23,15 @@ repositories {
 }
 
 dependencies {
+    // ---- Security: override vulnerable transitive dependencies from Ktor 2.3.x ----
+    constraints {
+        implementation("io.netty:netty-codec-http2:4.1.124.Final") { because("CVE-2025-55163") }
+        implementation("io.netty:netty-handler:4.1.124.Final") { because("CVE-2025-24970") }
+        implementation("com.fasterxml.jackson:jackson-bom:2.18.6") { because("GHSA-72hv-8253-57qq") }
+        implementation("com.fasterxml.jackson.core:jackson-core:2.18.6") { because("GHSA-72hv-8253-57qq") }
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6") { because("GHSA-72hv-8253-57qq") }
+    }
+
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-auth:$ktorVersion")

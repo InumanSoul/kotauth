@@ -44,7 +44,7 @@ class JwtTokenAdapter(
     private val tenantKeyRepository: TenantKeyRepository,
 ) : TokenPort {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val algorithmCache = mutableMapOf<Int, Pair<Algorithm, RSAPublicKey>>()
+    private val algorithmCache = java.util.concurrent.ConcurrentHashMap<Int, Pair<Algorithm, RSAPublicKey>>()
 
     // -------------------------------------------------------------------------
     // TokenPort — issue user tokens
