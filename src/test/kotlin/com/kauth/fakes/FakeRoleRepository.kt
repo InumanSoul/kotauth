@@ -89,6 +89,19 @@ class FakeRoleRepository : RoleRepository {
     override fun findChildRoleIds(roleId: RoleId): List<RoleId> =
         composites[roleId.value]?.map { RoleId(it) } ?: emptyList()
 
+    override fun findAllChildMappings(tenantId: TenantId): Map<RoleId, List<RoleId>> {
+        val tenantRoleIds =
+            store.values
+                .filter { it.tenantId == tenantId }
+                .mapNotNull { it.id }
+                .toSet()
+        return composites
+            .filter { (parentId, _) -> RoleId(parentId) in tenantRoleIds }
+            .mapKeys { (parentId, _) -> RoleId(parentId) }
+            .mapValues { (_, childIds) -> childIds.map { RoleId(it) } }
+            .filter { (_, children) -> children.isNotEmpty() }
+    }
+
     override fun assignRoleToUser(
         userId: UserId,
         roleId: RoleId,

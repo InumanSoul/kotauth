@@ -146,6 +146,24 @@ class PostgresRoleRepository : RoleRepository {
                 .map { RoleId(it[CompositeRoleMappingsTable.childRoleId]) }
         }
 
+    override fun findAllChildMappings(tenantId: TenantId): Map<RoleId, List<RoleId>> =
+        transaction {
+            val tenantRoleIds =
+                RolesTable
+                    .selectAll()
+                    .where { RolesTable.tenantId eq tenantId.value }
+                    .map { it[RolesTable.id] }
+                    .toSet()
+
+            if (tenantRoleIds.isEmpty()) return@transaction emptyMap()
+
+            CompositeRoleMappingsTable
+                .selectAll()
+                .where { CompositeRoleMappingsTable.parentRoleId inList tenantRoleIds }
+                .groupBy { RoleId(it[CompositeRoleMappingsTable.parentRoleId]) }
+                .mapValues { (_, rows) -> rows.map { RoleId(it[CompositeRoleMappingsTable.childRoleId]) } }
+        }
+
     // -------------------------------------------------------------------------
     // User ↔ Role assignment
     // -------------------------------------------------------------------------
@@ -292,21 +310,14 @@ class PostgresRoleRepository : RoleRepository {
     // Row mapping
     // -------------------------------------------------------------------------
 
-    private fun ResultRow.toRole(): Role {
-        val roleId = this[RolesTable.id]
-        return Role(
-            id = RoleId(roleId),
+    private fun ResultRow.toRole(): Role =
+        Role(
+            id = RoleId(this[RolesTable.id]),
             tenantId = TenantId(this[RolesTable.tenantId]),
             name = this[RolesTable.name],
             description = this[RolesTable.description],
             scope = RoleScope.fromValue(this[RolesTable.scope]),
             clientId = this[RolesTable.clientId]?.let { ApplicationId(it) },
-            childRoleIds =
-                CompositeRoleMappingsTable
-                    .selectAll()
-                    .where { CompositeRoleMappingsTable.parentRoleId eq roleId }
-                    .map { RoleId(it[CompositeRoleMappingsTable.childRoleId]) },
             createdAt = this[RolesTable.createdAt].toInstant(),
         )
-    }
 }
