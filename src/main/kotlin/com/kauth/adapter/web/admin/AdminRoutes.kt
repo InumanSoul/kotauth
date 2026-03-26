@@ -114,12 +114,12 @@ fun Route.adminRoutes(
             val workspaces = tenantRepository.findAll().filter { !it.isMaster }
             if (workspaces.isEmpty()) {
                 call.respondRedirect("/admin/workspaces/new")
-            } else if (workspaces.size == 1) {
-                call.respondRedirect("/admin/workspaces/${workspaces.first().slug}")
-            } else {
-                val fallback = workspaces.first().slug
-                call.respondHtml(HttpStatusCode.OK, AdminView.workspaceRedirector(fallback))
+                return@get
             }
+            // Prefer last-visited workspace (cookie), fall back to first available
+            val lastSlug = call.request.cookies["kotauth_last_ws"]
+            val target = workspaces.firstOrNull { it.slug == lastSlug } ?: workspaces.first()
+            call.respondRedirect("/admin/workspaces/${target.slug}")
         }
 
         // ===============================================================
@@ -221,6 +221,8 @@ fun Route.adminRoutes(
                     val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
                     call.attributes.put(WorkspaceAttr, workspace)
                     call.attributes.put(WsPairsAttr, wsPairs)
+                    // Remember last-visited workspace for the /admin redirect
+                    call.response.cookies.append("kotauth_last_ws", slug, path = "/admin", maxAge = 86400 * 30L)
                 }
 
                 get {

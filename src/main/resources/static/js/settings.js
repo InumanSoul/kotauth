@@ -7,18 +7,12 @@
  *   3. Copy to clipboard           (data-copy)
  *   4. Confirm dialogs             (data-confirm)
  *   5. Scope toggle (show/hide)    (data-scope-toggle)
- *   6. Persist last workspace slug (localStorage → kotauth_last_ws)
+ *   6. Auto-submit on change       (data-autosubmit)
  *
  * All bindings use data-* attributes — zero inline JS.
  */
 ;(function () {
   'use strict';
-
-  // ── persist last workspace for smart redirect ────────────
-  var wsMatch = window.location.pathname.match(/^\/admin\/workspaces\/([^/]+)/);
-  if (wsMatch) {
-    try { localStorage.setItem('kotauth_last_ws', wsMatch[1]); } catch(e) {}
-  }
 
   // ── helpers ─────────────────────────────────────────────────
   function updateCount(gridEl) {
@@ -108,5 +102,12 @@
       e.preventDefault();
       e.stopImmediatePropagation();
     }
+  });
+
+  // ── auto-submit on change ─────────────────────────────────
+  document.addEventListener('change', function (e) {
+    var el = e.target.closest('[data-autosubmit]');
+    if (!el || !el.form) return;
+    el.form.submit();
   });
 })();

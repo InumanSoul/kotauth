@@ -170,7 +170,7 @@ internal fun Route.oauthProtocolRoutes(
         val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val ipAddress = call.request.local.remoteAddress
 
-        if (!tokenRateLimiter.isAllowed("token:$ipAddress")) {
+        if (!tokenRateLimiter.isAllowed("token:$ipAddress:$slug")) {
             return@post call.respond(
                 HttpStatusCode.TooManyRequests,
                 mapOf(

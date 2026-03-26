@@ -76,7 +76,7 @@ internal fun Route.loginRoutes(
         val ipAddress = call.request.local.remoteAddress
         val oauthParams = params.toOAuthParams()
 
-        val rateLimitKey = "login:$ipAddress"
+        val rateLimitKey = "login:$ipAddress:$slug"
         if (!loginRateLimiter.isAllowed(rateLimitKey)) {
             return@post call.respondHtml(
                 HttpStatusCode.TooManyRequests,

@@ -39,9 +39,9 @@ import javax.crypto.spec.SecretKeySpec
 class WebhookService(
     private val endpointRepository: WebhookEndpointRepository,
     private val deliveryRepository: WebhookDeliveryRepository,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Retry delay schedule in milliseconds: immediate, 5 min, 30 min
     private val retryDelaysMs = listOf(0L, 5 * 60_000L, 30 * 60_000L)

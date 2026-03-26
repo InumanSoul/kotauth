@@ -239,7 +239,7 @@ class AuthServiceTest {
 
     @Test
     fun `register returns TenantNotFound for unknown slug`() {
-        val result = svc.register("no-such", "bob", "bob@x.com", "Bob", "pass", "pass")
+        val result = svc.register("no-such", "bob", "bob@x.com", "Bob", "pass", "pass", "http://localhost")
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.TenantNotFound>(result.error)
     }
@@ -250,7 +250,7 @@ class AuthServiceTest {
         tenants.clear()
         tenants.add(closed)
 
-        val result = svc.register("acme", "bob", "bob@x.com", "Bob", "pass", "pass")
+        val result = svc.register("acme", "bob", "bob@x.com", "Bob", "pass", "pass", "http://localhost")
 
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.RegistrationDisabled>(result.error)
@@ -258,21 +258,21 @@ class AuthServiceTest {
 
     @Test
     fun `register returns ValidationError for blank required fields`() {
-        val result = svc.register("acme", "", "bob@x.com", "Bob", "pass", "pass")
+        val result = svc.register("acme", "", "bob@x.com", "Bob", "pass", "pass", "http://localhost")
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.ValidationError>(result.error)
     }
 
     @Test
     fun `register returns ValidationError for malformed email`() {
-        val result = svc.register("acme", "bob", "not-an-email", "Bob", "pass8!", "pass8!")
+        val result = svc.register("acme", "bob", "not-an-email", "Bob", "pass8!", "pass8!", "http://localhost")
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.ValidationError>(result.error)
     }
 
     @Test
     fun `register returns ValidationError when passwords do not match`() {
-        val result = svc.register("acme", "bob", "bob@x.com", "Bob", "passA1!x", "passB1!x")
+        val result = svc.register("acme", "bob", "bob@x.com", "Bob", "passA1!x", "passB1!x", "http://localhost")
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.ValidationError>(result.error)
     }
@@ -280,21 +280,48 @@ class AuthServiceTest {
     @Test
     fun `register returns UserAlreadyExists for duplicate username`() {
         // alice is already seeded by @BeforeTest
-        val result = svc.register("acme", "alice", "other@x.com", "Other", "Password8!", "Password8!")
+        val result =
+            svc.register(
+                "acme",
+                "alice",
+                "other@x.com",
+                "Other",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.UserAlreadyExists>(result.error)
     }
 
     @Test
     fun `register returns EmailAlreadyExists for duplicate email`() {
-        val result = svc.register("acme", "newuser", "alice@example.com", "New", "Password8!", "Password8!")
+        val result =
+            svc.register(
+                "acme",
+                "newuser",
+                "alice@example.com",
+                "New",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.EmailAlreadyExists>(result.error)
     }
 
     @Test
     fun `register creates user, records audit event, and returns the saved user on success`() {
-        val result = svc.register("acme", "bob", "bob@x.com", "Bob Builder", "securePa33!", "securePa33!")
+        val result =
+            svc.register(
+                "acme",
+                "bob",
+                "bob@x.com",
+                "Bob Builder",
+                "securePa33!",
+                "securePa33!",
+                "http://localhost",
+            )
 
         assertIs<AuthResult.Success<User>>(result)
         val saved = result.value

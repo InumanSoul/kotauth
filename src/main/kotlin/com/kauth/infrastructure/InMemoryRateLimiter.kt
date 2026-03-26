@@ -36,6 +36,11 @@ class InMemoryRateLimiter(
         val now = System.currentTimeMillis()
         val windowStart = now - (windowSeconds * 1_000L)
 
+        // Probabilistic prune: when the map exceeds 1000 keys, evict idle buckets
+        if (buckets.size > 1_000) {
+            pruneIdleBuckets(windowStart)
+        }
+
         val bucket = buckets.getOrPut(key) { Bucket() }
 
         synchronized(bucket) {
@@ -49,6 +54,20 @@ class InMemoryRateLimiter(
             } else {
                 bucket.timestamps.addLast(now)
                 true
+            }
+        }
+    }
+
+    /** Removes buckets whose timestamps have all expired. */
+    private fun pruneIdleBuckets(windowStart: Long) {
+        val iter = buckets.entries.iterator()
+        while (iter.hasNext()) {
+            val (_, bucket) = iter.next()
+            synchronized(bucket) {
+                while (bucket.timestamps.isNotEmpty() && bucket.timestamps.first() < windowStart) {
+                    bucket.timestamps.removeFirst()
+                }
+                if (bucket.timestamps.isEmpty()) iter.remove()
             }
         }
     }
