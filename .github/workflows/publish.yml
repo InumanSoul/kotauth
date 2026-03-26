@@ -11,27 +11,32 @@ permissions:
   contents: read
   packages: write
 
+env:
+  GHCR_IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
-  publish:
-    name: Build & push Docker image
-    runs-on: ubuntu-latest
+  # ── Build per-platform images in parallel (native runners, no QEMU) ─────
+  build:
+    name: Build (${{ matrix.platform }})
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
 
     env:
-      # Expose the secret as an env var so it can be checked in `if:` conditions.
-      # GitHub doesn't allow referencing secrets directly in `if:` expressions.
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Buildx is required for GHA layer caching.
-      # arm64 dropped for now — QEMU emulation makes JVM builds 20–40 min.
-      # Re-add linux/arm64 once native arm64 runners are in use.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # GHCR login — always. Uses the workflow's GITHUB_TOKEN, no secrets required.
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -39,8 +44,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Docker Hub login — only when DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are set.
-      # To enable: add both as repository secrets in Settings → Secrets → Actions.
       - name: Log in to Docker Hub
         if: env.DOCKERHUB_USERNAME != ''
         uses: docker/login-action@v3
@@ -48,13 +51,90 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build the list of image names to push to.
-      # GHCR is always included. Docker Hub is appended only when credentials exist.
-      # The metadata-action reads this list to generate per-registry tags.
+      # Metadata is generated here for labels only — tags are applied during manifest merge.
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GHCR_IMAGE }}
+          labels: |
+            org.opencontainers.image.title=Kotauth
+            org.opencontainers.image.description=Self-hosted identity and authentication platform
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=MIT
+
+      # Slug the platform name for use as a cache key and digest artifact name.
+      - name: Prepare platform slug
+        id: slug
+        run: echo "pair=$(echo '${{ matrix.platform }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
+
+      # Build and push a single-platform image by digest (no tag yet).
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.GHCR_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=${{ steps.slug.outputs.pair }}
+          cache-to: type=gha,scope=${{ steps.slug.outputs.pair }},mode=max
+
+      # Export the digest so the merge job can reference it.
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ steps.slug.outputs.pair }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ── Merge platform digests into a multi-arch manifest and tag ────────────
+  merge:
+    name: Create multi-arch manifest
+    runs-on: ubuntu-latest
+    needs: build
+
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digest-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build the list of image names to tag.
       - name: Build image list
         id: image-list
         run: |
-          IMAGES="ghcr.io/${{ github.repository }}"
+          IMAGES="${{ env.GHCR_IMAGE }}"
           if [ -n "$DOCKERHUB_USERNAME" ]; then
             IMAGES="${IMAGES}"$'\n'"${DOCKERHUB_USERNAME}/kotauth"
           fi
@@ -65,8 +145,8 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # Derives image tags from the Git tag:
-      #   v1.2.3  →  1.2.3 | 1.2 | 1 | latest
-      #   v1.2.3-rc1  →  1.2.3-rc1  (pre-release: no latest tag)
+      #   v1.2.3     →  1.2.3 | 1.2 | 1 | latest
+      #   v1.2.3-rc1 →  1.2.3-rc1  (pre-release: no latest tag)
       - name: Extract image metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -76,26 +156,15 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-          labels: |
-            org.opencontainers.image.title=Kotauth
-            org.opencontainers.image.description=Self-hosted identity and authentication platform
-            org.opencontainers.image.url=https://github.com/${{ github.repository }}
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.licenses=MIT
 
-      # Build once, push to all registries.
-      # GHA cache keeps layer rebuilds fast across workflow runs.
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      # Combine per-platform digests into a single multi-arch manifest list
+      # and apply all computed tags to it.
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< '${{ steps.meta.outputs.json }}') \
+            $(printf '${{ env.GHCR_IMAGE }}@sha256:%s ' *)
 
-      # Print the digest so it's visible in the workflow summary for traceability.
-      - name: Image digest
-        run: echo "Pushed ${{ steps.meta.outputs.tags }}"
+      - name: Inspect image
+        run: docker buildx imagetools inspect ${{ env.GHCR_IMAGE }}:${{ steps.meta.outputs.version }}

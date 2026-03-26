@@ -140,6 +140,30 @@ DB_PASSWORD=changeme
 
 ---
 
+### `DB_POOL_MAX_SIZE`
+**Optional.** Default: `10`
+
+Maximum number of connections in the HikariCP connection pool. For coroutine-based apps, size to actual DB concurrency needs rather than thread count. A value of `CPU cores × 2` is a good starting point.
+
+When running multiple Kotauth instances, ensure the total across all instances stays within PostgreSQL's `max_connections` (default 100). For example, 4 instances × 10 = 40 connections.
+
+```
+DB_POOL_MAX_SIZE=10
+```
+
+---
+
+### `DB_POOL_MIN_IDLE`
+**Optional.** Default: `2`
+
+Minimum number of idle connections maintained in the pool. Keeps a small number of connections warm to avoid cold-start latency on the first requests after an idle period.
+
+```
+DB_POOL_MIN_IDLE=2
+```
+
+---
+
 ## Demo Mode
 
 ### `KAUTH_DEMO_MODE`
