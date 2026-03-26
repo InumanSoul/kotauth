@@ -2,6 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -42,6 +43,11 @@ class PostgresTenantRepository(
                 JoinType.LEFT,
                 onColumn = TenantsTable.id,
                 otherColumn = WorkspacePortalConfigTable.tenantId,
+            ).join(
+                TenantSecurityConfigTable,
+                JoinType.LEFT,
+                onColumn = TenantsTable.id,
+                otherColumn = TenantSecurityConfigTable.tenantId,
             )
 
     override fun findBySlug(slug: String): Tenant? =
@@ -92,8 +98,6 @@ class PostgresTenantRepository(
                 it[refreshTokenExpirySeconds] = tenant.refreshTokenExpirySeconds.toInt()
                 it[registrationEnabled] = tenant.registrationEnabled
                 it[emailVerificationRequired] = tenant.emailVerificationRequired
-                it[passwordPolicyMinLength] = tenant.passwordPolicyMinLength
-                it[passwordPolicyRequireSpecial] = tenant.passwordPolicyRequireSpecial
                 it[smtpHost] = tenant.smtpHost
                 it[smtpPort] = tenant.smtpPort
                 it[smtpUsername] = tenant.smtpUsername
@@ -103,12 +107,37 @@ class PostgresTenantRepository(
                 it[smtpTlsEnabled] = tenant.smtpTlsEnabled
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
-                it[passwordPolicyHistoryCount] = tenant.passwordPolicyHistoryCount
-                it[passwordPolicyMaxAgeDays] = tenant.passwordPolicyMaxAgeDays
-                it[passwordPolicyRequireUppercase] = tenant.passwordPolicyRequireUppercase
-                it[passwordPolicyRequireNumber] = tenant.passwordPolicyRequireNumber
-                it[passwordPolicyBlacklistEnabled] = tenant.passwordPolicyBlacklistEnabled
-                it[mfaPolicy] = tenant.mfaPolicy
+            }
+            // Upsert: update if exists, insert if the row was never created
+            val updatedRows =
+                TenantSecurityConfigTable.update({
+                    TenantSecurityConfigTable.tenantId eq tenant.id.value
+                }) {
+                    it[passwordMinLength] = tenant.securityConfig.passwordMinLength
+                    it[passwordRequireSpecial] = tenant.securityConfig.passwordRequireSpecial
+                    it[passwordRequireUppercase] = tenant.securityConfig.passwordRequireUppercase
+                    it[passwordRequireNumber] = tenant.securityConfig.passwordRequireNumber
+                    it[passwordHistoryCount] = tenant.securityConfig.passwordHistoryCount
+                    it[passwordMaxAgeDays] = tenant.securityConfig.passwordMaxAgeDays
+                    it[passwordBlacklistEnabled] = tenant.securityConfig.passwordBlacklistEnabled
+                    it[mfaPolicy] = tenant.securityConfig.mfaPolicy
+                    it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
+                    it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                }
+            if (updatedRows == 0) {
+                TenantSecurityConfigTable.insert {
+                    it[tenantId] = tenant.id.value
+                    it[passwordMinLength] = tenant.securityConfig.passwordMinLength
+                    it[passwordRequireSpecial] = tenant.securityConfig.passwordRequireSpecial
+                    it[passwordRequireUppercase] = tenant.securityConfig.passwordRequireUppercase
+                    it[passwordRequireNumber] = tenant.securityConfig.passwordRequireNumber
+                    it[passwordHistoryCount] = tenant.securityConfig.passwordHistoryCount
+                    it[passwordMaxAgeDays] = tenant.securityConfig.passwordMaxAgeDays
+                    it[passwordBlacklistEnabled] = tenant.securityConfig.passwordBlacklistEnabled
+                    it[mfaPolicy] = tenant.securityConfig.mfaPolicy
+                    it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
+                    it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                }
             }
             tenantJoined
                 .selectAll()
@@ -130,6 +159,11 @@ class PostgresTenantRepository(
                     it[TenantsTable.issuerUrl] = issuerUrl
                 } get TenantsTable.id
 
+            // Create default security config row for the new tenant
+            TenantSecurityConfigTable.insert {
+                it[tenantId] = insertedId
+            }
+
             tenantJoined
                 .selectAll()
                 .where { TenantsTable.id eq insertedId }
@@ -150,13 +184,7 @@ class PostgresTenantRepository(
             refreshTokenExpirySeconds = this[TenantsTable.refreshTokenExpirySeconds].toLong(),
             registrationEnabled = this[TenantsTable.registrationEnabled],
             emailVerificationRequired = this[TenantsTable.emailVerificationRequired],
-            passwordPolicyMinLength = this[TenantsTable.passwordPolicyMinLength],
-            passwordPolicyRequireSpecial = this[TenantsTable.passwordPolicyRequireSpecial],
-            passwordPolicyHistoryCount = this[TenantsTable.passwordPolicyHistoryCount],
-            passwordPolicyMaxAgeDays = this[TenantsTable.passwordPolicyMaxAgeDays],
-            passwordPolicyRequireUppercase = this[TenantsTable.passwordPolicyRequireUppercase],
-            passwordPolicyRequireNumber = this[TenantsTable.passwordPolicyRequireNumber],
-            passwordPolicyBlacklistEnabled = this[TenantsTable.passwordPolicyBlacklistEnabled],
+            securityConfig = toSecurityConfig(),
             theme = toTheme(),
             smtpHost = this[TenantsTable.smtpHost],
             smtpPort = this[TenantsTable.smtpPort],
@@ -166,9 +194,26 @@ class PostgresTenantRepository(
             smtpFromName = this[TenantsTable.smtpFromName],
             smtpTlsEnabled = this[TenantsTable.smtpTlsEnabled],
             smtpEnabled = this[TenantsTable.smtpEnabled],
-            mfaPolicy = this[TenantsTable.mfaPolicy],
             maxConcurrentSessions = this[TenantsTable.maxConcurrentSessions],
             portalConfig = toPortalConfig(),
+        )
+    }
+
+    private fun ResultRow.toSecurityConfig(): SecurityConfig {
+        // When there is no row in tenant_security_config yet (LEFT JOIN returns null),
+        // fall back to the defaults defined on SecurityConfig.
+        getOrNull(TenantSecurityConfigTable.lockoutMaxAttempts) ?: return SecurityConfig()
+        return SecurityConfig(
+            passwordMinLength = this[TenantSecurityConfigTable.passwordMinLength],
+            passwordRequireSpecial = this[TenantSecurityConfigTable.passwordRequireSpecial],
+            passwordRequireUppercase = this[TenantSecurityConfigTable.passwordRequireUppercase],
+            passwordRequireNumber = this[TenantSecurityConfigTable.passwordRequireNumber],
+            passwordHistoryCount = this[TenantSecurityConfigTable.passwordHistoryCount],
+            passwordMaxAgeDays = this[TenantSecurityConfigTable.passwordMaxAgeDays],
+            passwordBlacklistEnabled = this[TenantSecurityConfigTable.passwordBlacklistEnabled],
+            mfaPolicy = this[TenantSecurityConfigTable.mfaPolicy],
+            lockoutMaxAttempts = this[TenantSecurityConfigTable.lockoutMaxAttempts],
+            lockoutDurationMinutes = this[TenantSecurityConfigTable.lockoutDurationMinutes],
         )
     }
 

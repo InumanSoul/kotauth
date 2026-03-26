@@ -54,6 +54,7 @@ class AuthService(
         rawPassword: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        baseUrl: String? = null,
     ): AuthResult<User> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -92,7 +93,49 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
+        // Account lockout check — before password verification to avoid wasting bcrypt cycles
+        val security = tenant.securityConfig
+        if (security.isLockoutEnabled && user.isLocked) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.ACCOUNT_LOCKED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "still_locked"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.AccountLocked(user.lockedUntil!!))
+        }
+
         if (!passwordHasher.verify(rawPassword, user.passwordHash)) {
+            // Increment failed attempt counter and apply lockout if threshold reached
+            if (security.isLockoutEnabled) {
+                val newCount = user.failedLoginAttempts + 1
+                val lockUntil =
+                    if (newCount >= security.lockoutMaxAttempts) {
+                        Instant.now().plusSeconds(security.lockoutDurationMinutes * 60L)
+                    } else {
+                        null
+                    }
+                userRepository.recordFailedLogin(user.id!!, newCount, lockUntil)
+                if (lockUntil != null) {
+                    auditLog.record(
+                        AuditEvent(
+                            tenantId = tenant.id,
+                            userId = user.id,
+                            clientId = null,
+                            eventType = AuditEventType.ACCOUNT_LOCKED,
+                            ipAddress = ipAddress,
+                            userAgent = userAgent,
+                            details = mapOf("attempts" to newCount.toString()),
+                        ),
+                    )
+                    selfServiceService?.sendAccountLockedNotification(user, tenant, baseUrl ?: "")
+                }
+            }
             auditLog.record(
                 AuditEvent(
                     tenantId = tenant.id,
@@ -125,6 +168,11 @@ class AuthService(
                 )
                 return AuthResult.Failure(AuthError.PasswordExpired)
             }
+        }
+
+        // Reset failed login counter on successful authentication
+        if (security.isLockoutEnabled && user.failedLoginAttempts > 0) {
+            userRepository.resetFailedLogins(user.id!!)
         }
 
         auditLog.record(
@@ -348,4 +396,9 @@ sealed class AuthError {
      * direct the user to the forgot-password flow with an actionable message.
      */
     object PasswordExpired : AuthError()
+
+    /** The account has been locked after too many failed login attempts. */
+    class AccountLocked(
+        val lockedUntil: java.time.Instant,
+    ) : AuthError()
 }

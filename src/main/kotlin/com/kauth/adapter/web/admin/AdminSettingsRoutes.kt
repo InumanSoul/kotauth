@@ -301,6 +301,12 @@ fun Route.adminSettingsRoutes(
                     passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
                     passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
                     mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
+                    lockoutMaxAttempts =
+                        params["lockoutMaxAttempts"]?.toIntOrNull()
+                            ?: workspace.securityConfig.lockoutMaxAttempts,
+                    lockoutDurationMinutes =
+                        params["lockoutDurationMinutes"]?.toIntOrNull()
+                            ?: workspace.securityConfig.lockoutDurationMinutes,
                 )
         ) {
             is AdminResult.Success ->

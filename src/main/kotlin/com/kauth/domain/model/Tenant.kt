@@ -19,13 +19,7 @@ data class Tenant(
     val refreshTokenExpirySeconds: Long = 86400L,
     val registrationEnabled: Boolean = true,
     val emailVerificationRequired: Boolean = false,
-    val passwordPolicyMinLength: Int = 8,
-    val passwordPolicyRequireSpecial: Boolean = false,
-    val passwordPolicyHistoryCount: Int = 0, // 0 = disabled
-    val passwordPolicyMaxAgeDays: Int = 0, // 0 = never expires
-    val passwordPolicyRequireUppercase: Boolean = false,
-    val passwordPolicyRequireNumber: Boolean = false,
-    val passwordPolicyBlacklistEnabled: Boolean = false,
+    val securityConfig: SecurityConfig = SecurityConfig(),
     val theme: TenantTheme = TenantTheme.DEFAULT,
     // SMTP fields
     // smtp_password is stored AES-256-GCM encrypted in the DB (see EncryptionService).
@@ -38,10 +32,6 @@ data class Tenant(
     val smtpFromName: String? = null,
     val smtpTlsEnabled: Boolean = true,
     val smtpEnabled: Boolean = false,
-    // MFA policy
-    // 'optional' = users can opt-in; 'required' = all users must enroll;
-    // 'required_admins' = only admin-role users must enroll
-    val mfaPolicy: String = "optional",
     // Session policy
     val maxConcurrentSessions: Int? = null, // null = unlimited
     // Portal UI configuration (loaded from workspace_portal_config via LEFT JOIN)
@@ -49,6 +39,16 @@ data class Tenant(
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG
+
+    // Backward-compatible accessors — delegate to securityConfig so existing call sites need no changes.
+    val passwordPolicyMinLength: Int get() = securityConfig.passwordMinLength
+    val passwordPolicyRequireSpecial: Boolean get() = securityConfig.passwordRequireSpecial
+    val passwordPolicyHistoryCount: Int get() = securityConfig.passwordHistoryCount
+    val passwordPolicyMaxAgeDays: Int get() = securityConfig.passwordMaxAgeDays
+    val passwordPolicyRequireUppercase: Boolean get() = securityConfig.passwordRequireUppercase
+    val passwordPolicyRequireNumber: Boolean get() = securityConfig.passwordRequireNumber
+    val passwordPolicyBlacklistEnabled: Boolean get() = securityConfig.passwordBlacklistEnabled
+    val mfaPolicy: String get() = securityConfig.mfaPolicy
 
     /** True when SMTP is fully configured and enabled for this tenant. */
     val isSmtpReady: Boolean

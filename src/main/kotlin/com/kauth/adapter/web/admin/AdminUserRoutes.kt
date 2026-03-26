@@ -102,6 +102,7 @@ fun Route.adminUserRoutes(
                     when (savedParam) {
                         "true" -> "Profile saved."
                         "reset_email_sent" -> "Password reset email sent successfully."
+                        "unlocked" -> "Account unlocked successfully."
                         else -> null
                     }
                 call.respondHtml(
@@ -152,6 +153,20 @@ fun Route.adminUserRoutes(
                     AdminView.userProfileEditFragment(workspace, user),
                     ContentType.Text.Html,
                 )
+            }
+
+            post("/unlock") {
+                val userId =
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
+                when (adminService.unlockUser(userId, workspace.id)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=unlocked")
+                    is AdminResult.Failure ->
+                        call.respond(HttpStatusCode.NotFound)
+                }
             }
 
             post("/toggle") {

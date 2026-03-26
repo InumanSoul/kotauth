@@ -146,6 +146,9 @@ internal fun AuthError.toMessage(): String =
         is AuthError.WeakPassword -> "Password must be at least $minLength characters."
         is AuthError.ValidationError -> this.message
         is AuthError.PasswordExpired -> "Your password has expired. Please reset it."
+        is AuthError.AccountLocked ->
+            "Too many failed attempts. Your account is temporarily locked. " +
+                "Reset your password to regain access immediately."
     }
 
 internal fun SocialLoginError.toMessage(): String =

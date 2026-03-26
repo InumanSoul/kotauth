@@ -60,6 +60,32 @@ class SmtpEmailAdapter : EmailPort {
         send(to, toName, subject, html, text, tenant)
     }
 
+    override fun sendAccountLockedEmail(
+        to: String,
+        toName: String,
+        resetUrl: String,
+        workspaceName: String,
+        lockoutDuration: String,
+        tenant: Tenant,
+    ) {
+        val subject = "Your account has been locked — $workspaceName"
+        val html = buildAccountLockedHtml(toName, resetUrl, workspaceName, lockoutDuration)
+        val text = buildAccountLockedText(toName, resetUrl, workspaceName, lockoutDuration)
+        send(to, toName, subject, html, text, tenant)
+    }
+
+    override fun sendPasswordChangedEmail(
+        to: String,
+        toName: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val subject = "Your password has been changed — $workspaceName"
+        val html = buildPasswordChangedHtml(toName, workspaceName)
+        val text = buildPasswordChangedText(toName, workspaceName)
+        send(to, toName, subject, html, text, tenant)
+    }
+
     // -------------------------------------------------------------------------
     // Core send logic
     // -------------------------------------------------------------------------
@@ -278,6 +304,110 @@ class SmtpEmailAdapter : EmailPort {
         $url
 
         If you did not request a password reset, you can safely ignore this email.
+        """.trimIndent()
+
+    private fun buildAccountLockedHtml(
+        name: String,
+        url: String,
+        workspace: String,
+        lockoutDuration: String,
+    ) = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+            <tr><td align="center">
+              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
+                <tr><td>
+                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
+                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Your account has been locked</h1>
+                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
+                    Hi ${htmlEscape(name)},<br><br>
+                    We temporarily locked your $workspace account after several failed sign-in attempts.
+                    Your account will automatically unlock in $lockoutDuration.
+                    If you'd like to regain access sooner, or if you don't recognize this activity,
+                    you can reset your password now.
+                  </p>
+                  <a href="$url" style="display:inline-block;padding:12px 24px;background:#18181b;color:#ffffff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
+                    Reset password
+                  </a>
+                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
+                    If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically.<br>
+                    If the button doesn't work, copy this link:<br>
+                    <a href="$url" style="color:#71717a;word-break:break-all;">$url</a>
+                  </p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </body>
+        </html>
+        """.trimIndent()
+
+    private fun buildAccountLockedText(
+        name: String,
+        url: String,
+        workspace: String,
+        lockoutDuration: String,
+    ) = """
+        $workspace — Your account has been locked
+
+        Hi $name,
+
+        We temporarily locked your $workspace account after several failed sign-in attempts.
+        Your account will automatically unlock in $lockoutDuration.
+        If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.
+
+        $url
+
+        If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically.
+        """.trimIndent()
+
+    private fun buildPasswordChangedHtml(
+        name: String,
+        workspace: String,
+    ) = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
+            <tr><td align="center">
+              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
+                <tr><td>
+                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
+                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Your password has been changed</h1>
+                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
+                    Hi ${htmlEscape(name)},<br><br>
+                    Your $workspace password was successfully changed.
+                    If you made this change, no action is needed.
+                    If you did not make this change, go to the sign-in page and use the forgot password link to reset it immediately.
+                  </p>
+                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
+                    For security, all active sessions were signed out when your password was changed.
+                  </p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
+        </body>
+        </html>
+        """.trimIndent()
+
+    private fun buildPasswordChangedText(
+        name: String,
+        workspace: String,
+    ) = """
+        $workspace — Your password has been changed
+
+        Hi $name,
+
+        Your $workspace password was successfully changed.
+        If you made this change, no action is needed.
+        If you did not make this change, go to the sign-in page and use the forgot password link to reset it immediately.
+
+        For security, all active sessions were signed out when your password was changed.
         """.trimIndent()
 
     private fun htmlEscape(s: String) =

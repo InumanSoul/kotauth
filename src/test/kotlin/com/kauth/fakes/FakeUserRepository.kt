@@ -81,4 +81,18 @@ class FakeUserRepository : UserRepository {
         tenantId: TenantId,
         email: String,
     ) = store.values.any { it.tenantId == tenantId && it.email == email }
+
+    override fun recordFailedLogin(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    ) {
+        val user = store[userId.value] ?: return
+        store[userId.value] = user.copy(failedLoginAttempts = newCount, lockedUntil = lockedUntil)
+    }
+
+    override fun resetFailedLogins(userId: UserId) {
+        val user = store[userId.value] ?: return
+        store[userId.value] = user.copy(failedLoginAttempts = 0, lockedUntil = null)
+    }
 }

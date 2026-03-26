@@ -6,6 +6,7 @@ import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -311,8 +312,32 @@ class UserSelfServiceService(
         val now = Instant.now()
         val hashedPassword = passwordHasher.hash(newPassword)
         userRepository.updatePassword(token.userId, hashedPassword, now)
+        userRepository.resetFailedLogins(token.userId) // clear lockout on password reset
         sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
         prTokenRepo.markUsed(token.id!!, now)
+
+        if (tenant != null && tenant.isSmtpReady) {
+            val resetUser = userRepository.findById(token.userId)
+            if (resetUser != null) {
+                emailScope.launch {
+                    try {
+                        emailPort.sendPasswordChangedEmail(
+                            resetUser.email,
+                            resetUser.fullName,
+                            tenant.displayName,
+                            tenant,
+                        )
+                    } catch (e: Exception) {
+                        log.warn(
+                            "Password changed email failed tenantId={} userId={}: {}",
+                            token.tenantId.value,
+                            token.userId.value,
+                            e.message,
+                        )
+                    }
+                }
+            }
+        }
 
         // Record in password history
         if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
@@ -458,6 +483,21 @@ class UserSelfServiceService(
         userRepository.updatePassword(userId, hashedPassword, now)
         sessionRepository.revokeAllForUser(tenantId, userId, now)
 
+        if (tenant.isSmtpReady) {
+            emailScope.launch {
+                try {
+                    emailPort.sendPasswordChangedEmail(user.email, user.fullName, tenant.displayName, tenant)
+                } catch (e: Exception) {
+                    log.warn(
+                        "Password changed email failed tenantId={} userId={}: {}",
+                        tenantId.value,
+                        userId.value,
+                        e.message,
+                    )
+                }
+            }
+        }
+
         // Record in password history
         if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(userId, tenantId, hashedPassword)
@@ -476,6 +516,65 @@ class UserSelfServiceService(
 
         return SelfServiceResult.Success(Unit)
     }
+
+    // =========================================================================
+    // Security notifications
+    // =========================================================================
+
+    /**
+     * Sends an account-locked notification email with an embedded password reset link.
+     * Generates a fresh reset token so the user can bypass the lockout window immediately.
+     * Silent no-op if the tenant has no SMTP configured.
+     */
+    fun sendAccountLockedNotification(
+        user: User,
+        tenant: Tenant,
+        baseUrl: String,
+    ) {
+        if (!tenant.isSmtpReady) return
+
+        val (rawToken, tokenHash) = generateToken()
+        prTokenRepo.deleteByUser(user.id!!)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = user.id,
+                tenantId = tenant.id,
+                tokenHash = tokenHash,
+                expiresAt = Instant.now().plusSeconds(3600),
+                ipAddress = null,
+            ),
+        )
+
+        val resetUrl = "$baseUrl/t/${tenant.slug}/reset-password?token=$rawToken"
+        val duration = formatLockoutDuration(tenant.securityConfig.lockoutDurationMinutes)
+
+        emailScope.launch {
+            try {
+                emailPort.sendAccountLockedEmail(
+                    user.email,
+                    user.fullName,
+                    resetUrl,
+                    tenant.displayName,
+                    duration,
+                    tenant,
+                )
+            } catch (e: Exception) {
+                log.warn(
+                    "Account locked email failed tenantId={} userId={}: {}",
+                    tenant.id.value,
+                    user.id.value,
+                    e.message,
+                )
+            }
+        }
+    }
+
+    private fun formatLockoutDuration(minutes: Int): String =
+        when {
+            minutes < 60 -> "$minutes minute${if (minutes == 1) "" else "s"}"
+            minutes % 60 == 0 -> "${minutes / 60} hour${if (minutes / 60 == 1) "" else "s"}"
+            else -> "$minutes minutes"
+        }
 
     // =========================================================================
     // Session management

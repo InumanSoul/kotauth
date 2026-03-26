@@ -59,6 +59,7 @@ fun Route.authRoutes(
             roleRepository = roleRepository,
             identityProviderRepository = identityProviderRepository,
             encryptionService = encryptionService,
+            baseUrl = baseUrl,
         )
 
         registerRoutes(

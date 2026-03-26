@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -76,7 +77,7 @@ class AdminServiceTest {
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
-            passwordPolicyMinLength = 8,
+            securityConfig = SecurityConfig(passwordMinLength = 8),
             smtpHost = "smtp.example.com",
             smtpFromAddress = "no-reply@acme.com",
             smtpEnabled = true,
