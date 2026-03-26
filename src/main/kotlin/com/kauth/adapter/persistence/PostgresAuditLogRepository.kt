@@ -6,6 +6,9 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 
@@ -61,7 +64,13 @@ class PostgresAuditLogRepository : AuditLogRepository {
                     .getOrDefault(AuditEventType.LOGIN_SUCCESS),
             ipAddress = this[AuditLogTable.ipAddress],
             userAgent = this[AuditLogTable.userAgent],
-            details = emptyMap(), // details JSONB deserialization is out of scope for admin UI display
+            details = this[AuditLogTable.details]?.let { parseJsonDetails(it) } ?: emptyMap(),
             createdAt = this[AuditLogTable.createdAt].toInstant(),
         )
+
+    private fun parseJsonDetails(json: String): Map<String, String> =
+        runCatching {
+            val obj = Json.parseToJsonElement(json) as? JsonObject ?: return@runCatching emptyMap()
+            obj.mapValues { (_, v) -> v.jsonPrimitive.content }
+        }.getOrDefault(emptyMap())
 }

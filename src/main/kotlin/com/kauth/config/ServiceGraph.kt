@@ -53,6 +53,9 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 
 /**
  * Holds every service and repository needed by the Ktor module.
@@ -86,9 +89,11 @@ data class ServiceGraph(
     val tokenRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
+    val applicationScope: CoroutineScope,
 ) {
     companion object {
         fun create(config: EnvironmentConfig): ServiceGraph {
+            val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val encryptionService = EncryptionService(config.secretKey)
 
             // -- Repositories -------------------------------------------------
@@ -140,6 +145,7 @@ data class ServiceGraph(
                 WebhookService(
                     endpointRepository = webhookEndpointRepository,
                     deliveryRepository = webhookDeliveryRepository,
+                    scope = applicationScope,
                 )
             val auditLogAdapter =
                 PostgresAuditLogAdapter(webhookService = webhookService)
@@ -157,6 +163,7 @@ data class ServiceGraph(
                     prTokenRepo = prTokenRepository,
                     emailPort = emailAdapter,
                     passwordPolicy = passwordPolicyAdapter,
+                    emailScope = applicationScope,
                 )
             val authService =
                 AuthService(
@@ -314,6 +321,7 @@ data class ServiceGraph(
                 tokenRateLimiter = tokenLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
+                applicationScope = applicationScope,
             )
         }
     }

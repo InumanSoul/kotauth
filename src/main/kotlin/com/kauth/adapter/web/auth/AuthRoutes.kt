@@ -65,6 +65,7 @@ fun Route.authRoutes(
             authService = authService,
             registerRateLimiter = registerRateLimiter,
             identityProviderRepository = identityProviderRepository,
+            baseUrl = baseUrl,
         )
 
         selfServiceRoutes(

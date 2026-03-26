@@ -17,6 +17,7 @@ internal fun Route.registerRoutes(
     authService: AuthService,
     registerRateLimiter: RateLimiterPort,
     identityProviderRepository: IdentityProviderRepository?,
+    baseUrl: String,
 ) {
     get("/register") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -72,7 +73,7 @@ internal fun Route.registerRoutes(
         val confirmPassword = params["confirmPassword"] ?: ""
         val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
 
-        when (val result = authService.register(slug, username, email, fullName, password, confirmPassword)) {
+        when (val result = authService.register(slug, username, email, fullName, password, confirmPassword, baseUrl)) {
             is AuthResult.Success ->
                 call.respondRedirect("/t/$slug/login?registered=true")
             is AuthResult.Failure ->

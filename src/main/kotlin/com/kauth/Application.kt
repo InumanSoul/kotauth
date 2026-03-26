@@ -32,6 +32,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
+import kotlinx.coroutines.cancel
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
 
@@ -69,6 +70,7 @@ fun main() {
 
     Runtime.getRuntime().addShutdownHook(
         Thread {
+            services.applicationScope.cancel()
             server.stop(
                 gracePeriodMillis = 1_000,
                 timeoutMillis = 5_000,
