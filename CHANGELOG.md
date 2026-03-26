@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.3] - 2026-03-25
+
+### Added
+
+- **HikariCP connection pool** — replaced bare JDBC `DriverManager.getConnection()` (new TCP connection per transaction) with HikariCP 5.1.0 pooled connections. Eliminates 10-20ms of TCP/TLS/auth overhead per DB call. Pool configured with leak detection (4s threshold), connection keepalive, and max lifetime rotation
+- **`DB_POOL_MAX_SIZE`** environment variable — configurable maximum pool size (default: 10)
+- **`DB_POOL_MIN_IDLE`** environment variable — configurable minimum idle connections (default: 2)
+- **Multi-arch Docker images** — publish workflow now builds `linux/amd64` and `linux/arm64` natively in parallel using GitHub's free arm64 runners. No QEMU emulation
+
+### Changed
+
+- **Async email delivery** — verification and password-reset emails are now sent in a background coroutine (`CoroutineScope + SupervisorJob + Dispatchers.IO`), matching the existing async webhook pattern. HTTP responses return immediately instead of blocking on SMTP
+- **Admin route intercepts** — extracted ~60 duplicate `findBySlug` + `findAll` calls from 7 admin sub-route files into a single `intercept(ApplicationCallPipeline.Call)` block at the `/{slug}` route level. Workspace and sidebar data resolved once per request via `call.attributes`
+- **Auth route intercepts** — extracted ~21 duplicate `findBySlug` calls from 6 auth sub-route files into a single intercept at the `/t/{slug}` route level. Tenant, theme, and workspace name resolved once per request via `AuthTenantContext`
+
+---
+
 ## [1.1.2] - 2026-03-25
 
 ### Added
@@ -159,7 +176,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/inumansoul/kotauth/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/inumansoul/kotauth/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/inumansoul/kotauth/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/inumansoul/kotauth/compare/v1.0.3...v1.1.0
