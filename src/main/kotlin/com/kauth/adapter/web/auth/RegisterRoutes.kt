@@ -1,16 +1,13 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
-import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -18,15 +15,15 @@ import io.ktor.server.routing.post
 
 internal fun Route.registerRoutes(
     authService: AuthService,
-    tenantRepository: TenantRepository,
     registerRateLimiter: RateLimiterPort,
     identityProviderRepository: IdentityProviderRepository?,
 ) {
     get("/register") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -40,10 +37,11 @@ internal fun Route.registerRoutes(
     }
 
     post("/register") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }

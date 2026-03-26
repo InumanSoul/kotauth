@@ -210,12 +210,23 @@ fun Route.adminRoutes(
             // -----------------------------------------------------------
 
             route("/{slug}") {
+                // Resolve workspace + sidebar pairs once per request
+                intercept(ApplicationCallPipeline.Call) {
+                    val slug =
+                        call.parameters["slug"]
+                            ?: return@intercept call.respond(HttpStatusCode.BadRequest).also { finish() }
+                    val workspace =
+                        tenantRepository.findBySlug(slug)
+                            ?: return@intercept call.respond(HttpStatusCode.NotFound).also { finish() }
+                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    call.attributes.put(WorkspaceAttr, workspace)
+                    call.attributes.put(WsPairsAttr, wsPairs)
+                }
+
                 get {
                     val session = call.sessions.get<AdminSession>()!!
-                    val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-                    val workspace =
-                        tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val workspace = call.attributes[WorkspaceAttr]
+                    val wsPairs = call.attributes[WsPairsAttr]
                     val apps = applicationRepository.findByTenantId(workspace.id)
                     call.respondHtml(
                         HttpStatusCode.OK,
@@ -225,7 +236,6 @@ fun Route.adminRoutes(
 
                 adminSettingsRoutes(
                     adminService = adminService,
-                    tenantRepository = tenantRepository,
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
@@ -234,38 +244,32 @@ fun Route.adminRoutes(
 
                 adminApplicationRoutes(
                     adminService = adminService,
-                    tenantRepository = tenantRepository,
                     applicationRepository = applicationRepository,
                 )
 
                 adminUserRoutes(
                     adminService = adminService,
                     roleGroupService = roleGroupService,
-                    tenantRepository = tenantRepository,
                     userRepository = userRepository,
                     sessionRepository = sessionRepository,
                 )
 
                 adminSessionAuditRoutes(
-                    tenantRepository = tenantRepository,
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
                 )
 
                 adminRbacRoutes(
                     roleGroupService = roleGroupService,
-                    tenantRepository = tenantRepository,
                     applicationRepository = applicationRepository,
                     userRepository = userRepository,
                 )
 
                 adminApiKeyRoutes(
-                    tenantRepository = tenantRepository,
                     apiKeyService = apiKeyService,
                 )
 
                 adminWebhookRoutes(
-                    tenantRepository = tenantRepository,
                     webhookService = webhookService,
                 )
             }

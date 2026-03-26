@@ -1,7 +1,6 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.port.ApplicationRepository
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import io.ktor.http.HttpStatusCode
@@ -19,16 +18,13 @@ import io.ktor.server.sessions.sessions
 
 fun Route.adminApplicationRoutes(
     adminService: AdminService,
-    tenantRepository: TenantRepository,
     applicationRepository: ApplicationRepository,
 ) {
     route("/applications") {
         get("/new") {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+            val workspace = call.attributes[WorkspaceAttr]
+            val wsPairs = call.attributes[WsPairsAttr]
             call.respondHtml(
                 HttpStatusCode.OK,
                 AdminView.createApplicationPage(workspace, wsPairs, session.username),
@@ -37,9 +33,8 @@ fun Route.adminApplicationRoutes(
 
         post {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val workspace = call.attributes[WorkspaceAttr]
+            val slug = workspace.slug
             val params = call.receiveParameters()
             val clientId = params["clientId"]?.trim()?.lowercase() ?: ""
             val name = params["name"]?.trim() ?: ""
@@ -72,7 +67,7 @@ fun Route.adminApplicationRoutes(
                     else -> null
                 }
             if (error != null) {
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 return@post call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.createApplicationPage(
@@ -91,16 +86,13 @@ fun Route.adminApplicationRoutes(
         route("/{clientId}") {
             get {
                 val session = call.sessions.get<AdminSession>()!!
-                val slug =
-                    call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
                 val clientId =
                     call.parameters["clientId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@get call.respond(HttpStatusCode.NotFound)
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 val allApps = applicationRepository.findByTenantId(workspace.id)
                 val newSecret = call.request.queryParameters["newSecret"]
                 call.respondHtml(
@@ -118,16 +110,13 @@ fun Route.adminApplicationRoutes(
 
             get("/edit") {
                 val session = call.sessions.get<AdminSession>()!!
-                val slug =
-                    call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
                 val clientId =
                     call.parameters["clientId"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@get call.respond(HttpStatusCode.NotFound)
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 val allApps = applicationRepository.findByTenantId(workspace.id)
                 call.respondHtml(
                     HttpStatusCode.OK,
@@ -137,12 +126,10 @@ fun Route.adminApplicationRoutes(
 
             post("/edit") {
                 val session = call.sessions.get<AdminSession>()!!
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val clientId =
                     call.parameters["clientId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -169,7 +156,7 @@ fun Route.adminApplicationRoutes(
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
                     is AdminResult.Failure -> {
-                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val wsPairs = call.attributes[WsPairsAttr]
                         val allApps = applicationRepository.findByTenantId(workspace.id)
                         call.respondHtml(
                             HttpStatusCode.UnprocessableEntity,
@@ -187,12 +174,10 @@ fun Route.adminApplicationRoutes(
             }
 
             post("/toggle") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val clientId =
                     call.parameters["clientId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@post call.respond(HttpStatusCode.NotFound)
@@ -201,12 +186,10 @@ fun Route.adminApplicationRoutes(
             }
 
             post("/regenerate-secret") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val clientId =
                     call.parameters["clientId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@post call.respond(HttpStatusCode.NotFound)

@@ -1,6 +1,5 @@
 package com.kauth.adapter.web.admin
 
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.ApiKeyService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -14,16 +13,11 @@ import io.ktor.server.routing.post
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 
-fun Route.adminApiKeyRoutes(
-    tenantRepository: TenantRepository,
-    apiKeyService: ApiKeyService?,
-) {
+fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
     get("/settings/api-keys") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val keys = apiKeyService?.listForTenant(workspace.id) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
@@ -33,10 +27,8 @@ fun Route.adminApiKeyRoutes(
 
     get("/settings/api-keys/new") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.createApiKeyPage(workspace, wsPairs, session.username),
@@ -45,10 +37,8 @@ fun Route.adminApiKeyRoutes(
 
     post("/settings/api-keys") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val svc = apiKeyService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
 
         val params = call.receiveParameters()
@@ -93,21 +83,19 @@ fun Route.adminApiKeyRoutes(
     }
 
     post("/settings/api-keys/{keyId}/revoke") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val keyId =
             call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
         apiKeyService?.revoke(keyId, workspace.id)
         call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
     }
 
     post("/settings/api-keys/{keyId}/delete") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val keyId =
             call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
         apiKeyService?.delete(keyId, workspace.id)
         call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
     }

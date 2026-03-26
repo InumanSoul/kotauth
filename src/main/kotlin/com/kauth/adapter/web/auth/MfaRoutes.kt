@@ -1,8 +1,6 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
@@ -20,15 +18,14 @@ import io.ktor.server.routing.post
 
 internal fun Route.mfaRoutes(
     oauthService: OAuthService,
-    tenantRepository: TenantRepository,
     mfaService: MfaService?,
     encryptionService: EncryptionService,
 ) {
     get("/mfa-challenge") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val oauthParams = call.request.queryParameters.toOAuthParams()
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
@@ -43,10 +40,10 @@ internal fun Route.mfaRoutes(
     }
 
     post("/mfa-challenge") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress

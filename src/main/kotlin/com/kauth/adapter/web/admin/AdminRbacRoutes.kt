@@ -6,7 +6,6 @@ import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.RoleGroupService
@@ -25,7 +24,6 @@ import io.ktor.server.sessions.sessions
 
 fun Route.adminRbacRoutes(
     roleGroupService: RoleGroupService,
-    tenantRepository: TenantRepository,
     applicationRepository: ApplicationRepository,
     userRepository: UserRepository,
 ) {
@@ -36,10 +34,8 @@ fun Route.adminRbacRoutes(
     route("/roles") {
         get {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+            val workspace = call.attributes[WorkspaceAttr]
+            val wsPairs = call.attributes[WsPairsAttr]
             val roles = roleGroupService.listRoles(workspace.id)
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -49,10 +45,8 @@ fun Route.adminRbacRoutes(
 
         get("/create") {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+            val workspace = call.attributes[WorkspaceAttr]
+            val wsPairs = call.attributes[WsPairsAttr]
             val apps = applicationRepository.findByTenantId(workspace.id)
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -61,9 +55,8 @@ fun Route.adminRbacRoutes(
         }
 
         post {
-            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val workspace = call.attributes[WorkspaceAttr]
+            val slug = workspace.slug
             val params = call.receiveParameters()
             val name = params["name"]?.trim() ?: ""
             val desc = params["description"]?.trim()?.takeIf { it.isNotBlank() }
@@ -84,7 +77,7 @@ fun Route.adminRbacRoutes(
                     call.respondRedirect("/admin/workspaces/$slug/roles")
                 is AdminResult.Failure -> {
                     val session = call.sessions.get<AdminSession>()!!
-                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val wsPairs = call.attributes[WsPairsAttr]
                     val apps = applicationRepository.findByTenantId(workspace.id)
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
@@ -103,14 +96,11 @@ fun Route.adminRbacRoutes(
         route("/{roleId}") {
             get {
                 val session = call.sessions.get<AdminSession>()!!
-                val slug =
-                    call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val workspace = call.attributes[WorkspaceAttr]
+                val wsPairs = call.attributes[WsPairsAttr]
                 val roles = roleGroupService.listRoles(workspace.id)
                 val role =
                     roles.find { it.id == roleId } ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -122,13 +112,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/edit") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val params = call.receiveParameters()
                 roleGroupService.updateRole(
                     roleId,
@@ -140,25 +128,21 @@ fun Route.adminRbacRoutes(
             }
 
             post("/delete") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 roleGroupService.deleteRole(roleId, workspace.id)
                 call.respondRedirect("/admin/workspaces/$slug/roles")
             }
 
             post("/children") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val childId =
                     call.receiveParameters()["childRoleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -167,13 +151,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/remove-child") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val childId =
                     call.receiveParameters()["childRoleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -182,13 +164,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/assign-user") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -197,13 +177,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/unassign-user") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val roleId =
                     call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -220,10 +198,8 @@ fun Route.adminRbacRoutes(
     route("/groups") {
         get {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+            val workspace = call.attributes[WorkspaceAttr]
+            val wsPairs = call.attributes[WsPairsAttr]
             val groups = roleGroupService.listGroups(workspace.id)
             val roles = roleGroupService.listRoles(workspace.id)
             call.respondHtml(
@@ -234,10 +210,8 @@ fun Route.adminRbacRoutes(
 
         get("/create") {
             val session = call.sessions.get<AdminSession>()!!
-            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+            val workspace = call.attributes[WorkspaceAttr]
+            val wsPairs = call.attributes[WsPairsAttr]
             val groups = roleGroupService.listGroups(workspace.id)
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -246,9 +220,8 @@ fun Route.adminRbacRoutes(
         }
 
         post {
-            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-            val workspace =
-                tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+            val workspace = call.attributes[WorkspaceAttr]
+            val slug = workspace.slug
             val params = call.receiveParameters()
             val name = params["name"]?.trim() ?: ""
             val desc = params["description"]?.trim()?.takeIf { it.isNotBlank() }
@@ -259,7 +232,7 @@ fun Route.adminRbacRoutes(
                     call.respondRedirect("/admin/workspaces/$slug/groups")
                 is AdminResult.Failure -> {
                     val session = call.sessions.get<AdminSession>()!!
-                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val wsPairs = call.attributes[WsPairsAttr]
                     val groups = roleGroupService.listGroups(workspace.id)
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
@@ -278,14 +251,11 @@ fun Route.adminRbacRoutes(
         route("/{groupId}") {
             get {
                 val session = call.sessions.get<AdminSession>()!!
-                val slug =
-                    call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val workspace = call.attributes[WorkspaceAttr]
+                val wsPairs = call.attributes[WsPairsAttr]
                 val groups = roleGroupService.listGroups(workspace.id)
                 val group =
                     groups.find { it.id == groupId } ?: return@get call.respond(HttpStatusCode.NotFound)
@@ -309,13 +279,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/edit") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val params = call.receiveParameters()
                 roleGroupService.updateGroup(
                     groupId,
@@ -327,25 +295,21 @@ fun Route.adminRbacRoutes(
             }
 
             post("/delete") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 roleGroupService.deleteGroup(groupId, workspace.id)
                 call.respondRedirect("/admin/workspaces/$slug/groups")
             }
 
             post("/assign-role") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val roleId =
                     call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -354,13 +318,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/unassign-role") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val roleId =
                     call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -369,13 +331,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/add-member") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -384,13 +344,11 @@ fun Route.adminRbacRoutes(
             }
 
             post("/remove-member") {
-                val slug =
-                    call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val groupId =
                     call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
