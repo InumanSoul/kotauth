@@ -423,7 +423,7 @@ internal fun userListPageImpl(
                     input(type = InputType.search, name = "q", classes = "filter-bar__input") {
                         placeholder = "Filter by username, email, or name…"
                         value = search ?: ""
-                        attributes["onchange"] = "this.form.submit()"
+                        attributes["data-autosubmit"] = "true"
                     }
                 }
             }
