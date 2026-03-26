@@ -1,8 +1,8 @@
 val ktorVersion = "2.3.12"
-val exposedVersion = "0.50.1"
-val logbackVersion = "1.4.14"
+val exposedVersion = "0.55.0"
+val logbackVersion = "1.5.32"
 val flywayVersion = "9.22.3"
-val logstashEncoderVersion = "7.4"
+val logstashEncoderVersion = "8.0"
 
 plugins {
     kotlin("jvm") version "1.9.24"
@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.1.3"
+version = "1.1.4"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -23,10 +23,18 @@ repositories {
 }
 
 dependencies {
+    // ---- Security: override vulnerable transitive dependencies from Ktor 2.3.x ----
+    constraints {
+        implementation("io.netty:netty-codec-http2:4.1.124.Final") { because("CVE-2025-55163") }
+        implementation("io.netty:netty-handler:4.1.124.Final") { because("CVE-2025-24970") }
+        implementation("com.fasterxml.jackson:jackson-bom:2.18.6") { because("GHSA-72hv-8253-57qq") }
+        implementation("com.fasterxml.jackson.core:jackson-core:2.18.6") { because("GHSA-72hv-8253-57qq") }
+        implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6") { because("GHSA-72hv-8253-57qq") }
+    }
+
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-auth:$ktorVersion")
-    implementation("io.ktor:ktor-server-auth-jwt:$ktorVersion")
     implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
     implementation("io.ktor:ktor-server-html-builder:$ktorVersion")
@@ -40,10 +48,10 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
 
-    implementation("org.postgresql:postgresql:42.7.3")
+    implementation("org.postgresql:postgresql:42.7.10")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
-    implementation("com.auth0:java-jwt:4.4.0")
+    implementation("com.auth0:java-jwt:4.5.1")
     implementation("at.favre.lib:bcrypt:0.10.2")
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
@@ -56,9 +64,9 @@ dependencies {
     // Kotlin test assertions + JUnit 5 runner
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     // MockK — Kotlin-native mocking (HTTP integration tests only)
-    testImplementation("io.mockk:mockk:1.13.10")
+    testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.5")
 }
 
 tasks.test {

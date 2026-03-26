@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.4] - 2026-03-26
+
+### Security
+
+- **CVE-2025-55163** — Netty HTTP/2 DDoS vulnerability. Mitigated by constraining `netty-codec-http2` to 4.1.124.Final
+- **CVE-2025-24970** — Netty native SSL crash on crafted packet. Mitigated by constraining `netty-handler` to 4.1.124.Final
+- **GHSA-72hv-8253-57qq** — Jackson async parser DoS. Mitigated by constraining `jackson-core` to 2.18.6
+- **CVE-2025-11226 / CVE-2026-1225** — Logback arbitrary code execution. Fixed by upgrading to 1.5.32
+- **CVE-2025-49146** — PostgreSQL JDBC MITM attack. Fixed by upgrading to 42.7.10
+- **CSRF protection** — Added `SameSite=Lax` attribute to both `KOTAUTH_ADMIN` and `KOTAUTH_PORTAL` session cookies
+- **Content Security Policy** — Added `Content-Security-Policy` header to all responses (`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'`)
+- **Thread-safe JWT cache** — Replaced `mutableMapOf` with `ConcurrentHashMap` in `JwtTokenAdapter.algorithmCache` to prevent data race under concurrent token issuance
+
+### Fixed
+
+- **Webhook `X-KotAuth-Event` header** — was incorrectly sending the endpoint URL instead of the event type (e.g., `user.created`). Receivers relying on this header for event routing now get the correct value
+
+### Changed
+
+- **Dependency upgrades** (no breaking changes):
+  - Logback 1.4.14 → 1.5.32
+  - PostgreSQL JDBC 42.7.3 → 42.7.10
+  - Logstash encoder 7.4 → 8.0
+  - Exposed 0.50.1 → 0.55.0
+  - java-jwt 4.4.0 → 4.5.1
+  - MockK 1.13.10 → 1.13.16
+  - JUnit Jupiter 5.10.2 → 5.10.5
+
+### Removed
+
+- **`ktor-server-auth-jwt`** dependency — declared but unused (zero imports). All JWT operations use `com.auth0:java-jwt` directly
+
+---
+
 ## [1.1.3] - 2026-03-25
 
 ### Added
@@ -176,7 +210,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/inumansoul/kotauth/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/inumansoul/kotauth/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/inumansoul/kotauth/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/inumansoul/kotauth/compare/v1.1.0...v1.1.1
