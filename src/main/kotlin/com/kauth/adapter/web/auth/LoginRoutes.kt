@@ -1,10 +1,8 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
@@ -26,7 +24,6 @@ import io.ktor.server.routing.post
 internal fun Route.loginRoutes(
     authService: AuthService,
     oauthService: OAuthService,
-    tenantRepository: TenantRepository,
     loginRateLimiter: RateLimiterPort,
     mfaService: MfaService?,
     roleRepository: RoleRepository?,
@@ -34,10 +31,11 @@ internal fun Route.loginRoutes(
     encryptionService: EncryptionService,
 ) {
     get("/login") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val registered = call.request.queryParameters["registered"] == "true"
         val oauthParams = call.request.queryParameters.toOAuthParams()
         val enabledProviders =
@@ -61,10 +59,11 @@ internal fun Route.loginRoutes(
     }
 
     post("/login") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }

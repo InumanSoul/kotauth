@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.1.2"
+version = "1.1.3"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")

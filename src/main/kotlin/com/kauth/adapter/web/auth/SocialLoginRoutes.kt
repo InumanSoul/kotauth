@@ -1,9 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.SocialProvider
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginResult
@@ -21,14 +19,17 @@ import io.ktor.server.routing.post
 
 internal fun Route.socialLoginRoutes(
     oauthService: OAuthService,
-    tenantRepository: TenantRepository,
     socialLoginService: SocialLoginService?,
     identityProviderRepository: IdentityProviderRepository?,
     encryptionService: EncryptionService,
     baseUrl: String,
 ) {
     get("/auth/social/{provider}/redirect") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
@@ -55,9 +56,6 @@ internal fun Route.socialLoginRoutes(
         when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
             is SocialLoginResult.Success -> call.respondRedirect(result.value)
             is SocialLoginResult.Failure -> {
-                val tenant = tenantRepository.findBySlug(slug)
-                val theme = tenant?.theme ?: TenantTheme.DEFAULT
-                val workspaceName = tenant?.displayName ?: "KotAuth"
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
                         identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -81,15 +79,16 @@ internal fun Route.socialLoginRoutes(
     }
 
     get("/auth/social/{provider}/callback") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
                 ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -261,8 +260,9 @@ internal fun Route.socialLoginRoutes(
 
     // Social registration completion
     get("/auth/social/complete-registration") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant ?: return@get call.respond(HttpStatusCode.NotFound)
         val theme = tenant.theme
         val workspaceName = tenant.displayName
 
@@ -298,8 +298,9 @@ internal fun Route.socialLoginRoutes(
     }
 
     post("/auth/social/complete-registration") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant ?: return@post call.respond(HttpStatusCode.NotFound)
         val theme = tenant.theme
         val workspaceName = tenant.displayName
 

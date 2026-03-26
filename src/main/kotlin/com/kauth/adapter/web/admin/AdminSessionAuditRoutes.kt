@@ -4,7 +4,6 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
-import com.kauth.domain.port.TenantRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -18,7 +17,6 @@ import io.ktor.server.sessions.sessions
 import java.time.Instant
 
 fun Route.adminSessionAuditRoutes(
-    tenantRepository: TenantRepository,
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
 ) {
@@ -28,11 +26,9 @@ fun Route.adminSessionAuditRoutes(
 
     get("/sessions") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
         val sessions = sessionRepository.findActiveByTenant(workspace.id)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.activeSessionsPage(workspace, sessions, wsPairs, session.username),
@@ -40,7 +36,8 @@ fun Route.adminSessionAuditRoutes(
     }
 
     post("/sessions/{sessionId}/revoke") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val sessionId =
             call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
@@ -54,9 +51,7 @@ fun Route.adminSessionAuditRoutes(
 
     get("/logs") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
         val page =
             call.request.queryParameters["page"]
                 ?.toIntOrNull()
@@ -73,7 +68,7 @@ fun Route.adminSessionAuditRoutes(
                 offset = offset,
             )
         val total = auditLogRepository.countByTenant(workspace.id, eventType)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.auditLogPage(

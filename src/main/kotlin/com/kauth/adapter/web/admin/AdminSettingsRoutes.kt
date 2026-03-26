@@ -6,7 +6,6 @@ import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -25,7 +24,6 @@ import io.ktor.server.sessions.sessions
 
 fun Route.adminSettingsRoutes(
     adminService: AdminService,
-    tenantRepository: TenantRepository,
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
@@ -37,10 +35,8 @@ fun Route.adminSettingsRoutes(
 
     get("/settings") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
@@ -50,9 +46,8 @@ fun Route.adminSettingsRoutes(
 
     post("/settings") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val params = call.receiveParameters()
         when (
             val result =
@@ -84,7 +79,7 @@ fun Route.adminSettingsRoutes(
                 call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
             }
             is AdminResult.Failure -> {
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.workspaceSettingsPage(
@@ -104,10 +99,8 @@ fun Route.adminSettingsRoutes(
 
     get("/settings/smtp") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
@@ -117,7 +110,8 @@ fun Route.adminSettingsRoutes(
 
     post("/settings/smtp") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val params = call.receiveParameters()
         when (
             val result =
@@ -136,9 +130,7 @@ fun Route.adminSettingsRoutes(
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=true")
             is AdminResult.Failure -> {
-                val workspace =
-                    tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.smtpSettingsPage(
@@ -158,10 +150,8 @@ fun Route.adminSettingsRoutes(
 
     get("/settings/identity-providers") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
@@ -176,15 +166,13 @@ fun Route.adminSettingsRoutes(
 
     post("/settings/identity-providers/{provider}") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
                 ?: return@post call.respond(HttpStatusCode.BadRequest, "Unsupported provider: $provName")
 
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val params = call.receiveParameters()
 
         val newClientId = params["clientId"]?.trim() ?: ""
@@ -260,17 +248,17 @@ fun Route.adminSettingsRoutes(
             )
         }
 
+        val slug = workspace.slug
         call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers?saved=true")
     }
 
     post("/settings/identity-providers/{provider}/delete") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         identityProviderRepository?.delete(workspace.id, provider)
         call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers")
     }
@@ -281,10 +269,8 @@ fun Route.adminSettingsRoutes(
 
     get("/settings/security") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
@@ -294,9 +280,8 @@ fun Route.adminSettingsRoutes(
 
     post("/settings/security") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val params = call.receiveParameters()
         when (
             val result =
@@ -321,7 +306,7 @@ fun Route.adminSettingsRoutes(
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
             is AdminResult.Failure -> {
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.securityPolicyPage(
@@ -341,10 +326,8 @@ fun Route.adminSettingsRoutes(
 
     get("/settings/branding") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
@@ -354,9 +337,8 @@ fun Route.adminSettingsRoutes(
 
     post("/settings/branding") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@post call.respond(HttpStatusCode.NotFound)
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
         val params = call.receiveParameters()
         val theme =
             TenantTheme(
@@ -378,7 +360,7 @@ fun Route.adminSettingsRoutes(
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
             is AdminResult.Failure -> {
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.brandingPage(
@@ -398,10 +380,8 @@ fun Route.adminSettingsRoutes(
 
     get("/mfa") {
         val session = call.sessions.get<AdminSession>()!!
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val workspace =
-            tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
         val users = userRepository.findByTenantId(workspace.id, null)
         val (enrolled, notEnrolled) =
             if (mfaRepository != null) {

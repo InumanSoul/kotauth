@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
@@ -10,6 +11,10 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.call
+import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
 
@@ -29,10 +34,26 @@ fun Route.authRoutes(
     encryptionService: EncryptionService,
 ) {
     route("/t/{slug}") {
+        // Resolve tenant context once per request
+        intercept(ApplicationCallPipeline.Call) {
+            val slug =
+                call.parameters["slug"]
+                    ?: return@intercept call.respond(HttpStatusCode.BadRequest).also { finish() }
+            val tenant = tenantRepository.findBySlug(slug)
+            call.attributes.put(
+                AuthTenantAttr,
+                AuthTenantContext(
+                    slug = slug,
+                    tenant = tenant,
+                    theme = tenant?.theme ?: TenantTheme.DEFAULT,
+                    workspaceName = tenant?.displayName ?: "KotAuth",
+                ),
+            )
+        }
+
         loginRoutes(
             authService = authService,
             oauthService = oauthService,
-            tenantRepository = tenantRepository,
             loginRateLimiter = loginRateLimiter,
             mfaService = mfaService,
             roleRepository = roleRepository,
@@ -42,27 +63,23 @@ fun Route.authRoutes(
 
         registerRoutes(
             authService = authService,
-            tenantRepository = tenantRepository,
             registerRateLimiter = registerRateLimiter,
             identityProviderRepository = identityProviderRepository,
         )
 
         selfServiceRoutes(
-            tenantRepository = tenantRepository,
             selfServiceService = selfServiceService,
             registerRateLimiter = registerRateLimiter,
         )
 
         mfaRoutes(
             oauthService = oauthService,
-            tenantRepository = tenantRepository,
             mfaService = mfaService,
             encryptionService = encryptionService,
         )
 
         socialLoginRoutes(
             oauthService = oauthService,
-            tenantRepository = tenantRepository,
             socialLoginService = socialLoginService,
             identityProviderRepository = identityProviderRepository,
             encryptionService = encryptionService,
@@ -71,7 +88,6 @@ fun Route.authRoutes(
 
         oauthProtocolRoutes(
             oauthService = oauthService,
-            tenantRepository = tenantRepository,
             identityProviderRepository = identityProviderRepository,
             tokenRateLimiter = tokenRateLimiter,
         )

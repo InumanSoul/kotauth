@@ -1,30 +1,26 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.RateLimiterPort
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
-import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
 internal fun Route.selfServiceRoutes(
-    tenantRepository: TenantRepository,
     selfServiceService: UserSelfServiceService,
     registerRateLimiter: RateLimiterPort,
 ) {
     get("/forgot-password") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val sent = call.request.queryParameters["sent"] == "true"
         val reason = call.request.queryParameters["reason"]
         val errorMsg =
@@ -40,7 +36,7 @@ internal fun Route.selfServiceRoutes(
     }
 
     post("/forgot-password") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val slug = call.attributes[AuthTenantAttr].slug
         val params = call.receiveParameters()
         val email = params["email"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress
@@ -56,10 +52,10 @@ internal fun Route.selfServiceRoutes(
     }
 
     get("/reset-password") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val token = call.request.queryParameters["token"] ?: ""
 
         if (token.isBlank()) {
@@ -69,10 +65,10 @@ internal fun Route.selfServiceRoutes(
     }
 
     post("/reset-password") {
-        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val params = call.receiveParameters()
         val token = params["token"] ?: ""
         val newPassword = params["new_password"] ?: ""
@@ -99,10 +95,10 @@ internal fun Route.selfServiceRoutes(
     }
 
     get("/verify-email") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        val tenant = tenantRepository.findBySlug(slug)
-        val theme = tenant?.theme ?: TenantTheme.DEFAULT
-        val workspaceName = tenant?.displayName ?: "KotAuth"
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
         val token = call.request.queryParameters["token"] ?: ""
 
         if (token.isBlank()) {

@@ -2,7 +2,6 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
-import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.IntrospectionResult
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
@@ -20,14 +19,14 @@ import kotlinx.serialization.json.*
 
 internal fun Route.oauthProtocolRoutes(
     oauthService: OAuthService,
-    tenantRepository: TenantRepository,
     identityProviderRepository: IdentityProviderRepository?,
     tokenRateLimiter: RateLimiterPort,
 ) {
     get("/.well-known/openid-configuration") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
         val tenant =
-            tenantRepository.findBySlug(slug)
+            ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
         val openidBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
@@ -89,9 +88,9 @@ internal fun Route.oauthProtocolRoutes(
     }
 
     get("/protocol/openid-connect/certs") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val ctx = call.attributes[AuthTenantAttr]
         val tenant =
-            tenantRepository.findBySlug(slug)
+            ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound)
 
         val jwks = oauthService.getJwks(tenant.id)
@@ -99,7 +98,8 @@ internal fun Route.oauthProtocolRoutes(
     }
 
     get("/protocol/openid-connect/auth") {
-        val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
         val q = call.request.queryParameters
 
         val responseType = q["response_type"] ?: ""
@@ -133,11 +133,9 @@ internal fun Route.oauthProtocolRoutes(
             return@get
         }
 
-        val tenant = tenantRepository.findBySlug(slug)
-        if (tenant == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
-            return@get
-        }
+        val tenant =
+            ctx.tenant
+                ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
         val oauthParams =
             AuthView.OAuthParams(
