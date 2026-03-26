@@ -69,6 +69,8 @@ class AdminService(
         passwordPolicyMaxAgeDays: Int = 0,
         passwordPolicyBlacklistEnabled: Boolean = false,
         mfaPolicy: String = "optional",
+        lockoutMaxAttempts: Int = 0,
+        lockoutDurationMinutes: Int = 15,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -110,6 +112,8 @@ class AdminService(
                         passwordMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
                         passwordBlacklistEnabled = passwordPolicyBlacklistEnabled,
                         mfaPolicy = mfaPolicy,
+                        lockoutMaxAttempts = lockoutMaxAttempts.coerceAtLeast(0),
+                        lockoutDurationMinutes = lockoutDurationMinutes.coerceAtLeast(1),
                     ),
             )
 

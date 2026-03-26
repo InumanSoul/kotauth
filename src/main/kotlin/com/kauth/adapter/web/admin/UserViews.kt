@@ -64,6 +64,12 @@ internal fun userDetailPageImpl(
                             if (!user.emailVerified) {
                                 span("badge badge--inactive") { +"Email unverified" }
                             }
+                            if (user.isLocked) {
+                                span("badge badge--inactive") {
+                                    span("badge__dot") {}
+                                    +"Locked"
+                                }
+                            }
                         }
                     }
                 }
@@ -105,6 +111,12 @@ internal fun userDetailPageImpl(
                     style = "margin-bottom:20px;"
                     +editError
                 }
+            }
+            if (user.isLocked) {
+                notice(
+                    title = "Account temporarily locked",
+                    description = "Locked due to repeated failed login attempts. The account will auto-unlock after the lockout period expires, or you can unlock it immediately.",
+                )
             }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
@@ -179,6 +191,18 @@ internal fun userDetailPageImpl(
             div("ov-card") {
                 div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
                 div("danger-zone") {
+                    if (user.isLocked) {
+                        dangerZoneCard(
+                            title = "Unlock this account",
+                            description = "Reset the failed login counter and allow the user to log in immediately.",
+                        ) {
+                            postButton(
+                                action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/unlock",
+                                label = "Unlock",
+                                btnClass = "btn btn--primary btn--sm",
+                            )
+                        }
+                    }
                     dangerZoneCard(
                         title = "Disable this user",
                         description = "Blocks all login attempts. Account data is preserved and this can be reversed.",

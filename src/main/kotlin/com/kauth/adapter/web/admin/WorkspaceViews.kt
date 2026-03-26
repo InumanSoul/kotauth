@@ -790,6 +790,40 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                 }
+
+                // ── Account Lockout ──────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Account Lockout" }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Max failed attempts" }
+                        div {
+                            input(type = InputType.number, name = "lockoutMaxAttempts") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "100"
+                                value = workspace.securityConfig.lockoutMaxAttempts.toString()
+                            }
+                            div("edit-row__hint") {
+                                +"Set to 0 to disable lockout. Maximum 100."
+                            }
+                        }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Lockout duration" }
+                        div {
+                            input(type = InputType.number, name = "lockoutDurationMinutes") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "1"
+                                attributes["max"] = "1440"
+                                value = workspace.securityConfig.lockoutDurationMinutes.toString()
+                            }
+                            div("edit-row__hint") {
+                                +"Minutes before the account automatically unlocks. "
+                                +"Only applies when Max failed attempts is greater than 0."
+                            }
+                        }
+                    }
+                }
             }
                     }
 }
