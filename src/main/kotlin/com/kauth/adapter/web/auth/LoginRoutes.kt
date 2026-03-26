@@ -95,7 +95,8 @@ internal fun Route.loginRoutes(
         when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent)) {
             is AuthResult.Failure -> {
                 if (result.error is AuthError.PasswordExpired) {
-                    call.respondRedirect("/t/$slug/forgot-password?reason=expired")
+                    val oauthQs = if (oauthParams.isOAuthFlow) "&${oauthParams.toQueryString().drop(1)}" else ""
+                    call.respondRedirect("/t/$slug/forgot-password?reason=expired$oauthQs")
                 } else {
                     call.respondHtml(
                         HttpStatusCode.Unauthorized,
