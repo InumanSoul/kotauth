@@ -108,17 +108,36 @@ class PostgresTenantRepository(
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
             }
-            TenantSecurityConfigTable.update({ TenantSecurityConfigTable.tenantId eq tenant.id.value }) {
-                it[passwordMinLength] = tenant.securityConfig.passwordMinLength
-                it[passwordRequireSpecial] = tenant.securityConfig.passwordRequireSpecial
-                it[passwordRequireUppercase] = tenant.securityConfig.passwordRequireUppercase
-                it[passwordRequireNumber] = tenant.securityConfig.passwordRequireNumber
-                it[passwordHistoryCount] = tenant.securityConfig.passwordHistoryCount
-                it[passwordMaxAgeDays] = tenant.securityConfig.passwordMaxAgeDays
-                it[passwordBlacklistEnabled] = tenant.securityConfig.passwordBlacklistEnabled
-                it[mfaPolicy] = tenant.securityConfig.mfaPolicy
-                it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
-                it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+            // Upsert: update if exists, insert if the row was never created
+            val updatedRows =
+                TenantSecurityConfigTable.update({
+                    TenantSecurityConfigTable.tenantId eq tenant.id.value
+                }) {
+                    it[passwordMinLength] = tenant.securityConfig.passwordMinLength
+                    it[passwordRequireSpecial] = tenant.securityConfig.passwordRequireSpecial
+                    it[passwordRequireUppercase] = tenant.securityConfig.passwordRequireUppercase
+                    it[passwordRequireNumber] = tenant.securityConfig.passwordRequireNumber
+                    it[passwordHistoryCount] = tenant.securityConfig.passwordHistoryCount
+                    it[passwordMaxAgeDays] = tenant.securityConfig.passwordMaxAgeDays
+                    it[passwordBlacklistEnabled] = tenant.securityConfig.passwordBlacklistEnabled
+                    it[mfaPolicy] = tenant.securityConfig.mfaPolicy
+                    it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
+                    it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                }
+            if (updatedRows == 0) {
+                TenantSecurityConfigTable.insert {
+                    it[tenantId] = tenant.id.value
+                    it[passwordMinLength] = tenant.securityConfig.passwordMinLength
+                    it[passwordRequireSpecial] = tenant.securityConfig.passwordRequireSpecial
+                    it[passwordRequireUppercase] = tenant.securityConfig.passwordRequireUppercase
+                    it[passwordRequireNumber] = tenant.securityConfig.passwordRequireNumber
+                    it[passwordHistoryCount] = tenant.securityConfig.passwordHistoryCount
+                    it[passwordMaxAgeDays] = tenant.securityConfig.passwordMaxAgeDays
+                    it[passwordBlacklistEnabled] = tenant.securityConfig.passwordBlacklistEnabled
+                    it[mfaPolicy] = tenant.securityConfig.mfaPolicy
+                    it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
+                    it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                }
             }
             tenantJoined
                 .selectAll()
@@ -139,6 +158,11 @@ class PostgresTenantRepository(
                     it[TenantsTable.displayName] = displayName
                     it[TenantsTable.issuerUrl] = issuerUrl
                 } get TenantsTable.id
+
+            // Create default security config row for the new tenant
+            TenantSecurityConfigTable.insert {
+                it[tenantId] = insertedId
+            }
 
             tenantJoined
                 .selectAll()
