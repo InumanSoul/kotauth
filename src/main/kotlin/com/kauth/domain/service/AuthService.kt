@@ -54,6 +54,7 @@ class AuthService(
         rawPassword: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        baseUrl: String? = null,
     ): AuthResult<User> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -132,6 +133,7 @@ class AuthService(
                             details = mapOf("attempts" to newCount.toString()),
                         ),
                     )
+                    selfServiceService?.sendAccountLockedNotification(user, tenant, baseUrl ?: "")
                 }
             }
             auditLog.record(

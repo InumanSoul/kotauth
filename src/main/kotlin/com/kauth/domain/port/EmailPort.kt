@@ -36,4 +36,29 @@ interface EmailPort {
         workspaceName: String,
         tenant: Tenant,
     )
+
+    /**
+     * Notifies a user that their account has been locked after repeated failed sign-in attempts.
+     * Includes a password reset link ([resetUrl]) so the user can regain access immediately.
+     * [lockoutDuration] is a human-readable string such as "15 minutes" or "1 hour".
+     */
+    fun sendAccountLockedEmail(
+        to: String,
+        toName: String,
+        resetUrl: String,
+        workspaceName: String,
+        lockoutDuration: String,
+        tenant: Tenant,
+    )
+
+    /**
+     * Notifies a user that their password was successfully changed.
+     * Contains no action link — intentional to avoid a phishing surface.
+     */
+    fun sendPasswordChangedEmail(
+        to: String,
+        toName: String,
+        workspaceName: String,
+        tenant: Tenant,
+    )
 }

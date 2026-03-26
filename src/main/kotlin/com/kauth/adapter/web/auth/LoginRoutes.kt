@@ -29,6 +29,7 @@ internal fun Route.loginRoutes(
     roleRepository: RoleRepository?,
     identityProviderRepository: IdentityProviderRepository?,
     encryptionService: EncryptionService,
+    baseUrl: String = "",
 ) {
     get("/login") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -92,7 +93,7 @@ internal fun Route.loginRoutes(
         }
 
         val userAgent = call.request.headers["User-Agent"]
-        when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent)) {
+        when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent, baseUrl)) {
             is AuthResult.Failure -> {
                 if (result.error is AuthError.PasswordExpired) {
                     val oauthQs = if (oauthParams.isOAuthFlow) "&${oauthParams.toQueryString().drop(1)}" else ""
