@@ -8,5 +8,6 @@ SwaggerUIBundle({
   tryItOutEnabled: true,
   requestSnippetsEnabled: true,
   defaultModelsExpandDepth: 1,
-  defaultModelExpandDepth: 3
+  defaultModelExpandDepth: 3,
+  validatorUrl: null
 })

@@ -114,22 +114,7 @@ private fun swaggerUiHtml() =
   <style>
     body { margin: 0; background: #fafafa; font-family: 'Inter', system-ui, sans-serif; }
     .swagger-ui { font-family: 'Inter', system-ui, sans-serif; }
-    #swagger-ui .topbar { background: #0C0C0E; padding: 8px 16px; }
-    #swagger-ui .topbar-wrapper img {
-      content: url("/static/brand/kotauth-negative.svg");
-      height: 28px;
-      width: auto;
-    }
-    #swagger-ui .topbar-wrapper a span { display: none; }
-    #swagger-ui .topbar-wrapper::after {
-      content: "REST API";
-      color: #ededef;
-      font-size: 1rem;
-      font-weight: 500;
-      margin-left: 0.5rem;
-      align-self: center;
-      opacity: 0.7;
-    }
+    #swagger-ui .topbar { background: #0C0C0E; }
     .swagger-ui .btn.authorize { background: #1FBCFF; color: #05080a; border-color: #1FBCFF; }
     .swagger-ui .btn.authorize:hover { background: #0AAEE8; border-color: #0AAEE8; }
     .swagger-ui .btn.authorize svg { fill: #05080a; }
