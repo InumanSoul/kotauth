@@ -40,6 +40,8 @@
 @import "./components/radio-row.css";
 @import "./components/chip-grid.css";
 @import "./components/demo-banner.css";
+@import "./components/htmx.css";
+@import "./components/dialog.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";

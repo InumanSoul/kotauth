@@ -5,9 +5,10 @@
  *   1. Chip-grid All/None toggles  (data-chips-all, data-chips-none)
  *   2. Chip-grid count updates     (chip-grid change → .chip-grid__count)
  *   3. Copy to clipboard           (data-copy)
- *   4. Confirm dialogs             (data-confirm)
- *   5. Scope toggle (show/hide)    (data-scope-toggle)
- *   6. Auto-submit on change       (data-autosubmit)
+ *   4. Scope toggle (show/hide)    (data-scope-toggle)
+ *   5. Auto-submit on change       (data-autosubmit)
+ *
+ * Confirm dialogs are handled by confirm-dialog.js (shared with portal).
  *
  * All bindings use data-* attributes — zero inline JS.
  */
@@ -91,17 +92,6 @@
     var target = document.getElementById(targetId);
     if (!target) return;
     target.style.display = sel.value === 'application' ? '' : 'none';
-  });
-
-  // ── confirm dialogs ────────────────────────────────────────
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-confirm]');
-    if (!btn) return;
-    var msg = btn.getAttribute('data-confirm');
-    if (!window.confirm(msg)) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
   });
 
   // ── auto-submit on change ─────────────────────────────────

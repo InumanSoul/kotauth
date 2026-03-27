@@ -47,6 +47,14 @@
   flex-shrink: 0;
 }
 
+.portal-topbar__brand-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
 .portal-topbar__org {
   font-size: 1rem;
   font-weight: 500;
