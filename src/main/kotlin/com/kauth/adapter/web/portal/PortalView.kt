@@ -106,7 +106,7 @@ object PortalView {
         {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "profile", layout) {
+                portalShell(slug, workspaceName, session.username, "profile", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Profile" }
                         p(classes = "page-header__subtitle") { +"Manage your personal information" }
@@ -251,7 +251,7 @@ object PortalView {
         {
             head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
-                portalShell(slug, workspaceName, session.username, "security", layout) {
+                portalShell(slug, workspaceName, session.username, "security", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Security" }
                         p(classes = "page-header__subtitle") { +"Password and active sessions" }
@@ -340,7 +340,11 @@ object PortalView {
                                     button(
                                         type = ButtonType.submit,
                                         classes = "btn btn--danger btn--sm",
-                                    ) { +"Revoke all others" }
+                                    ) {
+                                        attributes["data-confirm"] =
+                                            "Sign out of all other sessions? Only your current session will remain active."
+                                        +"Revoke all others"
+                                    }
                                 }
                             }
                         }
@@ -537,7 +541,7 @@ object PortalView {
             }
         }
         body {
-            portalShell(slug, workspaceName, session.username, "mfa", layout) {
+            portalShell(slug, workspaceName, session.username, "mfa", layout, theme.logoUrl) {
                 div(classes = "page-header") {
                     h1(classes = "page-header__title") { +"Two-Factor Authentication" }
                     p(classes = "page-header__subtitle") { +"Protect your account with an authenticator app" }
@@ -933,6 +937,7 @@ object PortalView {
             PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
         }
         link(rel = "stylesheet", href = cssBundle)
+        script(src = "/static/js/confirm-dialog.js") { attributes["defer"] = "true" }
     }
 
     // =========================================================================
@@ -945,12 +950,39 @@ object PortalView {
         username: String,
         activePage: String,
         layout: PortalLayout,
+        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
         demoBanner()
         when (layout) {
-            PortalLayout.SIDEBAR -> portalShellSidenav(slug, workspaceName, username, activePage, content)
-            PortalLayout.CENTERED -> portalShellTabnav(slug, workspaceName, username, activePage, content)
+            PortalLayout.SIDEBAR -> portalShellSidenav(slug, workspaceName, username, activePage, logoUrl, content)
+            PortalLayout.CENTERED -> portalShellTabnav(slug, workspaceName, username, activePage, logoUrl, content)
+        }
+
+        // Shared confirmation dialog — same pattern as admin shell
+        dialog("confirm-dialog") {
+            id = "confirm-dialog"
+            div("confirm-dialog__card") {
+                div("confirm-dialog__body") {
+                    p("confirm-dialog__title") {
+                        id = "confirm-dialog-title"
+                        +"Confirm"
+                    }
+                    p("confirm-dialog__message") {
+                        id = "confirm-dialog-message"
+                    }
+                }
+                div("confirm-dialog__actions") {
+                    button(classes = "btn btn--ghost btn--sm") {
+                        id = "confirm-dialog-cancel"
+                        +"Cancel"
+                    }
+                    button(classes = "btn btn--danger btn--sm") {
+                        id = "confirm-dialog-ok"
+                        +"Confirm"
+                    }
+                }
+            }
         }
     }
 
@@ -959,16 +991,24 @@ object PortalView {
         workspaceName: String,
         username: String,
         activePage: String,
+        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
         aside(classes = "portal-sidebar") {
             div(classes = "portal-sidebar__brand") {
-                div(classes = "portal-sidebar__brand-mark") {
-                    +workspaceName.split(" ")
-                        .take(2)
-                        .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-                        .joinToString("")
-                        .ifEmpty { "K" }
+                if (logoUrl != null) {
+                    img(src = logoUrl, alt = workspaceName, classes = "portal-sidebar__brand-logo") {
+                        width = "32"
+                        height = "32"
+                    }
+                } else {
+                    div(classes = "portal-sidebar__brand-mark") {
+                        +workspaceName.split(" ")
+                            .take(2)
+                            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+                            .joinToString("")
+                            .ifEmpty { "K" }
+                    }
                 }
                 div(classes = "portal-sidebar__brand-info") {
                     span(classes = "portal-sidebar__org") { +workspaceName }
@@ -1013,6 +1053,7 @@ object PortalView {
         workspaceName: String,
         username: String,
         activePage: String,
+        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
         val initials = workspaceName.split(" ")
@@ -1024,7 +1065,14 @@ object PortalView {
         header(classes = "portal-topbar") {
             div(classes = "portal-topbar__inner") {
                 div(classes = "portal-topbar__brand") {
-                    div(classes = "portal-topbar__brand-mark") { +initials }
+                    if (logoUrl != null) {
+                        img(src = logoUrl, alt = workspaceName, classes = "portal-topbar__brand-logo") {
+                            width = "28"
+                            height = "28"
+                        }
+                    } else {
+                        div(classes = "portal-topbar__brand-mark") { +initials }
+                    }
                     span(classes = "portal-topbar__org") { +workspaceName }
                 }
                 div(classes = "portal-topbar__sep") { attributes["aria-hidden"] = "true" }
