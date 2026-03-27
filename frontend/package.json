@@ -1,15 +1,18 @@
 {
   "name": "kotauth-frontend",
   "version": "1.0.0",
-  "description": "CSS build tooling for KotAuth. Not a Node.js app — only used at build time.",
+  "description": "CSS and JS build tooling for KotAuth. Not a Node.js app — only used at build time.",
   "private": true,
   "scripts": {
-    "build:admin": "lightningcss --bundle --minify --targets '>= 0.5%' css/index-admin.css -o ../src/main/resources/static/kotauth-admin.css",
-    "build:auth":  "lightningcss --bundle --minify --targets '>= 0.5%' css/index-auth.css  -o ../src/main/resources/static/kotauth-auth.css",
-    "build":       "npm run build:admin && npm run build:auth",
-    "watch":       "find css -name '*.css' | entr sh -c 'npm run build'"
+    "build:css:admin":   "lightningcss --bundle --minify --targets '>= 0.5%' css/index-admin.css -o ../src/main/resources/static/kotauth-admin.css",
+    "build:css:auth":    "lightningcss --bundle --minify --targets '>= 0.5%' css/index-auth.css  -o ../src/main/resources/static/kotauth-auth.css",
+    "build:js":          "node scripts/build-js.js",
+    "build:sri":         "node scripts/generate-sri.js",
+    "build":             "npm run build:css:admin && npm run build:css:auth && npm run build:js && npm run build:sri",
+    "watch":             "find css js -name '*.css' -o -name '*.js' | entr sh -c 'npm run build'"
   },
   "devDependencies": {
+    "esbuild": "0.21.5",
     "lightningcss-cli": "1.32.0"
   }
 }
