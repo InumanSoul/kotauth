@@ -109,9 +109,7 @@ private fun swaggerUiHtml() =
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KotAuth REST API — Docs</title>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css"
-        crossorigin="anonymous" />
+  <link rel="stylesheet" href="/static/swagger/swagger-ui.min.css" />
   <style>
     body { margin: 0; background: #fafafa; font-family: system-ui, sans-serif; }
     #swagger-ui .topbar { background: #1a1a2e; }
@@ -129,10 +127,8 @@ private fun swaggerUiHtml() =
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js"
-          crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js"
-          crossorigin="anonymous"></script>
+  <script src="/static/swagger/swagger-ui-bundle.min.js"></script>
+  <script src="/static/swagger/swagger-ui-standalone-preset.min.js"></script>
   <script>
     SwaggerUIBundle({
       url: "/api/docs/openapi.yaml",

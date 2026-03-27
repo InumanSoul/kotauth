@@ -11,6 +11,7 @@ import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookEndpoint
 import kotlinx.html.*
@@ -187,7 +188,8 @@ object AdminView {
         sessions: List<Session>,
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs)
+        userMap: Map<UserId, String> = emptyMap(),
+    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap)
 
     fun auditLogPage(
         workspace: Tenant,
@@ -197,7 +199,8 @@ object AdminView {
         page: Int = 1,
         totalPages: Int = 1,
         eventTypeFilter: String? = null,
-    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter)
+        userMap: Map<UserId, String> = emptyMap(),
+    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap)
 
     // ── Settings ────────────────────────────────────────────────────────
 

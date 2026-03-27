@@ -4,6 +4,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.UserRepository
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -19,6 +20,7 @@ import java.time.Instant
 fun Route.adminSessionAuditRoutes(
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
+    userRepository: UserRepository,
 ) {
     // -------------------------------------------------------------------
     // Active sessions
@@ -28,10 +30,15 @@ fun Route.adminSessionAuditRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val sessions = sessionRepository.findActiveByTenant(workspace.id)
+        val sessionUserIds = sessions.mapNotNull { it.userId }.distinct()
+        val sessionUserMap =
+            sessionUserIds.associateWith { uid ->
+                userRepository.findById(uid)?.username ?: uid.value.toString()
+            }
         val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.activeSessionsPage(workspace, sessions, wsPairs, session.username),
+            AdminView.activeSessionsPage(workspace, sessions, wsPairs, session.username, sessionUserMap),
         )
     }
 
@@ -68,6 +75,11 @@ fun Route.adminSessionAuditRoutes(
                 offset = offset,
             )
         val total = auditLogRepository.countByTenant(workspace.id, eventType)
+        val auditUserIds = events.mapNotNull { it.userId }.distinct()
+        val auditUserMap =
+            auditUserIds.associateWith { uid ->
+                userRepository.findById(uid)?.username ?: uid.value.toString()
+            }
         val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
@@ -79,6 +91,7 @@ fun Route.adminSessionAuditRoutes(
                 page = page,
                 totalPages = ((total + pageSize - 1) / pageSize).toInt(),
                 eventTypeFilter = eventTypeStr,
+                userMap = auditUserMap,
             ),
         )
     }

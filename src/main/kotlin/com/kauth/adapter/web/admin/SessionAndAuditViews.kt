@@ -4,6 +4,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.UserId
 import kotlinx.html.*
 
 // Active sessions (workspace-wide).
@@ -12,6 +13,7 @@ internal fun activeSessionsPageImpl(
     sessions: List<Session>,
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
+    userMap: Map<UserId, String> = emptyMap(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -60,7 +62,15 @@ internal fun activeSessionsPageImpl(
                             sessions.forEach { s ->
                                 tr {
                                     td { span("data-table__id") { +"#${s.id?.value}" } }
-                                    td { +(s.userId?.value?.toString() ?: "M2M") }
+                                    td {
+                                        val uid = s.userId
+                                        if (uid != null) {
+                                            val name = userMap[uid] ?: uid.value.toString()
+                                            a(href = "/admin/workspaces/${workspace.slug}/users/${uid.value}") { +name }
+                                        } else {
+                                            +"M2M"
+                                        }
+                                    }
                                     td { +(s.clientId?.value?.toString() ?: "—") }
                                     td { span("data-table__email") { +(s.ipAddress ?: "—") } }
                                     td { +s.createdAt.toDisplayString() }
@@ -94,6 +104,7 @@ internal fun auditLogPageImpl(
     page: Int = 1,
     totalPages: Int = 1,
     eventTypeFilter: String? = null,
+    userMap: Map<UserId, String> = emptyMap(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -189,7 +200,15 @@ internal fun auditLogPageImpl(
                                     tr {
                                         td { +e.createdAt.toDisplayString() }
                                         td { span("data-table__id") { +e.eventType.name } }
-                                        td { +(e.userId?.value?.toString() ?: "—") }
+                                        td {
+                                            val uid = e.userId
+                                            if (uid != null) {
+                                                val name = userMap[uid] ?: uid.value.toString()
+                                                a(href = "/admin/workspaces/${workspace.slug}/users/${uid.value}") { +name }
+                                            } else {
+                                                +"—"
+                                            }
+                                        }
                                         td { +(e.clientId?.value?.toString() ?: "—") }
                                         td {
                                             span("data-table__email") { +(e.ipAddress ?: "—") }

@@ -504,6 +504,7 @@ fun Route.adminRoutes(
                 adminSessionAuditRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
+                    userRepository = userRepository,
                 )
 
                 adminRbacRoutes(
