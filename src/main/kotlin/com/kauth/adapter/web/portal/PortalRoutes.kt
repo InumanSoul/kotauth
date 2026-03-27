@@ -6,6 +6,7 @@ import com.kauth.adapter.web.generatePkceVerifier
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
@@ -60,6 +61,7 @@ import kotlinx.serialization.json.putJsonArray
 fun Route.portalRoutes(
     selfServiceService: UserSelfServiceService,
     tenantRepository: TenantRepository,
+    sessionRepository: SessionRepository? = null,
     mfaService: MfaService? = null,
     oauthService: OAuthService? = null,
     baseUrl: String = "",
@@ -262,6 +264,15 @@ fun Route.portalRoutes(
         fun ApplicationCall.portalSession(slug: String): PortalSession? {
             val session = sessions.get<PortalSession>() ?: return null
             if (session.tenantSlug != slug) return null
+            // Validate the backing DB session hasn't been revoked by an admin
+            val dbSessionId = session.portalSessionId
+            if (dbSessionId != null && sessionRepository != null) {
+                val dbSession = sessionRepository.findById(SessionId(dbSessionId))
+                if (dbSession == null || dbSession.revokedAt != null) {
+                    sessions.clear<PortalSession>()
+                    return null
+                }
+            }
             return session
         }
 

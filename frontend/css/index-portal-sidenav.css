@@ -36,3 +36,6 @@
 
 /* ── Demo mode banner ──────────────────────────────────────────────────── */
 @import "./components/demo-banner.css";
+
+/* ── Shared dialog ─────────────────────────────────────────────────────── */
+@import "./components/dialog.css";

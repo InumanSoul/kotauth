@@ -109,44 +109,22 @@ private fun swaggerUiHtml() =
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KotAuth REST API — Docs</title>
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css"
-        crossorigin="anonymous" />
+  <link rel="icon" href="/static/brand/kotauth-negative-icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/swagger/swagger-ui.min.css" />
   <style>
-    body { margin: 0; background: #fafafa; font-family: system-ui, sans-serif; }
-    #swagger-ui .topbar { background: #1a1a2e; }
-    #swagger-ui .topbar-wrapper img { content: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' width='28' height='28'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z'/></svg>"); }
-    #swagger-ui .topbar-wrapper a span { display: none; }
-    #swagger-ui .topbar-wrapper::after {
-      content: "KotAuth REST API";
-      color: white;
-      font-size: 1.125rem;
-      font-weight: 600;
-      margin-left: 0.75rem;
-      align-self: center;
-    }
+    body { margin: 0; background: #fafafa; font-family: 'Inter', system-ui, sans-serif; }
+    .swagger-ui { font-family: 'Inter', system-ui, sans-serif; }
+    #swagger-ui .topbar { background: #0C0C0E; }
+    .swagger-ui .btn.authorize { background: #1FBCFF; color: #05080a; border-color: #1FBCFF; }
+    .swagger-ui .btn.authorize:hover { background: #0AAEE8; border-color: #0AAEE8; }
+    .swagger-ui .btn.authorize svg { fill: #05080a; }
   </style>
 </head>
 <body>
   <div id="swagger-ui"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js"
-          crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-standalone-preset.min.js"
-          crossorigin="anonymous"></script>
-  <script>
-    SwaggerUIBundle({
-      url: "/api/docs/openapi.yaml",
-      dom_id: "#swagger-ui",
-      deepLinking: true,
-      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-      layout: "StandaloneLayout",
-      persistAuthorization: true,
-      tryItOutEnabled: true,
-      requestSnippetsEnabled: true,
-      defaultModelsExpandDepth: 1,
-      defaultModelExpandDepth: 3
-    })
-  </script>
+  <script src="/static/swagger/swagger-ui-bundle.min.js"></script>
+  <script src="/static/swagger/swagger-ui-standalone-preset.min.js"></script>
+  <script src="/static/swagger/swagger-init.js"></script>
 </body>
 </html>
     """.trimIndent()

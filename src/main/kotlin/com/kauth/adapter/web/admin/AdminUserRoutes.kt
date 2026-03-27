@@ -36,10 +36,11 @@ fun Route.adminUserRoutes(
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
             val users = userRepository.findByTenantId(workspace.id, search)
+            val totalCount = if (search != null) userRepository.findByTenantId(workspace.id, null).size else null
             val wsPairs = call.attributes[WsPairsAttr]
             call.respondHtml(
                 HttpStatusCode.OK,
-                AdminView.userListPage(workspace, users, wsPairs, session.username, search),
+                AdminView.userListPage(workspace, users, wsPairs, session.username, search, totalCount),
             )
         }
 
@@ -97,12 +98,16 @@ fun Route.adminUserRoutes(
                 val userRoles = roleGroupService.getRolesForUser(userId)
                 val userGroups = roleGroupService.getGroupsForUser(userId)
                 val savedParam = call.request.queryParameters["saved"]
-                val errorParam = call.request.queryParameters["error"]
                 val successMsg =
                     when (savedParam) {
                         "true" -> "Profile saved."
                         "reset_email_sent" -> "Password reset email sent successfully."
                         "unlocked" -> "Account unlocked successfully."
+                        else -> null
+                    }
+                val errorParam =
+                    when (savedParam) {
+                        "reset_email_failed" -> "Failed to send password reset email. Check SMTP configuration."
                         else -> null
                     }
                 call.respondHtml(
@@ -282,10 +287,7 @@ fun Route.adminUserRoutes(
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
                     is AdminResult.Failure ->
                         call.respondRedirect(
-                            "/admin/workspaces/$slug/users/${userId.value}?error=${java.net.URLEncoder.encode(
-                                result.error.message,
-                                "UTF-8",
-                            )}",
+                            "/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_failed",
                         )
                 }
             }

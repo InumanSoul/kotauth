@@ -4,6 +4,7 @@ import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
@@ -11,6 +12,7 @@ import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookEndpoint
 import kotlinx.html.*
@@ -141,7 +143,8 @@ object AdminView {
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
         search: String? = null,
-    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search)
+        totalCount: Int? = null,
+    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, totalCount)
 
     fun createUserPage(
         workspace: Tenant,
@@ -187,7 +190,9 @@ object AdminView {
         sessions: List<Session>,
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs)
+        userMap: Map<UserId, String> = emptyMap(),
+        clientMap: Map<ApplicationId, String> = emptyMap(),
+    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap)
 
     fun auditLogPage(
         workspace: Tenant,
@@ -197,7 +202,9 @@ object AdminView {
         page: Int = 1,
         totalPages: Int = 1,
         eventTypeFilter: String? = null,
-    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter)
+        userMap: Map<UserId, String> = emptyMap(),
+        clientMap: Map<ApplicationId, String> = emptyMap(),
+    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap, clientMap)
 
     // ── Settings ────────────────────────────────────────────────────────
 

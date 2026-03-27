@@ -50,6 +50,14 @@
   flex-shrink: 0;
 }
 
+.portal-sidebar__brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
 .portal-sidebar__brand-info {
   display: flex;
   flex-direction: column;

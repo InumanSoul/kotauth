@@ -25,8 +25,8 @@ import javax.mail.internet.MimeMultipart
  *   Port 587+ → STARTTLS:          mail.smtp.starttls.enable=true + starttls.required=true
  * These two modes are mutually exclusive. Conflating them is the most common JavaMail mistake.
  *
- * Emails use plain HTML with no template engine — workspace name only, no theme colors.
- * This is a deliberate KISS choice to keep the implementation simple.
+ * Emails use plain HTML with no template engine. Each email applies TenantTheme branding
+ * (accent color, font family, border radius, logo) via a shared [buildEmailHtml] layout function.
  *
  * The caller ([UserSelfServiceService]) is responsible for checking [Tenant.isSmtpReady]
  * before calling this adapter. If SMTP is not configured, this adapter will throw.
@@ -42,7 +42,7 @@ class SmtpEmailAdapter : EmailPort {
         tenant: Tenant,
     ) {
         val subject = "Verify your email address — $workspaceName"
-        val html = buildVerificationHtml(toName, verifyUrl, workspaceName)
+        val html = buildVerificationHtml(toName, verifyUrl, tenant)
         val text = buildVerificationText(toName, verifyUrl, workspaceName)
         send(to, toName, subject, html, text, tenant)
     }
@@ -55,7 +55,7 @@ class SmtpEmailAdapter : EmailPort {
         tenant: Tenant,
     ) {
         val subject = "Reset your password — $workspaceName"
-        val html = buildPasswordResetHtml(toName, resetUrl, workspaceName)
+        val html = buildPasswordResetHtml(toName, resetUrl, tenant)
         val text = buildPasswordResetText(toName, resetUrl, workspaceName)
         send(to, toName, subject, html, text, tenant)
     }
@@ -69,7 +69,7 @@ class SmtpEmailAdapter : EmailPort {
         tenant: Tenant,
     ) {
         val subject = "Your account has been locked — $workspaceName"
-        val html = buildAccountLockedHtml(toName, resetUrl, workspaceName, lockoutDuration)
+        val html = buildAccountLockedHtml(toName, resetUrl, lockoutDuration, tenant)
         val text = buildAccountLockedText(toName, resetUrl, workspaceName, lockoutDuration)
         send(to, toName, subject, html, text, tenant)
     }
@@ -81,8 +81,8 @@ class SmtpEmailAdapter : EmailPort {
         tenant: Tenant,
     ) {
         val subject = "Your password has been changed — $workspaceName"
-        val html = buildPasswordChangedHtml(toName, workspaceName)
-        val text = buildPasswordChangedText(toName, workspaceName)
+        val html = buildPasswordChangedHtml(toName, workspaceName, tenant)
+        val text = buildPasswordChangedText(toName, workspaceName, tenant)
         send(to, toName, subject, html, text, tenant)
     }
 
@@ -199,216 +199,257 @@ class SmtpEmailAdapter : EmailPort {
     private fun workspaceDisplayName(tenant: Tenant) = tenant.displayName
 
     // -------------------------------------------------------------------------
-    // Email templates — plain HTML, workspace name only
+    // Shared layout builders
+    // -------------------------------------------------------------------------
+
+    /**
+     * Renders the full HTML email with the shared table-based shell and TenantTheme branding.
+     *
+     * Email backgrounds are always light (#f4f4f5 / #ffffff) regardless of the tenant's auth-page
+     * theme — dark-mode email rendering is inconsistent across clients and inbox providers.
+     *
+     * When [ctaLabel] and [ctaUrl] are both non-null the CTA button and URL-fallback footer are
+     * rendered. When [ctaLabel] is null the button section is omitted entirely (e.g. password-
+     * changed notification, which has no actionable link).
+     */
+    private fun buildEmailHtml(
+        tenant: Tenant,
+        heading: String,
+        bodyHtml: String,
+        ctaLabel: String? = null,
+        ctaUrl: String? = null,
+        footerHtml: String,
+    ): String {
+        val theme = tenant.theme
+        val workspace = htmlEscape(tenant.displayName)
+        val font = "${htmlEscape(theme.fontFamily)}, sans-serif"
+
+        val logoSection =
+            if (theme.logoUrl != null) {
+                """<img src="${htmlEscape(theme.logoUrl)}" alt="$workspace" border="0" """ +
+                    """style="max-height:40px;max-width:200px;margin:0 0 16px 0;display:block;">"""
+            } else {
+                ""
+            }
+
+        val safeCtaUrl = ctaUrl?.let { htmlEscape(it) }
+        val safeCtaLabel = ctaLabel?.let { htmlEscape(it) }
+        val radius = htmlEscape(theme.borderRadius)
+
+        val ctaSection =
+            if (safeCtaLabel != null && safeCtaUrl != null) {
+                """
+                <a href="$safeCtaUrl" style="display:inline-block;padding:12px 24px;background:${theme.accentColor};color:${theme.accentForeground};border-radius:$radius;text-decoration:none;font-size:14px;font-weight:600;">
+                  $safeCtaLabel
+                </a>
+                <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
+                  $footerHtml<br>
+                  If the button doesn't work, copy this link:<br>
+                  <a href="$safeCtaUrl" style="color:#71717a;word-break:break-all;">$safeCtaUrl</a>
+                </p>
+                """.trimIndent()
+            } else {
+                """
+                <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
+                  $footerHtml
+                </p>
+                """.trimIndent()
+            }
+
+        return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;font-family:$font;background:#f4f4f5;color:#18181b;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr><td align="center" style="padding:40px 16px;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:$radius;padding:40px;border:1px solid #e4e4e7;">
+                    <tr><td>
+                      $logoSection
+                      <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
+                      <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">$heading</h1>
+                      <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
+                        $bodyHtml
+                      </p>
+                      $ctaSection
+                    </td></tr>
+                  </table>
+                </td></tr>
+              </table>
+            </body>
+            </html>
+            """.trimIndent()
+    }
+
+    /**
+     * Renders the plain-text fallback for all transactional emails.
+     *
+     * [url] is omitted when null — callers that have no CTA (e.g. password-changed) pass null.
+     */
+    private fun buildEmailText(
+        workspace: String,
+        heading: String,
+        body: String,
+        url: String? = null,
+        footer: String,
+    ): String {
+        val urlSection = if (url != null) "\n$url\n" else ""
+        return "$workspace — $heading\n\n$body\n$urlSection\n$footer"
+    }
+
+    // -------------------------------------------------------------------------
+    // Email templates — thin wrappers over the shared layout builders
     // -------------------------------------------------------------------------
 
     private fun buildVerificationHtml(
         name: String,
         url: String,
-        workspace: String,
-    ) = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-            <tr><td align="center">
-              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
-                <tr><td>
-                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
-                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Verify your email address</h1>
-                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
-                    Hi ${htmlEscape(name)},<br><br>
-                    Click the button below to verify your email address. This link expires in 24 hours.
-                  </p>
-                  <a href="$url" style="display:inline-block;padding:12px 24px;background:#18181b;color:#ffffff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
-                    Verify email address
-                  </a>
-                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                    If you did not create an account, you can safely ignore this email.<br>
-                    If the button doesn't work, copy this link:<br>
-                    <a href="$url" style="color:#71717a;word-break:break-all;">$url</a>
-                  </p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-        """.trimIndent()
+        tenant: Tenant,
+    ) = buildEmailHtml(
+        tenant = tenant,
+        heading = "Verify your email address",
+        bodyHtml = "Hi ${htmlEscape(
+            name,
+        )},<br><br>Click the button below to verify your email address. This link expires in 24 hours.",
+        ctaLabel = "Verify email address",
+        ctaUrl = url,
+        footerHtml = "If you did not create an account, you can safely ignore this email.",
+    )
 
     private fun buildVerificationText(
         name: String,
         url: String,
         workspace: String,
-    ) = """
-        $workspace — Verify your email address
-
-        Hi $name,
-
-        Click the link below to verify your email address. This link expires in 24 hours.
-
-        $url
-
-        If you did not create an account, you can safely ignore this email.
-        """.trimIndent()
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "Verify your email address",
+        body = "Hi $name,\n\nClick the link below to verify your email address. This link expires in 24 hours.",
+        url = url,
+        footer = "If you did not create an account, you can safely ignore this email.",
+    )
 
     private fun buildPasswordResetHtml(
         name: String,
         url: String,
-        workspace: String,
-    ) = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-            <tr><td align="center">
-              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
-                <tr><td>
-                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
-                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Reset your password</h1>
-                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
-                    Hi ${htmlEscape(name)},<br><br>
-                    We received a request to reset your password. Click the button below to choose a new one.
-                    This link expires in 1 hour.
-                  </p>
-                  <a href="$url" style="display:inline-block;padding:12px 24px;background:#18181b;color:#ffffff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
-                    Reset password
-                  </a>
-                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                    If you did not request a password reset, you can safely ignore this email.<br>
-                    If the button doesn't work, copy this link:<br>
-                    <a href="$url" style="color:#71717a;word-break:break-all;">$url</a>
-                  </p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-        """.trimIndent()
+        tenant: Tenant,
+    ) = buildEmailHtml(
+        tenant = tenant,
+        heading = "Reset your password",
+        bodyHtml =
+            "Hi ${htmlEscape(name)},<br><br>" +
+                "We received a request to reset your password. " +
+                "Click the button below to choose a new one. This link expires in 1 hour.",
+        ctaLabel = "Reset password",
+        ctaUrl = url,
+        footerHtml = "If you did not request a password reset, you can safely ignore this email.",
+    )
 
     private fun buildPasswordResetText(
         name: String,
         url: String,
         workspace: String,
-    ) = """
-        $workspace — Reset your password
-
-        Hi $name,
-
-        We received a request to reset your password. Click the link below to choose a new one.
-        This link expires in 1 hour.
-
-        $url
-
-        If you did not request a password reset, you can safely ignore this email.
-        """.trimIndent()
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "Reset your password",
+        body =
+            "Hi $name,\n\nWe received a request to reset your password. " +
+                "Click the link below to choose a new one. This link expires in 1 hour.",
+        url = url,
+        footer = "If you did not request a password reset, you can safely ignore this email.",
+    )
 
     private fun buildAccountLockedHtml(
         name: String,
         url: String,
-        workspace: String,
         lockoutDuration: String,
-    ) = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-            <tr><td align="center">
-              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
-                <tr><td>
-                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
-                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Your account has been locked</h1>
-                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
-                    Hi ${htmlEscape(name)},<br><br>
-                    We temporarily locked your $workspace account after several failed sign-in attempts.
-                    Your account will automatically unlock in $lockoutDuration.
-                    If you'd like to regain access sooner, or if you don't recognize this activity,
-                    you can reset your password now.
-                  </p>
-                  <a href="$url" style="display:inline-block;padding:12px 24px;background:#18181b;color:#ffffff;border-radius:6px;text-decoration:none;font-size:14px;font-weight:600;">
-                    Reset password
-                  </a>
-                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                    If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically.<br>
-                    If the button doesn't work, copy this link:<br>
-                    <a href="$url" style="color:#71717a;word-break:break-all;">$url</a>
-                  </p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-        """.trimIndent()
+        tenant: Tenant,
+    ) = buildEmailHtml(
+        tenant = tenant,
+        heading = "Your account has been locked",
+        bodyHtml =
+            "Hi ${htmlEscape(name)},<br><br>" +
+                "We temporarily locked your ${htmlEscape(
+                    tenant.displayName,
+                )} account after several failed sign-in attempts. " +
+                "Your account will automatically unlock in $lockoutDuration. " +
+                "If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.",
+        ctaLabel = "Reset password",
+        ctaUrl = url,
+        footerHtml =
+            "If you made these sign-in attempts, you can safely ignore this email " +
+                "— your account will unlock automatically.",
+    )
 
     private fun buildAccountLockedText(
         name: String,
         url: String,
         workspace: String,
         lockoutDuration: String,
-    ) = """
-        $workspace — Your account has been locked
-
-        Hi $name,
-
-        We temporarily locked your $workspace account after several failed sign-in attempts.
-        Your account will automatically unlock in $lockoutDuration.
-        If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.
-
-        $url
-
-        If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically.
-        """.trimIndent()
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "Your account has been locked",
+        body =
+            "Hi $name,\n\nWe temporarily locked your $workspace account after several failed sign-in attempts.\n" +
+                "Your account will automatically unlock in $lockoutDuration.\n" +
+                "If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.",
+        url = url,
+        footer =
+            "If you made these sign-in attempts, you can safely ignore this email " +
+                "— your account will unlock automatically.",
+    )
 
     private fun buildPasswordChangedHtml(
         name: String,
         workspace: String,
-    ) = """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-        <body style="margin:0;padding:0;font-family:sans-serif;background:#f4f4f5;color:#18181b;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 0;">
-            <tr><td align="center">
-              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:40px;border:1px solid #e4e4e7;">
-                <tr><td>
-                  <p style="font-size:13px;color:#71717a;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:.05em;">$workspace</p>
-                  <h1 style="font-size:22px;margin:0 0 16px 0;color:#09090b;">Your password has been changed</h1>
-                  <p style="font-size:15px;line-height:1.6;color:#3f3f46;margin:0 0 24px 0;">
-                    Hi ${htmlEscape(name)},<br><br>
-                    Your $workspace password was successfully changed.
-                    If you made this change, no action is needed.
-                    If you did not make this change, go to the sign-in page and use the forgot password link to reset it immediately.
-                  </p>
-                  <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                    For security, all active sessions were signed out when your password was changed.
-                  </p>
-                </td></tr>
-              </table>
-            </td></tr>
-          </table>
-        </body>
-        </html>
-        """.trimIndent()
+        tenant: Tenant,
+    ): String {
+        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/login") ?: ""
+        val loginLink =
+            if (loginUrl.isNotBlank()) {
+                " Sign in at <a href=\"${htmlEscape(loginUrl)}\" " +
+                    "style=\"color:#71717a;\">${htmlEscape(loginUrl)}</a>" +
+                    " and use the Forgot password link."
+            } else {
+                ""
+            }
+        return buildEmailHtml(
+            tenant = tenant,
+            heading = "Your password has been changed",
+            bodyHtml =
+                "Hi ${htmlEscape(name)},<br><br>" +
+                    "Your ${htmlEscape(workspace)} password was successfully changed. " +
+                    "If you made this change, no action is needed. " +
+                    "If you did not make this change, reset your password immediately." +
+                    loginLink,
+            ctaLabel = null,
+            ctaUrl = null,
+            footerHtml =
+                "For security, all active sessions were signed out " +
+                    "when your password was changed.",
+        )
+    }
 
     private fun buildPasswordChangedText(
         name: String,
         workspace: String,
-    ) = """
-        $workspace — Your password has been changed
-
-        Hi $name,
-
-        Your $workspace password was successfully changed.
-        If you made this change, no action is needed.
-        If you did not make this change, go to the sign-in page and use the forgot password link to reset it immediately.
-
-        For security, all active sessions were signed out when your password was changed.
-        """.trimIndent()
+        tenant: Tenant,
+    ): String {
+        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/login") ?: ""
+        val loginHint = if (loginUrl.isNotBlank()) "\nSign in at $loginUrl and use the Forgot password link." else ""
+        return buildEmailText(
+            workspace = workspace,
+            heading = "Your password has been changed",
+            body =
+                "Hi $name,\n\nYour $workspace password was successfully changed.\n" +
+                    "If you made this change, no action is needed.\n" +
+                    "If you did not make this change, reset your password immediately." +
+                    loginHint,
+            url = null,
+            footer =
+                "For security, all active sessions were signed out " +
+                    "when your password was changed.",
+        )
+    }
 
     private fun htmlEscape(s: String) =
         s

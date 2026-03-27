@@ -1,0 +1,23 @@
+/* htmx loading and indicator utilities */
+
+.htmx-loader {
+  display: none;
+  opacity: 0.6;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.htmx-request .htmx-loader,
+.htmx-request.htmx-loader {
+  display: inline-block;
+}
+
+.htmx-indicator {
+  opacity: 0;
+  transition: opacity 200ms;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  opacity: 1;
+}

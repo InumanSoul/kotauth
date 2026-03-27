@@ -137,6 +137,7 @@ internal fun userDetailPageImpl(
                                 action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/revoke-sessions",
                                 label = "Revoke all",
                                 btnClass = "btn btn--warning btn--sm",
+                                confirmMessage = "Revoke all active sessions for this user? They will be signed out everywhere.",
                             )
                         } else {
                             button(classes = "btn btn--warning btn--sm") {
@@ -211,6 +212,11 @@ internal fun userDetailPageImpl(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/toggle",
                             label = if (user.enabled) "Disable" else "Enable",
                             btnClass = "btn btn--danger btn--sm",
+                            confirmMessage = if (user.enabled) {
+                                "Disable this user? They will be unable to log in until re-enabled."
+                            } else {
+                                null
+                            },
                         )
                     }
                 }
@@ -399,6 +405,7 @@ internal fun userListPageImpl(
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
     search: String? = null,
+    totalCount: Int? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -423,9 +430,6 @@ internal fun userListPageImpl(
                 div("page-header__left") {
                     div("page-header__identity") {
                         h1("page-header__title") { +"Users" }
-                        span("page-header__sub") {
-                            +"${users.size} user${if (users.size != 1) "s" else ""} in this workspace"
-                        }
                     }
                 }
                 div("page-header__actions") {
@@ -437,7 +441,7 @@ internal fun userListPageImpl(
                 }
             }
 
-            // ── Search bar (server-side GET) ─────────────────────────
+            // ── Search bar (server-side GET, htmx-enhanced) ──────────
             form(
                 action = "/admin/workspaces/${workspace.slug}/users",
                 method = FormMethod.get,
@@ -447,84 +451,105 @@ internal fun userListPageImpl(
                     input(type = InputType.search, name = "q", classes = "filter-bar__input") {
                         placeholder = "Filter by username, email, or name…"
                         value = search ?: ""
-                        attributes["data-autosubmit"] = "true"
+                        attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/users"
+                        attributes["hx-target"] = "#user-list-content"
+                        attributes["hx-trigger"] = "input changed delay:300ms, search"
+                        attributes["hx-replace-url"] = "true"
+                        attributes["hx-select"] = "#user-list-content"
+                        attributes["hx-indicator"] = ".htmx-loader"
                     }
+                    span("htmx-loader") { +"Loading…" }
                 }
             }
 
-            // ── Users table ──────────────────────────────────────────
-            if (users.isEmpty()) {
-                emptyState(
-                    iconName = "user",
-                    title = if (search != null) "No users found" else "No users yet",
-                    description = if (search != null) {
-                        "No users match \"$search\". Try a different username, email, or name."
+            // ── Users table (htmx swap target) ───────────────────────
+            div {
+                id = "user-list-content"
+
+                span("page-header__sub") {
+                    val count = users.size
+                    val suffix = if (count != 1) "s" else ""
+                    if (search != null && totalCount != null && totalCount != count) {
+                        +"$count of $totalCount user$suffix"
                     } else {
-                        "Create a user to get started."
-                    },
-                    cta = if (search != null) {
-                        {
-                            a(
-                                href = "/admin/workspaces/${workspace.slug}/users",
-                                classes = "empty-state__cta",
-                            ) { +"Clear filter" }
-                        }
-                    } else {
-                        null
-                    },
-                )
-            } else {
-                table("data-table") {
-                    thead {
-                        tr {
-                            th { style = "width:200px;"; +"Username" }
-                            th { +"Full Name" }
-                            th { +"Email" }
-                            th { style = "width:110px;"; +"Status" }
-                            th { style = "width:70px;" }
-                        }
+                        +"$count user$suffix in this workspace"
                     }
-                    tbody {
-                        users.forEach { user ->
+                }
+
+                if (users.isEmpty()) {
+                    emptyState(
+                        iconName = "user",
+                        title = if (search != null) "No users found" else "No users yet",
+                        description = if (search != null) {
+                            "No users match \"$search\". Try a different username, email, or name."
+                        } else {
+                            "Create a user to get started."
+                        },
+                        cta = if (search != null) {
+                            {
+                                a(
+                                    href = "/admin/workspaces/${workspace.slug}/users",
+                                    classes = "empty-state__cta",
+                                ) { +"Clear filter" }
+                            }
+                        } else {
+                            null
+                        },
+                    )
+                } else {
+                    table("data-table") {
+                        thead {
                             tr {
-                                td {
-                                    a(
-                                        href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
-                                        classes = "data-table__id",
-                                    ) { +user.username }
-                                }
-                                td {
-                                    span("data-table__name") { +user.fullName }
-                                }
-                                td {
-                                    span("data-table__email") { +user.email }
-                                }
-                                td {
-                                    if (!user.enabled) {
-                                        span("badge badge--inactive") {
-                                            span("badge__dot") {}
-                                            +"Disabled"
-                                        }
-                                    } else if (user.isLocked) {
-                                        span("badge badge--warn") {
-                                            span("badge__dot") {}
-                                            +"Locked"
-                                        }
-                                    } else {
-                                        span("badge badge--active") {
-                                            span("badge__dot") {}
-                                            +"Active"
-                                        }
-                                    }
-                                }
-                                td {
-                                    div("data-table__actions") {
+                                th { style = "width:200px;"; +"Username" }
+                                th { +"Full Name" }
+                                th { +"Email" }
+                                th { style = "width:110px;"; +"Status" }
+                                th { style = "width:70px;" }
+                            }
+                        }
+                        tbody {
+                            id = "user-table-body"
+                            users.forEach { user ->
+                                tr {
+                                    td {
                                         a(
                                             href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
-                                            classes = "btn btn--ghost btn--sm",
-                                        ) {
-                                            +"Open"
-                                            inlineSvgIcon("open-sm", "open")
+                                            classes = "data-table__id",
+                                        ) { +user.username }
+                                    }
+                                    td {
+                                        span("data-table__name") { +user.fullName }
+                                    }
+                                    td {
+                                        span("data-table__email") { +user.email }
+                                    }
+                                    td {
+                                        if (!user.enabled) {
+                                            span("badge badge--inactive") {
+                                                span("badge__dot") {}
+                                                +"Disabled"
+                                            }
+                                        } else if (user.isLocked) {
+                                            span("badge badge--warn") {
+                                                span("badge__dot") {}
+                                                +"Locked"
+                                            }
+                                        } else {
+                                            span("badge badge--active") {
+                                                span("badge__dot") {}
+                                                +"Active"
+                                            }
+                                        }
+                                    }
+                                    td {
+                                        div("data-table__actions") {
+                                            a(
+                                                href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
+                                                classes = "btn btn--ghost btn--sm",
+                                            ) {
+                                                +"Open"
+                                                inlineSvgIcon("open-sm", "open")
+                                            }
                                         }
                                     }
                                 }

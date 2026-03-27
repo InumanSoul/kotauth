@@ -129,7 +129,12 @@ fun Application.module(
         header("Referrer-Policy", "strict-origin-when-cross-origin")
         header(
             "Content-Security-Policy",
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; form-action 'self'",
+            "default-src 'self'; " +
+                "script-src 'self'; " +
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+                "font-src 'self' https://fonts.gstatic.com; " +
+                "img-src 'self' data: https:; " +
+                "form-action 'self'",
         )
         header(HttpHeaders.Server, "KotAuth")
         if (config.isHttps) {
@@ -276,6 +281,7 @@ fun Application.module(
         portalRoutes(
             selfServiceService = s.selfServiceService,
             tenantRepository = s.tenantRepository,
+            sessionRepository = s.sessionRepository,
             mfaService = s.mfaService,
             oauthService = s.oauthService,
             baseUrl = config.baseUrl,

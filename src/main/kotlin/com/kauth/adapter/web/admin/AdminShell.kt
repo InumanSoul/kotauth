@@ -37,6 +37,7 @@ internal fun HEAD.adminHead(
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
     script(src = "/static/js/htmx.min.js") {}
     script(src = "/static/js/htmx-config.js") {}
+    script(src = "/static/js/confirm-dialog.js") { attributes["defer"] = "true" }
     script(src = "/static/js/settings.js") { attributes["defer"] = "true" }
     style {
         unsafe {
@@ -222,6 +223,32 @@ internal fun HTML.adminShell(
                 div("main") {
                     div(contentClass) {
                         content()
+                    }
+                }
+            }
+
+            // Shared confirmation dialog — replaces browser confirm()
+            dialog("confirm-dialog") {
+                id = "confirm-dialog"
+                div("confirm-dialog__card") {
+                    div("confirm-dialog__body") {
+                        p("confirm-dialog__title") {
+                            id = "confirm-dialog-title"
+                            +"Confirm"
+                        }
+                        p("confirm-dialog__message") {
+                            id = "confirm-dialog-message"
+                        }
+                    }
+                    div("confirm-dialog__actions") {
+                        button(classes = "btn btn--ghost btn--sm") {
+                            id = "confirm-dialog-cancel"
+                            +"Cancel"
+                        }
+                        button(classes = "btn btn--danger btn--sm") {
+                            id = "confirm-dialog-ok"
+                            +"Confirm"
+                        }
                     }
                 }
             }
