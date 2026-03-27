@@ -1,5 +1,8 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.decodeJwtPayload
+import com.kauth.adapter.web.generatePkceChallenge
+import com.kauth.adapter.web.generatePkceVerifier
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
@@ -24,9 +27,6 @@ import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Base64
 
 /**
  * Self-service portal routes.
@@ -87,15 +87,17 @@ fun Route.portalRoutes(
             // Generate PKCE verifier + challenge
             val verifier = generatePkceVerifier()
             val challenge = generatePkceChallenge(verifier)
+            val state = generatePkceVerifier()
 
             // Store the verifier in a short-lived signed cookie (5 min) to survive
             // the round-trip through the auth server
-            val cookieVal = encryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}")
+            val cookieVal = encryptionService.signCookie("$verifier|$slug|${System.currentTimeMillis()}|$state")
             call.response.cookies.append(
                 name = "KOTAUTH_PORTAL_PKCE",
                 value = cookieVal,
                 maxAge = 300L,
                 httpOnly = true,
+                secure = baseUrl.startsWith("https"),
                 path = "/t/$slug/account",
             )
 
@@ -110,6 +112,7 @@ fun Route.portalRoutes(
                     append("&scope=openid+profile+email")
                     append("&code_challenge=").append(challenge)
                     append("&code_challenge_method=S256")
+                    append("&state=").append(state)
                 }
             call.respondRedirect(authUrl)
         }
@@ -144,16 +147,23 @@ fun Route.portalRoutes(
                 )
             }
             val pkceParts = pkcePayload.split("|")
-            if (pkceParts.size != 3 || pkceParts[1] != slug) {
+            if (pkceParts.size != 4 || pkceParts[1] != slug) {
                 return@get call.respondRedirect(
                     "/t/$slug/account/login?error=${encodeParam("Session mismatch. Please try again.")}",
                 )
             }
             val verifier = pkceParts[0]
             val timestamp = pkceParts[2].toLongOrNull() ?: 0L
+            val state = pkceParts[3]
             if (System.currentTimeMillis() - timestamp > 300_000) {
                 return@get call.respondRedirect(
                     "/t/$slug/account/login?error=${encodeParam("Login session expired. Please try again.")}",
+                )
+            }
+            val callbackState = call.request.queryParameters["state"]
+            if (callbackState != state) {
+                return@get call.respondRedirect(
+                    "/t/$slug/account/login?error=${encodeParam("Invalid state parameter. Please try again.")}",
                 )
             }
 
@@ -162,6 +172,7 @@ fun Route.portalRoutes(
                 name = "KOTAUTH_PORTAL_PKCE",
                 value = "",
                 maxAge = 0L,
+                secure = baseUrl.startsWith("https"),
                 path = "/t/$slug/account",
                 httpOnly = true,
             )
@@ -528,65 +539,3 @@ private fun MfaError.toCode(): String =
     }
 
 private fun encodeParam(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
-
-// ============================================================================
-// PKCE helpers — RFC 7636
-// ============================================================================
-
-/**
- * Generates a cryptographically random PKCE code_verifier.
- * Length: 43 characters (spec allows 43–128). Base64url-encoded, no padding.
- */
-private fun generatePkceVerifier(): String {
-    val bytes = ByteArray(32)
-    SecureRandom().nextBytes(bytes)
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-}
-
-/**
- * Derives the PKCE code_challenge from the verifier using S256 method:
- * code_challenge = BASE64URL(SHA256(ASCII(code_verifier)))
- */
-private fun generatePkceChallenge(verifier: String): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
-}
-
-// ============================================================================
-// JWT payload decoder — extract claims from an access token without verification
-// (safe because we just issued the token ourselves in the callback flow)
-// ============================================================================
-
-/**
- * Decodes the payload section of a JWT and returns its claims as a flat string map.
- * This is NOT a security-sensitive verification — it is used only to read the sub
- * and preferred_username claims from a token that was just issued by us.
- *
- * Only handles simple string/number claims. Complex nested objects are ignored.
- * Returns an empty map on any parse failure.
- */
-private fun decodeJwtPayload(jwt: String): Map<String, String> {
-    return try {
-        val parts = jwt.split(".")
-        if (parts.size < 2) return emptyMap()
-        val payload =
-            String(
-                Base64.getUrlDecoder().decode(
-                    // JWT base64url payload may omit padding
-                    parts[1].padEnd((parts[1].length + 3) / 4 * 4, '='),
-                ),
-                Charsets.UTF_8,
-            )
-        // Minimal JSON parsing — extract "key":"value" and "key":number pairs
-        val result = mutableMapOf<String, String>()
-        val pattern = Regex("\"(\\w+)\"\\s*:\\s*(?:\"([^\"]*)\"|(\\d+))")
-        pattern.findAll(payload).forEach { match ->
-            val key = match.groupValues[1]
-            val value = match.groupValues[2].ifEmpty { match.groupValues[3] }
-            if (value.isNotEmpty()) result[key] = value
-        }
-        result
-    } catch (_: Exception) {
-        emptyMap()
-    }
-}

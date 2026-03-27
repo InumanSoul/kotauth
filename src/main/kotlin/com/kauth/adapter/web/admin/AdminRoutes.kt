@@ -1,6 +1,9 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.decodeJwtPayload
+import com.kauth.adapter.web.generatePkceChallenge
+import com.kauth.adapter.web.generatePkceVerifier
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -42,12 +45,6 @@ import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import java.security.MessageDigest
-import java.security.SecureRandom
-import java.util.Base64
 
 fun Route.adminRoutes(
     authService: AuthService,
@@ -264,8 +261,9 @@ fun Route.adminRoutes(
                 return@get
             }
 
-            val accessToken = (tokenResult as OAuthResult.Success).value.access_token
-            val idToken = (tokenResult as OAuthResult.Success).value.id_token ?: ""
+            val tokenValue = (tokenResult as OAuthResult.Success).value
+            val accessToken = tokenValue.access_token
+            val idToken = tokenValue.id_token ?: ""
             val claims = decodeJwtPayload(accessToken)
             val userId = claims["sub"]?.toIntOrNull()
             val username = claims["preferred_username"] ?: ""
@@ -523,45 +521,5 @@ fun Route.adminRoutes(
                 )
             }
         }
-    }
-}
-
-// =============================================================================
-// PKCE + JWT helpers — same as PortalRoutes.kt
-// =============================================================================
-
-private fun generatePkceVerifier(): String {
-    val bytes = ByteArray(32)
-    SecureRandom().nextBytes(bytes)
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-}
-
-private fun generatePkceChallenge(verifier: String): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
-}
-
-private fun decodeJwtPayload(jwt: String): Map<String, String> {
-    return try {
-        val parts = jwt.split(".")
-        if (parts.size < 2) return emptyMap()
-        val payload =
-            String(
-                Base64.getUrlDecoder().decode(
-                    parts[1].padEnd((parts[1].length + 3) / 4 * 4, '='),
-                ),
-                Charsets.UTF_8,
-            )
-        val jsonElement = Json.parseToJsonElement(payload)
-        val obj = jsonElement as? JsonObject ?: return emptyMap()
-        obj.entries.associate { (k, v) ->
-            k to
-                when (v) {
-                    is JsonPrimitive -> v.content
-                    else -> v.toString()
-                }
-        }
-    } catch (_: Exception) {
-        emptyMap()
     }
 }
