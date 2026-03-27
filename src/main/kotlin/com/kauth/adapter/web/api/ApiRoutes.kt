@@ -139,20 +139,7 @@ private fun swaggerUiHtml() =
   <div id="swagger-ui"></div>
   <script src="/static/swagger/swagger-ui-bundle.min.js"></script>
   <script src="/static/swagger/swagger-ui-standalone-preset.min.js"></script>
-  <script>
-    SwaggerUIBundle({
-      url: "/api/docs/openapi.yaml",
-      dom_id: "#swagger-ui",
-      deepLinking: true,
-      presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
-      layout: "StandaloneLayout",
-      persistAuthorization: true,
-      tryItOutEnabled: true,
-      requestSnippetsEnabled: true,
-      defaultModelsExpandDepth: 1,
-      defaultModelExpandDepth: 3
-    })
-  </script>
+  <script src="/static/swagger/swagger-init.js"></script>
 </body>
 </html>
     """.trimIndent()
