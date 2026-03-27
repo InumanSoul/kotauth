@@ -36,10 +36,11 @@ fun Route.adminUserRoutes(
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
             val users = userRepository.findByTenantId(workspace.id, search)
+            val totalCount = if (search != null) userRepository.findByTenantId(workspace.id, null).size else null
             val wsPairs = call.attributes[WsPairsAttr]
             call.respondHtml(
                 HttpStatusCode.OK,
-                AdminView.userListPage(workspace, users, wsPairs, session.username, search),
+                AdminView.userListPage(workspace, users, wsPairs, session.username, search, totalCount),
             )
         }
 

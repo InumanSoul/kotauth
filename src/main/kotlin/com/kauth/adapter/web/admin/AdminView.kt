@@ -4,6 +4,7 @@ import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
@@ -142,7 +143,8 @@ object AdminView {
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
         search: String? = null,
-    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search)
+        totalCount: Int? = null,
+    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, totalCount)
 
     fun createUserPage(
         workspace: Tenant,
@@ -189,7 +191,8 @@ object AdminView {
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
         userMap: Map<UserId, String> = emptyMap(),
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap)
+        clientMap: Map<ApplicationId, String> = emptyMap(),
+    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap)
 
     fun auditLogPage(
         workspace: Tenant,
@@ -200,7 +203,8 @@ object AdminView {
         totalPages: Int = 1,
         eventTypeFilter: String? = null,
         userMap: Map<UserId, String> = emptyMap(),
-    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap)
+        clientMap: Map<ApplicationId, String> = emptyMap(),
+    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap, clientMap)
 
     // ── Settings ────────────────────────────────────────────────────────
 
