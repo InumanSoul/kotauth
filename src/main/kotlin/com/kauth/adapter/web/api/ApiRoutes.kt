@@ -109,20 +109,30 @@ private fun swaggerUiHtml() =
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KotAuth REST API — Docs</title>
+  <link rel="icon" href="/static/brand/kotauth-negative-icon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/swagger/swagger-ui.min.css" />
   <style>
-    body { margin: 0; background: #fafafa; font-family: system-ui, sans-serif; }
-    #swagger-ui .topbar { background: #1a1a2e; }
-    #swagger-ui .topbar-wrapper img { content: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='white' width='28' height='28'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z'/></svg>"); }
+    body { margin: 0; background: #fafafa; font-family: 'Inter', system-ui, sans-serif; }
+    .swagger-ui { font-family: 'Inter', system-ui, sans-serif; }
+    #swagger-ui .topbar { background: #0C0C0E; padding: 8px 16px; }
+    #swagger-ui .topbar-wrapper img {
+      content: url("/static/brand/kotauth-negative.svg");
+      height: 28px;
+      width: auto;
+    }
     #swagger-ui .topbar-wrapper a span { display: none; }
     #swagger-ui .topbar-wrapper::after {
-      content: "KotAuth REST API";
-      color: white;
-      font-size: 1.125rem;
-      font-weight: 600;
-      margin-left: 0.75rem;
+      content: "REST API";
+      color: #ededef;
+      font-size: 1rem;
+      font-weight: 500;
+      margin-left: 0.5rem;
       align-self: center;
+      opacity: 0.7;
     }
+    .swagger-ui .btn.authorize { background: #1FBCFF; color: #05080a; border-color: #1FBCFF; }
+    .swagger-ui .btn.authorize:hover { background: #0AAEE8; border-color: #0AAEE8; }
+    .swagger-ui .btn.authorize svg { fill: #05080a; }
   </style>
 </head>
 <body>
