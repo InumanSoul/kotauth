@@ -56,6 +56,8 @@ object AuthView {
 
         // 3. Base stylesheet that uses var(--token) exclusively
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
+
+        script(src = "/static/js/auth.js") { attributes["defer"] = "true" }
     }
 
     // -------------------------------------------------------------------------
@@ -140,47 +142,10 @@ object AuthView {
                         }
 
                         form(
-                            action = "/t/$tenantSlug/login",
+                            action = "/t/$tenantSlug/authorize",
                             encType = FormEncType.applicationXWwwFormUrlEncoded,
                             method = FormMethod.post,
                         ) {
-                            // OAuth2 state — passed through hidden fields so the POST handler
-                            // can issue an authorization code and redirect after successful login
-                            if (oauthParams.isOAuthFlow) {
-                                oauthParams.responseType?.let {
-                                    input(type = InputType.hidden, name = "response_type") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.clientId?.let {
-                                    input(type = InputType.hidden, name = "oauth_client_id") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.redirectUri?.let {
-                                    input(type = InputType.hidden, name = "redirect_uri") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
-                                oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
-                                oauthParams.codeChallenge?.let {
-                                    input(type = InputType.hidden, name = "code_challenge") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.codeChallengeMethod?.let {
-                                    input(type = InputType.hidden, name = "code_challenge_method") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
-                            }
                             div("field") {
                                 label {
                                     htmlFor = "username"
@@ -199,11 +164,21 @@ object AuthView {
                                     htmlFor = "password"
                                     +"Password"
                                 }
-                                input(type = InputType.password, name = "password") {
-                                    id = "password"
-                                    placeholder = "Enter your password"
-                                    attributes["autocomplete"] = "current-password"
-                                    required = true
+                                div("field__input-wrap") {
+                                    input(type = InputType.password, name = "password") {
+                                        id = "password"
+                                        placeholder = "Enter your password"
+                                        attributes["autocomplete"] = "current-password"
+                                        required = true
+                                    }
+                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                        attributes["data-toggle-password"] = "password"
+                                        attributes["aria-label"] = "Show password"
+                                        attributes["aria-pressed"] = "false"
+                                        attributes["data-visible"] = "false"
+                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                    }
                                 }
                             }
                             button(type = ButtonType.submit, classes = "btn") { +"Sign In" }
@@ -349,11 +324,21 @@ object AuthView {
                                     htmlFor = "password"
                                     +"Password"
                                 }
-                                input(type = InputType.password, name = "password") {
-                                    id = "password"
-                                    placeholder = "Minimum 8 characters"
-                                    attributes["autocomplete"] = "new-password"
-                                    required = true
+                                div("field__input-wrap") {
+                                    input(type = InputType.password, name = "password") {
+                                        id = "password"
+                                        placeholder = "Minimum 8 characters"
+                                        attributes["autocomplete"] = "new-password"
+                                        required = true
+                                    }
+                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                        attributes["data-toggle-password"] = "password"
+                                        attributes["aria-label"] = "Show password"
+                                        attributes["aria-pressed"] = "false"
+                                        attributes["data-visible"] = "false"
+                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                    }
                                 }
                             }
                             div("field") {
@@ -361,11 +346,21 @@ object AuthView {
                                     htmlFor = "confirmPassword"
                                     +"Confirm Password"
                                 }
-                                input(type = InputType.password, name = "confirmPassword") {
-                                    id = "confirmPassword"
-                                    placeholder = "Repeat your password"
-                                    attributes["autocomplete"] = "new-password"
-                                    required = true
+                                div("field__input-wrap") {
+                                    input(type = InputType.password, name = "confirmPassword") {
+                                        id = "confirmPassword"
+                                        placeholder = "Repeat your password"
+                                        attributes["autocomplete"] = "new-password"
+                                        required = true
+                                    }
+                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                        attributes["data-toggle-password"] = "confirmPassword"
+                                        attributes["aria-label"] = "Show password"
+                                        attributes["aria-pressed"] = "false"
+                                        attributes["data-visible"] = "false"
+                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                    }
                                 }
                             }
                             button(type = ButtonType.submit, classes = "btn") { +"Create Account" }
@@ -373,7 +368,7 @@ object AuthView {
 
                         div("footer-link") {
                             +"Already have an account? "
-                            a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                            a(href = "/t/$tenantSlug/account/login") { +"Sign in" }
                         }
 
                         // Social login buttons — same providers as the login page.
@@ -442,7 +437,7 @@ object AuthView {
                                 +"If an account exists for that email address, you'll receive a reset link shortly. Check your spam folder if you don't see it."
                             }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
                             }
                         } else {
                             p(
@@ -475,7 +470,7 @@ object AuthView {
                             }
 
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
                             }
                         }
                     }
@@ -526,7 +521,7 @@ object AuthView {
                                 +"Password changed successfully."
                             }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/login") { +"Sign in with your new password" }
+                                a(href = "/t/$tenantSlug/account/login") { +"Sign in with your new password" }
                             }
                         } else {
                             p("card-subtitle") { +"Enter your new password below." }
@@ -547,12 +542,22 @@ object AuthView {
                                         htmlFor = "new_password"
                                         +"New password"
                                     }
-                                    input(type = InputType.password, name = "new_password") {
-                                        id = "new_password"
-                                        placeholder = "Minimum 8 characters"
-                                        attributes["autocomplete"] = "new-password"
-                                        required = true
-                                        attributes["autofocus"] = "true"
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "new_password") {
+                                            id = "new_password"
+                                            placeholder = "Minimum 8 characters"
+                                            attributes["autocomplete"] = "new-password"
+                                            required = true
+                                            attributes["autofocus"] = "true"
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "new_password"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        }
                                     }
                                 }
                                 div("field") {
@@ -560,11 +565,21 @@ object AuthView {
                                         htmlFor = "confirm_password"
                                         +"Confirm new password"
                                     }
-                                    input(type = InputType.password, name = "confirm_password") {
-                                        id = "confirm_password"
-                                        placeholder = "Repeat your new password"
-                                        attributes["autocomplete"] = "new-password"
-                                        required = true
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "confirm_password") {
+                                            id = "confirm_password"
+                                            placeholder = "Repeat your new password"
+                                            attributes["autocomplete"] = "new-password"
+                                            required = true
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "confirm_password"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        }
                                     }
                                 }
                                 button(type = ButtonType.submit, classes = "btn") { +"Change password" }
@@ -615,13 +630,13 @@ object AuthView {
                         if (success) {
                             div("alert alert-success") { +message }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/login") { +"Sign in to your account" }
+                                a(href = "/t/$tenantSlug/account/login") { +"Sign in to your account" }
                             }
                         } else {
                             p("card-subtitle") { +"There was a problem with your verification link." }
                             div("alert alert-error") { +message }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
                             }
                         }
                     }
@@ -723,7 +738,7 @@ object AuthView {
 
                         div("footer-link") {
                             +"Already have an account? "
-                            a(href = "/t/$tenantSlug/login") { +"Sign in" }
+                            a(href = "/t/$tenantSlug/account/login") { +"Sign in" }
                         }
                     }
                     p("copyright") {
@@ -743,7 +758,6 @@ object AuthView {
         theme: TenantTheme = TenantTheme.DEFAULT,
         workspaceName: String = "Kotauth",
         error: String? = null,
-        oauthParams: OAuthParams = OAuthParams(),
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Two-Factor Authentication", theme) }
@@ -770,43 +784,6 @@ object AuthView {
                         }
 
                         form(action = "/t/$tenantSlug/mfa-challenge", method = FormMethod.post) {
-                            // Preserve OAuth params through the MFA form submission
-                            if (oauthParams.isOAuthFlow) {
-                                oauthParams.responseType?.let {
-                                    input(type = InputType.hidden, name = "response_type") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.clientId?.let {
-                                    input(type = InputType.hidden, name = "oauth_client_id") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.redirectUri?.let {
-                                    input(type = InputType.hidden, name = "redirect_uri") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
-                                oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
-                                oauthParams.codeChallenge?.let {
-                                    input(type = InputType.hidden, name = "code_challenge") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.codeChallengeMethod?.let {
-                                    input(type = InputType.hidden, name = "code_challenge_method") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
-                            }
-
                             div("field") {
                                 label {
                                     htmlFor = "code"
@@ -826,7 +803,7 @@ object AuthView {
                         }
 
                         div("footer-link") {
-                            a(href = "/t/$tenantSlug/login") { +"Back to sign in" }
+                            a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
                         }
                     }
                     p("copyright") {

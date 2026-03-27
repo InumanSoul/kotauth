@@ -104,7 +104,7 @@ fun Route.adminRoutes(
             val redirectUri = "$baseUrl/admin/callback"
             val authUrl =
                 buildString {
-                    append("/t/master/protocol/openid-connect/auth")
+                    append("/t/master/authorize")
                     append("?response_type=code")
                     append("&client_id=").append(AdminClientProvisioning.ADMIN_CLIENT_ID)
                     append("&redirect_uri=").append(java.net.URLEncoder.encode(redirectUri, "UTF-8"))

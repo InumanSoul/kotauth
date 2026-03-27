@@ -120,6 +120,35 @@ class AuthRoutesTest {
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
+    /**
+     * Builds a valid signed KOTAUTH_AUTH_CONTEXT cookie value for use in POST /authorize tests.
+     * The payload format mirrors [ApplicationCall.setAuthContextCookie] in AuthHelpers.kt.
+     */
+    private fun buildAuthContextCookie(
+        responseType: String = "code",
+        clientId: String = "spa-app",
+        redirectUri: String = "https://app.example.com/callback",
+        scope: String = "openid",
+        state: String? = null,
+        codeChallenge: String? = null,
+        codeChallengeMethod: String? = null,
+        nonce: String? = null,
+    ): String {
+        val payload =
+            listOf(
+                responseType,
+                clientId,
+                redirectUri,
+                scope,
+                state ?: "",
+                codeChallenge ?: "",
+                codeChallengeMethod ?: "",
+                nonce ?: "",
+                System.currentTimeMillis().toString(),
+            ).joinToString("|")
+        return encryptionService.signCookie(payload)
+    }
+
     // -------------------------------------------------------------------------
     // Test application builder — avoids repetition across test cases
     // -------------------------------------------------------------------------
@@ -160,11 +189,11 @@ class AuthRoutesTest {
     }
 
     // =========================================================================
-    // POST /t/{slug}/login — MFA redirect
+    // POST /t/{slug}/authorize — MFA redirect
     // =========================================================================
 
     @Test
-    fun `POST login redirects to mfa-challenge when user has MFA enabled`() =
+    fun `POST authorize redirects to mfa-challenge when user has MFA enabled`() =
         testApplication {
             resetFixtures()
             every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
@@ -186,15 +215,25 @@ class AuthRoutesTest {
                 }
             }
 
+            // POST /authorize reads OAuth context from the signed cookie, not form fields.
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
             val response =
-                client.submitForm(
-                    url = "/t/acme/login",
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
                     formParameters =
                         Parameters.build {
                             append("username", "alice")
                             append("password", "correct-pass")
                         },
-                )
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"]
@@ -211,11 +250,11 @@ class AuthRoutesTest {
         }
 
     // =========================================================================
-    // POST /t/{slug}/login — password expired redirect
+    // POST /t/{slug}/authorize — password expired redirect
     // =========================================================================
 
     @Test
-    fun `POST login redirects to forgot-password with reason=expired for expired password`() =
+    fun `POST authorize redirects to forgot-password with reason=expired for expired password`() =
         testApplication {
             resetFixtures()
             // Seed a user with an expired password
@@ -247,20 +286,376 @@ class AuthRoutesTest {
                 }
             }
 
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
             val response =
-                client.submitForm(
-                    url = "/t/acme/login",
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(location.contains("forgot-password"), "Must redirect to forgot-password")
+            assertTrue(location.contains("reason=expired"), "Must include reason=expired query param")
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/authorize — missing / tampered cookie (Gap 3)
+    // =========================================================================
+
+    @Test
+    fun `POST authorize without KOTAUTH_AUTH_CONTEXT cookie redirects to authorize with session_expired`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
                     formParameters =
                         Parameters.build {
                             append("username", "alice")
                             append("password", "correct-pass")
                         },
                 )
+            // No KOTAUTH_AUTH_CONTEXT cookie sent — expect session_expired redirect
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
-            assertTrue(location.contains("forgot-password"), "Must redirect to forgot-password")
-            assertTrue(location.contains("reason=expired"), "Must include reason=expired query param")
+            assertTrue(
+                location.contains("/authorize") && location.contains("error=session_expired"),
+                "Must redirect to /authorize?error=session_expired when auth context cookie is absent, got: $location",
+            )
+        }
+
+    @Test
+    fun `POST authorize with tampered KOTAUTH_AUTH_CONTEXT cookie redirects to authorize with session_expired`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            // Build a valid cookie value then corrupt the HMAC suffix
+            val validCookie = buildAuthContextCookie()
+            val lastDot = validCookie.lastIndexOf('.')
+            val tamperedCookie =
+                if (lastDot >= 0) {
+                    validCookie.substring(0, lastDot) + ".INVALIDSIGNATURE"
+                } else {
+                    "$validCookie.INVALIDSIGNATURE"
+                }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$tamperedCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("/authorize") && location.contains("error=session_expired"),
+                "Must redirect to /authorize?error=session_expired when auth context cookie is tampered, got: $location",
+            )
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/authorize — happy path (Gap 4)
+    // =========================================================================
+
+    @Test
+    fun `POST authorize with correct credentials issues auth code and redirects to redirect_uri`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            // Public clients require PKCE — include a valid S256 challenge in the context cookie
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scope = "openid",
+                    state = "random-state-123",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.startsWith("https://app.example.com/callback"),
+                "Must redirect to the registered redirect_uri, got: $location",
+            )
+            assertTrue(
+                location.contains("code="),
+                "Redirect must contain an authorization code query param, got: $location",
+            )
+            assertTrue(
+                location.contains("state=random-state-123"),
+                "Redirect must echo back the state param, got: $location",
+            )
+        }
+
+    @Test
+    fun `POST authorize on success clears KOTAUTH_AUTH_CONTEXT cookie with maxAge=0`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            // Public clients require PKCE — include a valid S256 challenge in the context cookie
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val setCookies = response.headers.getAll("Set-Cookie") ?: emptyList()
+            val contextCookieHeader = setCookies.firstOrNull { it.contains("KOTAUTH_AUTH_CONTEXT") }
+            assertNotNull(contextCookieHeader, "KOTAUTH_AUTH_CONTEXT must appear in Set-Cookie on success")
+            // Ktor emits maxAge=0 either as "Max-Age=0" or as an empty cookie value with no Max-Age attribute.
+            // Either way the cookie value must be blank — that is the observable effect of clearAuthContextCookie().
+            val cookieValue =
+                contextCookieHeader
+                    .split(";")
+                    .firstOrNull()
+                    ?.substringAfter("KOTAUTH_AUTH_CONTEXT=")
+                    ?.trim()
+                    ?: ""
+            assertTrue(
+                cookieValue.isBlank() || contextCookieHeader.contains("Max-Age=0"),
+                "KOTAUTH_AUTH_CONTEXT must be cleared (empty value or Max-Age=0) after code issuance, " +
+                    "got: $contextCookieHeader",
+            )
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/authorize — wrong password (Gap 5)
+    // =========================================================================
+
+    @Test
+    fun `POST authorize with wrong password returns 401 and re-renders login page`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-password")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("Invalid") || body.contains("password") || body.contains("login"),
+                "Response must re-render the login page with an error message, got: $body",
+            )
+        }
+
+    // =========================================================================
+    // POST /t/{slug}/authorize — rate limiting (Gap 7)
+    // =========================================================================
+
+    @Test
+    fun `POST authorize returns 429 when login rate limit is exceeded`() =
+        testApplication {
+            resetFixtures()
+            // A limiter that allows exactly 1 request before blocking the next
+            val tightLoginLimiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = tightLoginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            // First request — consumes the single allowed slot
+            client.submitForm(
+                url = "/t/acme/authorize",
+                formParameters =
+                    Parameters.build {
+                        append("username", "alice")
+                        append("password", "wrong-pass")
+                    },
+            ) {
+                header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+            }
+
+            // Second request — must be blocked by the rate limiter
+            val response =
+                client.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.TooManyRequests, response.status)
         }
 
     // =========================================================================
@@ -297,7 +692,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.endsWith("/login") || location.contains("/login"),
+                location.endsWith("/authorize") || location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie is absent",
             )
         }
@@ -335,7 +730,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.contains("/login"),
+                location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie has invalid signature",
             )
         }
@@ -375,6 +770,165 @@ class AuthRoutesTest {
 
     // =========================================================================
     // GET /t/{slug}/protocol/openid-connect/auth — parameter validation
+    // =========================================================================
+
+    // =========================================================================
+    // GET /t/{slug}/authorize — sets auth context cookie (Gap 1)
+    // =========================================================================
+
+    @Test
+    fun `GET authorize with valid OAuth params sets KOTAUTH_AUTH_CONTEXT cookie`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val setCookies = response.headers.getAll("Set-Cookie") ?: emptyList()
+            assertTrue(
+                setCookies.any { it.contains("KOTAUTH_AUTH_CONTEXT") },
+                "GET /authorize must set KOTAUTH_AUTH_CONTEXT cookie for valid OAuth params",
+            )
+        }
+
+    @Test
+    fun `GET authorize KOTAUTH_AUTH_CONTEXT cookie is HttpOnly and scoped to tenant path`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val setCookies = response.headers.getAll("Set-Cookie") ?: emptyList()
+            val authContextHeader = setCookies.firstOrNull { it.contains("KOTAUTH_AUTH_CONTEXT") }
+            assertNotNull(authContextHeader, "KOTAUTH_AUTH_CONTEXT must be present in Set-Cookie")
+            assertTrue(
+                authContextHeader.contains("HttpOnly", ignoreCase = true),
+                "KOTAUTH_AUTH_CONTEXT cookie must be HttpOnly, got: $authContextHeader",
+            )
+            assertTrue(
+                authContextHeader.contains("Path=/t/acme", ignoreCase = true),
+                "KOTAUTH_AUTH_CONTEXT cookie must be scoped to /t/{slug}, got: $authContextHeader",
+            )
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/authorize — error paths (Gap 2)
+    // =========================================================================
+
+    @Test
+    fun `GET authorize returns 400 for unsupported response_type`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            // Canonical /authorize endpoint — "token" response_type is not supported
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=token&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback",
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("unsupported_response_type"), "Body must contain error code, got: $body")
+        }
+
+    @Test
+    fun `GET authorize returns 400 when client_id is missing`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            // client_id intentionally missing from the canonical /authorize endpoint
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&redirect_uri=https://app.example.com/callback",
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("invalid_request"), "Body must contain error code, got: $body")
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/protocol/openid-connect/auth — legacy endpoint parameter validation
     // =========================================================================
 
     @Test
@@ -576,8 +1130,98 @@ class AuthRoutesTest {
         }
 
     // =========================================================================
+    // GET /t/{slug}/protocol/openid-connect/auth — legacy redirect (Gap 10)
+    // =========================================================================
+
+    @Test
+    fun `GET legacy auth endpoint redirects 302 to canonical authorize with query string preserved`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/protocol/openid-connect/auth" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid&state=mystate",
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("/t/acme/authorize"),
+                "Legacy endpoint must redirect to canonical /authorize path, got: $location",
+            )
+            assertTrue(
+                location.contains("response_type=code"),
+                "Redirect must preserve response_type query param, got: $location",
+            )
+            assertTrue(
+                location.contains("client_id=spa-app"),
+                "Redirect must preserve client_id query param, got: $location",
+            )
+            assertTrue(
+                location.contains("state=mystate"),
+                "Redirect must preserve state query param, got: $location",
+            )
+        }
+
+    // =========================================================================
     // GET /t/{slug}/.well-known/openid-configuration — OIDC discovery
     // =========================================================================
+
+    @Test
+    fun `GET openid-configuration authorization_endpoint value contains canonical authorize path`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            // authorization_endpoint must point to the canonical /authorize path, not the legacy one
+            val authEndpointPattern = Regex(""""authorization_endpoint"\s*:\s*"([^"]+)"""")
+            val matchResult = authEndpointPattern.find(body)
+            assertNotNull(matchResult, "authorization_endpoint must be present in discovery document")
+            val authEndpointValue = matchResult.groupValues[1]
+            assertTrue(
+                authEndpointValue.contains("/authorize"),
+                "authorization_endpoint must contain /authorize, got: $authEndpointValue",
+            )
+        }
 
     @Test
     fun `GET openid-configuration returns 200 with all required OIDC fields as JSON`() =
@@ -1062,7 +1706,7 @@ class AuthRoutesTest {
     // =========================================================================
 
     @Test
-    fun `POST register redirects to login with registered=true on success`() =
+    fun `POST register redirects to portal login on success when no OAuth context`() =
         testApplication {
             resetFixtures()
 
@@ -1098,7 +1742,10 @@ class AuthRoutesTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
-            assertTrue(location.contains("registered=true"), "Must redirect with registered=true")
+            assertTrue(
+                location.contains("/account/login"),
+                "Without OAuth context, must redirect to portal login, got: $location",
+            )
         }
 
     @Test

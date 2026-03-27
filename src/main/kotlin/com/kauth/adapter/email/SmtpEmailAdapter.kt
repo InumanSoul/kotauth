@@ -403,7 +403,7 @@ class SmtpEmailAdapter : EmailPort {
         workspace: String,
         tenant: Tenant,
     ): String {
-        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/login") ?: ""
+        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
         val loginLink =
             if (loginUrl.isNotBlank()) {
                 " Sign in at <a href=\"${htmlEscape(loginUrl)}\" " +
@@ -434,7 +434,7 @@ class SmtpEmailAdapter : EmailPort {
         workspace: String,
         tenant: Tenant,
     ): String {
-        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/login") ?: ""
+        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
         val loginHint = if (loginUrl.isNotBlank()) "\nSign in at $loginUrl and use the Forgot password link." else ""
         return buildEmailText(
             workspace = workspace,

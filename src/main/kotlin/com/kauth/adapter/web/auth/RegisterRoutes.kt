@@ -4,6 +4,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
+import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -18,6 +19,7 @@ internal fun Route.registerRoutes(
     registerRateLimiter: RateLimiterPort,
     identityProviderRepository: IdentityProviderRepository?,
     baseUrl: String,
+    encryptionService: EncryptionService,
 ) {
     get("/register") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -74,8 +76,14 @@ internal fun Route.registerRoutes(
         val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
 
         when (val result = authService.register(slug, username, email, fullName, password, confirmPassword, baseUrl)) {
-            is AuthResult.Success ->
-                call.respondRedirect("/t/$slug/login?registered=true")
+            is AuthResult.Success -> {
+                // If an OAuth flow is active (auth context cookie), return to it.
+                // Otherwise redirect to the portal login which starts a proper OAuth flow.
+                val hasOAuthContext = call.getAuthContext(encryptionService) != null
+                val redirect =
+                    if (hasOAuthContext) "/t/$slug/authorize?registered=true" else "/t/$slug/account/login"
+                call.respondRedirect(redirect)
+            }
             is AuthResult.Failure ->
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,

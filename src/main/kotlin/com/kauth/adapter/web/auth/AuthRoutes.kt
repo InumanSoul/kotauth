@@ -51,22 +51,12 @@ fun Route.authRoutes(
             )
         }
 
-        loginRoutes(
-            authService = authService,
-            oauthService = oauthService,
-            loginRateLimiter = loginRateLimiter,
-            mfaService = mfaService,
-            roleRepository = roleRepository,
-            identityProviderRepository = identityProviderRepository,
-            encryptionService = encryptionService,
-            baseUrl = baseUrl,
-        )
-
         registerRoutes(
             authService = authService,
             registerRateLimiter = registerRateLimiter,
             identityProviderRepository = identityProviderRepository,
             baseUrl = baseUrl,
+            encryptionService = encryptionService,
         )
 
         selfServiceRoutes(
@@ -92,6 +82,12 @@ fun Route.authRoutes(
             oauthService = oauthService,
             identityProviderRepository = identityProviderRepository,
             tokenRateLimiter = tokenRateLimiter,
+            authService = authService,
+            mfaService = mfaService,
+            roleRepository = roleRepository,
+            encryptionService = encryptionService,
+            loginRateLimiter = loginRateLimiter,
+            baseUrl = baseUrl,
         )
     }
 }

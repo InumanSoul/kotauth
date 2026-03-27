@@ -26,16 +26,15 @@ internal fun Route.mfaRoutes(
         val slug = ctx.slug
         val theme = ctx.theme
         val workspaceName = ctx.workspaceName
-        val oauthParams = call.request.queryParameters.toOAuthParams()
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
-            return@get call.respondRedirect("/t/$slug/login")
+            return@get call.respondRedirect("/t/$slug/authorize")
         }
 
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.mfaChallengePage(slug, theme, workspaceName, oauthParams = oauthParams),
+            AuthView.mfaChallengePage(slug, theme, workspaceName),
         )
     }
 
@@ -47,22 +46,24 @@ internal fun Route.mfaRoutes(
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress
-        val oauthParams = params.toOAuthParams()
+
+        // OAuth context is read from the signed auth context cookie, not from form fields.
+        val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()
 
         val rawCookie = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawCookie.isNullOrBlank()) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
         val pending = encryptionService.verifyCookie(rawCookie)
         if (pending == null) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
         val parts = pending.split("|")
         if (parts.size != 3) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
-        val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
-        val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
+        val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
+        val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
 
         if (System.currentTimeMillis() - timestamp > 300_000) {
             return@post call.respondHtml(
@@ -72,13 +73,12 @@ internal fun Route.mfaRoutes(
                     theme,
                     workspaceName,
                     error = "MFA challenge expired. Please log in again.",
-                    oauthParams = oauthParams,
                 ),
             )
         }
 
         if (mfaService == null) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
 
         val mfaResult =
@@ -97,7 +97,6 @@ internal fun Route.mfaRoutes(
                         theme,
                         workspaceName,
                         error = "Invalid code. Please try again.",
-                        oauthParams = oauthParams,
                     ),
                 )
             }
@@ -134,6 +133,7 @@ internal fun Route.mfaRoutes(
                             )
                     ) {
                         is OAuthResult.Success -> {
+                            call.clearAuthContextCookie(slug)
                             val authCode = codeResult.value.code
                             val state = oauthParams.state
                             val redirect =
@@ -152,7 +152,6 @@ internal fun Route.mfaRoutes(
                                     theme,
                                     workspaceName,
                                     error = codeResult.error.toDescription(),
-                                    oauthParams = oauthParams,
                                 ),
                             )
                         }

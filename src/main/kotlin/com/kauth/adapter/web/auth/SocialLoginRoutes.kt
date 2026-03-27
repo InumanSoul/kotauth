@@ -271,7 +271,7 @@ internal fun Route.socialLoginRoutes(
 
         if (pending == null) {
             return@get call.respondRedirect(
-                "/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}",
+                "/t/$slug/authorize?error=${encodeParam("Session expired. Please sign in again.")}",
             )
         }
 
@@ -309,7 +309,7 @@ internal fun Route.socialLoginRoutes(
 
         if (pending == null) {
             return@post call.respondRedirect(
-                "/t/$slug/login?error=${encodeParam("Session expired. Please sign in again.")}",
+                "/t/$slug/authorize?error=${encodeParam("Session expired. Please sign in again.")}",
             )
         }
 
