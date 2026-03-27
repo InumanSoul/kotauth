@@ -449,7 +449,7 @@ class AdminRoutesTest {
             val noFollow = createClient { followRedirects = false }
             // No PKCE cookie → expect an error page (BadRequest), NOT a redirect to /admin/login.
             // This proves the session guard does not intercept /admin/callback.
-            val response = noFollow.get("/admin/callback?code=test-code")
+            val response = noFollow.get("/admin/callback?code=test-code&state=$testState")
 
             assertFalse(
                 response.status == HttpStatusCode.Found &&
@@ -586,7 +586,7 @@ class AdminRoutesTest {
         testApplication {
             application { installOAuthTestApp() }
 
-            val response = client.get("/admin/callback?code=some-auth-code")
+            val response = client.get("/admin/callback?code=some-auth-code&state=$testState")
 
             assertEquals(
                 HttpStatusCode.BadRequest,
@@ -610,7 +610,7 @@ class AdminRoutesTest {
             application { installOAuthTestApp() }
 
             val response =
-                client.get("/admin/callback?code=some-auth-code") {
+                client.get("/admin/callback?code=some-auth-code&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=tampered.invalidsignature")
                 }
 
@@ -640,7 +640,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback?error=access_denied") {
+                client.get("/admin/callback?error=access_denied&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -664,7 +664,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback?error=invalid_client") {
+                client.get("/admin/callback?error=invalid_client&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -685,7 +685,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback?error=server_error") {
+                client.get("/admin/callback?error=server_error&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -710,7 +710,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback") {
+                client.get("/admin/callback?state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -740,7 +740,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback?code=valid-looking-code") {
+                client.get("/admin/callback?code=valid-looking-code&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -769,7 +769,7 @@ class AdminRoutesTest {
             val fakeJwt = buildFakeJwt(userId = 1, username = "admin")
 
             val response =
-                client.get("/admin/callback?code=$fakeJwt") {
+                client.get("/admin/callback?code=$fakeJwt&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -796,7 +796,7 @@ class AdminRoutesTest {
             val fakeJwt = buildFakeJwt(userId = 1, username = "admin")
 
             val response =
-                noFollow.get("/admin/callback?code=$fakeJwt") {
+                noFollow.get("/admin/callback?code=$fakeJwt&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -825,7 +825,7 @@ class AdminRoutesTest {
             val pkceCookieValue = buildValidPkceCookie()
 
             val response =
-                client.get("/admin/callback?code=any-code") {
+                client.get("/admin/callback?code=any-code&state=$testState") {
                     header("Cookie", "KOTAUTH_ADMIN_PKCE=$pkceCookieValue")
                 }
 
@@ -995,9 +995,11 @@ class AdminRoutesTest {
      * secret key that the test app uses. The embedded timestamp is current so
      * the 5-minute expiry check inside the callback will pass.
      */
+    private val testState = "test-state-xxxx-yyyy-zzzz"
+
     private fun buildValidPkceCookie(): String {
         val verifier = "test-pkce-verifier-aaaa-bbbb-cccc-dddd-eeee"
-        val payload = "$verifier|${System.currentTimeMillis()}"
+        val payload = "$verifier|${System.currentTimeMillis()}|$testState"
         return encryptionService.signCookie(payload)
     }
 

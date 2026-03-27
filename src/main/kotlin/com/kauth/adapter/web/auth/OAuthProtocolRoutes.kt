@@ -368,7 +368,15 @@ internal fun Route.oauthProtocolRoutes(
 
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
             if (!postLogoutUri.isNullOrBlank()) {
-                call.respondRedirect(postLogoutUri)
+                // Only allow post-logout redirect to same origin to prevent open redirect
+                val local = call.request.local
+                val origin = "${local.scheme}://${local.serverHost}:${local.serverPort}"
+                if (postLogoutUri.startsWith(origin) || postLogoutUri.startsWith("/")) {
+                    call.respondRedirect(postLogoutUri)
+                } else {
+                    val slug = call.parameters["slug"] ?: "master"
+                    call.respondRedirect("/t/$slug/login")
+                }
             } else {
                 val slug = call.parameters["slug"] ?: "master"
                 call.respondRedirect("/t/$slug/login")

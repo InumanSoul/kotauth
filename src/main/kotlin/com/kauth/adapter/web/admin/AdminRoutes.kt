@@ -42,6 +42,9 @@ import io.ktor.server.sessions.clear
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
@@ -91,7 +94,8 @@ fun Route.adminRoutes(
             // OAuth PKCE redirect to master tenant auth endpoint
             val verifier = generatePkceVerifier()
             val challenge = generatePkceChallenge(verifier)
-            val cookieVal = encryptionService.signCookie("$verifier|${System.currentTimeMillis()}")
+            val state = generatePkceVerifier()
+            val cookieVal = encryptionService.signCookie("$verifier|${System.currentTimeMillis()}|$state")
             call.response.cookies.append(
                 name = "KOTAUTH_ADMIN_PKCE",
                 value = cookieVal,
@@ -110,6 +114,7 @@ fun Route.adminRoutes(
                     append("&scope=openid+profile+email")
                     append("&code_challenge=").append(challenge)
                     append("&code_challenge_method=S256")
+                    append("&state=").append(state)
                 }
             call.respondRedirect(authUrl)
         }
@@ -176,7 +181,7 @@ fun Route.adminRoutes(
                 return@get
             }
             val pkceParts = pkcePayload.split("|")
-            if (pkceParts.size != 2) {
+            if (pkceParts.size != 3) {
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AdminView.errorPage("Session mismatch. Please try again.", "/admin/login"),
@@ -185,10 +190,19 @@ fun Route.adminRoutes(
             }
             val verifier = pkceParts[0]
             val timestamp = pkceParts[1].toLongOrNull() ?: 0L
+            val state = pkceParts[2]
             if (System.currentTimeMillis() - timestamp > 300_000) {
                 call.respondHtml(
                     HttpStatusCode.BadRequest,
                     AdminView.errorPage("Login session expired. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+            val callbackState = call.request.queryParameters["state"]
+            if (callbackState != state) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Invalid state parameter. Please try again.", "/admin/login"),
                 )
                 return@get
             }
@@ -251,6 +265,7 @@ fun Route.adminRoutes(
             }
 
             val accessToken = (tokenResult as OAuthResult.Success).value.access_token
+            val idToken = (tokenResult as OAuthResult.Success).value.id_token ?: ""
             val claims = decodeJwtPayload(accessToken)
             val userId = claims["sub"]?.toIntOrNull()
             val username = claims["preferred_username"] ?: ""
@@ -291,6 +306,7 @@ fun Route.adminRoutes(
                     tenantId = masterTenant.id.value,
                     username = username,
                     accessToken = accessToken,
+                    idToken = idToken,
                     adminSessionId = latestSession?.id?.value,
                 ),
             )
@@ -313,8 +329,14 @@ fun Route.adminRoutes(
             }
             call.sessions.clear<AdminSession>()
             val postLogoutUri = java.net.URLEncoder.encode("$baseUrl/admin/login", "UTF-8")
+            val idTokenHint =
+                if (session?.idToken?.isNotBlank() == true) {
+                    "&id_token_hint=${java.net.URLEncoder.encode(session.idToken, "UTF-8")}"
+                } else {
+                    ""
+                }
             call.respondRedirect(
-                "/t/master/protocol/openid-connect/logout?post_logout_redirect_uri=$postLogoutUri",
+                "/t/master/protocol/openid-connect/logout?post_logout_redirect_uri=$postLogoutUri$idTokenHint",
             )
         }
 
@@ -519,28 +541,27 @@ private fun generatePkceChallenge(verifier: String): String {
     return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
 }
 
-private fun decodeJwtPayload(jwt: String): Map<String, String> =
-    try {
+private fun decodeJwtPayload(jwt: String): Map<String, String> {
+    return try {
         val parts = jwt.split(".")
-        if (parts.size < 2) {
-            emptyMap()
-        } else {
-            val payload =
-                String(
-                    Base64.getUrlDecoder().decode(
-                        parts[1].padEnd((parts[1].length + 3) / 4 * 4, '='),
-                    ),
-                    Charsets.UTF_8,
-                )
-            val result = mutableMapOf<String, String>()
-            val pattern = Regex("\"(\\w+)\"\\s*:\\s*(?:\"([^\"]*)\"|(\\d+))")
-            pattern.findAll(payload).forEach { match ->
-                val key = match.groupValues[1]
-                val value = match.groupValues[2].ifEmpty { match.groupValues[3] }
-                if (value.isNotEmpty()) result[key] = value
-            }
-            result
+        if (parts.size < 2) return emptyMap()
+        val payload =
+            String(
+                Base64.getUrlDecoder().decode(
+                    parts[1].padEnd((parts[1].length + 3) / 4 * 4, '='),
+                ),
+                Charsets.UTF_8,
+            )
+        val jsonElement = Json.parseToJsonElement(payload)
+        val obj = jsonElement as? JsonObject ?: return emptyMap()
+        obj.entries.associate { (k, v) ->
+            k to
+                when (v) {
+                    is JsonPrimitive -> v.content
+                    else -> v.toString()
+                }
         }
     } catch (_: Exception) {
         emptyMap()
     }
+}

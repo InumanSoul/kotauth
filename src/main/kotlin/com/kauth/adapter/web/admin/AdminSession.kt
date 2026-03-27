@@ -22,6 +22,7 @@ data class AdminSession(
     val tenantId: Int = 0,
     val username: String,
     val accessToken: String = "",
+    val idToken: String = "",
     val adminSessionId: Int? = null,
     val createdAt: Long = Instant.now().epochSecond,
 )
