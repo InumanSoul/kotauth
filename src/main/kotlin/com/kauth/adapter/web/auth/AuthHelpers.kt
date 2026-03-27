@@ -81,6 +81,75 @@ internal fun Parameters.toOAuthParams() =
         nonce = this["nonce"],
     )
 
+// -- Server-side OAuth context cookie ------------------------------------------
+
+private const val AUTH_CONTEXT_COOKIE = "KOTAUTH_AUTH_CONTEXT"
+
+/**
+ * Stores OAuth params in a signed cookie scoped to `/t/{slug}`.
+ * Replaces hidden form fields — survives page refreshes, URL changes, and incognito mode.
+ */
+internal fun ApplicationCall.setAuthContextCookie(
+    params: AuthView.OAuthParams,
+    slug: String,
+    encryptionService: EncryptionService,
+    secure: Boolean = false,
+) {
+    val payload =
+        listOf(
+            params.responseType ?: "",
+            params.clientId ?: "",
+            params.redirectUri ?: "",
+            params.scope ?: "",
+            params.state ?: "",
+            params.codeChallenge ?: "",
+            params.codeChallengeMethod ?: "",
+            params.nonce ?: "",
+            System.currentTimeMillis().toString(),
+        ).joinToString("|")
+    response.cookies.append(
+        name = AUTH_CONTEXT_COOKIE,
+        value = encryptionService.signCookie(payload),
+        maxAge = 300L,
+        httpOnly = true,
+        secure = secure,
+        path = "/t/$slug",
+    )
+}
+
+/** Reads and validates the OAuth context cookie. Returns null if missing, expired, or tampered. */
+internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService): AuthView.OAuthParams? {
+    val raw = request.cookies[AUTH_CONTEXT_COOKIE] ?: return null
+    val payload = encryptionService.verifyCookie(raw) ?: return null
+    val parts = payload.split("|")
+    if (parts.size != 9) return null
+    val timestamp = parts[8].toLongOrNull() ?: return null
+    if (System.currentTimeMillis() - timestamp > 300_000) return null
+    val params =
+        AuthView.OAuthParams(
+            responseType = parts[0].ifBlank { null },
+            clientId = parts[1].ifBlank { null },
+            redirectUri = parts[2].ifBlank { null },
+            scope = parts[3].ifBlank { null },
+            state = parts[4].ifBlank { null },
+            codeChallenge = parts[5].ifBlank { null },
+            codeChallengeMethod = parts[6].ifBlank { null },
+            nonce = parts[7].ifBlank { null },
+        )
+    return if (params.isOAuthFlow) params else null
+}
+
+/** Clears the auth context cookie after successful code issuance. */
+internal fun ApplicationCall.clearAuthContextCookie(slug: String) {
+    response.cookies.append(
+        name = AUTH_CONTEXT_COOKIE,
+        value = "",
+        maxAge = 0L,
+        httpOnly = true,
+        path = "/t/$slug",
+    )
+}
+
 internal fun parseQueryStringToOAuthParams(qs: String): AuthView.OAuthParams {
     if (qs.isBlank()) return AuthView.OAuthParams()
     val normalized = if (qs.startsWith("?")) qs.substring(1) else qs

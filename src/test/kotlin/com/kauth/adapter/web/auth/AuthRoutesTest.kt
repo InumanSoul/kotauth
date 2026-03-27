@@ -120,6 +120,35 @@ class AuthRoutesTest {
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
+    /**
+     * Builds a valid signed KOTAUTH_AUTH_CONTEXT cookie value for use in POST /authorize tests.
+     * The payload format mirrors [ApplicationCall.setAuthContextCookie] in AuthHelpers.kt.
+     */
+    private fun buildAuthContextCookie(
+        responseType: String = "code",
+        clientId: String = "spa-app",
+        redirectUri: String = "https://app.example.com/callback",
+        scope: String = "openid",
+        state: String? = null,
+        codeChallenge: String? = null,
+        codeChallengeMethod: String? = null,
+        nonce: String? = null,
+    ): String {
+        val payload =
+            listOf(
+                responseType,
+                clientId,
+                redirectUri,
+                scope,
+                state ?: "",
+                codeChallenge ?: "",
+                codeChallengeMethod ?: "",
+                nonce ?: "",
+                System.currentTimeMillis().toString(),
+            ).joinToString("|")
+        return encryptionService.signCookie(payload)
+    }
+
     // -------------------------------------------------------------------------
     // Test application builder — avoids repetition across test cases
     // -------------------------------------------------------------------------
@@ -160,11 +189,11 @@ class AuthRoutesTest {
     }
 
     // =========================================================================
-    // POST /t/{slug}/login — MFA redirect
+    // POST /t/{slug}/authorize — MFA redirect
     // =========================================================================
 
     @Test
-    fun `POST login redirects to mfa-challenge when user has MFA enabled`() =
+    fun `POST authorize redirects to mfa-challenge when user has MFA enabled`() =
         testApplication {
             resetFixtures()
             every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
@@ -186,15 +215,25 @@ class AuthRoutesTest {
                 }
             }
 
+            // POST /authorize reads OAuth context from the signed cookie, not form fields.
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
             val response =
-                client.submitForm(
-                    url = "/t/acme/login",
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
                     formParameters =
                         Parameters.build {
                             append("username", "alice")
                             append("password", "correct-pass")
                         },
-                )
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"]
@@ -211,11 +250,11 @@ class AuthRoutesTest {
         }
 
     // =========================================================================
-    // POST /t/{slug}/login — password expired redirect
+    // POST /t/{slug}/authorize — password expired redirect
     // =========================================================================
 
     @Test
-    fun `POST login redirects to forgot-password with reason=expired for expired password`() =
+    fun `POST authorize redirects to forgot-password with reason=expired for expired password`() =
         testApplication {
             resetFixtures()
             // Seed a user with an expired password
@@ -247,15 +286,24 @@ class AuthRoutesTest {
                 }
             }
 
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
             val response =
-                client.submitForm(
-                    url = "/t/acme/login",
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
                     formParameters =
                         Parameters.build {
                             append("username", "alice")
                             append("password", "correct-pass")
                         },
-                )
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""

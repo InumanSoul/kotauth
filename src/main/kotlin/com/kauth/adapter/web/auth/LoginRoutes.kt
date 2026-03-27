@@ -2,35 +2,25 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
-import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
-import com.kauth.domain.service.MfaService
-import com.kauth.domain.service.OAuthResult
-import com.kauth.domain.service.OAuthService
-import com.kauth.infrastructure.EncryptionService
-import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
-import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
 internal fun Route.loginRoutes(
     authService: AuthService,
-    oauthService: OAuthService,
     loginRateLimiter: RateLimiterPort,
-    mfaService: MfaService?,
-    roleRepository: RoleRepository?,
     identityProviderRepository: IdentityProviderRepository?,
-    encryptionService: EncryptionService,
-    baseUrl: String = "",
 ) {
+    // Plain login page — for direct (non-OAuth) logins and admin bypass.
+    // OAuth flows enter via GET /authorize, which sets the auth context cookie
+    // before rendering this same view.
     get("/login") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
@@ -38,7 +28,6 @@ internal fun Route.loginRoutes(
         val theme = ctx.theme
         val workspaceName = ctx.workspaceName
         val registered = call.request.queryParameters["registered"] == "true"
-        val oauthParams = call.request.queryParameters.toOAuthParams()
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -53,13 +42,15 @@ internal fun Route.loginRoutes(
                 theme = theme,
                 workspaceName = workspaceName,
                 success = registered,
-                oauthParams = oauthParams,
                 enabledProviders = enabledProviders,
                 registrationEnabled = tenant?.registrationEnabled ?: true,
             ),
         )
     }
 
+    // Direct (non-OAuth) login — issues tokens directly in the response body.
+    // OAuth logins POST to /authorize instead; this handler is kept for API clients
+    // and the admin bypass flow that doesn't use PKCE.
     post("/login") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
@@ -76,7 +67,6 @@ internal fun Route.loginRoutes(
         val username = params["username"]?.trim() ?: ""
         val password = params["password"] ?: ""
         val ipAddress = call.request.local.remoteAddress
-        val oauthParams = params.toOAuthParams()
 
         val rateLimitKey = "login:$ipAddress:$slug"
         if (!loginRateLimiter.isAllowed(rateLimitKey)) {
@@ -87,7 +77,6 @@ internal fun Route.loginRoutes(
                     theme,
                     workspaceName,
                     error = "Too many login attempts. Please wait a moment and try again.",
-                    oauthParams = oauthParams,
                     enabledProviders = enabledProviders,
                     registrationEnabled = tenant?.registrationEnabled ?: true,
                 ),
@@ -95,139 +84,13 @@ internal fun Route.loginRoutes(
         }
 
         val userAgent = call.request.headers["User-Agent"]
-        when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent, baseUrl)) {
-            is AuthResult.Failure -> {
-                if (result.error is AuthError.PasswordExpired) {
-                    val oauthQs = if (oauthParams.isOAuthFlow) "&${oauthParams.toQueryString().drop(1)}" else ""
-                    call.respondRedirect("/t/$slug/forgot-password?reason=expired$oauthQs")
-                } else {
-                    call.respondHtml(
-                        HttpStatusCode.Unauthorized,
-                        AuthView.loginPage(
-                            slug,
-                            theme,
-                            workspaceName,
-                            error = result.error.toMessage(),
-                            oauthParams = oauthParams,
-                            enabledProviders = enabledProviders,
-                            registrationEnabled = tenant?.registrationEnabled ?: true,
-                        ),
-                    )
-                }
-            }
-            is AuthResult.Success -> {
-                val user = result.value
-
-                // Enforce MFA enrollment before challenge check (skip for portal logins)
-                val isPortalLogin =
-                    oauthParams.isOAuthFlow &&
-                        oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
-                if (mfaService != null && tenant != null && !isPortalLogin) {
-                    val mfaPolicy = tenant.mfaPolicy
-                    if (mfaPolicy != "optional") {
-                        val userRoles =
-                            if (mfaPolicy == "required_admins" && roleRepository != null) {
-                                roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
-                            } else {
-                                emptyList()
-                            }
-
-                        if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) &&
-                            !mfaService.shouldChallengeMfa(user.id!!)
-                        ) {
-                            return@post call.respondHtml(
-                                HttpStatusCode.Forbidden,
-                                AuthView.loginPage(
-                                    tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
-                                    error =
-                                        "Multi-factor authentication is required for your account. " +
-                                            "Please sign in to the user portal and enable MFA under Security settings.",
-                                    oauthParams = oauthParams,
-                                    enabledProviders = enabledProviders,
-                                    registrationEnabled = tenant?.registrationEnabled ?: true,
-                                ),
-                            )
-                        }
-                    }
-                }
-
-                // MFA challenge redirect
-                if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
-                    val mfaPending = "${user.id.value}|$slug|${System.currentTimeMillis()}"
-                    call.response.cookies.append(
-                        name = "KOTAUTH_MFA_PENDING",
-                        value = encryptionService.signCookie(mfaPending),
-                        maxAge = 300L,
-                        httpOnly = true,
-                        path = "/t/$slug",
-                    )
-                    val queryString = if (oauthParams.isOAuthFlow) oauthParams.toQueryString() else ""
-                    call.respondRedirect("/t/$slug/mfa-challenge$queryString")
-                    return@post
-                }
-
-                if (oauthParams.isOAuthFlow) {
-                    val clientId =
-                        oauthParams.clientId
-                            ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
-                    val redirectUri =
-                        oauthParams.redirectUri
-                            ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
-
-                    when (
-                        val codeResult =
-                            oauthService.issueAuthorizationCode(
-                                tenantSlug = slug,
-                                userId = user.id!!,
-                                clientId = clientId,
-                                redirectUri = redirectUri,
-                                scopes = oauthParams.scope ?: "openid",
-                                codeChallenge = oauthParams.codeChallenge,
-                                codeChallengeMethod = oauthParams.codeChallengeMethod,
-                                nonce = oauthParams.nonce,
-                                state = oauthParams.state,
-                                ipAddress = ipAddress,
-                            )
-                    ) {
-                        is OAuthResult.Success -> {
-                            val code = codeResult.value.code
-                            val state = oauthParams.state
-                            val redirect =
-                                buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(code)
-                                    if (!state.isNullOrBlank()) append("&state=").append(state)
-                                }
-                            call.respondRedirect(redirect)
-                        }
-                        is OAuthResult.Failure -> {
-                            call.respondHtml(
-                                HttpStatusCode.BadRequest,
-                                AuthView.loginPage(
-                                    slug,
-                                    theme,
-                                    workspaceName,
-                                    error = codeResult.error.toDescription(),
-                                    oauthParams = oauthParams,
-                                    enabledProviders = enabledProviders,
-                                    registrationEnabled = tenant?.registrationEnabled ?: true,
-                                ),
-                            )
-                        }
-                    }
-                } else {
-                    when (val tokenResult = authService.login(slug, username, password, ipAddress, userAgent)) {
-                        is AuthResult.Success -> call.respond(tokenResult.value)
-                        is AuthResult.Failure ->
-                            call.respond(
-                                HttpStatusCode.Unauthorized,
-                                mapOf("error" to "invalid_credentials"),
-                            )
-                    }
-                }
-            }
+        when (val tokenResult = authService.login(slug, username, password, ipAddress, userAgent)) {
+            is AuthResult.Success -> call.respond(tokenResult.value)
+            is AuthResult.Failure ->
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    mapOf("error" to "invalid_credentials"),
+                )
         }
     }
 }

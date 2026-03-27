@@ -140,47 +140,10 @@ object AuthView {
                         }
 
                         form(
-                            action = "/t/$tenantSlug/login",
+                            action = "/t/$tenantSlug/authorize",
                             encType = FormEncType.applicationXWwwFormUrlEncoded,
                             method = FormMethod.post,
                         ) {
-                            // OAuth2 state — passed through hidden fields so the POST handler
-                            // can issue an authorization code and redirect after successful login
-                            if (oauthParams.isOAuthFlow) {
-                                oauthParams.responseType?.let {
-                                    input(type = InputType.hidden, name = "response_type") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.clientId?.let {
-                                    input(type = InputType.hidden, name = "oauth_client_id") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.redirectUri?.let {
-                                    input(type = InputType.hidden, name = "redirect_uri") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
-                                oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
-                                oauthParams.codeChallenge?.let {
-                                    input(type = InputType.hidden, name = "code_challenge") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.codeChallengeMethod?.let {
-                                    input(type = InputType.hidden, name = "code_challenge_method") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
-                            }
                             div("field") {
                                 label {
                                     htmlFor = "username"
@@ -743,7 +706,6 @@ object AuthView {
         theme: TenantTheme = TenantTheme.DEFAULT,
         workspaceName: String = "Kotauth",
         error: String? = null,
-        oauthParams: OAuthParams = OAuthParams(),
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Two-Factor Authentication", theme) }
@@ -770,43 +732,6 @@ object AuthView {
                         }
 
                         form(action = "/t/$tenantSlug/mfa-challenge", method = FormMethod.post) {
-                            // Preserve OAuth params through the MFA form submission
-                            if (oauthParams.isOAuthFlow) {
-                                oauthParams.responseType?.let {
-                                    input(type = InputType.hidden, name = "response_type") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.clientId?.let {
-                                    input(type = InputType.hidden, name = "oauth_client_id") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.redirectUri?.let {
-                                    input(type = InputType.hidden, name = "redirect_uri") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.scope?.let { input(type = InputType.hidden, name = "scope") { value = it } }
-                                oauthParams.state?.let { input(type = InputType.hidden, name = "state") { value = it } }
-                                oauthParams.codeChallenge?.let {
-                                    input(type = InputType.hidden, name = "code_challenge") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.codeChallengeMethod?.let {
-                                    input(type = InputType.hidden, name = "code_challenge_method") {
-                                        value =
-                                            it
-                                    }
-                                }
-                                oauthParams.nonce?.let { input(type = InputType.hidden, name = "nonce") { value = it } }
-                            }
-
                             div("field") {
                                 label {
                                     htmlFor = "code"

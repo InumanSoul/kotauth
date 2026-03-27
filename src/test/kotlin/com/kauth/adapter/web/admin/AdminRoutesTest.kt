@@ -477,7 +477,7 @@ class AdminRoutesTest {
             )
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.contains("/t/master/protocol/openid-connect/auth"),
+                location.contains("/t/master/authorize"),
                 "Redirect must target master-tenant OIDC auth endpoint, got: $location",
             )
         }

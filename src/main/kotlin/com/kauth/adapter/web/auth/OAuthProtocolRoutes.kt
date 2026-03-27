@@ -2,12 +2,20 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.RoleRepository
+import com.kauth.domain.service.AuthError
+import com.kauth.domain.service.AuthResult
+import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
+import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
+import io.ktor.server.request.queryString
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
@@ -21,6 +29,11 @@ internal fun Route.oauthProtocolRoutes(
     oauthService: OAuthService,
     identityProviderRepository: IdentityProviderRepository?,
     tokenRateLimiter: RateLimiterPort,
+    authService: AuthService,
+    mfaService: MfaService?,
+    roleRepository: RoleRepository?,
+    encryptionService: EncryptionService,
+    baseUrl: String = "",
 ) {
     get("/.well-known/openid-configuration") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -35,7 +48,7 @@ internal fun Route.oauthProtocolRoutes(
         call.respond(
             buildJsonObject {
                 put("issuer", issuer)
-                put("authorization_endpoint", "$issuer/protocol/openid-connect/auth")
+                put("authorization_endpoint", "$issuer/authorize")
                 put("token_endpoint", "$issuer/protocol/openid-connect/token")
                 put("userinfo_endpoint", "$issuer/protocol/openid-connect/userinfo")
                 put("jwks_uri", "$issuer/protocol/openid-connect/certs")
@@ -97,7 +110,16 @@ internal fun Route.oauthProtocolRoutes(
         call.respond(mapOf("keys" to jwks))
     }
 
+    // Legacy endpoint — redirects to the canonical /authorize path.
+    // Kept for backwards compatibility with existing OIDC clients that
+    // have the old URL hardcoded before their discovery doc refreshes.
     get("/protocol/openid-connect/auth") {
+        val slug = call.attributes[AuthTenantAttr].slug
+        val queryString = call.request.queryString()
+        call.respondRedirect("/t/$slug/authorize?$queryString")
+    }
+
+    get("/authorize") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val q = call.request.queryParameters
@@ -149,6 +171,8 @@ internal fun Route.oauthProtocolRoutes(
                 nonce = nonce,
             )
 
+        call.setAuthContextCookie(oauthParams, slug, encryptionService, baseUrl.startsWith("https"))
+
         val enabledProviders =
             identityProviderRepository
                 ?.findEnabledByTenant(tenant.id)
@@ -165,6 +189,155 @@ internal fun Route.oauthProtocolRoutes(
                 registrationEnabled = tenant.registrationEnabled,
             ),
         )
+    }
+
+    post("/authorize") {
+        val ctx = call.attributes[AuthTenantAttr]
+        val slug = ctx.slug
+        val tenant = ctx.tenant
+        val theme = ctx.theme
+        val workspaceName = ctx.workspaceName
+        val ipAddress = call.request.local.remoteAddress
+        val userAgent = call.request.headers["User-Agent"]
+
+        val enabledProviders =
+            if (tenant != null && identityProviderRepository != null) {
+                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            } else {
+                emptyList()
+            }
+
+        // OAuth context comes from the signed cookie, not form fields.
+        // If the cookie is absent or expired, the session has timed out.
+        val oauthParams = call.getAuthContext(encryptionService)
+        if (oauthParams == null) {
+            call.respondRedirect("/t/$slug/authorize?error=session_expired")
+            return@post
+        }
+
+        val params = call.receiveParameters()
+        val username = params["username"]?.trim() ?: ""
+        val password = params["password"] ?: ""
+
+        when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent, baseUrl)) {
+            is AuthResult.Failure -> {
+                if (result.error is AuthError.PasswordExpired) {
+                    call.respondRedirect("/t/$slug/forgot-password?reason=expired")
+                } else {
+                    call.respondHtml(
+                        HttpStatusCode.Unauthorized,
+                        AuthView.loginPage(
+                            tenantSlug = slug,
+                            theme = theme,
+                            workspaceName = workspaceName,
+                            error = result.error.toMessage(),
+                            oauthParams = oauthParams,
+                            enabledProviders = enabledProviders,
+                            registrationEnabled = tenant?.registrationEnabled ?: true,
+                        ),
+                    )
+                }
+            }
+            is AuthResult.Success -> {
+                val user = result.value
+
+                // Enforce MFA enrollment policy before issuing a challenge (skip for portal logins)
+                val isPortalLogin = oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
+                if (mfaService != null && tenant != null && !isPortalLogin) {
+                    val mfaPolicy = tenant.mfaPolicy
+                    if (mfaPolicy != "optional") {
+                        val userRoles =
+                            if (mfaPolicy == "required_admins" && roleRepository != null) {
+                                roleRepository.resolveEffectiveRoles(user.id!!, tenant.id)
+                            } else {
+                                emptyList()
+                            }
+
+                        if (mfaService.isMfaRequired(user, mfaPolicy, userRoles) &&
+                            !mfaService.shouldChallengeMfa(user.id!!)
+                        ) {
+                            return@post call.respondHtml(
+                                HttpStatusCode.Forbidden,
+                                AuthView.loginPage(
+                                    tenantSlug = slug,
+                                    theme = theme,
+                                    workspaceName = workspaceName,
+                                    error =
+                                        "Multi-factor authentication is required for your account. " +
+                                            "Please sign in to the user portal and enable MFA under Security settings.",
+                                    oauthParams = oauthParams,
+                                    enabledProviders = enabledProviders,
+                                    registrationEnabled = tenant.registrationEnabled,
+                                ),
+                            )
+                        }
+                    }
+                }
+
+                // MFA challenge — auth context cookie remains active across the redirect
+                if (mfaService != null && mfaService.shouldChallengeMfa(user.id!!)) {
+                    val mfaPending = "${user.id.value}|$slug|${System.currentTimeMillis()}"
+                    call.response.cookies.append(
+                        name = "KOTAUTH_MFA_PENDING",
+                        value = encryptionService.signCookie(mfaPending),
+                        maxAge = 300L,
+                        httpOnly = true,
+                        path = "/t/$slug",
+                    )
+                    call.respondRedirect("/t/$slug/mfa-challenge")
+                    return@post
+                }
+
+                val clientId =
+                    oauthParams.clientId
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
+                val redirectUri =
+                    oauthParams.redirectUri
+                        ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+
+                when (
+                    val codeResult =
+                        oauthService.issueAuthorizationCode(
+                            tenantSlug = slug,
+                            userId = user.id!!,
+                            clientId = clientId,
+                            redirectUri = redirectUri,
+                            scopes = oauthParams.scope ?: "openid",
+                            codeChallenge = oauthParams.codeChallenge,
+                            codeChallengeMethod = oauthParams.codeChallengeMethod,
+                            nonce = oauthParams.nonce,
+                            state = oauthParams.state,
+                            ipAddress = ipAddress,
+                        )
+                ) {
+                    is OAuthResult.Success -> {
+                        call.clearAuthContextCookie(slug)
+                        val code = codeResult.value.code
+                        val redirect =
+                            buildString {
+                                append(redirectUri)
+                                append("?code=").append(code)
+                                if (!oauthParams.state.isNullOrBlank()) append("&state=").append(oauthParams.state)
+                            }
+                        call.respondRedirect(redirect)
+                    }
+                    is OAuthResult.Failure -> {
+                        call.respondHtml(
+                            HttpStatusCode.BadRequest,
+                            AuthView.loginPage(
+                                tenantSlug = slug,
+                                theme = theme,
+                                workspaceName = workspaceName,
+                                error = codeResult.error.toDescription(),
+                                oauthParams = oauthParams,
+                                enabledProviders = enabledProviders,
+                                registrationEnabled = tenant?.registrationEnabled ?: true,
+                            ),
+                        )
+                    }
+                }
+            }
+        }
     }
 
     post("/protocol/openid-connect/token") {

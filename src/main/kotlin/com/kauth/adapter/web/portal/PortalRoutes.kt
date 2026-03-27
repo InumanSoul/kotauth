@@ -104,7 +104,7 @@ fun Route.portalRoutes(
             )
 
             val redirectUri = "$baseUrl/t/$slug/account/callback"
-            val authEndpoint = "/t/$slug/protocol/openid-connect/auth"
+            val authEndpoint = "/t/$slug/authorize"
             val authUrl =
                 buildString {
                     append(authEndpoint)
