@@ -345,7 +345,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.endsWith("/login") || location.contains("/login"),
+                location.endsWith("/authorize") || location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie is absent",
             )
         }
@@ -383,7 +383,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.contains("/login"),
+                location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie has invalid signature",
             )
         }

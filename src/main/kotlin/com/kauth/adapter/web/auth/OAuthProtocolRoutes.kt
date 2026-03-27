@@ -565,11 +565,11 @@ internal fun Route.oauthProtocolRoutes(
                     call.respondRedirect(postLogoutUri)
                 } else {
                     val slug = call.parameters["slug"] ?: "master"
-                    call.respondRedirect("/t/$slug/login")
+                    call.respondRedirect("/t/$slug/authorize")
                 }
             } else {
                 val slug = call.parameters["slug"] ?: "master"
-                call.respondRedirect("/t/$slug/login")
+                call.respondRedirect("/t/$slug/authorize")
             }
         }
 

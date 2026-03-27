@@ -75,7 +75,7 @@ internal fun Route.registerRoutes(
 
         when (val result = authService.register(slug, username, email, fullName, password, confirmPassword, baseUrl)) {
             is AuthResult.Success ->
-                call.respondRedirect("/t/$slug/login?registered=true")
+                call.respondRedirect("/t/$slug/authorize?registered=true")
             is AuthResult.Failure ->
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,

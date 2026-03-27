@@ -29,7 +29,7 @@ internal fun Route.mfaRoutes(
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
-            return@get call.respondRedirect("/t/$slug/login")
+            return@get call.respondRedirect("/t/$slug/authorize")
         }
 
         call.respondHtml(
@@ -52,18 +52,18 @@ internal fun Route.mfaRoutes(
 
         val rawCookie = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawCookie.isNullOrBlank()) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
         val pending = encryptionService.verifyCookie(rawCookie)
         if (pending == null) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
         val parts = pending.split("|")
         if (parts.size != 3) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
-        val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
-        val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/login")
+        val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
+        val timestamp = parts[2].toLongOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
 
         if (System.currentTimeMillis() - timestamp > 300_000) {
             return@post call.respondHtml(
@@ -78,7 +78,7 @@ internal fun Route.mfaRoutes(
         }
 
         if (mfaService == null) {
-            return@post call.respondRedirect("/t/$slug/login")
+            return@post call.respondRedirect("/t/$slug/authorize")
         }
 
         val mfaResult =
