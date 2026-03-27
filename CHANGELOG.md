@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-03-27
+
+### Added
+
+- **Admin Console OAuth Dogfooding** — the admin console now authenticates via OAuth Authorization Code + PKCE through the master tenant, replacing direct password auth. Admin login flows through the same auth pipeline as every other Kotauth consumer, gaining MFA enforcement, session tracking, and token revocation for free
+- **Admin role gating** — a `admin` role is provisioned on the master tenant (V28 migration). Only users with this role can access the admin console. Enforced in both OAuth and bypass modes
+- **OIDC end-session logout** — admin logout revokes the DB session, clears the cookie, and redirects through the OIDC end-session endpoint with `id_token_hint` for proper RP-initiated logout
+- **Break-glass bypass** — `KAUTH_ADMIN_BYPASS=true` environment variable keeps the old direct password login available for recovery scenarios. Defaults to `false`. Startup warning logged when active
+- **Account lockout** — per-user failed login attempt counter with configurable threshold (default: 10) and lockout duration (default: 15 min). Disabled by default — admin opt-in per tenant. Admin can unlock users from the admin console. Users receive an email notification with a password reset link when locked
+- **`SecurityConfig` extraction** — password policy, MFA policy, and lockout config moved from `tenants` table to dedicated `tenant_security_config` table (V26), following the existing `TenantTheme` and `PortalConfig` pattern
+- **Account locked email** — async notification with lockout duration and password reset CTA. Gated by `tenant.isSmtpReady`
+- **Password changed email** — async security notification sent on all password change paths (self-service, reset link, admin-initiated). No CTA link to prevent phishing surface
+- **`KAUTH_ADMIN_BYPASS`** environment variable — controls whether direct credential login is available on the admin console
+- **Admin client auto-provisioning** — `AdminClientProvisioning` ensures the master tenant has a `kotauth-admin` public OAuth client with the correct redirect URI, issuer URL, and branding logo at startup
+
+### Security
+
+- **HMAC-signed admin cookie** — `KOTAUTH_ADMIN` session cookie now uses `SessionTransportTransformerMessageAuthentication` with a dedicated `adminSessionKey` (different derivation prefix from portal)
+- **OAuth `state` parameter** — CSRF protection on both admin and portal OAuth flows. Random state embedded in signed PKCE cookie and verified on callback
+- **Open redirect prevention** — OIDC end-session endpoint now validates `post_logout_redirect_uri` against the request origin. External URIs are rejected
+- **PKCE cookie `Secure` flag** — both admin and portal PKCE cookies now set `secure` based on `baseUrl` scheme
+- **Portal security parity** — portal OAuth flow upgraded with `state` CSRF parameter, `secure` cookie flag, and `kotlinx.serialization` JWT parser (replacing fragile regex)
+- **Master tenant registration disabled** — V28 sets `registration_enabled = false` on master tenant. Login page hides "Create an account" when registration is off
+
+### Changed
+
+- **Shared OAuth utilities** — `generatePkceVerifier()`, `generatePkceChallenge()`, and `decodeJwtPayload()` extracted from duplicated private functions in AdminRoutes and PortalRoutes to shared `OAuthUtils.kt`. JWT parser upgraded from regex to `kotlinx.serialization`
+- **Admin session model** — expanded from `AdminSession(username)` to include `userId`, `tenantId`, `accessToken`, `idToken`, `adminSessionId`. Sessions are backed by real entries in the sessions table
+- **Admin session TTL** — reduced from 8 hours to 1 hour to match access token expiry
+- **Master tenant defaults** — startup provisioning sets issuer URL from `KAUTH_BASE_URL`, logo from built-in brand asset, sharp border radius. Replaces the V1 placeholder `kauth.example.com`
+- **Login page** — hides "Don't have an account? Create one" when `registrationEnabled = false`
+- **Brand logo sizing** — `width="180" height="48"` on auth page logos for correct rendering without CSS dependency
+
+### Fixed
+
+- **Locked badge visibility** — user list shows amber "Locked" badge (distinct from gray "Disabled"). Precedence: Disabled > Locked > Active
+- **SecurityConfig upsert** — `PostgresTenantRepository.update()` now uses upsert pattern for `tenant_security_config`, fixing settings not being saved for tenants created after V26
+- **V28 role scope** — uses lowercase `'tenant'` matching the DB check constraint
+
+### Removed
+
+- **Legacy `kotauth-admin-console`** confidential client — replaced by `kotauth-admin` public PKCE client in V28
+- **Legacy tenant policy columns** — V27 drops `password_policy_*` and `mfa_policy` from `tenants` table (data migrated to `tenant_security_config` in V26)
+
+---
+
 ## [1.1.5] - 2026-03-26
 
 ### Fixed
@@ -231,7 +277,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/inumansoul/kotauth/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/inumansoul/kotauth/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/inumansoul/kotauth/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/inumansoul/kotauth/compare/v1.1.2...v1.1.3

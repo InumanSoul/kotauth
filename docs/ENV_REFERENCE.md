@@ -164,6 +164,21 @@ DB_POOL_MIN_IDLE=2
 
 ---
 
+## Admin Console
+
+### `KAUTH_ADMIN_BYPASS`
+**Optional.** Default: `false`
+
+Break-glass fallback: when set to `true`, the admin console accepts direct username/password login instead of the standard OAuth PKCE flow. Use only for recovery scenarios where the OAuth flow is misconfigured.
+
+**Warning:** Bypass mode skips MFA enforcement. A startup warning is logged when active.
+
+```
+KAUTH_ADMIN_BYPASS=false
+```
+
+---
+
 ## Demo Mode
 
 ### `KAUTH_DEMO_MODE`
