@@ -58,7 +58,7 @@ object AuthView {
         // 3. Base stylesheet that uses var(--token) exclusively
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
 
-        script(src = "/static/js/kotauth-auth.js") {
+        script(src = "/static/js/kotauth-auth.min.js") {
             attributes["defer"] = "true"
             JsIntegrity.auth?.let { attributes["integrity"] = it }
             attributes["crossorigin"] = "anonymous"

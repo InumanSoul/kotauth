@@ -938,7 +938,7 @@ object PortalView {
             PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
         }
         link(rel = "stylesheet", href = cssBundle)
-        script(src = "/static/js/kotauth-portal.js") {
+        script(src = "/static/js/kotauth-portal.min.js") {
             attributes["defer"] = "true"
             JsIntegrity.portal?.let { attributes["integrity"] = it }
             attributes["crossorigin"] = "anonymous"

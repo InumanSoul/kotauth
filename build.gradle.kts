@@ -222,9 +222,9 @@ val compileJs =
 
         inputs.dir("frontend/js")
         outputs.files(
-            "src/main/resources/static/js/kotauth-admin.js",
-            "src/main/resources/static/js/kotauth-auth.js",
-            "src/main/resources/static/js/kotauth-portal.js",
+            "src/main/resources/static/js/kotauth-admin.min.js",
+            "src/main/resources/static/js/kotauth-auth.min.js",
+            "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
         )
     }
@@ -238,9 +238,9 @@ val generateJsSri =
         commandLine("node", "frontend/scripts/generate-sri.js")
 
         inputs.files(
-            "src/main/resources/static/js/kotauth-admin.js",
-            "src/main/resources/static/js/kotauth-auth.js",
-            "src/main/resources/static/js/kotauth-portal.js",
+            "src/main/resources/static/js/kotauth-admin.min.js",
+            "src/main/resources/static/js/kotauth-auth.min.js",
+            "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
         )
         outputs.file("src/main/resources/js-integrity.properties")

@@ -36,7 +36,7 @@ internal fun HEAD.adminHead(
     }
     style { unsafe { +theme.toCssVars() } }
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
-    script(src = "/static/js/kotauth-admin.js") {
+    script(src = "/static/js/kotauth-admin.min.js") {
         JsIntegrity.admin?.let { attributes["integrity"] = it }
         attributes["crossorigin"] = "anonymous"
     }

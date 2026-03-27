@@ -12,8 +12,8 @@ RUN npm ci
 
 # Copy CSS + JS source and build scripts
 COPY frontend/css ./css
-COPY frontend/js ./js
-COPY frontend/scripts ./scripts
+COPY frontend/js ./frontend/js
+COPY frontend/scripts ./frontend/scripts
 
 # Admin console bundle (fixed dark theme — tokens.css provides all defaults)
 RUN ./node_modules/.bin/lightningcss \
@@ -50,8 +50,8 @@ RUN ./node_modules/.bin/lightningcss \
 # JS bundles (esbuild concatenation + minification)
 # Create the output directories that the build scripts expect
 RUN mkdir -p src/main/resources/static/js src/main/resources
-RUN node scripts/build-js.js
-RUN node scripts/generate-sri.js
+RUN node frontend/scripts/build-js.js
+RUN node frontend/scripts/generate-sri.js
 
 
 # ── Stage 2: Kotlin / Gradle build ────────────────────────────────────────
@@ -69,9 +69,9 @@ COPY --from=frontend-build /build/kotauth-portal-sidenav.css src/main/resources/
 COPY --from=frontend-build /build/kotauth-portal-tabnav.css  src/main/resources/static/kotauth-portal-tabnav.css
 
 # JS bundles + SRI hashes from frontend build stage
-COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-admin.js   src/main/resources/static/js/kotauth-admin.js
-COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-auth.js    src/main/resources/static/js/kotauth-auth.js
-COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-portal.js  src/main/resources/static/js/kotauth-portal.js
+COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-admin.min.js   src/main/resources/static/js/kotauth-admin.min.js
+COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-auth.min.js    src/main/resources/static/js/kotauth-auth.min.js
+COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-portal.min.js  src/main/resources/static/js/kotauth-portal.min.js
 COPY --from=frontend-build /build/src/main/resources/static/js/branding.min.js    src/main/resources/static/js/branding.min.js
 COPY --from=frontend-build /build/src/main/resources/js-integrity.properties      src/main/resources/js-integrity.properties
 
@@ -81,6 +81,8 @@ RUN gradle buildFatJar \
       -x compileCssAuth \
       -x compileCssPortalSidenav \
       -x compileCssPortalTabnav \
+      -x compileJs \
+      -x generateJsSri \
       --no-daemon
 
 

@@ -15,7 +15,7 @@ const src = (...parts) => path.join(root, 'frontend/js', ...parts);
 
 const bundles = [
   {
-    name: 'kotauth-admin.js',
+    name: 'kotauth-admin.min.js',
     files: [
       src('vendor/htmx.min.js'),
       src('shared/htmx-config.js'),
@@ -24,14 +24,14 @@ const bundles = [
     ],
   },
   {
-    name: 'kotauth-auth.js',
+    name: 'kotauth-auth.min.js',
     files: [
       src('auth/auth.js'),
       src('shared/confirm-dialog.js'),
     ],
   },
   {
-    name: 'kotauth-portal.js',
+    name: 'kotauth-portal.min.js',
     files: [
       src('shared/confirm-dialog.js'),
     ],

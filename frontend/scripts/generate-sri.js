@@ -14,9 +14,9 @@ const path = require('path');
 const root = path.resolve(__dirname, '../../');
 
 const bundles = {
-  'js.admin.integrity': 'src/main/resources/static/js/kotauth-admin.js',
-  'js.auth.integrity': 'src/main/resources/static/js/kotauth-auth.js',
-  'js.portal.integrity': 'src/main/resources/static/js/kotauth-portal.js',
+  'js.admin.integrity': 'src/main/resources/static/js/kotauth-admin.min.js',
+  'js.auth.integrity': 'src/main/resources/static/js/kotauth-auth.min.js',
+  'js.portal.integrity': 'src/main/resources/static/js/kotauth-portal.min.js',
   'js.branding.integrity': 'src/main/resources/static/js/branding.min.js',
 };
 
