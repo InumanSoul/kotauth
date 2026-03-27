@@ -45,6 +45,16 @@ frontend/node_modules/
 src/main/resources/static/kotauth-admin.css
 src/main/resources/static/kotauth-auth.css
 
+# Compiled JS bundles — generated at build time by compileJs Gradle task
+# Source lives in frontend/js/. Docker and Gradle generate these automatically.
+src/main/resources/static/js/kotauth-admin.js
+src/main/resources/static/js/kotauth-auth.js
+src/main/resources/static/js/kotauth-portal.js
+src/main/resources/static/js/branding.min.js
+
+# JS SRI hash metadata — generated at build time by generateJsSri Gradle task
+src/main/resources/js-integrity.properties
+
 # Version metadata — generated at build time by the generateVersionProperties Gradle task
 src/main/resources/version.properties
 
