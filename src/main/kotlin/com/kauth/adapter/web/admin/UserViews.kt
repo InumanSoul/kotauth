@@ -137,6 +137,7 @@ internal fun userDetailPageImpl(
                                 action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/revoke-sessions",
                                 label = "Revoke all",
                                 btnClass = "btn btn--warning btn--sm",
+                                confirmMessage = "Revoke all active sessions for this user? They will be signed out everywhere.",
                             )
                         } else {
                             button(classes = "btn btn--warning btn--sm") {
@@ -211,6 +212,11 @@ internal fun userDetailPageImpl(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/toggle",
                             label = if (user.enabled) "Disable" else "Enable",
                             btnClass = "btn btn--danger btn--sm",
+                            confirmMessage = if (user.enabled) {
+                                "Disable this user? They will be unable to log in until re-enabled."
+                            } else {
+                                null
+                            },
                         )
                     }
                 }

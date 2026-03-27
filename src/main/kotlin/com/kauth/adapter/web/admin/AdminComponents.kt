@@ -278,9 +278,13 @@ fun DIV.postButton(
     action: String,
     label: String,
     btnClass: String = "btn btn--ghost btn--sm",
+    confirmMessage: String? = null,
 ) {
     form(action = action, method = FormMethod.post, classes = "inline-form") {
-        button(type = ButtonType.submit, classes = btnClass) { +label }
+        button(type = ButtonType.submit, classes = btnClass) {
+            if (confirmMessage != null) attributes["data-confirm"] = confirmMessage
+            +label
+        }
     }
 }
 
