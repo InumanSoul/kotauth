@@ -345,9 +345,25 @@ fun Route.adminRoutes(
         intercept(ApplicationCallPipeline.Call) {
             val uri = call.request.uri
             if (uri.startsWith("/admin/login") || uri.startsWith("/admin/callback")) return@intercept
-            if (call.sessions.get<AdminSession>() == null) {
+            val session = call.sessions.get<AdminSession>()
+            if (session == null) {
                 call.respondRedirect("/admin/login")
                 finish()
+                return@intercept
+            }
+            // Validate the backing DB session hasn't been revoked
+            val dbSessionId = session.adminSessionId
+            if (dbSessionId != null) {
+                val dbSession =
+                    sessionRepository.findById(
+                        com.kauth.domain.model
+                            .SessionId(dbSessionId),
+                    )
+                if (dbSession == null || dbSession.revokedAt != null) {
+                    call.sessions.clear<AdminSession>()
+                    call.respondRedirect("/admin/login")
+                    finish()
+                }
             }
         }
 
@@ -505,6 +521,7 @@ fun Route.adminRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
                     userRepository = userRepository,
+                    applicationRepository = applicationRepository,
                 )
 
                 adminRbacRoutes(
