@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.TenantTheme
@@ -35,10 +36,10 @@ internal fun HEAD.adminHead(
     }
     style { unsafe { +theme.toCssVars() } }
     link(rel = "stylesheet", href = "/static/kotauth-admin.css")
-    script(src = "/static/js/htmx.min.js") {}
-    script(src = "/static/js/htmx-config.js") {}
-    script(src = "/static/js/confirm-dialog.js") { attributes["defer"] = "true" }
-    script(src = "/static/js/settings.js") { attributes["defer"] = "true" }
+    script(src = "/static/js/kotauth-admin.js") {
+        JsIntegrity.admin?.let { attributes["integrity"] = it }
+        attributes["crossorigin"] = "anonymous"
+    }
     style {
         unsafe {
             +(
