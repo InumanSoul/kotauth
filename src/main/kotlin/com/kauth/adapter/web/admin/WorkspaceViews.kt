@@ -71,7 +71,7 @@ internal fun workspaceDetailPageImpl(
                     }
                 }
                 div("page-header__actions") {
-                    ghostLinkExternal("/t/${workspace.slug}/login", "Open Login")
+                    ghostLinkExternal("/t/${workspace.slug}/authorize", "Open Login")
                     ghostLinkExternal("/t/${workspace.slug}/account/login", "Open Portal")
                     primaryLink(
                         "/admin/workspaces/${workspace.slug}/applications/new",

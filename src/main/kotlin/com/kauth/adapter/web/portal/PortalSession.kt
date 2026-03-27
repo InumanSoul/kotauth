@@ -10,7 +10,7 @@ import java.time.Instant
  * flow using the built-in 'kotauth-portal' PUBLIC client provisioned per tenant.
  *
  * Login flow:
- *   1. GET /t/{slug}/account/login → redirect to /t/{slug}/protocol/openid-connect/auth
+ *   1. GET /t/{slug}/account/login → redirect to /t/{slug}/authorize
  *      (standard auth endpoint — handles password, MFA, email-verification checks)
  *   2. User authenticates → auth endpoint redirects to /t/{slug}/account/callback?code=…
  *   3. Portal callback exchanges the code (PKCE verifier included) for tokens

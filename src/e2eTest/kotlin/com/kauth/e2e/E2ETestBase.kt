@@ -168,7 +168,13 @@ abstract class E2ETestBase {
                 embeddedServer(Netty, port = port) {
                     install(ContentNegotiation) { json() }
                     install(Sessions) {
-                        cookie<AdminSession>("KOTAUTH_ADMIN")
+                        cookie<AdminSession>("KOTAUTH_ADMIN") {
+                            transform(
+                                io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication(
+                                    ByteArray(32),
+                                ),
+                            )
+                        }
                     }
                     install(StatusPages) {
                         exception<Throwable> { call, cause ->
@@ -194,6 +200,8 @@ abstract class E2ETestBase {
                             apiKeyService = buildApiKeyService(),
                             webhookService = buildWebhookService(),
                             encryptionService = encryptionService,
+                            roleRepository = roleRepo,
+                            adminBypass = true,
                         )
                     }
                 }
@@ -258,6 +266,16 @@ abstract class E2ETestBase {
 
         tenantRepo.add(masterTenant)
         userRepo.add(adminUser)
+        // Seed admin role + assignment for bypass login role check
+        val adminRole =
+            roleRepo.add(
+                com.kauth.domain.model.Role(
+                    tenantId = TenantId(1),
+                    name = "admin",
+                    scope = com.kauth.domain.model.RoleScope.TENANT,
+                ),
+            )
+        roleRepo.assignRoleToUser(UserId(1), adminRole.id!!)
 
         context = browser.newContext()
         page = context.newPage()

@@ -34,3 +34,41 @@ input {
 
 input:focus       { border-color: var(--color-accent); }
 input::placeholder { color: var(--color-muted); }
+
+/* Password field with show/hide toggle */
+.field__input-wrap {
+  position: relative;
+}
+
+.field__input-wrap input {
+  padding-right: 2.75rem;
+}
+
+.field__toggle-pw {
+  position: absolute;
+  right: .15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+
+.field__toggle-pw:hover,
+.field__toggle-pw:focus-visible {
+  opacity: 1;
+}
+
+/* Icon swap via data-visible attribute (set by auth.js) */
+.field__toggle-pw .icon-eye-off { display: none; }
+.field__toggle-pw[data-visible="true"] .icon-eye { display: none; }
+.field__toggle-pw[data-visible="true"] .icon-eye-off { display: inline; }

@@ -134,6 +134,41 @@ internal fun Route.oauthProtocolRoutes(
         val codeChallenge = q["code_challenge"]
         val codeChallengeMethod = q["code_challenge_method"]
 
+        // If no OAuth query params, check for an existing auth context cookie.
+        // This handles returning from registration/password-reset during an active OAuth flow.
+        // If no cookie either, redirect to the portal login which initiates a proper OAuth flow.
+        val hasOAuthParams = responseType.isNotBlank() || clientId.isNotBlank() || redirectUri.isNotBlank()
+
+        if (!hasOAuthParams) {
+            val existingContext = call.getAuthContext(encryptionService)
+            if (existingContext != null) {
+                // OAuth flow in progress via cookie — render login within that context
+                val tenant = ctx.tenant
+                val registered = q["registered"] == "true"
+                val enabledProviders =
+                    if (tenant != null && identityProviderRepository != null) {
+                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                    } else {
+                        emptyList()
+                    }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AuthView.loginPage(
+                        tenantSlug = slug,
+                        theme = ctx.theme,
+                        workspaceName = ctx.workspaceName,
+                        success = registered,
+                        oauthParams = existingContext,
+                        enabledProviders = enabledProviders,
+                        registrationEnabled = tenant?.registrationEnabled ?: true,
+                    ),
+                )
+                return@get
+            }
+            // No OAuth flow — redirect to portal login which starts a proper flow
+            call.respondRedirect("/t/$slug/account/login")
+            return@get
+        }
         if (responseType != "code") {
             call.respond(
                 HttpStatusCode.BadRequest,

@@ -75,7 +75,7 @@ internal fun applicationDetailPageImpl(
                 }
                 div("page-header__actions") {
                     ghostLinkExternal(
-                        "/t/${workspace.slug}/login?client_id=${application.clientId}",
+                        "/t/${workspace.slug}/authorize?client_id=${application.clientId}",
                         "Open Login",
                     )
                     primaryLink(
