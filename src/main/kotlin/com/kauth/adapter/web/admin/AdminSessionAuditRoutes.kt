@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.SessionId
+import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.UserRepository
@@ -21,6 +23,7 @@ fun Route.adminSessionAuditRoutes(
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
     userRepository: UserRepository,
+    applicationRepository: ApplicationRepository,
 ) {
     // -------------------------------------------------------------------
     // Active sessions
@@ -35,10 +38,22 @@ fun Route.adminSessionAuditRoutes(
             sessionUserIds.associateWith { uid ->
                 userRepository.findById(uid)?.username ?: uid.value.toString()
             }
+        val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
+        val sessionClientMap: Map<ApplicationId, String> =
+            sessionClientIds.associateWith { cid ->
+                applicationRepository.findById(cid)?.name ?: cid.value.toString()
+            }
         val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.activeSessionsPage(workspace, sessions, wsPairs, session.username, sessionUserMap),
+            AdminView.activeSessionsPage(
+                workspace,
+                sessions,
+                wsPairs,
+                session.username,
+                sessionUserMap,
+                sessionClientMap,
+            ),
         )
     }
 
@@ -65,7 +80,7 @@ fun Route.adminSessionAuditRoutes(
                 ?.coerceAtLeast(1) ?: 1
         val eventTypeStr = call.request.queryParameters["event"]
         val eventType = eventTypeStr?.let { runCatching { AuditEventType.valueOf(it) }.getOrNull() }
-        val pageSize = 50
+        val pageSize = 20
         val offset = (page - 1) * pageSize
         val events =
             auditLogRepository.findByTenant(
@@ -80,6 +95,11 @@ fun Route.adminSessionAuditRoutes(
             auditUserIds.associateWith { uid ->
                 userRepository.findById(uid)?.username ?: uid.value.toString()
             }
+        val auditClientIds = events.mapNotNull { it.clientId }.distinct()
+        val auditClientMap: Map<ApplicationId, String> =
+            auditClientIds.associateWith { cid ->
+                applicationRepository.findById(cid)?.name ?: cid.value.toString()
+            }
         val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
@@ -92,6 +112,7 @@ fun Route.adminSessionAuditRoutes(
                 totalPages = ((total + pageSize - 1) / pageSize).toInt(),
                 eventTypeFilter = eventTypeStr,
                 userMap = auditUserMap,
+                clientMap = auditClientMap,
             ),
         )
     }

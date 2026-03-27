@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Session
@@ -14,6 +15,7 @@ internal fun activeSessionsPageImpl(
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
     userMap: Map<UserId, String> = emptyMap(),
+    clientMap: Map<ApplicationId, String> = emptyMap(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -71,19 +73,26 @@ internal fun activeSessionsPageImpl(
                                             +"M2M"
                                         }
                                     }
-                                    td { +(s.clientId?.value?.toString() ?: "—") }
+                                    td {
+                                        val cid = s.clientId
+                                        if (cid != null) {
+                                            +(clientMap[cid] ?: cid.value.toString())
+                                        } else {
+                                            +"—"
+                                        }
+                                    }
                                     td { span("data-table__email") { +(s.ipAddress ?: "—") } }
                                     td { +s.createdAt.toDisplayString() }
                                     td { +s.expiresAt.toDisplayString() }
                                     td {
-                                        form(
-                                            action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
-                                            method = FormMethod.post,
-                                            classes = "inline-form",
-                                        ) {
-                                            button(type = ButtonType.submit, classes = "btn btn--ghost btn--sm") {
-                                                +"Revoke"
-                                            }
+                                        val userName = s.userId?.let { userMap[it] } ?: "this user"
+                                        div {
+                                            postButton(
+                                                action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
+                                                label = "Revoke",
+                                                btnClass = "btn btn--ghost btn--sm",
+                                                confirmMessage = "Revoke session for $userName?",
+                                            )
                                         }
                                     }
                                 }
@@ -105,6 +114,7 @@ internal fun auditLogPageImpl(
     totalPages: Int = 1,
     eventTypeFilter: String? = null,
     userMap: Map<UserId, String> = emptyMap(),
+    clientMap: Map<ApplicationId, String> = emptyMap(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -148,6 +158,11 @@ internal fun auditLogPageImpl(
                         method = FormMethod.get,
                         classes = "filter-bar filter-bar--row",
                     ) {
+                        attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/logs"
+                        attributes["hx-target"] = "#audit-content"
+                        attributes["hx-select"] = "#audit-content"
+                        attributes["hx-push-url"] = "true"
+                        attributes["hx-indicator"] = ".htmx-loader"
                         select("filter-bar__select") {
                             name = "event"
                             option {
@@ -172,70 +187,91 @@ internal fun auditLogPageImpl(
                         }
                     }
 
-                    // Data table
-                    if (events.isEmpty()) {
-                        emptyState(
-                            iconName = "search",
-                            title = "No events found",
-                            description =
-                                if (eventTypeFilter != null) {
-                                    "No events match the selected filter. Try clearing the filter."
-                                } else {
-                                    "No audit events have been recorded for this workspace yet."
-                                },
-                        )
-                    } else {
-                        table("data-table") {
-                            thead {
-                                tr {
-                                    th { +"Time" }
-                                    th { +"Event" }
-                                    th { +"User" }
-                                    th { +"Client" }
-                                    th { +"IP" }
-                                }
-                            }
-                            tbody {
-                                events.forEach { e ->
+                    div {
+                        id = "audit-content"
+
+                        // Data table
+                        if (events.isEmpty()) {
+                            emptyState(
+                                iconName = "search",
+                                title = "No events found",
+                                description =
+                                    if (eventTypeFilter != null) {
+                                        "No events match the selected filter. Try clearing the filter."
+                                    } else {
+                                        "No audit events have been recorded for this workspace yet."
+                                    },
+                            )
+                        } else {
+                            table("data-table") {
+                                thead {
                                     tr {
-                                        td { +e.createdAt.toDisplayString() }
-                                        td { span("data-table__id") { +e.eventType.name } }
-                                        td {
-                                            val uid = e.userId
-                                            if (uid != null) {
-                                                val name = userMap[uid] ?: uid.value.toString()
-                                                a(href = "/admin/workspaces/${workspace.slug}/users/${uid.value}") { +name }
-                                            } else {
-                                                +"—"
+                                        th { +"Time" }
+                                        th { +"Event" }
+                                        th { +"User" }
+                                        th { +"Client" }
+                                        th { +"IP" }
+                                    }
+                                }
+                                tbody {
+                                    events.forEach { e ->
+                                        tr {
+                                            td { +e.createdAt.toDisplayString() }
+                                            td { span("data-table__id") { +e.eventType.name } }
+                                            td {
+                                                val uid = e.userId
+                                                if (uid != null) {
+                                                    val name = userMap[uid] ?: uid.value.toString()
+                                                    a(href = "/admin/workspaces/${workspace.slug}/users/${uid.value}") { +name }
+                                                } else {
+                                                    +"—"
+                                                }
                                             }
-                                        }
-                                        td { +(e.clientId?.value?.toString() ?: "—") }
-                                        td {
-                                            span("data-table__email") { +(e.ipAddress ?: "—") }
+                                            td {
+                                                val cid = e.clientId
+                                                if (cid != null) {
+                                                    +(clientMap[cid] ?: cid.value.toString())
+                                                } else {
+                                                    +"—"
+                                                }
+                                            }
+                                            td {
+                                                span("data-table__email") { +(e.ipAddress ?: "—") }
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
-                    }
 
-                    // Pagination
-                    if (totalPages > 1) {
-                        div("data-table-pagination") {
-                            val baseUrl =
-                                "/admin/workspaces/${workspace.slug}/logs" +
-                                    (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
-                            if (page > 1) {
-                                a("${baseUrl}page=${page - 1}", classes = "btn btn--ghost btn--sm") {
-                                    +"← Prev"
+                        // Pagination
+                        if (totalPages > 1) {
+                            div("data-table-pagination") {
+                                val baseUrl =
+                                    "/admin/workspaces/${workspace.slug}/logs" +
+                                        (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
+                                if (page > 1) {
+                                    val prevUrl = "${baseUrl}page=${page - 1}"
+                                    a(prevUrl, classes = "btn btn--ghost btn--sm") {
+                                        attributes["hx-get"] = prevUrl
+                                        attributes["hx-target"] = "#audit-content"
+                                        attributes["hx-select"] = "#audit-content"
+                                        attributes["hx-push-url"] = "true"
+                                        +"← Prev"
+                                    }
                                 }
-                            }
-                            span("data-table-pagination__label") {
-                                +"Page $page of $totalPages"
-                            }
-                            if (page < totalPages) {
-                                a("${baseUrl}page=${page + 1}", classes = "btn btn--ghost btn--sm") {
-                                    +"Next →"
+                                span("data-table-pagination__label") {
+                                    +"Page $page of $totalPages"
+                                }
+                                if (page < totalPages) {
+                                    val nextUrl = "${baseUrl}page=${page + 1}"
+                                    a(nextUrl, classes = "btn btn--ghost btn--sm") {
+                                        attributes["hx-get"] = nextUrl
+                                        attributes["hx-target"] = "#audit-content"
+                                        attributes["hx-select"] = "#audit-content"
+                                        attributes["hx-push-url"] = "true"
+                                        +"Next →"
+                                    }
                                 }
                             }
                         }
