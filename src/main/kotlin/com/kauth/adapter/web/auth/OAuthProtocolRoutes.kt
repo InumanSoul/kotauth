@@ -33,6 +33,7 @@ internal fun Route.oauthProtocolRoutes(
     mfaService: MfaService?,
     roleRepository: RoleRepository?,
     encryptionService: EncryptionService,
+    loginRateLimiter: RateLimiterPort,
     baseUrl: String = "",
 ) {
     get("/.well-known/openid-configuration") {
@@ -206,6 +207,22 @@ internal fun Route.oauthProtocolRoutes(
             } else {
                 emptyList()
             }
+
+        // Rate limit login attempts per IP + tenant
+        val rateLimitKey = "login:$ipAddress:$slug"
+        if (!loginRateLimiter.isAllowed(rateLimitKey)) {
+            return@post call.respondHtml(
+                HttpStatusCode.TooManyRequests,
+                AuthView.loginPage(
+                    slug,
+                    theme,
+                    workspaceName,
+                    error = "Too many login attempts. Please wait a moment and try again.",
+                    enabledProviders = enabledProviders,
+                    registrationEnabled = tenant?.registrationEnabled ?: true,
+                ),
+            )
+        }
 
         // OAuth context comes from the signed cookie, not form fields.
         // If the cookie is absent or expired, the session has timed out.

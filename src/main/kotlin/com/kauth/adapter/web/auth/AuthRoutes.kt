@@ -51,12 +51,6 @@ fun Route.authRoutes(
             )
         }
 
-        loginRoutes(
-            authService = authService,
-            loginRateLimiter = loginRateLimiter,
-            identityProviderRepository = identityProviderRepository,
-        )
-
         registerRoutes(
             authService = authService,
             registerRateLimiter = registerRateLimiter,
@@ -91,6 +85,7 @@ fun Route.authRoutes(
             mfaService = mfaService,
             roleRepository = roleRepository,
             encryptionService = encryptionService,
+            loginRateLimiter = loginRateLimiter,
             baseUrl = baseUrl,
         )
     }
