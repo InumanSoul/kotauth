@@ -1110,7 +1110,7 @@ class AuthRoutesTest {
     // =========================================================================
 
     @Test
-    fun `POST register redirects to login with registered=true on success`() =
+    fun `POST register redirects to portal login on success when no OAuth context`() =
         testApplication {
             resetFixtures()
 
@@ -1146,7 +1146,10 @@ class AuthRoutesTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
-            assertTrue(location.contains("registered=true"), "Must redirect with registered=true")
+            assertTrue(
+                location.contains("/account/login"),
+                "Without OAuth context, must redirect to portal login, got: $location",
+            )
         }
 
     @Test
