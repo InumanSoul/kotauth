@@ -84,7 +84,7 @@ Each port interface has a corresponding `Fake` implementation in `src/test/kotli
 
 - **Required**: `KAUTH_BASE_URL`, `DB_USER`, `DB_PASSWORD`
 - **Recommended**: `KAUTH_SECRET_KEY` (32+ hex chars for AES-256-GCM + session signing)
-- **Optional**: `KAUTH_ENV` (default: development), `DB_URL` (overrides DB_HOST/DB_PORT/DB_NAME), `DB_POOL_MAX_SIZE` (default: 10), `DB_POOL_MIN_IDLE` (default: 2)
+- **Optional**: `KAUTH_ENV` (default: development), `DB_URL` (overrides DB_HOST/DB_PORT/DB_NAME), `DB_POOL_MAX_SIZE` (default: 10), `DB_POOL_MIN_IDLE` (default: 2), `KAUTH_ADMIN_BYPASS` (default: false — enables direct password login on admin console)
 
 ## ADRs
 

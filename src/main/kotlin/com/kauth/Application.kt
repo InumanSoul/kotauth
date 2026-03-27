@@ -96,6 +96,10 @@ fun main() {
         },
     )
 
+    if (config.adminBypass) {
+        startupLog.warn("KAUTH_ADMIN_BYPASS=true — admin console using legacy password auth. MFA NOT enforced.")
+    }
+
     startupLog.info(
         "KotAuth v{} started | env={} | baseUrl={} | encryption={} | jvm={}",
         appInfo.version,
@@ -177,8 +181,9 @@ fun Application.module(
         cookie<AdminSession>("KOTAUTH_ADMIN") {
             cookie.httpOnly = true
             cookie.secure = secureCookies
-            cookie.maxAgeInSeconds = 3600 * 8
+            cookie.maxAgeInSeconds = 3600 // 1 hour — matches access token TTL
             cookie.extensions["SameSite"] = "Lax"
+            transform(SessionTransportTransformerMessageAuthentication(s.adminSessionKey))
         }
         cookie<PortalSession>("KOTAUTH_PORTAL") {
             cookie.httpOnly = true
@@ -307,6 +312,11 @@ fun Application.module(
             apiKeyService = s.apiKeyService,
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,
+            oauthService = s.oauthService,
+            selfServiceService = s.selfServiceService,
+            roleRepository = s.roleRepository,
+            baseUrl = config.baseUrl,
+            adminBypass = config.adminBypass,
         )
     }
 }

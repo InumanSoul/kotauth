@@ -109,6 +109,7 @@ object AuthView {
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
         enabledProviders: List<SocialProvider> = emptyList(),
+        registrationEnabled: Boolean = true,
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Sign In", theme) }
@@ -117,7 +118,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }
@@ -208,9 +212,11 @@ object AuthView {
                         div("footer-link") {
                             a(href = "/t/$tenantSlug/forgot-password") { +"Forgot password?" }
                         }
-                        div("footer-link") {
-                            +"Don't have an account? "
-                            a(href = "/t/$tenantSlug/register") { +"Create one" }
+                        if (registrationEnabled) {
+                            div("footer-link") {
+                                +"Don't have an account? "
+                                a(href = "/t/$tenantSlug/register") { +"Create one" }
+                            }
                         }
 
                         // Social login buttons — only shown when providers are configured
@@ -277,7 +283,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }
@@ -417,7 +426,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }
@@ -498,7 +510,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }
@@ -586,7 +601,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }
@@ -734,7 +752,10 @@ object AuthView {
                 div("shell") {
                     div("brand") {
                         if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName)
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
                         } else {
                             div("brand-name") { +workspaceName }
                         }

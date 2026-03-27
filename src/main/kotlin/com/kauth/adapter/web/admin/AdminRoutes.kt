@@ -1,12 +1,18 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.decodeJwtPayload
+import com.kauth.adapter.web.generatePkceChallenge
+import com.kauth.adapter.web.generatePkceVerifier
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
+import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -14,8 +20,12 @@ import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.OAuthResult
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
+import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
@@ -53,12 +63,17 @@ fun Route.adminRoutes(
     apiKeyService: ApiKeyService? = null,
     webhookService: WebhookService? = null,
     encryptionService: EncryptionService,
+    oauthService: OAuthService? = null,
+    selfServiceService: UserSelfServiceService? = null,
+    roleRepository: RoleRepository? = null,
+    baseUrl: String = "",
+    adminBypass: Boolean = false,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
     route("/admin") {
         // ---------------------------------------------------------------
-        // Login / logout
+        // Login — OAuth PKCE flow (default) or break-glass bypass
         // ---------------------------------------------------------------
 
         get("/login") {
@@ -66,18 +81,71 @@ fun Route.adminRoutes(
                 call.respondRedirect("/admin")
                 return@get
             }
-            call.respondHtml(HttpStatusCode.OK, AdminView.loginPage())
+            if (adminBypass) {
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.loginPage(bypassNotice = "OAuth login is bypassed — direct credential login is active."),
+                )
+                return@get
+            }
+            // OAuth PKCE redirect to master tenant auth endpoint
+            val verifier = generatePkceVerifier()
+            val challenge = generatePkceChallenge(verifier)
+            val state = generatePkceVerifier()
+            val cookieVal = encryptionService.signCookie("$verifier|${System.currentTimeMillis()}|$state")
+            call.response.cookies.append(
+                name = "KOTAUTH_ADMIN_PKCE",
+                value = cookieVal,
+                maxAge = 300L,
+                httpOnly = true,
+                secure = baseUrl.startsWith("https"),
+                path = "/admin",
+            )
+            val redirectUri = "$baseUrl/admin/callback"
+            val authUrl =
+                buildString {
+                    append("/t/master/protocol/openid-connect/auth")
+                    append("?response_type=code")
+                    append("&client_id=").append(AdminClientProvisioning.ADMIN_CLIENT_ID)
+                    append("&redirect_uri=").append(java.net.URLEncoder.encode(redirectUri, "UTF-8"))
+                    append("&scope=openid+profile+email")
+                    append("&code_challenge=").append(challenge)
+                    append("&code_challenge_method=S256")
+                    append("&state=").append(state)
+                }
+            call.respondRedirect(authUrl)
         }
 
         post("/login") {
+            if (!adminBypass) {
+                call.respond(HttpStatusCode.NotFound)
+                return@post
+            }
             val params = call.receiveParameters()
             val username = params["username"]?.trim() ?: ""
             val password = params["password"] ?: ""
             val ipAddress = call.request.local.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
-            when (authService.authenticate(Tenant.MASTER_SLUG, username, password, ipAddress, userAgent)) {
+            when (val result = authService.authenticate(Tenant.MASTER_SLUG, username, password, ipAddress, userAgent)) {
                 is AuthResult.Success -> {
-                    call.sessions.set(AdminSession(username = username))
+                    val user = result.value
+                    // Verify admin role even in bypass mode
+                    val bypassRoles = roleRepository?.findRolesForUser(user.id!!) ?: emptyList()
+                    val master = tenantRepository.findBySlug(Tenant.MASTER_SLUG)
+                    if (master != null && bypassRoles.none { it.name == "admin" && it.tenantId == master.id }) {
+                        call.respondHtml(
+                            HttpStatusCode.Forbidden,
+                            AdminView.loginPage(error = "Your account does not have admin console access."),
+                        )
+                        return@post
+                    }
+                    call.sessions.set(
+                        AdminSession(
+                            userId = user.id?.value ?: 0,
+                            tenantId = user.tenantId.value,
+                            username = user.username,
+                        ),
+                    )
                     call.respondRedirect("/admin")
                 }
                 is AuthResult.Failure ->
@@ -88,9 +156,186 @@ fun Route.adminRoutes(
             }
         }
 
+        // ---------------------------------------------------------------
+        // OAuth callback — exchanges authorization code for session
+        // ---------------------------------------------------------------
+
+        get("/callback") {
+            val rawPkce = call.request.cookies["KOTAUTH_ADMIN_PKCE"]
+            if (rawPkce.isNullOrBlank()) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Session expired. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+            val pkcePayload = encryptionService.verifyCookie(rawPkce)
+            if (pkcePayload == null) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Invalid session. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+            val pkceParts = pkcePayload.split("|")
+            if (pkceParts.size != 3) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Session mismatch. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+            val verifier = pkceParts[0]
+            val timestamp = pkceParts[1].toLongOrNull() ?: 0L
+            val state = pkceParts[2]
+            if (System.currentTimeMillis() - timestamp > 300_000) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Login session expired. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+            val callbackState = call.request.queryParameters["state"]
+            if (callbackState != state) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Invalid state parameter. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+
+            // Clear the PKCE cookie
+            call.response.cookies.append(
+                name = "KOTAUTH_ADMIN_PKCE",
+                value = "",
+                maxAge = 0L,
+                path = "/admin",
+                httpOnly = true,
+            )
+
+            // Handle OAuth error responses
+            val errorParam = call.request.queryParameters["error"]
+            if (errorParam != null) {
+                val errorMsg =
+                    when (errorParam) {
+                        "access_denied" -> "Access denied. Your account may not have admin console access."
+                        "invalid_client" -> "Admin console configuration error. Contact your administrator."
+                        else -> "Authentication failed. Please try again."
+                    }
+                call.respondHtml(
+                    HttpStatusCode.Unauthorized,
+                    AdminView.errorPage(errorMsg, "/admin/login"),
+                )
+                return@get
+            }
+
+            val code = call.request.queryParameters["code"]
+            if (code.isNullOrBlank()) {
+                call.respondHtml(
+                    HttpStatusCode.BadRequest,
+                    AdminView.errorPage("Missing authorization code. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+
+            val redirectUri = "$baseUrl/admin/callback"
+            val ipAddress = call.request.local.remoteAddress
+            val userAgent = call.request.headers["User-Agent"]
+            val tokenResult =
+                oauthService?.exchangeAuthorizationCode(
+                    tenantSlug = Tenant.MASTER_SLUG,
+                    code = code,
+                    clientId = AdminClientProvisioning.ADMIN_CLIENT_ID,
+                    redirectUri = redirectUri,
+                    codeVerifier = verifier,
+                    clientSecret = null,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                )
+
+            if (tokenResult == null || tokenResult is OAuthResult.Failure) {
+                call.respondHtml(
+                    HttpStatusCode.Unauthorized,
+                    AdminView.errorPage("Token exchange failed. Please try again.", "/admin/login"),
+                )
+                return@get
+            }
+
+            val tokenValue = (tokenResult as OAuthResult.Success).value
+            val accessToken = tokenValue.access_token
+            val idToken = tokenValue.id_token ?: ""
+            val claims = decodeJwtPayload(accessToken)
+            val userId = claims["sub"]?.toIntOrNull()
+            val username = claims["preferred_username"] ?: ""
+            val masterTenant = tenantRepository.findBySlug(Tenant.MASTER_SLUG)
+
+            if (userId == null || masterTenant == null) {
+                call.respondHtml(
+                    HttpStatusCode.InternalServerError,
+                    AdminView.errorPage("Could not establish admin session.", "/admin/login"),
+                )
+                return@get
+            }
+
+            // Verify user has admin role on master tenant
+            val userRoles = roleRepository?.findRolesForUser(UserId(userId)) ?: emptyList()
+            val hasAdminRole = userRoles.any { it.name == "admin" && it.tenantId == masterTenant.id }
+            if (!hasAdminRole) {
+                call.respondHtml(
+                    HttpStatusCode.Forbidden,
+                    AdminView.errorPage(
+                        "Your account does not have admin console access. " +
+                            "Contact your administrator to request the admin role.",
+                        "/admin/login",
+                    ),
+                )
+                return@get
+            }
+
+            // Find the session record created by the token exchange
+            val latestSession =
+                selfServiceService
+                    ?.getActiveSessions(UserId(userId), masterTenant.id)
+                    ?.maxByOrNull { it.createdAt }
+
+            call.sessions.set(
+                AdminSession(
+                    userId = userId,
+                    tenantId = masterTenant.id.value,
+                    username = username,
+                    accessToken = accessToken,
+                    idToken = idToken,
+                    adminSessionId = latestSession?.id?.value,
+                ),
+            )
+            call.respondRedirect("/admin")
+        }
+
+        // ---------------------------------------------------------------
+        // Logout — revoke session + OIDC end-session
+        // ---------------------------------------------------------------
+
         post("/logout") {
+            val session = call.sessions.get<AdminSession>()
+            if (session?.adminSessionId != null) {
+                selfServiceService?.revokeSession(
+                    UserId(session.userId),
+                    TenantId(session.tenantId),
+                    com.kauth.domain.model
+                        .SessionId(session.adminSessionId),
+                )
+            }
             call.sessions.clear<AdminSession>()
-            call.respondRedirect("/admin/login")
+            val postLogoutUri = java.net.URLEncoder.encode("$baseUrl/admin/login", "UTF-8")
+            val idTokenHint =
+                if (session?.idToken?.isNotBlank() == true) {
+                    "&id_token_hint=${java.net.URLEncoder.encode(session.idToken, "UTF-8")}"
+                } else {
+                    ""
+                }
+            call.respondRedirect(
+                "/t/master/protocol/openid-connect/logout?post_logout_redirect_uri=$postLogoutUri$idTokenHint",
+            )
         }
 
         // ---------------------------------------------------------------
@@ -98,9 +343,9 @@ fun Route.adminRoutes(
         // ---------------------------------------------------------------
 
         intercept(ApplicationCallPipeline.Call) {
-            if (!call.request.uri.startsWith("/admin/login") &&
-                call.sessions.get<AdminSession>() == null
-            ) {
+            val uri = call.request.uri
+            if (uri.startsWith("/admin/login") || uri.startsWith("/admin/callback")) return@intercept
+            if (call.sessions.get<AdminSession>() == null) {
                 call.respondRedirect("/admin/login")
                 finish()
             }
@@ -278,8 +523,3 @@ fun Route.adminRoutes(
         }
     }
 }
-
-/** Identifies an authenticated admin console session. */
-data class AdminSession(
-    val username: String,
-)

@@ -55,6 +55,7 @@ internal fun Route.loginRoutes(
                 success = registered,
                 oauthParams = oauthParams,
                 enabledProviders = enabledProviders,
+                registrationEnabled = tenant?.registrationEnabled ?: true,
             ),
         )
     }
@@ -88,6 +89,7 @@ internal fun Route.loginRoutes(
                     error = "Too many login attempts. Please wait a moment and try again.",
                     oauthParams = oauthParams,
                     enabledProviders = enabledProviders,
+                    registrationEnabled = tenant?.registrationEnabled ?: true,
                 ),
             )
         }
@@ -108,6 +110,7 @@ internal fun Route.loginRoutes(
                             error = result.error.toMessage(),
                             oauthParams = oauthParams,
                             enabledProviders = enabledProviders,
+                            registrationEnabled = tenant?.registrationEnabled ?: true,
                         ),
                     )
                 }
@@ -143,6 +146,7 @@ internal fun Route.loginRoutes(
                                             "Please sign in to the user portal and enable MFA under Security settings.",
                                     oauthParams = oauthParams,
                                     enabledProviders = enabledProviders,
+                                    registrationEnabled = tenant?.registrationEnabled ?: true,
                                 ),
                             )
                         }
@@ -208,6 +212,7 @@ internal fun Route.loginRoutes(
                                     error = codeResult.error.toDescription(),
                                     oauthParams = oauthParams,
                                     enabledProviders = enabledProviders,
+                                    registrationEnabled = tenant?.registrationEnabled ?: true,
                                 ),
                             )
                         }

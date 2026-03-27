@@ -4,7 +4,10 @@ import com.kauth.adapter.web.demoBanner
 import kotlinx.html.*
 
 // Login page — standalone, no admin shell.
-internal fun loginPageImpl(error: String? = null): HTML.() -> Unit =
+internal fun loginPageImpl(
+    error: String? = null,
+    bypassNotice: String? = null,
+): HTML.() -> Unit =
     {
         head { adminHead("Login") }
         body {
@@ -16,6 +19,12 @@ internal fun loginPageImpl(error: String? = null): HTML.() -> Unit =
                 div("login-card") {
                     h1("card-title") { +"Administrator Login" }
                     p("card-subtitle") { +"Access is restricted to master workspace admins." }
+                    if (bypassNotice != null) {
+                        div("alert alert-error") {
+                            style = "background: #78350f; border-color: #92400e; color: #fef3c7;"
+                            +bypassNotice
+                        }
+                    }
                     if (error != null) {
                         div("alert alert-error") { +error }
                     }
@@ -50,6 +59,31 @@ internal fun loginPageImpl(error: String? = null): HTML.() -> Unit =
                             }
                         }
                         button(type = ButtonType.submit, classes = "btn btn--primary btn-full") { +"Sign In" }
+                    }
+                }
+                p("copyright") { +"© ${java.time.Year.now()} Powered by kotauth" }
+            }
+        }
+    }
+
+// Standalone error page for OAuth callback errors (user is not authenticated).
+internal fun adminOAuthErrorPageImpl(
+    message: String,
+    retryUrl: String,
+): HTML.() -> Unit =
+    {
+        head { adminHead("Error") }
+        body {
+            div("login-shell") {
+                div("brand") {
+                    img(src = "/static/brand/kotauth-negative.svg", alt = "kotauth Brand") {}
+                }
+                div("login-card") {
+                    h1("card-title") { +"Authentication Error" }
+                    div("alert alert-error") { +message }
+                    div {
+                        style = "margin-top:1.5rem; text-align:center;"
+                        a(retryUrl, classes = "btn btn--primary btn-full") { +"Try again" }
                     }
                 }
                 p("copyright") { +"© ${java.time.Year.now()} Powered by kotauth" }

@@ -48,6 +48,7 @@ import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
+import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
@@ -84,6 +85,8 @@ data class ServiceGraph(
     val themeRepository: ThemeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
+    val adminClientProvisioning: AdminClientProvisioning,
+    val adminSessionKey: ByteArray,
     val loginRateLimiter: RateLimiterPort,
     val registerRateLimiter: RateLimiterPort,
     val tokenRateLimiter: RateLimiterPort,
@@ -132,6 +135,15 @@ data class ServiceGraph(
                     baseUrl = config.baseUrl,
                 )
             portalClientProvisioning.provisionRedirectUris()
+
+            val adminClientProvisioning =
+                AdminClientProvisioning(
+                    tenantRepository = tenantRepository,
+                    applicationRepository = applicationRepository,
+                    themeRepository = themeRepository,
+                    baseUrl = config.baseUrl,
+                )
+            adminClientProvisioning.provision()
 
             // -- Token adapter ------------------------------------------------
             val tokenAdapter =
@@ -293,6 +305,23 @@ data class ServiceGraph(
                     }
                 }
 
+            val adminSessionKey: ByteArray =
+                run {
+                    val secret = config.secretKey
+                    if (!secret.isNullOrBlank()) {
+                        java.security.MessageDigest
+                            .getInstance("SHA-256")
+                            .digest(
+                                "admin-session:$secret"
+                                    .toByteArray(Charsets.UTF_8),
+                            )
+                    } else {
+                        ByteArray(32).also {
+                            java.security.SecureRandom().nextBytes(it)
+                        }
+                    }
+                }
+
             return ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
@@ -316,6 +345,8 @@ data class ServiceGraph(
                 themeRepository = themeRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
+                adminClientProvisioning = adminClientProvisioning,
+                adminSessionKey = adminSessionKey,
                 loginRateLimiter = loginLimiter,
                 registerRateLimiter = registerLimiter,
                 tokenRateLimiter = tokenLimiter,

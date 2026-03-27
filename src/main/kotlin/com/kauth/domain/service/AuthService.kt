@@ -190,7 +190,7 @@ class AuthService(
 
     /**
      * Authenticates a user, issues a token set, and persists a server-side session.
-     * Used for direct (non-OAuth) browser login and the admin console.
+     * Used for direct (non-OAuth) browser login and REST token issuance.
      *
      * Delegates credential verification to [authenticate] so that validation logic,
      * audit logging, and password expiry checks live in exactly one place.

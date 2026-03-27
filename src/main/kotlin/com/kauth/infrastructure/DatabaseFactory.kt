@@ -1,12 +1,15 @@
 package com.kauth.infrastructure
 
+import com.kauth.adapter.persistence.RolesTable
 import com.kauth.adapter.persistence.TenantsTable
+import com.kauth.adapter.persistence.UserRolesTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -117,14 +120,44 @@ object DatabaseFactory {
                     ?: error("Master tenant not found — V1 migration may not have run correctly.")
 
             val hasher = BcryptPasswordHasher()
-            UsersTable.insert {
-                it[tenantId] = masterTenantId
-                it[username] = "admin"
-                it[email] = "admin@kauth.local"
-                it[passwordHash] = hasher.hash("changeme123!")
-                it[fullName] = "KotAuth Administrator"
-                it[emailVerified] = false
-                it[enabled] = true
+            val adminUserId =
+                UsersTable.insert {
+                    it[tenantId] = masterTenantId
+                    it[username] = "admin"
+                    it[email] = "admin@kauth.local"
+                    it[passwordHash] = hasher.hash("changeme123!")
+                    it[fullName] = "KotAuth Administrator"
+                    it[emailVerified] = false
+                    it[enabled] = true
+                } get UsersTable.id
+
+            // Assign admin role (created by V28) to the default admin user
+            val adminRoleId =
+                RolesTable
+                    .selectAll()
+                    .where {
+                        (RolesTable.tenantId eq masterTenantId) and
+                            (RolesTable.name eq "admin") and
+                            (RolesTable.scope eq "tenant")
+                    }.firstOrNull()
+                    ?.get(RolesTable.id)
+
+            if (adminRoleId != null) {
+                val alreadyAssigned =
+                    UserRolesTable
+                        .selectAll()
+                        .where {
+                            (UserRolesTable.userId eq adminUserId) and
+                                (UserRolesTable.roleId eq adminRoleId)
+                        }.count() > 0
+
+                if (!alreadyAssigned) {
+                    UserRolesTable.insert {
+                        it[userId] = adminUserId
+                        it[roleId] = adminRoleId
+                        it[assignedAt] = java.time.OffsetDateTime.now()
+                    }
+                }
             }
         }
     }
