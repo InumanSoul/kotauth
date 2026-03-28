@@ -12,7 +12,7 @@
     "watch":             "find css js -name '*.css' -o -name '*.js' | entr sh -c 'npm run build'"
   },
   "devDependencies": {
-    "esbuild": "0.21.5",
+    "esbuild": "0.25.0",
     "lightningcss-cli": "1.32.0"
   }
 }
