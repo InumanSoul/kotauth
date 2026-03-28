@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth lint lint-fix test e2e build jar version up up-fresh down nuke logs health
+.PHONY: help css css-admin css-auth js lint lint-fix test e2e build jar version up up-fresh down nuke logs health
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -18,6 +18,11 @@ css-admin: ## Compile the admin console CSS bundle only
 
 css-auth: ## Compile the auth pages CSS bundle only
 	./gradlew compileCssAuth
+
+# ── JS ────────────────────────────────────────────────────────────────────────
+
+js: ## Compile all JS bundles and generate SRI hashes
+	./gradlew compileJs generateJsSri
 
 css-portal: ## Compile the portal CSS bundles (sidenav + tabnav)
 	./gradlew compileCssPortalSidenav compileCssPortalTabnav

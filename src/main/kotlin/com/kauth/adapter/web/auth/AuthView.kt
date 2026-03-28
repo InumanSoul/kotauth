@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.SocialProvider
@@ -57,7 +58,11 @@ object AuthView {
         // 3. Base stylesheet that uses var(--token) exclusively
         link(rel = "stylesheet", href = "/static/kotauth-auth.css")
 
-        script(src = "/static/js/auth.js") { attributes["defer"] = "true" }
+        script(src = "/static/js/kotauth-auth.min.js") {
+            attributes["defer"] = "true"
+            JsIntegrity.auth?.let { attributes["integrity"] = it }
+            attributes["crossorigin"] = "anonymous"
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.2.0"
+version = "1.2.1"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -209,6 +209,43 @@ val compileCssPortalTabnav =
         outputs.file("src/main/resources/static/kotauth-portal-tabnav.css")
     }
 
+// ── JS compilation ────────────────────────────────────────────────────────
+// Uses the same installCssDeps task (npm ci) — esbuild is in the same package.json.
+
+val compileJs =
+    tasks.register<Exec>("compileJs") {
+        description = "Compiles and minifies JS bundles via esbuild"
+        group = "build"
+        dependsOn(installCssDeps)
+
+        commandLine("node", "frontend/scripts/build-js.js")
+
+        inputs.dir("frontend/js")
+        outputs.files(
+            "src/main/resources/static/js/kotauth-admin.min.js",
+            "src/main/resources/static/js/kotauth-auth.min.js",
+            "src/main/resources/static/js/kotauth-portal.min.js",
+            "src/main/resources/static/js/branding.min.js",
+        )
+    }
+
+val generateJsSri =
+    tasks.register<Exec>("generateJsSri") {
+        description = "Generates js-integrity.properties with SHA-256 SRI hashes for each JS bundle"
+        group = "build"
+        dependsOn(compileJs)
+
+        commandLine("node", "frontend/scripts/generate-sri.js")
+
+        inputs.files(
+            "src/main/resources/static/js/kotauth-admin.min.js",
+            "src/main/resources/static/js/kotauth-auth.min.js",
+            "src/main/resources/static/js/kotauth-portal.min.js",
+            "src/main/resources/static/js/branding.min.js",
+        )
+        outputs.file("src/main/resources/js-integrity.properties")
+    }
+
 // ── Version properties ────────────────────────────────────────────────────
 // Generates src/main/resources/version.properties so the running application
 // can report its own version without parsing build files at runtime.
@@ -241,6 +278,7 @@ tasks.named("processResources") {
         compileCssPortalSidenav,
         compileCssPortalTabnav,
         generateVersionProperties,
+        generateJsSri,
     )
 }
 

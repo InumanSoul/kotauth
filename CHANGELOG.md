@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.1] - 2026-03-27
+
+### Added
+
+- **`/authorize` endpoint** — industry-standard OAuth authorization URL. `GET /authorize` validates params and sets a server-side auth context cookie. `POST /authorize` processes credentials with the full security pipeline (lockout, MFA, rate limiting, password expiry). Replaces the old `/protocol/openid-connect/auth` (backward compat redirect preserved) and eliminates all hidden OAuth form fields
+- **Server-side auth context cookie** (`KOTAUTH_AUTH_CONTEXT`) — signed cookie scoped to `/t/{slug}` replaces hidden form fields for carrying OAuth state through the login flow. Fixes double-login in incognito mode and survives page refreshes
+- **JS bundling with esbuild** — source files in `frontend/js/`, compiled into 4 minified bundles: `kotauth-admin.min.js` (53KB), `kotauth-auth.min.js` (1.6KB), `kotauth-portal.min.js` (1KB), `branding.min.js` (3.3KB). SRI integrity hashes generated at build time via `js-integrity.properties`
+- **Password show/hide toggle** — eye icon on all 5 password fields across login, register, and reset-password forms. Server-rendered SVGs with CSS-based icon swap. New `auth.js` for auth page interactions
+- **Custom confirmation dialog** — `<dialog>` element replaces browser `confirm()` across admin console and portal. Themed via CSS custom properties, backdrop fade + card fade-in-up animation. No `window.confirm()` fallback
+- **Portal brand logo** — tenant-configured `logoUrl` displayed in portal topbar and sidebar, replacing initials when available
+- **Session revocation DB check** — portal and admin session guards now validate the backing DB session on every request. Revoking a session from the admin console immediately invalidates the user's cookie
+- **Swagger UI bundled locally** — CSS/JS assets served from `/static/swagger/`, no CDN dependency. Works in air-gapped environments. Branded dark topbar with accent authorize button
+
+### Security
+
+- **`POST /t/{slug}/login` removed** — no standalone credential endpoint exists. All authentication goes through `POST /authorize` which enforces the full security pipeline. The only direct-auth path is `POST /admin/login`, gated by `KAUTH_ADMIN_BYPASS`
+- **Rate limiting on `POST /authorize`** — login rate limiter enforced on the new authorize endpoint
+- **SRI integrity hashes** on all JS bundle `<script>` tags — prevents tampering with static assets
+- **CSP updated** — allows Google Fonts (`style-src`, `font-src`) and HTTPS tenant logos (`img-src https:`)
+
+### Changed
+
+- **OIDC discovery `authorization_endpoint`** now advertises `/t/{slug}/authorize`
+- **Portal + admin PKCE redirects** point to `/authorize`
+- **All "Sign in" links** in auth views and email templates point to `/t/{slug}/account/login` (portal login which starts a proper OAuth flow)
+- **Post-registration redirect** — OAuth-aware: if auth context cookie exists, returns to `/authorize?registered=true`; standalone → `/account/login`
+- **Email templates** — shared `buildEmailHtml()` layout with TenantTheme branding (accent button, logo, font, border radius). Responsive table-based layout with `max-width:480px` fluid fallback
+- **Sessions/audit tables** — user IDs resolved to clickable usernames, client IDs resolved to application names
+- **Audit log page size** reduced from 50 to 20 per page
+- **Confirmation dialogs** added to disable-user and revoke-all-sessions buttons
+- **Error in URL** fixed — send-reset-email failure uses `?saved=` flag instead of URL-encoded error message
+- **htmx: user search** — debounced `hx-get` with `hx-replace-url`, "N of M users" subtitle
+- **htmx: audit filter** — in-place table update with `hx-push-url`, pagination carries htmx attributes
+- **All `<script>` tags** now use `defer` for non-blocking page rendering
+- **Dockerfile** — stage 1 renamed `frontend-build`, includes JS compilation + SRI generation
+
+### Removed
+
+- **`LoginRoutes.kt`** — deleted entirely. No `/t/{slug}/login` route exists
+- **Hidden OAuth form fields** — ~70 lines of `<input type="hidden">` elements removed from login and MFA pages
+- **Individual JS source files** from `src/main/resources/static/js/` — replaced by compiled bundles
+
+---
+
 ## [1.2.0] - 2026-03-27
 
 ### Added
@@ -277,7 +321,8 @@ Initial stable release.
 
 ---
 
-[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/inumansoul/kotauth/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/inumansoul/kotauth/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/inumansoul/kotauth/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/inumansoul/kotauth/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/inumansoul/kotauth/compare/v1.1.3...v1.1.4

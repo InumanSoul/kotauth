@@ -282,7 +282,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
-                when (val result = adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
+                when (adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
                     is AdminResult.Failure ->

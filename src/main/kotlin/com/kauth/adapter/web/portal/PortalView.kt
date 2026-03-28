@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
@@ -937,7 +938,11 @@ object PortalView {
             PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
         }
         link(rel = "stylesheet", href = cssBundle)
-        script(src = "/static/js/confirm-dialog.js") { attributes["defer"] = "true" }
+        script(src = "/static/js/kotauth-portal.min.js") {
+            attributes["defer"] = "true"
+            JsIntegrity.portal?.let { attributes["integrity"] = it }
+            attributes["crossorigin"] = "anonymous"
+        }
     }
 
     // =========================================================================
