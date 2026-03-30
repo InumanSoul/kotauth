@@ -34,15 +34,10 @@ data class EnvironmentConfig(
             validateLegacySecret(env)
 
             val secretKey = System.getenv("KAUTH_SECRET_KEY")
-            if (secretKey.isNullOrBlank()) {
-                System.err.println(
-                    """
-                    [WARN] KAUTH_SECRET_KEY is not set.
-                           SMTP passwords cannot be stored and portal sessions are ephemeral.
-                           Set this env var to a random 32+ char string for production use.
-                    """.trimIndent(),
-                )
-            }
+            validateSecretKey(secretKey, env)
+
+            val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
+            validateAdminBypass(adminBypass)
 
             return EnvironmentConfig(
                 baseUrl = baseUrl,
@@ -60,7 +55,7 @@ data class EnvironmentConfig(
                         ?.lowercase() == "true",
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
-                adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true",
+                adminBypass = adminBypass,
             )
         }
 
@@ -131,6 +126,59 @@ data class EnvironmentConfig(
                         "[DEV]  KAUTH_BASE_URL is HTTP on localhost — acceptable for local development only.",
                     )
                 }
+            }
+        }
+
+        private fun validateSecretKey(
+            secretKey: String?,
+            env: String,
+        ) {
+            if (env == "production" && (secretKey.isNullOrBlank() || secretKey.length < 32)) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_SECRET_KEY must be set (32+ chars) in         │
+                    │  production mode.                                            │
+                    │                                                              │
+                    │  This key is used for:                                       │
+                    │    • AES-256-GCM encryption of secrets at rest               │
+                    │    • HMAC signing of portal session cookies                  │
+                    │    • Encrypting SMTP credentials in the database             │
+                    │                                                              │
+                    │  Generate one:  openssl rand -hex 32                         │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+            if (secretKey.isNullOrBlank()) {
+                System.err.println(
+                    """
+                    [WARN] KAUTH_SECRET_KEY is not set.
+                           SMTP passwords cannot be stored and portal sessions are ephemeral.
+                           Set this env var to a random 32+ char string for production use.
+                    """.trimIndent(),
+                )
+            }
+        }
+
+        private fun validateAdminBypass(adminBypass: Boolean) {
+            if (adminBypass) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_ADMIN_BYPASS is no longer supported.          │
+                    │                                                              │
+                    │  This flag has been removed because it disables MFA          │
+                    │  enforcement and creates untracked sessions that cannot      │
+                    │  be revoked.                                                 │
+                    │                                                              │
+                    │  For emergency admin recovery, use the CLI recovery tool:    │
+                    │    ./gradlew resetAdminMfa --username=<admin>                │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
             }
         }
 
