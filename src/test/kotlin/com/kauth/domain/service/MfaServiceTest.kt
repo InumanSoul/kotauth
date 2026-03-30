@@ -337,7 +337,7 @@ class MfaServiceTest {
         assertIs<MfaResult.Success<Unit>>(result)
 
         assertFalse(svc.shouldChallengeMfa(userId = UserId(10)), "MFA should not challenge after disable")
-        val updatedUser = users.findById(UserId(10))
+        val updatedUser = users.findById(UserId(10), TenantId(1))
         assertNotNull(updatedUser)
         assertFalse(updatedUser.mfaEnabled, "User.mfaEnabled should be false after disable")
         assertTrue(auditLog.hasEvent(AuditEventType.MFA_DISABLED))

@@ -16,6 +16,7 @@ import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -23,8 +24,10 @@ import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.statuspages.*
@@ -51,7 +54,13 @@ private val startupLog = LoggerFactory.getLogger("com.kauth.startup")
  *   4. Provision RSA keys for any tenant that lacks one
  *   5. Start Ktor server
  */
-fun main() {
+fun main(args: Array<String> = emptyArray()) {
+    if (args.firstOrNull() == "cli") {
+        com.kauth.cli.CliRunner
+            .run(args.drop(1))
+        return
+    }
+
     val startTime = System.currentTimeMillis()
     val appInfo = loadAppInfo()
     val config = EnvironmentConfig.load()
@@ -96,16 +105,11 @@ fun main() {
         },
     )
 
-    if (config.adminBypass) {
-        startupLog.warn("KAUTH_ADMIN_BYPASS=true — admin console using legacy password auth. MFA NOT enforced.")
-    }
-
     startupLog.info(
-        "KotAuth v{} started | env={} | baseUrl={} | encryption={} | jvm={}",
+        "KotAuth v{} started | env={} | baseUrl={} | jvm={}",
         appInfo.version,
         config.env,
         config.baseUrl,
-        services.encryptionService.isAvailable,
         System.getProperty("java.version"),
     )
 
@@ -142,6 +146,44 @@ fun Application.module(
                 HttpHeaders.StrictTransportSecurity,
                 "max-age=31536000; includeSubDomains",
             )
+        }
+    }
+
+    // -- Response compression -------------------------------------------------
+    install(Compression) {
+        gzip {
+            priority = 1.0
+            minimumSize(1024)
+        }
+        deflate {
+            priority = 0.9
+            minimumSize(1024)
+        }
+        excludeContentType(ContentType.Image.Any)
+    }
+
+    // -- Cache headers for static assets -------------------------------------
+    install(CachingHeaders) {
+        options { _, content ->
+            val contentType = content.contentType?.withoutParameters()
+            when {
+                // CSS and JS are cache-busted via ?v= query param per release
+                contentType == ContentType.Text.CSS ||
+                    contentType == ContentType.Application.JavaScript ->
+                    CachingOptions(
+                        cacheControl =
+                            CacheControl.MaxAge(
+                                maxAgeSeconds = 31536000,
+                                visibility = CacheControl.Visibility.Public,
+                            ),
+                    )
+                // HTML pages must always revalidate
+                contentType == ContentType.Text.Html ->
+                    CachingOptions(
+                        cacheControl = CacheControl.NoCache(null),
+                    )
+                else -> null
+            }
         }
     }
 
@@ -257,10 +299,9 @@ fun Application.module(
             appInfo,
             startTime,
             config.isDevelopment,
-            s.encryptionService.isAvailable,
         )
 
-        healthRoutes(config.baseUrl, s.encryptionService.isAvailable)
+        healthRoutes(config.baseUrl)
 
         authRoutes(
             authService = s.authService,
@@ -269,6 +310,7 @@ fun Application.module(
             loginRateLimiter = s.loginRateLimiter,
             registerRateLimiter = s.registerRateLimiter,
             tokenRateLimiter = s.tokenRateLimiter,
+            mfaRateLimiter = s.mfaRateLimiter,
             selfServiceService = s.selfServiceService,
             mfaService = s.mfaService,
             roleRepository = s.roleRepository,
@@ -302,7 +344,6 @@ fun Application.module(
         )
 
         adminRoutes(
-            authService = s.authService,
             adminService = s.adminService,
             roleGroupService = s.roleGroupService,
             appInfo = appInfo,
@@ -322,7 +363,6 @@ fun Application.module(
             selfServiceService = s.selfServiceService,
             roleRepository = s.roleRepository,
             baseUrl = config.baseUrl,
-            adminBypass = config.adminBypass,
         )
     }
 }

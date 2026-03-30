@@ -39,11 +39,11 @@ KAUTH_ENV=production
 ---
 
 ### `KAUTH_SECRET_KEY`
-**Recommended.**
+**Required.** The server refuses to start without it.
 
-A 32+ character hex string used for:
-- AES-256-GCM encryption of SMTP passwords stored in the database
-- HMAC-SHA256 signing of short-lived cookies (MFA pending, PKCE verifier, portal session)
+A 32+ character string used for:
+- AES-256-GCM encryption of secrets at rest (SMTP passwords, TOTP secrets, RSA private keys)
+- HMAC-SHA256 signing of session cookies and short-lived auth state cookies
 
 ```
 KAUTH_SECRET_KEY=<output of: openssl rand -hex 32>
@@ -53,11 +53,6 @@ Generate one:
 ```bash
 openssl rand -hex 32
 ```
-
-If not set:
-- SMTP configuration cannot be saved (passwords cannot be encrypted)
-- Session and cookie signatures use a random key generated at startup — sessions do not survive a container restart
-- A warning is printed at startup; the server still starts
 
 ---
 
@@ -160,21 +155,6 @@ Minimum number of idle connections maintained in the pool. Keeps a small number 
 
 ```
 DB_POOL_MIN_IDLE=2
-```
-
----
-
-## Admin Console
-
-### `KAUTH_ADMIN_BYPASS`
-**Optional.** Default: `false`
-
-Break-glass fallback: when set to `true`, the admin console accepts direct username/password login instead of the standard OAuth PKCE flow. Use only for recovery scenarios where the OAuth flow is misconfigured.
-
-**Warning:** Bypass mode skips MFA enforcement. A startup warning is logged when active.
-
-```
-KAUTH_ADMIN_BYPASS=false
 ```
 
 ---

@@ -91,8 +91,7 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
-                if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
                 val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
                 val wsPairs = call.attributes[WsPairsAttr]
                 val userRoles = roleGroupService.getRolesForUser(userId)
@@ -132,8 +131,7 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
-                if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
                 val userRoles = roleGroupService.getRolesForUser(userId)
                 val userGroups = roleGroupService.getGroupsForUser(userId)
                 call.respondText(
@@ -152,8 +150,7 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId) ?: return@get call.respond(HttpStatusCode.NotFound)
-                if (user.tenantId != workspace.id) return@get call.respond(HttpStatusCode.NotFound)
+                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
                 call.respondText(
                     AdminView.userProfileEditFragment(workspace, user),
                     ContentType.Text.Html,
@@ -181,8 +178,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val user =
-                    userRepository.findById(userId) ?: return@post call.respond(HttpStatusCode.NotFound)
-                if (user.tenantId != workspace.id) return@post call.respond(HttpStatusCode.NotFound)
+                    userRepository.findById(userId, workspace.id) ?: return@post call.respond(HttpStatusCode.NotFound)
                 adminService.setUserEnabled(userId, workspace.id, !user.enabled)
                 call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
             }
@@ -195,8 +191,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val user =
-                    userRepository.findById(userId) ?: return@post call.respond(HttpStatusCode.NotFound)
-                if (user.tenantId != workspace.id) return@post call.respond(HttpStatusCode.NotFound)
+                    userRepository.findById(userId, workspace.id) ?: return@post call.respond(HttpStatusCode.NotFound)
                 val params = call.receiveParameters()
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
@@ -204,7 +199,7 @@ fun Route.adminUserRoutes(
                 when (val result = adminService.updateUser(userId, workspace.id, email, fullName)) {
                     is AdminResult.Success -> {
                         if (isHtmx) {
-                            val updatedUser = userRepository.findById(userId) ?: user
+                            val updatedUser = userRepository.findById(userId, workspace.id) ?: user
                             val userRoles = roleGroupService.getRolesForUser(userId)
                             val userGroups = roleGroupService.getGroupsForUser(userId)
                             call.respondText(

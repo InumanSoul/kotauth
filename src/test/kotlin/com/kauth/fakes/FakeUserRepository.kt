@@ -25,7 +25,10 @@ class FakeUserRepository : UserRepository {
         nextId = 1
     }
 
-    override fun findById(id: UserId) = store[id.value]
+    override fun findById(
+        id: UserId,
+        tenantId: TenantId,
+    ) = store[id.value]?.takeIf { it.tenantId == tenantId }
 
     override fun findByUsername(
         tenantId: TenantId,

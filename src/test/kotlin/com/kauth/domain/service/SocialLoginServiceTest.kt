@@ -419,7 +419,7 @@ class SocialLoginServiceTest {
         assertNotNull(result.value.tokens.access_token)
         val newSocialAccount = socialAccounts.all().find { it.providerUserId == "new-uid-999" }
         assertNotNull(newSocialAccount, "Social account link should be created")
-        assertEquals("brandnew", users.findById(newSocialAccount.userId)?.username)
+        assertEquals("brandnew", users.findById(newSocialAccount.userId, TenantId(1))?.username)
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_SUCCESS))
         assertEquals(1, sessions.all().size)
     }

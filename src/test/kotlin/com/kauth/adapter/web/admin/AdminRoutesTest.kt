@@ -10,7 +10,6 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
@@ -28,7 +27,6 @@ import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
-import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -95,16 +93,6 @@ class AdminRoutesTest {
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
 
-    private fun buildAuthService() =
-        AuthService(
-            userRepository = userRepo,
-            tenantRepository = tenantRepo,
-            tokenPort = tokenPort,
-            passwordHasher = hasher,
-            auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
-        )
-
     private fun buildSelfService() =
         UserSelfServiceService(
             userRepository = userRepo,
@@ -149,7 +137,7 @@ class AdminRoutesTest {
         tokenPort.reset()
         tenantRepo.add(masterTenant)
         userRepo.add(adminUser)
-        // Seed admin role and assign to admin user (required for bypass login role check)
+        // Seed admin role and assign to admin user (required for OAuth callback role check)
         val adminRole =
             roleRepo.add(
                 com.kauth.domain.model.Role(
@@ -168,7 +156,7 @@ class AdminRoutesTest {
     @Test
     fun `GET admin redirects to login when no session cookie is present`() =
         testApplication {
-            application { installTestApp() }
+            application { installOAuthTestApp() }
 
             val noFollow = createClient { followRedirects = false }
             val response = noFollow.get("/admin")
@@ -181,7 +169,7 @@ class AdminRoutesTest {
     @Test
     fun `GET admin workspaces redirects to login when unauthenticated`() =
         testApplication {
-            application { installTestApp() }
+            application { installOAuthTestApp() }
 
             val noFollow = createClient { followRedirects = false }
             val response = noFollow.get("/admin/workspaces")
@@ -191,97 +179,13 @@ class AdminRoutesTest {
         }
 
     // =========================================================================
-    // GET /admin/login
-    // =========================================================================
-
-    @Test
-    fun `GET admin login returns 200 with login form`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response = client.get("/admin/login")
-
-            assertEquals(HttpStatusCode.OK, response.status)
-            val body = response.bodyAsText()
-            assertTrue(body.contains("login") || body.contains("Login") || body.contains("form"))
-        }
-
-    // =========================================================================
-    // POST /admin/login
-    // =========================================================================
-
-    @Test
-    fun `POST admin login with valid credentials sets session and redirects`() =
-        testApplication {
-            application { installTestApp() }
-
-            val noFollow = createClient { followRedirects = false }
-            val response =
-                noFollow.submitForm(
-                    url = "/admin/login",
-                    formParameters =
-                        Parameters.build {
-                            append("username", "admin")
-                            append("password", "admin-pass")
-                        },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers["Location"] ?: ""
-            assertTrue(location.endsWith("/admin") || location.contains("/admin"), "Must redirect to /admin")
-            // Session cookie must be set
-            val cookies = response.headers.getAll("Set-Cookie")
-            assertTrue(
-                cookies?.any { it.contains("KOTAUTH_ADMIN") } == true,
-                "KOTAUTH_ADMIN session cookie must be set on successful login",
-            )
-        }
-
-    @Test
-    fun `POST admin login with invalid credentials returns 401`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.submitForm(
-                    url = "/admin/login",
-                    formParameters =
-                        Parameters.build {
-                            append("username", "admin")
-                            append("password", "wrong-password")
-                        },
-                )
-
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
-            assertTrue(response.bodyAsText().contains("Invalid credentials"))
-        }
-
-    @Test
-    fun `POST admin login with blank username returns 401`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.submitForm(
-                    url = "/admin/login",
-                    formParameters =
-                        Parameters.build {
-                            append("username", "")
-                            append("password", "admin-pass")
-                        },
-                )
-
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
-        }
-
-    // =========================================================================
     // POST /admin/logout
     // =========================================================================
 
     @Test
-    fun `POST admin logout redirects to login`() =
+    fun `POST admin logout without session redirects to login`() =
         testApplication {
-            application { installTestApp() }
+            application { installOAuthTestApp() }
 
             val noFollow = createClient { followRedirects = false }
             val response =
@@ -291,160 +195,21 @@ class AdminRoutesTest {
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            assertTrue(response.headers["Location"]?.contains("/admin/login") == true)
-        }
-
-    // =========================================================================
-    // POST /admin/login — bypass mode extras
-    // =========================================================================
-
-    @Test
-    fun `POST admin login in bypass mode sets AdminSession with userId and username from authenticated user`() =
-        testApplication {
-            application { installTestApp() }
-
-            val authed = createClient { install(HttpCookies) }
-            authed.submitForm(
-                url = "/admin/login",
-                formParameters =
-                    Parameters.build {
-                        append("username", "admin")
-                        append("password", "admin-pass")
-                    },
-            )
-
-            // Confirm subsequent protected request succeeds (session was established with correct identity)
-            val response = authed.get("/admin/workspaces")
-            assertEquals(
-                HttpStatusCode.OK,
-                response.status,
-                "Authenticated client must be able to access protected routes after bypass login",
-            )
-            val body = response.bodyAsText()
-            assertTrue(
-                body.contains("admin"),
-                "Response body must contain the username that was used to log in",
-            )
-        }
-
-    // =========================================================================
-    // POST /admin/logout — OIDC end-session redirect (authenticated session)
-    // =========================================================================
-
-    @Test
-    fun `POST admin logout with valid session redirects to OIDC end-session endpoint`() =
-        testApplication {
-            application { installTestApp() }
-
-            // Establish an authenticated session via bypass login, then logout with it
-            val authed =
-                createClient {
-                    install(HttpCookies)
-                    followRedirects = false
-                }
-            authed.submitForm(
-                url = "/admin/login",
-                formParameters =
-                    Parameters.build {
-                        append("username", "admin")
-                        append("password", "admin-pass")
-                    },
-            )
-
-            val response =
-                authed.submitForm(
-                    url = "/admin/logout",
-                    formParameters = Parameters.build { },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
             val location = response.headers["Location"] ?: ""
             assertTrue(
-                location.contains("/t/master/protocol/openid-connect/logout"),
-                "Logout must redirect to OIDC end-session endpoint, got: $location",
-            )
-        }
-
-    @Test
-    fun `POST admin logout with valid session includes post_logout_redirect_uri in OIDC redirect`() =
-        testApplication {
-            application { installTestApp() }
-
-            val authed =
-                createClient {
-                    install(HttpCookies)
-                    followRedirects = false
-                }
-            authed.submitForm(
-                url = "/admin/login",
-                formParameters =
-                    Parameters.build {
-                        append("username", "admin")
-                        append("password", "admin-pass")
-                    },
-            )
-
-            val response =
-                authed.submitForm(
-                    url = "/admin/logout",
-                    formParameters = Parameters.build { },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers["Location"] ?: ""
-            assertTrue(
-                location.contains("post_logout_redirect_uri"),
-                "Logout redirect must carry post_logout_redirect_uri param, got: $location",
-            )
-        }
-
-    @Test
-    fun `POST admin logout with valid session clears KOTAUTH_ADMIN cookie`() =
-        testApplication {
-            application { installTestApp() }
-
-            val authed =
-                createClient {
-                    install(HttpCookies)
-                    followRedirects = false
-                }
-            authed.submitForm(
-                url = "/admin/login",
-                formParameters =
-                    Parameters.build {
-                        append("username", "admin")
-                        append("password", "admin-pass")
-                    },
-            )
-
-            val response =
-                authed.submitForm(
-                    url = "/admin/logout",
-                    formParameters = Parameters.build { },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
-            // After logout, the KOTAUTH_ADMIN session cookie must be cleared
-            val setCookies = response.headers.getAll("Set-Cookie") ?: emptyList()
-            val adminCookieCleared =
-                setCookies.any { header ->
-                    header.contains("KOTAUTH_ADMIN") &&
-                        (header.contains("Max-Age=0") || header.contains("KOTAUTH_ADMIN=;"))
-                }
-            assertTrue(
-                adminCookieCleared || setCookies.isEmpty(),
-                "KOTAUTH_ADMIN session cookie must be cleared on logout, Set-Cookie headers: $setCookies",
+                location.contains("/admin/login"),
+                "Unauthenticated logout must redirect to login, got: $location",
             )
         }
 
     // =========================================================================
-    // Session guard — callback bypass
+    // Session guard — callback is accessible without session
     // =========================================================================
 
     @Test
     fun `GET admin callback is reachable without an active session`() =
         testApplication {
-            application { installTestApp() }
+            application { installOAuthTestApp() }
 
             val noFollow = createClient { followRedirects = false }
             // No PKCE cookie → expect an error page (BadRequest), NOT a redirect to /admin/login.
@@ -459,11 +224,11 @@ class AdminRoutesTest {
         }
 
     // =========================================================================
-    // OAuth flow — GET /admin/login with adminBypass = false
+    // OAuth flow — GET /admin/login
     // =========================================================================
 
     @Test
-    fun `GET admin login redirects to OAuth authorization endpoint when bypass is disabled`() =
+    fun `GET admin login redirects to OAuth authorization endpoint`() =
         testApplication {
             application { installOAuthTestApp() }
 
@@ -513,7 +278,7 @@ class AdminRoutesTest {
         }
 
     @Test
-    fun `GET admin login sets signed PKCE state cookie when bypass is disabled`() =
+    fun `GET admin login sets signed PKCE state cookie`() =
         testApplication {
             application { installOAuthTestApp() }
 
@@ -549,32 +314,6 @@ class AdminRoutesTest {
                     ?.get(1)
                     ?.toIntOrNull()
             assertTrue(maxAge != null && maxAge <= 300, "PKCE cookie Max-Age must be ≤ 300s, got: $maxAge")
-        }
-
-    // =========================================================================
-    // OAuth flow — POST /admin/login returns 404 when bypass is disabled
-    // =========================================================================
-
-    @Test
-    fun `POST admin login returns 404 when bypass is disabled`() =
-        testApplication {
-            application { installOAuthTestApp() }
-
-            val response =
-                client.submitForm(
-                    url = "/admin/login",
-                    formParameters =
-                        Parameters.build {
-                            append("username", "admin")
-                            append("password", "admin-pass")
-                        },
-                )
-
-            assertEquals(
-                HttpStatusCode.NotFound,
-                response.status,
-                "POST /admin/login must not exist when adminBypass=false",
-            )
         }
 
     // =========================================================================
@@ -853,34 +592,8 @@ class AdminRoutesTest {
     // Test app wiring
     // =========================================================================
 
-    private fun io.ktor.server.application.Application.installTestApp() {
-        install(ContentNegotiation) { json() }
-        install(Sessions) {
-            cookie<AdminSession>("KOTAUTH_ADMIN") {
-                transform(SessionTransportTransformerMessageAuthentication(ByteArray(32)))
-            }
-        }
-        routing {
-            adminRoutes(
-                authService = buildAuthService(),
-                adminService = buildAdminService(),
-                roleGroupService = buildRoleGroupService(),
-                appInfo = AppInfo(),
-                tenantRepository = tenantRepo,
-                applicationRepository = appRepo,
-                userRepository = userRepo,
-                sessionRepository = sessionRepo,
-                auditLogRepository = auditLogRepo,
-                keyProvisioningService = keyProvisioningService,
-                encryptionService = encryptionService,
-                roleRepository = roleRepo,
-                adminBypass = true,
-            )
-        }
-    }
-
     /**
-     * OAuth mode test app — adminBypass=false, oauthService=null.
+     * Test app with oauthService=null.
      * Used to verify all PKCE redirect logic and callback guard rails without
      * a real token exchange (null oauthService exercises the failure branch).
      */
@@ -893,7 +606,6 @@ class AdminRoutesTest {
         }
         routing {
             adminRoutes(
-                authService = buildAuthService(),
                 adminService = buildAdminService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
@@ -905,13 +617,12 @@ class AdminRoutesTest {
                 keyProvisioningService = keyProvisioningService,
                 encryptionService = encryptionService,
                 oauthService = null,
-                adminBypass = false,
             )
         }
     }
 
     /**
-     * OAuth mode test app with a mockk OAuthService stub.
+     * Test app with a mockk OAuthService stub.
      *
      * The stub returns an [OAuthResult.Success] whose access_token equals whatever
      * code was passed in — this lets the test craft a fake JWT as the "code" so that
@@ -921,7 +632,7 @@ class AdminRoutesTest {
      * tenant so the role-check branch succeeds. When false the role check fails → 403.
      */
     private fun io.ktor.server.application.Application.installOAuthTestAppWithOAuth(adminRole: Boolean) {
-        roleRepo.clear() // Reset roles — @BeforeTest seeds the admin role for bypass tests
+        roleRepo.clear()
         if (adminRole) {
             val role =
                 roleRepo.add(
@@ -967,7 +678,6 @@ class AdminRoutesTest {
         }
         routing {
             adminRoutes(
-                authService = buildAuthService(),
                 adminService = buildAdminService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
@@ -981,7 +691,6 @@ class AdminRoutesTest {
                 oauthService = oauthSvcMock,
                 selfServiceService = buildSelfService(),
                 roleRepository = roleRepo,
-                adminBypass = false,
             )
         }
     }

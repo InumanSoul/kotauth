@@ -261,7 +261,7 @@ fun Route.adminRbacRoutes(
                     groups.find { it.id == groupId } ?: return@get call.respond(HttpStatusCode.NotFound)
                 val roles = roleGroupService.listRoles(workspace.id)
                 val memberIds = roleGroupService.getUserIdsInGroup(groupId)
-                val members = memberIds.mapNotNull { userRepository.findById(it) }
+                val members = memberIds.mapNotNull { userRepository.findById(it, workspace.id) }
                 val users = userRepository.findByTenantId(workspace.id, null)
                 call.respondHtml(
                     HttpStatusCode.OK,

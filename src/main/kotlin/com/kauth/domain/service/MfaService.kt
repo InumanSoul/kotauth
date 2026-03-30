@@ -67,7 +67,7 @@ class MfaService(
         userAgent: String? = null,
     ): MfaResult<EnrollmentResponse> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return MfaResult.Failure(MfaError.UserNotFound)
         val tenant =
             tenantRepository.findById(tenantId)
@@ -169,7 +169,7 @@ class MfaService(
             )
 
         // Update user's mfaEnabled flag
-        val user = userRepository.findById(userId)
+        val user = userRepository.findById(userId, enrollment.tenantId)
         if (user != null) {
             userRepository.update(user.copy(mfaEnabled = true))
         }
@@ -302,7 +302,7 @@ class MfaService(
         mfaRepository.deleteEnrollmentsByUser(userId)
         mfaRepository.deleteRecoveryCodesByUser(userId)
 
-        val user = userRepository.findById(userId)
+        val user = userRepository.findById(userId, tenantId)
         if (user != null) {
             userRepository.update(user.copy(mfaEnabled = false))
         }

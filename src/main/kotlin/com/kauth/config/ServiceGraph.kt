@@ -52,6 +52,7 @@ import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import kotlinx.coroutines.CoroutineScope
@@ -90,6 +91,7 @@ data class ServiceGraph(
     val loginRateLimiter: RateLimiterPort,
     val registerRateLimiter: RateLimiterPort,
     val tokenRateLimiter: RateLimiterPort,
+    val mfaRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val applicationScope: CoroutineScope,
@@ -103,7 +105,7 @@ data class ServiceGraph(
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
-            val tenantKeyRepository = PostgresTenantKeyRepository()
+            val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
             val sessionRepository = PostgresSessionRepository()
             val authCodeRepository = PostgresAuthorizationCodeRepository()
             val auditLogRepository = PostgresAuditLogRepository()
@@ -127,6 +129,7 @@ data class ServiceGraph(
             val keyProvisioning =
                 KeyProvisioningService(tenantRepository, tenantKeyRepository)
             keyProvisioning.provisionMissingKeys()
+            KeyEncryptionMigration(encryptionService).migrateIfNeeded()
 
             val portalClientProvisioning =
                 PortalClientProvisioning(
@@ -286,41 +289,22 @@ data class ServiceGraph(
                     maxRequests = 20,
                     windowSeconds = 60,
                 )
+            val mfaLimiter =
+                InMemoryRateLimiter(
+                    maxRequests = 5,
+                    windowSeconds = 300,
+                )
 
-            // -- Portal session key -------------------------------------------
+            // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
-                run {
-                    val secret = config.secretKey
-                    if (!secret.isNullOrBlank()) {
-                        java.security.MessageDigest
-                            .getInstance("SHA-256")
-                            .digest(
-                                "portal-session:$secret"
-                                    .toByteArray(Charsets.UTF_8),
-                            )
-                    } else {
-                        ByteArray(32).also {
-                            java.security.SecureRandom().nextBytes(it)
-                        }
-                    }
-                }
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest("portal-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
             val adminSessionKey: ByteArray =
-                run {
-                    val secret = config.secretKey
-                    if (!secret.isNullOrBlank()) {
-                        java.security.MessageDigest
-                            .getInstance("SHA-256")
-                            .digest(
-                                "admin-session:$secret"
-                                    .toByteArray(Charsets.UTF_8),
-                            )
-                    } else {
-                        ByteArray(32).also {
-                            java.security.SecureRandom().nextBytes(it)
-                        }
-                    }
-                }
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest("admin-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
             return ServiceGraph(
                 authService = authService,
@@ -350,6 +334,7 @@ data class ServiceGraph(
                 loginRateLimiter = loginLimiter,
                 registerRateLimiter = registerLimiter,
                 tokenRateLimiter = tokenLimiter,
+                mfaRateLimiter = mfaLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 applicationScope = applicationScope,

@@ -69,10 +69,25 @@ internal fun Route.selfServiceRoutes(
         val slug = ctx.slug
         val theme = ctx.theme
         val workspaceName = ctx.workspaceName
+        val ipAddress = call.request.local.remoteAddress
         val params = call.receiveParameters()
         val token = params["token"] ?: ""
         val newPassword = params["new_password"] ?: ""
         val confirmPassword = params["confirm_password"] ?: ""
+
+        val rateLimitKey = "reset:$ipAddress:$slug"
+        if (!registerRateLimiter.isAllowed(rateLimitKey)) {
+            return@post call.respondHtml(
+                HttpStatusCode.TooManyRequests,
+                AuthView.resetPasswordPage(
+                    slug,
+                    theme,
+                    workspaceName,
+                    token = token,
+                    error = "Too many attempts. Please wait a few minutes and try again.",
+                ),
+            )
+        }
 
         when (val result = selfServiceService.confirmPasswordReset(token, newPassword, confirmPassword)) {
             is SelfServiceResult.Success ->

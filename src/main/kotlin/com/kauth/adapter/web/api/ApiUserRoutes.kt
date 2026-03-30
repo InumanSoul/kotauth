@@ -70,19 +70,12 @@ internal fun Route.apiUserRoutes(
                             "userId must be an integer.",
                         )
                 val user =
-                    userRepository.findById(userId)
+                    userRepository.findById(userId, tenantId)
                         ?: return@get call.respondProblem(
                             HttpStatusCode.NotFound,
                             "User not found",
                             "No user with id $userId in this workspace.",
                         )
-                if (user.tenantId != tenantId) {
-                    return@get call.respondProblem(
-                        HttpStatusCode.NotFound,
-                        "User not found",
-                        "No user with id $userId in this workspace.",
-                    )
-                }
                 call.respond(HttpStatusCode.OK, user.toApiDto())
             }
 

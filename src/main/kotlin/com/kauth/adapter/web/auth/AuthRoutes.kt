@@ -11,6 +11,7 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCallPipeline
 import io.ktor.server.application.call
@@ -25,6 +26,7 @@ fun Route.authRoutes(
     loginRateLimiter: RateLimiterPort,
     registerRateLimiter: RateLimiterPort,
     tokenRateLimiter: RateLimiterPort,
+    mfaRateLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300),
     selfServiceService: UserSelfServiceService,
     mfaService: MfaService? = null,
     roleRepository: RoleRepository? = null,
@@ -68,6 +70,7 @@ fun Route.authRoutes(
             oauthService = oauthService,
             mfaService = mfaService,
             encryptionService = encryptionService,
+            mfaRateLimiter = mfaRateLimiter,
         )
 
         socialLoginRoutes(

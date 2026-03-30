@@ -31,7 +31,7 @@ class HealthRoutesTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
-                routing { healthRoutes(baseUrl = "http://localhost:8080", encryptionAvailable = true) }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
             }
 
             val response = client.get("/health")
@@ -46,7 +46,7 @@ class HealthRoutesTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
-                routing { healthRoutes(baseUrl = "http://localhost:8080", encryptionAvailable = true) }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
             }
 
             val body = client.get("/health").bodyAsText()
@@ -65,7 +65,7 @@ class HealthRoutesTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
-                routing { healthRoutes(baseUrl = "http://localhost:8080", encryptionAvailable = true) }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
             }
 
             val response = client.get("/health/ready")
@@ -84,7 +84,7 @@ class HealthRoutesTest {
         testApplication {
             application {
                 install(ContentNegotiation) { json() }
-                routing { healthRoutes(baseUrl = "http://localhost:8080", encryptionAvailable = true) }
+                routing { healthRoutes(baseUrl = "http://localhost:8080") }
             }
 
             val body = client.get("/health/ready").bodyAsText()
@@ -100,7 +100,7 @@ class HealthRoutesTest {
 
     @Test
     fun `checkConfig reports warning for non-HTTPS non-localhost base URL`() {
-        val result = checkConfig("http://production.example.com", secretKeyPresent = true)
+        val result = checkConfig("http://production.example.com")
 
         assertEquals("warn", result.status)
         assertTrue(result.warnings.any { it.contains("HTTPS") })
@@ -109,7 +109,7 @@ class HealthRoutesTest {
 
     @Test
     fun `checkConfig returns ok for localhost even without HTTPS`() {
-        val result = checkConfig("http://localhost:8080", secretKeyPresent = true)
+        val result = checkConfig("http://localhost:8080")
 
         // Localhost is exempted from the HTTPS warning
         assertTrue(
@@ -120,7 +120,7 @@ class HealthRoutesTest {
 
     @Test
     fun `checkConfig returns ok for HTTPS base URL`() {
-        val result = checkConfig("https://auth.example.com", secretKeyPresent = true)
+        val result = checkConfig("https://auth.example.com")
 
         assertEquals(true, result.httpsEnforced)
         assertTrue(

@@ -200,7 +200,7 @@ class SocialLoginService(
         // between the callback and this completion call.
         val existingLink = socialAccountRepository.findByProviderIdentity(tenant.id, provider, providerUserId)
         if (existingLink != null) {
-            userRepository.findById(existingLink.userId)?.let { user ->
+            userRepository.findById(existingLink.userId, tenant.id)?.let { user ->
                 return issueTokens(user, tenant, provider, isNewUser = false, ipAddress, userAgent)
             }
         }
@@ -279,7 +279,7 @@ class SocialLoginService(
                 providerUserId = profile.providerUserId,
             )
         if (existing != null) {
-            return userRepository.findById(existing.userId)
+            return userRepository.findById(existing.userId, tenantId)
         }
 
         val email = profile.email?.trim()?.lowercase() ?: return null

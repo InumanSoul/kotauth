@@ -10,7 +10,10 @@ import java.time.Instant
  * All queries are scoped by [tenantId] — there are no cross-tenant lookups.
  */
 interface UserRepository {
-    fun findById(id: UserId): User?
+    fun findById(
+        id: UserId,
+        tenantId: TenantId,
+    ): User?
 
     fun findByUsername(
         tenantId: TenantId,

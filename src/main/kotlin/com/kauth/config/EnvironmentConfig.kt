@@ -2,6 +2,26 @@ package com.kauth.config
 
 import kotlin.system.exitProcess
 
+/** Database connection config — loadable independently for CLI commands that don't need the full server config. */
+data class DbConfig(
+    val dbUrl: String,
+    val dbUser: String,
+    val dbPassword: String,
+    val dbPoolMaxSize: Int = 10,
+    val dbPoolMinIdle: Int = 2,
+) {
+    companion object {
+        fun load(): DbConfig =
+            DbConfig(
+                dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
+                dbUser = System.getenv("DB_USER") ?: "postgres",
+                dbPassword = System.getenv("DB_PASSWORD") ?: "password",
+                dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
+                dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
+            )
+    }
+}
+
 /**
  * All environment-derived configuration, validated at startup.
  *
@@ -13,16 +33,19 @@ data class EnvironmentConfig(
     val baseUrl: String,
     val env: String,
     val isDevelopment: Boolean,
-    val secretKey: String?,
+    val secretKey: String,
     val dbUrl: String,
     val dbUser: String,
     val dbPassword: String,
     val isDemoMode: Boolean,
     val dbPoolMaxSize: Int,
     val dbPoolMinIdle: Int,
-    val adminBypass: Boolean,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
+
+    /** Database connection config — usable by CLI commands without full server config. */
+    val dbConfig: DbConfig
+        get() = DbConfig(dbUrl, dbUser, dbPassword, dbPoolMaxSize, dbPoolMinIdle)
 
     companion object {
         fun load(): EnvironmentConfig {
@@ -33,22 +56,16 @@ data class EnvironmentConfig(
             validateHttps(baseUrl, env)
             validateLegacySecret(env)
 
-            val secretKey = System.getenv("KAUTH_SECRET_KEY")
-            if (secretKey.isNullOrBlank()) {
-                System.err.println(
-                    """
-                    [WARN] KAUTH_SECRET_KEY is not set.
-                           SMTP passwords cannot be stored and portal sessions are ephemeral.
-                           Set this env var to a random 32+ char string for production use.
-                    """.trimIndent(),
-                )
-            }
+            val secretKey = requireSecretKey(System.getenv("KAUTH_SECRET_KEY"))
+
+            val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
+            validateAdminBypass(adminBypass)
 
             return EnvironmentConfig(
                 baseUrl = baseUrl,
                 env = env,
                 isDevelopment = isDevelopment,
-                secretKey = secretKey?.ifBlank { null },
+                secretKey = secretKey,
                 dbUrl =
                     System.getenv("DB_URL")
                         ?: "jdbc:postgresql://localhost:5432/kauth_db",
@@ -60,7 +77,6 @@ data class EnvironmentConfig(
                         ?.lowercase() == "true",
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
-                adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true",
             )
         }
 
@@ -131,6 +147,48 @@ data class EnvironmentConfig(
                         "[DEV]  KAUTH_BASE_URL is HTTP on localhost — acceptable for local development only.",
                     )
                 }
+            }
+        }
+
+        private fun requireSecretKey(secretKey: String?): String {
+            if (secretKey.isNullOrBlank() || secretKey.length < 32) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_SECRET_KEY must be set (32+ chars).           │
+                    │                                                              │
+                    │  This key is used for:                                       │
+                    │    • AES-256-GCM encryption of secrets at rest               │
+                    │    • HMAC signing of session cookies                         │
+                    │    • Encrypting SMTP credentials and TOTP secrets            │
+                    │    • Encrypting RSA private keys in the database             │
+                    │                                                              │
+                    │  Generate one:  openssl rand -hex 32                         │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+            return secretKey
+        }
+
+        private fun validateAdminBypass(adminBypass: Boolean) {
+            if (adminBypass) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_ADMIN_BYPASS is no longer supported.          │
+                    │                                                              │
+                    │  This flag has been removed because it disables MFA          │
+                    │  enforcement and creates untracked sessions that cannot      │
+                    │  be revoked.                                                 │
+                    │                                                              │
+                    │  For emergency admin recovery, use the CLI recovery tool:    │
+                    │    java -jar kauth.jar cli reset-admin-mfa --username=admin  │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
             }
         }
 

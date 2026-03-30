@@ -10,7 +10,6 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
@@ -39,16 +38,21 @@ import com.microsoft.playwright.Playwright
 import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.respondRedirect
 import io.ktor.server.response.respondText
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.sessions
+import io.ktor.server.sessions.set
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.AfterEach
@@ -100,16 +104,6 @@ abstract class E2ETestBase {
                 fullName = "Admin User",
                 passwordHash = hasher.hash("admin-pass"),
                 enabled = true,
-            )
-
-        private fun buildAuthService() =
-            AuthService(
-                userRepository = userRepo,
-                tenantRepository = tenantRepo,
-                tokenPort = tokenPort,
-                passwordHasher = hasher,
-                auditLog = auditLogPort,
-                sessionRepository = sessionRepo,
             )
 
         private fun buildSelfService() =
@@ -186,8 +180,18 @@ abstract class E2ETestBase {
                         }
                     }
                     routing {
+                        // Test-only route to inject an admin session for E2E tests
+                        post("/test-admin-login") {
+                            call.sessions.set(
+                                AdminSession(
+                                    userId = 1,
+                                    tenantId = 1,
+                                    username = "admin",
+                                ),
+                            )
+                            call.respondRedirect("/admin")
+                        }
                         adminRoutes(
-                            authService = buildAuthService(),
                             adminService = buildAdminService(),
                             roleGroupService = buildRoleGroupService(),
                             appInfo = AppInfo(),
@@ -201,7 +205,6 @@ abstract class E2ETestBase {
                             webhookService = buildWebhookService(),
                             encryptionService = encryptionService,
                             roleRepository = roleRepo,
-                            adminBypass = true,
                         )
                     }
                 }
@@ -266,7 +269,7 @@ abstract class E2ETestBase {
 
         tenantRepo.add(masterTenant)
         userRepo.add(adminUser)
-        // Seed admin role + assignment for bypass login role check
+        // Seed admin role + assignment for OAuth callback role check
         val adminRole =
             roleRepo.add(
                 com.kauth.domain.model.Role(
@@ -301,10 +304,11 @@ abstract class E2ETestBase {
     }
 
     protected fun loginAsAdmin() {
-        navigateSafe("$baseUrl/admin/login")
-        page.fill("input[name=username]", "admin")
-        page.fill("input[name=password]", "admin-pass")
-        page.click("button[type=submit]")
+        // POST to the test-only login route to inject an admin session cookie
+        val apiContext = context.request()
+        apiContext.post("$baseUrl/test-admin-login")
+        // Navigate to admin — the session cookie is now set in the browser context
+        navigateSafe("$baseUrl/admin")
         waitForUrlPattern("**/admin/**")
     }
 }

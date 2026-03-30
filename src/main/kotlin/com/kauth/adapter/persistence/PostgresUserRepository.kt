@@ -17,11 +17,14 @@ import java.time.ZoneOffset
  * allows cross-tenant access — the constraint is structural, not convention.
  */
 class PostgresUserRepository : UserRepository {
-    override fun findById(id: UserId): User? =
+    override fun findById(
+        id: UserId,
+        tenantId: TenantId,
+    ): User? =
         transaction {
             UsersTable
                 .selectAll()
-                .where { UsersTable.id eq id.value }
+                .where { (UsersTable.id eq id.value) and (UsersTable.tenantId eq tenantId.value) }
                 .map { it.toUser() }
                 .singleOrNull()
         }

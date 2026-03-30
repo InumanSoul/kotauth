@@ -14,7 +14,6 @@ import kotlin.test.assertTrue
  */
 class EncryptionServiceTest {
     private val service = EncryptionService("test-secret-key-for-unit-tests")
-    private val serviceNoKey = EncryptionService(null)
 
     // -------------------------------------------------------------------------
     // Cookie signing
@@ -77,18 +76,11 @@ class EncryptionServiceTest {
 
     @Test
     fun `encrypt and decrypt round-trip returns original plaintext`() {
-        assertTrue(service.isAvailable, "Service with key must report isAvailable=true")
-
         val plaintext = "smtp-password-super-secret"
         val encrypted = service.encrypt(plaintext)
         val decrypted = service.decrypt(encrypted)
 
         assertEquals(plaintext, decrypted, "decrypt must recover the original plaintext")
-    }
-
-    @Test
-    fun `isAvailable is false when no key provided`() {
-        assertEquals(false, serviceNoKey.isAvailable)
     }
 
     @Test

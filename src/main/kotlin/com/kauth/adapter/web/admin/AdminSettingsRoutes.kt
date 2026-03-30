@@ -199,20 +199,6 @@ fun Route.adminSettingsRoutes(
                 "Identity provider repository not configured",
             )
 
-        if (!encryptionService.isAvailable && newSecret != null) {
-            val providers = idpRepo.findAllByTenant(workspace.id)
-            return@post call.respondHtml(
-                HttpStatusCode.UnprocessableEntity,
-                AdminView.identityProvidersPage(
-                    workspace = workspace,
-                    providers = providers,
-                    allWorkspaces = wsPairs,
-                    loggedInAs = session.username,
-                    error = "KAUTH_SECRET_KEY must be set to store provider credentials securely.",
-                ),
-            )
-        }
-
         val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
         if (existing == null) {
             if (newSecret.isNullOrBlank()) {
