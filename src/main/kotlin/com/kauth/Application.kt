@@ -54,7 +54,13 @@ private val startupLog = LoggerFactory.getLogger("com.kauth.startup")
  *   4. Provision RSA keys for any tenant that lacks one
  *   5. Start Ktor server
  */
-fun main() {
+fun main(args: Array<String> = emptyArray()) {
+    if (args.firstOrNull() == "cli") {
+        com.kauth.cli.CliRunner
+            .run(args.drop(1))
+        return
+    }
+
     val startTime = System.currentTimeMillis()
     val appInfo = loadAppInfo()
     val config = EnvironmentConfig.load()

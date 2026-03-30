@@ -5,6 +5,7 @@ import com.kauth.adapter.persistence.TenantsTable
 import com.kauth.adapter.persistence.UserRolesTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.adapter.token.BcryptPasswordHasher
+import com.kauth.config.DbConfig
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.flywaydb.core.Flyway
@@ -27,6 +28,12 @@ import org.jetbrains.exposed.sql.transactions.transaction
  * Flyway owns the schema from here on.
  */
 object DatabaseFactory {
+    /** CLI-only: connect to the database without running Flyway migrations or seeding. */
+    fun connectOnly(config: DbConfig) {
+        val dataSource = createDataSource(config.dbUrl, config.dbUser, config.dbPassword, 2, 1)
+        Database.connect(dataSource)
+    }
+
     fun init(
         url: String,
         user: String,

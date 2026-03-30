@@ -2,6 +2,26 @@ package com.kauth.config
 
 import kotlin.system.exitProcess
 
+/** Database connection config — loadable independently for CLI commands that don't need the full server config. */
+data class DbConfig(
+    val dbUrl: String,
+    val dbUser: String,
+    val dbPassword: String,
+    val dbPoolMaxSize: Int = 10,
+    val dbPoolMinIdle: Int = 2,
+) {
+    companion object {
+        fun load(): DbConfig =
+            DbConfig(
+                dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
+                dbUser = System.getenv("DB_USER") ?: "postgres",
+                dbPassword = System.getenv("DB_PASSWORD") ?: "password",
+                dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
+                dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
+            )
+    }
+}
+
 /**
  * All environment-derived configuration, validated at startup.
  *
@@ -22,6 +42,10 @@ data class EnvironmentConfig(
     val dbPoolMinIdle: Int,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
+
+    /** Database connection config — usable by CLI commands without full server config. */
+    val dbConfig: DbConfig
+        get() = DbConfig(dbUrl, dbUser, dbPassword, dbPoolMaxSize, dbPoolMinIdle)
 
     companion object {
         fun load(): EnvironmentConfig {
@@ -160,7 +184,7 @@ data class EnvironmentConfig(
                     │  be revoked.                                                 │
                     │                                                              │
                     │  For emergency admin recovery, use the CLI recovery tool:    │
-                    │    ./gradlew resetAdminMfa --username=<admin>                │
+                    │    java -jar kauth.jar cli reset-admin-mfa --username=admin  │
                     └──────────────────────────────────────────────────────────────┘
                     """.trimIndent(),
                 )
