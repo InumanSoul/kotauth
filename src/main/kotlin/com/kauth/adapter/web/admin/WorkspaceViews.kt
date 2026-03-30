@@ -309,7 +309,7 @@ internal fun createWorkspacePageImpl(
                     div("page-header__identity") {
                         h1("page-header__title") { +"Create Workspace" }
                         p("page-header__sub") {
-                            +"A workspace is an isolated authorization boundary — like an Auth0 tenant."
+                            +"A workspace is an isolated authorization boundary."
                         }
                     }
                 }
