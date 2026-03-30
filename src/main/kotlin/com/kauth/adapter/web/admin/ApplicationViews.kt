@@ -206,17 +206,16 @@ internal fun createApplicationPageImpl(
     prefill: ApplicationPrefill = ApplicationPrefill(),
 ): HTML.() -> Unit =
     {
-        val appPairs = emptyList<Pair<String, String>>() // no apps yet when creating
         adminShell(
             pageTitle = "New Application — ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
-            apps = appPairs,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            showSidebar = false,
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",

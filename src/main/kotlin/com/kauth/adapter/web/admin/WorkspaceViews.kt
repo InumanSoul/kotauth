@@ -374,34 +374,30 @@ internal fun createWorkspacePageImpl(
             // ── Registration Policy card ───────────────────────────
             div("ov-card") {
                 div("ov-card__section-label") { +"Registration Policy" }
-                div("check-row") {
+                label("check-row") {
                     input(type = InputType.checkBox, name = "registrationEnabled") {
                         attributes["form"] = "create-workspace-form"
-                        this.id = "registrationEnabled"
                         if (prefill.registrationEnabled) checked = true
                         attributes["value"] = "true"
                     }
-                    label {
-                        htmlFor = "registrationEnabled"
-                        +"Allow public registration"
-                    }
-                    div("check-row__hint") {
-                        +"Anyone can create an account via the hosted login page."
+                    div("check-row__body") {
+                        span("check-row__label") { +"Allow public registration" }
+                        span("check-row__desc") {
+                            +"Anyone can create an account via the hosted login page."
+                        }
                     }
                 }
-                div("check-row") {
+                label("check-row") {
                     input(type = InputType.checkBox, name = "emailVerificationRequired") {
                         attributes["form"] = "create-workspace-form"
-                        this.id = "emailVerificationRequired"
                         if (prefill.emailVerificationRequired) checked = true
                         attributes["value"] = "true"
                     }
-                    label {
-                        htmlFor = "emailVerificationRequired"
-                        +"Require email verification"
-                    }
-                    div("check-row__hint") {
-                        +"Users must confirm their email address before they can sign in."
+                    div("check-row__body") {
+                        span("check-row__label") { +"Require email verification" }
+                        span("check-row__desc") {
+                            +"Users must confirm their email address before they can sign in."
+                        }
                     }
                 }
             }
