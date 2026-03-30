@@ -218,7 +218,7 @@ class OAuthService(
         }
 
         val user =
-            userRepository.findById(authCode.userId)
+            userRepository.findById(authCode.userId, authCode.tenantId)
                 ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User not found"))
 
         if (!user.enabled) {
@@ -395,7 +395,7 @@ class OAuthService(
         }
 
         val user =
-            userRepository.findById(session.userId)
+            userRepository.findById(session.userId, session.tenantId)
                 ?: return OAuthResult.Failure(OAuthError.InvalidGrant("User no longer exists"))
 
         if (!user.enabled) {
@@ -562,7 +562,7 @@ class OAuthService(
         val session = sessionRepository.findActiveByAccessTokenHash(hash) ?: return null
         val userId = session.userId ?: return null // No userinfo for M2M tokens
 
-        val user = userRepository.findById(userId) ?: return null
+        val user = userRepository.findById(userId, session.tenantId) ?: return null
         if (!user.enabled) return null
 
         return UserInfoResult(

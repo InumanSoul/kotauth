@@ -344,7 +344,7 @@ class AdminServiceTest {
     fun `setUserEnabled - disables user`() {
         val result = svc.setUserEnabled(userId = UserId(10), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
-        assertEquals(false, users.findById(UserId(10))!!.enabled)
+        assertEquals(false, users.findById(UserId(10), TenantId(1))!!.enabled)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_DISABLED))
     }
 

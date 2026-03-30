@@ -320,7 +320,7 @@ class UserSelfServiceServiceTest {
         val result = svc.confirmEmailVerification("raw-token")
         assertIs<SelfServiceResult.Success<Unit>>(result)
         assertTrue(
-            users.findById(UserId(10))!!.emailVerified,
+            users.findById(UserId(10), TenantId(1))!!.emailVerified,
             "User should be marked as email-verified",
         )
         assertNotNull(evTokenRepo.all().first().usedAt, "Token should be marked as used")
@@ -525,7 +525,7 @@ class UserSelfServiceServiceTest {
         assertIs<SelfServiceResult.Success<Unit>>(result)
         assertEquals(
             "hashed:new-secure-password",
-            users.findById(UserId(10))!!.passwordHash,
+            users.findById(UserId(10), TenantId(1))!!.passwordHash,
         )
         assertTrue(
             sessions.findActiveByUser(TenantId(1), UserId(10)).isEmpty(),
@@ -579,7 +579,9 @@ class UserSelfServiceServiceTest {
                 fullName = "X",
             )
         assertIs<SelfServiceResult.Failure>(result)
-        assertIs<SelfServiceError.Unauthorized>(result.error)
+        // findById now enforces tenant scope at the DB level, so a cross-tenant request
+        // returns NotFound rather than Unauthorized — same security outcome, no info leakage.
+        assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
@@ -713,7 +715,9 @@ class UserSelfServiceServiceTest {
                 confirmPassword = "new-pass-123",
             )
         assertIs<SelfServiceResult.Failure>(result)
-        assertIs<SelfServiceError.Unauthorized>(result.error)
+        // findById now enforces tenant scope at the DB level, so a cross-tenant request
+        // returns NotFound rather than Unauthorized — same security outcome, no info leakage.
+        assertIs<SelfServiceError.NotFound>(result.error)
     }
 
     @Test
@@ -833,7 +837,7 @@ class UserSelfServiceServiceTest {
         assertIs<SelfServiceResult.Success<Unit>>(result)
         assertEquals(
             "hashed:brand-new-pass",
-            users.findById(UserId(10))!!.passwordHash,
+            users.findById(UserId(10), TenantId(1))!!.passwordHash,
         )
         assertTrue(
             sessions.findActiveByUser(TenantId(1), UserId(10)).isEmpty(),

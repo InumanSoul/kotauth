@@ -308,12 +308,9 @@ class AdminService(
         fullName: String,
     ): AdminResult<User> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
 
-        if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
-        }
         if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
@@ -350,12 +347,8 @@ class AdminService(
         enabled: Boolean,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
-
-        if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
-        }
 
         userRepository.update(user.copy(enabled = enabled))
 
@@ -580,11 +573,8 @@ class AdminService(
             tenantRepository.findById(tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
-        if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found in this workspace."))
-        }
         if (!tenant.isSmtpReady) {
             return AdminResult.Failure(
                 AdminError.Validation(
@@ -644,11 +634,8 @@ class AdminService(
         tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
-        if (user.tenantId != tenantId) {
-            return AdminResult.Failure(AdminError.NotFound("User not found."))
-        }
         userRepository.resetFailedLogins(userId)
         auditLog.record(
             AuditEvent(

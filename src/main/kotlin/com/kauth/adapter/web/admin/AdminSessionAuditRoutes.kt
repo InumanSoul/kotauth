@@ -36,7 +36,7 @@ fun Route.adminSessionAuditRoutes(
         val sessionUserIds = sessions.mapNotNull { it.userId }.distinct()
         val sessionUserMap =
             sessionUserIds.associateWith { uid ->
-                userRepository.findById(uid)?.username ?: uid.value.toString()
+                userRepository.findById(uid, workspace.id)?.username ?: uid.value.toString()
             }
         val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
         val sessionClientMap: Map<ApplicationId, String> =
@@ -93,7 +93,7 @@ fun Route.adminSessionAuditRoutes(
         val auditUserIds = events.mapNotNull { it.userId }.distinct()
         val auditUserMap =
             auditUserIds.associateWith { uid ->
-                userRepository.findById(uid)?.username ?: uid.value.toString()
+                userRepository.findById(uid, workspace.id)?.username ?: uid.value.toString()
             }
         val auditClientIds = events.mapNotNull { it.clientId }.distinct()
         val auditClientMap: Map<ApplicationId, String> =

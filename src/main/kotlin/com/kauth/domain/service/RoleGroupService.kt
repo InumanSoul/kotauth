@@ -268,12 +268,12 @@ class RoleGroupService(
         tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         val role =
             roleRepository.findById(roleId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Role not found."))
-        if (user.tenantId != tenantId || role.tenantId != tenantId) {
+        if (role.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.Validation("User and role must belong to the same workspace."))
         }
 
@@ -300,12 +300,12 @@ class RoleGroupService(
         tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         val role =
             roleRepository.findById(roleId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Role not found."))
-        if (user.tenantId != tenantId || role.tenantId != tenantId) {
+        if (role.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.Validation("User and role must belong to the same workspace."))
         }
 
@@ -522,12 +522,12 @@ class RoleGroupService(
         tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         val group =
             groupRepository.findById(groupId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Group not found."))
-        if (user.tenantId != tenantId || group.tenantId != tenantId) {
+        if (group.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.Validation("User and group must belong to the same workspace."))
         }
 
@@ -554,12 +554,12 @@ class RoleGroupService(
         tenantId: TenantId,
     ): AdminResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         val group =
             groupRepository.findById(groupId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Group not found."))
-        if (user.tenantId != tenantId || group.tenantId != tenantId) {
+        if (group.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.Validation("User and group must belong to the same workspace."))
         }
 

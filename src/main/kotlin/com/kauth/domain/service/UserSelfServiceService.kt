@@ -80,7 +80,7 @@ class UserSelfServiceService(
             tenantRepository.findById(tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("Workspace not found."))
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
 
         if (!tenant.isSmtpReady) {
@@ -157,7 +157,7 @@ class UserSelfServiceService(
         }
 
         val user =
-            userRepository.findById(token.userId)
+            userRepository.findById(token.userId, token.tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
 
         userRepository.update(user.copy(emailVerified = true))
@@ -317,7 +317,7 @@ class UserSelfServiceService(
         prTokenRepo.markUsed(token.id!!, now)
 
         if (tenant != null && tenant.isSmtpReady) {
-            val resetUser = userRepository.findById(token.userId)
+            val resetUser = userRepository.findById(token.userId, token.tenantId)
             if (resetUser != null) {
                 emailScope.launch {
                     try {
@@ -367,11 +367,8 @@ class UserSelfServiceService(
         tenantId: TenantId,
     ): SelfServiceResult<User> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-        if (user.tenantId != tenantId) {
-            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
-        }
         return SelfServiceResult.Success(user)
     }
 
@@ -382,12 +379,9 @@ class UserSelfServiceService(
         fullName: String,
     ): SelfServiceResult<User> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
 
-        if (user.tenantId != tenantId) {
-            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
-        }
         if (email.isBlank() || !email.contains('@')) {
             return SelfServiceResult.Failure(SelfServiceError.Validation("A valid email address is required."))
         }
@@ -440,12 +434,9 @@ class UserSelfServiceService(
             tenantRepository.findById(tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("Workspace not found."))
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
 
-        if (user.tenantId != tenantId) {
-            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
-        }
         if (!passwordHasher.verify(currentPassword, user.passwordHash)) {
             return SelfServiceResult.Failure(SelfServiceError.Validation("Current password is incorrect."))
         }
@@ -656,11 +647,8 @@ class UserSelfServiceService(
         tenantId: TenantId,
     ): SelfServiceResult<Unit> {
         val user =
-            userRepository.findById(userId)
+            userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-        if (user.tenantId != tenantId) {
-            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Access denied."))
-        }
 
         userRepository.update(user.copy(enabled = false))
         sessionRepository.revokeAllForUser(tenantId, userId)
