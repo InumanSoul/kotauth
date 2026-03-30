@@ -369,8 +369,6 @@ fun Route.adminRoutes(
                         issuerUrl = issuerUrl ?: "",
                         registrationEnabled = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
-                        themeAccentColor = params["themeAccentColor"]?.trim() ?: "#1FBCFF",
-                        themeLogoUrl = params["themeLogoUrl"]?.trim() ?: "",
                     )
                 val error =
                     when {

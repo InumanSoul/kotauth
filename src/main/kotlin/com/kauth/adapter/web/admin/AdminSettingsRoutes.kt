@@ -220,7 +220,7 @@ fun Route.adminSettingsRoutes(
                     provider = provider,
                     clientId = newClientId,
                     clientSecret = newSecret,
-                    enabled = false,
+                    enabled = enabled,
                 ),
             )
         } else {
