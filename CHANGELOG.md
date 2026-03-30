@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.0] - 2026-03-30
+
+### Security
+
+- **`KAUTH_SECRET_KEY` required in all environments** — the server refuses to start without a 32+ character key. Eliminates the previous dev-mode fallback that stored TOTP secrets in plaintext and silently discarded SMTP passwords
+- **RSA private keys encrypted at rest** — tenant JWT signing keys are now AES-256-GCM encrypted in the database. Existing plaintext keys are automatically encrypted on first startup via `KeyEncryptionMigration`
+- **`KAUTH_ADMIN_BYPASS` removed** — the direct-credential admin login path has been fully deleted (route handler, tests, docs). Admin authentication is exclusively via OAuth PKCE. For emergency recovery, use `java -jar kauth.jar cli reset-admin-mfa --username=admin`
+- **MFA challenge rate limiting** — `POST /t/{slug}/mfa-challenge` is now limited to 5 attempts per 5 minutes per IP. Prevents brute-forcing of 6-digit TOTP codes within the MFA pending window
+- **Password reset rate limiting** — `POST /t/{slug}/reset-password` is limited to 3 attempts per 5 minutes per IP. Prevents repeated password attempts against a leaked reset token
+- **`findById` tenant scoping** — `UserRepository.findById(userId)` now requires `tenantId`, enforced at the database query level. Cross-tenant user lookups are structurally impossible. 33 call sites updated, redundant post-call tenant checks removed
+- **Client secret removed from URL** — regenerated client secrets are no longer passed via `?newSecret=` query parameter (visible in logs, browser history, referrer headers). Uses a server-side `FlashStore` with one-time read semantics
+- **FK indexes** — V29 migration adds 12 missing foreign key indexes across `sessions`, `authorization_codes`, `audit_log`, `composite_role_mappings`, `group_roles`, and 5 tenant-scoped tables. Prevents sequential scans on `DELETE CASCADE` operations
+
+### Added
+
+- **CLI infrastructure** — the JAR now supports subcommands: `java -jar kauth.jar cli <command>`. Dispatched in `Application.kt`, no CLI framework dependency
+- **`generate-secret-key` command** — generates a cryptographically secure 32-byte hex key for `KAUTH_SECRET_KEY`. Pure crypto, no database connection required
+- **`reset-admin-mfa` command** — resets MFA enrollment for a locked-out admin on the master tenant. Connects to the database without running Flyway migrations
+- **HTTP response compression** — gzip (priority 1.0) and deflate (priority 0.9) with 1024-byte minimum. Images excluded
+- **Static asset cache headers** — CSS and JS get `Cache-Control: public, max-age=31536000` with `?v=` version query param for cache busting. HTML gets `Cache-Control: no-cache`
+- **Global htmx loading indicator** — thin accent-colored progress bar at the top of every admin page during htmx requests
+- **Rate limiting documentation** — `docs/RATE_LIMITING.md` covering all protected endpoints, architecture, memory management, and planned additions
+- **`AdminDisplayHelpers`** — shared display utility for resolving user IDs and client IDs to human-readable names across admin views
+- **Makefile targets** — `make generate-key` and `make reset-mfa USER=admin` convenience wrappers
+
+### Changed
+
+- **`EncryptionService` is always available** — constructor takes non-nullable `String`. The `isAvailable` property and all branching on it have been removed from `EncryptionPort`, `PostgresMfaRepository`, `PostgresTenantRepository`, `AdminSettingsRoutes`, `ServiceGraph`, `Application.kt`, and health/welcome routes
+- **`AdminService` expanded** — new methods: `getUser`, `listUsers`, `toggleUserEnabled`, `createWorkspace`. Route handlers no longer call `UserRepository` directly
+- **ADR-04 compliance** — `AdminUserRoutes`, `AdminSessionAuditRoutes`, and `ApiUserRoutes` no longer receive `UserRepository` as a parameter. All user operations go through `AdminService`
+- **Workspace creation validation** — slug format, reserved names, uniqueness, and display name checks moved from the route handler into `AdminService.createWorkspace()` with sealed `AdminResult` return
+- **`resolveEffectiveRoles` performance** — replaced N+1 ancestor group traversal with a single recursive CTE query. For 3 groups × 5 levels deep, reduces from ~15 DB roundtrips to 1
+- **Rate limiter hardened** — `InMemoryRateLimiter` now tracks `lastAccess` for LRU eviction, configurable `maxKeys` cap (default 10,000), two-phase eviction (prune expired, then LRU). Dead `hitCount` field removed
+- **IdP form toggle** — enabling a new identity provider now respects the toggle value on first save (was hardcoded to `false`)
+- **Workspace creation form** — removed branding card (accent color + logo URL were silently discarded). Added `(optional)` to Issuer URL label. Registration policy checkboxes now use `check-row__body` pattern with descriptions
+- **Audit log** — breadcrumb uses standard component with `›` separators. Filter bar inside htmx swap target so Clear button updates correctly. `activeAppSection` fixed from `"events"` to `"audit"`
+- **Error alerts** — 3 legacy `alert alert-error` instances in `UserViews` replaced with `notice notice--error`
+- **RBAC tables** — `key-table` class replaced with `data-table` across all RBAC detail views
+- **MFA tables** — bespoke `mfa-user-*` classes replaced with `data-table__*` for consistency
+- **Rail navigation** — workspace-dependent nav items render as disabled ghosts when no workspace is selected
+- **Topbar search** — wired to navigate to user list with `?q=` when a workspace is selected. Disabled with tooltip when no workspace is selected
+- **Application detail** — client secret display uses `copy-field` pattern with copy button (was plain text in a notice)
+- **Session revoke** — per-row confirmation dialog added on user detail page
+- **Webhook deliveries** — removed redundant `.take(50)` in view (already limited at query level)
+- **Workspace detail** — removed duplicate "New Application" CTA from section label
+- **Create application** — sidebar hidden (was rendering empty)
+- **Roles/Groups headers** — `span` → `p` for subtitle element
+
+### Removed
+
+- **`KAUTH_ADMIN_BYPASS`** environment variable and all supporting code
+- **`EncryptionPort.isAvailable`** property — encryption is always available
+- **`isAvailable` branching** in `PostgresMfaRepository`, `PostgresTenantRepository`, `AdminSettingsRoutes`, `ServiceGraph` session key derivation
+- **Direct `UserRepository` access** from `AdminUserRoutes`, `AdminSessionAuditRoutes`, `ApiUserRoutes`, `ApiRoutes`
+
+---
+
 ## [1.2.1] - 2026-03-27
 
 ### Added
