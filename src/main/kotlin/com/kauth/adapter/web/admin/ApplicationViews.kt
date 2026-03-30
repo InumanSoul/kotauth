@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.Tenant
@@ -87,10 +88,18 @@ internal fun applicationDetailPageImpl(
 
             // ── New secret banner (shown once after regeneration) ────
             if (newSecret != null) {
-                notice(
-                    title = "New Client Secret (copy now — shown once)",
-                    description = newSecret,
-                )
+                div("notice notice--success") {
+                    p { +"New Client Secret — copy it now. You will not see it again." }
+                    div("copy-field") {
+                        span("copy-field__value") { +newSecret }
+                        button(type = ButtonType.button) {
+                            classes = setOf("copy-field__btn")
+                            attributes["data-copy"] = newSecret
+                            title = "Copy"
+                            inlineSvgIcon("copy", "Copy")
+                        }
+                    }
+                }
             }
 
             // ── Overview ────────────────────────────────────────────

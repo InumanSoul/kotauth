@@ -146,8 +146,23 @@ internal fun HTML.adminShell(
                 }
 
                 div("topbar-search-wrap") {
-                    input(type = InputType.search, classes = "topbar-search") {
-                        placeholder = "Search apps, users, roles…"
+                    if (workspaceSlug != null) {
+                        form(
+                            action = "/admin/workspaces/$workspaceSlug/users",
+                            method = FormMethod.get,
+                            classes = "topbar-search-form",
+                        ) {
+                            input(type = InputType.search, name = "q", classes = "topbar-search") {
+                                placeholder = "Search users…"
+                                attributes["autocomplete"] = "off"
+                            }
+                        }
+                    } else {
+                        input(type = InputType.search, classes = "topbar-search") {
+                            placeholder = "Search users…"
+                            disabled = true
+                            attributes["title"] = "Select a workspace first"
+                        }
                     }
                 }
 
