@@ -1,9 +1,13 @@
 package com.kauth.adapter.web.admin
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Unit tests for [FlashStore].
@@ -62,5 +66,39 @@ class FlashStoreTest {
         // Clean up so these entries do not bleed into other tests
         FlashStore.take(token1)
         FlashStore.take(token2)
+    }
+
+    // =========================================================================
+    // Concurrency
+    // =========================================================================
+
+    @Test
+    fun `concurrent put and take operations do not lose data`() {
+        val concurrency = 100
+        val recovered = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+        runBlocking(Dispatchers.Default) {
+            val tokens =
+                (1..concurrency).map { i ->
+                    FlashStore.put("value-$i")
+                }
+
+            tokens.forEach { token ->
+                launch {
+                    val value = FlashStore.take(token)
+                    if (value != null) recovered[token] = value
+                }
+            }
+        }
+
+        assertEquals(
+            concurrency,
+            recovered.size,
+            "Every value stored with put must be recoverable by exactly one take — no entries lost under concurrency",
+        )
+        assertTrue(
+            recovered.values.all { it.startsWith("value-") },
+            "All recovered values must match the originals",
+        )
     }
 }
