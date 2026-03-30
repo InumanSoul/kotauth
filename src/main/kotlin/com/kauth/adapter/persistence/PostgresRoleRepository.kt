@@ -9,6 +9,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RoleRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -223,18 +224,19 @@ class PostgresRoleRepository : RoleRepository {
                     .map { it[UserRolesTable.roleId] }
                     .toMutableSet()
 
-            // Step 2: roles from group membership (including ancestor groups)
+            // Step 2: roles from group membership (including ancestor groups via CTE)
             val userGroupIds =
                 UserGroupsTable
                     .selectAll()
                     .where { UserGroupsTable.userId eq userId.value }
                     .map { it[UserGroupsTable.groupId] }
 
-            val allGroupIds = mutableSetOf<Int>()
-            for (gid in userGroupIds) {
-                allGroupIds.add(gid)
-                allGroupIds.addAll(findAncestorGroupIdsInternal(gid))
-            }
+            val allGroupIds =
+                if (userGroupIds.isEmpty()) {
+                    emptySet()
+                } else {
+                    findAllAncestorGroupIds(userGroupIds)
+                }
 
             if (allGroupIds.isNotEmpty()) {
                 val groupRoleIds =
@@ -282,28 +284,29 @@ class PostgresRoleRepository : RoleRepository {
     }
 
     /**
-     * Walks up the group hierarchy to find all ancestor group IDs.
+     * Resolves all ancestor group IDs (including the seeds) in a single recursive CTE.
+     * Replaces the N+1 loop that issued one query per ancestor level.
      */
-    private fun findAncestorGroupIdsInternal(groupId: Int): List<Int> {
-        val ancestors = mutableListOf<Int>()
-        val visited = mutableSetOf(groupId)
-        var currentId: Int? =
-            GroupsTable
-                .selectAll()
-                .where { GroupsTable.id eq groupId }
-                .firstOrNull()
-                ?.get(GroupsTable.parentGroupId)
+    private fun findAllAncestorGroupIds(seedGroupIds: List<Int>): Set<Int> {
+        val ids = seedGroupIds.joinToString(",")
+        val sql =
+            """
+            WITH RECURSIVE ancestors AS (
+                SELECT id, parent_group_id FROM groups WHERE id IN ($ids)
+                UNION
+                SELECT g.id, g.parent_group_id FROM groups g
+                JOIN ancestors a ON g.id = a.parent_group_id
+            )
+            SELECT DISTINCT id FROM ancestors
+            """.trimIndent()
 
-        while (currentId != null && visited.add(currentId)) {
-            ancestors.add(currentId)
-            currentId =
-                GroupsTable
-                    .selectAll()
-                    .where { GroupsTable.id eq currentId!! }
-                    .firstOrNull()
-                    ?.get(GroupsTable.parentGroupId)
+        val result = mutableSetOf<Int>()
+        TransactionManager.current().exec(sql) { rs ->
+            while (rs.next()) {
+                result.add(rs.getInt("id"))
+            }
         }
-        return ancestors
+        return result
     }
 
     // -------------------------------------------------------------------------

@@ -549,6 +549,163 @@ class AdminServiceTest {
     }
 
     // =========================================================================
+    // createWorkspace
+    // =========================================================================
+
+    @Test
+    fun `createWorkspace - returns Validation failure when slug is blank`() {
+        val result = svc.createWorkspace(slug = "  ", displayName = "New Corp", issuerUrl = null)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createWorkspace - returns Validation failure when slug has uppercase or special chars`() {
+        val result = svc.createWorkspace(slug = "New_Corp!", displayName = "New Corp", issuerUrl = null)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createWorkspace - returns Validation failure when slug is master`() {
+        val result = svc.createWorkspace(slug = "master", displayName = "Master", issuerUrl = null)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createWorkspace - returns Validation failure when displayName is blank`() {
+        val result = svc.createWorkspace(slug = "new-corp", displayName = "  ", issuerUrl = null)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createWorkspace - returns Validation failure when slug already exists`() {
+        // "acme" was seeded in @BeforeTest
+        val result = svc.createWorkspace(slug = "acme", displayName = "Acme Duplicate", issuerUrl = null)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createWorkspace - returns Success with created tenant on valid input`() {
+        val result = svc.createWorkspace(slug = "beta-corp", displayName = "Beta Corp", issuerUrl = null)
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertEquals("beta-corp", result.value.slug)
+        assertEquals("Beta Corp", result.value.displayName)
+    }
+
+    @Test
+    fun `createWorkspace - emits ADMIN_TENANT_CREATED audit event`() {
+        svc.createWorkspace(slug = "gamma-corp", displayName = "Gamma Corp", issuerUrl = null)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_TENANT_CREATED))
+    }
+
+    // =========================================================================
+    // getUser
+    // =========================================================================
+
+    @Test
+    fun `getUser - returns Success when user exists in tenant`() {
+        val result = svc.getUser(userId = UserId(10), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice", result.value.username)
+    }
+
+    @Test
+    fun `getUser - returns NotFound when user does not exist`() {
+        val result = svc.getUser(userId = UserId(999), tenantId = TenantId(1))
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `getUser - returns NotFound when user exists in different tenant`() {
+        // Alice belongs to TenantId(1); querying from TenantId(2) must not expose her data.
+        val result = svc.getUser(userId = UserId(10), tenantId = TenantId(2))
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    // =========================================================================
+    // toggleUserEnabled
+    // =========================================================================
+
+    @Test
+    fun `toggleUserEnabled - disables an enabled user`() {
+        // Alice starts enabled = true
+        val result = svc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(false, users.findById(UserId(10), TenantId(1))!!.enabled)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_DISABLED))
+    }
+
+    @Test
+    fun `toggleUserEnabled - enables a disabled user`() {
+        // Disable alice first so the toggle has something to flip
+        users.update(alice.copy(enabled = false))
+        val result = svc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(true, users.findById(UserId(10), TenantId(1))!!.enabled)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_ENABLED))
+    }
+
+    @Test
+    fun `toggleUserEnabled - returns NotFound for non-existent user`() {
+        val result = svc.toggleUserEnabled(userId = UserId(999), tenantId = TenantId(1))
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    // =========================================================================
+    // listUsers
+    // =========================================================================
+
+    @Test
+    fun `listUsers - returns users for the requested tenant only`() {
+        // Add a user in a different tenant — must not appear in tenant 1's list
+        users.add(
+            User(
+                id = UserId(20),
+                tenantId = TenantId(2),
+                username = "bob",
+                email = "bob@other.com",
+                fullName = "Bob Other",
+                passwordHash = hasher.hash("pass"),
+                enabled = true,
+            ),
+        )
+        val result = svc.listUsers(tenantId = TenantId(1))
+        assertEquals(1, result.size)
+        assertEquals("alice", result.first().username)
+    }
+
+    @Test
+    fun `listUsers - filters by search term`() {
+        users.add(
+            User(
+                id = UserId(21),
+                tenantId = TenantId(1),
+                username = "charlie",
+                email = "charlie@example.com",
+                fullName = "Charlie Brown",
+                passwordHash = hasher.hash("pass"),
+                enabled = true,
+            ),
+        )
+        val result = svc.listUsers(tenantId = TenantId(1), search = "charlie")
+        assertEquals(1, result.size)
+        assertEquals("charlie", result.first().username)
+    }
+
+    @Test
+    fun `listUsers - returns empty list for tenant with no users`() {
+        val result = svc.listUsers(tenantId = TenantId(99))
+        assertTrue(result.isEmpty())
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 

@@ -94,7 +94,7 @@ fun Route.adminApplicationRoutes(
                         ?: return@get call.respond(HttpStatusCode.NotFound)
                 val wsPairs = call.attributes[WsPairsAttr]
                 val allApps = applicationRepository.findByTenantId(workspace.id)
-                val newSecret = call.request.queryParameters["newSecret"]
+                val newSecret = FlashStore.take(call.request.queryParameters["flash"])
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.applicationDetailPage(
@@ -195,9 +195,9 @@ fun Route.adminApplicationRoutes(
                         ?: return@post call.respond(HttpStatusCode.NotFound)
                 when (val result = adminService.regenerateClientSecret(app.id, workspace.id)) {
                     is AdminResult.Success -> {
-                        val encoded = java.net.URLEncoder.encode(result.value, "UTF-8")
+                        val flashToken = FlashStore.put(result.value)
                         call.respondRedirect(
-                            "/admin/workspaces/$slug/applications/$clientId?newSecret=$encoded",
+                            "/admin/workspaces/$slug/applications/$clientId?flash=$flashToken",
                         )
                     }
                     is AdminResult.Failure ->

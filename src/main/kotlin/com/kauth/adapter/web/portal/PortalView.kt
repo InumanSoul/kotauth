@@ -979,11 +979,11 @@ object PortalView {
                     }
                 }
                 div("confirm-dialog__actions") {
-                    button(classes = "btn btn--ghost btn--sm") {
+                    button(classes = "btn btn--ghost") {
                         id = "confirm-dialog-cancel"
                         +"Cancel"
                     }
-                    button(classes = "btn btn--danger btn--sm") {
+                    button(classes = "btn btn--danger") {
                         id = "confirm-dialog-ok"
                         +"Confirm"
                     }

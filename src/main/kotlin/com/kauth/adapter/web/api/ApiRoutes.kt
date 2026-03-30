@@ -6,7 +6,6 @@ import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
-import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
@@ -26,7 +25,6 @@ import io.ktor.server.routing.route
 fun Route.apiRoutes(
     apiKeyService: ApiKeyService,
     tenantRepository: TenantRepository,
-    userRepository: UserRepository,
     roleRepository: RoleRepository,
     groupRepository: GroupRepository,
     applicationRepository: ApplicationRepository,
@@ -91,7 +89,7 @@ fun Route.apiRoutes(
                 proceed()
             }
 
-            apiUserRoutes(userRepository, adminService, roleGroupService)
+            apiUserRoutes(adminService, roleGroupService)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiApplicationRoutes(applicationRepository, adminService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)

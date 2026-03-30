@@ -16,6 +16,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.OAuthResult
@@ -370,47 +371,40 @@ fun Route.adminRoutes(
                         registrationEnabled = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
                     )
-                val error =
-                    when {
-                        slug.isBlank() -> "Slug is required."
-                        !slug.matches(
-                            Regex("[a-z0-9-]+"),
-                        ) -> "Slug may only contain lowercase letters, numbers, and hyphens."
-                        slug == Tenant.MASTER_SLUG -> "The slug 'master' is reserved."
-                        displayName.isBlank() -> "Display name is required."
-                        tenantRepository.existsBySlug(slug) -> "A workspace with slug '$slug' already exists."
-                        else -> null
+                when (val result = adminService.createWorkspace(slug, displayName, issuerUrl)) {
+                    is AdminResult.Failure -> {
+                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                        return@post call.respondHtml(
+                            HttpStatusCode.UnprocessableEntity,
+                            AdminView.createWorkspacePage(
+                                loggedInAs = session.username,
+                                allWorkspaces = wsPairs,
+                                error = result.error.message,
+                                prefill = prefill,
+                            ),
+                        )
                     }
-                if (error != null) {
-                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
-                    return@post call.respondHtml(
-                        HttpStatusCode.UnprocessableEntity,
-                        AdminView.createWorkspacePage(
-                            loggedInAs = session.username,
-                            allWorkspaces = wsPairs,
-                            error = error,
-                            prefill = prefill,
-                        ),
-                    )
+                    is AdminResult.Success -> {
+                        val newTenant = result.value
+                        keyProvisioningService.provisionForTenant(newTenant)
+                        portalClientProvisioning?.provisionRedirectUris()
+                        roleGroupService.createRole(
+                            newTenant.id,
+                            "admin",
+                            "Full administrative access within this workspace",
+                            RoleScope.TENANT,
+                            null,
+                        )
+                        roleGroupService.createRole(
+                            newTenant.id,
+                            "user",
+                            "Standard authenticated user — default role for self-registrations",
+                            RoleScope.TENANT,
+                            null,
+                        )
+                        call.respondRedirect("/admin/workspaces/$slug")
+                    }
                 }
-                val newTenant = tenantRepository.create(slug, displayName, issuerUrl)
-                keyProvisioningService.provisionForTenant(newTenant)
-                portalClientProvisioning?.provisionRedirectUris()
-                roleGroupService.createRole(
-                    newTenant.id,
-                    "admin",
-                    "Full administrative access within this workspace",
-                    RoleScope.TENANT,
-                    null,
-                )
-                roleGroupService.createRole(
-                    newTenant.id,
-                    "user",
-                    "Standard authenticated user — default role for self-registrations",
-                    RoleScope.TENANT,
-                    null,
-                )
-                call.respondRedirect("/admin/workspaces/$slug")
             }
 
             // -----------------------------------------------------------
@@ -460,14 +454,13 @@ fun Route.adminRoutes(
                 adminUserRoutes(
                     adminService = adminService,
                     roleGroupService = roleGroupService,
-                    userRepository = userRepository,
                     sessionRepository = sessionRepository,
                 )
 
                 adminSessionAuditRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
-                    userRepository = userRepository,
+                    adminService = adminService,
                     applicationRepository = applicationRepository,
                 )
 
