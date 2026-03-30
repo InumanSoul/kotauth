@@ -178,6 +178,7 @@ internal fun userDetailPageImpl(
                                                 action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
                                                 label = "Revoke",
                                                 btnClass = "btn btn--ghost btn--sm",
+                                                confirmMessage = "Revoke this session? The user will be signed out.",
                                             )
                                         }
                                     }
