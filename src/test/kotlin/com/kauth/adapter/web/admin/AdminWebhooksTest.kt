@@ -7,7 +7,6 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
@@ -34,12 +33,17 @@ import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
+import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.response.respond
+import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
 import io.ktor.server.sessions.Sessions
 import io.ktor.server.sessions.cookie
+import io.ktor.server.sessions.sessions
+import io.ktor.server.sessions.set
 import io.ktor.server.testing.testApplication
 import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
@@ -102,16 +106,6 @@ class AdminWebhooksTest {
             fullName = "Admin",
             passwordHash = hasher.hash("admin-pass"),
             enabled = true,
-        )
-
-    private fun buildAuthService() =
-        AuthService(
-            userRepository = userRepo,
-            tenantRepository = tenantRepo,
-            tokenPort = tokenPort,
-            passwordHasher = hasher,
-            auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
         )
 
     private fun buildSelfService() =
@@ -271,12 +265,8 @@ class AdminWebhooksTest {
 
     private suspend fun login(client: io.ktor.client.HttpClient) {
         client.submitForm(
-            url = "/admin/login",
-            formParameters =
-                Parameters.build {
-                    append("username", "admin")
-                    append("password", "admin-pass")
-                },
+            url = "/test-admin-login",
+            formParameters = Parameters.build { },
         )
     }
 
@@ -288,8 +278,17 @@ class AdminWebhooksTest {
             }
         }
         routing {
+            post("/test-admin-login") {
+                call.sessions.set(
+                    AdminSession(
+                        userId = 1,
+                        tenantId = 1,
+                        username = "admin",
+                    ),
+                )
+                call.respond(io.ktor.http.HttpStatusCode.OK, "session set")
+            }
             adminRoutes(
-                authService = buildAuthService(),
                 adminService = buildAdminService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
@@ -302,7 +301,6 @@ class AdminWebhooksTest {
                 webhookService = webhookService,
                 encryptionService = encryptionService,
                 roleRepository = roleRepo,
-                adminBypass = true,
             )
         }
     }

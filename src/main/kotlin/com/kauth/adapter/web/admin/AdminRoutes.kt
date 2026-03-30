@@ -18,8 +18,6 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
-import com.kauth.domain.service.AuthResult
-import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
@@ -47,7 +45,6 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 fun Route.adminRoutes(
-    authService: AuthService,
     adminService: AdminService,
     roleGroupService: RoleGroupService,
     appInfo: AppInfo,
@@ -67,25 +64,17 @@ fun Route.adminRoutes(
     selfServiceService: UserSelfServiceService? = null,
     roleRepository: RoleRepository? = null,
     baseUrl: String = "",
-    adminBypass: Boolean = false,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
     route("/admin") {
         // ---------------------------------------------------------------
-        // Login — OAuth PKCE flow (default) or break-glass bypass
+        // Login — OAuth PKCE flow
         // ---------------------------------------------------------------
 
         get("/login") {
             if (call.sessions.get<AdminSession>() != null) {
                 call.respondRedirect("/admin")
-                return@get
-            }
-            if (adminBypass) {
-                call.respondHtml(
-                    HttpStatusCode.OK,
-                    AdminView.loginPage(bypassNotice = "OAuth login is bypassed — direct credential login is active."),
-                )
                 return@get
             }
             // OAuth PKCE redirect to master tenant auth endpoint
@@ -114,46 +103,6 @@ fun Route.adminRoutes(
                     append("&state=").append(state)
                 }
             call.respondRedirect(authUrl)
-        }
-
-        post("/login") {
-            if (!adminBypass) {
-                call.respond(HttpStatusCode.NotFound)
-                return@post
-            }
-            val params = call.receiveParameters()
-            val username = params["username"]?.trim() ?: ""
-            val password = params["password"] ?: ""
-            val ipAddress = call.request.local.remoteAddress
-            val userAgent = call.request.headers["User-Agent"]
-            when (val result = authService.authenticate(Tenant.MASTER_SLUG, username, password, ipAddress, userAgent)) {
-                is AuthResult.Success -> {
-                    val user = result.value
-                    // Verify admin role even in bypass mode
-                    val bypassRoles = roleRepository?.findRolesForUser(user.id!!) ?: emptyList()
-                    val master = tenantRepository.findBySlug(Tenant.MASTER_SLUG)
-                    if (master != null && bypassRoles.none { it.name == "admin" && it.tenantId == master.id }) {
-                        call.respondHtml(
-                            HttpStatusCode.Forbidden,
-                            AdminView.loginPage(error = "Your account does not have admin console access."),
-                        )
-                        return@post
-                    }
-                    call.sessions.set(
-                        AdminSession(
-                            userId = user.id?.value ?: 0,
-                            tenantId = user.tenantId.value,
-                            username = user.username,
-                        ),
-                    )
-                    call.respondRedirect("/admin")
-                }
-                is AuthResult.Failure ->
-                    call.respondHtml(
-                        HttpStatusCode.Unauthorized,
-                        AdminView.loginPage(error = "Invalid credentials."),
-                    )
-            }
         }
 
         // ---------------------------------------------------------------

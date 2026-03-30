@@ -20,7 +20,6 @@ data class EnvironmentConfig(
     val isDemoMode: Boolean,
     val dbPoolMaxSize: Int,
     val dbPoolMinIdle: Int,
-    val adminBypass: Boolean,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
 
@@ -55,7 +54,6 @@ data class EnvironmentConfig(
                         ?.lowercase() == "true",
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
-                adminBypass = adminBypass,
             )
         }
 

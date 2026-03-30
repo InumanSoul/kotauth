@@ -96,10 +96,6 @@ fun main() {
         },
     )
 
-    if (config.adminBypass) {
-        startupLog.warn("KAUTH_ADMIN_BYPASS=true — admin console using legacy password auth. MFA NOT enforced.")
-    }
-
     startupLog.info(
         "KotAuth v{} started | env={} | baseUrl={} | encryption={} | jvm={}",
         appInfo.version,
@@ -302,7 +298,6 @@ fun Application.module(
         )
 
         adminRoutes(
-            authService = s.authService,
             adminService = s.adminService,
             roleGroupService = s.roleGroupService,
             appInfo = appInfo,
@@ -322,7 +317,6 @@ fun Application.module(
             selfServiceService = s.selfServiceService,
             roleRepository = s.roleRepository,
             baseUrl = config.baseUrl,
-            adminBypass = config.adminBypass,
         )
     }
 }
