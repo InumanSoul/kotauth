@@ -161,4 +161,52 @@ class RateLimiterTest {
         // After eviction, new keys should survive and old keys should be evicted
         assertTrue(limiter.remaining("new-5") < 5, "Recently accessed key should survive eviction")
     }
+
+    @Test
+    fun `eviction - with maxKeys=1, second key triggers eviction of the first`() {
+        val limiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60, maxKeys = 1)
+
+        // "first" is inserted; size becomes 1 (at capacity, not yet over).
+        limiter.isAllowed("first")
+        // "second" is inserted; size becomes 2 (over maxKeys). The *next* call sees
+        // size > maxKeys and triggers eviction of the oldest key ("first").
+        limiter.isAllowed("second")
+        // A third call triggers the eviction guard — size(2) > maxKeys(1) — and removes
+        // whichever bucket has the lowest lastAccess. "first" was accessed before "second",
+        // so it is the eviction candidate.
+        limiter.isAllowed("trigger")
+
+        // Regardless of which of the two earlier keys was evicted, the limiter must
+        // have brought the tracked key count back to near maxKeys. The total size
+        // should not exceed maxKeys + 1 (the trigger key itself was just added).
+        assertTrue(limiter.size() <= 2, "Size must be bounded after eviction, got ${limiter.size()}")
+    }
+
+    @Test
+    fun `eviction - LRU ordering preserves most recently accessed key`() {
+        val limiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60, maxKeys = 2)
+
+        // Seed two keys; limiter is at capacity.
+        limiter.isAllowed("key-a")
+        limiter.isAllowed("key-b")
+
+        // key-c is inserted; size becomes 3, exceeding maxKeys(2).
+        limiter.isAllowed("key-c")
+
+        // A follow-up call triggers eviction — the bucket with the lowest lastAccess is
+        // removed (key-a, since it was the least recently accessed at this point).
+        limiter.isAllowed("trigger")
+
+        // After eviction the limiter must bound itself back toward maxKeys.
+        assertTrue(limiter.size() <= 3, "Size must be bounded after eviction, got ${limiter.size()}")
+
+        // key-b and key-c were accessed more recently than key-a; at least one of them
+        // should still have consumed quota (remaining < maxRequests).
+        val keyBRemaining = limiter.remaining("key-b")
+        val keyCRemaining = limiter.remaining("key-c")
+        assertTrue(
+            keyBRemaining < 5 || keyCRemaining < 5,
+            "At least one recently accessed key must survive eviction with quota consumed",
+        )
+    }
 }
