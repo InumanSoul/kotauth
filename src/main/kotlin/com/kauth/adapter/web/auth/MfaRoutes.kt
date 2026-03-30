@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
@@ -20,6 +21,7 @@ internal fun Route.mfaRoutes(
     oauthService: OAuthService,
     mfaService: MfaService?,
     encryptionService: EncryptionService,
+    mfaRateLimiter: RateLimiterPort,
 ) {
     get("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -46,6 +48,19 @@ internal fun Route.mfaRoutes(
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress
+
+        val rateLimitKey = "mfa:$ipAddress:$slug"
+        if (!mfaRateLimiter.isAllowed(rateLimitKey)) {
+            return@post call.respondHtml(
+                HttpStatusCode.TooManyRequests,
+                AuthView.mfaChallengePage(
+                    slug,
+                    theme,
+                    workspaceName,
+                    error = "Too many attempts. Please wait a few minutes and try again.",
+                ),
+            )
+        }
 
         // OAuth context is read from the signed auth context cookie, not from form fields.
         val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()

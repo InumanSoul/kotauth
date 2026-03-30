@@ -90,6 +90,7 @@ data class ServiceGraph(
     val loginRateLimiter: RateLimiterPort,
     val registerRateLimiter: RateLimiterPort,
     val tokenRateLimiter: RateLimiterPort,
+    val mfaRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val applicationScope: CoroutineScope,
@@ -286,6 +287,11 @@ data class ServiceGraph(
                     maxRequests = 20,
                     windowSeconds = 60,
                 )
+            val mfaLimiter =
+                InMemoryRateLimiter(
+                    maxRequests = 5,
+                    windowSeconds = 300,
+                )
 
             // -- Portal session key -------------------------------------------
             val portalSessionKey: ByteArray =
@@ -350,6 +356,7 @@ data class ServiceGraph(
                 loginRateLimiter = loginLimiter,
                 registerRateLimiter = registerLimiter,
                 tokenRateLimiter = tokenLimiter,
+                mfaRateLimiter = mfaLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 applicationScope = applicationScope,
