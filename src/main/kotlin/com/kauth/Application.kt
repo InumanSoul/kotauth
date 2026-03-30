@@ -306,6 +306,7 @@ fun Application.module(
             loginRateLimiter = s.loginRateLimiter,
             registerRateLimiter = s.registerRateLimiter,
             tokenRateLimiter = s.tokenRateLimiter,
+            mfaRateLimiter = s.mfaRateLimiter,
             selfServiceService = s.selfServiceService,
             mfaService = s.mfaService,
             roleRepository = s.roleRepository,

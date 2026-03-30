@@ -132,4 +132,33 @@ class RateLimiterTest {
         assertEquals(10, limiter.maxRequests)
         assertEquals(120L, limiter.windowSeconds)
     }
+
+    // =========================================================================
+    // LRU eviction — memory bound
+    // =========================================================================
+
+    @Test
+    fun `eviction - caps tracked keys at maxKeys`() {
+        val limiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60, maxKeys = 10)
+
+        // Fill past capacity — each isAllowed over maxKeys triggers eviction
+        repeat(15) { i -> limiter.isAllowed("key-$i") }
+
+        // One final call to trigger eviction after all keys are inserted
+        limiter.isAllowed("trigger-eviction")
+
+        assertTrue(limiter.size() <= 11, "Bucket count should be bounded near maxKeys")
+    }
+
+    @Test
+    fun `eviction - preserves most recently accessed keys`() {
+        val limiter = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60, maxKeys = 5)
+
+        // Access keys 0-4, then 5-9 (keys 0-4 are oldest)
+        repeat(5) { i -> limiter.isAllowed("old-$i") }
+        repeat(6) { i -> limiter.isAllowed("new-$i") }
+
+        // After eviction, new keys should survive and old keys should be evicted
+        assertTrue(limiter.remaining("new-5") < 5, "Recently accessed key should survive eviction")
+    }
 }
