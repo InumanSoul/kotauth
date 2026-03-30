@@ -32,7 +32,7 @@ internal fun activeSessionsPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
-                    "Security" to "/admin/workspaces/${workspace.slug}/mfa",
+                    "Security" to "/admin/workspaces/${workspace.slug}/sessions",
                     "Sessions" to null,
                 )
 
@@ -123,36 +123,37 @@ internal fun auditLogPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
-            activeAppSection = "events",
+            activeAppSection = "audit",
             loggedInAs = loggedInAs,
             showSidebar = false,
             contentClass = "content-outer",
         ) {
             div("content-inner content-inner--wide") {
-                // Breadcrumb
-                nav("breadcrumb") {
-                        a("/admin", classes = "breadcrumb__link") { +"Workspaces" }
-                        span("breadcrumb__sep") { +"/" }
-                        a("/admin/workspaces/${workspace.slug}", classes = "breadcrumb__link") { +workspace.slug }
-                        span("breadcrumb__sep") { +"/" }
-                        span("breadcrumb__current") { +"Audit Log" }
-                    }
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    workspace.slug to "/admin/workspaces/${workspace.slug}",
+                    "Logs" to "/admin/workspaces/${workspace.slug}/logs",
+                    "Audit Log" to null,
+                )
 
-                    // Page header
-                    div("page-header") {
-                        div("page-header__left") {
-                            div("page-header__identity") {
-                                h1("page-header__title") { +"Audit Log" }
-                                p("page-header__sub") {
-                                    +"Security-relevant events for the "
-                                    strong { +workspace.displayName }
-                                    +" workspace."
-                                }
+                div("page-header") {
+                    div("page-header__left") {
+                        div("page-header__identity") {
+                            h1("page-header__title") { +"Audit Log" }
+                            p("page-header__sub") {
+                                +"Security-relevant events for the "
+                                strong { +workspace.displayName }
+                                +" workspace."
                             }
                         }
                     }
+                }
 
-                    // Filter bar
+                div {
+                    id = "audit-content"
+
+                    // Filter bar — inside the htmx swap target so the Clear button
+                    // appears/disappears correctly when filtering via htmx.
                     form(
                         action = "/admin/workspaces/${workspace.slug}/logs",
                         method = FormMethod.get,
@@ -186,9 +187,6 @@ internal fun auditLogPageImpl(
                             ) { +"Clear" }
                         }
                     }
-
-                    div {
-                        id = "audit-content"
 
                         // Data table
                         if (events.isEmpty()) {

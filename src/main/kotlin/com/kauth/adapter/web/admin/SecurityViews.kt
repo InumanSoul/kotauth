@@ -170,11 +170,11 @@ internal fun mfaSettingsPageImpl(
                                         td {
                                             a(
                                                 "/admin/workspaces/${workspace.slug}/users/${u.id?.value}",
-                                                classes = "mfa-user-id",
+                                                classes = "data-table__id",
                                             ) { +u.username }
                                         }
-                                        td { span("mfa-user-name") { +u.fullName } }
-                                        td { span("mfa-user-email") { +u.email } }
+                                        td { span("data-table__name") { +u.fullName } }
+                                        td { span("data-table__email") { +u.email } }
                                     }
                                 }
                             }
@@ -213,11 +213,11 @@ internal fun mfaSettingsPageImpl(
                                         td {
                                             a(
                                                 "/admin/workspaces/${workspace.slug}/users/${u.id?.value}",
-                                                classes = "mfa-user-id",
+                                                classes = "data-table__id",
                                             ) { +u.username }
                                         }
-                                        td { span("mfa-user-name") { +u.fullName } }
-                                        td { span("mfa-user-email") { +u.email } }
+                                        td { span("data-table__name") { +u.fullName } }
+                                        td { span("data-table__email") { +u.email } }
                                     }
                                 }
                             }

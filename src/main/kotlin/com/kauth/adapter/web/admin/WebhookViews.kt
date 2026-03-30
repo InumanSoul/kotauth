@@ -186,7 +186,7 @@ internal fun webhooksListPageImpl(
                             }
                         }
                         tbody {
-                            deliveries.take(50).forEach { d ->
+                            deliveries.forEach { d ->
                                 val ep = endpoints.firstOrNull { it.id == d.endpointId }
                                 tr {
                                     td { span("key-table__meta") { +d.eventType } }

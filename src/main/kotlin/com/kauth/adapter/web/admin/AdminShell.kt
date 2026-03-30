@@ -94,6 +94,9 @@ internal fun HTML.adminShell(
 ) {
     head { adminHead(pageTitle) }
     body {
+        attributes["hx-indicator"] = "#global-loader"
+        div("htmx-progress htmx-indicator") { id = "global-loader" }
+
         demoBanner()
         div("shell") {
             // ── Top bar ──────────────────────────────────────────────
@@ -143,8 +146,23 @@ internal fun HTML.adminShell(
                 }
 
                 div("topbar-search-wrap") {
-                    input(type = InputType.search, classes = "topbar-search") {
-                        placeholder = "Search apps, users, roles…"
+                    if (workspaceSlug != null) {
+                        form(
+                            action = "/admin/workspaces/$workspaceSlug/users",
+                            method = FormMethod.get,
+                            classes = "topbar-search-form",
+                        ) {
+                            input(type = InputType.search, name = "q", classes = "topbar-search") {
+                                placeholder = "Search users…"
+                                attributes["autocomplete"] = "off"
+                            }
+                        }
+                    } else {
+                        input(type = InputType.search, classes = "topbar-search") {
+                            placeholder = "Search users…"
+                            disabled = true
+                            attributes["title"] = "Select a workspace first"
+                        }
                     }
                 }
 
@@ -180,25 +198,25 @@ internal fun HTML.adminShell(
                         iconKey = "apps",
                     )
                     railItem(
-                        href = if (ws != null) "/admin/workspaces/$ws/users" else "/admin/directory",
+                        href = ws?.let { "/admin/workspaces/$it/users" },
                         key = "directory",
                         activeKey = activeRail,
                         iconKey = "directory",
                     )
                     railItem(
-                        href = if (ws != null) "/admin/workspaces/$ws/sessions" else "/admin/security",
+                        href = ws?.let { "/admin/workspaces/$it/sessions" },
                         key = "security",
                         activeKey = activeRail,
                         iconKey = "security",
                     )
                     railItem(
-                        href = if (ws != null) "/admin/workspaces/$ws/logs" else "/admin/logs",
+                        href = ws?.let { "/admin/workspaces/$it/logs" },
                         key = "logs",
                         activeKey = activeRail,
                         iconKey = "logs",
                     )
                     railItem(
-                        href = if (ws != null) "/admin/workspaces/$ws/settings" else "/admin/settings",
+                        href = ws?.let { "/admin/workspaces/$it/settings" },
                         key = "settings",
                         activeKey = activeRail,
                         iconKey = "settings",
@@ -261,7 +279,7 @@ internal fun HTML.adminShell(
 // ─── Rail Item ──────────────────────────────────────────────────────────────
 
 private fun DIV.railItem(
-    href: String,
+    href: String?,
     key: String,
     activeKey: String,
     iconKey: String,
@@ -275,9 +293,18 @@ private fun DIV.railItem(
             "settings" -> "rail-settings" to "Settings"
             else -> iconKey to iconKey
         }
-    a(href, classes = "rail__item${if (key == activeKey) " rail__item--active" else ""}") {
-        inlineSvgIcon(iconName, label)
-        span("rail__label") { +label }
+    if (href != null) {
+        a(href, classes = "rail__item${if (key == activeKey) " rail__item--active" else ""}") {
+            attributes["title"] = label
+            inlineSvgIcon(iconName, label)
+            span("rail__label") { +label }
+        }
+    } else {
+        span("rail__item rail__item--ghost") {
+            attributes["title"] = "$label — select a workspace first"
+            inlineSvgIcon(iconName, label)
+            span("rail__label") { +label }
+        }
     }
 }
 

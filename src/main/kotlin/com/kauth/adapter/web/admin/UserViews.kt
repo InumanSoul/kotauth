@@ -107,10 +107,7 @@ internal fun userDetailPageImpl(
                 }
             }
             if (editError != null) {
-                div("alert alert-error") {
-                    style = "margin-bottom:20px;"
-                    +editError
-                }
+                div("notice notice--error") { +editError }
             }
             if (user.isLocked) {
                 notice(
@@ -178,6 +175,7 @@ internal fun userDetailPageImpl(
                                                 action = "/admin/workspaces/${workspace.slug}/sessions/${s.id?.value}/revoke",
                                                 label = "Revoke",
                                                 btnClass = "btn btn--ghost btn--sm",
+                                                confirmMessage = "Revoke this session? The user will be signed out.",
                                             )
                                         }
                                     }
@@ -314,10 +312,7 @@ internal fun DIV.userProfileEditFragment(
     div {
         id = "profile-section"
         if (editError != null) {
-            div("alert alert-error") {
-                style = "margin-bottom:12px;"
-                +editError
-            }
+            div("notice notice--error") { +editError }
         }
         div("ov-card") {
             div("ov-card__section-label") { +"Edit Profile" }
@@ -604,10 +599,7 @@ internal fun createUserPageImpl(
             }
 
             if (error != null) {
-                div("alert alert-error") {
-                    style = "margin-bottom:20px;"
-                    +error
-                }
+                div("notice notice--error") { +error }
             }
 
             // ── Form ─────────────────────────────────────────────────

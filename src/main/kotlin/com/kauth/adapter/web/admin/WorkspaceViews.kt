@@ -165,13 +165,7 @@ internal fun workspaceDetailPageImpl(
 
             // ── Applications ────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") {
-                    +"Applications"
-                    a(
-                        href = "/admin/workspaces/${workspace.slug}/applications/new",
-                        classes = "btn btn--ghost btn--sm",
-                    ) { +"+ New Application" }
-                }
+                div("ov-card__section-label") { +"Applications" }
 
                 if (apps.isEmpty()) {
                     emptyState(
@@ -276,8 +270,6 @@ data class WorkspacePrefill(
     val issuerUrl: String = "",
     val registrationEnabled: Boolean = true,
     val emailVerificationRequired: Boolean = false,
-    val themeAccentColor: String = "#1FBCFF",
-    val themeLogoUrl: String = "",
 )
 
 // Create workspace form.
@@ -363,7 +355,7 @@ internal fun createWorkspacePageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Issuer URL" }
+                        span("edit-row__label") { +"Issuer URL (optional)" }
                         div {
                             input(type = InputType.url, name = "issuerUrl") {
                                 classes = setOf("edit-row__field")
@@ -382,61 +374,29 @@ internal fun createWorkspacePageImpl(
             // ── Registration Policy card ───────────────────────────
             div("ov-card") {
                 div("ov-card__section-label") { +"Registration Policy" }
-                div("check-row") {
+                label("check-row") {
                     input(type = InputType.checkBox, name = "registrationEnabled") {
                         attributes["form"] = "create-workspace-form"
-                        this.id = "registrationEnabled"
                         if (prefill.registrationEnabled) checked = true
                         attributes["value"] = "true"
                     }
-                    label {
-                        htmlFor = "registrationEnabled"
-                        +"Allow public registration"
+                    div("check-row__body") {
+                        span("check-row__label") { +"Allow public registration" }
+                        span("check-row__desc") {
+                            +"Anyone can create an account via the hosted login page."
+                        }
                     }
                 }
-                div("check-row") {
+                label("check-row") {
                     input(type = InputType.checkBox, name = "emailVerificationRequired") {
                         attributes["form"] = "create-workspace-form"
-                        this.id = "emailVerificationRequired"
                         if (prefill.emailVerificationRequired) checked = true
                         attributes["value"] = "true"
                     }
-                    label {
-                        htmlFor = "emailVerificationRequired"
-                        +"Require email verification"
-                    }
-                }
-            }
-
-            // ── Branding card ──────────────────────────────────────
-            div("ov-card") {
-                div("ov-card__section-label") { +"Branding" }
-                div("edit-row") {
-                    span("edit-row__label") { +"Accent Color" }
-                    div {
-                        input(type = InputType.color, name = "themeAccentColor") {
-                            attributes["form"] = "create-workspace-form"
-                            classes = setOf("edit-row__field")
-                            this.id = "themeAccentColor"
-                            value = prefill.themeAccentColor
-                        }
-                        div("edit-row__hint") {
-                            +"Primary brand color used on the tenant's login page."
-                        }
-                    }
-                }
-                div("edit-row") {
-                    span("edit-row__label") { +"Logo URL" }
-                    div {
-                        input(type = InputType.url, name = "themeLogoUrl") {
-                            attributes["form"] = "create-workspace-form"
-                            classes = setOf("edit-row__field")
-                            this.id = "themeLogoUrl"
-                            placeholder = "https://cdn.acme.com/logo.png"
-                            value = prefill.themeLogoUrl
-                        }
-                        div("edit-row__hint") {
-                            +"Shown above the login card. Max 180×48px recommended."
+                    div("check-row__body") {
+                        span("check-row__label") { +"Require email verification" }
+                        span("check-row__desc") {
+                            +"Users must confirm their email address before they can sign in."
                         }
                     }
                 }

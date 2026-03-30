@@ -76,7 +76,19 @@
   flex: 1;
 }
 
+.check-row__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .check-row__hint {
   font-size: 11px;
   color: var(--color-subtle);
+}
+
+.check-row__desc {
+  font-size: 11px;
+  color: var(--color-subtle);
+  line-height: 1.5;
 }
