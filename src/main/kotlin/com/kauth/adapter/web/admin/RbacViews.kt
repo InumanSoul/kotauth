@@ -37,7 +37,7 @@ internal fun rolesListPageImpl(
                 div("page-header__left") {
                     div("page-header__identity") {
                         h1("page-header__title") { +"Roles" }
-                        span("page-header__sub") {
+                        p("page-header__sub") {
                             +"${roles.size} role${if (roles.size != 1) "s" else ""} in this workspace"
                         }
                     }
@@ -321,7 +321,7 @@ internal fun roleDetailPageImpl(
                         +"No child roles."
                     }
                 } else {
-                    table("key-table") {
+                    table("data-table") {
                         thead {
                             tr {
                                 th { +"Child Role" }
@@ -332,7 +332,7 @@ internal fun roleDetailPageImpl(
                             role.childRoleIds.forEach { childId ->
                                 val child = allRoles.find { it.id == childId }
                                 tr {
-                                    td { span("key-table__name") { +(child?.name ?: "#${childId.value}") } }
+                                    td { span("data-table__name") { +(child?.name ?: "#${childId.value}") } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/roles/${role.id?.value}/remove-child",
@@ -440,7 +440,7 @@ internal fun groupsListPageImpl(
                 div("page-header__left") {
                     div("page-header__identity") {
                         h1("page-header__title") { +"Groups" }
-                        span("page-header__sub") {
+                        p("page-header__sub") {
                             +"${groups.size} group${if (groups.size != 1) "s" else ""} in this workspace"
                         }
                     }
@@ -701,7 +701,7 @@ internal fun groupDetailPageImpl(
                         +"No roles assigned."
                     }
                 } else {
-                    table("key-table") {
+                    table("data-table") {
                         thead {
                             tr {
                                 th { +"Role" }
@@ -713,7 +713,7 @@ internal fun groupDetailPageImpl(
                             group.roleIds.forEach { rid ->
                                 val r = allRoles.find { it.id == rid }
                                 tr {
-                                    td { span("key-table__name") { +(r?.name ?: "#${rid.value}") } }
+                                    td { span("data-table__name") { +(r?.name ?: "#${rid.value}") } }
                                     td {
                                         span("badge badge--active") { +(r?.scope?.value ?: "?") }
                                     }
@@ -772,7 +772,7 @@ internal fun groupDetailPageImpl(
                         +"No members."
                     }
                 } else {
-                    table("key-table") {
+                    table("data-table") {
                         thead {
                             tr {
                                 th { +"Username" }
@@ -783,8 +783,8 @@ internal fun groupDetailPageImpl(
                         tbody {
                             members.forEach { u ->
                                 tr {
-                                    td { span("key-table__name") { +u.username } }
-                                    td { span("key-table__meta") { +u.email } }
+                                    td { span("data-table__name") { +u.username } }
+                                    td { span("data-table__meta") { +u.email } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/groups/${group.id?.value}/remove-member",

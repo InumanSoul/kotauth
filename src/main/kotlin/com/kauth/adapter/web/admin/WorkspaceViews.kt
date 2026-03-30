@@ -165,13 +165,7 @@ internal fun workspaceDetailPageImpl(
 
             // ── Applications ────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label") {
-                    +"Applications"
-                    a(
-                        href = "/admin/workspaces/${workspace.slug}/applications/new",
-                        classes = "btn btn--ghost btn--sm",
-                    ) { +"+ New Application" }
-                }
+                div("ov-card__section-label") { +"Applications" }
 
                 if (apps.isEmpty()) {
                     emptyState(

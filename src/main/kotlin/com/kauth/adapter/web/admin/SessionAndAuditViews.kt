@@ -32,7 +32,7 @@ internal fun activeSessionsPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
-                    "Security" to "/admin/workspaces/${workspace.slug}/mfa",
+                    "Security" to "/admin/workspaces/${workspace.slug}/sessions",
                     "Sessions" to null,
                 )
 
@@ -123,7 +123,7 @@ internal fun auditLogPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
-            activeAppSection = "events",
+            activeAppSection = "audit",
             loggedInAs = loggedInAs,
             showSidebar = false,
             contentClass = "content-outer",
@@ -132,6 +132,7 @@ internal fun auditLogPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
+                    "Logs" to "/admin/workspaces/${workspace.slug}/logs",
                     "Audit Log" to null,
                 )
 
