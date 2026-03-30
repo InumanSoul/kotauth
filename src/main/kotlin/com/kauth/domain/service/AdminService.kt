@@ -49,6 +49,43 @@ class AdminService(
     // Workspace settings
     // =========================================================================
 
+    fun createWorkspace(
+        slug: String,
+        displayName: String,
+        issuerUrl: String?,
+    ): AdminResult<Tenant> {
+        if (slug.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Slug is required."))
+        }
+        if (!slug.matches(Regex("[a-z0-9-]+"))) {
+            return AdminResult.Failure(
+                AdminError.Validation("Slug may only contain lowercase letters, numbers, and hyphens."),
+            )
+        }
+        if (slug == Tenant.MASTER_SLUG) {
+            return AdminResult.Failure(AdminError.Validation("The slug 'master' is reserved."))
+        }
+        if (displayName.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Display name is required."))
+        }
+        if (tenantRepository.existsBySlug(slug)) {
+            return AdminResult.Failure(AdminError.Validation("A workspace with slug '$slug' already exists."))
+        }
+        val tenant = tenantRepository.create(slug, displayName, issuerUrl)
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_TENANT_CREATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "displayName" to displayName),
+            ),
+        )
+        return AdminResult.Success(tenant)
+    }
+
     /**
      * Updates all mutable workspace settings. Slug is immutable.
      * Returns [AdminResult.Failure] with a user-visible message on validation errors.
