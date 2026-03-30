@@ -22,6 +22,8 @@ Kotauth is a self-hosted identity and access management server built with Kotlin
 | Lint check | `make lint` |
 | Auto-fix lint | `make lint-fix` |
 | Compile CSS bundles | `make css` |
+| Generate secret key | `make generate-key` |
+| Reset admin MFA | `make reset-mfa USER=admin` |
 
 ## Architecture
 
@@ -40,12 +42,14 @@ src/main/kotlin/com/kauth/
 │   ├── email/       # SMTP
 │   └── social/      # Google/GitHub OAuth
 ├── infrastructure/  # Encryption (AES-256-GCM), rate limiting, TOTP, key management
+├── cli/             # CLI subcommands (generate-secret-key, reset-admin-mfa)
 └── config/          # ServiceGraph (composition root) + EnvironmentConfig
 ```
 
 - **Application.kt** is the composition root — all dependency wiring happens via `ServiceGraph`.
 - **EnvironmentConfig** centralizes env var parsing with fail-fast validation.
-- **Flyway migrations** in `src/main/resources/db/migration/` (V1–V24, immutable).
+- **Flyway migrations** in `src/main/resources/db/migration/` (V1–V29, immutable).
+- **CLI subcommands** — `java -jar kauth.jar cli <command>` dispatched in `Application.kt`, commands in `cli/` package.
 
 ## Key Conventions
 

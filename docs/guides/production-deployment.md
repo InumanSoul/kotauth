@@ -57,9 +57,12 @@ ACME_EMAIL=you@yourdomain.com
 
 ```bash
 openssl rand -hex 32
+
+# or using the built-in CLI:
+docker run --rm kotauth:latest java -jar /app/kauth.jar cli generate-secret-key
 ```
 
-Never reuse a key across environments. If this key is lost or rotated, all existing SMTP configurations will need to be re-entered (they are encrypted with this key), and all active sessions will be invalidated.
+Never reuse a key across environments. If this key is lost or rotated, all encrypted secrets (SMTP passwords, TOTP secrets, RSA private keys) become unrecoverable, and all active sessions will be invalidated.
 
 ---
 
@@ -246,6 +249,49 @@ The `-v` flag destroys the database volume. On restart, Flyway re-migrates from 
 | `/admin` (master workspace) | `admin` | `changeme123!` |
 | `/t/acme/login` | `sarah.chen` | `Demo1234!` |
 | `/t/startup-labs/login` | `jordan.lee` | `Demo1234!` |
+
+---
+
+## CLI tools
+
+Kotauth includes built-in CLI commands accessible via the same JAR. These run independently of the HTTP server — no need to stop the running instance.
+
+### Generate a secret key
+
+```bash
+# Local
+java -jar kotauth-all.jar cli generate-secret-key
+
+# Docker (from the running container)
+docker exec kotauth java -jar /app/kauth.jar cli generate-secret-key
+
+# Docker (standalone — no running container needed)
+docker run --rm kotauth:latest java -jar /app/kauth.jar cli generate-secret-key
+```
+
+### Reset MFA for a locked-out admin
+
+If the admin loses their MFA device and cannot access the admin console:
+
+```bash
+# Local
+java -jar kotauth-all.jar cli reset-admin-mfa --username=admin
+
+# Docker
+docker exec kotauth java -jar /app/kauth.jar cli reset-admin-mfa --username=admin
+```
+
+This deletes the user's TOTP enrollment and recovery codes on the master tenant and sets `mfaEnabled = false`. The user can re-enroll MFA on their next login. Requires database connectivity (`DB_URL`, `DB_USER`, `DB_PASSWORD` env vars).
+
+### Available commands
+
+```
+java -jar kauth.jar cli --help
+
+Commands:
+  generate-secret-key                Generate a KAUTH_SECRET_KEY value
+  reset-admin-mfa --username=<name>  Reset MFA for an admin user
+```
 
 ---
 

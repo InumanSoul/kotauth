@@ -15,12 +15,21 @@ No global npm installs are needed. The `installCssDeps` Gradle task runs `npm ci
 ## Quick-start
 
 ```bash
-# 1. Copy the env template and fill in the required values
+# 1. Copy the env template
 cp .env.example .env
 
-# 2. Build and start the full stack
+# 2. Generate a secret key and add it to .env
+openssl rand -hex 32
+# or, if you have the JAR built:
+#   make generate-key
+
+# 3. Paste the key into .env as KAUTH_SECRET_KEY=<value>
+
+# 4. Build and start the full stack
 make up
 ```
+
+`KAUTH_SECRET_KEY` is required in all environments. The server will not start without it.
 
 The app is available at `http://localhost:8080`. The admin console is at `http://localhost:8080/admin`.
 
@@ -54,6 +63,10 @@ Docker
   nuke           Wipe containers and volumes (destroys DB)
   logs           Follow app container logs
   health         Probe http://localhost:8080/health/ready
+
+CLI
+  generate-key   Generate a cryptographically secure KAUTH_SECRET_KEY
+  reset-mfa      Reset MFA for an admin user (usage: make reset-mfa USER=admin)
 ```
 
 ---

@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix test e2e build jar version up up-fresh down nuke logs health
+.PHONY: help css css-admin css-auth js lint lint-fix test e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -78,6 +78,14 @@ logs: ## Follow app container logs
 
 health: ## Probe the local health endpoint
 	@curl -sf http://localhost:8080/health/ready && echo " OK" || echo " FAILED"
+
+# ── CLI ──────────────────────────────────────────────────────────────────────
+
+generate-key: ## Generate a cryptographically secure KAUTH_SECRET_KEY
+	@java -jar build/libs/kotauth-all.jar cli generate-secret-key
+
+reset-mfa: ## Reset MFA for an admin user (usage: make reset-mfa USER=admin)
+	@java -jar build/libs/kotauth-all.jar cli reset-admin-mfa --username=$(USER)
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
