@@ -297,6 +297,30 @@ class AdminService(
         return AdminResult.Success(user)
     }
 
+    fun getUser(
+        userId: UserId,
+        tenantId: TenantId,
+    ): AdminResult<User> =
+        userRepository
+            .findById(userId, tenantId)
+            ?.let { AdminResult.Success(it) }
+            ?: AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+    fun listUsers(
+        tenantId: TenantId,
+        search: String? = null,
+    ): List<User> = userRepository.findByTenantId(tenantId, search)
+
+    fun toggleUserEnabled(
+        userId: UserId,
+        tenantId: TenantId,
+    ): AdminResult<Unit> {
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+        return setUserEnabled(userId, tenantId, !user.enabled)
+    }
+
     /**
      * Updates a user's mutable profile fields (email, fullName).
      * Username is intentionally immutable — it may appear in tokens already issued.

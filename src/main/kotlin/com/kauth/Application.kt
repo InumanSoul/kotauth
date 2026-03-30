@@ -333,7 +333,6 @@ fun Application.module(
         apiRoutes(
             apiKeyService = s.apiKeyService,
             tenantRepository = s.tenantRepository,
-            userRepository = s.userRepository,
             roleRepository = s.roleRepository,
             groupRepository = s.groupRepository,
             applicationRepository = s.applicationRepository,

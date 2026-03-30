@@ -2,7 +2,6 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
-import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.RoleGroupService
@@ -24,7 +23,6 @@ import io.ktor.server.sessions.sessions
 fun Route.adminUserRoutes(
     adminService: AdminService,
     roleGroupService: RoleGroupService,
-    userRepository: UserRepository,
     sessionRepository: SessionRepository,
 ) {
     route("/users") {
@@ -35,8 +33,8 @@ fun Route.adminUserRoutes(
                 call.request.queryParameters["q"]
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
-            val users = userRepository.findByTenantId(workspace.id, search)
-            val totalCount = if (search != null) userRepository.findByTenantId(workspace.id, null).size else null
+            val users = adminService.listUsers(workspace.id, search)
+            val totalCount = if (search != null) adminService.listUsers(workspace.id).size else null
             val wsPairs = call.attributes[WsPairsAttr]
             call.respondHtml(
                 HttpStatusCode.OK,
@@ -91,7 +89,10 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    when (val r = adminService.getUser(userId, workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
+                    }
                 val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
                 val wsPairs = call.attributes[WsPairsAttr]
                 val userRoles = roleGroupService.getRolesForUser(userId)
@@ -131,7 +132,10 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    when (val r = adminService.getUser(userId, workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
+                    }
                 val userRoles = roleGroupService.getRolesForUser(userId)
                 val userGroups = roleGroupService.getGroupsForUser(userId)
                 call.respondText(
@@ -150,7 +154,10 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    userRepository.findById(userId, workspace.id) ?: return@get call.respond(HttpStatusCode.NotFound)
+                    when (val r = adminService.getUser(userId, workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
+                    }
                 call.respondText(
                     AdminView.userProfileEditFragment(workspace, user),
                     ContentType.Text.Html,
@@ -177,10 +184,12 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                val user =
-                    userRepository.findById(userId, workspace.id) ?: return@post call.respond(HttpStatusCode.NotFound)
-                adminService.setUserEnabled(userId, workspace.id, !user.enabled)
-                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
+                when (adminService.toggleUserEnabled(userId, workspace.id)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
+                    is AdminResult.Failure ->
+                        call.respond(HttpStatusCode.NotFound)
+                }
             }
 
             post("/edit") {
@@ -191,7 +200,10 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val user =
-                    userRepository.findById(userId, workspace.id) ?: return@post call.respond(HttpStatusCode.NotFound)
+                    when (val r = adminService.getUser(userId, workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
+                    }
                 val params = call.receiveParameters()
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
@@ -199,7 +211,7 @@ fun Route.adminUserRoutes(
                 when (val result = adminService.updateUser(userId, workspace.id, email, fullName)) {
                     is AdminResult.Success -> {
                         if (isHtmx) {
-                            val updatedUser = userRepository.findById(userId, workspace.id) ?: user
+                            val updatedUser = result.value
                             val userRoles = roleGroupService.getRolesForUser(userId)
                             val userGroups = roleGroupService.getGroupsForUser(userId)
                             call.respondText(

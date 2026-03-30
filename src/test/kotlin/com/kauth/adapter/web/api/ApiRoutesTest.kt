@@ -816,7 +816,6 @@ class ApiRoutesTest {
             apiRoutes(
                 apiKeyService = apiKeyService,
                 tenantRepository = tenantRepo,
-                userRepository = userRepo,
                 roleRepository = roleRepo,
                 groupRepository = groupRepo,
                 applicationRepository = appRepo,

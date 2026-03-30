@@ -3,7 +3,6 @@ package com.kauth.adapter.web.api
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.UserId
-import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.RoleGroupService
@@ -19,7 +18,6 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
 internal fun Route.apiUserRoutes(
-    userRepository: UserRepository,
     adminService: AdminService,
     roleGroupService: RoleGroupService,
 ) {
@@ -28,7 +26,7 @@ internal fun Route.apiUserRoutes(
             requireScope(call, ApiScope.USERS_READ) ?: return@get
             val tenantId = call.attributes[TenantIdAttr]
             val search = call.request.queryParameters["search"]
-            val users = userRepository.findByTenantId(tenantId, search)
+            val users = adminService.listUsers(tenantId, search)
             call.respond(
                 HttpStatusCode.OK,
                 ApiResponse(
@@ -70,12 +68,15 @@ internal fun Route.apiUserRoutes(
                             "userId must be an integer.",
                         )
                 val user =
-                    userRepository.findById(userId, tenantId)
-                        ?: return@get call.respondProblem(
-                            HttpStatusCode.NotFound,
-                            "User not found",
-                            "No user with id $userId in this workspace.",
-                        )
+                    when (val r = adminService.getUser(userId, tenantId)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure ->
+                            return@get call.respondProblem(
+                                HttpStatusCode.NotFound,
+                                "User not found",
+                                "No user with id $userId in this workspace.",
+                            )
+                    }
                 call.respond(HttpStatusCode.OK, user.toApiDto())
             }
 

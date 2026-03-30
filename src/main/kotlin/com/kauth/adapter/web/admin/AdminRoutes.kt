@@ -460,14 +460,13 @@ fun Route.adminRoutes(
                 adminUserRoutes(
                     adminService = adminService,
                     roleGroupService = roleGroupService,
-                    userRepository = userRepository,
                     sessionRepository = sessionRepository,
                 )
 
                 adminSessionAuditRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
-                    userRepository = userRepository,
+                    adminService = adminService,
                     applicationRepository = applicationRepository,
                 )
 
