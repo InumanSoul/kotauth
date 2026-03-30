@@ -1,5 +1,25 @@
 /* htmx loading and indicator utilities */
 
+/* Global progress bar — fixed at the top of the viewport */
+.htmx-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 9999;
+  background: var(--color-accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease, opacity 0.2s;
+}
+
+.htmx-request .htmx-progress,
+.htmx-request.htmx-progress {
+  transform: scaleX(0.85);
+  opacity: 1;
+}
+
 .htmx-loader {
   display: none;
   opacity: 0.6;

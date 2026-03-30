@@ -94,6 +94,9 @@ internal fun HTML.adminShell(
 ) {
     head { adminHead(pageTitle) }
     body {
+        attributes["hx-indicator"] = "#global-loader"
+        div("htmx-progress htmx-indicator") { id = "global-loader" }
+
         demoBanner()
         div("shell") {
             // ── Top bar ──────────────────────────────────────────────
