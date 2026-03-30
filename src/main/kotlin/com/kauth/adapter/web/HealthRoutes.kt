@@ -32,7 +32,6 @@ data class ConfigCheckResult(
     val status: String,
     val baseUrl: String,
     val httpsEnforced: Boolean,
-    val secretKeyPresent: Boolean,
     val warnings: List<String> = emptyList(),
 )
 
@@ -65,10 +64,7 @@ data class ReadinessResponse(
  *                       Returns 200 when ready, 503 when not_ready.
  *                       Used by Docker depends_on / k8s readiness probe.
  */
-fun Route.healthRoutes(
-    baseUrl: String,
-    encryptionAvailable: Boolean,
-) {
+fun Route.healthRoutes(baseUrl: String) {
     // -- Liveness ------------------------------------------------------------
     get("/health") {
         call.respond(
@@ -82,7 +78,7 @@ fun Route.healthRoutes(
     // -- Readiness -----------------------------------------------------------
     get("/health/ready") {
         val dbCheck = pingDatabase()
-        val configCheck = checkConfig(baseUrl, encryptionAvailable)
+        val configCheck = checkConfig(baseUrl)
 
         // The container is only "ready" when the DB is reachable.
         // Config issues are surfaced as warnings, not hard failures, so that
@@ -144,10 +140,7 @@ internal fun pingDatabase(): DbCheckResult {
  * Startup enforcement (exitProcess) handles hard failures; this surfaces
  * soft warnings for operators checking the health endpoint after deploy.
  */
-internal fun checkConfig(
-    baseUrl: String,
-    secretKeyPresent: Boolean,
-): ConfigCheckResult {
+internal fun checkConfig(baseUrl: String): ConfigCheckResult {
     val isHttps = baseUrl.startsWith("https://")
     val isLocalhost = baseUrl.contains("localhost") || baseUrl.contains("127.0.0.1")
 
@@ -156,16 +149,12 @@ internal fun checkConfig(
             if (!isHttps && !isLocalhost) {
                 add("KAUTH_BASE_URL is not HTTPS on a non-localhost host — OAuth2 providers will reject redirect URIs")
             }
-            if (!secretKeyPresent) {
-                add("KAUTH_SECRET_KEY is not set — portal sessions are ephemeral and SMTP passwords cannot be stored")
-            }
         }
 
     return ConfigCheckResult(
         status = if (warnings.isEmpty()) "ok" else "warn",
         baseUrl = baseUrl,
         httpsEnforced = isHttps,
-        secretKeyPresent = secretKeyPresent,
         warnings = warnings,
     )
 }

@@ -11,52 +11,25 @@ import javax.crypto.spec.SecretKeySpec
 /**
  * AES-256-GCM symmetric encryption + HMAC-SHA256 cookie signing.
  *
- * Used for:
- *   1. Encrypting SMTP passwords at rest (AES-256-GCM).
- *   2. Signing short-lived MFA pending cookies (HMAC-SHA256) — prevents userId
- *      forgery that would let an attacker bypass the MFA challenge step.
+ * Both keys are derived from [rawSecretKey] using SHA-256 with a domain-specific
+ * prefix. Keys are deterministic and do not need to be stored separately.
  *
- * Key derivation: Both keys are derived from [rawSecretKey] using SHA-256 with
- * a domain-specific prefix. This means keys are deterministic and do not need
- * to be stored separately.
- *
- * If [rawSecretKey] is null or blank, a random HMAC key is generated at
- * construction time (cookie signatures won't survive a restart, but they will
- * always be valid within a session — the 5-minute TTL makes this acceptable).
- *
- * Cookie signing format: "{value}.{base64url(hmac)}"
- * Verification strips the signature, recomputes it, and compares in constant time.
- *
- * Persistence adapters depend on [com.kauth.domain.port.EncryptionPort] (encrypt/decrypt/isAvailable).
+ * Persistence adapters depend on [com.kauth.domain.port.EncryptionPort] (encrypt/decrypt).
  * Web adapters depend on the concrete class for cookie signing (signCookie/verifyCookie).
  */
 class EncryptionService(
-    rawSecretKey: String?,
+    rawSecretKey: String,
 ) : com.kauth.domain.port.EncryptionPort {
-    private val secretKey: SecretKeySpec? =
-        if (rawSecretKey.isNullOrBlank()) {
-            null
-        } else {
+    private val secretKey: SecretKeySpec =
+        run {
             val keyBytes = MessageDigest.getInstance("SHA-256").digest(rawSecretKey.toByteArray(Charsets.UTF_8))
             SecretKeySpec(keyBytes, KEY_ALGORITHM)
         }
 
-    /**
-     * HMAC-SHA256 key for MFA pending cookie signing.
-     * Derived from [rawSecretKey] with a domain prefix to isolate it from
-     * the AES key. Falls back to a random 32-byte key if the secret is not set
-     * (signatures valid only within a single process lifetime).
-     */
     private val hmacKey: ByteArray =
-        if (!rawSecretKey.isNullOrBlank()) {
-            MessageDigest
-                .getInstance("SHA-256")
-                .digest("mfa-cookie-signing:$rawSecretKey".toByteArray(Charsets.UTF_8))
-        } else {
-            ByteArray(32).also { SecureRandom().nextBytes(it) }
-        }
-
-    override val isAvailable: Boolean get() = secretKey != null
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest("mfa-cookie-signing:$rawSecretKey".toByteArray(Charsets.UTF_8))
 
     /**
      * Encrypts [plaintext] using AES-256-GCM.
@@ -64,14 +37,9 @@ class EncryptionService(
      * Throws [IllegalStateException] if no secret key was provided.
      */
     override fun encrypt(plaintext: String): String {
-        val key =
-            secretKey ?: error(
-                "KAUTH_SECRET_KEY env var is not set. Cannot encrypt SMTP password.",
-            )
-
         val iv = ByteArray(GCM_IV_LENGTH).also { SecureRandom().nextBytes(it) }
         val cipher = Cipher.getInstance(ALGORITHM)
-        cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
         val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
 
         val enc = Base64.getUrlEncoder().withoutPadding()
@@ -83,7 +51,6 @@ class EncryptionService(
      * Returns null if decryption fails (wrong key, tampered data, or missing secret key).
      */
     override fun decrypt(encrypted: String): String? {
-        val key = secretKey ?: return null
         return try {
             val parts = encrypted.split(".")
             if (parts.size != 2) return null
@@ -92,7 +59,7 @@ class EncryptionService(
             val ciphertext = dec.decode(parts[1])
 
             val cipher = Cipher.getInstance(ALGORITHM)
-            cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_BITS, iv))
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
             String(cipher.doFinal(ciphertext), Charsets.UTF_8)
         } catch (_: Exception) {
             null

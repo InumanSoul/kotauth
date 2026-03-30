@@ -13,7 +13,7 @@ data class EnvironmentConfig(
     val baseUrl: String,
     val env: String,
     val isDevelopment: Boolean,
-    val secretKey: String?,
+    val secretKey: String,
     val dbUrl: String,
     val dbUser: String,
     val dbPassword: String,
@@ -32,8 +32,7 @@ data class EnvironmentConfig(
             validateHttps(baseUrl, env)
             validateLegacySecret(env)
 
-            val secretKey = System.getenv("KAUTH_SECRET_KEY")
-            validateSecretKey(secretKey, env)
+            val secretKey = requireSecretKey(System.getenv("KAUTH_SECRET_KEY"))
 
             val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
             validateAdminBypass(adminBypass)
@@ -42,7 +41,7 @@ data class EnvironmentConfig(
                 baseUrl = baseUrl,
                 env = env,
                 isDevelopment = isDevelopment,
-                secretKey = secretKey?.ifBlank { null },
+                secretKey = secretKey,
                 dbUrl =
                     System.getenv("DB_URL")
                         ?: "jdbc:postgresql://localhost:5432/kauth_db",
@@ -127,21 +126,18 @@ data class EnvironmentConfig(
             }
         }
 
-        private fun validateSecretKey(
-            secretKey: String?,
-            env: String,
-        ) {
-            if (env == "production" && (secretKey.isNullOrBlank() || secretKey.length < 32)) {
+        private fun requireSecretKey(secretKey: String?): String {
+            if (secretKey.isNullOrBlank() || secretKey.length < 32) {
                 System.err.println(
                     """
                     ┌──────────────────────────────────────────────────────────────┐
-                    │  FATAL: KAUTH_SECRET_KEY must be set (32+ chars) in         │
-                    │  production mode.                                            │
+                    │  FATAL: KAUTH_SECRET_KEY must be set (32+ chars).           │
                     │                                                              │
                     │  This key is used for:                                       │
                     │    • AES-256-GCM encryption of secrets at rest               │
-                    │    • HMAC signing of portal session cookies                  │
-                    │    • Encrypting SMTP credentials in the database             │
+                    │    • HMAC signing of session cookies                         │
+                    │    • Encrypting SMTP credentials and TOTP secrets            │
+                    │    • Encrypting RSA private keys in the database             │
                     │                                                              │
                     │  Generate one:  openssl rand -hex 32                         │
                     └──────────────────────────────────────────────────────────────┘
@@ -149,15 +145,7 @@ data class EnvironmentConfig(
                 )
                 exitProcess(1)
             }
-            if (secretKey.isNullOrBlank()) {
-                System.err.println(
-                    """
-                    [WARN] KAUTH_SECRET_KEY is not set.
-                           SMTP passwords cannot be stored and portal sessions are ephemeral.
-                           Set this env var to a random 32+ char string for production use.
-                    """.trimIndent(),
-                )
-            }
+            return secretKey
         }
 
         private fun validateAdminBypass(adminBypass: Boolean) {

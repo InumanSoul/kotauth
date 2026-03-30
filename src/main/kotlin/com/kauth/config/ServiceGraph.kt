@@ -293,40 +293,16 @@ data class ServiceGraph(
                     windowSeconds = 300,
                 )
 
-            // -- Portal session key -------------------------------------------
+            // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
-                run {
-                    val secret = config.secretKey
-                    if (!secret.isNullOrBlank()) {
-                        java.security.MessageDigest
-                            .getInstance("SHA-256")
-                            .digest(
-                                "portal-session:$secret"
-                                    .toByteArray(Charsets.UTF_8),
-                            )
-                    } else {
-                        ByteArray(32).also {
-                            java.security.SecureRandom().nextBytes(it)
-                        }
-                    }
-                }
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest("portal-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
             val adminSessionKey: ByteArray =
-                run {
-                    val secret = config.secretKey
-                    if (!secret.isNullOrBlank()) {
-                        java.security.MessageDigest
-                            .getInstance("SHA-256")
-                            .digest(
-                                "admin-session:$secret"
-                                    .toByteArray(Charsets.UTF_8),
-                            )
-                    } else {
-                        ByteArray(32).also {
-                            java.security.SecureRandom().nextBytes(it)
-                        }
-                    }
-                }
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest("admin-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
             return ServiceGraph(
                 authService = authService,

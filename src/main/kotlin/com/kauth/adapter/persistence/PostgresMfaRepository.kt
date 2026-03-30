@@ -165,13 +165,7 @@ class PostgresMfaRepository(
             createdAt = this[MfaRecoveryCodesTable.createdAt].toInstant(),
         )
 
-    // -----------------------------------------------------------------------
-    // Encryption helpers — transparent encrypt/decrypt for TOTP secrets
-    // -----------------------------------------------------------------------
+    private fun encryptSecret(plaintext: String): String = encryptionService.encrypt(plaintext)
 
-    private fun encryptSecret(plaintext: String): String =
-        if (encryptionService.isAvailable) encryptionService.encrypt(plaintext) else plaintext
-
-    private fun decryptSecret(stored: String): String =
-        if (encryptionService.isAvailable) encryptionService.decrypt(stored) ?: stored else stored
+    private fun decryptSecret(stored: String): String = encryptionService.decrypt(stored) ?: stored
 }

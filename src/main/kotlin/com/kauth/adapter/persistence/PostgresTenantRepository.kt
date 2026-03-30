@@ -87,9 +87,7 @@ class PostgresTenantRepository(
     override fun update(tenant: Tenant): Tenant =
         transaction {
             val encryptedPassword: String? =
-                tenant.smtpPassword?.let { raw ->
-                    if (encryptionService.isAvailable) encryptionService.encrypt(raw) else null
-                }
+                tenant.smtpPassword?.let { encryptionService.encrypt(it) }
 
             TenantsTable.update({ TenantsTable.id eq tenant.id.value }) {
                 it[displayName] = tenant.displayName

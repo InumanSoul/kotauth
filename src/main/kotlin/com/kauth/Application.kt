@@ -100,11 +100,10 @@ fun main() {
     )
 
     startupLog.info(
-        "KotAuth v{} started | env={} | baseUrl={} | encryption={} | jvm={}",
+        "KotAuth v{} started | env={} | baseUrl={} | jvm={}",
         appInfo.version,
         config.env,
         config.baseUrl,
-        services.encryptionService.isAvailable,
         System.getProperty("java.version"),
     )
 
@@ -294,10 +293,9 @@ fun Application.module(
             appInfo,
             startTime,
             config.isDevelopment,
-            s.encryptionService.isAvailable,
         )
 
-        healthRoutes(config.baseUrl, s.encryptionService.isAvailable)
+        healthRoutes(config.baseUrl)
 
         authRoutes(
             authService = s.authService,
