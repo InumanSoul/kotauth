@@ -2,15 +2,16 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantKey
+import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantKeyRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.OffsetDateTime
 
-/**
- * Persistence adapter for tenant RSA signing keys.
- */
-class PostgresTenantKeyRepository : TenantKeyRepository {
+/** Persistence adapter for tenant RSA signing keys. Private keys are AES-256-GCM encrypted at rest. */
+class PostgresTenantKeyRepository(
+    private val encryptionService: EncryptionPort,
+) : TenantKeyRepository {
     override fun findActiveKey(tenantId: TenantId): TenantKey? =
         transaction {
             TenantKeysTable
@@ -39,7 +40,7 @@ class PostgresTenantKeyRepository : TenantKeyRepository {
                     it[keyId] = key.keyId
                     it[algorithm] = key.algorithm
                     it[publicKey] = key.publicKeyPem
-                    it[privateKey] = key.privateKeyPem
+                    it[privateKey] = encryptionService.encrypt(key.privateKeyPem)
                     it[enabled] = key.enabled
                     it[createdAt] = OffsetDateTime.now()
                 } get TenantKeysTable.id
@@ -59,14 +60,17 @@ class PostgresTenantKeyRepository : TenantKeyRepository {
         Unit
     }
 
-    private fun ResultRow.toTenantKey() =
-        TenantKey(
+    private fun ResultRow.toTenantKey(): TenantKey {
+        val storedPrivateKey = this[TenantKeysTable.privateKey]
+        val decryptedPrivateKey = encryptionService.decrypt(storedPrivateKey) ?: storedPrivateKey
+        return TenantKey(
             id = this[TenantKeysTable.id],
             tenantId = TenantId(this[TenantKeysTable.tenantId]),
             keyId = this[TenantKeysTable.keyId],
             algorithm = this[TenantKeysTable.algorithm],
             publicKeyPem = this[TenantKeysTable.publicKey],
-            privateKeyPem = this[TenantKeysTable.privateKey],
+            privateKeyPem = decryptedPrivateKey,
             enabled = this[TenantKeysTable.enabled],
         )
+    }
 }

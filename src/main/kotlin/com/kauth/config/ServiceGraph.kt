@@ -52,6 +52,7 @@ import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import kotlinx.coroutines.CoroutineScope
@@ -104,7 +105,7 @@ data class ServiceGraph(
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
-            val tenantKeyRepository = PostgresTenantKeyRepository()
+            val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
             val sessionRepository = PostgresSessionRepository()
             val authCodeRepository = PostgresAuthorizationCodeRepository()
             val auditLogRepository = PostgresAuditLogRepository()
@@ -128,6 +129,7 @@ data class ServiceGraph(
             val keyProvisioning =
                 KeyProvisioningService(tenantRepository, tenantKeyRepository)
             keyProvisioning.provisionMissingKeys()
+            KeyEncryptionMigration(encryptionService).migrateIfNeeded()
 
             val portalClientProvisioning =
                 PortalClientProvisioning(

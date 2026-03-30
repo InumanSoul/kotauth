@@ -16,8 +16,7 @@ import java.util.Base64
  *
  * Security notes:
  *   - 2048-bit RSA is the minimum acceptable for production (NIST recommends 2048-4096).
- *   - Private keys are stored unencrypted in the DB. If at-rest encryption is required
- *     (for compliance), wrap with database TDE or a KMS-backed column encryption layer.
+ *   - Private keys are encrypted at rest with AES-256-GCM via EncryptionService.
  *   - Key rotation: generate a new key pair, add it (enabled=true), then disable the old
  *     one after all tokens signed with the old key have expired.
  */
