@@ -53,7 +53,7 @@ object WelcomeView {
             attributes["sizes"] =
                 "16x16"
         }
-        link(rel = "stylesheet", href = "/static/kotauth-admin.css")
+        link(rel = "stylesheet", href = "/static/kotauth-admin.css?v=${AppInfo.assetVersion}")
         style {
             unsafe {
                 +(

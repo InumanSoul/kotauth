@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
@@ -903,7 +904,7 @@ object PortalView {
         link(rel = "preconnect", href = "https://fonts.gstatic.com") { attributes["crossorigin"] = "" }
         link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
-        link(rel = "stylesheet", href = "/static/kotauth-auth.css")
+        link(rel = "stylesheet", href = "/static/kotauth-auth.css?v=${AppInfo.assetVersion}")
     }
 
     // =========================================================================
@@ -934,11 +935,11 @@ object PortalView {
         link(rel = "stylesheet", href = theme.googleFontsUrl)
         style { unsafe { +theme.toCssVars() } }
         val cssBundle = when (layout) {
-            PortalLayout.SIDEBAR -> "/static/kotauth-portal-sidenav.css"
-            PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css"
+            PortalLayout.SIDEBAR -> "/static/kotauth-portal-sidenav.css?v=${AppInfo.assetVersion}"
+            PortalLayout.CENTERED -> "/static/kotauth-portal-tabnav.css?v=${AppInfo.assetVersion}"
         }
         link(rel = "stylesheet", href = cssBundle)
-        script(src = "/static/js/kotauth-portal.min.js") {
+        script(src = "/static/js/kotauth-portal.min.js?v=${AppInfo.assetVersion}") {
             attributes["defer"] = "true"
             JsIntegrity.portal?.let { attributes["integrity"] = it }
             attributes["crossorigin"] = "anonymous"

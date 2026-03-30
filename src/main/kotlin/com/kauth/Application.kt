@@ -16,6 +16,7 @@ import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -23,8 +24,10 @@ import io.ktor.server.engine.*
 import io.ktor.server.html.*
 import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
+import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
 import io.ktor.server.plugins.statuspages.*
@@ -138,6 +141,44 @@ fun Application.module(
                 HttpHeaders.StrictTransportSecurity,
                 "max-age=31536000; includeSubDomains",
             )
+        }
+    }
+
+    // -- Response compression -------------------------------------------------
+    install(Compression) {
+        gzip {
+            priority = 1.0
+            minimumSize(1024)
+        }
+        deflate {
+            priority = 0.9
+            minimumSize(1024)
+        }
+        excludeContentType(ContentType.Image.Any)
+    }
+
+    // -- Cache headers for static assets -------------------------------------
+    install(CachingHeaders) {
+        options { _, content ->
+            val contentType = content.contentType?.withoutParameters()
+            when {
+                // CSS and JS are cache-busted via ?v= query param per release
+                contentType == ContentType.Text.CSS ||
+                    contentType == ContentType.Application.JavaScript ->
+                    CachingOptions(
+                        cacheControl =
+                            CacheControl.MaxAge(
+                                maxAgeSeconds = 31536000,
+                                visibility = CacheControl.Visibility.Public,
+                            ),
+                    )
+                // HTML pages must always revalidate
+                contentType == ContentType.Text.Html ->
+                    CachingOptions(
+                        cacheControl = CacheControl.NoCache(null),
+                    )
+                else -> null
+            }
         }
     }
 

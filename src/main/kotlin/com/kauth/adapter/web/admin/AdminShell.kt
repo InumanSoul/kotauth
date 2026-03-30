@@ -35,8 +35,8 @@ internal fun HEAD.adminHead(
         attributes["sizes"] = "16x16"
     }
     style { unsafe { +theme.toCssVars() } }
-    link(rel = "stylesheet", href = "/static/kotauth-admin.css")
-    script(src = "/static/js/kotauth-admin.min.js") {
+    link(rel = "stylesheet", href = "/static/kotauth-admin.css?v=${AppInfo.assetVersion}")
+    script(src = "/static/js/kotauth-admin.min.js?v=${AppInfo.assetVersion}") {
         attributes["defer"] = "true"
         JsIntegrity.admin?.let { attributes["integrity"] = it }
         attributes["crossorigin"] = "anonymous"

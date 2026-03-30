@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
@@ -1079,7 +1080,7 @@ internal fun brandingPageImpl(
             }
 
             // ── Script: live preview + presets (external) ──────────
-            script(src = "/static/js/branding.min.js") {
+            script(src = "/static/js/branding.min.js?v=${AppInfo.assetVersion}") {
                 attributes["defer"] = "true"
                 JsIntegrity.branding?.let { attributes["integrity"] = it }
                 attributes["crossorigin"] = "anonymous"
