@@ -405,8 +405,20 @@ object AuthView {
                                         href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
                                         classes = "btn-social",
                                     ) {
-                                        span("social-icon") {}
-                                        +prov.displayName
+                                        when (prov) {
+                                            SocialProvider.GOOGLE -> {
+                                                span("social-icon") {
+                                                    inlineSvgIcon(iconName = "google-logo", ariaLabel = "Google")
+                                                }
+                                                +"Continue with Google"
+                                            }
+                                            SocialProvider.GITHUB -> {
+                                                span("social-icon") {
+                                                    inlineSvgIcon(iconName = "github-logo", ariaLabel = "GitHub")
+                                                }
+                                                +"Continue with GitHub"
+                                            }
+                                        }
                                     }
                                 }
                             }
