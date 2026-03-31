@@ -90,12 +90,22 @@ internal fun HTML.adminShell(
     loggedInAs: String,
     showSidebar: Boolean = true,
     contentClass: String = "content",
+    toastMessage: String? = null,
     content: DIV.() -> Unit,
 ) {
     head { adminHead(pageTitle) }
     body {
         attributes["hx-indicator"] = "#global-loader"
+        if (toastMessage != null) {
+            attributes["data-toast-msg"] = toastMessage
+        }
         div("htmx-progress htmx-indicator") { id = "global-loader" }
+        div {
+            id = "toast-region"
+            attributes["role"] = "status"
+            attributes["aria-live"] = "polite"
+            attributes["aria-atomic"] = "true"
+        }
 
         demoBanner()
         div("shell") {

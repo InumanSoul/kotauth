@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
@@ -254,9 +255,9 @@ internal fun identityProvidersPageImpl(
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
                   contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_IDP_SAVED else null,
 ) {
             div("content-inner") {
-            // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -264,7 +265,6 @@ internal fun identityProvidersPageImpl(
                 "Identity Providers" to null,
             )
 
-            // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
@@ -274,11 +274,6 @@ internal fun identityProvidersPageImpl(
                         }
                     }
                 }
-            }
-
-            // ── Notices ──────────────────────────────────────────────
-            if (saved) {
-                div("notice notice--success") { +"Identity provider settings saved." }
             }
             if (error != null) {
                 div("notice notice--error") { +error }

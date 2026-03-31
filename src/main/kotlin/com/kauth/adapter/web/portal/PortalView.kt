@@ -110,14 +110,13 @@ object PortalView {
         {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
+                if (successMsg != null) {
+                    attributes["data-toast-msg"] = EnglishStrings.TOAST_PROFILE_UPDATED
+                }
                 portalShell(slug, workspaceName, session.username, "profile", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Profile" }
                         p(classes = "page-header__subtitle") { +"Manage your personal information" }
-                    }
-
-                    if (successMsg != null) {
-                        div(classes = "alert alert-success") { +"Profile updated successfully." }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -203,7 +202,7 @@ object PortalView {
                                 type = ButtonType.button,
                                 classes = "btn btn--danger",
                             ) {
-                                attributes["onclick"] = "document.getElementById('delete-confirm').classList.toggle('is-open')"
+                                attributes["data-action"] = "toggle-delete-confirm"
                                 +"Delete account"
                             }
                         }
@@ -256,14 +255,13 @@ object PortalView {
         {
             head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
+                if (successMsg != null) {
+                    attributes["data-toast-msg"] = EnglishStrings.TOAST_PASSWORD_CHANGED
+                }
                 portalShell(slug, workspaceName, session.username, "security", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Security" }
                         p(classes = "page-header__subtitle") { +"Password and active sessions" }
-                    }
-
-                    if (successMsg != null) {
-                        div(classes = "alert alert-success") { +"Password changed successfully." }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -485,7 +483,7 @@ object PortalView {
                     div("footer-link") {
                         a(href = "#") {
                             id = "recovery-toggle"
-                            attributes["onclick"] = "toggleRecoveryMode(); return false;"
+                            attributes["data-action"] = "toggle-recovery"
                             +"Use a recovery code instead"
                         }
                     }
@@ -519,6 +517,10 @@ object PortalView {
             portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
         }
         body {
+            attributes["data-tenant-slug"] = slug
+            if (successMsg != null) {
+                attributes["data-toast-msg"] = EnglishStrings.TOAST_MFA_SETUP
+            }
             portalShell(slug, workspaceName, session.username, "mfa", layout, theme.logoUrl) {
                 div(classes = "page-header") {
                     h1(classes = "page-header__title") { +"Two-Factor Authentication" }
@@ -529,12 +531,6 @@ object PortalView {
                     div(classes = "alert alert-warning") {
                         style = "font-size:14px; padding:12px 16px;"
                         +noticeMsg
-                    }
-                }
-
-                if (successMsg != null) {
-                    div(classes = "alert alert-success") {
-                        +"Authenticator set up successfully. Your account is now protected with two-factor authentication."
                     }
                 }
                 if (!errorMsg.isNullOrBlank()) {
@@ -571,11 +567,7 @@ object PortalView {
                             div {
                                 id = "disable-btn-row"
                                 button(classes = "btn btn--danger") {
-                                    attributes["onclick"] =
-                                        """
-                                        document.getElementById('disable-confirm').style.display='block';
-                                        document.getElementById('disable-btn-row').style.display='none';
-                                        """.trimIndent()
+                                    attributes["data-action"] = "show-disable-confirm"
                                     +"Remove authenticator"
                                 }
                             }
@@ -591,15 +583,11 @@ object PortalView {
                                 div(classes = "mfa-action-row") {
                                     button(classes = "btn btn--danger") {
                                         id = "disable-btn"
-                                        attributes["onclick"] = "disableMfa('$slug')"
+                                        attributes["data-action"] = "disable-mfa"
                                         +"Yes, remove authenticator"
                                     }
                                     button(classes = "btn btn--ghost") {
-                                        attributes["onclick"] =
-                                            """
-                                            document.getElementById('disable-confirm').style.display='none';
-                                            document.getElementById('disable-btn-row').style.display='block';
-                                            """.trimIndent()
+                                        attributes["data-action"] = "hide-disable-confirm"
                                         +"Cancel"
                                     }
                                 }
@@ -637,7 +625,7 @@ object PortalView {
                                 }
                                 button(classes = "btn btn--primary") {
                                     id = "start-btn"
-                                    attributes["onclick"] = "startEnrollment('$slug')"
+                                    attributes["data-action"] = "start-enrollment"
                                     +"Set up authenticator"
                                 }
                                 div(classes = "alert alert-error") {
@@ -673,15 +661,14 @@ object PortalView {
                                 button(classes = "btn btn--ghost") {
                                     id = "copy-codes-btn"
                                     style = "margin-bottom: 4px;"
-                                    attributes["onclick"] = "copyCodes()"
+                                    attributes["data-action"] = "copy-codes"
                                     +"Copy codes"
                                 }
 
                                 label(classes = "mfa-confirm-label") {
                                     input(type = InputType.checkBox) {
                                         id = "codes-saved"
-                                        attributes["onchange"] =
-                                            "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                                        attributes["data-action"] = "codes-saved-toggle"
                                     }
                                     +" I've saved my recovery codes in a safe place"
                                 }
@@ -715,7 +702,7 @@ object PortalView {
                                     }
                                     button(classes = "btn btn--primary") {
                                         id = "verify-btn"
-                                        attributes["onclick"] = "verifyEnrollment('$slug')"
+                                        attributes["data-action"] = "verify-enrollment"
                                         +"Confirm setup"
                                     }
                                 }

@@ -32,6 +32,7 @@ internal fun userDetailPageImpl(
             activeAppSection = "users",
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
+            toastMessage = successMessage,
 ) {
             div("content-inner") {
             breadcrumb(
@@ -40,8 +41,6 @@ internal fun userDetailPageImpl(
                 "Users" to "/admin/workspaces/${workspace.slug}/users",
                 user.username to null,
             )
-
-            // ── User header with avatar ──────────────────────────────
             div("user-header") {
                 div("user-header__left") {
                     div("user-header__avatar") {
@@ -98,15 +97,6 @@ internal fun userDetailPageImpl(
                 }
             }
 
-            // ── Alerts ───────────────────────────────────────────────
-            if (successMessage != null) {
-                div("notice notice--success") {
-                    span("notice__icon") { inlineSvgIcon("check-circle", "Success") }
-                    div("notice__body") {
-                        span("notice__title") { +successMessage }
-                    }
-                }
-            }
             if (editError != null) {
                 div("notice notice--error") { +editError }
             }

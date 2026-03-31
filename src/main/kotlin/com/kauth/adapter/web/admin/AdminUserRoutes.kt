@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.service.AdminResult
@@ -100,9 +101,9 @@ fun Route.adminUserRoutes(
                 val savedParam = call.request.queryParameters["saved"]
                 val successMsg =
                     when (savedParam) {
-                        "true" -> "Profile saved."
-                        "reset_email_sent" -> "Password reset email sent successfully."
-                        "unlocked" -> "Account unlocked successfully."
+                        "true" -> EnglishStrings.TOAST_PROFILE_SAVED
+                        "reset_email_sent" -> EnglishStrings.TOAST_RESET_EMAIL_SENT
+                        "unlocked" -> EnglishStrings.TOAST_UNLOCKED
                         else -> null
                     }
                 val errorParam =

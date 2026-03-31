@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -28,9 +29,9 @@ internal fun smtpSettingsPageImpl(
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
                   contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_SMTP_SAVED else null,
 ) {
             div("content-inner") {
-            // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -38,7 +39,6 @@ internal fun smtpSettingsPageImpl(
                 "SMTP" to null,
             )
 
-            // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
@@ -55,11 +55,6 @@ internal fun smtpSettingsPageImpl(
                         +"Save SMTP"
                     }
                 }
-            }
-
-            // ── Notices ──────────────────────────────────────────────
-            if (saved) {
-                div("notice notice--success") { +"SMTP settings saved." }
             }
             if (error != null) {
                 div("notice notice--error") { +error }
