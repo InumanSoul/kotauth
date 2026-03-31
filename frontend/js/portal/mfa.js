@@ -1,17 +1,77 @@
 /**
  * MFA challenge and enrollment interactions for the self-service portal.
  *
- * MFA challenge: toggles between TOTP code input and recovery code input.
- * MFA enrollment: drives the multi-step TOTP setup flow (enroll → QR → verify → done).
+ * All interactions use data-action attributes + event delegation (CSP-compliant).
+ * The tenant slug is read once from data-tenant-slug on the page container.
  */
 (function () {
   'use strict';
 
+  let recoveryMode = false;
+  let savedRecoveryCodes = null;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const slugElement = document.querySelector('[data-tenant-slug]');
+    const slug = slugElement ? slugElement.getAttribute('data-tenant-slug') : null;
+
+    document.addEventListener('click', (event) => {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+
+      const action = target.getAttribute('data-action');
+
+      switch (action) {
+        case 'toggle-recovery':
+          event.preventDefault();
+          toggleRecoveryMode();
+          break;
+        case 'start-enrollment':
+          startEnrollment(slug, target);
+          break;
+        case 'verify-enrollment':
+          verifyEnrollment(slug, target);
+          break;
+        case 'copy-codes':
+          copyCodes(target);
+          break;
+        case 'show-disable-confirm':
+          showElement('disable-confirm');
+          hideElement('disable-btn-row');
+          break;
+        case 'hide-disable-confirm':
+          hideElement('disable-confirm');
+          showElement('disable-btn-row');
+          break;
+        case 'disable-mfa':
+          disableMfa(slug, target);
+          break;
+        case 'toggle-delete-confirm':
+          document.getElementById('delete-confirm')?.classList.toggle('is-open');
+          break;
+      }
+    });
+
+    document.addEventListener('change', (event) => {
+      const target = event.target.closest('[data-action="codes-saved-toggle"]');
+      if (!target) return;
+      const step2b = document.getElementById('mfa-step-2b');
+      if (step2b) step2b.style.display = target.checked ? 'block' : 'none';
+    });
+  });
+
+  function showElement(id) {
+    const element = document.getElementById(id);
+    if (element) element.style.display = 'block';
+  }
+
+  function hideElement(id) {
+    const element = document.getElementById(id);
+    if (element) element.style.display = 'none';
+  }
+
   // ── MFA challenge — recovery mode toggle ────────────────────────────────
 
-  let recoveryMode = false;
-
-  window.toggleRecoveryMode = function () {
+  function toggleRecoveryMode() {
     recoveryMode = !recoveryMode;
     const codeInput = document.getElementById('code');
     const codeLabel = document.getElementById('code-label');
@@ -37,17 +97,14 @@
     }
     codeInput.value = '';
     codeInput.focus();
-  };
+  }
 
   // ── MFA enrollment — multi-step setup ───────────────────────────────────
 
-  let savedRecoveryCodes = null;
-
-  window.startEnrollment = async function (slug) {
-    const startButton = document.getElementById('start-btn');
+  async function startEnrollment(slug, button) {
     const errorElement = document.getElementById('enroll-error');
-    startButton.disabled = true;
-    startButton.textContent = 'Setting up\u2026';
+    button.disabled = true;
+    button.textContent = 'Setting up\u2026';
     errorElement.style.display = 'none';
 
     try {
@@ -59,13 +116,13 @@
           ? 'An authenticator is already configured. Refresh the page.'
           : 'Failed to start setup. Please try again.';
         errorElement.style.display = 'block';
-        startButton.disabled = false;
-        startButton.textContent = 'Set up authenticator';
+        button.disabled = false;
+        button.textContent = 'Set up authenticator';
         return;
       }
 
-      document.getElementById('mfa-step-1').style.display = 'none';
-      document.getElementById('mfa-step-2').style.display = 'block';
+      hideElement('mfa-step-1');
+      showElement('mfa-step-2');
 
       new QRCode(document.getElementById('qr-code'), {
         text: data.totp_uri,
@@ -93,15 +150,14 @@
     } catch (_error) {
       errorElement.textContent = 'Network error. Please check your connection and try again.';
       errorElement.style.display = 'block';
-      startButton.disabled = false;
-      startButton.textContent = 'Set up authenticator';
+      button.disabled = false;
+      button.textContent = 'Set up authenticator';
     }
-  };
+  }
 
-  window.verifyEnrollment = async function (slug) {
+  async function verifyEnrollment(slug, button) {
     const totpCode = document.getElementById('totp-code').value.trim();
     const errorElement = document.getElementById('verify-error');
-    const verifyButton = document.getElementById('verify-btn');
     errorElement.style.display = 'none';
 
     if (!/^\d{6}$/.test(totpCode)) {
@@ -110,8 +166,8 @@
       return;
     }
 
-    verifyButton.disabled = true;
-    verifyButton.textContent = 'Verifying\u2026';
+    button.disabled = true;
+    button.textContent = 'Verifying\u2026';
 
     try {
       const body = new URLSearchParams({ code: totpCode });
@@ -129,42 +185,40 @@
           ? 'Incorrect code. Check your device clock is accurate and try again.'
           : 'Verification failed. Please try again.';
         errorElement.style.display = 'block';
-        verifyButton.disabled = false;
-        verifyButton.textContent = 'Confirm setup';
+        button.disabled = false;
+        button.textContent = 'Confirm setup';
       }
     } catch (_error) {
       errorElement.textContent = 'Network error. Please try again.';
       errorElement.style.display = 'block';
-      verifyButton.disabled = false;
-      verifyButton.textContent = 'Confirm setup';
+      button.disabled = false;
+      button.textContent = 'Confirm setup';
     }
-  };
+  }
 
-  window.disableMfa = async function (slug) {
-    const disableButton = document.getElementById('disable-btn');
-    disableButton.disabled = true;
-    disableButton.textContent = 'Removing\u2026';
+  async function disableMfa(slug, button) {
+    button.disabled = true;
+    button.textContent = 'Removing\u2026';
 
     try {
       const response = await fetch('/t/' + slug + '/account/mfa/disable', { method: 'POST' });
       if (response.ok) {
         window.location.reload();
       } else {
-        disableButton.disabled = false;
-        disableButton.textContent = 'Yes, remove authenticator';
+        button.disabled = false;
+        button.textContent = 'Yes, remove authenticator';
       }
     } catch (_error) {
-      disableButton.disabled = false;
-      disableButton.textContent = 'Yes, remove authenticator';
+      button.disabled = false;
+      button.textContent = 'Yes, remove authenticator';
     }
-  };
+  }
 
-  window.copyCodes = function () {
+  function copyCodes(button) {
     if (!savedRecoveryCodes) return;
-    navigator.clipboard.writeText(savedRecoveryCodes.join('\n')).then(function () {
-      const copyButton = document.getElementById('copy-codes-btn');
-      copyButton.textContent = 'Copied!';
-      setTimeout(function () { copyButton.textContent = 'Copy codes'; }, 2000);
+    navigator.clipboard.writeText(savedRecoveryCodes.join('\n')).then(() => {
+      button.textContent = 'Copied!';
+      setTimeout(() => { button.textContent = 'Copy codes'; }, 2000);
     });
-  };
+  }
 })();
