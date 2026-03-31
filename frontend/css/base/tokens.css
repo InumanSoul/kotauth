@@ -45,6 +45,10 @@
   --color-red-bg:         rgba(248, 113, 113, 0.09);
   --color-red-border:     rgba(248, 113, 113, 0.22);
 
+  /* ── Semantic: status aliases (override these for tenant branding) ──────── */
+  --color-success:        var(--color-green);   /* requirement met, valid state    */
+  --color-error:          var(--color-red);     /* requirement failed, error state */
+
   /* ── Semantic: warning ───────────────────────────────────────────────── */
   --color-amber:          #fbbf24;
   --color-amber-bg:       rgba(251, 191, 36, 0.09);

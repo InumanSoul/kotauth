@@ -42,6 +42,7 @@
 @import "./components/demo-banner.css";
 @import "./components/htmx.css";
 @import "./components/dialog.css";
+@import "./components/password-validation.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";

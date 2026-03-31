@@ -31,5 +31,8 @@
 @import "./auth/social.css";
 @import "./auth/misc.css";
 
+/* ── Password validation checklist ────────────────────────────────────────── */
+@import "./components/password-validation.css";
+
 /* ── Demo mode banner (shared with admin bundle) ─────────────────────────── */
 @import "./components/demo-banner.css";
