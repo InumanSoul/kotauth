@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
@@ -424,6 +425,7 @@ internal fun workspaceSettingsPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
 ) {
             div("content-inner") {
             breadcrumb(
@@ -449,10 +451,6 @@ internal fun workspaceSettingsPageImpl(
                         +"Save Settings"
                     }
                 }
-            }
-
-            if (saved) {
-                div("notice notice--success") { +"Settings saved." }
             }
             if (error != null) {
                 div("notice notice--error") { +error }
@@ -594,9 +592,9 @@ internal fun securityPolicyPageImpl(
             workspaceSlug = slug,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
 ) {
             div("content-inner") {
-            // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -604,7 +602,6 @@ internal fun securityPolicyPageImpl(
                 "Security Policy" to null,
             )
 
-            // ── Page header ──────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
@@ -621,11 +618,6 @@ internal fun securityPolicyPageImpl(
                         +"Save Policy"
                     }
                 }
-            }
-
-            // ── Notices ──────────────────────────────────────────────
-            if (saved) {
-                div("notice notice--success") { +"Security policy saved." }
             }
             if (error != null) {
                 div("notice notice--error") { +error }
@@ -809,12 +801,12 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             loggedInAs = loggedInAs,
                   contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,
 ) {
             div("content-inner content-inner--wide") {
             val t = workspace.theme
             val slug = workspace.slug
 
-            // ── Breadcrumb ─────────────────────────────────────────
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
@@ -822,7 +814,6 @@ internal fun brandingPageImpl(
                 "Branding" to null,
             )
 
-            // ── Page header ────────────────────────────────────────
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
@@ -839,11 +830,6 @@ internal fun brandingPageImpl(
                         +"Save Branding"
                     }
                 }
-            }
-
-            // ── Alerts ─────────────────────────────────────────────
-            if (saved) {
-                div("notice notice--success") { +"Branding saved." }
             }
             if (error != null) {
                 div("notice notice--error") { +error }

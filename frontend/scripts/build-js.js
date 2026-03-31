@@ -20,6 +20,8 @@ const bundles = [
       src('vendor/htmx.min.js'),
       src('shared/htmx-config.js'),
       src('shared/confirm-dialog.js'),
+      src('shared/password-validation.js'),
+      src('shared/toast.js'),
       src('admin/settings.js'),
     ],
   },
@@ -28,12 +30,17 @@ const bundles = [
     files: [
       src('auth/auth.js'),
       src('shared/confirm-dialog.js'),
+      src('shared/password-validation.js'),
     ],
   },
   {
     name: 'kotauth-portal.min.js',
     files: [
+      src('vendor/qrcode.min.js'),
       src('shared/confirm-dialog.js'),
+      src('shared/password-validation.js'),
+      src('shared/toast.js'),
+      src('portal/mfa.js'),
     ],
   },
   {

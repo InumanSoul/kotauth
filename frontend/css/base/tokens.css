@@ -1,15 +1,10 @@
 /* frontend/css/base/tokens.css
  *
- * Design token definitions for the admin console.
- * Included in the admin bundle only — never in the auth bundle.
- *
- * Auth token values are injected at runtime via TenantTheme.toCssVars(),
- * which writes a :root {} block into the page <head> before the auth
- * stylesheet is linked.
- *
- * Rule: No selectors other than :root live here.
- *       No hardcoded values anywhere else — always reference a token.
+ * Admin console design tokens — superset of tokens-shared.css.
+ * Structural tokens (spacing, typography, status colors) come from the
+ * shared import. Admin-specific overrides and additional tokens below.
  */
+@import "./tokens-shared.css";
 
 :root {
   /* ── Backgrounds ─────────────────────────────────────────────────────── */
@@ -44,6 +39,10 @@
   --color-red:            #f87171;
   --color-red-bg:         rgba(248, 113, 113, 0.09);
   --color-red-border:     rgba(248, 113, 113, 0.22);
+
+  /* ── Semantic: status aliases (override these for tenant branding) ──────── */
+  --color-success:        var(--color-green);   /* requirement met, valid state    */
+  --color-error:          var(--color-red);     /* requirement failed, error state */
 
   /* ── Semantic: warning ───────────────────────────────────────────────── */
   --color-amber:          #fbbf24;

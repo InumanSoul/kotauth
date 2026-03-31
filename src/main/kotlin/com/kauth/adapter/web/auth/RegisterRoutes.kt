@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthResult
@@ -35,7 +36,13 @@ internal fun Route.registerRoutes(
             }
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.registerPage(slug, theme, workspaceName, enabledProviders = enabledProviders),
+            AuthView.registerPage(
+                slug,
+                theme,
+                workspaceName,
+                enabledProviders = enabledProviders,
+                passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
+            ),
         )
     }
 
@@ -63,6 +70,7 @@ internal fun Route.registerRoutes(
                     workspaceName,
                     error = "Too many registration attempts. Please wait a moment.",
                     enabledProviders = enabledProviders,
+                    passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
                 ),
             )
         }
@@ -94,6 +102,7 @@ internal fun Route.registerRoutes(
                         error = result.error.toMessage(),
                         prefill = prefill,
                         enabledProviders = enabledProviders,
+                        passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
                     ),
                 )
         }

@@ -1,41 +1,41 @@
 /* frontend/css/shared/form.css
  *
- * Shared form elements used by both auth pages and portal.
- * Token values (--color-*, --radius) are injected at runtime by TenantTheme.toCssVars().
+ * Form input base — shared contract for tenant-branded surfaces.
+ * Auth and portal both import this, then add context-specific layout.
  *
- * Border radius uses calc(var(--radius) - 2px) to be slightly tighter
- * than the parent container, maintaining visual hierarchy.
+ * Auth layer:  global selectors (label, input) + .field layout
+ * Portal layer: .edit-field BEM layout + .edit-field__input overrides
  */
 
-.field { margin-bottom: 1rem; }
+/* ── Input base (shared by both auth and portal inputs) ──────────────────── */
 
-label {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--color-muted);
-  margin-bottom: 0.4rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-input {
+.input-base,
+.field input,
+.edit-field__input {
   width: 100%;
-  padding: 0.75rem 1rem;
   background: var(--color-input);
   border: 1px solid var(--color-border);
   border-radius: calc(var(--radius) - 2px);
   color: var(--color-text);
-  font-size: 0.95rem;
-  font-family: inherit;
+  font-family: var(--font-sans);
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-input:focus       { border-color: var(--color-accent); }
-input::placeholder { color: var(--color-muted); }
+.input-base:focus,
+.field input:focus,
+.edit-field__input:focus {
+  border-color: var(--color-accent);
+}
 
-/* Password field with show/hide toggle */
+.input-base::placeholder,
+.field input::placeholder,
+.edit-field__input::placeholder {
+  color: var(--color-muted);
+}
+
+/* ── Password field with show/hide toggle ────────────────────────────────── */
+
 .field__input-wrap {
   position: relative;
 }
@@ -68,7 +68,6 @@ input::placeholder { color: var(--color-muted); }
   opacity: 1;
 }
 
-/* Icon swap via data-visible attribute (set by auth.js) */
 .field__toggle-pw .icon-eye-off { display: none; }
 .field__toggle-pw[data-visible="true"] .icon-eye { display: none; }
 .field__toggle-pw[data-visible="true"] .icon-eye-off { display: inline; }

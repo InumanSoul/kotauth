@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.1] - 2026-03-30
+
+### Added
+
+- **Client-side password validation** — real-time inline checklist on all password fields (register, reset-password, portal change-password, admin user creation). Shows per-tenant policy requirements as the user types: minimum length, uppercase, numbers, special characters. Appears on first keystroke, green checkmarks for met rules, red after blur. Confirm password mismatch shown on blur. `aria-live="polite"` for screen readers
+- **Auto-dismissing toast notifications** — replaces persistent `?saved=true` banners across all admin settings pages and portal pages. Slides in at top-right, auto-removes after 5 seconds. Server renders `data-toast-msg` on `<body>`; JS displays and cleans the URL. Falls back to no-JS gracefully
+- **`EnglishStrings` object** — centralized English strings for i18n preparation (v2.x). Password field labels, toast messages, and validation text extracted. Strings are added incrementally as views are touched
+- **`FRONTEND_COMPONENTS.md`** — documents the three notification patterns (toast, alert, notice) with use cases, decision matrix, and CSS architecture (layer pattern, token sources)
+
+### Security
+
+- **CSP compliance** — all 9 inline `onclick`/`onchange` handlers in portal MFA pages replaced with `data-action` attributes + event delegation in `portal/mfa.js`. No more `'unsafe-inline'` violations for script execution
+- **QRCode.js bundled locally** — removed CDN dependency (`cdnjs.cloudflare.com`). Library now bundled in `kotauth-portal.min.js`. Portal MFA enrollment works fully offline / air-gapped
+
+### Changed
+
+- **CSS token architecture** — created `base/tokens-shared.css` with structural tokens (spacing, typography, status colors) shared across all 4 bundles. Admin's `tokens.css` imports it as a superset. Auth and portal bundles import it directly. Fixes toast and password validation rendering on portal pages
+- **Button CSS refactored to BEM layers** — `shared/button.css` defines the base contract (font, radius, focus-visible, color modifiers). `auth/button.css` defaults to block layout (full-width CTA). `portal/button.css` defaults to compact layout (inline actions). Portal buttons now respect tenant `border-radius` (was broken — used admin-only `--radius-sm` token)
+- **Form CSS refactored to shared base** — `shared/form.css` defines common input styling (background, border, radius, focus, password toggle). Auth and portal layers add context-specific layout
+- **Alert CSS follows re-export pattern** — `portal/alert.css` re-exports `shared/alert.css` (consistent with button and form pattern)
+- **Portal button coherence** — primary hover uses color swap (was opacity), `font-weight` aligned to 600, `letter-spacing` added, `focus-visible` outline added, active state uses `scale(0.98)` matching auth
+- **Auth button** — `font-family: inherit` → `var(--font-sans)` for explicit consistency
+- **Semantic color tokens** — `--color-success` and `--color-error` aliases added to `tokens.css`, used by toast and password validation CSS
+- **Register page social login icons** — Google and GitHub SVG icons now render correctly on the create account page (were empty `span` elements)
+- **Portal MFA scripts extracted** — 140 lines of inline JS moved to `frontend/js/portal/mfa.js` bundle. Modern JS (const/let, async/await, descriptive names). `window._codes` replaced with module-scoped variable
+- **Toast messages use `EnglishStrings`** — all 11 toast messages centralized for i18n readiness
+
+---
+
 ## [1.3.0] - 2026-03-30
 
 ### Security

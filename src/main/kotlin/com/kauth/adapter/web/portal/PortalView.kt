@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
@@ -108,14 +110,13 @@ object PortalView {
         {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
             body {
+                if (successMsg != null) {
+                    attributes["data-toast-msg"] = EnglishStrings.TOAST_PROFILE_UPDATED
+                }
                 portalShell(slug, workspaceName, session.username, "profile", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Profile" }
                         p(classes = "page-header__subtitle") { +"Manage your personal information" }
-                    }
-
-                    if (successMsg != null) {
-                        div(classes = "alert alert-success") { +"Profile updated successfully." }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -201,7 +202,7 @@ object PortalView {
                                 type = ButtonType.button,
                                 classes = "btn btn--danger",
                             ) {
-                                attributes["onclick"] = "document.getElementById('delete-confirm').classList.toggle('is-open')"
+                                attributes["data-action"] = "toggle-delete-confirm"
                                 +"Delete account"
                             }
                         }
@@ -249,18 +250,18 @@ object PortalView {
         currentSessionId: Int? = null,
         successMsg: String?,
         errorMsg: String?,
+        passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
             head { portalPageHead("Security — $workspaceName", theme, layout) }
             body {
+                if (successMsg != null) {
+                    attributes["data-toast-msg"] = EnglishStrings.TOAST_PASSWORD_CHANGED
+                }
                 portalShell(slug, workspaceName, session.username, "security", layout, theme.logoUrl) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +"Security" }
                         p(classes = "page-header__subtitle") { +"Password and active sessions" }
-                    }
-
-                    if (successMsg != null) {
-                        div(classes = "alert alert-success") { +"Password changed successfully." }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -294,28 +295,39 @@ object PortalView {
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "new_password"
-                                        +"New password"
+                                        +EnglishStrings.NEW_PASSWORD
                                     }
                                     input(type = InputType.password, name = "new_password") {
                                         classes = setOf("edit-field__input")
                                         id = "new_password"
-                                        placeholder = "Minimum 8 characters"
+                                        placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
                                         required = true
                                         attributes["autocomplete"] = "new-password"
+                                        attributes["data-pw-min-length"] =
+                                            passwordPolicy.passwordMinLength.toString()
+                                        if (passwordPolicy.passwordRequireUppercase) {
+                                            attributes["data-pw-require-upper"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireNumber) {
+                                            attributes["data-pw-require-number"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireSpecial) {
+                                            attributes["data-pw-require-special"] = "true"
+                                        }
                                     }
-                                    span(classes = "edit-field__hint") { +"Must be at least 8 characters" }
                                 }
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "confirm_password"
-                                        +"Confirm new password"
+                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
                                     }
                                     input(type = InputType.password, name = "confirm_password") {
                                         classes = setOf("edit-field__input")
                                         id = "confirm_password"
-                                        placeholder = "Repeat your new password"
+                                        placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                         required = true
                                         attributes["autocomplete"] = "new-password"
+                                        attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
                                     }
                                 }
                                 div(classes = "edit-actions") {
@@ -471,7 +483,7 @@ object PortalView {
                     div("footer-link") {
                         a(href = "#") {
                             id = "recovery-toggle"
-                            attributes["onclick"] = "toggleRecoveryMode(); return false;"
+                            attributes["data-action"] = "toggle-recovery"
                             +"Use a recovery code instead"
                         }
                     }
@@ -481,41 +493,6 @@ object PortalView {
                     }
                 }
 
-                script {
-                    unsafe {
-                        raw(
-                            """
-                            var _recoveryMode = false;
-                            function toggleRecoveryMode() {
-                                _recoveryMode = !_recoveryMode;
-                                var input    = document.getElementById('code');
-                                var label    = document.getElementById('code-label');
-                                var subtitle = document.getElementById('challenge-subtitle');
-                                var toggle   = document.getElementById('recovery-toggle');
-                                if (_recoveryMode) {
-                                    label.textContent    = 'Recovery code';
-                                    subtitle.textContent = 'Enter one of the 8-character recovery codes you saved during setup';
-                                    toggle.textContent   = 'Use authenticator app instead';
-                                    input.placeholder    = 'e.g. a1b2c3d4';
-                                    input.removeAttribute('inputmode');
-                                    input.removeAttribute('pattern');
-                                    input.removeAttribute('maxlength');
-                                } else {
-                                    label.textContent    = 'Verification code';
-                                    subtitle.textContent = 'Enter the 6-digit code from your authenticator app';
-                                    toggle.textContent   = 'Use a recovery code instead';
-                                    input.placeholder    = '000000';
-                                    input.setAttribute('inputmode', 'numeric');
-                                    input.setAttribute('pattern', '[0-9]*');
-                                    input.setAttribute('maxlength', '6');
-                                }
-                                input.value = '';
-                                input.focus();
-                            }
-                            """.trimIndent(),
-                        )
-                    }
-                }
             }
         }
 
@@ -538,11 +515,12 @@ object PortalView {
     ): HTML.() -> Unit = {
         head {
             portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
-            if (!mfaEnabled) {
-                script(src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js") {}
-            }
         }
         body {
+            attributes["data-tenant-slug"] = slug
+            if (successMsg != null) {
+                attributes["data-toast-msg"] = EnglishStrings.TOAST_MFA_SETUP
+            }
             portalShell(slug, workspaceName, session.username, "mfa", layout, theme.logoUrl) {
                 div(classes = "page-header") {
                     h1(classes = "page-header__title") { +"Two-Factor Authentication" }
@@ -553,12 +531,6 @@ object PortalView {
                     div(classes = "alert alert-warning") {
                         style = "font-size:14px; padding:12px 16px;"
                         +noticeMsg
-                    }
-                }
-
-                if (successMsg != null) {
-                    div(classes = "alert alert-success") {
-                        +"Authenticator set up successfully. Your account is now protected with two-factor authentication."
                     }
                 }
                 if (!errorMsg.isNullOrBlank()) {
@@ -595,11 +567,7 @@ object PortalView {
                             div {
                                 id = "disable-btn-row"
                                 button(classes = "btn btn--danger") {
-                                    attributes["onclick"] =
-                                        """
-                                        document.getElementById('disable-confirm').style.display='block';
-                                        document.getElementById('disable-btn-row').style.display='none';
-                                        """.trimIndent()
+                                    attributes["data-action"] = "show-disable-confirm"
                                     +"Remove authenticator"
                                 }
                             }
@@ -615,15 +583,11 @@ object PortalView {
                                 div(classes = "mfa-action-row") {
                                     button(classes = "btn btn--danger") {
                                         id = "disable-btn"
-                                        attributes["onclick"] = "disableMfa('$slug')"
+                                        attributes["data-action"] = "disable-mfa"
                                         +"Yes, remove authenticator"
                                     }
                                     button(classes = "btn btn--ghost") {
-                                        attributes["onclick"] =
-                                            """
-                                            document.getElementById('disable-confirm').style.display='none';
-                                            document.getElementById('disable-btn-row').style.display='block';
-                                            """.trimIndent()
+                                        attributes["data-action"] = "hide-disable-confirm"
                                         +"Cancel"
                                     }
                                 }
@@ -661,7 +625,7 @@ object PortalView {
                                 }
                                 button(classes = "btn btn--primary") {
                                     id = "start-btn"
-                                    attributes["onclick"] = "startEnrollment('$slug')"
+                                    attributes["data-action"] = "start-enrollment"
                                     +"Set up authenticator"
                                 }
                                 div(classes = "alert alert-error") {
@@ -697,15 +661,14 @@ object PortalView {
                                 button(classes = "btn btn--ghost") {
                                     id = "copy-codes-btn"
                                     style = "margin-bottom: 4px;"
-                                    attributes["onclick"] = "copyCodes()"
+                                    attributes["data-action"] = "copy-codes"
                                     +"Copy codes"
                                 }
 
                                 label(classes = "mfa-confirm-label") {
                                     input(type = InputType.checkBox) {
                                         id = "codes-saved"
-                                        attributes["onchange"] =
-                                            "document.getElementById('mfa-step-2b').style.display=this.checked?'block':'none'"
+                                        attributes["data-action"] = "codes-saved-toggle"
                                     }
                                     +" I've saved my recovery codes in a safe place"
                                 }
@@ -739,7 +702,7 @@ object PortalView {
                                     }
                                     button(classes = "btn btn--primary") {
                                         id = "verify-btn"
-                                        attributes["onclick"] = "verifyEnrollment('$slug')"
+                                        attributes["data-action"] = "verify-enrollment"
                                         +"Confirm setup"
                                     }
                                 }
@@ -748,125 +711,6 @@ object PortalView {
                     }
                 }
 
-                // ── JavaScript ────────────────────────────────────────────────────
-                script {
-                    unsafe {
-                        raw(
-                            """
-                            async function startEnrollment(slug) {
-                                var btn   = document.getElementById('start-btn');
-                                var errEl = document.getElementById('enroll-error');
-                                btn.disabled    = true;
-                                btn.textContent = 'Setting up\u2026';
-                                errEl.style.display = 'none';
-                                try {
-                                    var res  = await fetch('/t/' + slug + '/account/mfa/enroll', { method: 'POST' });
-                                    var data = await res.json();
-                                    if (!res.ok) {
-                                        errEl.textContent   = data.error === 'already_enrolled'
-                                            ? 'An authenticator is already configured. Refresh the page.'
-                                            : 'Failed to start setup. Please try again.';
-                                        errEl.style.display = 'block';
-                                        btn.disabled        = false;
-                                        btn.textContent     = 'Set up authenticator';
-                                        return;
-                                    }
-                                    document.getElementById('mfa-step-1').style.display = 'none';
-                                    document.getElementById('mfa-step-2').style.display = 'block';
-                                    new QRCode(document.getElementById('qr-code'), {
-                                        text: data.totp_uri, width: 200, height: 200,
-                                        colorDark: '#000000', colorLight: '#ffffff',
-                                        correctLevel: QRCode.CorrectLevel.M
-                                    });
-                                    var m = data.totp_uri.match(/secret=([A-Z2-7]+)/i);
-                                    if (m) document.getElementById('setup-key').textContent = m[1];
-                                    window._codes = data.recovery_codes;
-                                    var grid = document.getElementById('recovery-codes');
-                                    grid.innerHTML = '';
-                                    data.recovery_codes.forEach(function(c) {
-                                        var s = document.createElement('span');
-                                        s.className = 'recovery-code';
-                                        s.textContent = c;
-                                        grid.appendChild(s);
-                                    });
-                                } catch (e) {
-                                    errEl.textContent   = 'Network error. Please check your connection and try again.';
-                                    errEl.style.display = 'block';
-                                    btn.disabled        = false;
-                                    btn.textContent     = 'Set up authenticator';
-                                }
-                            }
-
-                            async function verifyEnrollment(slug) {
-                                var code  = document.getElementById('totp-code').value.trim();
-                                var errEl = document.getElementById('verify-error');
-                                var btn   = document.getElementById('verify-btn');
-                                errEl.style.display = 'none';
-                                if (!/^\d{6}${'$'}/.test(code)) {
-                                    errEl.textContent   = 'Please enter the 6-digit code from your authenticator app.';
-                                    errEl.style.display = 'block';
-                                    return;
-                                }
-                                btn.disabled    = true;
-                                btn.textContent = 'Verifying\u2026';
-                                try {
-                                    var body = new URLSearchParams({ code: code });
-                                    var res  = await fetch('/t/' + slug + '/account/mfa/verify', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                        body: body
-                                    });
-                                    var data = await res.json();
-                                    if (res.ok) {
-                                        window.location.href = '/t/' + slug + '/account/mfa?success=true';
-                                    } else {
-                                        errEl.textContent   = data.error === 'invalid_code'
-                                            ? 'Incorrect code. Check your device clock is accurate and try again.'
-                                            : 'Verification failed. Please try again.';
-                                        errEl.style.display = 'block';
-                                        btn.disabled        = false;
-                                        btn.textContent     = 'Confirm setup';
-                                    }
-                                } catch (e) {
-                                    errEl.textContent   = 'Network error. Please try again.';
-                                    errEl.style.display = 'block';
-                                    btn.disabled        = false;
-                                    btn.textContent     = 'Confirm setup';
-                                }
-                            }
-
-                            async function disableMfa(slug) {
-                                var btn = document.getElementById('disable-btn');
-                                btn.disabled    = true;
-                                btn.textContent = 'Removing\u2026';
-                                try {
-                                    var res = await fetch('/t/' + slug + '/account/mfa/disable', { method: 'POST' });
-                                    if (res.ok) {
-                                        window.location.reload();
-                                    } else {
-                                        btn.disabled    = false;
-                                        btn.textContent = 'Yes, remove authenticator';
-                                        alert('Failed to remove authenticator. Please try again.');
-                                    }
-                                } catch (e) {
-                                    btn.disabled    = false;
-                                    btn.textContent = 'Yes, remove authenticator';
-                                    alert('Network error. Please try again.');
-                                }
-                            }
-
-                            function copyCodes() {
-                                if (!window._codes) return;
-                                navigator.clipboard.writeText(window._codes.join('\n')).then(function() {
-                                    var btn = document.getElementById('copy-codes-btn');
-                                    btn.textContent = 'Copied!';
-                                    setTimeout(function() { btn.textContent = 'Copy codes'; }, 2000);
-                                });
-                            }
-                            """.trimIndent(),
-                        )
-                    }
-                }
             }
         }
     }

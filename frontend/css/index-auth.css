@@ -17,8 +17,9 @@
  * No rules live here — this file is imports only.
  */
 
-/* ── Base reset (no tokens — theme is injected by server) ────────────────── */
+/* ── Base ──────────────────────────────────────────────────────────────────── */
 @import "./base/reset.css";
+@import "./base/tokens-shared.css";
 
 /* ── Auth layout and components ──────────────────────────────────────────── */
 @import "./auth/view-transitions.css";
@@ -30,6 +31,10 @@
 @import "./auth/alert.css";
 @import "./auth/social.css";
 @import "./auth/misc.css";
+
+/* ── Password validation checklist ────────────────────────────────────────── */
+@import "./components/password-validation.css";
+@import "./components/toast.css";
 
 /* ── Demo mode banner (shared with admin bundle) ─────────────────────────── */
 @import "./components/demo-banner.css";

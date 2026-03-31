@@ -244,6 +244,10 @@
   gap: 14px;
 }
 
+.portal-form > .edit-field {
+  margin: 0;  /* override base edit-field margins for better section card layout */
+}
+
 .form-hint {
   font-size: 0.875rem;
   color: var(--color-muted);
