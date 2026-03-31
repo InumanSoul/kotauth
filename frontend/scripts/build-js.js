@@ -35,8 +35,10 @@ const bundles = [
   {
     name: 'kotauth-portal.min.js',
     files: [
+      src('vendor/qrcode.min.js'),
       src('shared/confirm-dialog.js'),
       src('shared/password-validation.js'),
+      src('portal/mfa.js'),
     ],
   },
   {

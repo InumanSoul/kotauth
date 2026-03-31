@@ -495,41 +495,6 @@ object PortalView {
                     }
                 }
 
-                script {
-                    unsafe {
-                        raw(
-                            """
-                            var _recoveryMode = false;
-                            function toggleRecoveryMode() {
-                                _recoveryMode = !_recoveryMode;
-                                var input    = document.getElementById('code');
-                                var label    = document.getElementById('code-label');
-                                var subtitle = document.getElementById('challenge-subtitle');
-                                var toggle   = document.getElementById('recovery-toggle');
-                                if (_recoveryMode) {
-                                    label.textContent    = 'Recovery code';
-                                    subtitle.textContent = 'Enter one of the 8-character recovery codes you saved during setup';
-                                    toggle.textContent   = 'Use authenticator app instead';
-                                    input.placeholder    = 'e.g. a1b2c3d4';
-                                    input.removeAttribute('inputmode');
-                                    input.removeAttribute('pattern');
-                                    input.removeAttribute('maxlength');
-                                } else {
-                                    label.textContent    = 'Verification code';
-                                    subtitle.textContent = 'Enter the 6-digit code from your authenticator app';
-                                    toggle.textContent   = 'Use a recovery code instead';
-                                    input.placeholder    = '000000';
-                                    input.setAttribute('inputmode', 'numeric');
-                                    input.setAttribute('pattern', '[0-9]*');
-                                    input.setAttribute('maxlength', '6');
-                                }
-                                input.value = '';
-                                input.focus();
-                            }
-                            """.trimIndent(),
-                        )
-                    }
-                }
             }
         }
 
@@ -552,9 +517,6 @@ object PortalView {
     ): HTML.() -> Unit = {
         head {
             portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
-            if (!mfaEnabled) {
-                script(src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js") {}
-            }
         }
         body {
             portalShell(slug, workspaceName, session.username, "mfa", layout, theme.logoUrl) {
@@ -762,125 +724,6 @@ object PortalView {
                     }
                 }
 
-                // ── JavaScript ────────────────────────────────────────────────────
-                script {
-                    unsafe {
-                        raw(
-                            """
-                            async function startEnrollment(slug) {
-                                var btn   = document.getElementById('start-btn');
-                                var errEl = document.getElementById('enroll-error');
-                                btn.disabled    = true;
-                                btn.textContent = 'Setting up\u2026';
-                                errEl.style.display = 'none';
-                                try {
-                                    var res  = await fetch('/t/' + slug + '/account/mfa/enroll', { method: 'POST' });
-                                    var data = await res.json();
-                                    if (!res.ok) {
-                                        errEl.textContent   = data.error === 'already_enrolled'
-                                            ? 'An authenticator is already configured. Refresh the page.'
-                                            : 'Failed to start setup. Please try again.';
-                                        errEl.style.display = 'block';
-                                        btn.disabled        = false;
-                                        btn.textContent     = 'Set up authenticator';
-                                        return;
-                                    }
-                                    document.getElementById('mfa-step-1').style.display = 'none';
-                                    document.getElementById('mfa-step-2').style.display = 'block';
-                                    new QRCode(document.getElementById('qr-code'), {
-                                        text: data.totp_uri, width: 200, height: 200,
-                                        colorDark: '#000000', colorLight: '#ffffff',
-                                        correctLevel: QRCode.CorrectLevel.M
-                                    });
-                                    var m = data.totp_uri.match(/secret=([A-Z2-7]+)/i);
-                                    if (m) document.getElementById('setup-key').textContent = m[1];
-                                    window._codes = data.recovery_codes;
-                                    var grid = document.getElementById('recovery-codes');
-                                    grid.innerHTML = '';
-                                    data.recovery_codes.forEach(function(c) {
-                                        var s = document.createElement('span');
-                                        s.className = 'recovery-code';
-                                        s.textContent = c;
-                                        grid.appendChild(s);
-                                    });
-                                } catch (e) {
-                                    errEl.textContent   = 'Network error. Please check your connection and try again.';
-                                    errEl.style.display = 'block';
-                                    btn.disabled        = false;
-                                    btn.textContent     = 'Set up authenticator';
-                                }
-                            }
-
-                            async function verifyEnrollment(slug) {
-                                var code  = document.getElementById('totp-code').value.trim();
-                                var errEl = document.getElementById('verify-error');
-                                var btn   = document.getElementById('verify-btn');
-                                errEl.style.display = 'none';
-                                if (!/^\d{6}${'$'}/.test(code)) {
-                                    errEl.textContent   = 'Please enter the 6-digit code from your authenticator app.';
-                                    errEl.style.display = 'block';
-                                    return;
-                                }
-                                btn.disabled    = true;
-                                btn.textContent = 'Verifying\u2026';
-                                try {
-                                    var body = new URLSearchParams({ code: code });
-                                    var res  = await fetch('/t/' + slug + '/account/mfa/verify', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                        body: body
-                                    });
-                                    var data = await res.json();
-                                    if (res.ok) {
-                                        window.location.href = '/t/' + slug + '/account/mfa?success=true';
-                                    } else {
-                                        errEl.textContent   = data.error === 'invalid_code'
-                                            ? 'Incorrect code. Check your device clock is accurate and try again.'
-                                            : 'Verification failed. Please try again.';
-                                        errEl.style.display = 'block';
-                                        btn.disabled        = false;
-                                        btn.textContent     = 'Confirm setup';
-                                    }
-                                } catch (e) {
-                                    errEl.textContent   = 'Network error. Please try again.';
-                                    errEl.style.display = 'block';
-                                    btn.disabled        = false;
-                                    btn.textContent     = 'Confirm setup';
-                                }
-                            }
-
-                            async function disableMfa(slug) {
-                                var btn = document.getElementById('disable-btn');
-                                btn.disabled    = true;
-                                btn.textContent = 'Removing\u2026';
-                                try {
-                                    var res = await fetch('/t/' + slug + '/account/mfa/disable', { method: 'POST' });
-                                    if (res.ok) {
-                                        window.location.reload();
-                                    } else {
-                                        btn.disabled    = false;
-                                        btn.textContent = 'Yes, remove authenticator';
-                                        alert('Failed to remove authenticator. Please try again.');
-                                    }
-                                } catch (e) {
-                                    btn.disabled    = false;
-                                    btn.textContent = 'Yes, remove authenticator';
-                                    alert('Network error. Please try again.');
-                                }
-                            }
-
-                            function copyCodes() {
-                                if (!window._codes) return;
-                                navigator.clipboard.writeText(window._codes.join('\n')).then(function() {
-                                    var btn = document.getElementById('copy-codes-btn');
-                                    btn.textContent = 'Copied!';
-                                    setTimeout(function() { btn.textContent = 'Copy codes'; }, 2000);
-                                });
-                            }
-                            """.trimIndent(),
-                        )
-                    }
-                }
             }
         }
     }
