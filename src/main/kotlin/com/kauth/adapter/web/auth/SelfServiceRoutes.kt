@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
@@ -61,7 +62,11 @@ internal fun Route.selfServiceRoutes(
         if (token.isBlank()) {
             return@get call.respondRedirect("/t/$slug/forgot-password")
         }
-        call.respondHtml(HttpStatusCode.OK, AuthView.resetPasswordPage(slug, theme, workspaceName, token = token))
+        val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, passwordPolicy = policy),
+        )
     }
 
     post("/reset-password") {
@@ -69,6 +74,7 @@ internal fun Route.selfServiceRoutes(
         val slug = ctx.slug
         val theme = ctx.theme
         val workspaceName = ctx.workspaceName
+        val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
         val ipAddress = call.request.local.remoteAddress
         val params = call.receiveParameters()
         val token = params["token"] ?: ""
@@ -85,6 +91,7 @@ internal fun Route.selfServiceRoutes(
                     workspaceName,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes and try again.",
+                    passwordPolicy = policy,
                 ),
             )
         }
@@ -93,7 +100,14 @@ internal fun Route.selfServiceRoutes(
             is SelfServiceResult.Success ->
                 call.respondHtml(
                     HttpStatusCode.OK,
-                    AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, success = true),
+                    AuthView.resetPasswordPage(
+                        slug,
+                        theme,
+                        workspaceName,
+                        token = token,
+                        success = true,
+                        passwordPolicy = policy,
+                    ),
                 )
             is SelfServiceResult.Failure ->
                 call.respondHtml(
@@ -104,6 +118,7 @@ internal fun Route.selfServiceRoutes(
                         workspaceName,
                         token = token,
                         error = result.error.message,
+                        passwordPolicy = policy,
                     ),
                 )
         }

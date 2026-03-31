@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
@@ -249,6 +251,7 @@ object PortalView {
         currentSessionId: Int? = null,
         successMsg: String?,
         errorMsg: String?,
+        passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
             head { portalPageHead("Security — $workspaceName", theme, layout) }
@@ -294,26 +297,36 @@ object PortalView {
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "new_password"
-                                        +"New password"
+                                        +EnglishStrings.NEW_PASSWORD
                                     }
                                     input(type = InputType.password, name = "new_password") {
                                         classes = setOf("edit-field__input")
                                         id = "new_password"
-                                        placeholder = "Minimum 8 characters"
+                                        placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
                                         required = true
                                         attributes["autocomplete"] = "new-password"
+                                        attributes["data-pw-min-length"] =
+                                            passwordPolicy.passwordMinLength.toString()
+                                        if (passwordPolicy.passwordRequireUppercase) {
+                                            attributes["data-pw-require-upper"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireNumber) {
+                                            attributes["data-pw-require-number"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireSpecial) {
+                                            attributes["data-pw-require-special"] = "true"
+                                        }
                                     }
-                                    span(classes = "edit-field__hint") { +"Must be at least 8 characters" }
                                 }
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "confirm_password"
-                                        +"Confirm new password"
+                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
                                     }
                                     input(type = InputType.password, name = "confirm_password") {
                                         classes = setOf("edit-field__input")
                                         id = "confirm_password"
-                                        placeholder = "Repeat your new password"
+                                        placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                         required = true
                                         attributes["autocomplete"] = "new-password"
                                     }

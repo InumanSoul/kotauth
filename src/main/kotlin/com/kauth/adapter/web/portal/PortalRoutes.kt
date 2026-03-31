@@ -379,6 +379,7 @@ fun Route.portalRoutes(
                     currentSessionId = session.portalSessionId,
                     successMsg = successMsg,
                     errorMsg = errorMsg,
+                    passwordPolicy = tenant.securityConfig,
                 ),
             )
         }

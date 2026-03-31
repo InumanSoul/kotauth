@@ -3,12 +3,13 @@ package com.kauth.adapter.web
 /**
  * Canonical English strings for user-facing UI text.
  *
- * Centralized here to prepare for i18n (v2.1). Each string is the reference
- * value that community translators will use as the source of truth.
+ * Centralized here to prepare for i18n (v2.x). Each string is the reference
+ * value that translators will use as the source of truth.
  *
- * Strings are extracted incrementally as views are touched — do not attempt
+ * Strings are extracted incrementally as views are touched, do not attempt
  * to extract all strings in one pass.
  */
+
 object EnglishStrings {
     // Password fields
     const val PASSWORD = "Password"

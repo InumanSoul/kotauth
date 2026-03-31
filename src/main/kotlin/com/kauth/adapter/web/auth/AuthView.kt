@@ -1,9 +1,11 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
@@ -256,6 +258,7 @@ object AuthView {
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
         enabledProviders: List<SocialProvider> = emptyList(),
+        passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Create Account", theme) }
@@ -328,14 +331,25 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "password"
-                                    +"Password"
+                                    +EnglishStrings.PASSWORD
                                 }
                                 div("field__input-wrap") {
                                     input(type = InputType.password, name = "password") {
                                         id = "password"
-                                        placeholder = "Minimum 8 characters"
+                                        placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
                                         attributes["autocomplete"] = "new-password"
                                         required = true
+                                        attributes["data-pw-min-length"] =
+                                            passwordPolicy.passwordMinLength.toString()
+                                        if (passwordPolicy.passwordRequireUppercase) {
+                                            attributes["data-pw-require-upper"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireNumber) {
+                                            attributes["data-pw-require-number"] = "true"
+                                        }
+                                        if (passwordPolicy.passwordRequireSpecial) {
+                                            attributes["data-pw-require-special"] = "true"
+                                        }
                                     }
                                     button(type = ButtonType.button, classes = "field__toggle-pw") {
                                         attributes["data-toggle-password"] = "password"
@@ -350,12 +364,12 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "confirmPassword"
-                                    +"Confirm Password"
+                                    +EnglishStrings.CONFIRM_PASSWORD
                                 }
                                 div("field__input-wrap") {
                                     input(type = InputType.password, name = "confirmPassword") {
                                         id = "confirmPassword"
-                                        placeholder = "Repeat your password"
+                                        placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                         attributes["autocomplete"] = "new-password"
                                         required = true
                                     }
@@ -503,6 +517,7 @@ object AuthView {
         token: String,
         error: String? = null,
         success: Boolean = false,
+        passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Reset Password", theme) }
@@ -546,15 +561,26 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "new_password"
-                                        +"New password"
+                                        +EnglishStrings.NEW_PASSWORD
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "new_password") {
                                             id = "new_password"
-                                            placeholder = "Minimum 8 characters"
+                                            placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
                                             attributes["autocomplete"] = "new-password"
                                             required = true
                                             attributes["autofocus"] = "true"
+                                            attributes["data-pw-min-length"] =
+                                                passwordPolicy.passwordMinLength.toString()
+                                            if (passwordPolicy.passwordRequireUppercase) {
+                                                attributes["data-pw-require-upper"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireNumber) {
+                                                attributes["data-pw-require-number"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireSpecial) {
+                                                attributes["data-pw-require-special"] = "true"
+                                            }
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "new_password"
@@ -569,12 +595,12 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "confirm_password"
-                                        +"Confirm new password"
+                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "confirm_password") {
                                             id = "confirm_password"
-                                            placeholder = "Repeat your new password"
+                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                             attributes["autocomplete"] = "new-password"
                                             required = true
                                         }

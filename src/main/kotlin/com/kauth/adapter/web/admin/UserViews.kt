@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.Role
@@ -648,15 +649,27 @@ internal fun createUserPageImpl(
                         }
                     }
                     div("edit-row") {
-                        span("edit-row__label") { +"Password" }
+                        span("edit-row__label") { +EnglishStrings.PASSWORD }
                         div {
                             input(classes = "edit-row__field") {
                                 type = InputType.password
                                 name = "password"
                                 required = true
-                                placeholder = "Minimum 8 characters"
+                                placeholder =
+                                    EnglishStrings.passwordMinPlaceholder(workspace.securityConfig.passwordMinLength)
+                                attributes["data-pw-min-length"] =
+                                    workspace.securityConfig.passwordMinLength.toString()
+                                if (workspace.securityConfig.passwordRequireUppercase) {
+                                    attributes["data-pw-require-upper"] = "true"
+                                }
+                                if (workspace.securityConfig.passwordRequireNumber) {
+                                    attributes["data-pw-require-number"] = "true"
+                                }
+                                if (workspace.securityConfig.passwordRequireSpecial) {
+                                    attributes["data-pw-require-special"] = "true"
+                                }
                             }
-                            div("edit-row__hint") { +"The user can change it after login." }
+                            div("edit-row__hint") { +EnglishStrings.PASSWORD_HINT_USER_CAN_CHANGE }
                         }
                     }
                     div("edit-actions") {
