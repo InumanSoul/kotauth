@@ -22,7 +22,7 @@
 @import "./portal/form.css";
 @import "./portal/button.css";
 @import "./portal/badge.css";
-@import "./shared/alert.css";
+@import "./portal/alert.css";
 
 /* ── Portal layout: centered tabs ──────────────────────────────────────── */
 @import "./portal/shell-tabnav.css";

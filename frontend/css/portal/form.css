@@ -1,15 +1,7 @@
-/* frontend/css/portal/form.css
- *
- * Portal-specific form components — separate from shared/form.css (auth pages).
- * Uses the .edit-field BEM pattern instead of the auth .field pattern.
- *
- * Token references:
- *   --color-surface    elevated surface bg (input bg in portal context)
- *   --color-border-md  medium-emphasis border
- *   --color-accent-*   focus ring derived tokens (from portal/reset.css)
- *   --font-sans        tenant-chosen typeface
- *   --font-mono        monospace fallback
+/* Portal form layer — imports shared input base, adds .edit-field BEM layout.
+ * Portal forms use explicit BEM classes instead of global selectors.
  */
+@import "../shared/form.css";
 
 .edit-field {
   display: flex;
@@ -27,26 +19,16 @@
 }
 
 .edit-field__input {
-  width: 100%;
   height: 34px;
-  background: var(--color-surface);
-  border: 0.5px solid var(--color-border-md);
-  border-radius: var(--radius-sm);
   padding: 0 10px;
   font-size: 0.875rem;
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  border-width: 0.5px;
+  border-color: var(--color-border-md);
 }
 
 .edit-field__input:focus {
   border-color: var(--color-accent-border);
   box-shadow: 0 0 0 3px var(--color-accent-bg);
-}
-
-.edit-field__input::placeholder {
-  color: var(--color-muted);
 }
 
 .edit-field__input--mono {
@@ -67,8 +49,6 @@
   align-items: center;
   gap: 5px;
 }
-
-/* ── Form action row ─────────────────────────────────────────────────── */
 
 .edit-actions {
   display: flex;

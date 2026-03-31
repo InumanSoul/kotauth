@@ -1,4 +1,22 @@
-/* Auth form styles — now sourced from shared layer.
- * Auth pages have no form-specific overrides beyond the shared styles.
+/* Auth form layer — imports shared input base, adds auth-specific layout.
+ * Global selectors (label, input) are intentional — auth forms have
+ * simple structures where all labels and inputs share the same style.
  */
 @import "../shared/form.css";
+
+.field { margin-bottom: 1rem; }
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+input {
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+}
