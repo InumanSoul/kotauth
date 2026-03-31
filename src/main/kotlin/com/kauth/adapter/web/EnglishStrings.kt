@@ -23,4 +23,18 @@ object EnglishStrings {
 
     // Password validation (client-side — mirrored in password-validation.js)
     const val PASSWORDS_DO_NOT_MATCH = "Passwords do not match"
+
+    // Toast messages — success feedback after form saves
+    const val TOAST_SETTINGS_SAVED = "Settings saved."
+    const val TOAST_SECURITY_POLICY_SAVED = "Security policy saved."
+    const val TOAST_BRANDING_SAVED = "Branding saved."
+    const val TOAST_SMTP_SAVED = "SMTP settings saved."
+    const val TOAST_IDP_SAVED = "Identity provider settings saved."
+    const val TOAST_PROFILE_UPDATED = "Profile updated successfully."
+    const val TOAST_PASSWORD_CHANGED = "Password changed successfully."
+    const val TOAST_MFA_SETUP =
+        "Authenticator set up successfully. Your account is now protected with two-factor authentication."
+    const val TOAST_PROFILE_SAVED = "Profile saved."
+    const val TOAST_RESET_EMAIL_SENT = "Password reset email sent successfully."
+    const val TOAST_UNLOCKED = "Account unlocked successfully."
 }
