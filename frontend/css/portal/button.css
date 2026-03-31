@@ -1,73 +1,18 @@
-/* frontend/css/portal/button.css
- *
- * Portal-specific button system — replaces shared/button.css for portal pages.
- * BEM modifiers: --primary, --ghost, --danger, --sm, --full, --disabled.
+/* Portal button layer — imports the shared base.
+ * Defaults all portal buttons to compact layout (--compact).
+ * Full-width CTAs use btn--block to override.
  */
+@import "../shared/button.css";
 
-.btn {
+/* Portal default: compact layout (overridden by btn--block when needed) */
+.btn:not(.btn--block) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-2, 6px);
   height: 32px;
   padding: 0 14px;
   font-size: 0.8125rem;
-  font-weight: 500;
-  font-family: var(--font-sans);
-  border-radius: var(--radius-sm);
-  border: 0.5px solid transparent;
-  cursor: pointer;
-  outline: none;
-  transition: opacity 0.1s, background 0.1s;
-  text-decoration: none;
   white-space: nowrap;
-}
-
-.btn:hover { opacity: 0.85; }
-.btn:active { opacity: 0.65; }
-
-.btn--primary {
-  background: var(--color-accent);
-  color: var(--color-accent-fg);
-}
-
-.btn--ghost {
-  background: transparent;
-  color: var(--color-muted);
-  border-color: var(--color-border-md);
-}
-
-.btn--ghost:hover {
-  color: var(--color-text);
-  opacity: 1;
-  background: var(--color-row-hover);
-}
-
-.btn--danger {
-  background: transparent;
-  color: var(--color-red);
-  border-color: var(--color-red-border);
-}
-
-.btn--danger:hover {
-  background: var(--color-red-bg);
-  opacity: 1;
-}
-
-.btn--sm {
-  height: 26px;
-  padding: 0 10px;
-  font-size: 0.75rem;
-}
-
-.btn--full {
-  width: 100%;
-  height: 36px;
-  font-size: 0.875rem;
-}
-
-.btn--disabled {
-  opacity: 0.35 !important;
-  cursor: not-allowed !important;
-  pointer-events: none;
+  border: 0.5px solid transparent;
 }

@@ -1,28 +1,90 @@
 /* frontend/css/shared/button.css
  *
- * Primary action button shared by auth pages and portal.
- * Uses --color-accent-fg for text color to ensure contrast regardless of
- * the tenant's chosen accent color.
+ * Button base — shared contract for all tenant-branded surfaces.
+ * Auth and portal both import this, then apply context-specific defaults.
+ *
+ * Auth layer:  defaults to block layout (full-width CTA)
+ * Portal layer: defaults to compact layout (inline action button)
+ *
+ * Color modifiers (shared):
+ *   .btn--primary  — accent-colored fill
+ *   .btn--ghost    — outlined, muted
+ *   .btn--danger   — red outlined
+ *
+ * Size modifiers (shared):
+ *   .btn--sm       — compact height
+ *   .btn--full     — 100% width
+ *
+ * State modifiers (shared):
+ *   .btn--disabled — greyed out, non-interactive
  */
 
 .btn {
-  width: 100%;
-  padding: 0.85rem;
-  background: var(--color-accent);
-  border: none;
-  border-radius: calc(var(--radius) - 2px);
-  color: var(--color-accent-fg);
-  font-size: 0.95rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
-  margin-top: 0.5rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
   letter-spacing: 0.02em;
-  font-family: inherit;
-  display: block;
-  text-align: center;
+  border-radius: calc(var(--radius) - 2px);
+  border: none;
+  cursor: pointer;
   text-decoration: none;
+  text-align: center;
+  transition: background 0.15s, opacity 0.1s, transform 0.1s;
 }
 
-.btn:hover  { background: var(--color-accent-hover); }
-.btn:active { transform: scale(0.98); }
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* ── Color modifiers ─────────────────────────────────────────────────────── */
+
+.btn--primary {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.btn--primary:hover  { background: var(--color-accent-hover); }
+.btn--primary:active { transform: scale(0.98); }
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
+}
+
+.btn--ghost:hover {
+  color: var(--color-text);
+  background: var(--color-row-hover);
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--color-red);
+  border-color: var(--color-red-border);
+}
+
+.btn--danger:hover {
+  background: var(--color-red-bg);
+}
+
+/* ── Size modifiers ──────────────────────────────────────────────────────── */
+
+.btn--sm {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 0.75rem;
+}
+
+.btn--full {
+  width: 100%;
+  height: 36px;
+  font-size: 0.875rem;
+}
+
+/* ── State modifiers ─────────────────────────────────────────────────────── */
+
+.btn--disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}

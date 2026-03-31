@@ -1,0 +1,57 @@
+/* Auto-dismissing toast notification — fixed at top-right of viewport */
+
+.toast {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 9998;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-success);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  max-width: 360px;
+  animation: toast-in 0.25s ease-out;
+}
+
+.toast--leaving {
+  animation: toast-out 0.3s ease-in forwards;
+}
+
+.toast__icon {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.toast__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}

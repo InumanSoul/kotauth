@@ -1,0 +1,31 @@
+/* frontend/css/base/tokens-shared.css
+ *
+ * Structural tokens shared across all bundle surfaces:
+ * admin (kotauth-admin.css), auth (kotauth-auth.css), and portal bundles.
+ *
+ * Rule: Only fixed, non-tenant-customizable values live here.
+ *       Brand/color tokens (--color-accent, --color-bg, --radius, etc.)
+ *       come from toCssVars() (auth/portal) or tokens.css (admin superset).
+ */
+
+:root {
+  /* ── Typography scale ───────────────────────────────────────────────────── */
+  --text-xs:   10px;
+  --text-sm:   11px;
+  --text-base: 13px;
+
+  --leading-relaxed: 1.6;
+
+  /* ── Spacing scale (4px base) ───────────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+
+  /* ── Radius — structural fallback for shared components ─────────────────── */
+  --radius-md: 4px;
+
+  /* ── Semantic status colors (fixed — not tenant-customizable) ────────────── */
+  --color-success: #4ade80;
+  --color-error:   #f87171;
+}

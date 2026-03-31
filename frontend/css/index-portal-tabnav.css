@@ -10,8 +10,9 @@
  * Import order: base reset → portal reset → shared components → portal shell → tabnav → content
  */
 
-/* ── Base reset ────────────────────────────────────────────────────────── */
+/* ── Base ──────────────────────────────────────────────────────────────── */
 @import "./base/reset.css";
+@import "./base/tokens-shared.css";
 
 /* ── Portal body override ──────────────────────────────────────────────── */
 @import "./portal/reset.css";
@@ -36,6 +37,7 @@
 
 /* ── Password validation checklist ─────────────────────────────────────── */
 @import "./components/password-validation.css";
+@import "./components/toast.css";
 
 /* ── Demo mode banner ──────────────────────────────────────────────────── */
 @import "./components/demo-banner.css";

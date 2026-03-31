@@ -1,4 +1,20 @@
-/* Auth button styles — now sourced from shared layer.
- * Uses var(--color-accent-fg) for button text instead of hardcoded #05080a.
+/* Auth button layer — imports the shared base.
+ * Auth buttons default to block layout + primary color since every
+ * auth form CTA is a full-width accent-colored submit button.
  */
 @import "../shared/button.css";
+
+/* Auth default: block layout + primary fill */
+.btn:not(.btn--compact) {
+  display: block;
+  width: 100%;
+  padding: 0.85rem;
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.btn:not(.btn--compact):hover { background: var(--color-accent-hover); }
+.btn:not(.btn--compact):active { transform: scale(0.98); }

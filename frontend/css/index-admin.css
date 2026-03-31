@@ -43,6 +43,7 @@
 @import "./components/htmx.css";
 @import "./components/dialog.css";
 @import "./components/password-validation.css";
+@import "./components/toast.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";
