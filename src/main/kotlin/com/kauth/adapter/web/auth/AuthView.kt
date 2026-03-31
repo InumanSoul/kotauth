@@ -371,6 +371,7 @@ object AuthView {
                                         id = "confirmPassword"
                                         placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                         attributes["autocomplete"] = "new-password"
+                                        attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
                                         required = true
                                     }
                                     button(type = ButtonType.button, classes = "field__toggle-pw") {
@@ -602,6 +603,7 @@ object AuthView {
                                             id = "confirm_password"
                                             placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                             attributes["autocomplete"] = "new-password"
+                                            attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
                                             required = true
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {

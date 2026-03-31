@@ -329,6 +329,7 @@ object PortalView {
                                         placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
                                         required = true
                                         attributes["autocomplete"] = "new-password"
+                                        attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
                                     }
                                 }
                                 div(classes = "edit-actions") {

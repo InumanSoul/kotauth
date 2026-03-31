@@ -51,7 +51,7 @@
     });
 
     // Insert after the field's parent container
-    const fieldWrapper = passwordInput.closest('.field') || passwordInput.closest('.edit-row') || passwordInput.parentElement;
+    const fieldWrapper = passwordInput.closest('.field') || passwordInput.closest('.edit-field') || passwordInput.closest('.edit-row') || passwordInput.parentElement;
     fieldWrapper.parentElement.insertBefore(requirementsList, fieldWrapper.nextSibling);
 
     let isListVisible = false;
@@ -117,9 +117,9 @@
     matchErrorElement.setAttribute('aria-live', 'polite');
     matchErrorElement.setAttribute('role', 'alert');
     matchErrorElement.style.display = 'none';
-    matchErrorElement.textContent = 'Passwords do not match';
+    matchErrorElement.textContent = confirmInput.getAttribute('data-pw-mismatch-msg') || 'Passwords do not match';
 
-    const confirmWrapper = confirmInput.closest('.field') || confirmInput.closest('.edit-row') || confirmInput.parentElement;
+    const confirmWrapper = confirmInput.closest('.field') || confirmInput.closest('.edit-field') || confirmInput.closest('.edit-row') || confirmInput.parentElement;
     confirmWrapper.parentElement.insertBefore(matchErrorElement, confirmWrapper.nextSibling);
 
     confirmInput.addEventListener('blur', () => {
