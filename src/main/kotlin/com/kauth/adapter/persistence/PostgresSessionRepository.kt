@@ -91,6 +91,20 @@ class PostgresSessionRepository : SessionRepository {
         Unit
     }
 
+    override fun revokeAllForTenant(
+        tenantId: TenantId,
+        revokedAt: Instant,
+    ): Int =
+        transaction {
+            val ts = revokedAt.toOffsetDateTime()
+            SessionsTable.update({
+                (SessionsTable.tenantId eq tenantId.value) and
+                    (SessionsTable.revokedAt.isNull())
+            }) {
+                it[SessionsTable.revokedAt] = ts
+            }
+        }
+
     override fun findActiveByUser(
         tenantId: TenantId,
         userId: UserId,

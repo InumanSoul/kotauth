@@ -37,6 +37,7 @@ fun Route.adminSessionAuditRoutes(
         val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
         val sessionClientMap = resolveClientNames(sessionClientIds, applicationRepository)
         val wsPairs = call.attributes[WsPairsAttr]
+        val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.activeSessionsPage(
@@ -46,6 +47,7 @@ fun Route.adminSessionAuditRoutes(
                 session.username,
                 sessionUserMap,
                 sessionClientMap,
+                saved = saved,
             ),
         )
     }
@@ -58,6 +60,12 @@ fun Route.adminSessionAuditRoutes(
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         sessionRepository.revoke(sessionId, Instant.now())
         call.respondRedirect("/admin/workspaces/$slug/sessions")
+    }
+
+    post("/sessions/revoke-all") {
+        val workspace = call.attributes[WorkspaceAttr]
+        adminService.revokeAllSessions(workspace.id)
+        call.respondRedirect("/admin/workspaces/${workspace.slug}/sessions?saved=true")
     }
 
     // -------------------------------------------------------------------

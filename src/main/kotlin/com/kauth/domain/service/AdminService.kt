@@ -358,6 +358,22 @@ class AdminService(
         return setUserEnabled(userId, tenantId, !user.enabled)
     }
 
+    fun revokeAllSessions(tenantId: TenantId): AdminResult<Int> {
+        val count = sessionRepository.revokeAllForTenant(tenantId)
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_SESSIONS_REVOKED_ALL,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("sessionsRevoked" to count.toString()),
+            ),
+        )
+        return AdminResult.Success(count)
+    }
+
     /**
      * Updates a user's mutable profile fields (email, fullName).
      * Username is intentionally immutable — it may appear in tokens already issued.

@@ -16,6 +16,7 @@ internal fun activeSessionsPageImpl(
     loggedInAs: String,
     userMap: Map<UserId, String> = emptyMap(),
     clientMap: Map<ApplicationId, String> = emptyMap(),
+    saved: Boolean = false,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -27,6 +28,7 @@ internal fun activeSessionsPageImpl(
             activeAppSection = "sessions",
             loggedInAs = loggedInAs,
             contentClass = "content-outer",
+            toastMessage = if (saved) "All sessions revoked." else null,
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -39,6 +41,18 @@ internal fun activeSessionsPageImpl(
                 pageHeader(
                     title = "Active Sessions",
                     subtitle = "${sessions.size} active session${if (sessions.size != 1) "s" else ""} in this workspace",
+                    actions = if (sessions.isNotEmpty()) {
+                        {
+                            postButton(
+                                action = "/admin/workspaces/${workspace.slug}/sessions/revoke-all",
+                                label = "Revoke All Sessions",
+                                btnClass = "btn btn--warning btn--sm",
+                                confirmMessage = "Revoke all ${sessions.size} active session${if (sessions.size != 1) "s" else ""}? All users will be signed out immediately.",
+                            )
+                        }
+                    } else {
+                        null
+                    },
                 )
 
                 if (sessions.isEmpty()) {

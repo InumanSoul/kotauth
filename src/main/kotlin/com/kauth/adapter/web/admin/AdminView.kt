@@ -192,7 +192,8 @@ object AdminView {
         loggedInAs: String,
         userMap: Map<UserId, String> = emptyMap(),
         clientMap: Map<ApplicationId, String> = emptyMap(),
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap)
+        saved: Boolean = false,
+    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, saved)
 
     fun auditLogPage(
         workspace: Tenant,
