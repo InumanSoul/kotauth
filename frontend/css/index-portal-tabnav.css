@@ -34,6 +34,9 @@
 /* ── MFA management page ─────────────────────────────────────────────── */
 @import "./portal/mfa.css";
 
+/* ── Password validation checklist ─────────────────────────────────────── */
+@import "./components/password-validation.css";
+
 /* ── Demo mode banner ──────────────────────────────────────────────────── */
 @import "./components/demo-banner.css";
 
