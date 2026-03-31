@@ -15,7 +15,7 @@ internal fun smtpSettingsPageImpl(
     allWorkspaces: List<Pair<String, String>>,
     loggedInAs: String,
     error: String? = null,
-    saved: Boolean = false,
+    savedParam: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -29,7 +29,11 @@ internal fun smtpSettingsPageImpl(
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
                   contentClass = "content-outer",
-            toastMessage = if (saved) EnglishStrings.TOAST_SMTP_SAVED else null,
+            toastMessage = when (savedParam) {
+                "true" -> EnglishStrings.TOAST_SMTP_SAVED
+                "test_sent" -> "Test email sent successfully."
+                else -> null
+            },
 ) {
             div("content-inner") {
             breadcrumb(
@@ -49,6 +53,13 @@ internal fun smtpSettingsPageImpl(
                     }
                 }
                 div("page-header__actions") {
+                    if (workspace.isSmtpReady) {
+                        postButton(
+                            action = "/admin/workspaces/$slug/settings/smtp/test",
+                            label = "Send Test Email",
+                            btnClass = "btn btn--ghost btn--sm",
+                        )
+                    }
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
                         attributes["form"] = "smtp-form"

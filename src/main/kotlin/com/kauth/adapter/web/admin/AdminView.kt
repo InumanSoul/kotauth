@@ -214,8 +214,8 @@ object AdminView {
         allWorkspaces: List<Pair<String, String>>,
         loggedInAs: String,
         error: String? = null,
-        saved: Boolean = false,
-    ): HTML.() -> Unit = smtpSettingsPageImpl(workspace, allWorkspaces, loggedInAs, error, saved)
+        savedParam: String? = null,
+    ): HTML.() -> Unit = smtpSettingsPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam)
 
     // ── RBAC ────────────────────────────────────────────────────────────
 

@@ -86,9 +86,25 @@ class SmtpEmailAdapter : EmailPort {
         send(to, toName, subject, html, text, tenant)
     }
 
-    // -------------------------------------------------------------------------
-    // Core send logic
-    // -------------------------------------------------------------------------
+    override fun sendTestEmail(
+        to: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val subject = "KotAuth SMTP Test — $workspaceName"
+        val html =
+            buildEmailHtml(
+                tenant = tenant,
+                heading = "SMTP Configuration Test",
+                bodyHtml =
+                    "This email confirms that SMTP is correctly configured for " +
+                        "<strong>${htmlEscape(workspaceName)}</strong>. " +
+                        "Email delivery (verification, password reset, notifications) is operational.",
+                footerHtml = "Sent by KotAuth to verify SMTP configuration.",
+            )
+        val text = "SMTP test email for $workspaceName. Email delivery is operational."
+        send(to, to, subject, html, text, tenant)
+    }
 
     private fun send(
         to: String,
