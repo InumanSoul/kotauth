@@ -42,7 +42,7 @@ internal fun workspaceRedirectorImpl(fallbackSlug: String): HTML.() -> Unit =
  */
 internal fun workspaceListPageImpl(
     workspaces: List<Tenant>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {

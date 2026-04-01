@@ -3,6 +3,7 @@ package com.kauth
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
+import com.kauth.adapter.web.admin.WorkspaceStub
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
@@ -270,7 +271,7 @@ fun Application.module(
                     try {
                         s.tenantRepository
                             .findAll()
-                            .map { it.slug to it.displayName }
+                            .map { WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl) }
                     } catch (_: Exception) {
                         emptyList()
                     }

@@ -10,7 +10,7 @@ import kotlinx.html.*
 internal fun rolesListPageImpl(
     workspace: Tenant,
     roles: List<Role>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
@@ -22,6 +22,7 @@ internal fun rolesListPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
                   contentClass = "content-outer",
@@ -105,7 +106,7 @@ internal fun rolesListPageImpl(
 internal fun createRolePageImpl(
     workspace: Tenant,
     apps: List<Application>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
 ): HTML.() -> Unit =
@@ -118,6 +119,7 @@ internal fun createRolePageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
@@ -234,7 +236,7 @@ internal fun roleDetailPageImpl(
     role: Role,
     allRoles: List<Role>,
     allUsers: List<User>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
@@ -246,6 +248,7 @@ internal fun roleDetailPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
@@ -413,7 +416,7 @@ internal fun groupsListPageImpl(
     workspace: Tenant,
     groups: List<Group>,
     roles: List<Role>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
@@ -425,6 +428,7 @@ internal fun groupsListPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
                   contentClass = "content-outer",
@@ -508,7 +512,7 @@ internal fun groupsListPageImpl(
 internal fun createGroupPageImpl(
     workspace: Tenant,
     groups: List<Group>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
 ): HTML.() -> Unit =
@@ -521,6 +525,7 @@ internal fun createGroupPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
@@ -610,7 +615,7 @@ internal fun groupDetailPageImpl(
     allRoles: List<Role>,
     members: List<User>,
     allUsers: List<User>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
 ): HTML.() -> Unit =
     {
@@ -622,6 +627,7 @@ internal fun groupDetailPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",

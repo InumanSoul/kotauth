@@ -12,7 +12,7 @@ import kotlinx.html.*
 internal fun activeSessionsPageImpl(
     workspace: Tenant,
     sessions: List<Session>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     userMap: Map<UserId, String> = emptyMap(),
     clientMap: Map<ApplicationId, String> = emptyMap(),
@@ -25,6 +25,7 @@ internal fun activeSessionsPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "sessions",
             loggedInAs = loggedInAs,
             contentClass = "content-outer",
@@ -126,7 +127,7 @@ internal fun activeSessionsPageImpl(
 internal fun auditLogPageImpl(
     workspace: Tenant,
     events: List<AuditEvent>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     page: Int = 1,
     totalPages: Int = 1,
@@ -142,6 +143,7 @@ internal fun auditLogPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "audit",
             loggedInAs = loggedInAs,
             showSidebar = false,

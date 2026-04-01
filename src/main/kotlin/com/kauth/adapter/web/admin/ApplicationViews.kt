@@ -20,7 +20,7 @@ data class ApplicationPrefill(
 internal fun applicationDetailPageImpl(
     workspace: Tenant,
     application: Application,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     allApps: List<Application>,
     loggedInAs: String,
     newSecret: String? = null,
@@ -33,6 +33,7 @@ internal fun applicationDetailPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
@@ -200,7 +201,7 @@ internal fun applicationDetailPageImpl(
 // Create application form.
 internal fun createApplicationPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     prefill: ApplicationPrefill = ApplicationPrefill(),
@@ -212,6 +213,7 @@ internal fun createApplicationPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             showSidebar = false,
             contentClass = "content-outer",
@@ -351,7 +353,7 @@ internal fun createApplicationPageImpl(
 internal fun editApplicationPageImpl(
     workspace: Tenant,
     application: Application,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     allApps: List<Application>,
     loggedInAs: String,
     error: String? = null,
@@ -364,6 +366,7 @@ internal fun editApplicationPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             activeAppSlug = application.clientId,
             activeAppSection = "overview",

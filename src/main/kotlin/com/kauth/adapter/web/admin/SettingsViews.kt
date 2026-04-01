@@ -12,7 +12,7 @@ import kotlinx.html.*
  */
 internal fun smtpSettingsPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     savedParam: String? = null,
@@ -26,6 +26,7 @@ internal fun smtpSettingsPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
                   contentClass = "content-outer",

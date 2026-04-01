@@ -15,7 +15,7 @@ internal fun webhooksListPageImpl(
     workspace: Tenant,
     endpoints: List<WebhookEndpoint>,
     deliveries: List<WebhookDelivery>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     newSecret: String? = null,
     error: String? = null,
@@ -29,6 +29,7 @@ internal fun webhooksListPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
                   contentClass = "content-outer",
@@ -230,7 +231,7 @@ internal fun webhooksListPageImpl(
 
 internal fun createWebhookPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
 ): HTML.() -> Unit =
@@ -244,6 +245,7 @@ internal fun createWebhookPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
                     contentClass = "content-outer",
