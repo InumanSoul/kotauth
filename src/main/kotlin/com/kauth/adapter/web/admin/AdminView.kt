@@ -192,8 +192,8 @@ object AdminView {
         loggedInAs: String,
         userMap: Map<UserId, String> = emptyMap(),
         clientMap: Map<ApplicationId, String> = emptyMap(),
-        saved: Boolean = false,
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, saved)
+        savedParam: String? = null,
+    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, savedParam)
 
     fun auditLogPage(
         workspace: Tenant,
@@ -205,7 +205,8 @@ object AdminView {
         eventTypeFilter: String? = null,
         userMap: Map<UserId, String> = emptyMap(),
         clientMap: Map<ApplicationId, String> = emptyMap(),
-    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap, clientMap)
+        clientLinks: Map<ApplicationId, ClientDisplayInfo> = emptyMap(),
+    ): HTML.() -> Unit = auditLogPageImpl(workspace, events, allWorkspaces, loggedInAs, page, totalPages, eventTypeFilter, userMap, clientMap, clientLinks)
 
     // ── Settings ────────────────────────────────────────────────────────
 

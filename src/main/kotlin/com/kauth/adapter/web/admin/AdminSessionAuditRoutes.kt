@@ -37,7 +37,7 @@ fun Route.adminSessionAuditRoutes(
         val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
         val sessionClientMap = resolveClientNames(sessionClientIds, applicationRepository)
         val wsPairs = call.attributes[WsPairsAttr]
-        val saved = call.request.queryParameters["saved"] == "true"
+        val savedParam = call.request.queryParameters["saved"]
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.activeSessionsPage(
@@ -47,7 +47,7 @@ fun Route.adminSessionAuditRoutes(
                 session.username,
                 sessionUserMap,
                 sessionClientMap,
-                saved = saved,
+                savedParam = savedParam,
             ),
         )
     }
@@ -59,13 +59,13 @@ fun Route.adminSessionAuditRoutes(
             call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         sessionRepository.revoke(sessionId, Instant.now())
-        call.respondRedirect("/admin/workspaces/$slug/sessions")
+        call.respondRedirect("/admin/workspaces/$slug/sessions?saved=revoked")
     }
 
     post("/sessions/revoke-all") {
         val workspace = call.attributes[WorkspaceAttr]
         adminService.revokeAllSessions(workspace.id)
-        call.respondRedirect("/admin/workspaces/${workspace.slug}/sessions?saved=true")
+        call.respondRedirect("/admin/workspaces/${workspace.slug}/sessions?saved=revoked_all")
     }
 
     // -------------------------------------------------------------------
@@ -95,6 +95,7 @@ fun Route.adminSessionAuditRoutes(
         val auditUserMap = resolveUsernames(auditUserIds, workspace.id, adminService)
         val auditClientIds = events.mapNotNull { it.clientId }.distinct()
         val auditClientMap = resolveClientNames(auditClientIds, applicationRepository)
+        val auditClientLinks = resolveClientLinks(auditClientIds, applicationRepository)
         val wsPairs = call.attributes[WsPairsAttr]
         call.respondHtml(
             HttpStatusCode.OK,
@@ -108,6 +109,7 @@ fun Route.adminSessionAuditRoutes(
                 eventTypeFilter = eventTypeStr,
                 userMap = auditUserMap,
                 clientMap = auditClientMap,
+                clientLinks = auditClientLinks,
             ),
         )
     }

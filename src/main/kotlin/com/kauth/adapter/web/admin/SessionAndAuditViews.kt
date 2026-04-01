@@ -16,7 +16,7 @@ internal fun activeSessionsPageImpl(
     loggedInAs: String,
     userMap: Map<UserId, String> = emptyMap(),
     clientMap: Map<ApplicationId, String> = emptyMap(),
-    saved: Boolean = false,
+    savedParam: String? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -28,7 +28,11 @@ internal fun activeSessionsPageImpl(
             activeAppSection = "sessions",
             loggedInAs = loggedInAs,
             contentClass = "content-outer",
-            toastMessage = if (saved) "All sessions revoked." else null,
+            toastMessage = when (savedParam) {
+                "revoked" -> "Session revoked."
+                "revoked_all" -> "All sessions revoked."
+                else -> null
+            },
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -129,6 +133,7 @@ internal fun auditLogPageImpl(
     eventTypeFilter: String? = null,
     userMap: Map<UserId, String> = emptyMap(),
     clientMap: Map<ApplicationId, String> = emptyMap(),
+    clientLinks: Map<ApplicationId, ClientDisplayInfo> = emptyMap(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -150,18 +155,10 @@ internal fun auditLogPageImpl(
                     "Audit Log" to null,
                 )
 
-                div("page-header") {
-                    div("page-header__left") {
-                        div("page-header__identity") {
-                            h1("page-header__title") { +"Audit Log" }
-                            p("page-header__sub") {
-                                +"Security-relevant events for the "
-                                strong { +workspace.displayName }
-                                +" workspace."
-                            }
-                        }
-                    }
-                }
+                pageHeader(
+                    title = "Audit Log",
+                    subtitle = "Security-relevant events for the ${workspace.displayName} workspace.",
+                )
 
                 div {
                     id = "audit-content"
@@ -185,11 +182,29 @@ internal fun auditLogPageImpl(
                                 selected = (eventTypeFilter == null)
                                 +"All events"
                             }
-                            AuditEventType.entries.forEach { type ->
-                                option {
-                                    value = type.name
-                                    selected = (type.name == eventTypeFilter)
-                                    +type.name.lowercase().replace('_', ' ')
+                            val groups = linkedMapOf(
+                                "Login & Registration" to listOf("LOGIN_", "REGISTER_", "ACCOUNT_"),
+                                "Tokens & Authorization" to listOf("TOKEN_", "AUTHORIZATION_CODE_"),
+                                "Sessions" to listOf("SESSION_"),
+                                "Admin Actions" to listOf("ADMIN_"),
+                                "Email & Password" to listOf("EMAIL_", "PASSWORD_"),
+                                "User Self-Service" to listOf("USER_"),
+                                "MFA" to listOf("MFA_"),
+                            )
+                            groups.forEach { (groupLabel, prefixes) ->
+                                val types = AuditEventType.entries.filter { t ->
+                                    prefixes.any { t.name.startsWith(it) }
+                                }
+                                if (types.isNotEmpty()) {
+                                    optGroup(groupLabel) {
+                                        types.forEach { type ->
+                                            option {
+                                                value = type.name
+                                                selected = (type.name == eventTypeFilter)
+                                                +type.name.lowercase().replace('_', ' ')
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -229,7 +244,11 @@ internal fun auditLogPageImpl(
                                     events.forEach { e ->
                                         tr {
                                             td { +e.createdAt.toDisplayString() }
-                                            td { span("data-table__id") { +e.eventType.name } }
+                                            td {
+                                                span("badge ${e.eventType.badgeModifier()}") {
+                                                    +e.eventType.name.lowercase().replace('_', ' ')
+                                                }
+                                            }
                                             td {
                                                 val uid = e.userId
                                                 if (uid != null) {
@@ -242,7 +261,14 @@ internal fun auditLogPageImpl(
                                             td {
                                                 val cid = e.clientId
                                                 if (cid != null) {
-                                                    +(clientMap[cid] ?: cid.value.toString())
+                                                    val info = clientLinks[cid]
+                                                    if (info != null) {
+                                                        a(href = "/admin/workspaces/${workspace.slug}/applications/${info.clientId}") {
+                                                            +info.name
+                                                        }
+                                                    } else {
+                                                        +(clientMap[cid] ?: cid.value.toString())
+                                                    }
                                                 } else {
                                                     +"—"
                                                 }
@@ -291,3 +317,56 @@ internal fun auditLogPageImpl(
                 }
             }
         }
+
+private fun AuditEventType.badgeModifier(): String =
+    when (this) {
+        AuditEventType.LOGIN_SUCCESS,
+        AuditEventType.REGISTER_SUCCESS,
+        AuditEventType.TOKEN_ISSUED,
+        AuditEventType.TOKEN_REFRESHED,
+        AuditEventType.AUTHORIZATION_CODE_ISSUED,
+        AuditEventType.AUTHORIZATION_CODE_USED,
+        AuditEventType.SESSION_CREATED,
+        AuditEventType.EMAIL_VERIFIED,
+        AuditEventType.PASSWORD_RESET_COMPLETED,
+        AuditEventType.USER_PROFILE_UPDATED,
+        AuditEventType.USER_PASSWORD_CHANGED,
+        AuditEventType.MFA_ENROLLMENT_VERIFIED,
+        AuditEventType.MFA_CHALLENGE_SUCCESS,
+        AuditEventType.ADMIN_USER_ENABLED,
+        AuditEventType.ADMIN_CLIENT_ENABLED,
+        AuditEventType.ADMIN_USER_PASSWORD_RESET,
+        AuditEventType.ACCOUNT_UNLOCKED,
+        -> "badge--active"
+
+        AuditEventType.LOGIN_FAILED,
+        AuditEventType.REGISTER_FAILED,
+        AuditEventType.MFA_CHALLENGE_FAILED,
+        AuditEventType.ACCOUNT_LOCKED,
+        AuditEventType.ADMIN_USER_DISABLED,
+        AuditEventType.ADMIN_CLIENT_DISABLED,
+        AuditEventType.USER_ACCOUNT_DISABLED_SELF,
+        -> "badge--danger"
+
+        AuditEventType.LOGIN_RATE_LIMITED,
+        AuditEventType.AUTHORIZATION_CODE_EXPIRED,
+        AuditEventType.TOKEN_REVOKED,
+        AuditEventType.SESSION_REVOKED,
+        AuditEventType.ADMIN_SESSION_REVOKED,
+        AuditEventType.ADMIN_SESSIONS_REVOKED_ALL,
+        AuditEventType.USER_SESSION_REVOKED_SELF,
+        AuditEventType.MFA_DISABLED,
+        AuditEventType.MFA_RECOVERY_CODE_USED,
+        AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED,
+        -> "badge--warn"
+
+        AuditEventType.EMAIL_VERIFICATION_SENT,
+        AuditEventType.PASSWORD_RESET_REQUESTED,
+        AuditEventType.MFA_ENROLLMENT_STARTED,
+        AuditEventType.TOKEN_INTROSPECTED,
+        AuditEventType.ADMIN_SMTP_TEST,
+        AuditEventType.ADMIN_SMTP_UPDATED,
+        -> "badge--info"
+
+        else -> "badge--inactive"
+    }
