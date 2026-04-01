@@ -51,6 +51,15 @@ class FakeSessionRepository : SessionRepository {
             .forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
     }
 
+    override fun revokeAllForTenant(
+        tenantId: TenantId,
+        revokedAt: Instant,
+    ): Int {
+        val active = store.values.filter { it.tenantId == tenantId && it.isActive }
+        active.forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
+        return active.size
+    }
+
     override fun findActiveByUser(
         tenantId: TenantId,
         userId: UserId,

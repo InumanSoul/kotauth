@@ -27,3 +27,22 @@ fun resolveClientNames(
     clientIds.associateWith { cid ->
         applicationRepository.findById(cid)?.name ?: cid.value.toString()
     }
+
+/** Display info for linking to application detail pages. */
+data class ClientDisplayInfo(
+    val name: String,
+    val clientId: String,
+)
+
+/** Resolves application IDs to display info (name + clientId slug for URL). */
+fun resolveClientLinks(
+    appIds: List<ApplicationId>,
+    applicationRepository: ApplicationRepository,
+): Map<ApplicationId, ClientDisplayInfo> =
+    appIds.associateWith { cid ->
+        val app = applicationRepository.findById(cid)
+        ClientDisplayInfo(
+            name = app?.name ?: cid.value.toString(),
+            clientId = app?.clientId ?: cid.value.toString(),
+        )
+    }

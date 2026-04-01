@@ -70,4 +70,13 @@ class FakeEmailPort : EmailPort {
         if (shouldFail) throw RuntimeException("SMTP delivery failed")
         _sent.add(SentEmail(to = to, toName = toName, workspaceName = workspaceName, type = "password_changed"))
     }
+
+    override fun sendTestEmail(
+        to: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        if (shouldFail) throw RuntimeException("SMTP delivery failed")
+        _sent.add(SentEmail(to = to, toName = to, workspaceName = workspaceName, type = "test"))
+    }
 }

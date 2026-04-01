@@ -341,7 +341,7 @@ fun Route.adminRoutes(
             get {
                 val session = call.sessions.get<AdminSession>()!!
                 val workspaces = tenantRepository.findAll()
-                val wsPairs = workspaces.map { it.slug to it.displayName }
+                val wsPairs = workspaces.map { WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl) }
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.workspaceListPage(workspaces, wsPairs, session.username),
@@ -350,7 +350,10 @@ fun Route.adminRoutes(
 
             get("/new") {
                 val session = call.sessions.get<AdminSession>()!!
-                val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                val wsPairs =
+                    tenantRepository.findAll().map {
+                        WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl)
+                    }
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.createWorkspacePage(loggedInAs = session.username, allWorkspaces = wsPairs),
@@ -373,7 +376,10 @@ fun Route.adminRoutes(
                     )
                 when (val result = adminService.createWorkspace(slug, displayName, issuerUrl)) {
                     is AdminResult.Failure -> {
-                        val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                        val wsPairs =
+                            tenantRepository.findAll().map {
+                                WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl)
+                            }
                         return@post call.respondHtml(
                             HttpStatusCode.UnprocessableEntity,
                             AdminView.createWorkspacePage(
@@ -420,7 +426,10 @@ fun Route.adminRoutes(
                     val workspace =
                         tenantRepository.findBySlug(slug)
                             ?: return@intercept call.respond(HttpStatusCode.NotFound).also { finish() }
-                    val wsPairs = tenantRepository.findAll().map { it.slug to it.displayName }
+                    val wsPairs =
+                        tenantRepository.findAll().map {
+                            WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl)
+                        }
                     call.attributes.put(WorkspaceAttr, workspace)
                     call.attributes.put(WsPairsAttr, wsPairs)
                     // Remember last-visited workspace for the /admin redirect

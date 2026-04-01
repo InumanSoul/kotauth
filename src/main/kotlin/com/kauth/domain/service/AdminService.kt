@@ -13,6 +13,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
+import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.PortalConfigRepository
@@ -44,6 +45,7 @@ class AdminService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val themeRepository: ThemeRepository? = null,
     private val portalConfigRepository: PortalConfigRepository? = null,
+    private val emailPort: EmailPort? = null,
 ) {
     // =========================================================================
     // Workspace settings
@@ -356,6 +358,58 @@ class AdminService(
             userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
         return setUserEnabled(userId, tenantId, !user.enabled)
+    }
+
+    fun sendTestEmail(
+        tenantId: TenantId,
+        recipientEmail: String,
+    ): AdminResult<Unit> {
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        if (!tenant.isSmtpReady) {
+            return AdminResult.Failure(AdminError.Validation("SMTP is not configured for this workspace."))
+        }
+        val port =
+            emailPort
+                ?: return AdminResult.Failure(AdminError.Validation("Email delivery is not available."))
+        return try {
+            port.sendTestEmail(
+                to = recipientEmail,
+                workspaceName = tenant.displayName,
+                tenant = tenant,
+            )
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenantId,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.ADMIN_SMTP_TEST,
+                    ipAddress = null,
+                    userAgent = null,
+                    details = mapOf("recipient" to recipientEmail),
+                ),
+            )
+            AdminResult.Success(Unit)
+        } catch (e: Exception) {
+            AdminResult.Failure(AdminError.Validation("Failed to send test email: ${e.message}"))
+        }
+    }
+
+    fun revokeAllSessions(tenantId: TenantId): AdminResult<Int> {
+        val count = sessionRepository.revokeAllForTenant(tenantId)
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_SESSIONS_REVOKED_ALL,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("sessionsRevoked" to count.toString()),
+            ),
+        )
+        return AdminResult.Success(count)
     }
 
     /**

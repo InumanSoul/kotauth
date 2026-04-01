@@ -81,9 +81,10 @@ internal fun HTML.adminShell(
     pageTitle: String,
     appInfo: AppInfo = AdminView.shellAppInfo,
     activeRail: String = "apps",
-    allWorkspaces: List<Pair<String, String>> = emptyList(),
+    allWorkspaces: List<WorkspaceStub> = emptyList(),
     workspaceName: String = "KotAuth",
     workspaceSlug: String? = null,
+    workspaceLogoUrl: String? = null,
     apps: List<Pair<String, String>> = emptyList(),
     activeAppSlug: String? = null,
     activeAppSection: String = "overview",
@@ -113,9 +114,7 @@ internal fun HTML.adminShell(
             div("shell-topbar") {
                 details("ws-dropdown") {
                     summary("ws-switcher") {
-                        div("ws-badge") {
-                            +(workspaceName.firstOrNull()?.uppercaseChar()?.toString() ?: "K")
-                        }
+                        workspaceAvatar(workspaceName, workspaceLogoUrl, "ws-avatar-wrap ws-avatar-wrap--sm")
                         div("ws-meta") {
                             span("ws-name") { +workspaceName }
                             span("ws-label") { +"workspace" }
@@ -126,19 +125,14 @@ internal fun HTML.adminShell(
                         if (allWorkspaces.isEmpty()) {
                             span("ws-dropdown-empty") { +"No workspaces yet" }
                         } else {
-                            allWorkspaces.forEach { (slug, name) ->
-                                val isActive = slug == workspaceSlug
+                            allWorkspaces.forEach { ws ->
+                                val isActive = ws.slug == workspaceSlug
                                 a(
-                                    href = "/admin/workspaces/$slug",
+                                    href = "/admin/workspaces/${ws.slug}",
                                     classes = "ws-dropdown-item${if (isActive) " active" else ""}",
                                 ) {
-                                    div("ws-dropdown-item-badge") {
-                                        +(
-                                            name.firstOrNull()?.uppercaseChar()?.toString()
-                                                ?: slug.first().uppercaseChar().toString()
-                                        )
-                                    }
-                                    span("ws-dropdown-item-name") { +name }
+                                    workspaceAvatar(ws.name, ws.logoUrl, "ws-avatar-wrap ws-avatar-wrap--sm")
+                                    span("ws-dropdown-item-name") { +ws.name }
                                     if (isActive) span("ws-dropdown-item-check") { +"✓" }
                                 }
                             }
@@ -282,6 +276,22 @@ internal fun HTML.adminShell(
                     }
                 }
             }
+        }
+    }
+}
+
+// ─── Workspace Avatar ───────────────────────────────────────────────────────
+
+internal fun FlowContent.workspaceAvatar(
+    name: String,
+    logoUrl: String?,
+    cssClass: String = "ws-avatar",
+) {
+    if (!logoUrl.isNullOrBlank()) {
+        img(src = logoUrl, alt = name, classes = "$cssClass ${cssClass.split(" ").first()}__img") {}
+    } else {
+        div(cssClass) {
+            +(name.firstOrNull()?.uppercaseChar()?.toString() ?: "W")
         }
     }
 }

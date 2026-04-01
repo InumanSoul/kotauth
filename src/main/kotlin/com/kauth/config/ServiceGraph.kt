@@ -215,6 +215,7 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
+                    emailPort = emailAdapter,
                 )
             val roleGroupService =
                 RoleGroupService(

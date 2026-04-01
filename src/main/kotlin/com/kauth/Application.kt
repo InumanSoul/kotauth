@@ -3,6 +3,7 @@ package com.kauth
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
+import com.kauth.adapter.web.admin.WorkspaceStub
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
@@ -91,6 +92,18 @@ fun main(args: Array<String> = emptyArray()) {
                 }
             } catch (e: Exception) {
                 startupLog.warn("Session cleanup failed: {}", e.message)
+            }
+        }
+    }
+
+    // Background sweep: retry orphaned webhook deliveries every 5 minutes
+    services.applicationScope.launch {
+        while (isActive) {
+            delay(5 * 60_000)
+            try {
+                services.webhookService.retrySweep()
+            } catch (e: Exception) {
+                startupLog.warn("Webhook recovery sweep failed: {}", e.message)
             }
         }
     }
@@ -258,7 +271,7 @@ fun Application.module(
                     try {
                         s.tenantRepository
                             .findAll()
-                            .map { it.slug to it.displayName }
+                            .map { WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl) }
                     } catch (_: Exception) {
                         emptyList()
                     }

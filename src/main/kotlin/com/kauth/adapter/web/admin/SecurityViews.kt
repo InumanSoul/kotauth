@@ -12,7 +12,7 @@ import kotlinx.html.*
 
 internal fun mfaSettingsPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     totalUsers: Int = 0,
     enrolledUsers: Int = 0,
@@ -36,6 +36,7 @@ internal fun mfaSettingsPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "mfa",
             loggedInAs = loggedInAs,
             contentClass = "content-outer",
@@ -237,7 +238,7 @@ internal fun mfaSettingsPageImpl(
 internal fun identityProvidersPageImpl(
     workspace: Tenant,
     providers: List<IdentityProvider>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
@@ -252,6 +253,7 @@ internal fun identityProvidersPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
                   contentClass = "content-outer",
@@ -395,7 +397,7 @@ internal fun identityProvidersPageImpl(
 internal fun apiKeysListPageImpl(
     workspace: Tenant,
     apiKeys: List<ApiKey>,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     newKeyRaw: String? = null,
     error: String? = null,
@@ -408,6 +410,7 @@ internal fun apiKeysListPageImpl(
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
         workspaceSlug = slug,
+        workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
     contentClass = "content-outer",
@@ -561,7 +564,7 @@ internal fun apiKeysListPageImpl(
 
 internal fun createApiKeyPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     scopes: List<String> = ApiScope.ALL,
@@ -575,6 +578,7 @@ internal fun createApiKeyPageImpl(
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
         workspaceSlug = slug,
+        workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
     contentClass = "content-outer",

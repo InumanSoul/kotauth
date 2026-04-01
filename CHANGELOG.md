@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.2] - 2026-04-01
+
+### Added
+
+- **Workspace "Revoke all sessions"** — new button in the sessions page header with confirmation dialog. Revokes all active sessions across all users in a workspace. New `SessionRepository.revokeAllForTenant()` port method. Audit event `ADMIN_SESSIONS_REVOKED_ALL` recorded with count
+- **SMTP test email button** — "Send Test Email" button on the SMTP settings page (visible when SMTP is configured). Sends a branded test email to the admin's address via `AdminService.sendTestEmail()`. New `EmailPort.sendTestEmail()` method. Audit event `ADMIN_SMTP_TEST` recorded
+- **Webhook recovery sweep** — background coroutine runs every 5 minutes, queries pending deliveries via `findPending()`, and retries them. Marks deliveries as FAILED if their endpoint was deleted. Follows the session cleanup job pattern
+- **Workspace logo in admin console** — workspace logos (configured in branding settings) now display in the topbar switcher badge, dropdown items, and workspace detail page. Falls back to letter initial when no logo is configured. New `workspaceAvatar()` reusable component with BEM `--sm` modifier for compact contexts
+- **`WorkspaceStub` data class** — replaces `Pair<String, String>` for workspace navigation data. Carries `slug`, `name`, and `logoUrl`. Used across all admin shell calls and view functions
+- **`ClientDisplayInfo` + `resolveClientLinks` helper** — resolves application IDs to both display name and OAuth `clientId` for correct URL linking in the audit log
+- **Audit log event badges** — event types rendered as color-coded badges using the existing badge component: green (success), red (failure), amber (revocation/warning), blue (informational), gray (admin CRUD)
+- **Audit log `<optgroup>` filter** — 55 event types grouped into 7 categories (Login & Registration, Tokens & Authorization, Sessions, Admin Actions, Email & Password, User Self-Service, MFA) for easier scanning
+
+### Changed
+
+- **Composite role expansion → recursive CTE** — `expandCompositeRoles()` replaced BFS loop (1 query per tree level) with a single `WITH RECURSIVE` CTE query. Uses `UNION` to prevent infinite cycles on circular role hierarchies
+- **Typed webhook events** — `WebhookEvent` string constants replaced with `WebhookEventType` enum. Type-safe across model (`WebhookEndpoint.events`, `WebhookDelivery.eventType`), service (`dispatch`, `createEndpoint`), repository serialization, routes, views, and tests. Invalid event types are now impossible at compile time. No migration needed — DB column stays TEXT, string values unchanged
+- **Audit log page header** — hand-rolled markup replaced with shared `pageHeader()` component
+- **Audit log event types human-readable** — table rows display `login success` instead of `LOGIN_SUCCESS`, matching the filter dropdown format
+- **Audit log client column linked** — client names now link to the application detail page using the OAuth `clientId` slug
+- **Session revoke toast feedback** — single-session revoke shows "Session revoked." toast. Revoke-all shows "All sessions revoked." Both use distinct `?saved=` values (`revoked` / `revoked_all`)
+
+### Fixed
+
+- **CTE queries use `prepareStatement().executeQuery()`** — Exposed's `Transaction.exec()` internally calls `executeUpdate` which throws when a SELECT result is returned. Both CTE methods (`expandCompositeRoles`, `findAllAncestorGroupIds`) now use `connection.prepareStatement(sql, false).executeQuery()` for correct result set handling. Fixes login failure introduced by the CTE migration
+
+---
+
 ## [1.3.1] - 2026-03-30
 
 ### Added

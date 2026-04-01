@@ -95,7 +95,7 @@ internal fun adminOAuthErrorPageImpl(
 internal fun adminErrorPageImpl(
     message: String,
     exceptionType: String? = null,
-    allWorkspaces: List<Pair<String, String>> = emptyList(),
+    allWorkspaces: List<WorkspaceStub> = emptyList(),
     loggedInAs: String = "—",
 ): HTML.() -> Unit =
     {

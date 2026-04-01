@@ -61,4 +61,10 @@ interface EmailPort {
         workspaceName: String,
         tenant: Tenant,
     )
+
+    fun sendTestEmail(
+        to: String,
+        workspaceName: String,
+        tenant: Tenant,
+    )
 }

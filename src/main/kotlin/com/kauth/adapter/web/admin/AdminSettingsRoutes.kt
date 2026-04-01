@@ -3,7 +3,9 @@ package com.kauth.adapter.web.admin
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.UserRepository
@@ -101,10 +103,10 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
-        val saved = call.request.queryParameters["saved"] == "true"
+        val savedParam = call.request.queryParameters["saved"]
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.smtpSettingsPage(workspace, wsPairs, session.username, saved = saved),
+            AdminView.smtpSettingsPage(workspace, wsPairs, session.username, savedParam = savedParam),
         )
     }
 
@@ -129,6 +131,31 @@ fun Route.adminSettingsRoutes(
         ) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=true")
+            is AdminResult.Failure -> {
+                val wsPairs = call.attributes[WsPairsAttr]
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.smtpSettingsPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = result.error.message,
+                    ),
+                )
+            }
+        }
+    }
+
+    post("/settings/smtp/test") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
+        val adminUser =
+            (adminService.getUser(UserId(session.userId), TenantId(session.tenantId)) as? AdminResult.Success)?.value
+        val recipientEmail = adminUser?.email ?: "${session.username}@localhost"
+        when (val result = adminService.sendTestEmail(workspace.id, recipientEmail)) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=test_sent")
             is AdminResult.Failure -> {
                 val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(

@@ -3,6 +3,7 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookDeliveryRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -39,7 +40,7 @@ class PostgresWebhookDeliveryRepository : WebhookDeliveryRepository {
             val insertedId =
                 WebhookDeliveriesTable.insert {
                     it[endpointId] = delivery.endpointId
-                    it[eventType] = delivery.eventType
+                    it[eventType] = delivery.eventType.value
                     it[payload] = delivery.payload
                     it[status] = delivery.status.value
                     it[attempts] = delivery.attempts
@@ -125,7 +126,9 @@ class PostgresWebhookDeliveryRepository : WebhookDeliveryRepository {
         return WebhookDelivery(
             id = this[WebhookDeliveriesTable.id],
             endpointId = this[WebhookDeliveriesTable.endpointId],
-            eventType = this[WebhookDeliveriesTable.eventType],
+            eventType =
+                WebhookEventType.fromValue(this[WebhookDeliveriesTable.eventType])
+                    ?: WebhookEventType.USER_CREATED,
             payload = this[WebhookDeliveriesTable.payload],
             status = WebhookDeliveryStatus.fromValue(this[WebhookDeliveriesTable.status]),
             attempts = this[WebhookDeliveriesTable.attempts],

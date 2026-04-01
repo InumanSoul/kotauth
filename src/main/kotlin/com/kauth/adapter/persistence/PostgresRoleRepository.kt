@@ -260,27 +260,31 @@ class PostgresRoleRepository : RoleRepository {
         }
 
     /**
-     * BFS expansion of composite roles. Visited set prevents infinite cycles.
+     * Expands composite roles transitively in a single recursive CTE.
+     * UNION prevents infinite cycles on circular role hierarchies.
      */
     private fun expandCompositeRoles(seedRoleIds: Set<Int>): Set<Int> {
-        val visited = seedRoleIds.toMutableSet()
-        val queue = ArrayDeque(seedRoleIds)
+        if (seedRoleIds.isEmpty()) return emptySet()
+        val ids = seedRoleIds.joinToString(",")
+        val sql =
+            """
+            WITH RECURSIVE role_tree AS (
+                SELECT id FROM roles WHERE id IN ($ids)
+                UNION
+                SELECT crm.child_role_id FROM composite_role_mappings crm
+                JOIN role_tree rt ON crm.parent_role_id = rt.id
+            )
+            SELECT DISTINCT id FROM role_tree
+            """.trimIndent()
 
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-            val children =
-                CompositeRoleMappingsTable
-                    .selectAll()
-                    .where { CompositeRoleMappingsTable.parentRoleId eq current }
-                    .map { it[CompositeRoleMappingsTable.childRoleId] }
-
-            for (childId in children) {
-                if (visited.add(childId)) {
-                    queue.addLast(childId)
-                }
-            }
+        val result = mutableSetOf<Int>()
+        val conn = TransactionManager.current().connection
+        val stmt = conn.prepareStatement(sql, false)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            result.add(rs.getInt(1))
         }
-        return visited
+        return result
     }
 
     /**
@@ -301,10 +305,11 @@ class PostgresRoleRepository : RoleRepository {
             """.trimIndent()
 
         val result = mutableSetOf<Int>()
-        TransactionManager.current().exec(sql) { rs ->
-            while (rs.next()) {
-                result.add(rs.getInt("id"))
-            }
+        val conn = TransactionManager.current().connection
+        val stmt = conn.prepareStatement(sql, false)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            result.add(rs.getInt(1))
         }
         return result
     }

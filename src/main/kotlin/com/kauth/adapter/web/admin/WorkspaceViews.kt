@@ -22,7 +22,7 @@ import kotlinx.html.*
  */
 internal fun workspaceDetailPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     apps: List<Application> = emptyList(),
     loggedInAs: String,
 ): HTML.() -> Unit =
@@ -34,6 +34,7 @@ internal fun workspaceDetailPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             loggedInAs = loggedInAs,
                   contentClass = "content-outer",
@@ -48,14 +49,8 @@ internal fun workspaceDetailPageImpl(
             div("page-header") {
                 div("page-header__left") {
                     // Square workspace avatar with edit overlay
-                    div("ws-avatar") {
-                        +(
-                            workspace.displayName
-                                .firstOrNull()
-                                ?.uppercaseChar()
-                                ?.toString()
-                                ?: "W"
-                            )
+                    div("ws-avatar-wrap") {
+                        workspaceAvatar(workspace.displayName, workspace.theme.logoUrl, "ws-avatar-wrap")
                         a(
                             href = "/admin/workspaces/${workspace.slug}/settings/branding",
                             classes = "ws-avatar__edit",
@@ -276,7 +271,7 @@ data class WorkspacePrefill(
 // Create workspace form.
 internal fun createWorkspacePageImpl(
     loggedInAs: String,
-    allWorkspaces: List<Pair<String, String>> = emptyList(),
+    allWorkspaces: List<WorkspaceStub> = emptyList(),
     error: String? = null,
     prefill: WorkspacePrefill = WorkspacePrefill(),
 ): HTML.() -> Unit =
@@ -409,7 +404,7 @@ internal fun createWorkspacePageImpl(
 // Workspace settings form.
 internal fun workspaceSettingsPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
@@ -423,6 +418,7 @@ internal fun workspaceSettingsPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
@@ -575,7 +571,7 @@ internal fun workspaceSettingsPageImpl(
 // Security policy page.
 internal fun securityPolicyPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
@@ -590,6 +586,7 @@ internal fun securityPolicyPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
@@ -786,7 +783,7 @@ internal fun securityPolicyPageImpl(
 // Branding page.
 internal fun brandingPageImpl(
     workspace: Tenant,
-    allWorkspaces: List<Pair<String, String>>,
+    allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
@@ -799,6 +796,7 @@ internal fun brandingPageImpl(
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = workspace.slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                   contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,

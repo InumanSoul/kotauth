@@ -42,6 +42,12 @@ interface SessionRepository {
     /** Returns a session by its DB id, regardless of state. */
     fun findById(id: SessionId): Session?
 
+    /** Revokes all active sessions across all users in a tenant. */
+    fun revokeAllForTenant(
+        tenantId: TenantId,
+        revokedAt: Instant = Instant.now(),
+    ): Int
+
     /** Returns all active (non-revoked, non-expired) sessions across all users in a tenant. */
     fun findActiveByTenant(tenantId: TenantId): List<Session>
 
