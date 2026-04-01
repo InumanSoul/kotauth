@@ -278,10 +278,11 @@ class PostgresRoleRepository : RoleRepository {
             """.trimIndent()
 
         val result = mutableSetOf<Int>()
-        TransactionManager.current().exec(sql) { rs ->
-            while (rs.next()) {
-                result.add(rs.getInt("id"))
-            }
+        val conn = TransactionManager.current().connection
+        val stmt = conn.prepareStatement(sql, false)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            result.add(rs.getInt(1))
         }
         return result
     }
@@ -304,10 +305,11 @@ class PostgresRoleRepository : RoleRepository {
             """.trimIndent()
 
         val result = mutableSetOf<Int>()
-        TransactionManager.current().exec(sql) { rs ->
-            while (rs.next()) {
-                result.add(rs.getInt("id"))
-            }
+        val conn = TransactionManager.current().connection
+        val stmt = conn.prepareStatement(sql, false)
+        val rs = stmt.executeQuery()
+        while (rs.next()) {
+            result.add(rs.getInt(1))
         }
         return result
     }
