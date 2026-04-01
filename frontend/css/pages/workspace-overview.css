@@ -15,7 +15,7 @@
 
 /* ── Workspace avatar ──────────────────────────────────────────────────── */
 
-.ws-avatar {
+.ws-avatar-wrap {
   position: relative;
   flex-shrink: 0;
   width: 52px;
@@ -31,6 +31,7 @@
   cursor: pointer;
   user-select: none;
   overflow: hidden;
+  padding: var(--space-2);
 }
 
 .ws-avatar__img {
@@ -39,17 +40,16 @@
   object-fit: contain;
 }
 
-.ws-avatar--sm {
+.ws-avatar-wrap--sm {
   width: 28px;
   height: 28px;
   font-size: 13px;
   font-family: var(--font-mono);
   border-radius: var(--radius-md);
-  background: var(--color-accent-bg);
-  border-color: var(--color-accent);
+  padding: var(--space-1);
 }
 
-.ws-avatar:hover .ws-avatar__edit { opacity: 1; }
+.ws-avatar-wrap:hover .ws-avatar__edit { opacity: 1; }
 
 .ws-avatar__edit {
   position: absolute;

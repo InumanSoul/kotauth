@@ -114,7 +114,7 @@ internal fun HTML.adminShell(
             div("shell-topbar") {
                 details("ws-dropdown") {
                     summary("ws-switcher") {
-                        workspaceAvatar(workspaceName, workspaceLogoUrl, "ws-avatar ws-avatar--sm")
+                        workspaceAvatar(workspaceName, workspaceLogoUrl, "ws-avatar-wrap ws-avatar-wrap--sm")
                         div("ws-meta") {
                             span("ws-name") { +workspaceName }
                             span("ws-label") { +"workspace" }
@@ -131,7 +131,7 @@ internal fun HTML.adminShell(
                                     href = "/admin/workspaces/${ws.slug}",
                                     classes = "ws-dropdown-item${if (isActive) " active" else ""}",
                                 ) {
-                                    workspaceAvatar(ws.name, ws.logoUrl, "ws-avatar ws-avatar--sm")
+                                    workspaceAvatar(ws.name, ws.logoUrl, "ws-avatar-wrap ws-avatar-wrap--sm")
                                     span("ws-dropdown-item-name") { +ws.name }
                                     if (isActive) span("ws-dropdown-item-check") { +"✓" }
                                 }

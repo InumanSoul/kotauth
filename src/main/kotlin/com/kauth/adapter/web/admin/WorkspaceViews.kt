@@ -50,7 +50,7 @@ internal fun workspaceDetailPageImpl(
                 div("page-header__left") {
                     // Square workspace avatar with edit overlay
                     div("ws-avatar-wrap") {
-                        workspaceAvatar(workspace.displayName, workspace.theme.logoUrl, "ws-avatar")
+                        workspaceAvatar(workspace.displayName, workspace.theme.logoUrl, "ws-avatar-wrap")
                         a(
                             href = "/admin/workspaces/${workspace.slug}/settings/branding",
                             classes = "ws-avatar__edit",
