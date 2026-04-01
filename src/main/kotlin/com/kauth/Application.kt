@@ -95,6 +95,18 @@ fun main(args: Array<String> = emptyArray()) {
         }
     }
 
+    // Background sweep: retry orphaned webhook deliveries every 5 minutes
+    services.applicationScope.launch {
+        while (isActive) {
+            delay(5 * 60_000)
+            try {
+                services.webhookService.retrySweep()
+            } catch (e: Exception) {
+                startupLog.warn("Webhook recovery sweep failed: {}", e.message)
+            }
+        }
+    }
+
     Runtime.getRuntime().addShutdownHook(
         Thread {
             services.applicationScope.cancel()

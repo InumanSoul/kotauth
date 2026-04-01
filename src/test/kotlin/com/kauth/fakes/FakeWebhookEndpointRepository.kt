@@ -33,13 +33,15 @@ class FakeWebhookEndpointRepository : WebhookEndpointRepository {
         eventType: String,
     ): List<WebhookEndpoint> =
         store.values.filter {
-            it.tenantId == tenantId && it.enabled && eventType in it.events
+            it.tenantId == tenantId && it.enabled && it.events.any { e -> e.value == eventType }
         }
 
     override fun findById(
         id: Int,
         tenantId: TenantId,
     ): WebhookEndpoint? = store[id]?.takeIf { it.tenantId == tenantId }
+
+    override fun findById(id: Int): WebhookEndpoint? = store[id]
 
     override fun update(endpoint: WebhookEndpoint) {
         endpoint.id?.let { store[it] = endpoint }

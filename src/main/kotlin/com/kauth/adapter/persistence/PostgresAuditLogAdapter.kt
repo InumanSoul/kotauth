@@ -2,7 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
-import com.kauth.domain.model.WebhookEvent
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.service.WebhookService
 import org.jetbrains.exposed.sql.insert
@@ -71,35 +71,35 @@ class PostgresAuditLogAdapter(
     // -------------------------------------------------------------------------
 
     /** Maps [AuditEventType] values to their webhook event string counterparts. */
-    private fun auditTypeToWebhookEvent(type: AuditEventType): String? =
+    private fun auditTypeToWebhookEvent(type: AuditEventType): WebhookEventType? =
         when (type) {
             AuditEventType.ADMIN_USER_CREATED,
             AuditEventType.REGISTER_SUCCESS,
-            -> WebhookEvent.USER_CREATED
+            -> WebhookEventType.USER_CREATED
 
             AuditEventType.ADMIN_USER_UPDATED,
             AuditEventType.USER_PROFILE_UPDATED,
-            -> WebhookEvent.USER_UPDATED
+            -> WebhookEventType.USER_UPDATED
 
             AuditEventType.ADMIN_USER_DISABLED,
             AuditEventType.ADMIN_USER_ENABLED,
-            -> WebhookEvent.USER_UPDATED
+            -> WebhookEventType.USER_UPDATED
 
-            AuditEventType.LOGIN_SUCCESS -> WebhookEvent.LOGIN_SUCCESS
-            AuditEventType.LOGIN_FAILED -> WebhookEvent.LOGIN_FAILED
+            AuditEventType.LOGIN_SUCCESS -> WebhookEventType.LOGIN_SUCCESS
+            AuditEventType.LOGIN_FAILED -> WebhookEventType.LOGIN_FAILED
 
             AuditEventType.PASSWORD_RESET_COMPLETED,
             AuditEventType.ADMIN_USER_PASSWORD_RESET,
-            -> WebhookEvent.PASSWORD_RESET
+            -> WebhookEventType.PASSWORD_RESET
 
-            AuditEventType.MFA_ENROLLMENT_VERIFIED -> WebhookEvent.MFA_ENROLLED
+            AuditEventType.MFA_ENROLLMENT_VERIFIED -> WebhookEventType.MFA_ENROLLED
 
             AuditEventType.SESSION_REVOKED,
             AuditEventType.ADMIN_SESSION_REVOKED,
             AuditEventType.USER_SESSION_REVOKED_SELF,
-            -> WebhookEvent.SESSION_REVOKED
+            -> WebhookEventType.SESSION_REVOKED
 
-            else -> null // Not mapped to a webhook event
+            else -> null
         }
 
     /** Extracts a flat map of useful fields from an [AuditEvent] for the webhook payload. */

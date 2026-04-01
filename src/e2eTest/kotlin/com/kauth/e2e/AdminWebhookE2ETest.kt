@@ -4,7 +4,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.WebhookEndpoint
-import com.kauth.domain.model.WebhookEvent
+import com.kauth.domain.model.WebhookEventType
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertFalse
@@ -31,7 +31,7 @@ class AdminWebhookE2ETest : E2ETestBase() {
         navigateSafe("$baseUrl/admin/workspaces/webhook-ws/settings/webhooks/new")
 
         page.fill("input[name=url]", "https://example.com/hook")
-        page.locator("input[name=events][value='${WebhookEvent.USER_CREATED}']").check()
+        page.locator("input[name=events][value='${WebhookEventType.USER_CREATED}']").check()
         page.locator("button[type=submit][form=create-webhook-form]").click()
 
         waitForUrlPattern("**/settings/webhooks**")
@@ -50,7 +50,7 @@ class AdminWebhookE2ETest : E2ETestBase() {
                 tenantId = TenantId(2),
                 url = "https://hooks.example.com/receiver",
                 secret = "fake-secret-abc",
-                events = setOf(WebhookEvent.USER_CREATED, WebhookEvent.LOGIN_SUCCESS),
+                events = setOf(WebhookEventType.USER_CREATED, WebhookEventType.LOGIN_SUCCESS),
                 description = "Test Endpoint",
                 enabled = true,
             ),
@@ -78,7 +78,7 @@ class AdminWebhookE2ETest : E2ETestBase() {
                 tenantId = TenantId(2),
                 url = "https://hooks.example.com/receiver",
                 secret = "fake-secret-abc",
-                events = setOf(WebhookEvent.USER_CREATED),
+                events = setOf(WebhookEventType.USER_CREATED),
                 description = "Toggle Test",
                 enabled = true,
             ),

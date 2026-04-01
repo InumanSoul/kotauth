@@ -5,7 +5,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 import com.kauth.domain.model.WebhookEndpoint
-import com.kauth.domain.model.WebhookEvent
+import com.kauth.domain.model.WebhookEventType
 import kotlinx.html.*
 import java.time.format.DateTimeFormatter
 
@@ -120,7 +120,7 @@ internal fun webhooksListPageImpl(
                                 td { span("key-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
                                 td {
                                     span("key-table__meta") {
-                                        +(ep.events.sorted().joinToString(", ").ifBlank { "none" })
+                                        +(ep.events.map { it.value }.sorted().joinToString(", ").ifBlank { "none" })
                                     }
                                 }
                                 td {
@@ -189,7 +189,7 @@ internal fun webhooksListPageImpl(
                             deliveries.forEach { d ->
                                 val ep = endpoints.firstOrNull { it.id == d.endpointId }
                                 tr {
-                                    td { span("key-table__meta") { +d.eventType } }
+                                    td { span("key-table__meta") { +d.eventType.value } }
                                     td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
                                     td {
                                         span(
@@ -236,7 +236,7 @@ internal fun createWebhookPageImpl(
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
-        val totalEvents = WebhookEvent.ALL.size
+        val totalEvents = WebhookEventType.entries.size
 
         adminShell(
             pageTitle = "New Endpoint — ${workspace.displayName}",
@@ -338,13 +338,13 @@ internal fun createWebhookPageImpl(
                     }
                     div("chip-grid") {
                         id = "events-grid"
-                        WebhookEvent.ALL.forEach { event ->
+                        WebhookEventType.entries.forEach { event ->
                             label("scope-chip") {
                                 input(type = InputType.checkBox, name = "events") {
-                                    value = event
+                                    value = event.value
                                     attributes["form"] = "create-webhook-form"
                                 }
-                                span("scope-chip__label") { +event }
+                                span("scope-chip__label") { +event.value }
                             }
                         }
                     }

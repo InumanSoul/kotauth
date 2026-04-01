@@ -26,6 +26,9 @@ interface WebhookEndpointRepository {
         tenantId: TenantId,
     ): WebhookEndpoint?
 
+    /** Returns a single endpoint by ID without tenant scoping (for internal background jobs). */
+    fun findById(id: Int): WebhookEndpoint?
+
     /** Replaces the mutable fields of an existing endpoint (url, events, description, enabled). */
     fun update(endpoint: WebhookEndpoint)
 

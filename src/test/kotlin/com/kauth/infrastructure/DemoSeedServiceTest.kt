@@ -3,6 +3,7 @@ package com.kauth.infrastructure
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -297,7 +298,7 @@ class DemoSeedServiceTest {
         val acmeId = tenants.findBySlug("acme")!!.id
         val wh = webhooks.findByTenantId(acmeId).first()
 
-        assertEquals(setOf("user.created", "login.success"), wh.events)
+        assertEquals(setOf(WebhookEventType.USER_CREATED, WebhookEventType.LOGIN_SUCCESS), wh.events)
         assertEquals("https://webhook.site/demo-acme", wh.url)
     }
 

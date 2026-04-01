@@ -4,7 +4,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookDelivery
 import com.kauth.domain.model.WebhookDeliveryStatus
 import com.kauth.domain.model.WebhookEndpoint
-import com.kauth.domain.model.WebhookEvent
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookDeliveryRepository
 import com.kauth.domain.port.WebhookEndpointRepository
 import kotlinx.coroutines.CoroutineScope
@@ -68,12 +68,12 @@ class WebhookService(
      */
     fun dispatch(
         tenantId: TenantId,
-        eventType: String,
+        eventType: WebhookEventType,
         payloadData: Map<String, Any?> = emptyMap(),
     ) {
         val endpoints =
             try {
-                endpointRepository.findEnabledByTenantAndEvent(tenantId, eventType)
+                endpointRepository.findEnabledByTenantAndEvent(tenantId, eventType.value)
             } catch (e: Exception) {
                 log.error(
                     "Webhook dispatch: failed to query endpoints for tenant=${tenantId.value} event=$eventType",
@@ -84,7 +84,7 @@ class WebhookService(
 
         if (endpoints.isEmpty()) return
 
-        val payload = buildPayload(eventType, payloadData)
+        val payload = buildPayload(eventType.value, payloadData)
 
         endpoints.forEach { endpoint ->
             val delivery =
@@ -118,7 +118,7 @@ class WebhookService(
     fun createEndpoint(
         tenantId: TenantId,
         url: String,
-        events: Set<String>,
+        events: Set<WebhookEventType>,
         description: String = "",
     ): WebhookResult {
         if (url.isBlank()) return WebhookResult.Failure("URL cannot be blank.")
@@ -126,10 +126,6 @@ class WebhookService(
             return WebhookResult.Failure("URL must start with http:// or https://.")
         }
         if (url.length > 2048) return WebhookResult.Failure("URL must be 2048 characters or fewer.")
-        val unknownEvents = events.filter { it !in WebhookEvent.ALL }
-        if (unknownEvents.isNotEmpty()) {
-            return WebhookResult.Failure("Unknown event types: ${unknownEvents.joinToString(", ")}.")
-        }
 
         val secret = generateSecret()
         val saved =
@@ -168,6 +164,26 @@ class WebhookService(
         limit: Int = 50,
     ): List<WebhookDelivery> = deliveryRepository.findByEndpointId(endpointId, limit)
 
+    /**
+     * Retries pending deliveries that may have been orphaned during downtime.
+     * Called by a background coroutine on a schedule.
+     */
+    fun retrySweep(maxDeliveries: Int = 50) {
+        val pending = deliveryRepository.findPending(maxDeliveries)
+        if (pending.isEmpty()) return
+        log.info("Webhook recovery sweep: found {} pending deliveries", pending.size)
+        for (delivery in pending) {
+            val endpoint = endpointRepository.findById(delivery.endpointId)
+            if (endpoint == null) {
+                deliveryRepository.update(delivery.copy(status = WebhookDeliveryStatus.FAILED))
+                continue
+            }
+            scope.launch {
+                attemptDelivery(endpoint, delivery, delivery.attempts)
+            }
+        }
+    }
+
     // ==========================================================================
     // Delivery machinery (internal)
     // ==========================================================================
@@ -182,7 +198,7 @@ class WebhookService(
         val delayMs = retryDelaysMs[attemptNumber]
         if (delayMs > 0) delay(delayMs)
 
-        val (responseStatus, success) = sendRequest(endpoint, delivery.payload, delivery.eventType)
+        val (responseStatus, success) = sendRequest(endpoint, delivery.payload, delivery.eventType.value)
         val now = Instant.now()
         val newAttempts = delivery.attempts + 1
         val newStatus =

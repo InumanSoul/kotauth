@@ -2,6 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.WebhookEndpoint
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookEndpointRepository
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
@@ -39,7 +40,7 @@ class PostgresWebhookEndpointRepository : WebhookEndpointRepository {
                     it[tenantId] = endpoint.tenantId.value
                     it[url] = endpoint.url
                     it[secret] = endpoint.secret
-                    it[events] = endpoint.events.joinToString(",")
+                    it[events] = endpoint.events.joinToString(",") { e -> e.value }
                     it[description] = endpoint.description
                     it[enabled] = endpoint.enabled
                     it[createdAt] = OffsetDateTime.ofInstant(endpoint.createdAt, ZoneOffset.UTC)
@@ -68,7 +69,7 @@ class PostgresWebhookEndpointRepository : WebhookEndpointRepository {
                     (WebhookEndpointsTable.tenantId eq tenantId.value) and
                         (WebhookEndpointsTable.enabled eq true)
                 }.map { it.toEndpoint() }
-                .filter { eventType in it.events }
+                .filter { endpoint -> endpoint.events.any { it.value == eventType } }
         }
 
     override fun findById(
@@ -83,6 +84,15 @@ class PostgresWebhookEndpointRepository : WebhookEndpointRepository {
                 .singleOrNull()
         }
 
+    override fun findById(id: Int): WebhookEndpoint? =
+        transaction {
+            WebhookEndpointsTable
+                .selectAll()
+                .where { WebhookEndpointsTable.id eq id }
+                .map { it.toEndpoint() }
+                .singleOrNull()
+        }
+
     override fun update(endpoint: WebhookEndpoint) =
         transaction {
             WebhookEndpointsTable.update({
@@ -90,7 +100,7 @@ class PostgresWebhookEndpointRepository : WebhookEndpointRepository {
                     (WebhookEndpointsTable.tenantId eq endpoint.tenantId.value)
             }) {
                 it[url] = endpoint.url
-                it[events] = endpoint.events.joinToString(",")
+                it[events] = endpoint.events.joinToString(",") { e -> e.value }
                 it[description] = endpoint.description
                 it[enabled] = endpoint.enabled
             }
@@ -131,7 +141,13 @@ class PostgresWebhookEndpointRepository : WebhookEndpointRepository {
             tenantId = TenantId(this[WebhookEndpointsTable.tenantId]),
             url = this[WebhookEndpointsTable.url],
             secret = this[WebhookEndpointsTable.secret],
-            events = this[WebhookEndpointsTable.events].split(",").filter { it.isNotBlank() }.toSet(),
+            events =
+                this[WebhookEndpointsTable.events]
+                    .split(",")
+                    .filter {
+                        it.isNotBlank()
+                    }.mapNotNull { WebhookEventType.fromValue(it) }
+                    .toSet(),
             description = this[WebhookEndpointsTable.description],
             enabled = this[WebhookEndpointsTable.enabled],
             createdAt = created.toInstant(),

@@ -10,6 +10,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookEndpoint
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
@@ -214,7 +215,7 @@ class DemoSeedService(
                 tenantId = updated.id,
                 url = "https://webhook.site/demo-acme",
                 secret = "whsec_demo_acme_secret_key_123",
-                events = setOf("user.created", "login.success"),
+                events = setOf(WebhookEventType.USER_CREATED, WebhookEventType.LOGIN_SUCCESS),
                 description = "Acme webhook integration",
             ),
         )
@@ -315,7 +316,7 @@ class DemoSeedService(
                 tenantId = updated.id,
                 url = "https://webhook.site/demo-startup-labs",
                 secret = "whsec_demo_sl_secret_key_456",
-                events = setOf("user.created"),
+                events = setOf(WebhookEventType.USER_CREATED),
                 description = "Startup Labs notifications",
             ),
         )

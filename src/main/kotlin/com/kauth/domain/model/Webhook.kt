@@ -23,7 +23,7 @@ data class WebhookEndpoint(
     val url: String,
     /** HMAC-SHA256 signing key — returned once at creation, never shown again in the UI. */
     val secret: String,
-    val events: Set<String>,
+    val events: Set<WebhookEventType>,
     val description: String = "",
     val enabled: Boolean = true,
     val createdAt: Instant = Instant.now(),
@@ -38,8 +38,7 @@ data class WebhookEndpoint(
 data class WebhookDelivery(
     val id: Int? = null,
     val endpointId: Int,
-    /** Webhook event name, e.g. "user.created". */
-    val eventType: String,
+    val eventType: WebhookEventType,
     /** Raw JSON string of the payload that was (or will be) sent. */
     val payload: String,
     val status: WebhookDeliveryStatus = WebhookDeliveryStatus.PENDING,
@@ -66,32 +65,23 @@ enum class WebhookDeliveryStatus(
 }
 
 /**
- * Canonical webhook event names.
- *
- * These strings appear verbatim in the [WebhookEndpoint.events] set and in the
- * `event_type` field of [WebhookDelivery] records. They are intentionally
- * separate from [AuditEventType] — the audit log is internal; webhook events
- * are a public contract with integrators.
+ * Typed webhook event names — public contract with integrators.
+ * Intentionally separate from [AuditEventType] (audit is internal).
  */
-object WebhookEvent {
-    const val USER_CREATED = "user.created"
-    const val USER_UPDATED = "user.updated"
-    const val USER_DELETED = "user.deleted"
-    const val LOGIN_SUCCESS = "login.success"
-    const val LOGIN_FAILED = "login.failed"
-    const val PASSWORD_RESET = "password.reset"
-    const val MFA_ENROLLED = "mfa.enrolled"
-    const val SESSION_REVOKED = "session.revoked"
+enum class WebhookEventType(
+    val value: String,
+) {
+    USER_CREATED("user.created"),
+    USER_UPDATED("user.updated"),
+    USER_DELETED("user.deleted"),
+    LOGIN_SUCCESS("login.success"),
+    LOGIN_FAILED("login.failed"),
+    PASSWORD_RESET("password.reset"),
+    MFA_ENROLLED("mfa.enrolled"),
+    SESSION_REVOKED("session.revoked"),
+    ;
 
-    val ALL =
-        listOf(
-            USER_CREATED,
-            USER_UPDATED,
-            USER_DELETED,
-            LOGIN_SUCCESS,
-            LOGIN_FAILED,
-            PASSWORD_RESET,
-            MFA_ENROLLED,
-            SESSION_REVOKED,
-        )
+    companion object {
+        fun fromValue(v: String): WebhookEventType? = entries.find { it.value == v }
+    }
 }

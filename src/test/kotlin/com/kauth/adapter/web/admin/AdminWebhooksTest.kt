@@ -244,7 +244,7 @@ class AdminWebhooksTest {
                 webhookService.createEndpoint(
                     TenantId(2),
                     "https://hooks.example.com/test",
-                    setOf("user.created"),
+                    setOf(com.kauth.domain.model.WebhookEventType.USER_CREATED),
                     "test",
                 )
             val endpointId = (created as com.kauth.domain.service.WebhookResult.Success).endpoint.id!!
