@@ -1,9 +1,11 @@
 package com.kauth.infrastructure
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -83,39 +85,49 @@ class VersionCheckService(
 
     fun current(): VersionCheckResult = cached
 
-    private fun fetchLatest(): VersionCheckResult {
-        val body =
-            if (fetcher != null) {
-                fetcher.invoke(manifestUrl)
-            } else {
-                val request =
-                    HttpRequest
-                        .newBuilder()
-                        .uri(URI.create(manifestUrl))
-                        .timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECONDS))
-                        .header("User-Agent", "KotAuth/$currentVersion (version-check)")
-                        .GET()
-                        .build()
-                httpClient.send(request, HttpResponse.BodyHandlers.ofString()).body()
-            }
+    private suspend fun fetchLatest(): VersionCheckResult =
+        withContext(Dispatchers.IO) {
+            val body =
+                if (fetcher != null) {
+                    fetcher.invoke(manifestUrl)
+                } else {
+                    val request =
+                        HttpRequest
+                            .newBuilder()
+                            .uri(URI.create(manifestUrl))
+                            .timeout(Duration.ofSeconds(HTTP_TIMEOUT_SECONDS))
+                            .header("User-Agent", "KotAuth/$currentVersion (version-check)")
+                            .GET()
+                            .build()
+                    val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+                    if (response.statusCode() != 200) {
+                        log.debug(
+                            "Version manifest returned HTTP {}: {}",
+                            response.statusCode(),
+                            manifestUrl,
+                        )
+                        return@withContext cached
+                    }
+                    response.body()
+                }
 
-        val json = Json.parseToJsonElement(body).jsonObject
-        val latest =
-            json["version"]?.jsonPrimitive?.content
-                ?: error("Manifest missing 'version' field")
-        val releaseUrl = json["releaseUrl"]?.jsonPrimitive?.content
-        val urgency = json["urgency"]?.jsonPrimitive?.content ?: "info"
+            val json = Json.parseToJsonElement(body).jsonObject
+            val latest =
+                json["version"]?.jsonPrimitive?.content
+                    ?: error("Manifest missing 'version' field")
+            val releaseUrl = json["releaseUrl"]?.jsonPrimitive?.content
+            val urgency = json["urgency"]?.jsonPrimitive?.content ?: "info"
 
-        return VersionCheckResult(
-            currentVersion = currentVersion,
-            latestVersion = latest,
-            urgency = urgency,
-            updateAvailable = isNewer(latest, currentVersion),
-            releaseUrl = releaseUrl,
-            checkedAt = Instant.now(),
-            enabled = true,
-        )
-    }
+            VersionCheckResult(
+                currentVersion = currentVersion,
+                latestVersion = latest,
+                urgency = urgency,
+                updateAvailable = isNewer(latest, currentVersion),
+                releaseUrl = releaseUrl,
+                checkedAt = Instant.now(),
+                enabled = true,
+            )
+        }
 }
 
 internal fun isNewer(
