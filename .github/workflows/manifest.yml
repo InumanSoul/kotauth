@@ -16,12 +16,19 @@ jobs:
     if: ${{ !github.event.release.prerelease }}
 
     steps:
-      - name: Checkout gh-pages
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: gh-pages
-          # gh-pages may not exist yet on first run; create it if absent.
           fetch-depth: 0
+
+      - name: Setup gh-pages branch
+        run: |
+          if git ls-remote --exit-code origin gh-pages &>/dev/null; then
+            git checkout gh-pages
+          else
+            git checkout --orphan gh-pages
+            git rm -rf .
+          fi
 
       - name: Generate latest.json
         env:
@@ -37,22 +44,18 @@ jobs:
             URGENCY="security"
           fi
           cat > latest.json <<EOF
-            {
-              "version": "${VERSION}",
-              "urgency": "${URGENCY}",
-              "releaseUrl": "https://github.com/${REPO}/releases/tag/${TAG}",
-              "publishedAt": "${PUBLISHED_AT}"
-            }
+          {
+            "version": "${VERSION}",
+            "urgency": "${URGENCY}",
+            "releaseUrl": "https://github.com/${REPO}/releases/tag/${TAG}",
+            "publishedAt": "${PUBLISHED_AT}"
+          }
           EOF
 
       - name: Commit and push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Initialize gh-pages branch with an empty root commit if this is the first run.
-          if ! git log --oneline -1 &>/dev/null; then
-            git checkout --orphan gh-pages
-          fi
           git add latest.json
           # Nothing to commit if the file is unchanged (e.g. re-publishing same tag).
           git diff --cached --quiet && echo "No changes." && exit 0
