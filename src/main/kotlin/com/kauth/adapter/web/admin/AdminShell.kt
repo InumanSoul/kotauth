@@ -2,8 +2,10 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.JsIntegrity
+import com.kauth.adapter.web.UpdateBannerConfig
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.adapter.web.updateChip
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
 
@@ -171,6 +173,7 @@ internal fun HTML.adminShell(
                 }
 
                 div("topbar-right") {
+                    updateChip()
                     div("topbar-avatar") {
                         attributes["title"] = "Signed in as $loggedInAs"
                         +(loggedInAs.firstOrNull()?.uppercaseChar()?.toString() ?: "A")
@@ -228,7 +231,13 @@ internal fun HTML.adminShell(
                     div("rail__spacer") {}
                     a("/admin", classes = "rail__brand") {
                         img(src = "/static/brand/kotauth-negative-icon.svg", alt = "kotauth Brand") {}
-                        p(classes = "rail__version") { +"v${appInfo.version}" }
+                        val versionClass =
+                            if (UpdateBannerConfig.isUpdateAvailable()) {
+                                "rail__version rail__version--outdated"
+                            } else {
+                                "rail__version"
+                            }
+                        p(classes = versionClass) { +"v${appInfo.version}" }
                     }
                 }
 

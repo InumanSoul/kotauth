@@ -45,6 +45,7 @@
 @import "./components/password-validation.css";
 @import "./components/toast.css";
 @import "./components/tooltip.css";
+@import "./components/update-chip.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";

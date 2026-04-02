@@ -1,6 +1,7 @@
 package com.kauth
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.UpdateBannerConfig
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.WorkspaceStub
@@ -11,11 +12,13 @@ import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
+import com.kauth.adapter.web.versionCheckRoutes
 import com.kauth.adapter.web.welcomeRoutes
 import com.kauth.config.EnvironmentConfig
 import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
+import com.kauth.infrastructure.VersionCheckService
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
@@ -76,9 +79,20 @@ fun main(args: Array<String> = emptyArray()) {
 
     val services = ServiceGraph.create(config)
 
+    // Background: check for new KotAuth versions every 6 hours
+    val versionCheckService =
+        VersionCheckService(
+            currentVersion = appInfo.version,
+            manifestUrl = config.updateCheckUrl,
+            enabled = config.updateCheckEnabled,
+            scope = services.applicationScope,
+        )
+    versionCheckService.start()
+    UpdateBannerConfig.register(versionCheckService)
+
     val server =
         embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
-            module(services, appInfo, config, startTime)
+            module(services, appInfo, config, startTime, versionCheckService)
         }
 
     // Background cleanup: purge expired sessions every hour
@@ -138,6 +152,7 @@ fun Application.module(
     appInfo: AppInfo,
     config: EnvironmentConfig,
     startTime: Long,
+    versionCheckService: VersionCheckService,
 ) {
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {
@@ -315,6 +330,7 @@ fun Application.module(
         )
 
         healthRoutes(config.baseUrl)
+        versionCheckRoutes(versionCheckService)
 
         authRoutes(
             authService = s.authService,

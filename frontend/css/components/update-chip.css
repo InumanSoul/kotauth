@@ -1,0 +1,102 @@
+/* frontend/css/components/update-chip.css
+ *
+ * Topbar update notification chip — shown in topbar-right when a new
+ * KotAuth version is detected by the background update checker.
+ *
+ * .update-chip              — default: routine update (accent)
+ * .update-chip--security    — security urgency (red palette)
+ * .update-chip__dot         — 6px status dot
+ * .update-chip__label       — short version text
+ * .update-chip__link        — release notes / advisory CTA
+ * .update-chip__dismiss     — icon button to hide for this session
+ * .update-chip--hidden      — dismissed (display:none, set by JS)
+ *
+ * Dismissal handled by update-check.js via localStorage.
+ */
+
+.update-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px var(--space-2);
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.update-chip--security {
+  background: var(--color-red-bg);
+  border-color: var(--color-red-border);
+  color: var(--color-red);
+}
+
+.update-chip__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+  animation: chip-pulse 2.4s ease-in-out 3;
+}
+
+@keyframes chip-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-chip__dot { animation: none; }
+}
+
+.update-chip__label {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.update-chip__link {
+  color: currentColor;
+  opacity: 0.75;
+  text-decoration: none;
+  border-bottom: 0.5px solid currentColor;
+  white-space: nowrap;
+  padding-bottom: 1px;
+}
+
+.update-chip__link:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.update-chip__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  background: transparent;
+  border: none;
+  color: currentColor;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.update-chip__dismiss:hover { opacity: 1; }
+.update-chip__dismiss:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 1px;
+}
+
+.update-chip--hidden { display: none; }
+
+/* Rail version — amber hint when outdated */
+.rail__version--outdated {
+  color: var(--color-amber);
+  opacity: 0.7;
+}

@@ -40,6 +40,8 @@ data class EnvironmentConfig(
     val isDemoMode: Boolean,
     val dbPoolMaxSize: Int,
     val dbPoolMinIdle: Int,
+    val updateCheckEnabled: Boolean,
+    val updateCheckUrl: String,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
 
@@ -77,6 +79,10 @@ data class EnvironmentConfig(
                         ?.lowercase() == "true",
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
+                updateCheckEnabled = System.getenv("KAUTH_UPDATE_CHECK")?.lowercase() != "false",
+                updateCheckUrl =
+                    System.getenv("KAUTH_UPDATE_CHECK_URL")
+                        ?: "https://inumansoul.github.io/kotauth/latest.json",
             )
         }
 
