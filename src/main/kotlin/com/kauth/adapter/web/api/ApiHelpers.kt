@@ -99,8 +99,8 @@ data class ProblemDetail(
 )
 
 @Serializable data class UpdateUserRequest(
-    val email: String,
-    val fullName: String,
+    val email: String? = null,
+    val fullName: String? = null,
 )
 
 @Serializable data class CreateRoleRequest(
@@ -126,10 +126,10 @@ data class ProblemDetail(
 )
 
 @Serializable data class UpdateApplicationRequest(
-    val name: String,
+    val name: String? = null,
     val description: String? = null,
-    val accessType: String = "public",
-    val redirectUris: List<String> = emptyList(),
+    val accessType: String? = null,
+    val redirectUris: List<String>? = null,
 )
 
 // -- Response DTOs ------------------------------------------------------------

@@ -419,24 +419,25 @@ class AdminService(
     fun updateUser(
         userId: UserId,
         tenantId: TenantId,
-        email: String,
-        fullName: String,
+        email: String? = null,
+        fullName: String? = null,
     ): AdminResult<User> {
         val user =
             userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
 
-        if (email.isBlank() || !email.contains('@')) {
+        val resolvedEmail = email?.trim()?.lowercase() ?: user.email
+        val resolvedFullName = fullName?.trim() ?: user.fullName
+
+        if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
 
-        // Check email uniqueness only if it changed
-        val newEmail = email.trim().lowercase()
-        if (newEmail != user.email && userRepository.existsByEmail(tenantId, newEmail)) {
-            return AdminResult.Failure(AdminError.Conflict("Email '$newEmail' is already registered."))
+        if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
 
-        val updated = userRepository.update(user.copy(email = newEmail, fullName = fullName.trim()))
+        val updated = userRepository.update(user.copy(email = resolvedEmail, fullName = resolvedFullName))
 
         auditLog.record(
             AuditEvent(
@@ -492,10 +493,10 @@ class AdminService(
     fun updateApplication(
         appId: ApplicationId,
         tenantId: TenantId,
-        name: String,
-        description: String?,
-        accessType: String,
-        redirectUris: List<String>,
+        name: String? = null,
+        description: String? = null,
+        accessType: String? = null,
+        redirectUris: List<String>? = null,
     ): AdminResult<Application> {
         val app =
             applicationRepository.findById(appId)
@@ -504,17 +505,30 @@ class AdminService(
         if (app.tenantId != tenantId) {
             return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
         }
-        if (name.isBlank()) {
+
+        val resolvedName = name?.trim() ?: app.name
+        val resolvedDescription =
+            if (description !=
+                null
+            ) {
+                description.trim().takeIf { it.isNotBlank() }
+            } else {
+                app.description
+            }
+        val resolvedAccessType = accessType ?: app.accessType.value
+        val resolvedRedirectUris = redirectUris ?: app.redirectUris
+
+        if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
         }
 
         val updated =
             applicationRepository.update(
                 appId = appId,
-                name = name.trim(),
-                description = description?.trim()?.takeIf { it.isNotBlank() },
-                accessType = accessType,
-                redirectUris = redirectUris,
+                name = resolvedName,
+                description = resolvedDescription,
+                accessType = resolvedAccessType,
+                redirectUris = resolvedRedirectUris,
             )
 
         auditLog.record(

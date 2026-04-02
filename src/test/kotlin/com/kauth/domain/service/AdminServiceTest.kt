@@ -330,6 +330,30 @@ class AdminServiceTest {
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_UPDATED))
     }
 
+    @Test
+    fun `updateUser - partial update email only`() {
+        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "new@example.com")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("new@example.com", result.value.email)
+        assertEquals("Alice Test", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - partial update fullName only`() {
+        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice@example.com", result.value.email)
+        assertEquals("Alice Renamed", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - no fields keeps existing values`() {
+        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice@example.com", result.value.email)
+        assertEquals("Alice Test", result.value.fullName)
+    }
+
     // =========================================================================
     // setUserEnabled
     // =========================================================================
@@ -411,6 +435,35 @@ class AdminServiceTest {
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("Renamed App", result.value.name)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_UPDATED))
+    }
+
+    @Test
+    fun `updateApplication - partial update name only`() {
+        val result = svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), name = "New Name")
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals("New Name", result.value.name)
+        assertEquals("Test app", result.value.description)
+        assertEquals(AccessType.CONFIDENTIAL, result.value.accessType)
+        assertEquals(listOf("http://localhost/callback"), result.value.redirectUris)
+    }
+
+    @Test
+    fun `updateApplication - partial update description only`() {
+        val result =
+            svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), description = "New desc")
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals("My App", result.value.name)
+        assertEquals("New desc", result.value.description)
+    }
+
+    @Test
+    fun `updateApplication - no fields keeps existing values`() {
+        val result = svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals("My App", result.value.name)
+        assertEquals("Test app", result.value.description)
+        assertEquals(AccessType.CONFIDENTIAL, result.value.accessType)
+        assertEquals(listOf("http://localhost/callback"), result.value.redirectUris)
     }
 
     // =========================================================================
