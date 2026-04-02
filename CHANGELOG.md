@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.0] - 2026-04-02
+
+### Added
+
+- **Auto-update version discovery** — background coroutine checks a remote manifest (`latest.json`) every 6 hours for new KotAuth releases. Cached result is served at `GET /health/version` with `currentVersion`, `latestVersion`, `updateAvailable`, `urgency`, `releaseUrl`, and `checkedAt` fields. The check is non-blocking, failure-tolerant (silent degradation on network errors, 404s, or malformed responses), and runs on `Dispatchers.IO` via `withContext`
+- **Admin console update chip** — when an update is detected, a compact notification chip appears in the topbar-right cluster showing the available version and a link to release notes. Security updates (`urgency: "security"`) render in red with `role="alert"`. Routine updates use the accent color with `role="status"`. A pulsing dot draws initial attention (3 cycles, respects `prefers-reduced-motion`). Dismissible via localStorage — dismissal is version-scoped, so a newer release supersedes prior dismissals automatically
+- **Rail version amber styling** — the version label at the bottom of the icon rail turns amber when an update is available, providing a secondary visual hint alongside the topbar chip
+- **`KAUTH_UPDATE_CHECK` env var** — opt-out for air-gapped deployments. Set to `false` to disable outbound version checks entirely. Enabled by default
+- **`KAUTH_UPDATE_CHECK_URL` env var** — override the manifest URL for custom mirrors or internal proxies. Defaults to `https://inumansoul.github.io/kotauth/latest.json`
+- **GitHub Actions manifest workflow** — `.github/workflows/manifest.yml` triggers on `release: published`, generates `latest.json` on the `gh-pages` branch, and pushes it to GitHub Pages. Handles first-run (`gh-pages` branch creation), skips pre-releases, and derives urgency from `[security]` tag in the release body
+- **Semver comparison** — internal `isNewer()` function handles `v` prefixes, pre-release suffixes, 2-part versions, and 4-part versions (truncated to 3). Pre-release of the same base version (e.g., `1.4.0-rc1` vs `1.4.0`) correctly returns `false`
+
+### Changed
+
+- **Quickstart compose** — `KAUTH_UPDATE_CHECK: "false"` added to `docker-compose.quickstart.yml` to avoid update banners in evaluation environments
+
+---
+
 ## [1.3.3] - 2026-04-02
 
 ### Added
