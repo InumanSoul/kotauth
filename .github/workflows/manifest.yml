@@ -1,0 +1,60 @@
+name: Update version manifest
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  pages: write
+
+jobs:
+  manifest:
+    name: Publish latest.json
+    runs-on: ubuntu-latest
+    # Skip pre-releases — they must not become "latest" for stable instances.
+    if: ${{ !github.event.release.prerelease }}
+
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          # gh-pages may not exist yet on first run; create it if absent.
+          fetch-depth: 0
+
+      - name: Generate latest.json
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          BODY: ${{ github.event.release.body }}
+          PUBLISHED_AT: ${{ github.event.release.published_at }}
+          REPO: ${{ github.repository }}
+        run: |
+          VERSION="${TAG#v}"
+          URGENCY="info"
+          # Release author signals a security release by including [security] anywhere in the body.
+          if echo "$BODY" | grep -qi '\[security\]'; then
+            URGENCY="security"
+          fi
+          cat > latest.json <<EOF
+            {
+              "version": "${VERSION}",
+              "urgency": "${URGENCY}",
+              "releaseUrl": "https://github.com/${REPO}/releases/tag/${TAG}",
+              "publishedAt": "${PUBLISHED_AT}"
+            }
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Initialize gh-pages branch with an empty root commit if this is the first run.
+          if ! git log --oneline -1 &>/dev/null; then
+            git checkout --orphan gh-pages
+          fi
+          git add latest.json
+          # Nothing to commit if the file is unchanged (e.g. re-publishing same tag).
+          git diff --cached --quiet && echo "No changes." && exit 0
+          git commit -m "chore: update manifest for ${{ github.event.release.tag_name }}"
+          git push origin gh-pages
