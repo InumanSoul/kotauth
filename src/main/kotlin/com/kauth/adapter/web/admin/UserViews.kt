@@ -82,10 +82,12 @@ internal fun userDetailPageImpl(
                             btnClass = "btn btn--ghost btn--sm",
                         )
                     } else {
-                        button(classes = "btn btn--ghost btn--sm") {
-                            disabled = true
-                            title = "Configure SMTP to enable password reset emails"
-                            +"Send Reset Email"
+                        span("tooltip-wrap") {
+                            attributes["data-tooltip"] = "Configure SMTP to enable password reset emails"
+                            button(classes = "btn btn--ghost btn--sm") {
+                                disabled = true
+                                +"Send Reset Email"
+                            }
                         }
                     }
                     button(classes = "btn btn--ghost btn--sm") {
@@ -195,8 +197,12 @@ internal fun userDetailPageImpl(
                         }
                     }
                     dangerZoneCard(
-                        title = "Disable this user",
-                        description = "Blocks all login attempts. Account data is preserved and this can be reversed.",
+                        title = if (user.enabled) "Disable this user" else "Enable this user",
+                        description = if (user.enabled) {
+                            "Blocks all login attempts. Account data is preserved and this can be reversed."
+                        } else {
+                            "This user is currently disabled. Re-enable to allow login."
+                        },
                     ) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/toggle",
