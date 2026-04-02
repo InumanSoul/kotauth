@@ -216,12 +216,14 @@ internal fun auditLogPageImpl(
                                 }
                             }
                         }
-                        button(type = ButtonType.submit, classes = "btn btn--sm") { +"Filter" }
+                        button(type = ButtonType.submit, classes = "btn btn--ghost") { +"Filter" }
                         if (eventTypeFilter != null) {
                             a(
                                 "/admin/workspaces/${workspace.slug}/logs",
-                                classes = "btn btn--ghost btn--sm",
-                            ) { +"Clear" }
+                                classes = "btn btn--ghost",
+                            ) {
+                                +"Clear"
+                            }
                         }
                     }
 
