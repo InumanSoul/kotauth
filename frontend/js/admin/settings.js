@@ -7,6 +7,7 @@
  *   3. Copy to clipboard           (data-copy)
  *   4. Scope toggle (show/hide)    (data-scope-toggle)
  *   5. Auto-submit on change       (data-autosubmit)
+ *   6. Save button feedback         (btn--primary in forms → "Saving…" on submit)
  *
  * Confirm dialogs are handled by confirm-dialog.js (shared with portal).
  *
@@ -99,5 +100,16 @@
     var el = e.target.closest('[data-autosubmit]');
     if (!el || !el.form) return;
     el.form.submit();
+  });
+
+  // ── save button feedback ──────────────────────────────────
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.tagName !== 'FORM') return;
+    var btn = form.querySelector('button[type="submit"].btn--primary');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.setAttribute('data-original-text', btn.textContent);
+    btn.textContent = 'Saving\u2026';
   });
 })();
