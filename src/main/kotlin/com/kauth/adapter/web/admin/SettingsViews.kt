@@ -58,7 +58,7 @@ internal fun smtpSettingsPageImpl(
                         postButton(
                             action = "/admin/workspaces/$slug/settings/smtp/test",
                             label = "Send Test Email",
-                            btnClass = "btn btn--ghost btn--sm",
+                            btnClass = "btn btn--ghost",
                         )
                     }
                     button(type = ButtonType.submit) {

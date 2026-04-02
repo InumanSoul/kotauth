@@ -79,16 +79,18 @@ internal fun userDetailPageImpl(
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/send-reset-email",
                             label = "Send Reset Email",
-                            btnClass = "btn btn--ghost btn--sm",
+                            btnClass = "btn btn--ghost",
                         )
                     } else {
-                        button(classes = "btn btn--ghost btn--sm") {
-                            disabled = true
-                            title = "Configure SMTP to enable password reset emails"
-                            +"Send Reset Email"
+                        span("tooltip-wrap") {
+                            attributes["data-tooltip"] = "Configure SMTP to enable password reset emails"
+                            button(classes = "btn btn--ghost") {
+                                disabled = true
+                                +"Send Reset Email"
+                            }
                         }
                     }
-                    button(classes = "btn btn--ghost btn--sm") {
+                    button(classes = "btn btn--ghost") {
                         attributes["hx-get"] =
                             "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit-fragment"
                         attributes["hx-target"] = "#profile-section"
@@ -195,8 +197,12 @@ internal fun userDetailPageImpl(
                         }
                     }
                     dangerZoneCard(
-                        title = "Disable this user",
-                        description = "Blocks all login attempts. Account data is preserved and this can be reversed.",
+                        title = if (user.enabled) "Disable this user" else "Enable this user",
+                        description = if (user.enabled) {
+                            "Blocks all login attempts. Account data is preserved and this can be reversed."
+                        } else {
+                            "This user is currently disabled. Re-enable to allow login."
+                        },
                     ) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/toggle",

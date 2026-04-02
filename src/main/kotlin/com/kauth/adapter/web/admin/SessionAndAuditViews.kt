@@ -179,6 +179,12 @@ internal fun auditLogPageImpl(
                         attributes["hx-indicator"] = ".htmx-loader"
                         select("filter-bar__select") {
                             name = "event"
+                            attributes["hx-get"] = "/admin/workspaces/${workspace.slug}/logs"
+                            attributes["hx-target"] = "#audit-content"
+                            attributes["hx-select"] = "#audit-content"
+                            attributes["hx-push-url"] = "true"
+                            attributes["hx-indicator"] = ".htmx-loader"
+                            attributes["hx-trigger"] = "change"
                             option {
                                 value = ""
                                 selected = (eventTypeFilter == null)
@@ -210,12 +216,14 @@ internal fun auditLogPageImpl(
                                 }
                             }
                         }
-                        button(type = ButtonType.submit, classes = "btn btn--sm") { +"Filter" }
+                        button(type = ButtonType.submit, classes = "btn btn--ghost") { +"Filter" }
                         if (eventTypeFilter != null) {
                             a(
                                 "/admin/workspaces/${workspace.slug}/logs",
-                                classes = "btn btn--ghost btn--sm",
-                            ) { +"Clear" }
+                                classes = "btn btn--ghost",
+                            ) {
+                                +"Clear"
+                            }
                         }
                     }
 

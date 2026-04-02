@@ -412,7 +412,11 @@ object PortalView {
                                                         button(
                                                             type = ButtonType.submit,
                                                             classes = "btn btn--danger btn--sm",
-                                                        ) { +"Revoke" }
+                                                        ) {
+                                                            attributes["data-confirm"] =
+                                                                "Revoke this session? The user will be signed out immediately."
+                                                            +"Revoke"
+                                                        }
                                                     }
                                                 }
                                             }

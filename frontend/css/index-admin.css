@@ -44,6 +44,7 @@
 @import "./components/dialog.css";
 @import "./components/password-validation.css";
 @import "./components/toast.css";
+@import "./components/tooltip.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";

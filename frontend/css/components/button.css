@@ -38,6 +38,12 @@
 
 .btn:hover { text-decoration: none; }
 
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn svg { width: 11px; height: 11px; }
 
 /* ── BEM modifiers (new) ───────────────────────────────────────────────── */

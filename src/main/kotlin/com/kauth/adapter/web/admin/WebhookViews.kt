@@ -174,7 +174,10 @@ internal fun webhooksListPageImpl(
             // ── Recent delivery history ──────────────────────────────
             if (deliveries.isNotEmpty()) {
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Recent Delivery History" }
+                    div("ov-card__section-label") {
+                        +"Recent Delivery History"
+                        span("text-muted text-sm") { +" (last ${deliveries.size})" }
+                    }
                     table("key-table") {
                         thead {
                             tr {

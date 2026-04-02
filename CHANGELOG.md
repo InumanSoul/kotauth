@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.3.3] - 2026-04-02
+
+### Added
+
+- **CSS tooltip component** — pure-CSS tooltip using `data-tooltip` attribute and `::after` pseudo-element. Uses `:has(:disabled)` to show `cursor: not-allowed` on wrappers containing disabled elements. New `tooltip-wrap` class available across the admin console
+- **Disabled button styling** — `.btn:disabled` now renders at 40% opacity with `cursor: not-allowed`, consistent across all button variants
+- **Toast notifications for user actions** — enable/disable user, revoke all user sessions, and resend verification email now show toast feedback ("User disabled.", "User enabled.", "All sessions revoked.", "Verification email sent.")
+
+### Changed
+
+- **REST API partial updates** — `PUT /users/{id}` and `PUT /applications/{id}` now accept partial payloads. All fields in `UpdateUserRequest` (`email`, `fullName`) and `UpdateApplicationRequest` (`name`, `accessType`, `redirectUris`) are optional — omitted fields retain their current values. Enables PATCH-style updates via PUT without requiring the full object
+- **Audit log filter auto-submit** — the event type `<select>` now fires immediately on change via `hx-trigger="change"`, no longer requires clicking the "Filter" button
+- **Settings save button feedback** — all admin settings forms (general, SMTP, identity providers, security, branding) now disable the submit button and show "Saving…" text during form submission, providing immediate visual feedback
+- **Danger zone card — dynamic text** — the disable/enable user card in the user detail view now reflects the current user state: "Disable this user" / "Enable this user" with context-appropriate descriptions
+- **Send Reset Email — tooltip on disabled state** — when SMTP is not configured, the disabled button is wrapped in a `tooltip-wrap` that shows "Configure SMTP to enable password reset emails" on hover
+- **Webhook delivery count label** — the "Recent Delivery History" section header now shows "(last N)" indicating the visible delivery count, replacing the previous silent truncation
+- **Portal session revoke confirmation** — individual session revoke buttons in the self-service portal now require confirmation via the custom dialog ("Revoke this session? The user will be signed out immediately.")
+
+### Fixed
+
+- **Verification email toast** — resending a verification email previously showed "Profile saved." — now correctly shows "Verification email sent."
+
+---
+
 ## [1.3.2] - 2026-04-01
 
 ### Added
