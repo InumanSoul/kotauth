@@ -79,18 +79,18 @@ internal fun userDetailPageImpl(
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/send-reset-email",
                             label = "Send Reset Email",
-                            btnClass = "btn btn--ghost btn--sm",
+                            btnClass = "btn btn--ghost",
                         )
                     } else {
                         span("tooltip-wrap") {
                             attributes["data-tooltip"] = "Configure SMTP to enable password reset emails"
-                            button(classes = "btn btn--ghost btn--sm") {
+                            button(classes = "btn btn--ghost") {
                                 disabled = true
                                 +"Send Reset Email"
                             }
                         }
                     }
-                    button(classes = "btn btn--ghost btn--sm") {
+                    button(classes = "btn btn--ghost") {
                         attributes["hx-get"] =
                             "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/edit-fragment"
                         attributes["hx-target"] = "#profile-section"

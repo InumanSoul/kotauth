@@ -104,6 +104,10 @@ fun Route.adminUserRoutes(
                         "true" -> EnglishStrings.TOAST_PROFILE_SAVED
                         "reset_email_sent" -> EnglishStrings.TOAST_RESET_EMAIL_SENT
                         "unlocked" -> EnglishStrings.TOAST_UNLOCKED
+                        "disabled" -> EnglishStrings.TOAST_USER_DISABLED
+                        "enabled" -> EnglishStrings.TOAST_USER_ENABLED
+                        "sessions_revoked" -> EnglishStrings.TOAST_USER_SESSIONS_REVOKED
+                        "verification_sent" -> EnglishStrings.TOAST_VERIFICATION_SENT
                         else -> null
                     }
                 val errorParam =
@@ -185,9 +189,17 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
+                val user =
+                    when (val r = adminService.getUser(userId, workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
+                    }
+                val toastKey = if (user.enabled) "disabled" else "enabled"
                 when (adminService.toggleUserEnabled(userId, workspace.id)) {
                     is AdminResult.Success ->
-                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
+                        call.respondRedirect(
+                            "/admin/workspaces/$slug/users/${userId.value}?saved=$toastKey",
+                        )
                     is AdminResult.Failure ->
                         call.respond(HttpStatusCode.NotFound)
                 }
@@ -269,7 +281,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 sessionRepository.revokeAllForUser(workspace.id, userId)
-                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}")
+                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=sessions_revoked")
             }
 
             post("/send-verification") {
@@ -280,7 +292,7 @@ fun Route.adminUserRoutes(
                 val slug = workspace.slug
                 val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
                 adminService.resendVerificationEmail(userId, workspace.id, baseUrl)
-                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=true")
+                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
             }
 
             post("/send-reset-email") {

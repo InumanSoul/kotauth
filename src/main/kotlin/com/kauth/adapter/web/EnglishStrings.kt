@@ -37,4 +37,8 @@ object EnglishStrings {
     const val TOAST_PROFILE_SAVED = "Profile saved."
     const val TOAST_RESET_EMAIL_SENT = "Password reset email sent successfully."
     const val TOAST_UNLOCKED = "Account unlocked successfully."
+    const val TOAST_USER_DISABLED = "User disabled."
+    const val TOAST_USER_ENABLED = "User enabled."
+    const val TOAST_USER_SESSIONS_REVOKED = "All sessions revoked."
+    const val TOAST_VERIFICATION_SENT = "Verification email sent."
 }
