@@ -11,21 +11,21 @@
 ;(function () {
   'use strict';
 
-  var chip = document.querySelector('.update-chip');
+  const chip = document.querySelector('.update-chip');
   if (!chip) return;
 
-  var version = chip.getAttribute('data-dismiss-version');
+  const version = chip.getAttribute('data-dismiss-version');
   if (!version) return;
 
-  var dismissed = localStorage.getItem('kauth_update_dismissed');
+  const dismissed = localStorage.getItem('kauth_update_dismissed');
   if (dismissed === version) {
     chip.classList.add('update-chip--hidden');
     return;
   }
 
-  var btn = chip.querySelector('.update-chip__dismiss');
+  const btn = chip.querySelector('.update-chip__dismiss');
   if (!btn) return;
-  btn.addEventListener('click', function () {
+  btn.addEventListener('click', () => {
     localStorage.setItem('kauth_update_dismissed', version);
     chip.classList.add('update-chip--hidden');
   });
