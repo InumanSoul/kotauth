@@ -18,7 +18,7 @@ import kotlinx.html.stream.createHTML
 internal fun renderFragment(block: DIV.() -> Unit): String {
     val wrapped = createHTML(prettyPrint = false).div { block() }
     // Strip the outer <div>...</div> wrapper added by createHTML().div
-    return wrapped.removePrefix("<div>").removeSuffix("</div>")
+    return wrapped.removePrefix("<div>").removeSuffix("</div>").trim()
 }
 
 /**
@@ -284,6 +284,89 @@ fun DIV.postButton(
         button(type = ButtonType.submit, classes = btnClass) {
             if (confirmMessage != null) attributes["data-confirm"] = confirmMessage
             +label
+        }
+    }
+}
+
+// ─── Entity Search Picker ───────────────────────────────────────────────────
+
+/**
+ * Reusable search-as-you-type picker for assigning entities (users to roles, users to groups).
+ *
+ * Renders a debounced search input whose results are htmx-loaded into a dropdown.
+ * Each result is a form that POSTs the assignment. The page reloads with updated state.
+ *
+ * @param pickerId     Unique DOM id for this picker instance (e.g. "role-user-picker").
+ * @param searchUrl    GET endpoint returning HTML result fragments (e.g. /roles/{id}/search-users).
+ * @param placeholder  Input placeholder text.
+ */
+fun DIV.entityPicker(
+    pickerId: String,
+    searchUrl: String,
+    placeholder: String = "Search by username or email\u2026",
+) {
+    div("entity-picker") {
+        id = pickerId
+        attributes["data-entity-picker"] = ""
+        div("entity-picker__input-wrap") {
+            input(type = InputType.search, name = "q", classes = "entity-picker__input") {
+                this.placeholder = placeholder
+                autoComplete = false
+                attributes["spellcheck"] = "false"
+                attributes["role"] = "combobox"
+                attributes["aria-autocomplete"] = "list"
+                attributes["aria-expanded"] = "false"
+                attributes["aria-controls"] = "$pickerId-results"
+                attributes["hx-get"] = searchUrl
+                attributes["hx-target"] = "#$pickerId-results"
+                attributes["hx-trigger"] = "input changed delay:300ms, search"
+                attributes["hx-swap"] = "innerHTML"
+                attributes["hx-indicator"] = "#$pickerId-spinner"
+            }
+            span("entity-picker__spinner htmx-indicator") {
+                id = "$pickerId-spinner"
+                attributes["aria-hidden"] = "true"
+            }
+        }
+        div("entity-picker__dropdown") {
+            id = "$pickerId-results"
+            attributes["role"] = "listbox"
+            attributes["aria-label"] = "Search results"
+        }
+    }
+}
+
+/**
+ * Renders search result items for an [entityPicker] dropdown.
+ *
+ * Called by the search endpoint to produce the HTML fragment that htmx swaps
+ * into the dropdown's innerHTML. Each result wraps a form that POSTs the assignment.
+ */
+fun FlowContent.entityPickerResults(
+    items: List<Pair<String, String>>,
+    idField: String,
+    actionUrl: String,
+    emptyMessage: String = "No results found.",
+) {
+    if (items.isEmpty()) {
+        div("entity-picker__empty") {
+            attributes["role"] = "option"
+            attributes["aria-disabled"] = "true"
+            +emptyMessage
+        }
+        return
+    }
+    items.forEachIndexed { index, (id, label) ->
+        div("entity-picker__item") {
+            this.id = "ep-item-$index"
+            attributes["role"] = "option"
+            form(action = actionUrl, method = FormMethod.post) {
+                input(type = InputType.hidden, name = idField) { value = id }
+                button(type = ButtonType.submit, classes = "entity-picker__item-btn") {
+                    attributes["data-entity-picker-item"] = ""
+                    +label
+                }
+            }
         }
     }
 }

@@ -239,10 +239,12 @@ object AdminView {
         workspace: Tenant,
         role: Role,
         allRoles: List<Role>,
-        allUsers: List<User>,
+        assignedUsers: List<User> = emptyList(),
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-    ): HTML.() -> Unit = roleDetailPageImpl(workspace, role, allRoles, allUsers, allWorkspaces, loggedInAs)
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        roleDetailPageImpl(workspace, role, allRoles, assignedUsers, allWorkspaces, loggedInAs, toastMessage)
 
     fun groupsListPage(
         workspace: Tenant,
@@ -266,10 +268,11 @@ object AdminView {
         allGroups: List<Group>,
         allRoles: List<Role>,
         members: List<User>,
-        allUsers: List<User>,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-    ): HTML.() -> Unit = groupDetailPageImpl(workspace, group, allGroups, allRoles, members, allUsers, allWorkspaces, loggedInAs)
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        groupDetailPageImpl(workspace, group, allGroups, allRoles, members, allWorkspaces, loggedInAs, toastMessage)
 
     // ── Security ────────────────────────────────────────────────────────
 

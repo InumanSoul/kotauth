@@ -4,17 +4,21 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.RoleGroupService
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
@@ -104,10 +108,38 @@ fun Route.adminRbacRoutes(
                 val roles = roleGroupService.listRoles(workspace.id)
                 val role =
                     roles.find { it.id == roleId } ?: return@get call.respond(HttpStatusCode.NotFound)
-                val users = userRepository.findByTenantId(workspace.id, null)
+                val assignedUserIds = roleGroupService.getUserIdsForRole(roleId)
+                val assignedUsers = assignedUserIds.mapNotNull { userRepository.findById(it, workspace.id) }
+                val toastMsg =
+                    when (call.request.queryParameters["saved"]) {
+                        "assigned" -> "User assigned to role."
+                        "unassigned" -> "User removed from role."
+                        else -> null
+                    }
                 call.respondHtml(
                     HttpStatusCode.OK,
-                    AdminView.roleDetailPage(workspace, role, roles, users, wsPairs, session.username),
+                    AdminView.roleDetailPage(
+                        workspace,
+                        role,
+                        roles,
+                        assignedUsers,
+                        wsPairs,
+                        session.username,
+                        toastMessage = toastMsg,
+                    ),
+                )
+            }
+
+            get("/search-users") {
+                val roleId =
+                    call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                respondUserSearch(
+                    call,
+                    workspace,
+                    userRepository,
+                    actionUrl = "/admin/workspaces/${workspace.slug}/roles/${roleId.value}/assign-user",
                 )
             }
 
@@ -172,8 +204,12 @@ fun Route.adminRbacRoutes(
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                roleGroupService.assignRoleToUser(userId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
+                when (roleGroupService.assignRoleToUser(userId, roleId, workspace.id)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}?saved=assigned")
+                    is AdminResult.Failure ->
+                        call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
+                }
             }
 
             post("/unassign-user") {
@@ -186,7 +222,7 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.unassignRoleFromUser(userId, roleId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}")
+                call.respondRedirect("/admin/workspaces/$slug/roles/${roleId.value}?saved=unassigned")
             }
         }
     }
@@ -262,7 +298,12 @@ fun Route.adminRbacRoutes(
                 val roles = roleGroupService.listRoles(workspace.id)
                 val memberIds = roleGroupService.getUserIdsInGroup(groupId)
                 val members = memberIds.mapNotNull { userRepository.findById(it, workspace.id) }
-                val users = userRepository.findByTenantId(workspace.id, null)
+                val toastMsg =
+                    when (call.request.queryParameters["saved"]) {
+                        "member_added" -> "Member added to group."
+                        "member_removed" -> "Member removed from group."
+                        else -> null
+                    }
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.groupDetailPage(
@@ -271,10 +312,23 @@ fun Route.adminRbacRoutes(
                         groups,
                         roles,
                         members,
-                        users,
                         wsPairs,
                         session.username,
+                        toastMessage = toastMsg,
                     ),
+                )
+            }
+
+            get("/search-users") {
+                val groupId =
+                    call.parameters["groupId"]?.toIntOrNull()?.let { GroupId(it) }
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                respondUserSearch(
+                    call,
+                    workspace,
+                    userRepository,
+                    actionUrl = "/admin/workspaces/${workspace.slug}/groups/${groupId.value}/add-member",
                 )
             }
 
@@ -339,8 +393,12 @@ fun Route.adminRbacRoutes(
                 val userId =
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                roleGroupService.addUserToGroup(userId, groupId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
+                when (roleGroupService.addUserToGroup(userId, groupId, workspace.id)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}?saved=member_added")
+                    is AdminResult.Failure ->
+                        call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
+                }
             }
 
             post("/remove-member") {
@@ -353,8 +411,52 @@ fun Route.adminRbacRoutes(
                     call.receiveParameters()["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 roleGroupService.removeUserFromGroup(userId, groupId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}")
+                call.respondRedirect("/admin/workspaces/$slug/groups/${groupId.value}?saved=member_removed")
             }
         }
     }
+}
+
+private const val MAX_SEARCH_QUERY_LENGTH = 100
+private const val MAX_SEARCH_RESULTS = 20
+
+private suspend fun respondUserSearch(
+    call: ApplicationCall,
+    workspace: Tenant,
+    userRepository: UserRepository,
+    actionUrl: String,
+) {
+    val q =
+        call.request.queryParameters["q"]
+            ?.trim()
+            ?.take(MAX_SEARCH_QUERY_LENGTH)
+            ?.takeIf { it.isNotEmpty() }
+    if (q == null) {
+        call.respondText("", ContentType.Text.Html)
+        return
+    }
+    val excludeIds =
+        call.request.queryParameters["exclude"]
+            ?.split(",")
+            ?.take(500)
+            ?.mapNotNull { it.trim().toIntOrNull()?.let { id -> UserId(id) } }
+            ?.toSet() ?: emptySet()
+    val users =
+        userRepository
+            .findByTenantId(workspace.id, q)
+            .filter { it.id !in excludeIds }
+            .take(MAX_SEARCH_RESULTS)
+    call.respondText(
+        renderFragment {
+            entityPickerResults(
+                items =
+                    users.mapNotNull { u ->
+                        u.id?.let { uid -> uid.value.toString() to "${u.username} (${u.email})" }
+                    },
+                idField = "userId",
+                actionUrl = actionUrl,
+            )
+        },
+        ContentType.Text.Html,
+    )
 }

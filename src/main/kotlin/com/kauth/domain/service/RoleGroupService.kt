@@ -583,4 +583,6 @@ class RoleGroupService(
     fun getGroupsForUser(userId: UserId): List<Group> = groupRepository.findGroupsForUser(userId)
 
     fun getUserIdsInGroup(groupId: GroupId): List<UserId> = groupRepository.findUserIdsInGroup(groupId)
+
+    fun getUserIdsForRole(roleId: RoleId): List<UserId> = roleRepository.findUserIdsForRole(roleId)
 }

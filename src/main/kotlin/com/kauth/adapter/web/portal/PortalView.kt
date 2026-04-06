@@ -9,7 +9,6 @@ import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
 import java.time.ZoneOffset
@@ -481,75 +480,6 @@ object PortalView {
                         }
                     }
                 }
-            }
-        }
-
-    // =========================================================================
-    // MFA challenge
-    // =========================================================================
-
-    fun mfaChallengePage(
-        slug: String,
-        workspaceName: String,
-        theme: TenantTheme,
-        error: String? = null,
-    ): HTML.() -> Unit =
-        {
-            head { authPageHead("$workspaceName | Verify Identity", theme) }
-            body {
-                demoBanner()
-                div("brand") {
-                    div("brand-name") { +workspaceName }
-                }
-                div("card") {
-                    h1("card-title") { +"Two-Factor Authentication" }
-                    p("card-subtitle") {
-                        id = "challenge-subtitle"
-                        +"Enter the 6-digit code from your authenticator app"
-                    }
-
-                    if (!error.isNullOrBlank()) {
-                        div("alert alert-error") { +error }
-                    }
-
-                    form(
-                        action = "/t/$slug/account/mfa-challenge",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                    ) {
-                        div("field") {
-                            label {
-                                htmlFor = "code"
-                                id = "code-label"
-                                +"Verification code"
-                            }
-                            input(type = InputType.text, name = "code") {
-                                id = "code"
-                                placeholder = "000000"
-                                attributes["autocomplete"] = "one-time-code"
-                                attributes["inputmode"] = "numeric"
-                                attributes["pattern"] = "[0-9]*"
-                                maxLength = "6"
-                                required = true
-                                attributes["autofocus"] = "true"
-                            }
-                        }
-                        button(type = ButtonType.submit, classes = "btn") { +"Verify" }
-                    }
-
-                    div("footer-link") {
-                        a(href = "#") {
-                            id = "recovery-toggle"
-                            attributes["data-action"] = "toggle-recovery"
-                            +"Use a recovery code instead"
-                        }
-                    }
-
-                    div("footer-link") {
-                        a(href = "/t/$slug/account/login") { +"Back to login" }
-                    }
-                }
-
             }
         }
 
