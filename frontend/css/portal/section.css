@@ -257,6 +257,64 @@
   gap: 4px;
 }
 
+/* ── Connected social accounts list ───────────────────────────────────── */
+
+.social-accounts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.social-accounts-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.social-accounts-list__item:last-child {
+  border-bottom: none;
+}
+
+.social-accounts-list__provider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.social-accounts-list__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.social-accounts-list__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.social-accounts-list__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.social-accounts-list__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.social-accounts-list__email {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+}
+
 /* ── Empty state ──────────────────────────────────────────────────────── */
 
 .portal-empty {

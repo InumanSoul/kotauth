@@ -3,10 +3,13 @@ package com.kauth.adapter.web.portal
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.adapter.web.demoBanner
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SocialAccount
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
 import java.time.ZoneOffset
@@ -106,6 +109,7 @@ object PortalView {
         errorMsg: String?,
         email: String = "",
         fullName: String = "",
+        connectedAccounts: List<SocialAccount> = emptyList(),
     ): HTML.() -> Unit =
         {
             head { portalPageHead("Profile — $workspaceName", theme, layout) }
@@ -182,6 +186,55 @@ object PortalView {
                                 }
                                 div(classes = "edit-actions") {
                                     button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Connected social accounts ───────────────────────
+                    div(classes = "portal-section") {
+                        attributes["aria-labelledby"] = "connected-accounts-title"
+                        div(classes = "portal-section__header") {
+                            div(classes = "portal-section__header-left") {
+                                span(classes = "portal-section__title") {
+                                    id = "connected-accounts-title"
+                                    +EnglishStrings.CONNECTED_ACCOUNTS_TITLE
+                                }
+                                span(classes = "portal-section__subtitle") {
+                                    +EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                }
+                            }
+                        }
+                        if (connectedAccounts.isEmpty()) {
+                            div(classes = "portal-section__body") {
+                                p(classes = "portal-empty") {
+                                    +EnglishStrings.CONNECTED_ACCOUNTS_EMPTY
+                                }
+                            }
+                        } else {
+                            ul(classes = "social-accounts-list") {
+                                attributes["aria-label"] = EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                for (account in connectedAccounts) {
+                                    li(classes = "social-accounts-list__item") {
+                                        div(classes = "social-accounts-list__provider") {
+                                            span(classes = "social-accounts-list__icon") {
+                                                inlineSvgIcon(
+                                                    iconName = "${account.provider.value}-logo",
+                                                    ariaLabel = account.provider.displayName,
+                                                )
+                                            }
+                                            div(classes = "social-accounts-list__info") {
+                                                span(classes = "social-accounts-list__name") {
+                                                    +account.provider.displayName
+                                                }
+                                                if (!account.providerEmail.isNullOrBlank()) {
+                                                    span(classes = "social-accounts-list__email") {
+                                                        +account.providerEmail
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -857,22 +910,18 @@ object PortalView {
                     }
                 } else {
                     div(classes = "portal-sidebar__brand-mark") {
-                        +workspaceName.split(" ")
-                            .take(2)
-                            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-                            .joinToString("")
-                            .ifEmpty { "K" }
+                        +workspaceInitials(workspaceName)
                     }
                 }
                 div(classes = "portal-sidebar__brand-info") {
                     span(classes = "portal-sidebar__org") { +workspaceName }
-                    span(classes = "portal-sidebar__app") { +"My Account" }
+                    span(classes = "portal-sidebar__app") { +EnglishStrings.PORTAL_MY_ACCOUNT }
                 }
             }
             nav(classes = "portal-nav") {
                 attributes["role"] = "navigation"
                 attributes["aria-label"] = "Account settings"
-                span(classes = "portal-nav__label") { +"Account" }
+                span(classes = "portal-nav__label") { +EnglishStrings.PORTAL_ACCOUNT }
                 portalNavItems(slug, activePage, "portal-nav__item")
             }
             div(classes = "portal-sidebar__footer") {
@@ -883,18 +932,10 @@ object PortalView {
                     }
                     div(classes = "portal-user__info") {
                         span(classes = "portal-user__name") { +username }
-                        span(classes = "portal-user__email") { +"@$username" }
+                        span(classes = "portal-user__handle") { +"@$username" }
                     }
                 }
-                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-                    button(type = ButtonType.submit, classes = "portal-signout") {
-                        attributes["aria-label"] = "Sign out"
-                        consumer.onTagContentUnsafe {
-                            +"""<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
-                        }
-                        +"Sign out"
-                    }
-                }
+                portalSignOutButton(slug, "portal-signout")
             }
         }
         div(classes = "portal-main-wrap") {
@@ -910,11 +951,7 @@ object PortalView {
         logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
-        val initials = workspaceName.split(" ")
-            .take(2)
-            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-            .joinToString("")
-            .ifEmpty { "K" }
+        val initials = workspaceInitials(workspaceName)
 
         header(classes = "portal-topbar") {
             div(classes = "portal-topbar__inner") {
@@ -939,15 +976,7 @@ object PortalView {
                     }
                     span(classes = "portal-topbar__username") { +username }
                 }
-                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-                    button(type = ButtonType.submit, classes = "portal-topbar__signout") {
-                        attributes["aria-label"] = "Sign out"
-                        consumer.onTagContentUnsafe {
-                            +"""<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>"""
-                        }
-                        +"Sign out"
-                    }
-                }
+                portalSignOutButton(slug, "portal-topbar__signout")
             }
         }
         nav(classes = "portal-tabnav") {
@@ -977,5 +1006,28 @@ object PortalView {
             href = "/t/$slug/account/mfa",
             classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
         ) { +"Two-Factor Auth" }
+    }
+
+    // ─── Shared helpers ────────────────────────────────────────────────────
+
+    private fun workspaceInitials(workspaceName: String): String =
+        workspaceName
+            .split(" ")
+            .take(2)
+            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
+            .joinToString("")
+            .ifEmpty { "K" }
+
+    private fun FlowContent.portalSignOutButton(
+        slug: String,
+        cssClass: String,
+    ) {
+        form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+            button(type = ButtonType.submit, classes = cssClass) {
+                attributes["aria-label"] = EnglishStrings.PORTAL_SIGN_OUT
+                inlineSvgIcon("logout", EnglishStrings.PORTAL_SIGN_OUT)
+                +EnglishStrings.PORTAL_SIGN_OUT
+            }
+        }
     }
 }

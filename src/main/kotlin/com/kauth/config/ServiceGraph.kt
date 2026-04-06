@@ -94,6 +94,7 @@ data class ServiceGraph(
     val mfaRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
+    val socialAccountRepository: PostgresSocialAccountRepository,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -338,6 +339,7 @@ data class ServiceGraph(
                 mfaRateLimiter = mfaLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
+                socialAccountRepository = socialAccountRepository,
                 applicationScope = applicationScope,
             )
         }
