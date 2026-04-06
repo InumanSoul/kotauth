@@ -1,0 +1,159 @@
+/* frontend/css/components/entity-picker.css
+ *
+ * Reusable search-as-you-type entity picker.
+ * Used in RBAC detail pages to replace <select> for assigning users/roles.
+ *
+ * .entity-picker              — block wrapper (position: relative for dropdown)
+ * .entity-picker__input-wrap  — input + spinner container
+ * .entity-picker__input       — search input
+ * .entity-picker__spinner     — loading indicator (htmx-indicator)
+ * .entity-picker__dropdown    — absolute-positioned results list
+ * .entity-picker__item        — single result row
+ * .entity-picker__item-btn    — clickable button inside each result
+ * .entity-picker__empty       — no-results message
+ */
+
+/* Parent ov-card must allow overflow for the absolute dropdown */
+.ov-card:has(.entity-picker) {
+  overflow: visible;
+}
+
+.entity-picker {
+  position: relative;
+  padding: 10px 12px;
+}
+
+/* ── Input ───────────────────────────────────────────────────────────────── */
+
+.entity-picker__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.entity-picker__input {
+  background: var(--color-input, rgba(255, 255, 255, 0.05));
+  border: 0.5px solid var(--color-border-md);
+  padding: var(--space-2) var(--space-3);
+  padding-right: 28px;
+  font-size: var(--text-base);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+
+.entity-picker__input::placeholder {
+  color: var(--color-subtle);
+}
+
+/* Remove native browser search decorations (clear X button) */
+.entity-picker__input::-webkit-search-decoration,
+.entity-picker__input::-webkit-search-cancel-button,
+.entity-picker__input::-webkit-search-results-button,
+.entity-picker__input::-webkit-search-results-decoration {
+  -webkit-appearance: none;
+  display: none;
+}
+
+.entity-picker__input:focus {
+  border-color: var(--color-accent);
+  background: rgba(31, 188, 255, 0.04);
+}
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+
+.entity-picker__spinner {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--color-border-em);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+}
+
+/* htmx adds .htmx-request to the indicator element itself (not parent)
+   when using hx-indicator with an explicit ID selector */
+.entity-picker__spinner.htmx-request,
+.htmx-request .entity-picker__spinner {
+  animation: entity-picker-spin 0.6s linear infinite;
+}
+
+@keyframes entity-picker-spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* ── Dropdown ────────────────────────────────────────────────────────────── */
+
+.entity-picker__dropdown {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--color-bg-raised);
+  border: 0.5px solid var(--color-border-em);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+}
+
+.entity-picker__dropdown:not(:empty) {
+  display: block;
+}
+
+/* ── Result items ────────────────────────────────────────────────────────── */
+
+.entity-picker__item {
+  display: block;
+}
+
+.entity-picker__item form {
+  margin: 0;
+}
+
+.entity-picker__item-btn {
+  background: none;
+  border: none;
+  border-bottom: 0.5px solid var(--color-border);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  transition: background 0.1s;
+}
+
+.entity-picker__item:last-child .entity-picker__item-btn {
+  border-bottom: none;
+}
+
+.entity-picker__item-btn:hover,
+.entity-picker__item-btn:focus {
+  background: var(--color-row-hover);
+  outline: none;
+}
+
+.entity-picker__item--focused .entity-picker__item-btn {
+  background: var(--color-accent-bg);
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.entity-picker__empty {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  pointer-events: none;
+}
