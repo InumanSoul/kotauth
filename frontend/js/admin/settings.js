@@ -47,7 +47,6 @@
     if (noneBtn) {
       e.preventDefault();
       setAll(noneBtn.getAttribute('data-chips-none'), false);
-      return;
     }
   });
 
