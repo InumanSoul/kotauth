@@ -106,6 +106,19 @@ class SmtpEmailAdapter : EmailPort {
         send(to, to, subject, html, text, tenant)
     }
 
+    override fun sendInviteEmail(
+        to: String,
+        toName: String,
+        inviteUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val subject = "You've been invited to join $workspaceName"
+        val html = buildInviteHtml(toName, inviteUrl, tenant)
+        val text = buildInviteText(toName, inviteUrl, workspaceName)
+        send(to, toName, subject, html, text, tenant)
+    }
+
     private fun send(
         to: String,
         toName: String,
@@ -466,6 +479,39 @@ class SmtpEmailAdapter : EmailPort {
                     "when your password was changed.",
         )
     }
+
+    private fun buildInviteHtml(
+        name: String,
+        url: String,
+        tenant: Tenant,
+    ) = buildEmailHtml(
+        tenant = tenant,
+        heading = "You\u2019ve been invited",
+        bodyHtml =
+            "Hi ${htmlEscape(name)},<br><br>" +
+                "You\u2019ve been added to <strong>${htmlEscape(tenant.displayName)}</strong>. " +
+                "Click the button below to set your password and activate your account. " +
+                "This link expires in 72 hours.",
+        ctaLabel = "Set your password",
+        ctaUrl = url,
+        footerHtml = "If you weren\u2019t expecting this, you can safely ignore this email. " +
+            "No account will be activated without clicking the link above.",
+    )
+
+    private fun buildInviteText(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "You've been invited",
+        body =
+            "Hi $name,\n\nYou've been added to $workspace. " +
+                "Click the link below to set your password and activate your account. " +
+                "This link expires in 72 hours.",
+        url = url,
+        footer = "If you weren't expecting this, you can safely ignore this email.",
+    )
 
     private fun htmlEscape(s: String) =
         s
