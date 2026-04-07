@@ -1,9 +1,14 @@
 package com.kauth.e2e
 
+import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.microsoft.playwright.Page
 import com.microsoft.playwright.options.WaitUntilState
 import org.junit.jupiter.api.Test
 import java.util.regex.Pattern
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AdminUserE2ETest : E2ETestBase() {
@@ -120,6 +125,56 @@ class AdminUserE2ETest : E2ETestBase() {
         assertTrue(
             !content.contains("TenantId(value="),
             "Page must not render TenantId value class toString",
+        )
+    }
+
+    @Test
+    fun `create user form has credential setup radio group`() {
+        loginAsAdmin()
+
+        navigateSafe("$baseUrl/admin/workspaces/master/users/new")
+
+        // Radio group should exist
+        val inviteRadio = page.querySelector("input[name=setupMode][value=invite]")
+        assertNotNull(inviteRadio, "Invite radio should be present")
+
+        val passwordRadio = page.querySelector("input[name=setupMode][value=password]")
+        assertNotNull(passwordRadio, "Password radio should be present")
+
+        // Without SMTP, invite radio should be disabled and password selected
+        assertTrue(
+            inviteRadio.getAttribute("disabled") != null,
+            "Invite radio should be disabled when SMTP is not configured",
+        )
+        assertTrue(
+            passwordRadio.isChecked,
+            "Password radio should be pre-selected when SMTP is not configured",
+        )
+    }
+
+    @Test
+    fun `invite pending badge shows on user detail for invited users`() {
+        val invitedUser =
+            userRepo.add(
+                User(
+                    id = UserId(50),
+                    tenantId = TenantId(1),
+                    username = "invited-user",
+                    email = "invited@test.dev",
+                    fullName = "Invited User",
+                    passwordHash = User.SENTINEL_PASSWORD_HASH,
+                    requiredActions = setOf(RequiredAction.SET_PASSWORD),
+                    enabled = true,
+                ),
+            )
+
+        loginAsAdmin()
+        navigateSafe("$baseUrl/admin/workspaces/master/users/${invitedUser.id?.value}")
+
+        val content = page.content()
+        assertTrue(
+            content.contains("Invite pending"),
+            "Invite pending badge should be visible for invited users",
         )
     }
 }
