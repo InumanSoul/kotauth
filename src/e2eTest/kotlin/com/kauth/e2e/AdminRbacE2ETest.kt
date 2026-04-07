@@ -197,7 +197,7 @@ class AdminRbacE2ETest : E2ETestBase() {
     }
 
     @Test
-    fun `role detail assign-user form uses plain int userId`() {
+    fun `role detail has entity picker for user assignment`() {
         val role =
             roleRepo.add(
                 Role(
@@ -207,41 +207,25 @@ class AdminRbacE2ETest : E2ETestBase() {
                     scope = RoleScope.TENANT,
                 ),
             )
-        userRepo.add(
-            User(
-                id = UserId(10),
-                tenantId = TenantId(1),
-                username = "testuser",
-                email = "test@example.com",
-                fullName = "Test User",
-                passwordHash = hasher.hash("password"),
-                enabled = true,
-            ),
-        )
 
         loginAsAdmin()
         navigateSafe("$baseUrl/admin/workspaces/master/roles/${role.id?.value}")
 
-        // Check assign-user form action
-        val assignForm = page.querySelector("form[action*='/assign-user']")
-        if (assignForm != null) {
-            val action = assignForm.getAttribute("action")
-            assertFalse(
-                action.contains("RoleId("),
-                "assign-user form action must not contain RoleId toString, got: $action",
-            )
-        }
+        val content = page.content()
+        assertFalse(content.contains("RoleId(value="), "Must not render RoleId value class toString")
 
-        // Check userId select options
-        val userOptions = page.querySelectorAll("select[name=userId] option")
-        userOptions.forEach { opt ->
-            val value = opt.getAttribute("value") ?: ""
-            if (value.isNotBlank()) {
-                assertTrue(
-                    value.toIntOrNull() != null,
-                    "userId select option must be a plain integer, got: $value",
-                )
-            }
+        // Entity picker should be present instead of the old <select>
+        val picker = page.querySelector("[data-entity-picker]")
+        assertTrue(picker != null, "Entity picker should be present for user assignment")
+
+        // The picker input should have hx-get pointing to the search endpoint
+        val pickerInput = page.querySelector(".entity-picker__input")
+        if (pickerInput != null) {
+            val hxGet = pickerInput.getAttribute("hx-get") ?: ""
+            assertTrue(
+                hxGet.contains("/search-users"),
+                "Picker input hx-get should point to search-users endpoint, got: $hxGet",
+            )
         }
     }
 
@@ -295,17 +279,9 @@ class AdminRbacE2ETest : E2ETestBase() {
             )
         }
 
-        // Check add-member userId select options
-        val memberOptions = page.querySelectorAll("select[name=userId] option")
-        memberOptions.forEach { opt ->
-            val value = opt.getAttribute("value") ?: ""
-            if (value.isNotBlank()) {
-                assertTrue(
-                    value.toIntOrNull() != null,
-                    "userId select option must be a plain integer, got: $value",
-                )
-            }
-        }
+        // Entity picker should be present for member assignment instead of the old <select>
+        val memberPicker = page.querySelector("[data-entity-picker]")
+        assertTrue(memberPicker != null, "Entity picker should be present for member assignment")
 
         // Check form actions use plain ints
         val groupForms = page.querySelectorAll("form[action*='/groups/']")

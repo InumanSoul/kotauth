@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] - 2026-04-07
+
+### Added
+
+- **Invite Users** — admins can create users and send an invite email instead of setting a password. The invited user receives a branded email with a link to set their password and activate their account
+- **`RequiredAction` enum** — extensible user action model stored as PostgreSQL `text[]`. Ships with `SET_PASSWORD` for invite flow. Designed as foundation for future temporary passwords (`CHANGE_PASSWORD`) and magic links
+- **`TokenPurpose` enum** — discriminator on `PasswordResetToken` (`PASSWORD_RESET` / `INVITE`). Cross-purpose token usage is rejected at the service layer — invite tokens cannot be used on the reset endpoint and vice versa
+- **Sentinel password hash** — `User.SENTINEL_PASSWORD_HASH = "!"` for users who haven't set a password. The `AuthService.PendingSetup` guard fires before bcrypt verification, preventing wasted CPU and providing an actionable error message
+- **Accept-invite page** — `GET/POST /t/{slug}/accept-invite?token=...` branded page with password fields, client-side validation, rate limiting, and success/error states. Uses `TenantTheme` for workspace branding
+- **Admin create-user form** — credential setup radio group: "Send invite email" (default when SMTP ready) / "Set password now". Uses existing `radio-row` BEM component. Invite option disabled with description when SMTP not configured
+- **Invite pending badge** — amber `"Invite pending"` badge on user detail page for users with `SET_PASSWORD` in `requiredActions`
+- **Resend invite** — `POST /users/{id}/resend-invite` route with toast feedback. Generates new token, invalidates old one, sends fresh email. Propagates failure with error toast when SMTP fails
+- **Invite email template** — HTML + plaintext with "Set your password" CTA, 72-hour expiry notice, security footer. Subject: "You've been invited to join {Workspace Name}"
+- **Audit events** — `USER_INVITE_SENT` (on create + resend) and `USER_INVITE_ACCEPTED` (on successful password set)
+- **`TextArrayColumnType`** — custom Exposed column type for PostgreSQL `text[]` arrays, following the `JsonbColumnType` precedent
+- **`PasswordResetTokenRepository.deleteByUserAndPurpose()`** — purpose-scoped token deletion prevents invite tokens from being invalidated by password reset flows (and vice versa)
+- **`EnglishStrings`** — 16 new constants for all invite-related user-facing text
+- **Migration V30** — `required_actions text[]` on users, `purpose varchar(32)` on password_reset_tokens, partial index on active tokens
+
+### Changed
+
+- **`AdminService.createUser`** — accepts `sendInvite: Boolean` and `password: String?` (nullable). When invite mode: stores sentinel hash, sets `requiredActions = [SET_PASSWORD]`, `emailVerified = false`, dispatches invite email. When password mode: existing behavior unchanged
+- **`UserSelfServiceService.confirmPasswordReset`** — now rejects tokens with `purpose != PASSWORD_RESET` (cross-purpose guard)
+- **`UserSelfServiceService` token deletion** — both existing `deleteByUser` call sites changed to `deleteByUserAndPurpose(..., PASSWORD_RESET)` to avoid silently invalidating invite tokens
+- **Login page** — shows actionable message for invited users: "This account has a pending invitation. Check your email for the invite link, or ask your administrator to resend it."
+
+### Fixed
+
+- **Webhook E2E test** — `WebhookEventType.USER_CREATED` interpolated enum name (`USER_CREATED`) instead of `.value` property (`user.created`), causing checkbox selector timeout. Fixed to use `.value`
+
+---
+
 ## [1.4.1] - 2026-04-07
 
 ### Added

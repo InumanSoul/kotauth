@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -69,6 +70,12 @@ internal fun userDetailPageImpl(
                                 span("badge badge--warn") {
                                     span("badge__dot") {}
                                     +"Locked"
+                                }
+                            }
+                            if (RequiredAction.SET_PASSWORD in user.requiredActions) {
+                                span("badge badge--warn") {
+                                    span("badge__dot") {}
+                                    +EnglishStrings.BADGE_INVITE_PENDING
                                 }
                             }
                         }
@@ -611,7 +618,7 @@ internal fun createUserPageImpl(
                         p("page-header__sub") {
                             +"Add a user to the "
                             strong { +workspace.displayName }
-                            +" workspace. The account will be pre-verified."
+                            +" workspace."
                         }
                     }
                 }
@@ -666,13 +673,59 @@ internal fun createUserPageImpl(
                             placeholder = "John Doe"
                         }
                     }
+                    // ── Credential setup radio ──────────────────
                     div("edit-row") {
+                        span("edit-row__label") { +"Credential setup" }
+                        div("radio-group") {
+                            label("radio-row") {
+                                input(type = InputType.radio, name = "setupMode") {
+                                    value = "invite"
+                                    id = "setupMode_invite"
+                                    if (workspace.isSmtpReady) {
+                                        checked = true
+                                    } else {
+                                        disabled = true
+                                    }
+                                    attributes["data-setup-toggle"] = "invite"
+                                }
+                                div("radio-row__body") {
+                                    span("radio-row__label") { +EnglishStrings.INVITE_RADIO_SEND }
+                                    span("radio-row__desc") {
+                                        if (workspace.isSmtpReady) {
+                                            +EnglishStrings.INVITE_RADIO_SEND_HINT
+                                        } else {
+                                            +EnglishStrings.INVITE_RADIO_SMTP_HINT
+                                        }
+                                    }
+                                }
+                            }
+                            label("radio-row") {
+                                input(type = InputType.radio, name = "setupMode") {
+                                    value = "password"
+                                    id = "setupMode_password"
+                                    if (!workspace.isSmtpReady) checked = true
+                                    attributes["data-setup-toggle"] = "password"
+                                }
+                                div("radio-row__body") {
+                                    span("radio-row__label") { +EnglishStrings.INVITE_RADIO_PASSWORD }
+                                    span("radio-row__desc") {
+                                        +EnglishStrings.PASSWORD_HINT_USER_CAN_CHANGE
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // ── Password field (hidden when invite selected) ────
+                    div("edit-row") {
+                        id = "passwordField"
+                        if (workspace.isSmtpReady) {
+                            style = "display:none;"
+                        }
                         span("edit-row__label") { +EnglishStrings.PASSWORD }
                         div {
                             input(classes = "edit-row__field") {
                                 type = InputType.password
                                 name = "password"
-                                required = true
                                 placeholder =
                                     EnglishStrings.passwordMinPlaceholder(workspace.securityConfig.passwordMinLength)
                                 attributes["data-pw-min-length"] =

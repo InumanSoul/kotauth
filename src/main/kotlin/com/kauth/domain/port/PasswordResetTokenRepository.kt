@@ -1,6 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.UserId
 import java.time.Instant
 
@@ -29,4 +30,14 @@ interface PasswordResetTokenRepository {
      * and after a successful reset (cleanup).
      */
     fun deleteByUser(userId: UserId)
+
+    /**
+     * Deletes all unused tokens for a user with a specific [purpose].
+     * Used to invalidate old invite tokens before issuing a new one,
+     * without touching password reset tokens (and vice versa).
+     */
+    fun deleteByUserAndPurpose(
+        userId: UserId,
+        purpose: TokenPurpose,
+    )
 }

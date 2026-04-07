@@ -4,9 +4,11 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeApplicationRepository
@@ -295,6 +297,129 @@ class AdminServiceTest {
         assertEquals("bob", result.value.username)
         assertEquals(true, result.value.emailVerified, "Admin-created users should be email-verified")
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_CREATED))
+    }
+
+    // =========================================================================
+    // createUser — invite mode
+    // =========================================================================
+
+    @Test
+    fun `createUser invite - stores sentinel hash and SET_PASSWORD action`() {
+        val result =
+            svc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals(User.SENTINEL_PASSWORD_HASH, result.value.passwordHash)
+        assertTrue(RequiredAction.SET_PASSWORD in result.value.requiredActions)
+        assertEquals(false, result.value.emailVerified, "Invite users should not be pre-verified")
+    }
+
+    @Test
+    fun `createUser invite - sends invite email when SMTP ready`() {
+        val result =
+            svc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals(1, emailPort.sent.size)
+        assertEquals("invite", emailPort.sent[0].type)
+        assertTrue(auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `createUser invite - creates token with purpose INVITE`() {
+        svc.createUser(
+            tenantId = TenantId(1),
+            username = "bob",
+            email = "bob@example.com",
+            fullName = "Bob Test",
+            sendInvite = true,
+            baseUrl = "http://localhost:8080",
+        )
+        val tokens = prTokenRepo.all()
+        assertEquals(1, tokens.size)
+        assertEquals(TokenPurpose.INVITE, tokens[0].purpose)
+    }
+
+    @Test
+    fun `createUser invite - does not send email when SMTP not configured`() {
+        val noSmtpTenant = tenant.copy(id = TenantId(2), slug = "no-smtp", smtpHost = null, smtpEnabled = false)
+        tenants.add(noSmtpTenant)
+        val result =
+            svc.createUser(
+                tenantId = TenantId(2),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals(0, emailPort.sent.size, "No email should be sent when SMTP is not configured")
+        assertTrue(!auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `createUser password mode - requires password`() {
+        val result =
+            svc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                password = null,
+                sendInvite = false,
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    // =========================================================================
+    // resendInvite
+    // =========================================================================
+
+    @Test
+    fun `resendInvite - user not found`() {
+        val result = svc.resendInvite(UserId(999), TenantId(1), "http://localhost:8080")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `resendInvite - user has no pending invite`() {
+        val result = svc.resendInvite(alice.id!!, TenantId(1), "http://localhost:8080")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `resendInvite - success sends email and records audit event`() {
+        val invitedUser =
+            users.add(
+                alice.copy(
+                    id = null,
+                    username = "invited",
+                    email = "invited@example.com",
+                    passwordHash = User.SENTINEL_PASSWORD_HASH,
+                    requiredActions = setOf(RequiredAction.SET_PASSWORD),
+                ),
+            )
+        val result = svc.resendInvite(invitedUser.id!!, TenantId(1), "http://localhost:8080")
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(1, emailPort.sent.size)
+        assertEquals("invite", emailPort.sent[0].type)
+        assertTrue(auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
     }
 
     // =========================================================================

@@ -94,6 +94,8 @@
   border-bottom: 0.5px solid var(--color-border);
 }
 
+.edit-row > .radio-group { border: 0.5px solid var(--color-border); }
+
 .edit-row:last-of-type { border-bottom: none; }
 
 .edit-row__label {

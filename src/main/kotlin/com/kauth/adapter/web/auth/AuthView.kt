@@ -641,6 +641,128 @@ object AuthView {
         }
 
     // -------------------------------------------------------------------------
+    // Accept invite — branded page where invited users set their password
+    // -------------------------------------------------------------------------
+
+    fun acceptInvitePage(
+        tenantSlug: String,
+        theme: TenantTheme = TenantTheme.DEFAULT,
+        workspaceName: String = "Kotauth",
+        token: String,
+        error: String? = null,
+        success: Boolean = false,
+        passwordPolicy: SecurityConfig = SecurityConfig(),
+    ): HTML.() -> Unit =
+        {
+            head { authHead("$workspaceName | Accept Invitation", theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +"${EnglishStrings.INVITE_WELCOME_TITLE} $workspaceName" }
+
+                        if (success) {
+                            div("alert alert-success") { +EnglishStrings.INVITE_ACCEPT_SUCCESS }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/account/login") { +EnglishStrings.INVITE_ACCEPT_SIGN_IN }
+                            }
+                        } else {
+                            p("card-subtitle") { +EnglishStrings.INVITE_ACCEPT_SUBTITLE }
+
+                            if (error != null) {
+                                div("alert alert-error") { +error }
+                            }
+
+                            form(
+                                action = "/t/$tenantSlug/accept-invite",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                input(type = InputType.hidden, name = "token") { value = token }
+
+                                div("field") {
+                                    label {
+                                        htmlFor = "new_password"
+                                        +EnglishStrings.NEW_PASSWORD
+                                    }
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "new_password") {
+                                            id = "new_password"
+                                            placeholder =
+                                                EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
+                                            attributes["autocomplete"] = "new-password"
+                                            required = true
+                                            attributes["autofocus"] = "true"
+                                            attributes["data-pw-min-length"] =
+                                                passwordPolicy.passwordMinLength.toString()
+                                            if (passwordPolicy.passwordRequireUppercase) {
+                                                attributes["data-pw-require-upper"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireNumber) {
+                                                attributes["data-pw-require-number"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireSpecial) {
+                                                attributes["data-pw-require-special"] = "true"
+                                            }
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "new_password"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        }
+                                    }
+                                }
+                                div("field") {
+                                    label {
+                                        htmlFor = "confirm_password"
+                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
+                                    }
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "confirm_password") {
+                                            id = "confirm_password"
+                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
+                                            attributes["autocomplete"] = "new-password"
+                                            attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
+                                            required = true
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "confirm_password"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        }
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") {
+                                    +EnglishStrings.INVITE_ACCEPT_SUBMIT
+                                }
+                            }
+                        }
+                    }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
+                }
+            }
+        }
+
+    // -------------------------------------------------------------------------
     // Email verification — result page after clicking the verification link
     // -------------------------------------------------------------------------
 

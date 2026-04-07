@@ -105,6 +105,22 @@
     btn.textContent = 'Saving\u2026';
   });
 
+  // ── invite/password radio toggle on create-user form ────
+  document.addEventListener('change', (e) => {
+    const radio = e.target.closest('[data-setup-toggle]');
+    if (!radio) return;
+    const pwField = document.getElementById('passwordField');
+    if (!pwField) return;
+    const pwInput = pwField.querySelector('input[name="password"]');
+    if (radio.value === 'invite') {
+      pwField.style.display = 'none';
+      if (pwInput) pwInput.removeAttribute('required');
+    } else {
+      pwField.style.display = '';
+      if (pwInput) pwInput.setAttribute('required', 'true');
+    }
+  });
+
   // ── entity-picker: keyboard navigation ──────────────────
   const pickerSetFocused = (input, items, target) => {
     items.forEach((item) => { item.classList.remove('entity-picker__item--focused'); });

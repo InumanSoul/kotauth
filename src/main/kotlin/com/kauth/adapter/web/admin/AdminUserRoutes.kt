@@ -79,8 +79,14 @@ fun Route.adminUserRoutes(
             val username = params["username"]?.trim() ?: ""
             val email = params["email"]?.trim() ?: ""
             val fullName = params["fullName"]?.trim() ?: ""
-            val password = params["password"] ?: ""
-            when (val result = adminService.createUser(workspace.id, username, email, fullName, password)) {
+            val setupMode = params["setupMode"] ?: "password"
+            val sendInvite = setupMode == "invite"
+            val password = if (sendInvite) null else (params["password"] ?: "")
+            val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+            when (
+                val result =
+                    adminService.createUser(workspace.id, username, email, fullName, password, sendInvite, baseUrl)
+            ) {
                 is AdminResult.Success ->
                     call.respondRedirect("/admin/workspaces/$slug/users/${result.value.id?.value}")
                 is AdminResult.Failure -> {
@@ -126,11 +132,14 @@ fun Route.adminUserRoutes(
                         "enabled" -> EnglishStrings.TOAST_USER_ENABLED
                         "sessions_revoked" -> EnglishStrings.TOAST_USER_SESSIONS_REVOKED
                         "verification_sent" -> EnglishStrings.TOAST_VERIFICATION_SENT
+                        "invite_sent" -> EnglishStrings.TOAST_INVITE_SENT
+                        "invite_resent" -> EnglishStrings.TOAST_INVITE_RESENT
                         else -> null
                     }
                 val errorParam =
                     when (savedParam) {
                         "reset_email_failed" -> "Failed to send password reset email. Check SMTP configuration."
+                        "invite_send_failed" -> EnglishStrings.TOAST_INVITE_SEND_FAILED
                         else -> null
                     }
                 call.respondHtml(
@@ -326,6 +335,23 @@ fun Route.adminUserRoutes(
                     is AdminResult.Failure ->
                         call.respondRedirect(
                             "/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_failed",
+                        )
+                }
+            }
+
+            post("/resend-invite") {
+                val userId =
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
+                val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                when (adminService.resendInvite(userId, workspace.id, baseUrl)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=invite_resent")
+                    is AdminResult.Failure ->
+                        call.respondRedirect(
+                            "/admin/workspaces/$slug/users/${userId.value}?saved=invite_send_failed",
                         )
                 }
             }

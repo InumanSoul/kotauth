@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
@@ -108,6 +109,22 @@ class AuthService(
                 ),
             )
             return AuthResult.Failure(AuthError.AccountLocked(user.lockedUntil!!))
+        }
+
+        // Invite guard — user was created but has not yet accepted their invite
+        if (RequiredAction.SET_PASSWORD in user.requiredActions) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "pending_setup"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.PendingSetup)
         }
 
         if (!passwordHasher.verify(rawPassword, user.passwordHash)) {
@@ -401,4 +418,7 @@ sealed class AuthError {
     class AccountLocked(
         val lockedUntil: java.time.Instant,
     ) : AuthError()
+
+    /** The user was created via invite and has not yet set a password. */
+    object PendingSetup : AuthError()
 }

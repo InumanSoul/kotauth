@@ -67,4 +67,16 @@ interface EmailPort {
         workspaceName: String,
         tenant: Tenant,
     )
+
+    /**
+     * Sends a welcome/invite email with a link to the accept-invite page.
+     * [inviteUrl] contains the full URL with the raw token as a query parameter.
+     */
+    fun sendInviteEmail(
+        to: String,
+        toName: String,
+        inviteUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    )
 }

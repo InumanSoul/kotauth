@@ -4,10 +4,12 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
@@ -208,7 +210,7 @@ class UserSelfServiceService(
 
         val (rawToken, tokenHash) = generateToken()
 
-        prTokenRepo.deleteByUser(user.id!!)
+        prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.PASSWORD_RESET)
         prTokenRepo.create(
             PasswordResetToken(
                 userId = user.id,
@@ -261,6 +263,11 @@ class UserSelfServiceService(
         val token =
             prTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
+
+        // Purpose guard — invite tokens must not be usable on the reset endpoint
+        if (token.purpose != TokenPurpose.PASSWORD_RESET) {
+            return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
+        }
 
         if (!token.isValid) {
             val msg =
@@ -525,7 +532,7 @@ class UserSelfServiceService(
         if (!tenant.isSmtpReady) return
 
         val (rawToken, tokenHash) = generateToken()
-        prTokenRepo.deleteByUser(user.id!!)
+        prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.PASSWORD_RESET)
         prTokenRepo.create(
             PasswordResetToken(
                 userId = user.id,
@@ -681,6 +688,154 @@ class UserSelfServiceService(
         val raw = ByteArray(32).also { SecureRandom().nextBytes(it) }
         val token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
         return token to sha256Hex(token)
+    }
+
+    // =========================================================================
+    // Invite flow
+    // =========================================================================
+
+    /**
+     * Creates an invite token and sends the invite email.
+     * Called by [AdminService.createUser] when sendInvite = true, and by resend-invite.
+     */
+    fun initiateInvite(
+        user: User,
+        tenant: Tenant,
+        baseUrl: String,
+    ): SelfServiceResult<Unit> {
+        if (!tenant.isSmtpReady) {
+            return SelfServiceResult.Failure(
+                SelfServiceError.SmtpNotConfigured("Email delivery is not configured for this workspace."),
+            )
+        }
+
+        val (rawToken, tokenHash) = generateToken()
+
+        prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.INVITE)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = user.id,
+                tenantId = tenant.id,
+                tokenHash = tokenHash,
+                expiresAt = Instant.now().plusSeconds(72 * 3600), // 72 hours
+                purpose = TokenPurpose.INVITE,
+            ),
+        )
+
+        val inviteUrl = "$baseUrl/t/${tenant.slug}/accept-invite?token=$rawToken"
+        emailScope.launch {
+            try {
+                emailPort.sendInviteEmail(
+                    to = user.email,
+                    toName = user.fullName,
+                    inviteUrl = inviteUrl,
+                    workspaceName = tenant.displayName,
+                    tenant = tenant,
+                )
+            } catch (e: Exception) {
+                log.warn(
+                    "Invite email delivery failed tenantId={} userId={}: {}",
+                    tenant.id.value,
+                    user.id?.value,
+                    e.message,
+                )
+            }
+        }
+
+        return SelfServiceResult.Success(Unit)
+    }
+
+    /**
+     * Processes the accept-invite form submission.
+     * On success: password set, email verified, SET_PASSWORD cleared, token consumed.
+     * Does NOT create a session — user goes through normal login.
+     */
+    fun confirmAcceptInvite(
+        rawToken: String,
+        newPassword: String,
+        confirmPassword: String,
+    ): SelfServiceResult<User> {
+        val hash = sha256Hex(rawToken)
+        val token =
+            prTokenRepo.findByTokenHash(hash)
+                ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Invite link is invalid."))
+
+        if (token.purpose != TokenPurpose.INVITE) {
+            return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Invite link is invalid."))
+        }
+
+        if (!token.isValid) {
+            val msg =
+                if (token.isExpired) {
+                    "This invite link has expired. Please contact your administrator for a new invite."
+                } else {
+                    "This invite link has already been used."
+                }
+            return SelfServiceResult.Failure(SelfServiceError.TokenExpired(msg))
+        }
+
+        if (newPassword.isBlank()) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation("Password cannot be empty."))
+        }
+        if (newPassword != confirmPassword) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
+        }
+
+        val tenant = tenantRepository.findById(token.tenantId)
+        if (tenant != null) {
+            val policyError = passwordPolicy?.validate(newPassword, tenant)
+            if (policyError != null) {
+                return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
+            } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
+                return SelfServiceResult.Failure(
+                    SelfServiceError.Validation(
+                        "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
+                    ),
+                )
+            }
+        }
+
+        val user =
+            userRepository.findById(token.userId, token.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+
+        val now = Instant.now()
+        val hashedPassword = passwordHasher.hash(newPassword)
+
+        userRepository.updatePassword(token.userId, hashedPassword, now)
+
+        // Re-fetch after updatePassword to avoid stale snapshot
+        val freshUser =
+            userRepository.findById(token.userId, token.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        userRepository.update(
+            freshUser.copy(
+                emailVerified = true,
+                requiredActions = freshUser.requiredActions - RequiredAction.SET_PASSWORD,
+            ),
+        )
+
+        prTokenRepo.markUsed(token.id!!, now)
+
+        // Record first password in history
+        if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
+        }
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = token.tenantId,
+                userId = token.userId,
+                clientId = null,
+                eventType = AuditEventType.USER_INVITE_ACCEPTED,
+                ipAddress = null,
+                userAgent = null,
+            ),
+        )
+
+        return SelfServiceResult.Success(
+            userRepository.findById(token.userId, token.tenantId)!!,
+        )
     }
 }
 

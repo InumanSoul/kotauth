@@ -31,7 +31,7 @@ class AdminWebhookE2ETest : E2ETestBase() {
         navigateSafe("$baseUrl/admin/workspaces/webhook-ws/settings/webhooks/new")
 
         page.fill("input[name=url]", "https://example.com/hook")
-        page.locator("input[name=events][value='${WebhookEventType.USER_CREATED}']").check()
+        page.locator("input[name=events][value='${WebhookEventType.USER_CREATED.value}']").check()
         page.locator("button[type=submit][form=create-webhook-form]").click()
 
         waitForUrlPattern("**/settings/webhooks**")

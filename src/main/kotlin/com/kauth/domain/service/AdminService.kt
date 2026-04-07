@@ -6,6 +6,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -265,7 +266,9 @@ class AdminService(
         username: String,
         email: String,
         fullName: String,
-        password: String,
+        password: String? = null,
+        sendInvite: Boolean = false,
+        baseUrl: String = "",
     ): AdminResult<User> {
         val tenant =
             tenantRepository.findById(tenantId)
@@ -283,16 +286,29 @@ class AdminService(
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
 
-        // Enforce full password policy
-        val policyError = passwordPolicy?.validate(password, tenant)
-        if (policyError != null) {
-            return AdminResult.Failure(AdminError.Validation(policyError))
-        } else if (passwordPolicy == null && password.length < tenant.passwordPolicyMinLength) {
-            return AdminResult.Failure(
-                AdminError.Validation(
-                    "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-                ),
-            )
+        // Resolve password hash and required actions based on invite mode
+        val resolvedPasswordHash: String
+        val resolvedRequiredActions: Set<RequiredAction>
+
+        if (sendInvite) {
+            resolvedPasswordHash = User.SENTINEL_PASSWORD_HASH
+            resolvedRequiredActions = setOf(RequiredAction.SET_PASSWORD)
+        } else {
+            val pw =
+                password
+                    ?: return AdminResult.Failure(AdminError.Validation("Password is required."))
+            val policyError = passwordPolicy?.validate(pw, tenant)
+            if (policyError != null) {
+                return AdminResult.Failure(AdminError.Validation(policyError))
+            } else if (passwordPolicy == null && pw.length < tenant.passwordPolicyMinLength) {
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
+                    ),
+                )
+            }
+            resolvedPasswordHash = passwordHasher.hash(pw)
+            resolvedRequiredActions = emptySet()
         }
 
         if (userRepository.existsByUsername(tenantId, username)) {
@@ -302,23 +318,23 @@ class AdminService(
             return AdminResult.Failure(AdminError.Conflict("Email '${email.lowercase()}' is already registered."))
         }
 
-        val hashedPassword = passwordHasher.hash(password)
         val user =
             userRepository.save(
                 User(
                     tenantId = tenantId,
                     username = username.trim(),
-                    email = email.trim(),
+                    email = email.trim().lowercase(),
                     fullName = fullName.trim(),
-                    passwordHash = hashedPassword,
-                    emailVerified = true, // admin-created users are considered verified
+                    passwordHash = resolvedPasswordHash,
+                    emailVerified = !sendInvite, // invite: verified on acceptance
                     enabled = true,
+                    requiredActions = resolvedRequiredActions,
                 ),
             )
 
-        // Record in password history
-        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
-            passwordPolicy.recordPasswordHistory(user.id!!, tenantId, hashedPassword)
+        // Record in password history (only for password-set users)
+        if (!sendInvite && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(user.id!!, tenantId, resolvedPasswordHash)
         }
 
         auditLog.record(
@@ -329,11 +345,72 @@ class AdminService(
                 eventType = AuditEventType.ADMIN_USER_CREATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to username),
+                details = mapOf("username" to username, "invite" to sendInvite.toString()),
             ),
         )
 
+        // Send invite email — user is created regardless of email outcome.
+        // The email itself is async (fire-and-forget via emailScope).
+        // initiateInvite only fails synchronously if SMTP is not configured,
+        // which we already guard above with tenant.isSmtpReady.
+        if (sendInvite && tenant.isSmtpReady) {
+            when (selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+                is SelfServiceResult.Success ->
+                    auditLog.record(
+                        AuditEvent(
+                            tenantId = tenantId,
+                            userId = user.id,
+                            clientId = null,
+                            eventType = AuditEventType.USER_INVITE_SENT,
+                            ipAddress = null,
+                            userAgent = null,
+                            details = mapOf("username" to username),
+                        ),
+                    )
+                is SelfServiceResult.Failure -> { /* SMTP guard above prevents this; log if it happens */ }
+            }
+        }
+
         return AdminResult.Success(user)
+    }
+
+    fun resendInvite(
+        userId: UserId,
+        tenantId: TenantId,
+        baseUrl: String,
+    ): AdminResult<Unit> {
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        if (RequiredAction.SET_PASSWORD !in user.requiredActions) {
+            return AdminResult.Failure(AdminError.Validation("This user does not have a pending invite."))
+        }
+        if (!tenant.isSmtpReady) {
+            return AdminResult.Failure(AdminError.Validation("SMTP is not configured."))
+        }
+
+        return when (val result = selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+            is SelfServiceResult.Success -> {
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenantId,
+                        userId = userId,
+                        clientId = null,
+                        eventType = AuditEventType.USER_INVITE_SENT,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username, "action" to "resend"),
+                    ),
+                )
+                AdminResult.Success(Unit)
+            }
+            is SelfServiceResult.Failure ->
+                AdminResult.Failure(AdminError.Validation(result.error.message))
+        }
     }
 
     fun getUser(

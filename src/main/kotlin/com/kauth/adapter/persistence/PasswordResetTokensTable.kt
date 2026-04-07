@@ -15,6 +15,7 @@ object PasswordResetTokensTable : Table("password_reset_tokens") {
     val expiresAt = timestampWithTimeZone("expires_at")
     val usedAt = timestampWithTimeZone("used_at").nullable()
     val ipAddress = varchar("ip_address", 45).nullable()
+    val purpose = varchar("purpose", 32).default(com.kauth.domain.model.TokenPurpose.PASSWORD_RESET.name)
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

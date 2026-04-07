@@ -3,11 +3,13 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeAuditLogPort
@@ -985,5 +987,198 @@ class UserSelfServiceServiceTest {
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    // =========================================================================
+    // initiateInvite
+    // =========================================================================
+
+    @Test
+    fun `initiateInvite returns SmtpNotConfigured when tenant has no SMTP`() {
+        val user = users.add(alice.copy(id = null, tenantId = TenantId(2)))
+        val result = svc.initiateInvite(user, noSmtpTenant, "http://localhost:8080")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.SmtpNotConfigured>(result.error)
+    }
+
+    @Test
+    fun `initiateInvite creates token with purpose INVITE`() {
+        val user = users.add(alice)
+        svc.initiateInvite(user, smtpTenant, "http://localhost:8080")
+        val tokens = prTokenRepo.all().filter { it.purpose == TokenPurpose.INVITE }
+        assertEquals(1, tokens.size)
+    }
+
+    @Test
+    fun `initiateInvite sends invite email`() {
+        val user = users.add(alice)
+        svc.initiateInvite(user, smtpTenant, "http://localhost:8080")
+        assertEquals(1, emailPort.sent.size)
+        assertEquals("invite", emailPort.sent[0].type)
+        assertTrue(emailPort.sent[0].url.contains("/t/acme/accept-invite?token="))
+    }
+
+    @Test
+    fun `initiateInvite does not delete PASSWORD_RESET tokens`() {
+        val user = users.add(alice)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = user.id!!,
+                tenantId = TenantId(1),
+                tokenHash = "existing-reset-hash",
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.PASSWORD_RESET,
+            ),
+        )
+        svc.initiateInvite(user, smtpTenant, "http://localhost:8080")
+        val resetTokens = prTokenRepo.all().filter { it.purpose == TokenPurpose.PASSWORD_RESET }
+        assertEquals(1, resetTokens.size, "PASSWORD_RESET tokens should not be deleted by initiateInvite")
+    }
+
+    // =========================================================================
+    // confirmAcceptInvite
+    // =========================================================================
+
+    private fun seedInviteToken(
+        userId: UserId = UserId(10),
+        expired: Boolean = false,
+        used: Boolean = false,
+    ): String {
+        val rawToken = "test-invite-token"
+        val hash = sha256(rawToken)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = userId,
+                tenantId = TenantId(1),
+                tokenHash = hash,
+                expiresAt = if (expired) Instant.now().minusSeconds(3600) else Instant.now().plusSeconds(72 * 3600),
+                purpose = TokenPurpose.INVITE,
+                usedAt = if (used) Instant.now().minusSeconds(60) else null,
+            ),
+        )
+        return rawToken
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns TokenInvalid for unknown token`() {
+        val result = svc.confirmAcceptInvite("bogus", "pass123", "pass123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.TokenInvalid>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite rejects PASSWORD_RESET token (cross-purpose guard)`() {
+        val rawToken = "cross-purpose-token"
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256(rawToken),
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.PASSWORD_RESET,
+            ),
+        )
+        users.add(alice)
+        val result = svc.confirmAcceptInvite(rawToken, "pass123", "pass123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.TokenInvalid>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns TokenExpired for expired invite`() {
+        users.add(alice)
+        val rawToken = seedInviteToken(expired = true)
+        val result = svc.confirmAcceptInvite(rawToken, "pass123", "pass123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.TokenExpired>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns TokenExpired for already-used invite`() {
+        users.add(alice)
+        val rawToken = seedInviteToken(used = true)
+        val result = svc.confirmAcceptInvite(rawToken, "pass123", "pass123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.TokenExpired>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns Validation for blank password`() {
+        users.add(alice)
+        val rawToken = seedInviteToken()
+        val result = svc.confirmAcceptInvite(rawToken, "", "")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.Validation>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns Validation for password mismatch`() {
+        users.add(alice)
+        val rawToken = seedInviteToken()
+        val result = svc.confirmAcceptInvite(rawToken, "pass123", "different")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.Validation>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite success sets password and clears requiredActions`() {
+        val invitedAlice =
+            alice.copy(
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD),
+            )
+        users.add(invitedAlice)
+        val rawToken = seedInviteToken()
+        val result = svc.confirmAcceptInvite(rawToken, "new-pass-123", "new-pass-123")
+        assertIs<SelfServiceResult.Success<User>>(result)
+        val updated = users.findById(UserId(10), TenantId(1))!!
+        assertTrue(updated.passwordHash != User.SENTINEL_PASSWORD_HASH, "Password should be set")
+        assertTrue(updated.requiredActions.isEmpty(), "SET_PASSWORD should be cleared")
+        assertTrue(updated.emailVerified, "Email should be verified on invite acceptance")
+    }
+
+    @Test
+    fun `confirmAcceptInvite marks token as used`() {
+        users.add(
+            alice.copy(
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD),
+            ),
+        )
+        val rawToken = seedInviteToken()
+        svc.confirmAcceptInvite(rawToken, "new-pass-123", "new-pass-123")
+        val token = prTokenRepo.all().first()
+        assertNotNull(token.usedAt, "Token should be marked as used")
+    }
+
+    @Test
+    fun `confirmAcceptInvite emits USER_INVITE_ACCEPTED audit event`() {
+        users.add(
+            alice.copy(
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD),
+            ),
+        )
+        val rawToken = seedInviteToken()
+        svc.confirmAcceptInvite(rawToken, "new-pass-123", "new-pass-123")
+        assertTrue(auditLog.hasEvent(AuditEventType.USER_INVITE_ACCEPTED))
+    }
+
+    @Test
+    fun `confirmPasswordReset rejects INVITE token (cross-purpose guard)`() {
+        val rawToken = "invite-for-reset"
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256(rawToken),
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.INVITE,
+            ),
+        )
+        users.add(alice)
+        val result = svc.confirmPasswordReset(rawToken, "new-pass", "new-pass")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.TokenInvalid>(result.error)
     }
 }
