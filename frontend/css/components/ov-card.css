@@ -24,6 +24,7 @@
   overflow: hidden;
 }
 
+form+.ov-card { margin-top: var(--space-5); }
 .ov-card + .ov-card { margin-top: var(--space-5); }
 
 /* ── Section label (divider heading row) ───────────────────────────────── */

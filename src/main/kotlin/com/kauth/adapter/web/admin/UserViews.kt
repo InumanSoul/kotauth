@@ -398,7 +398,9 @@ internal fun userListPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     search: String? = null,
-    totalCount: Int? = null,
+    page: Int = 1,
+    totalPages: Int = 1,
+    totalCount: Long = 0,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -461,12 +463,21 @@ internal fun userListPageImpl(
                 id = "user-list-content"
 
                 span("page-header__sub") {
-                    val count = users.size
-                    val suffix = if (count != 1) "s" else ""
-                    if (search != null && totalCount != null && totalCount != count) {
-                        +"$count of $totalCount user$suffix"
+                    val suffix = if (totalCount != 1L) "s" else ""
+                    if (search != null) {
+                        if (totalPages > 1) {
+                            val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                            val end = start + users.size - 1
+                            +"Showing $start\u2013$end of $totalCount result$suffix for \u201c$search\u201d"
+                        } else {
+                            +"$totalCount result$suffix for \u201c$search\u201d"
+                        }
+                    } else if (totalPages > 1) {
+                        val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                        val end = start + users.size - 1
+                        +"Showing $start\u2013$end of $totalCount user$suffix"
                     } else {
-                        +"$count user$suffix in this workspace"
+                        +"$totalCount user$suffix in this workspace"
                     }
                 }
 
@@ -551,6 +562,14 @@ internal fun userListPageImpl(
                         }
                     }
                 }
+
+                paginationControls(
+                    currentPage = page,
+                    totalPages = totalPages,
+                    baseUrl = "/admin/workspaces/${workspace.slug}/users" +
+                        if (search != null) "?q=$search&" else "?",
+                    htmxTarget = "#user-list-content",
+                )
             }
                     }
 }

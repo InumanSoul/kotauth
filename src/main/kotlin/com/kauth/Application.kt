@@ -355,6 +355,7 @@ fun Application.module(
             sessionRepository = s.sessionRepository,
             mfaService = s.mfaService,
             oauthService = s.oauthService,
+            socialAccountRepository = s.socialAccountRepository,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
         )

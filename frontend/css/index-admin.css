@@ -46,6 +46,7 @@
 @import "./components/toast.css";
 @import "./components/tooltip.css";
 @import "./components/update-chip.css";
+@import "./components/entity-picker.css";
 
 /* ── Page-specific ───────────────────────────────────────────────────────── */
 @import "./pages/workspace-overview.css";

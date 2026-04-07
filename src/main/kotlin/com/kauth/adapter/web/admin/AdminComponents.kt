@@ -18,7 +18,7 @@ import kotlinx.html.stream.createHTML
 internal fun renderFragment(block: DIV.() -> Unit): String {
     val wrapped = createHTML(prettyPrint = false).div { block() }
     // Strip the outer <div>...</div> wrapper added by createHTML().div
-    return wrapped.removePrefix("<div>").removeSuffix("</div>")
+    return wrapped.removePrefix("<div>").removeSuffix("</div>").trim()
 }
 
 /**
@@ -284,6 +284,134 @@ fun DIV.postButton(
         button(type = ButtonType.submit, classes = btnClass) {
             if (confirmMessage != null) attributes["data-confirm"] = confirmMessage
             +label
+        }
+    }
+}
+
+// ─── Pagination Controls ────────────────────────────────────────────────────
+
+/**
+ * Standard htmx-enhanced pagination control for data tables.
+ *
+ * Renders Prev / "Page N of N" / Next with htmx partial-page swaps.
+ * The component only renders when [totalPages] > 1.
+ *
+ * @param currentPage  1-based current page number.
+ * @param totalPages   Total number of pages.
+ * @param baseUrl      URL prefix ending with '?' or '&', ready for `page=N` appended.
+ * @param htmxTarget   CSS selector for the htmx swap target (e.g. "#user-list-content").
+ */
+fun DIV.paginationControls(
+    currentPage: Int,
+    totalPages: Int,
+    baseUrl: String,
+    htmxTarget: String,
+) {
+    if (totalPages <= 1) return
+    div("data-table-pagination") {
+        if (currentPage > 1) {
+            val prevUrl = "${baseUrl}page=${currentPage - 1}"
+            a(prevUrl, classes = "btn btn--ghost btn--sm") {
+                attributes["hx-get"] = prevUrl
+                attributes["hx-target"] = htmxTarget
+                attributes["hx-select"] = htmxTarget
+                attributes["hx-push-url"] = "true"
+                +"\u2190 Prev"
+            }
+        }
+        span("data-table-pagination__label") { +"Page $currentPage of $totalPages" }
+        if (currentPage < totalPages) {
+            val nextUrl = "${baseUrl}page=${currentPage + 1}"
+            a(nextUrl, classes = "btn btn--ghost btn--sm") {
+                attributes["hx-get"] = nextUrl
+                attributes["hx-target"] = htmxTarget
+                attributes["hx-select"] = htmxTarget
+                attributes["hx-push-url"] = "true"
+                +"Next \u2192"
+            }
+        }
+    }
+}
+
+// ─── Entity Search Picker ───────────────────────────────────────────────────
+
+/**
+ * Reusable search-as-you-type picker for assigning entities (users to roles, users to groups).
+ *
+ * Renders a debounced search input whose results are htmx-loaded into a dropdown.
+ * Each result is a form that POSTs the assignment. The page reloads with updated state.
+ *
+ * @param pickerId     Unique DOM id for this picker instance (e.g. "role-user-picker").
+ * @param searchUrl    GET endpoint returning HTML result fragments (e.g. /roles/{id}/search-users).
+ * @param placeholder  Input placeholder text.
+ */
+fun DIV.entityPicker(
+    pickerId: String,
+    searchUrl: String,
+    placeholder: String = "Search by username or email\u2026",
+) {
+    div("entity-picker") {
+        id = pickerId
+        attributes["data-entity-picker"] = ""
+        div("entity-picker__input-wrap") {
+            input(type = InputType.search, name = "q", classes = "entity-picker__input") {
+                this.placeholder = placeholder
+                autoComplete = false
+                attributes["spellcheck"] = "false"
+                attributes["role"] = "combobox"
+                attributes["aria-autocomplete"] = "list"
+                attributes["aria-expanded"] = "false"
+                attributes["aria-controls"] = "$pickerId-results"
+                attributes["hx-get"] = searchUrl
+                attributes["hx-target"] = "#$pickerId-results"
+                attributes["hx-trigger"] = "input changed delay:300ms, search"
+                attributes["hx-swap"] = "innerHTML"
+                attributes["hx-indicator"] = "#$pickerId-spinner"
+            }
+            span("entity-picker__spinner htmx-indicator") {
+                id = "$pickerId-spinner"
+                attributes["aria-hidden"] = "true"
+            }
+        }
+        div("entity-picker__dropdown") {
+            id = "$pickerId-results"
+            attributes["role"] = "listbox"
+            attributes["aria-label"] = "Search results"
+        }
+    }
+}
+
+/**
+ * Renders search result items for an [entityPicker] dropdown.
+ *
+ * Called by the search endpoint to produce the HTML fragment that htmx swaps
+ * into the dropdown's innerHTML. Each result wraps a form that POSTs the assignment.
+ */
+fun FlowContent.entityPickerResults(
+    items: List<Pair<String, String>>,
+    idField: String,
+    actionUrl: String,
+    emptyMessage: String = "No results found.",
+) {
+    if (items.isEmpty()) {
+        div("entity-picker__empty") {
+            attributes["role"] = "option"
+            attributes["aria-disabled"] = "true"
+            +emptyMessage
+        }
+        return
+    }
+    items.forEachIndexed { index, (id, label) ->
+        div("entity-picker__item") {
+            this.id = "ep-item-$index"
+            attributes["role"] = "option"
+            form(action = actionUrl, method = FormMethod.post) {
+                input(type = InputType.hidden, name = idField) { value = id }
+                button(type = ButtonType.submit, classes = "entity-picker__item-btn") {
+                    attributes["data-entity-picker-item"] = ""
+                    +label
+                }
+            }
         }
     }
 }

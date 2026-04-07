@@ -13,58 +13,55 @@
 ;(function () {
   'use strict';
 
-  var dialog = document.getElementById('confirm-dialog');
-  var dialogMsg = document.getElementById('confirm-dialog-message');
-  var dialogOk = document.getElementById('confirm-dialog-ok');
-  var dialogCancel = document.getElementById('confirm-dialog-cancel');
-  var pendingResolve = null;
+  const dialog = document.getElementById('confirm-dialog');
+  const dialogMsg = document.getElementById('confirm-dialog-message');
+  const dialogOk = document.getElementById('confirm-dialog-ok');
+  const dialogCancel = document.getElementById('confirm-dialog-cancel');
+  let pendingResolve = null;
 
-  function showConfirm(message) {
-    return new Promise(function (resolve) {
-      if (!dialog) { resolve(false); return; }
-      dialogMsg.textContent = message;
-      pendingResolve = resolve;
-      dialog.showModal();
-    });
-  }
+  const showConfirm = (message) => new Promise((resolve) => {
+    if (!dialog) { resolve(false); return; }
+    dialogMsg.textContent = message;
+    pendingResolve = resolve;
+    dialog.showModal();
+  });
 
   if (dialog) {
-    dialogOk.addEventListener('click', function () {
+    dialogOk.addEventListener('click', () => {
       dialog.close();
       if (pendingResolve) { pendingResolve(true); pendingResolve = null; }
     });
-    dialogCancel.addEventListener('click', function () {
+    dialogCancel.addEventListener('click', () => {
       dialog.close();
       if (pendingResolve) { pendingResolve(false); pendingResolve = null; }
     });
-    dialog.addEventListener('close', function () {
+    dialog.addEventListener('close', () => {
       if (pendingResolve) { pendingResolve(false); pendingResolve = null; }
     });
   }
 
   // data-confirm on regular buttons/forms
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-confirm]');
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-confirm]');
     if (!btn) return;
-    var msg = btn.getAttribute('data-confirm');
+    const msg = btn.getAttribute('data-confirm');
     e.preventDefault();
     e.stopImmediatePropagation();
-    showConfirm(msg).then(function (ok) {
+    showConfirm(msg).then((ok) => {
       if (ok) {
         btn.removeAttribute('data-confirm');
         btn.click();
-        setTimeout(function () { btn.setAttribute('data-confirm', msg); }, 0);
+        setTimeout(() => { btn.setAttribute('data-confirm', msg); }, 0);
       }
     });
   }, true);
 
   // htmx:confirm for hx-confirm attributes (only if htmx is present)
   if (typeof htmx !== 'undefined') {
-    document.addEventListener('htmx:confirm', function (e) {
-      // Only intercept when hx-confirm is set (question is non-empty)
+    document.addEventListener('htmx:confirm', (e) => {
       if (!e.detail.question) return;
       e.preventDefault();
-      showConfirm(e.detail.question).then(function (ok) {
+      showConfirm(e.detail.question).then((ok) => {
         if (ok) e.detail.issueRequest();
       });
     });

@@ -235,9 +235,10 @@ internal fun roleDetailPageImpl(
     workspace: Tenant,
     role: Role,
     allRoles: List<Role>,
-    allUsers: List<User>,
+    assignedUsers: List<User> = emptyList(),
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
+    toastMessage: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -251,8 +252,9 @@ internal fun roleDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+            toastMessage = toastMessage,
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -374,7 +376,7 @@ internal fun roleDetailPageImpl(
                                 }
                             }
                             button(type = ButtonType.submit) {
-                                classes = setOf("btn", "btn--primary", "btn--sm")
+                                classes = setOf("btn", "btn--primary")
                                 +"Add Child"
                             }
                         }
@@ -385,28 +387,52 @@ internal fun roleDetailPageImpl(
             // ── Assigned users ───────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label") { +"Assigned Users" }
-                div("edit-actions") {
-                    form(
-                        action = "/admin/workspaces/$slug/roles/${role.id?.value}/assign-user",
-                        method = FormMethod.post,
-                    ) {
-                        style = "display:flex; align-items:center; gap:8px;"
-                        select {
-                            classes = setOf("edit-row__field", "edit-row__field--select")
-                            name = "userId"
-                            allUsers.forEach { u ->
-                                option {
-                                    value = u.id?.value.toString()
-                                    +"${u.username} (${u.email})"
+                if (assignedUsers.isNotEmpty()) {
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Username" }
+                                th { +"Email" }
+                                th { style = "width:80px;" }
+                            }
+                        }
+                        tbody {
+                            assignedUsers.forEach { u ->
+                                tr {
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/$slug/users/${u.id?.value}",
+                                            classes = "data-table__name",
+                                        ) { +u.username }
+                                    }
+                                    td { +u.email }
+                                    td {
+                                        form(
+                                            action = "/admin/workspaces/$slug/roles/${role.id?.value}/unassign-user",
+                                            method = FormMethod.post,
+                                        ) {
+                                            input(type = InputType.hidden, name = "userId") {
+                                                value = u.id?.value.toString()
+                                            }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost")
+                                                +"Remove"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
-                        button(type = ButtonType.submit) {
-                            classes = setOf("btn", "btn--primary", "btn--sm")
-                            +"Assign"
-                        }
                     }
                 }
+                val excludeParam =
+                    assignedUsers.mapNotNull { it.id?.value }.joinToString(",")
+                entityPicker(
+                    pickerId = "role-user-picker",
+                    searchUrl = "/admin/workspaces/$slug/roles/${role.id?.value}/search-users" +
+                        if (excludeParam.isNotEmpty()) "?exclude=$excludeParam" else "",
+                    placeholder = "Search users to assign\u2026",
+                )
             }
                     }
 }
@@ -614,9 +640,9 @@ internal fun groupDetailPageImpl(
     allGroups: List<Group>,
     allRoles: List<Role>,
     members: List<User>,
-    allUsers: List<User>,
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
+    toastMessage: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -630,8 +656,9 @@ internal fun groupDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+            toastMessage = toastMessage,
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -810,31 +837,14 @@ internal fun groupDetailPageImpl(
                         }
                     }
                 }
-                val nonMembers = allUsers.filter { u -> members.none { it.id == u.id } }
-                if (nonMembers.isNotEmpty()) {
-                    div("edit-actions") {
-                        form(
-                            action = "/admin/workspaces/$slug/groups/${group.id?.value}/add-member",
-                            method = FormMethod.post,
-                        ) {
-                            style = "display:flex; align-items:center; gap:8px;"
-                            select {
-                                classes = setOf("edit-row__field", "edit-row__field--select")
-                                name = "userId"
-                                nonMembers.forEach { u ->
-                                    option {
-                                        value = u.id?.value.toString()
-                                        +"${u.username} (${u.email})"
-                                    }
-                                }
-                            }
-                            button(type = ButtonType.submit) {
-                                classes = setOf("btn", "btn--primary", "btn--sm")
-                                +"Add Member"
-                            }
-                        }
-                    }
-                }
+                val memberExclude =
+                    members.mapNotNull { it.id?.value }.joinToString(",")
+                entityPicker(
+                    pickerId = "group-member-picker",
+                    searchUrl = "/admin/workspaces/$slug/groups/${group.id?.value}/search-users" +
+                        if (memberExclude.isNotEmpty()) "?exclude=$memberExclude" else "",
+                    placeholder = "Search users to add\u2026",
+                )
             }
                     }
 }

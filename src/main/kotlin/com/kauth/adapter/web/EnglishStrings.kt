@@ -41,4 +41,14 @@ object EnglishStrings {
     const val TOAST_USER_ENABLED = "User enabled."
     const val TOAST_USER_SESSIONS_REVOKED = "All sessions revoked."
     const val TOAST_VERIFICATION_SENT = "Verification email sent."
+
+    // Portal — navigation and shell
+    const val PORTAL_SIGN_OUT = "Sign out"
+    const val PORTAL_MY_ACCOUNT = "My Account"
+    const val PORTAL_ACCOUNT = "Account"
+
+    // Portal — connected accounts section (profile page)
+    const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
+    const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"
+    const val CONNECTED_ACCOUNTS_EMPTY = "No social accounts connected."
 }

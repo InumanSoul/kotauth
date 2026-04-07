@@ -7,6 +7,7 @@ import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.SocialAccountRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
@@ -64,6 +65,7 @@ fun Route.portalRoutes(
     sessionRepository: SessionRepository? = null,
     mfaService: MfaService? = null,
     oauthService: OAuthService? = null,
+    socialAccountRepository: SocialAccountRepository? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
 ) {
@@ -293,6 +295,8 @@ fun Route.portalRoutes(
                     is SelfServiceResult.Failure -> null
                 }
 
+            val connectedAccounts = socialAccountRepository?.findByUserId(UserId(session.userId)) ?: emptyList()
+
             call.respondHtml(
                 HttpStatusCode.OK,
                 PortalView.profilePage(
@@ -305,6 +309,7 @@ fun Route.portalRoutes(
                     errorMsg = errorMsg,
                     email = user?.email ?: "",
                     fullName = user?.fullName ?: "",
+                    connectedAccounts = connectedAccounts,
                 ),
             )
         }

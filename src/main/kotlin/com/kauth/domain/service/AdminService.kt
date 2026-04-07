@@ -348,7 +348,14 @@ class AdminService(
     fun listUsers(
         tenantId: TenantId,
         search: String? = null,
-    ): List<User> = userRepository.findByTenantId(tenantId, search)
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
+    ): List<User> = userRepository.findByTenantId(tenantId, search, limit, offset)
+
+    fun countUsers(
+        tenantId: TenantId,
+        search: String? = null,
+    ): Long = userRepository.countByTenantId(tenantId, search)
 
     fun toggleUserEnabled(
         userId: UserId,
@@ -762,9 +769,8 @@ class AdminService(
         userId: UserId,
         tenantId: TenantId,
     ): AdminResult<Unit> {
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
+        userRepository.findById(userId, tenantId)
+            ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         userRepository.resetFailedLogins(userId)
         auditLog.record(
             AuditEvent(

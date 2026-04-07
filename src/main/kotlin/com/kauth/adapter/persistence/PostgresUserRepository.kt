@@ -56,6 +56,8 @@ class PostgresUserRepository : UserRepository {
     override fun findByTenantId(
         tenantId: TenantId,
         search: String?,
+        limit: Int,
+        offset: Int,
     ): List<User> =
         transaction {
             val query =
@@ -70,7 +72,31 @@ class PostgresUserRepository : UserRepository {
                         (UsersTable.fullName.lowerCase() like term)
                 }
             }
-            query.orderBy(UsersTable.id).map { it.toUser() }
+            query
+                .orderBy(UsersTable.id)
+                .limit(limit)
+                .offset(offset.toLong())
+                .map { it.toUser() }
+        }
+
+    override fun countByTenantId(
+        tenantId: TenantId,
+        search: String?,
+    ): Long =
+        transaction {
+            val query =
+                UsersTable
+                    .selectAll()
+                    .where { UsersTable.tenantId eq tenantId.value }
+            if (!search.isNullOrBlank()) {
+                val term = "%${search.lowercase()}%"
+                query.andWhere {
+                    (UsersTable.username.lowerCase() like term) or
+                        (UsersTable.email.lowerCase() like term) or
+                        (UsersTable.fullName.lowerCase() like term)
+                }
+            }
+            query.count()
         }
 
     override fun update(user: User): User =

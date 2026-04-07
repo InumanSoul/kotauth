@@ -187,7 +187,7 @@
   line-height: 1.3;
 }
 
-.portal-user__email {
+.portal-user__handle {
   font-size: 0.75rem;
   color: var(--color-muted);
   white-space: nowrap;

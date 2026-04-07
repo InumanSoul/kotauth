@@ -11,16 +11,15 @@
   'use strict';
 
   // ── password show/hide toggle ──────────────────────────────
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-toggle-password]');
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-toggle-password]');
     if (!btn) return;
     e.preventDefault();
 
-    var targetId = btn.getAttribute('data-toggle-password');
-    var input = document.getElementById(targetId);
+    const input = document.getElementById(btn.getAttribute('data-toggle-password'));
     if (!input) return;
 
-    var isVisible = btn.getAttribute('data-visible') === 'true';
+    const isVisible = btn.getAttribute('data-visible') === 'true';
     if (isVisible) {
       input.type = 'password';
       btn.setAttribute('data-visible', 'false');

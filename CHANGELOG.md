@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.4.1] - 2026-04-07
+
+### Added
+
+- **Portal — connected social accounts** — new "Connected accounts" section on the self-service portal Profile page. Displays linked social providers (Google, GitHub) with provider icon and email. Empty state shown for password-only users. Uses existing `SocialAccountRepository.findByUserId()` — no migration needed
+- **Entity picker component** — reusable `entityPicker()` search-as-you-type component in `AdminComponents.kt`. Replaces native `<select>` dropdowns for assigning users to roles and groups. Debounced htmx search (300ms), absolute-positioned dropdown, keyboard navigation (arrow keys, enter, escape), ARIA combobox pattern, focusout dismiss
+- **RBAC assigned users table** — role detail page now shows a data table of currently assigned users (username linked to user detail, email, "Remove" button). Previously only the assignment form was visible
+- **RBAC search endpoints** — `GET /roles/{id}/search-users` and `GET /groups/{id}/search-users` return HTML fragments for the entity picker, capped at 20 results. Shared `respondUserSearch()` handler eliminates code duplication
+- **User list pagination** — 25 users per page with htmx-enhanced Prev/Next controls. Position-aware subtitle: "Showing 1–25 of 247 users" / "12 results for 'alice'". Search and pagination compose via `?q=alice&page=2`. Page clamped to valid range. Eliminates the old double-query anti-pattern (`listUsers` called twice)
+- **Reusable `paginationControls()` component** — extracted to `AdminComponents.kt` with htmx partial-page swaps and URL push. Used by both users list and audit log
+- **`UserRepository.countByTenantId()`** — dedicated count method for pagination. `SELECT COUNT(*)` instead of fetching all rows
+- **`SessionRepository.countActiveByTenant()`** — dedicated count for sessions display
+- **`AdminService.countUsers()`** — thin wrapper for the user count port method
+- **`RoleGroupService.getUserIdsForRole()`** — delegating method for fetching assigned user IDs per role
+- **Portal sidebar helpers** — extracted `workspaceInitials()` and `portalSignOutButton()` private helpers replacing duplicated code across sidenav and tabnav shell variants
+- **`EnglishStrings` additions** — `PORTAL_SIGN_OUT`, `PORTAL_MY_ACCOUNT`, `PORTAL_ACCOUNT`, `CONNECTED_ACCOUNTS_TITLE`, `CONNECTED_ACCOUNTS_SUBTITLE`, `CONNECTED_ACCOUNTS_EMPTY`
+
+### Changed
+
+- **Sessions list capped at 100** — `findActiveByTenant` now accepts `limit`/`offset` with `Int.MAX_VALUE` defaults. The admin sessions page displays the 100 most recent active sessions with a subtitle: "Showing the 100 most recent of N active sessions" when capped
+- **Audit log pagination retrofitted** — inline pagination HTML replaced with the shared `paginationControls()` component. Pagination links now include htmx attributes for partial-page swaps (previously caused full-page reloads)
+- **RBAC assign/unassign toast feedback** — "User assigned to role.", "User removed from role.", "Member added to group.", "Member removed from group." toasts on all assignment actions
+- **RBAC duplicate assignment prevention** — search results exclude already-assigned users via the `exclude` query param. POST handlers now check `AdminResult` and redirect gracefully on failure
+- **Portal `portal-user__email` → `portal-user__handle`** — CSS class renamed to match actual content (renders username, not email)
+- **JS modernized to ES2020+** — `var` → `const`/`let`, `function` → arrow functions, template literals, optional chaining across `settings.js`, `branding.js`, `confirm-dialog.js`, `auth.js`, `update-check.js`. IIFE wrappers retained for strict mode. `branding.js` `this` references replaced with closed-over parameters
+- **`renderFragment()` trims whitespace** — prevents CSS `:not(:empty)` from being defeated by stray text nodes in htmx swap responses
+
+### Fixed
+
+- **Scope toggle JS bug** — `settings.js` compared `sel.value === 'application'` but the `<option>` emits `value = "client"`. Application-scoped role creation was silently broken — the app selector field never appeared. Fixed to match the emitted value
+- **Entity picker dropdown clipped** — `.ov-card { overflow: hidden }` clipped the absolute-positioned dropdown. Added `.ov-card:has(.entity-picker) { overflow: visible }` scoped override
+- **Entity picker spinner invisible** — htmx adds `.htmx-request` to the indicator element itself (not parent) when using `hx-indicator` with an explicit ID. Added self-class selector `.entity-picker__spinner.htmx-request` alongside the parent-child selector
+- **Entity picker input missing `name` attribute** — htmx had nothing to serialize into the query string. Search requests never fired. Added `name="q"`
+
+### Removed
+
+- **`PortalView.mfaChallengePage()`** — 70 lines of dead code. MFA challenge during portal login is handled by `AuthView.mfaChallengePage()` in the OAuth auth flow
+- **`AdminView.loginPage()`** — dead since OAuth PKCE migration (v1.2.0). Old password login page
+- **`AdminView.workspaceRedirector()`** — dead, localStorage redirect logic no longer used
+- **`loginPageImpl()`** in `AuthViews.kt` — 60-line implementation backing the removed facade
+- **`workspaceRedirectorImpl()`** in `DashboardViews.kt` — 20-line implementation backing the removed facade
+- **Unused `val user` binding** in `AdminService.unlockUser()` — findById call kept as not-found guard, dropped unused variable assignment
+- **`allUsers` parameter** removed from `roleDetailPageImpl`, `groupDetailPageImpl`, `AdminView.roleDetailPage`, `AdminView.groupDetailPage`, and their route handlers — replaced by the entity picker search pattern. Eliminates full table scans on every role/group detail page load
+
+---
+
 ## [1.4.0] - 2026-04-02
 
 ### Added

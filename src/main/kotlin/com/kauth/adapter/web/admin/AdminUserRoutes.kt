@@ -34,12 +34,30 @@ fun Route.adminUserRoutes(
                 call.request.queryParameters["q"]
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
-            val users = adminService.listUsers(workspace.id, search)
-            val totalCount = if (search != null) adminService.listUsers(workspace.id).size else null
+            val pageSize = 25
+            val totalCount = adminService.countUsers(workspace.id, search)
+            val totalPages = ((totalCount + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
+            val page =
+                (
+                    call.request.queryParameters["page"]
+                        ?.toIntOrNull()
+                        ?.coerceAtLeast(1) ?: 1
+                ).coerceAtMost(totalPages)
+            val offset = (page - 1) * pageSize
+            val users = adminService.listUsers(workspace.id, search, limit = pageSize, offset = offset)
             val wsPairs = call.attributes[WsPairsAttr]
             call.respondHtml(
                 HttpStatusCode.OK,
-                AdminView.userListPage(workspace, users, wsPairs, session.username, search, totalCount),
+                AdminView.userListPage(
+                    workspace,
+                    users,
+                    wsPairs,
+                    session.username,
+                    search,
+                    page = page,
+                    totalPages = totalPages,
+                    totalCount = totalCount,
+                ),
             )
         }
 

@@ -37,12 +37,6 @@ object AdminView {
 
     // ── Auth ────────────────────────────────────────────────────────────
 
-    fun loginPage(
-        error: String? = null,
-        bypassNotice: String? = null,
-    ): HTML.() -> Unit =
-        loginPageImpl(error, bypassNotice)
-
     fun errorPage(
         message: String,
         retryUrl: String,
@@ -57,9 +51,6 @@ object AdminView {
     ): HTML.() -> Unit = adminErrorPageImpl(message, exceptionType, allWorkspaces, loggedInAs)
 
     // ── Dashboard / redirect ────────────────────────────────────────────
-
-    fun workspaceRedirector(fallbackSlug: String): HTML.() -> Unit =
-        workspaceRedirectorImpl(fallbackSlug)
 
     fun workspaceListPage(
         workspaces: List<Tenant>,
@@ -143,8 +134,11 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         search: String? = null,
-        totalCount: Int? = null,
-    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, totalCount)
+        page: Int = 1,
+        totalPages: Int = 1,
+        totalCount: Long = 0,
+    ): HTML.() -> Unit =
+        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount)
 
     fun createUserPage(
         workspace: Tenant,
@@ -193,7 +187,9 @@ object AdminView {
         userMap: Map<UserId, String> = emptyMap(),
         clientMap: Map<ApplicationId, String> = emptyMap(),
         savedParam: String? = null,
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, savedParam)
+        totalCount: Int = 0,
+    ): HTML.() -> Unit =
+        activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, savedParam, totalCount)
 
     fun auditLogPage(
         workspace: Tenant,
@@ -239,10 +235,12 @@ object AdminView {
         workspace: Tenant,
         role: Role,
         allRoles: List<Role>,
-        allUsers: List<User>,
+        assignedUsers: List<User> = emptyList(),
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-    ): HTML.() -> Unit = roleDetailPageImpl(workspace, role, allRoles, allUsers, allWorkspaces, loggedInAs)
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        roleDetailPageImpl(workspace, role, allRoles, assignedUsers, allWorkspaces, loggedInAs, toastMessage)
 
     fun groupsListPage(
         workspace: Tenant,
@@ -266,10 +264,11 @@ object AdminView {
         allGroups: List<Group>,
         allRoles: List<Role>,
         members: List<User>,
-        allUsers: List<User>,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-    ): HTML.() -> Unit = groupDetailPageImpl(workspace, group, allGroups, allRoles, members, allUsers, allWorkspaces, loggedInAs)
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        groupDetailPageImpl(workspace, group, allGroups, allRoles, members, allWorkspaces, loggedInAs, toastMessage)
 
     // ── Security ────────────────────────────────────────────────────────
 

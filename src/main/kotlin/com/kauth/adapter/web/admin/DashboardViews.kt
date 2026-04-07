@@ -5,38 +5,6 @@ import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
 /**
- * Lightweight redirector page served at /admin when multiple workspaces exist.
- *
- * Reads `kotauth_last_ws` from localStorage and redirects to that workspace.
- * Falls back to [fallbackSlug] (the first available workspace) if nothing is
- * stored or the stored value is empty.
- *
- * This page renders no shell — just a blank body with an inline script that
- * fires immediately. The user sees a near-instant redirect.
- */
-internal fun workspaceRedirectorImpl(fallbackSlug: String): HTML.() -> Unit =
-    {
-        head {
-            title { +"KotAuth — Redirecting…" }
-            meta(charset = "UTF-8")
-        }
-        body {
-            script {
-                unsafe {
-                    +"""
-                    (function() {
-                      var slug = null;
-                      try { slug = localStorage.getItem('kotauth_last_ws'); } catch(e) {}
-                      if (!slug) slug = '${fallbackSlug}';
-                      window.location.replace('/admin/workspaces/' + encodeURIComponent(slug));
-                    })();
-                    """.trimIndent()
-                }
-            }
-        }
-    }
-
-/**
  * Workspace management list — accessible via "Manage workspaces" in the
  * topbar dropdown. Shows all workspaces with a CTA to create new ones.
  */
