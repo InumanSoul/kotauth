@@ -78,8 +78,9 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
             tenantId = TenantId(this[PasswordResetTokensTable.tenantId]),
             tokenHash = this[PasswordResetTokensTable.tokenHash],
             expiresAt = this[PasswordResetTokensTable.expiresAt].toInstant(),
-            purpose = runCatching { TokenPurpose.valueOf(this[PasswordResetTokensTable.purpose]) }
-                .getOrDefault(TokenPurpose.PASSWORD_RESET),
+            purpose =
+                runCatching { TokenPurpose.valueOf(this[PasswordResetTokensTable.purpose]) }
+                    .getOrDefault(TokenPurpose.PASSWORD_RESET),
             usedAt = this[PasswordResetTokensTable.usedAt]?.toInstant(),
             ipAddress = this[PasswordResetTokensTable.ipAddress],
             createdAt = this[PasswordResetTokensTable.createdAt].toInstant(),

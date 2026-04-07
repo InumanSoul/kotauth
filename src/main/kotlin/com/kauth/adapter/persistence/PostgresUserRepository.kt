@@ -201,9 +201,10 @@ class PostgresUserRepository : UserRepository {
             fullName = this[UsersTable.fullName],
             emailVerified = this[UsersTable.emailVerified],
             enabled = this[UsersTable.enabled],
-            requiredActions = this[UsersTable.requiredActions]
-                .mapNotNull { name -> runCatching { RequiredAction.valueOf(name) }.getOrNull() }
-                .toSet(),
+            requiredActions =
+                this[UsersTable.requiredActions]
+                    .mapNotNull { name -> runCatching { RequiredAction.valueOf(name) }.getOrNull() }
+                    .toSet(),
             lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
             mfaEnabled = this[UsersTable.mfaEnabled],
             failedLoginAttempts = this[UsersTable.failedLoginAttempts],

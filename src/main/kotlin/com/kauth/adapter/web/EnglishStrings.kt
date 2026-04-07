@@ -51,4 +51,25 @@ object EnglishStrings {
     const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"
     const val CONNECTED_ACCOUNTS_EMPTY = "No social accounts connected."
+
+    // Invite Users feature
+    const val INVITE_WELCOME_TITLE = "Welcome to"
+    const val INVITE_ACCEPT_SUBTITLE = "Set a password to activate your account."
+    const val INVITE_ACCEPT_SUBMIT = "Activate account"
+    const val INVITE_ACCEPT_SUCCESS = "Your password has been set. Your account is now active."
+    const val INVITE_ACCEPT_SIGN_IN = "Sign in to your account"
+    const val INVITE_TOKEN_INVALID = "This invite link has expired or has already been used."
+    const val INVITE_LOGIN_BLOCKED =
+        "This account has a pending invitation. Check your email for the invite link, " +
+            "or ask your administrator to resend it."
+    const val INVITE_RADIO_SEND = "Send invite email"
+    const val INVITE_RADIO_SEND_HINT = "An email will be sent with a link to set their password."
+    const val INVITE_RADIO_PASSWORD = "Set password now"
+    const val INVITE_RADIO_SMTP_HINT =
+        "SMTP is not configured for this workspace. Configure it in Settings \u203a SMTP to enable invite emails."
+    const val TOAST_INVITE_SENT = "Invite email sent."
+    const val TOAST_INVITE_RESENT = "Invite resent."
+    const val TOAST_INVITE_SEND_FAILED =
+        "User created, but the invite email could not be sent. Resend it from this page."
+    const val BADGE_INVITE_PENDING = "Invite pending"
 }

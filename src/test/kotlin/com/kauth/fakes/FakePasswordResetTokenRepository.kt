@@ -1,6 +1,7 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.PasswordResetToken
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.PasswordResetTokenRepository
 import java.time.Instant
@@ -36,5 +37,12 @@ class FakePasswordResetTokenRepository : PasswordResetTokenRepository {
 
     override fun deleteByUser(userId: UserId) {
         store.entries.removeIf { it.value.userId == userId }
+    }
+
+    override fun deleteByUserAndPurpose(
+        userId: UserId,
+        purpose: TokenPurpose,
+    ) {
+        store.entries.removeIf { it.value.userId == userId && it.value.purpose == purpose }
     }
 }

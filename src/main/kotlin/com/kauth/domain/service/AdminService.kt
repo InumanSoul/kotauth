@@ -4,9 +4,9 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
-import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -294,8 +294,9 @@ class AdminService(
             resolvedPasswordHash = User.SENTINEL_PASSWORD_HASH
             resolvedRequiredActions = setOf(RequiredAction.SET_PASSWORD)
         } else {
-            val pw = password
-                ?: return AdminResult.Failure(AdminError.Validation("Password is required."))
+            val pw =
+                password
+                    ?: return AdminResult.Failure(AdminError.Validation("Password is required."))
             val policyError = passwordPolicy?.validate(pw, tenant)
             if (policyError != null) {
                 return AdminResult.Failure(AdminError.Validation(policyError))
@@ -348,20 +349,26 @@ class AdminService(
             ),
         )
 
-        // Send invite email (non-fatal — user exists, admin can resend)
+        // Send invite email — user is created regardless of email outcome.
+        // The email itself is async (fire-and-forget via emailScope).
+        // initiateInvite only fails synchronously if SMTP is not configured,
+        // which we already guard above with tenant.isSmtpReady.
         if (sendInvite && tenant.isSmtpReady) {
-            selfServiceService.initiateInvite(user, tenant, baseUrl)
-            auditLog.record(
-                AuditEvent(
-                    tenantId = tenantId,
-                    userId = user.id,
-                    clientId = null,
-                    eventType = AuditEventType.USER_INVITE_SENT,
-                    ipAddress = null,
-                    userAgent = null,
-                    details = mapOf("username" to username),
-                ),
-            )
+            when (selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+                is SelfServiceResult.Success ->
+                    auditLog.record(
+                        AuditEvent(
+                            tenantId = tenantId,
+                            userId = user.id,
+                            clientId = null,
+                            eventType = AuditEventType.USER_INVITE_SENT,
+                            ipAddress = null,
+                            userAgent = null,
+                            details = mapOf("username" to username),
+                        ),
+                    )
+                is SelfServiceResult.Failure -> { /* SMTP guard above prevents this; log if it happens */ }
+            }
         }
 
         return AdminResult.Success(user)
@@ -386,19 +393,24 @@ class AdminService(
             return AdminResult.Failure(AdminError.Validation("SMTP is not configured."))
         }
 
-        selfServiceService?.initiateInvite(user, tenant, baseUrl)
-        auditLog.record(
-            AuditEvent(
-                tenantId = tenantId,
-                userId = userId,
-                clientId = null,
-                eventType = AuditEventType.USER_INVITE_SENT,
-                ipAddress = null,
-                userAgent = null,
-                details = mapOf("username" to user.username, "action" to "resend"),
-            ),
-        )
-        return AdminResult.Success(Unit)
+        return when (val result = selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+            is SelfServiceResult.Success -> {
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenantId,
+                        userId = userId,
+                        clientId = null,
+                        eventType = AuditEventType.USER_INVITE_SENT,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username, "action" to "resend"),
+                    ),
+                )
+                AdminResult.Success(Unit)
+            }
+            is SelfServiceResult.Failure ->
+                AdminResult.Failure(AdminError.Validation(result.error.message))
+        }
     }
 
     fun getUser(

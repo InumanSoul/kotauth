@@ -5,11 +5,11 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.RequiredAction
-import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
@@ -733,7 +733,12 @@ class UserSelfServiceService(
                     tenant = tenant,
                 )
             } catch (e: Exception) {
-                log.warn("Invite email delivery failed: {}", e.message)
+                log.warn(
+                    "Invite email delivery failed tenantId={} userId={}: {}",
+                    tenant.id.value,
+                    user.id?.value,
+                    e.message,
+                )
             }
         }
 
@@ -781,6 +786,12 @@ class UserSelfServiceService(
             val policyError = passwordPolicy?.validate(newPassword, tenant)
             if (policyError != null) {
                 return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
+            } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
+                return SelfServiceResult.Failure(
+                    SelfServiceError.Validation(
+                        "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
+                    ),
+                )
             }
         }
 
@@ -792,10 +803,15 @@ class UserSelfServiceService(
         val hashedPassword = passwordHasher.hash(newPassword)
 
         userRepository.updatePassword(token.userId, hashedPassword, now)
+
+        // Re-fetch after updatePassword to avoid stale snapshot
+        val freshUser =
+            userRepository.findById(token.userId, token.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
         userRepository.update(
-            user.copy(
+            freshUser.copy(
                 emailVerified = true,
-                requiredActions = user.requiredActions - RequiredAction.SET_PASSWORD,
+                requiredActions = freshUser.requiredActions - RequiredAction.SET_PASSWORD,
             ),
         )
 
@@ -817,7 +833,9 @@ class UserSelfServiceService(
             ),
         )
 
-        return SelfServiceResult.Success(userRepository.findById(token.userId, token.tenantId)!!)
+        return SelfServiceResult.Success(
+            userRepository.findById(token.userId, token.tenantId)!!,
+        )
     }
 }
 

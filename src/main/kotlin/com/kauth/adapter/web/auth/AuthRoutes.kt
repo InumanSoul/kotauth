@@ -66,6 +66,11 @@ fun Route.authRoutes(
             registerRateLimiter = registerRateLimiter,
         )
 
+        acceptInviteRoutes(
+            selfServiceService = selfServiceService,
+            rateLimiter = registerRateLimiter,
+        )
+
         mfaRoutes(
             oauthService = oauthService,
             mfaService = mfaService,
