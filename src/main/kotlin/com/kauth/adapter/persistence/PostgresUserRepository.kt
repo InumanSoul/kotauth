@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -107,6 +108,7 @@ class PostgresUserRepository : UserRepository {
                 it[emailVerified] = user.emailVerified
                 it[enabled] = user.enabled
                 it[mfaEnabled] = user.mfaEnabled
+                it[requiredActions] = user.requiredActions.map { a -> a.name }
             }
             user
         }
@@ -140,6 +142,7 @@ class PostgresUserRepository : UserRepository {
                     it[fullName] = user.fullName
                     it[emailVerified] = user.emailVerified
                     it[enabled] = user.enabled
+                    it[requiredActions] = user.requiredActions.map { a -> a.name }
                 } get UsersTable.id
 
             user.copy(id = UserId(insertedId))
@@ -198,6 +201,9 @@ class PostgresUserRepository : UserRepository {
             fullName = this[UsersTable.fullName],
             emailVerified = this[UsersTable.emailVerified],
             enabled = this[UsersTable.enabled],
+            requiredActions = this[UsersTable.requiredActions]
+                .mapNotNull { name -> runCatching { RequiredAction.valueOf(name) }.getOrNull() }
+                .toSet(),
             lastPasswordChangeAt = this[UsersTable.lastPasswordChangeAt]?.toInstant(),
             mfaEnabled = this[UsersTable.mfaEnabled],
             failedLoginAttempts = this[UsersTable.failedLoginAttempts],

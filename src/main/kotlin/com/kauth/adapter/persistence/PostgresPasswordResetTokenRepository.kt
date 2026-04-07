@@ -2,6 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.PasswordResetTokenRepository
 import org.jetbrains.exposed.sql.*
@@ -25,6 +26,7 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
                     it[tokenHash] = token.tokenHash
                     it[expiresAt] = token.expiresAt.toOffsetDateTime()
                     it[ipAddress] = token.ipAddress
+                    it[purpose] = token.purpose.name
                     it[createdAt] = token.createdAt.toOffsetDateTime()
                 } get PasswordResetTokensTable.id
 
@@ -58,6 +60,17 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
             Unit
         }
 
+    override fun deleteByUserAndPurpose(
+        userId: UserId,
+        purpose: TokenPurpose,
+    ) = transaction {
+        PasswordResetTokensTable.deleteWhere {
+            (PasswordResetTokensTable.userId eq userId.value) and
+                (PasswordResetTokensTable.purpose eq purpose.name)
+        }
+        Unit
+    }
+
     private fun ResultRow.toToken() =
         PasswordResetToken(
             id = this[PasswordResetTokensTable.id],
@@ -65,6 +78,8 @@ class PostgresPasswordResetTokenRepository : PasswordResetTokenRepository {
             tenantId = TenantId(this[PasswordResetTokensTable.tenantId]),
             tokenHash = this[PasswordResetTokensTable.tokenHash],
             expiresAt = this[PasswordResetTokensTable.expiresAt].toInstant(),
+            purpose = runCatching { TokenPurpose.valueOf(this[PasswordResetTokensTable.purpose]) }
+                .getOrDefault(TokenPurpose.PASSWORD_RESET),
             usedAt = this[PasswordResetTokensTable.usedAt]?.toInstant(),
             ipAddress = this[PasswordResetTokensTable.ipAddress],
             createdAt = this[PasswordResetTokensTable.createdAt].toInstant(),
