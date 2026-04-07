@@ -131,7 +131,11 @@ class PostgresSessionRepository : SessionRepository {
                 .singleOrNull()
         }
 
-    override fun findActiveByTenant(tenantId: TenantId): List<Session> =
+    override fun findActiveByTenant(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ): List<Session> =
         transaction {
             val now = OffsetDateTime.now()
             SessionsTable
@@ -141,7 +145,22 @@ class PostgresSessionRepository : SessionRepository {
                         (SessionsTable.revokedAt.isNull()) and
                         (SessionsTable.expiresAt greater now)
                 }.orderBy(SessionsTable.createdAt, SortOrder.DESC)
+                .limit(limit)
+                .offset(offset.toLong())
                 .map { it.toSession() }
+        }
+
+    override fun countActiveByTenant(tenantId: TenantId): Int =
+        transaction {
+            val now = OffsetDateTime.now()
+            SessionsTable
+                .selectAll()
+                .where {
+                    (SessionsTable.tenantId eq tenantId.value) and
+                        (SessionsTable.revokedAt.isNull()) and
+                        (SessionsTable.expiresAt greater now)
+                }.count()
+                .toInt()
         }
 
     override fun countActiveByUser(

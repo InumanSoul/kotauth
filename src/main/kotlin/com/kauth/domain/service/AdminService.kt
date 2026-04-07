@@ -348,7 +348,14 @@ class AdminService(
     fun listUsers(
         tenantId: TenantId,
         search: String? = null,
-    ): List<User> = userRepository.findByTenantId(tenantId, search)
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
+    ): List<User> = userRepository.findByTenantId(tenantId, search, limit, offset)
+
+    fun countUsers(
+        tenantId: TenantId,
+        search: String? = null,
+    ): Long = userRepository.countByTenantId(tenantId, search)
 
     fun toggleUserEnabled(
         userId: UserId,

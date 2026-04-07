@@ -288,6 +288,51 @@ fun DIV.postButton(
     }
 }
 
+// ─── Pagination Controls ────────────────────────────────────────────────────
+
+/**
+ * Standard htmx-enhanced pagination control for data tables.
+ *
+ * Renders Prev / "Page N of N" / Next with htmx partial-page swaps.
+ * The component only renders when [totalPages] > 1.
+ *
+ * @param currentPage  1-based current page number.
+ * @param totalPages   Total number of pages.
+ * @param baseUrl      URL prefix ending with '?' or '&', ready for `page=N` appended.
+ * @param htmxTarget   CSS selector for the htmx swap target (e.g. "#user-list-content").
+ */
+fun DIV.paginationControls(
+    currentPage: Int,
+    totalPages: Int,
+    baseUrl: String,
+    htmxTarget: String,
+) {
+    if (totalPages <= 1) return
+    div("data-table-pagination") {
+        if (currentPage > 1) {
+            val prevUrl = "${baseUrl}page=${currentPage - 1}"
+            a(prevUrl, classes = "btn btn--ghost btn--sm") {
+                attributes["hx-get"] = prevUrl
+                attributes["hx-target"] = htmxTarget
+                attributes["hx-select"] = htmxTarget
+                attributes["hx-push-url"] = "true"
+                +"\u2190 Prev"
+            }
+        }
+        span("data-table-pagination__label") { +"Page $currentPage of $totalPages" }
+        if (currentPage < totalPages) {
+            val nextUrl = "${baseUrl}page=${currentPage + 1}"
+            a(nextUrl, classes = "btn btn--ghost btn--sm") {
+                attributes["hx-get"] = nextUrl
+                attributes["hx-target"] = htmxTarget
+                attributes["hx-select"] = htmxTarget
+                attributes["hx-push-url"] = "true"
+                +"Next \u2192"
+            }
+        }
+    }
+}
+
 // ─── Entity Search Picker ───────────────────────────────────────────────────
 
 /**

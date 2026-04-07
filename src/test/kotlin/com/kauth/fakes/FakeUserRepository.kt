@@ -43,16 +43,28 @@ class FakeUserRepository : UserRepository {
     override fun findByTenantId(
         tenantId: TenantId,
         search: String?,
+        limit: Int,
+        offset: Int,
     ): List<User> {
         val all = store.values.filter { it.tenantId == tenantId }
-        if (search.isNullOrBlank()) return all
-        val q = search.lowercase()
-        return all.filter {
-            it.username.lowercase().contains(q) ||
-                it.email.lowercase().contains(q) ||
-                it.fullName.lowercase().contains(q)
-        }
+        val filtered =
+            if (search.isNullOrBlank()) {
+                all
+            } else {
+                val q = search.lowercase()
+                all.filter {
+                    it.username.lowercase().contains(q) ||
+                        it.email.lowercase().contains(q) ||
+                        it.fullName.lowercase().contains(q)
+                }
+            }
+        return filtered.drop(offset).take(limit)
     }
+
+    override fun countByTenantId(
+        tenantId: TenantId,
+        search: String?,
+    ): Long = findByTenantId(tenantId, search).size.toLong()
 
     override fun save(user: User): User {
         val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user

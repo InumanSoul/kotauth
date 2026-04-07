@@ -143,8 +143,11 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         search: String? = null,
-        totalCount: Int? = null,
-    ): HTML.() -> Unit = userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, totalCount)
+        page: Int = 1,
+        totalPages: Int = 1,
+        totalCount: Long = 0,
+    ): HTML.() -> Unit =
+        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount)
 
     fun createUserPage(
         workspace: Tenant,
@@ -193,7 +196,9 @@ object AdminView {
         userMap: Map<UserId, String> = emptyMap(),
         clientMap: Map<ApplicationId, String> = emptyMap(),
         savedParam: String? = null,
-    ): HTML.() -> Unit = activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, savedParam)
+        totalCount: Int = 0,
+    ): HTML.() -> Unit =
+        activeSessionsPageImpl(workspace, sessions, allWorkspaces, loggedInAs, userMap, clientMap, savedParam, totalCount)
 
     fun auditLogPage(
         workspace: Tenant,

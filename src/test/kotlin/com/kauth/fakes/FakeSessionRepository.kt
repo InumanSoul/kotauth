@@ -67,7 +67,16 @@ class FakeSessionRepository : SessionRepository {
 
     override fun findById(id: SessionId) = store[id.value]
 
-    override fun findActiveByTenant(tenantId: TenantId) = store.values.filter { it.tenantId == tenantId && it.isActive }
+    override fun findActiveByTenant(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ) = store.values
+        .filter { it.tenantId == tenantId && it.isActive }
+        .drop(offset)
+        .take(limit)
+
+    override fun countActiveByTenant(tenantId: TenantId) = store.values.count { it.tenantId == tenantId && it.isActive }
 
     override fun countActiveByUser(
         tenantId: TenantId,

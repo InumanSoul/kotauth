@@ -31,7 +31,9 @@ fun Route.adminSessionAuditRoutes(
     get("/sessions") {
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
-        val sessions = sessionRepository.findActiveByTenant(workspace.id)
+        val sessionsLimit = 100
+        val totalCount = sessionRepository.countActiveByTenant(workspace.id)
+        val sessions = sessionRepository.findActiveByTenant(workspace.id, limit = sessionsLimit)
         val sessionUserIds = sessions.mapNotNull { it.userId }.distinct()
         val sessionUserMap = resolveUsernames(sessionUserIds, workspace.id, adminService)
         val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
@@ -48,6 +50,7 @@ fun Route.adminSessionAuditRoutes(
                 sessionUserMap,
                 sessionClientMap,
                 savedParam = savedParam,
+                totalCount = totalCount,
             ),
         )
     }

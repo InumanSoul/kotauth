@@ -48,8 +48,15 @@ interface SessionRepository {
         revokedAt: Instant = Instant.now(),
     ): Int
 
-    /** Returns all active (non-revoked, non-expired) sessions across all users in a tenant. */
-    fun findActiveByTenant(tenantId: TenantId): List<Session>
+    /** Returns active (non-revoked, non-expired) sessions across all users in a tenant, optionally paginated. */
+    fun findActiveByTenant(
+        tenantId: TenantId,
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
+    ): List<Session>
+
+    /** Returns total count of active sessions for [tenantId]. Used for pagination/display. */
+    fun countActiveByTenant(tenantId: TenantId): Int
 
     /**
      * Counts active (non-revoked, non-expired) sessions for a user within a tenant.

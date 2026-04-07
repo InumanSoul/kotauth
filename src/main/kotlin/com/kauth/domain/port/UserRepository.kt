@@ -25,11 +25,19 @@ interface UserRepository {
         email: String,
     ): User?
 
-    /** Returns all users in a tenant, optionally filtered by a search term (username/email/name prefix). */
+    /** Returns users in a tenant, optionally filtered by a search term and paginated. */
     fun findByTenantId(
         tenantId: TenantId,
         search: String? = null,
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
     ): List<User>
+
+    /** Returns total count of users matching [search] in [tenantId]. Used for pagination. */
+    fun countByTenantId(
+        tenantId: TenantId,
+        search: String? = null,
+    ): Long
 
     fun save(user: User): User
 

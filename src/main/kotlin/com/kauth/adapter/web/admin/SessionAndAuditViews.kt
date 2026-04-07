@@ -17,6 +17,7 @@ internal fun activeSessionsPageImpl(
     userMap: Map<UserId, String> = emptyMap(),
     clientMap: Map<ApplicationId, String> = emptyMap(),
     savedParam: String? = null,
+    totalCount: Int = 0,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -43,9 +44,15 @@ internal fun activeSessionsPageImpl(
                     "Sessions" to null,
                 )
 
+                val sessionSubtitle =
+                    if (totalCount > sessions.size) {
+                        "Showing the ${sessions.size} most recent of $totalCount active sessions"
+                    } else {
+                        "$totalCount active session${if (totalCount != 1) "s" else ""} in this workspace"
+                    }
                 pageHeader(
                     title = "Active Sessions",
-                    subtitle = "${sessions.size} active session${if (sessions.size != 1) "s" else ""} in this workspace",
+                    subtitle = sessionSubtitle,
                     actions = if (sessions.isNotEmpty()) {
                         {
                             postButton(
@@ -293,36 +300,13 @@ internal fun auditLogPageImpl(
                         }
 
                         // Pagination
-                        if (totalPages > 1) {
-                            div("data-table-pagination") {
-                                val baseUrl =
-                                    "/admin/workspaces/${workspace.slug}/logs" +
-                                        (if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?")
-                                if (page > 1) {
-                                    val prevUrl = "${baseUrl}page=${page - 1}"
-                                    a(prevUrl, classes = "btn btn--ghost btn--sm") {
-                                        attributes["hx-get"] = prevUrl
-                                        attributes["hx-target"] = "#audit-content"
-                                        attributes["hx-select"] = "#audit-content"
-                                        attributes["hx-push-url"] = "true"
-                                        +"← Prev"
-                                    }
-                                }
-                                span("data-table-pagination__label") {
-                                    +"Page $page of $totalPages"
-                                }
-                                if (page < totalPages) {
-                                    val nextUrl = "${baseUrl}page=${page + 1}"
-                                    a(nextUrl, classes = "btn btn--ghost btn--sm") {
-                                        attributes["hx-get"] = nextUrl
-                                        attributes["hx-target"] = "#audit-content"
-                                        attributes["hx-select"] = "#audit-content"
-                                        attributes["hx-push-url"] = "true"
-                                        +"Next →"
-                                    }
-                                }
-                            }
-                        }
+                        paginationControls(
+                            currentPage = page,
+                            totalPages = totalPages,
+                            baseUrl = "/admin/workspaces/${workspace.slug}/logs" +
+                                if (eventTypeFilter != null) "?event=$eventTypeFilter&" else "?",
+                            htmxTarget = "#audit-content",
+                        )
                     }
                 }
             }
