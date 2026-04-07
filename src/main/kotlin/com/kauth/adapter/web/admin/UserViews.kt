@@ -677,7 +677,7 @@ internal fun createUserPageImpl(
                     div("edit-row") {
                         span("edit-row__label") { +"Credential setup" }
                         div("radio-group") {
-                            label("radio-option") {
+                            label("radio-row") {
                                 input(type = InputType.radio, name = "setupMode") {
                                     value = "invite"
                                     id = "setupMode_invite"
@@ -688,23 +688,30 @@ internal fun createUserPageImpl(
                                     }
                                     attributes["data-setup-toggle"] = "invite"
                                 }
-                                span { +EnglishStrings.INVITE_RADIO_SEND }
-                                if (workspace.isSmtpReady) {
-                                    span("edit-row__hint") { +EnglishStrings.INVITE_RADIO_SEND_HINT }
-                                } else {
-                                    span("edit-row__hint edit-row__hint--disabled") {
-                                        +EnglishStrings.INVITE_RADIO_SMTP_HINT
+                                div("radio-row__body") {
+                                    span("radio-row__label") { +EnglishStrings.INVITE_RADIO_SEND }
+                                    span("radio-row__desc") {
+                                        if (workspace.isSmtpReady) {
+                                            +EnglishStrings.INVITE_RADIO_SEND_HINT
+                                        } else {
+                                            +EnglishStrings.INVITE_RADIO_SMTP_HINT
+                                        }
                                     }
                                 }
                             }
-                            label("radio-option") {
+                            label("radio-row") {
                                 input(type = InputType.radio, name = "setupMode") {
                                     value = "password"
                                     id = "setupMode_password"
                                     if (!workspace.isSmtpReady) checked = true
                                     attributes["data-setup-toggle"] = "password"
                                 }
-                                span { +EnglishStrings.INVITE_RADIO_PASSWORD }
+                                div("radio-row__body") {
+                                    span("radio-row__label") { +EnglishStrings.INVITE_RADIO_PASSWORD }
+                                    span("radio-row__desc") {
+                                        +EnglishStrings.PASSWORD_HINT_USER_CAN_CHANGE
+                                    }
+                                }
                             }
                         }
                     }
