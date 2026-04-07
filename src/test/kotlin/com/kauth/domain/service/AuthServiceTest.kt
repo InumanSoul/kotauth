@@ -1,6 +1,7 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -365,5 +366,49 @@ class AuthServiceTest {
 
         val active = sessions.findActiveByUser(TenantId(1), UserId(10))
         assertEquals(2, active.size, "Only 2 sessions should remain active after the limit enforcement")
+    }
+
+    // =========================================================================
+    // authenticate() — PendingSetup guard (invite flow)
+    // =========================================================================
+
+    @Test
+    fun `authenticate returns PendingSetup when user has SET_PASSWORD in requiredActions`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "anything")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.PendingSetup>(result.error)
+    }
+
+    @Test
+    fun `authenticate PendingSetup emits LOGIN_FAILED audit event`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+                requiredActions = setOf(RequiredAction.SET_PASSWORD),
+            ),
+        )
+        svc.authenticate("acme", "alice", "anything")
+        assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_FAILED))
+    }
+
+    @Test
+    fun `authenticate succeeds after invite is accepted and requiredActions cleared`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                passwordHash = hasher.hash("new-pass"),
+                requiredActions = emptySet(),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "new-pass")
+        assertIs<AuthResult.Success<User>>(result)
     }
 }
