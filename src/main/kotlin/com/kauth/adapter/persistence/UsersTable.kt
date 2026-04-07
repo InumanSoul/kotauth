@@ -19,6 +19,7 @@ object UsersTable : Table("users") {
     val fullName = varchar("full_name", 100)
     val emailVerified = bool("email_verified").default(false)
     val enabled = bool("enabled").default(true)
+    val requiredActions = textArray("required_actions").default(emptyList())
 
     val lastPasswordChangeAt = timestampWithTimeZone("last_password_change_at").nullable()
 
