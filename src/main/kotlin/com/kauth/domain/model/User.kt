@@ -3,13 +3,6 @@ package com.kauth.domain.model
 import java.time.Instant
 
 /**
- * Core domain entity representing an authenticated user.
- * This class has zero dependencies on any framework (Ktor, Exposed, etc.).
- *
- * [tenantId] scopes this user to exactly one tenant. A user cannot
- * authenticate against a different tenant's clients.
- */
-/**
  * Actions a user must complete before normal authentication is allowed.
  *
  * Stored as `text[]` in PostgreSQL — new values can be added without a migration.
@@ -21,6 +14,13 @@ enum class RequiredAction {
     SET_PASSWORD,
 }
 
+/**
+ * Core domain entity representing an authenticated user.
+ * This class has zero dependencies on any framework (Ktor, Exposed, etc.).
+ *
+ * [tenantId] scopes this user to exactly one tenant. A user cannot
+ * authenticate against a different tenant's clients.
+ */
 data class User(
     val id: UserId? = null,
     val tenantId: TenantId,

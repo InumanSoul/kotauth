@@ -25,6 +25,8 @@ class TextArrayColumnType : ColumnType<List<String>>() {
         }
 
     override fun notNullValueToDB(value: List<String>): Any {
+        // ExposedConnection<java.sql.Connection>.connection returns the underlying JDBC connection.
+        // We need the raw java.sql.Connection to call createArrayOf(), which has no Exposed equivalent.
         val conn = TransactionManager.current().connection.connection as java.sql.Connection
         return conn.createArrayOf("text", value.toTypedArray())
     }

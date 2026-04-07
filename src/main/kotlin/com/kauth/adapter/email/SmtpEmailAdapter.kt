@@ -510,7 +510,8 @@ class SmtpEmailAdapter : EmailPort {
                 "Click the link below to set your password and activate your account. " +
                 "This link expires in 72 hours.",
         url = url,
-        footer = "If you weren't expecting this, you can safely ignore this email.",
+        footer = "If you weren't expecting this, you can safely ignore this email. " +
+            "No account will be activated without clicking the link above.",
     )
 
     private fun htmlEscape(s: String) =

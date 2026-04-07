@@ -218,6 +218,9 @@ internal fun AuthError.toMessage(): String =
         is AuthError.AccountLocked ->
             "Too many failed attempts. Your account is temporarily locked. " +
                 "Reset your password to regain access immediately."
+        is AuthError.PendingSetup ->
+            "This account has a pending invitation. Check your email for the invite link, " +
+                "or ask your administrator to resend it."
     }
 
 internal fun SocialLoginError.toMessage(): String =
