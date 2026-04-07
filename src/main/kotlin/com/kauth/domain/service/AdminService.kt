@@ -769,9 +769,8 @@ class AdminService(
         userId: UserId,
         tenantId: TenantId,
     ): AdminResult<Unit> {
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
+        userRepository.findById(userId, tenantId)
+            ?: return AdminResult.Failure(AdminError.NotFound("User not found."))
         userRepository.resetFailedLogins(userId)
         auditLog.record(
             AuditEvent(

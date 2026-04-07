@@ -37,12 +37,6 @@ object AdminView {
 
     // ── Auth ────────────────────────────────────────────────────────────
 
-    fun loginPage(
-        error: String? = null,
-        bypassNotice: String? = null,
-    ): HTML.() -> Unit =
-        loginPageImpl(error, bypassNotice)
-
     fun errorPage(
         message: String,
         retryUrl: String,
@@ -57,9 +51,6 @@ object AdminView {
     ): HTML.() -> Unit = adminErrorPageImpl(message, exceptionType, allWorkspaces, loggedInAs)
 
     // ── Dashboard / redirect ────────────────────────────────────────────
-
-    fun workspaceRedirector(fallbackSlug: String): HTML.() -> Unit =
-        workspaceRedirectorImpl(fallbackSlug)
 
     fun workspaceListPage(
         workspaces: List<Tenant>,
