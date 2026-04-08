@@ -288,32 +288,8 @@ class UserSelfServiceService(
 
         val tenant = tenantRepository.findById(token.tenantId)
         if (tenant != null) {
-            val policyError = passwordPolicy?.validate(newPassword, tenant)
-            if (policyError != null) {
-                return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
-            } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-                return SelfServiceResult.Failure(
-                    SelfServiceError.Validation(
-                        "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-                    ),
-                )
-            }
-            // Check password history
-            if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
-                if (passwordPolicy.isInHistory(
-                        token.userId,
-                        token.tenantId,
-                        newPassword,
-                        tenant.passwordPolicyHistoryCount,
-                    )
-                ) {
-                    return SelfServiceResult.Failure(
-                        SelfServiceError.Validation(
-                            "This password has been used recently. Please choose a different password.",
-                        ),
-                    )
-                }
-            }
+            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
+                ?.let { return SelfServiceResult.Failure(it) }
         }
 
         val now = Instant.now()
@@ -454,27 +430,9 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
         }
 
-        // Enforce full password policy
-        val policyError = passwordPolicy?.validate(newPassword, tenant)
-        if (policyError != null) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
-        } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-            return SelfServiceResult.Failure(
-                SelfServiceError.Validation(
-                    "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-                ),
-            )
-        }
-        // Check password history
-        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
-            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
-                return SelfServiceResult.Failure(
-                    SelfServiceError.Validation(
-                        "This password has been used recently. Please choose a different password.",
-                    ),
-                )
-            }
-        }
+        // Enforce password policy + history
+        validatePasswordPolicy(newPassword, tenant, userId, tenantId, checkHistory = true)
+            ?.let { return SelfServiceResult.Failure(it) }
 
         val now = Instant.now()
         val hashedPassword = passwordHasher.hash(newPassword)
@@ -690,6 +648,39 @@ class UserSelfServiceService(
         return token to sha256Hex(token)
     }
 
+    /**
+     * Validates a new password against the tenant's policy and optionally against password history.
+     * Returns a [SelfServiceError.Validation] if the password fails, or null if it passes.
+     */
+    private fun validatePasswordPolicy(
+        newPassword: String,
+        tenant: Tenant,
+        userId: UserId? = null,
+        tenantId: TenantId? = null,
+        checkHistory: Boolean = false,
+    ): SelfServiceError.Validation? {
+        val policyError = passwordPolicy?.validate(newPassword, tenant)
+        if (policyError != null) return SelfServiceError.Validation(policyError)
+        if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
+            return SelfServiceError.Validation(
+                "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
+            )
+        }
+        if (checkHistory &&
+            passwordPolicy != null &&
+            tenant.passwordPolicyHistoryCount > 0 &&
+            userId != null &&
+            tenantId != null
+        ) {
+            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
+                return SelfServiceError.Validation(
+                    "This password has been used recently. Please choose a different password.",
+                )
+            }
+        }
+        return null
+    }
+
     // =========================================================================
     // Invite flow
     // =========================================================================
@@ -783,16 +774,8 @@ class UserSelfServiceService(
 
         val tenant = tenantRepository.findById(token.tenantId)
         if (tenant != null) {
-            val policyError = passwordPolicy?.validate(newPassword, tenant)
-            if (policyError != null) {
-                return SelfServiceResult.Failure(SelfServiceError.Validation(policyError))
-            } else if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-                return SelfServiceResult.Failure(
-                    SelfServiceError.Validation(
-                        "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-                    ),
-                )
-            }
+            validatePasswordPolicy(newPassword, tenant)
+                ?.let { return SelfServiceResult.Failure(it) }
         }
 
         val user =
