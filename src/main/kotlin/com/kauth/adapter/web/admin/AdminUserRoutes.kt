@@ -18,8 +18,6 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
-import io.ktor.server.sessions.get
-import io.ktor.server.sessions.sessions
 
 fun Route.adminUserRoutes(
     adminService: AdminService,
@@ -28,14 +26,13 @@ fun Route.adminUserRoutes(
 ) {
     route("/users") {
         get {
-            val session = call.sessions.get<AdminSession>()!!
-            val workspace = call.attributes[WorkspaceAttr]
+            val ctx = call.adminContext()
             val search =
                 call.request.queryParameters["q"]
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
             val pageSize = 25
-            val totalCount = adminService.countUsers(workspace.id, search)
+            val totalCount = adminService.countUsers(ctx.workspace.id, search)
             val totalPages = ((totalCount + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
             val page =
                 (
@@ -44,15 +41,14 @@ fun Route.adminUserRoutes(
                         ?.coerceAtLeast(1) ?: 1
                 ).coerceAtMost(totalPages)
             val offset = (page - 1) * pageSize
-            val users = adminService.listUsers(workspace.id, search, limit = pageSize, offset = offset)
-            val wsPairs = call.attributes[WsPairsAttr]
+            val users = adminService.listUsers(ctx.workspace.id, search, limit = pageSize, offset = offset)
             call.respondHtml(
                 HttpStatusCode.OK,
                 AdminView.userListPage(
-                    workspace,
+                    ctx.workspace,
                     users,
-                    wsPairs,
-                    session.username,
+                    ctx.wsPairs,
+                    ctx.session.username,
                     search,
                     page = page,
                     totalPages = totalPages,
@@ -62,19 +58,15 @@ fun Route.adminUserRoutes(
         }
 
         get("/new") {
-            val session = call.sessions.get<AdminSession>()!!
-            val workspace = call.attributes[WorkspaceAttr]
-            val wsPairs = call.attributes[WsPairsAttr]
+            val ctx = call.adminContext()
             call.respondHtml(
                 HttpStatusCode.OK,
-                AdminView.createUserPage(workspace, wsPairs, session.username),
+                AdminView.createUserPage(ctx.workspace, ctx.wsPairs, ctx.session.username),
             )
         }
 
         post {
-            val session = call.sessions.get<AdminSession>()!!
-            val workspace = call.attributes[WorkspaceAttr]
-            val slug = workspace.slug
+            val ctx = call.adminContext()
             val params = call.receiveParameters()
             val username = params["username"]?.trim() ?: ""
             val email = params["email"]?.trim() ?: ""
@@ -85,19 +77,26 @@ fun Route.adminUserRoutes(
             val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
             when (
                 val result =
-                    adminService.createUser(workspace.id, username, email, fullName, password, sendInvite, baseUrl)
+                    adminService.createUser(
+                        ctx.workspace.id,
+                        username,
+                        email,
+                        fullName,
+                        password,
+                        sendInvite,
+                        baseUrl,
+                    )
             ) {
                 is AdminResult.Success ->
-                    call.respondRedirect("/admin/workspaces/$slug/users/${result.value.id?.value}")
+                    call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${result.value.id?.value}")
                 is AdminResult.Failure -> {
-                    val wsPairs = call.attributes[WsPairsAttr]
                     val prefill = UserPrefill(username = username, email = email, fullName = fullName)
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
                         AdminView.createUserPage(
-                            workspace,
-                            wsPairs,
-                            session.username,
+                            ctx.workspace,
+                            ctx.wsPairs,
+                            ctx.session.username,
                             error = result.error.message,
                             prefill = prefill,
                         ),
@@ -108,18 +107,16 @@ fun Route.adminUserRoutes(
 
         route("/{userId}") {
             get {
-                val session = call.sessions.get<AdminSession>()!!
+                val ctx = call.adminContext()
                 val userId =
                     call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
-                val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    when (val r = adminService.getUser(userId, workspace.id)) {
+                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
-                val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
-                val wsPairs = call.attributes[WsPairsAttr]
+                val sessions = sessionRepository.findActiveByUser(ctx.workspace.id, userId)
                 val userRoles = roleGroupService.getRolesForUser(userId)
                 val userGroups = roleGroupService.getGroupsForUser(userId)
                 val savedParam = call.request.queryParameters["saved"]
@@ -146,11 +143,11 @@ fun Route.adminUserRoutes(
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
-                        workspace,
+                        ctx.workspace,
                         user,
                         sessions,
-                        wsPairs,
-                        session.username,
+                        ctx.wsPairs,
+                        ctx.session.username,
                         successMessage = successMsg,
                         editError = errorParam,
                         roles = userRoles,
@@ -234,14 +231,12 @@ fun Route.adminUserRoutes(
             }
 
             post("/edit") {
-                val session = call.sessions.get<AdminSession>()!!
+                val ctx = call.adminContext()
                 val userId =
                     call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
-                val workspace = call.attributes[WorkspaceAttr]
-                val slug = workspace.slug
                 val user =
-                    when (val r = adminService.getUser(userId, workspace.id)) {
+                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
                     }
@@ -249,7 +244,7 @@ fun Route.adminUserRoutes(
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
                 val isHtmx = call.request.headers["HX-Request"] == "true"
-                when (val result = adminService.updateUser(userId, workspace.id, email, fullName)) {
+                when (val result = adminService.updateUser(userId, ctx.workspace.id, email, fullName)) {
                     is AdminResult.Success -> {
                         if (isHtmx) {
                             val updatedUser = result.value
@@ -265,14 +260,14 @@ fun Route.adminUserRoutes(
                                 ContentType.Text.Html,
                             )
                         } else {
-                            call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=true")
+                            call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=true")
                         }
                     }
                     is AdminResult.Failure -> {
                         if (isHtmx) {
                             call.respondText(
                                 AdminView.userProfileEditFragment(
-                                    workspace,
+                                    ctx.workspace,
                                     user,
                                     editError = result.error.message,
                                 ),
@@ -280,18 +275,17 @@ fun Route.adminUserRoutes(
                                 HttpStatusCode.UnprocessableEntity,
                             )
                         } else {
-                            val sessions = sessionRepository.findActiveByUser(workspace.id, userId)
-                            val wsPairs = call.attributes[WsPairsAttr]
+                            val sessions = sessionRepository.findActiveByUser(ctx.workspace.id, userId)
                             val userRoles = roleGroupService.getRolesForUser(userId)
                             val userGroups = roleGroupService.getGroupsForUser(userId)
                             call.respondHtml(
                                 HttpStatusCode.UnprocessableEntity,
                                 AdminView.userDetailPage(
-                                    workspace,
+                                    ctx.workspace,
                                     user,
                                     sessions,
-                                    wsPairs,
-                                    session.username,
+                                    ctx.wsPairs,
+                                    ctx.session.username,
                                     editError = result.error.message,
                                     roles = userRoles,
                                     groups = userGroups,
