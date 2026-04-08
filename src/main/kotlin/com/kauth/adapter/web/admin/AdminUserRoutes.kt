@@ -139,6 +139,7 @@ fun Route.adminUserRoutes(
                 val errorParam =
                     when (savedParam) {
                         "reset_email_failed" -> "Failed to send password reset email. Check SMTP configuration."
+                        "verification_failed" -> "Failed to send verification email. Check SMTP configuration."
                         "invite_send_failed" -> EnglishStrings.TOAST_INVITE_SEND_FAILED
                         else -> null
                     }
@@ -318,8 +319,14 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
-                adminService.resendVerificationEmail(userId, workspace.id, baseUrl)
-                call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
+                when (adminService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
+                    is AdminResult.Success ->
+                        call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
+                    is AdminResult.Failure ->
+                        call.respondRedirect(
+                            "/admin/workspaces/$slug/users/${userId.value}?saved=verification_failed",
+                        )
+                }
             }
 
             post("/send-reset-email") {
