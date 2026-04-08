@@ -74,7 +74,7 @@ fun Route.adminUserRoutes(
             val setupMode = params["setupMode"] ?: "password"
             val sendInvite = setupMode == "invite"
             val password = if (sendInvite) null else (params["password"] ?: "")
-            val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+            val baseUrl = call.resolvedBaseUrl()
             when (
                 val result =
                     adminService.createUser(
@@ -312,7 +312,7 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                val baseUrl = call.resolvedBaseUrl()
                 when (adminService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
@@ -329,7 +329,7 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                val baseUrl = call.resolvedBaseUrl()
                 when (adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
@@ -346,7 +346,7 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                val baseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+                val baseUrl = call.resolvedBaseUrl()
                 when (adminService.resendInvite(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=invite_resent")

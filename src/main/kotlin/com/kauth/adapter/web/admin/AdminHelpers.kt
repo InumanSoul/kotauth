@@ -55,3 +55,11 @@ fun <T> Parameters.typedId(
     name: String,
     wrap: (Int) -> T,
 ): T? = get(name)?.toIntOrNull()?.let(wrap)
+
+/**
+ * Derives the base URL from the current request's local connection info.
+ * Used to construct callback URLs, invite links, and verification links.
+ *
+ * Example: `http://localhost:8080` or `https://auth.example.com:443`
+ */
+fun ApplicationCall.resolvedBaseUrl(): String = request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }

@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
@@ -43,7 +44,7 @@ internal fun Route.oauthProtocolRoutes(
             ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
-        val openidBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+        val openidBaseUrl = call.resolvedBaseUrl()
         val issuer = tenant.issuerUrl ?: "$openidBaseUrl/t/$slug"
 
         call.respond(
@@ -594,8 +595,7 @@ internal fun Route.oauthProtocolRoutes(
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
             if (!postLogoutUri.isNullOrBlank()) {
                 // Only allow post-logout redirect to same origin to prevent open redirect
-                val local = call.request.local
-                val origin = "${local.scheme}://${local.serverHost}:${local.serverPort}"
+                val origin = call.resolvedBaseUrl()
                 if (postLogoutUri.startsWith(origin) || postLogoutUri.startsWith("/")) {
                     call.respondRedirect(postLogoutUri)
                 } else {
