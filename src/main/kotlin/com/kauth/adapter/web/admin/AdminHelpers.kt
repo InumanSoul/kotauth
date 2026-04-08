@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.Tenant
+import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
@@ -43,3 +44,14 @@ fun ApplicationCall.adminContext(): AdminRouteContext =
         workspace = attributes[WorkspaceAttr],
         wsPairs = attributes[WsPairsAttr],
     )
+
+/**
+ * Extracts a typed integer ID from a path parameter.
+ * Returns null if the parameter is missing or not a valid integer.
+ *
+ * Usage: `val userId = call.parameters.typedId("userId", ::UserId) ?: return@get ...`
+ */
+fun <T> Parameters.typedId(
+    name: String,
+    wrap: (Int) -> T,
+): T? = get(name)?.toIntOrNull()?.let(wrap)

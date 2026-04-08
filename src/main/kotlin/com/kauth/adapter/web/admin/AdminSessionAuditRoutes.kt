@@ -59,7 +59,7 @@ fun Route.adminSessionAuditRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
         val sessionId =
-            call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
+            call.parameters.typedId("sessionId", ::SessionId)
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         sessionRepository.revoke(sessionId, Instant.now())
         call.respondRedirect("/admin/workspaces/$slug/sessions?saved=revoked")

@@ -109,7 +109,7 @@ fun Route.adminUserRoutes(
             get {
                 val ctx = call.adminContext()
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val user =
                     when (val r = adminService.getUser(userId, ctx.workspace.id)) {
@@ -158,7 +158,7 @@ fun Route.adminUserRoutes(
 
             get("/profile-fragment") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
@@ -180,7 +180,7 @@ fun Route.adminUserRoutes(
 
             get("/edit-fragment") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
@@ -196,7 +196,7 @@ fun Route.adminUserRoutes(
 
             post("/unlock") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
@@ -210,7 +210,7 @@ fun Route.adminUserRoutes(
 
             post("/toggle") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
@@ -233,7 +233,7 @@ fun Route.adminUserRoutes(
             post("/edit") {
                 val ctx = call.adminContext()
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val user =
                     when (val r = adminService.getUser(userId, ctx.workspace.id)) {
@@ -298,7 +298,7 @@ fun Route.adminUserRoutes(
 
             post("/revoke-sessions") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
@@ -308,7 +308,7 @@ fun Route.adminUserRoutes(
 
             post("/send-verification") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
@@ -325,7 +325,7 @@ fun Route.adminUserRoutes(
 
             post("/send-reset-email") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
@@ -342,7 +342,7 @@ fun Route.adminUserRoutes(
 
             post("/resend-invite") {
                 val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                    call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
