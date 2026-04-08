@@ -9,6 +9,7 @@ import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -585,4 +586,22 @@ class RoleGroupService(
     fun getUserIdsInGroup(groupId: GroupId): List<UserId> = groupRepository.findUserIdsInGroup(groupId)
 
     fun getUserIdsForRole(roleId: RoleId): List<UserId> = roleRepository.findUserIdsForRole(roleId)
+
+    /** Returns hydrated User objects for all members of a group. Single batch query. */
+    fun getUsersInGroup(
+        groupId: GroupId,
+        tenantId: TenantId,
+    ): List<User> {
+        val ids = groupRepository.findUserIdsInGroup(groupId)
+        return if (ids.isEmpty()) emptyList() else userRepository.findByIds(ids, tenantId)
+    }
+
+    /** Returns hydrated User objects assigned to a role. Single batch query. */
+    fun getUsersForRole(
+        roleId: RoleId,
+        tenantId: TenantId,
+    ): List<User> {
+        val ids = roleRepository.findUserIdsForRole(roleId)
+        return if (ids.isEmpty()) emptyList() else userRepository.findByIds(ids, tenantId)
+    }
 }

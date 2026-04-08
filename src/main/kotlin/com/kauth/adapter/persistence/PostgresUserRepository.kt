@@ -54,6 +54,23 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findByIds(
+        ids: Collection<UserId>,
+        tenantId: TenantId,
+    ): List<User> =
+        if (ids.isEmpty()) {
+            emptyList()
+        } else {
+            transaction {
+                UsersTable
+                    .selectAll()
+                    .where {
+                        (UsersTable.id inList ids.map { it.value }) and
+                            (UsersTable.tenantId eq tenantId.value)
+                    }.map { it.toUser() }
+            }
+        }
+
     override fun findByTenantId(
         tenantId: TenantId,
         search: String?,

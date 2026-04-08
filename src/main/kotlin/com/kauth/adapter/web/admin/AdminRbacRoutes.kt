@@ -108,8 +108,7 @@ fun Route.adminRbacRoutes(
                 val roles = roleGroupService.listRoles(workspace.id)
                 val role =
                     roles.find { it.id == roleId } ?: return@get call.respond(HttpStatusCode.NotFound)
-                val assignedUserIds = roleGroupService.getUserIdsForRole(roleId)
-                val assignedUsers = assignedUserIds.mapNotNull { userRepository.findById(it, workspace.id) }
+                val assignedUsers = roleGroupService.getUsersForRole(roleId, workspace.id)
                 val toastMsg =
                     when (call.request.queryParameters["saved"]) {
                         "assigned" -> "User assigned to role."
@@ -296,8 +295,7 @@ fun Route.adminRbacRoutes(
                 val group =
                     groups.find { it.id == groupId } ?: return@get call.respond(HttpStatusCode.NotFound)
                 val roles = roleGroupService.listRoles(workspace.id)
-                val memberIds = roleGroupService.getUserIdsInGroup(groupId)
-                val members = memberIds.mapNotNull { userRepository.findById(it, workspace.id) }
+                val members = roleGroupService.getUsersInGroup(groupId, workspace.id)
                 val toastMsg =
                     when (call.request.queryParameters["saved"]) {
                         "member_added" -> "Member added to group."
