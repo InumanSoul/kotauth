@@ -25,6 +25,12 @@ interface UserRepository {
         email: String,
     ): User?
 
+    /** Returns all users matching [ids] scoped to [tenantId] in a single batch query. */
+    fun findByIds(
+        ids: Collection<UserId>,
+        tenantId: TenantId,
+    ): List<User>
+
     /** Returns users in a tenant, optionally filtered by a search term and paginated. */
     fun findByTenantId(
         tenantId: TenantId,

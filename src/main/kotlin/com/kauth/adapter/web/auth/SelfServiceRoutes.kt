@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.SelfServiceResult
@@ -41,7 +42,7 @@ internal fun Route.selfServiceRoutes(
         val params = call.receiveParameters()
         val email = params["email"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress
-        val callbackBaseUrl = call.request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+        val callbackBaseUrl = call.resolvedBaseUrl()
 
         val rateLimitKey = "forgot:$ipAddress:$slug"
         if (!registerRateLimiter.isAllowed(rateLimitKey)) {
