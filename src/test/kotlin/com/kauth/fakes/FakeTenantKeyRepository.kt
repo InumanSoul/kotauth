@@ -30,6 +30,8 @@ class FakeTenantKeyRepository : TenantKeyRepository {
     override fun findEnabledKeys(tenantId: TenantId): List<TenantKey> =
         store.filter { it.tenantId == tenantId && it.enabled }
 
+    override fun findAllKeys(tenantId: TenantId): List<TenantKey> = store.filter { it.tenantId == tenantId }
+
     override fun findByKeyId(
         tenantId: TenantId,
         keyId: String,

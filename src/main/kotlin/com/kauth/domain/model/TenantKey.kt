@@ -1,5 +1,7 @@
 package com.kauth.domain.model
 
+import java.time.Instant
+
 /**
  * An RSA signing key pair belonging to a tenant.
  *
@@ -24,4 +26,5 @@ data class TenantKey(
     val enabled: Boolean = true,
     /** True if this is the current signing key. Exactly one key per tenant should be active. */
     val active: Boolean = false,
+    val createdAt: Instant? = null,
 )

@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
-import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantKey
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 import kotlinx.html.*
 
 internal fun keyManagementPageImpl(
@@ -55,7 +57,7 @@ internal fun keyManagementPageImpl(
                 }
 
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Key Pairs" }
+                    div("ov-card__section-label") { +"Signing Key History" }
                     if (keys.isEmpty()) {
                         emptyState(
                             iconName = "security",
@@ -67,7 +69,8 @@ internal fun keyManagementPageImpl(
                             thead {
                                 tr {
                                     th { +"Key ID" }
-                                    th { style = "width:100px;"; +"Status" }
+                                    th { +"Created" }
+                                    th { style = "width:140px;"; +"Status" }
                                     th { style = "width:80px;" }
                                 }
                             }
@@ -76,6 +79,13 @@ internal fun keyManagementPageImpl(
                                     tr {
                                         td {
                                             span("data-table__id") { +key.keyId }
+                                        }
+                                        td {
+                                            val dtf =
+                                                DateTimeFormatter
+                                                    .ofPattern("yyyy-MM-dd HH:mm")
+                                                    .withZone(ZoneOffset.UTC)
+                                            +(key.createdAt?.let { dtf.format(it) } ?: "—")
                                         }
                                         td {
                                             if (key.active) {

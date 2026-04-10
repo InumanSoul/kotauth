@@ -14,6 +14,9 @@ interface TenantKeyRepository {
     /** Returns all enabled keys for a tenant (used by the JWKS endpoint). */
     fun findEnabledKeys(tenantId: TenantId): List<TenantKey>
 
+    /** Returns all keys for a tenant including retired ones (used by the admin key management page). */
+    fun findAllKeys(tenantId: TenantId): List<TenantKey>
+
     /** Returns a specific key by its keyId, regardless of enabled/active state. */
     fun findByKeyId(
         tenantId: TenantId,

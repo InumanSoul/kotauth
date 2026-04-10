@@ -20,7 +20,7 @@ fun Route.adminKeyRotationRoutes(
 ) {
     get("/settings/signing-keys") {
         val ctx = call.adminContext()
-        val keys = tenantKeyRepository.findEnabledKeys(ctx.workspace.id)
+        val keys = tenantKeyRepository.findAllKeys(ctx.workspace.id)
         val toastMsg =
             when (call.request.queryParameters["saved"]) {
                 "rotated" -> EnglishStrings.TOAST_KEY_ROTATED
@@ -56,7 +56,7 @@ fun Route.adminKeyRotationRoutes(
                         ctx.workspace,
                         ctx.wsPairs,
                         ctx.session.username,
-                        tenantKeyRepository.findEnabledKeys(ctx.workspace.id),
+                        tenantKeyRepository.findAllKeys(ctx.workspace.id),
                         error = result.error.message,
                     ),
                 )
@@ -80,7 +80,7 @@ fun Route.adminKeyRotationRoutes(
                         ctx.workspace,
                         ctx.wsPairs,
                         ctx.session.username,
-                        tenantKeyRepository.findEnabledKeys(ctx.workspace.id),
+                        tenantKeyRepository.findAllKeys(ctx.workspace.id),
                         error = result.error.message,
                     ),
                 )

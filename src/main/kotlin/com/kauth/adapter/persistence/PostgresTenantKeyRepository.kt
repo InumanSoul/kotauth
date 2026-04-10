@@ -33,6 +33,15 @@ class PostgresTenantKeyRepository(
                 .map { it.toTenantKey() }
         }
 
+    override fun findAllKeys(tenantId: TenantId): List<TenantKey> =
+        transaction {
+            TenantKeysTable
+                .selectAll()
+                .where { TenantKeysTable.tenantId eq tenantId.value }
+                .orderBy(TenantKeysTable.createdAt, SortOrder.DESC)
+                .map { it.toTenantKey() }
+        }
+
     override fun findByKeyId(
         tenantId: TenantId,
         keyId: String,
@@ -104,6 +113,7 @@ class PostgresTenantKeyRepository(
             privateKeyPem = decryptedPrivateKey,
             enabled = this[TenantKeysTable.enabled],
             active = this[TenantKeysTable.active],
+            createdAt = this[TenantKeysTable.createdAt].toInstant(),
         )
     }
 }
