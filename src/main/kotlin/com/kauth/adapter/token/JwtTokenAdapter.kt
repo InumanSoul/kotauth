@@ -12,6 +12,7 @@ import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TokenPort
+import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.KeyGenerator
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
@@ -323,11 +324,7 @@ class JwtTokenAdapter(
 
     private fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
 
-    private fun generateRefreshToken(): String =
-        Base64
-            .getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(java.security.SecureRandom().generateSeed(32))
+    private fun generateRefreshToken(): String = SecureTokens.randomBase64Url(32)
 
     private fun BigInteger.toByteArrayUnsigned(): ByteArray {
         val bytes = toByteArray()
@@ -336,10 +333,5 @@ class JwtTokenAdapter(
 
     override fun invalidateSigningKeyCache(tenantId: TenantId) {
         algorithmCache.remove(tenantId.value)
-    }
-
-    /** @deprecated Use [invalidateSigningKeyCache] instead. Kept for backward compatibility. */
-    fun invalidateCache(tenantId: Int) {
-        algorithmCache.remove(tenantId)
     }
 }

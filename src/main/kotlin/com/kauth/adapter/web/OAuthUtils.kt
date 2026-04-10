@@ -1,10 +1,10 @@
 package com.kauth.adapter.web
 
+import com.kauth.domain.util.SecureTokens
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.util.Base64
 
 // Shared OAuth utilities for admin and portal route handlers.
@@ -12,11 +12,7 @@ import java.util.Base64
 // the admin console and the self-service portal OAuth flows.
 
 /** Generates a cryptographically random PKCE code verifier (43 chars, base64url, no padding). */
-internal fun generatePkceVerifier(): String {
-    val bytes = ByteArray(32)
-    SecureRandom().nextBytes(bytes)
-    return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-}
+internal fun generatePkceVerifier(): String = SecureTokens.randomBase64Url(32)
 
 /** Computes the S256 PKCE code challenge from a verifier. */
 internal fun generatePkceChallenge(verifier: String): String {

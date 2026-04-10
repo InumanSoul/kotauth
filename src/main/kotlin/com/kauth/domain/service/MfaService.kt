@@ -14,8 +14,8 @@ import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.TotpUtil
-import java.security.SecureRandom
 import java.time.Instant
 
 /**
@@ -365,14 +365,8 @@ class MfaService(
     // Helpers
     // -----------------------------------------------------------------------
 
-    private fun generateRecoveryCodes(): List<String> {
-        val random = SecureRandom()
-        return (1..RECOVERY_CODE_COUNT).map {
-            val bytes = ByteArray(RECOVERY_CODE_LENGTH / 2)
-            random.nextBytes(bytes)
-            bytes.joinToString("") { "%02x".format(it) }
-        }
-    }
+    private fun generateRecoveryCodes(): List<String> =
+        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_LENGTH / 2) }
 }
 
 // ---------------------------------------------------------------------------

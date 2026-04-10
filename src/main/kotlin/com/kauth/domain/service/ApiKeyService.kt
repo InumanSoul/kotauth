@@ -5,10 +5,9 @@ import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApiKeyRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
-import java.security.SecureRandom
 import java.time.Instant
-import java.util.Base64
 
 /**
  * Domain service — API key lifecycle management.
@@ -67,9 +66,7 @@ class ApiKeyService(
         }
 
         // Build raw key: kauth_<slug>_<32 random bytes base64url, no padding>
-        val randomBytes = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val randomPart = Base64.getUrlEncoder().withoutPadding().encodeToString(randomBytes)
-        val rawKey = "kauth_${tenant.slug}_$randomPart"
+        val rawKey = "kauth_${tenant.slug}_${SecureTokens.randomBase64Url(32)}"
 
         val hash = sha256Hex(rawKey)
         val prefix = rawKey.take(16) // e.g. "kauth_acme_4wQk2" — enough to identify in UI

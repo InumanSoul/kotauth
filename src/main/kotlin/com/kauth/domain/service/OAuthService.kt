@@ -17,9 +17,9 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.time.Instant
 import java.util.Base64
 
@@ -619,11 +619,7 @@ class OAuthService(
     // Internal utilities
     // -------------------------------------------------------------------------
 
-    private fun generateSecureCode(): String {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-    }
+    private fun generateSecureCode(): String = SecureTokens.randomBase64Url(32)
 
     /**
      * PKCE S256 verification: SHA-256(code_verifier) must equal code_challenge (base64url).

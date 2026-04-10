@@ -7,6 +7,7 @@ import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookDeliveryRepository
 import com.kauth.domain.port.WebhookEndpointRepository
+import com.kauth.domain.util.SecureTokens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -325,11 +326,7 @@ class WebhookService(
     }
 
     /** Generates a cryptographically random 32-byte hex secret. */
-    private fun generateSecret(): String {
-        val bytes = ByteArray(32)
-        java.security.SecureRandom().nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
+    private fun generateSecret(): String = SecureTokens.randomHex(32)
 }
 
 // =============================================================================

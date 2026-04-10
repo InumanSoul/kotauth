@@ -21,15 +21,14 @@ import com.kauth.domain.port.PasswordResetTokenRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.security.SecureRandom
 import java.time.Instant
-import java.util.Base64
 
 /**
  * Domain service — user self-service use cases.
@@ -643,8 +642,7 @@ class UserSelfServiceService(
      * Raw token is base64url-encoded (43 chars, URL-safe).
      */
     private fun generateToken(): Pair<String, String> {
-        val raw = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val token = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
+        val token = SecureTokens.randomBase64Url(32)
         return token to sha256Hex(token)
     }
 
@@ -727,7 +725,7 @@ class UserSelfServiceService(
                 log.warn(
                     "Invite email delivery failed tenantId={} userId={}: {}",
                     tenant.id.value,
-                    user.id?.value,
+                    user.id!!.value,
                     e.message,
                 )
             }
@@ -778,9 +776,8 @@ class UserSelfServiceService(
                 ?.let { return SelfServiceResult.Failure(it) }
         }
 
-        val user =
-            userRepository.findById(token.userId, token.tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        userRepository.findById(token.userId, token.tenantId)
+            ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
 
         val now = Instant.now()
         val hashedPassword = passwordHasher.hash(newPassword)
@@ -860,10 +857,6 @@ sealed class SelfServiceError(
     ) : SelfServiceError(message)
 
     class SmtpNotConfigured(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class EmailDeliveryFailed(
         message: String,
     ) : SelfServiceError(message)
 }
