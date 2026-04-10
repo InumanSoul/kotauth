@@ -72,4 +72,9 @@ object EnglishStrings {
     const val TOAST_INVITE_SEND_FAILED =
         "User created, but the invite email could not be sent. Resend it from this page."
     const val BADGE_INVITE_PENDING = "Invite pending"
+
+    // Key rotation
+    const val TOAST_KEY_ROTATED =
+        "Signing key rotated. The previous key remains active for token verification until retired."
+    const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
 }
