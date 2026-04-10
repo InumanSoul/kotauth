@@ -391,6 +391,8 @@ fun Application.module(
             oauthService = s.oauthService,
             selfServiceService = s.selfServiceService,
             roleRepository = s.roleRepository,
+            keyRotationService = s.keyRotationService,
+            tenantKeyRepository = s.tenantKeyRepository,
             baseUrl = config.baseUrl,
         )
     }

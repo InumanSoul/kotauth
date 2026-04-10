@@ -19,8 +19,8 @@ import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
-import java.security.SecureRandom
 import java.time.Instant
 
 /**
@@ -374,11 +374,7 @@ class SocialLoginService(
         )
     }
 
-    private fun generateRandomPassword(): String {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
+    private fun generateRandomPassword(): String = SecureTokens.randomHex(32)
 
     private fun callbackUri(
         baseUrl: String,

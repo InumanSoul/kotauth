@@ -22,8 +22,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
-import java.security.SecureRandom
-import java.util.Base64
+import com.kauth.domain.util.SecureTokens
 
 /**
  * Domain service — admin console use cases.
@@ -681,8 +680,7 @@ class AdminService(
         }
 
         // Generate 32-byte (256-bit) cryptographically random secret, base64url encoded
-        val raw = ByteArray(32).also { SecureRandom().nextBytes(it) }
-        val secret = Base64.getUrlEncoder().withoutPadding().encodeToString(raw)
+        val secret = SecureTokens.randomBase64Url(32)
 
         applicationRepository.setClientSecretHash(appId, passwordHasher.hash(secret))
 

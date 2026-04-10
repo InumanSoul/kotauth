@@ -54,4 +54,10 @@ interface TokenPort {
      * Returns the JWKS (JSON Web Key Set) for a tenant's active signing keys.
      */
     fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>>
+
+    /**
+     * Invalidates the cached signing key for a tenant.
+     * Must be called after key rotation so new tokens use the new key.
+     */
+    fun invalidateSigningKeyCache(tenantId: TenantId)
 }

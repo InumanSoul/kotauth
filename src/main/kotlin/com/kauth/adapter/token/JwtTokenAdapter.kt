@@ -12,6 +12,7 @@ import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TokenPort
+import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.KeyGenerator
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
@@ -44,7 +45,14 @@ class JwtTokenAdapter(
     private val tenantKeyRepository: TenantKeyRepository,
 ) : TokenPort {
     private val log = LoggerFactory.getLogger(javaClass)
-    private val algorithmCache = java.util.concurrent.ConcurrentHashMap<Int, Pair<Algorithm, RSAPublicKey>>()
+
+    private data class CachedKey(
+        val algorithm: Algorithm,
+        val publicKey: RSAPublicKey,
+        val keyId: String,
+    )
+
+    private val algorithmCache = java.util.concurrent.ConcurrentHashMap<Int, CachedKey>()
 
     // -------------------------------------------------------------------------
     // TokenPort — issue user tokens
@@ -58,7 +66,7 @@ class JwtTokenAdapter(
         nonce: String?,
         roles: List<Role>,
     ): TokenResponse {
-        val (algorithm, _) = getOrCreateAlgorithm(tenant.id.value)
+        val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val audience = client?.clientId ?: tenant.slug
         val subject = user.id!!.value.toString()
@@ -74,6 +82,7 @@ class JwtTokenAdapter(
         val accessTokenBuilder =
             JWT
                 .create()
+                .withKeyId(activeKey.keyId)
                 .withIssuer(issuer)
                 .withAudience(audience)
                 .withSubject(subject)
@@ -119,12 +128,13 @@ class JwtTokenAdapter(
             }
         }
 
-        val accessToken = accessTokenBuilder.sign(algorithm)
+        val accessToken = accessTokenBuilder.sign(activeKey.algorithm)
 
         val idToken =
             if ("openid" in scopes) {
                 JWT
                     .create()
+                    .withKeyId(activeKey.keyId)
                     .withIssuer(issuer)
                     .withAudience(audience)
                     .withSubject(subject)
@@ -135,7 +145,7 @@ class JwtTokenAdapter(
                     .apply { if (nonce != null) withClaim("nonce", nonce) }
                     .withIssuedAt(Date())
                     .withExpiresAt(expiresAt)
-                    .sign(algorithm)
+                    .sign(activeKey.algorithm)
             } else {
                 null
             }
@@ -163,12 +173,13 @@ class JwtTokenAdapter(
         client: Application,
         scopes: List<String>,
     ): String {
-        val (algorithm, _) = getOrCreateAlgorithm(tenant.id.value)
+        val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val expiryMs = (client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
 
         return JWT
             .create()
+            .withKeyId(activeKey.keyId)
             .withIssuer(issuer)
             .withAudience(client.clientId)
             .withSubject(client.clientId) // sub = client_id for M2M
@@ -178,7 +189,7 @@ class JwtTokenAdapter(
             .withIssuedAt(Date())
             .withExpiresAt(Date(System.currentTimeMillis() + expiryMs))
             .withJWTId(UUID.randomUUID().toString())
-            .sign(algorithm)
+            .sign(activeKey.algorithm)
     }
 
     // -------------------------------------------------------------------------
@@ -189,7 +200,15 @@ class JwtTokenAdapter(
         return try {
             val decoded = JWT.decode(token)
             val tenantIdRaw = decoded.getClaim("tenant_id").asInt() ?: return null
-            val (algorithm, _) = getOrCreateAlgorithm(tenantIdRaw)
+            val kid = decoded.keyId // JWT "kid" header — null for tokens issued before key rotation
+
+            // Use kid-based lookup for rotated keys, fall back to active key for legacy tokens
+            val algorithm =
+                if (kid != null) {
+                    getAlgorithmForKid(tenantIdRaw, kid) ?: getOrCreateAlgorithm(tenantIdRaw).algorithm
+                } else {
+                    getOrCreateAlgorithm(tenantIdRaw).algorithm
+                }
 
             val verifier = JWT.require(algorithm).build()
             val verified = verifier.verify(token)
@@ -252,7 +271,7 @@ class JwtTokenAdapter(
     // Internal helpers
     // -------------------------------------------------------------------------
 
-    private fun getOrCreateAlgorithm(tenantId: Int): Pair<Algorithm, RSAPublicKey> {
+    private fun getOrCreateAlgorithm(tenantId: Int): CachedKey {
         algorithmCache[tenantId]?.let { return it }
 
         val key =
@@ -268,8 +287,24 @@ class JwtTokenAdapter(
         val privateKey = KeyGenerator.decodePrivateKey(key.privateKeyPem)
         val algorithm = Algorithm.RSA256(publicKey, privateKey)
 
-        algorithmCache[tenantId] = algorithm to publicKey
-        return algorithm to publicKey
+        val cached = CachedKey(algorithm, publicKey, key.keyId)
+        algorithmCache[tenantId] = cached
+        return cached
+    }
+
+    /**
+     * Resolves an Algorithm for a specific kid (key ID) — used for token verification
+     * after key rotation when the token was signed by a non-active but still-enabled key.
+     */
+    private fun getAlgorithmForKid(
+        tenantId: Int,
+        kid: String,
+    ): Algorithm? {
+        val key = tenantKeyRepository.findByKeyId(TenantId(tenantId), kid) ?: return null
+        if (!key.enabled) return null
+        val publicKey = KeyGenerator.decodePublicKey(key.publicKeyPem)
+        val privateKey = KeyGenerator.decodePrivateKey(key.privateKeyPem)
+        return Algorithm.RSA256(publicKey, privateKey)
     }
 
     private fun buildJwk(
@@ -289,18 +324,14 @@ class JwtTokenAdapter(
 
     private fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
 
-    private fun generateRefreshToken(): String =
-        Base64
-            .getUrlEncoder()
-            .withoutPadding()
-            .encodeToString(java.security.SecureRandom().generateSeed(32))
+    private fun generateRefreshToken(): String = SecureTokens.randomBase64Url(32)
 
     private fun BigInteger.toByteArrayUnsigned(): ByteArray {
         val bytes = toByteArray()
         return if (bytes[0] == 0.toByte()) bytes.copyOfRange(1, bytes.size) else bytes
     }
 
-    fun invalidateCache(tenantId: Int) {
-        algorithmCache.remove(tenantId)
+    override fun invalidateSigningKeyCache(tenantId: TenantId) {
+        algorithmCache.remove(tenantId.value)
     }
 }

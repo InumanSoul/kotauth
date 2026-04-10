@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.WebhookEventType
+import com.kauth.domain.service.WebhookResult
 import com.kauth.domain.service.WebhookService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -49,7 +50,7 @@ fun Route.adminWebhookRoutes(webhookService: WebhookService?) {
         val events = params.getAll("events")?.mapNotNull { WebhookEventType.fromValue(it) }?.toSet() ?: emptySet()
 
         when (val result = svc.createEndpoint(workspace.id, url, events, description)) {
-            is com.kauth.domain.service.WebhookResult.Success -> {
+            is WebhookResult.Success -> {
                 val endpoints = svc.listEndpoints(workspace.id)
                 val deliveries = svc.recentDeliveries(workspace.id)
                 call.respondHtml(
@@ -64,7 +65,7 @@ fun Route.adminWebhookRoutes(webhookService: WebhookService?) {
                     ),
                 )
             }
-            is com.kauth.domain.service.WebhookResult.Failure -> {
+            is WebhookResult.Failure -> {
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.createWebhookPage(

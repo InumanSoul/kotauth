@@ -1,13 +1,11 @@
 package com.kauth.cli
 
-import java.security.SecureRandom
+import com.kauth.domain.util.SecureTokens
 import kotlin.system.exitProcess
 
 object GenerateSecretKeyCommand {
     fun execute() {
-        val bytes = ByteArray(32)
-        SecureRandom().nextBytes(bytes)
-        println(bytes.joinToString("") { "%02x".format(it) })
+        println(SecureTokens.randomHex(32))
         exitProcess(0)
     }
 }

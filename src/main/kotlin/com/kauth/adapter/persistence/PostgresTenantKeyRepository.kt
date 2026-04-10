@@ -16,10 +16,11 @@ class PostgresTenantKeyRepository(
         transaction {
             TenantKeysTable
                 .selectAll()
-                .where { (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.enabled eq true) }
-                .orderBy(TenantKeysTable.createdAt, SortOrder.DESC)
-                .limit(1)
-                .map { it.toTenantKey() }
+                .where {
+                    (TenantKeysTable.tenantId eq tenantId.value) and
+                        (TenantKeysTable.active eq true) and
+                        (TenantKeysTable.enabled eq true)
+                }.map { it.toTenantKey() }
                 .singleOrNull()
         }
 
@@ -32,6 +33,27 @@ class PostgresTenantKeyRepository(
                 .map { it.toTenantKey() }
         }
 
+    override fun findAllKeys(tenantId: TenantId): List<TenantKey> =
+        transaction {
+            TenantKeysTable
+                .selectAll()
+                .where { TenantKeysTable.tenantId eq tenantId.value }
+                .orderBy(TenantKeysTable.createdAt, SortOrder.DESC)
+                .map { it.toTenantKey() }
+        }
+
+    override fun findByKeyId(
+        tenantId: TenantId,
+        keyId: String,
+    ): TenantKey? =
+        transaction {
+            TenantKeysTable
+                .selectAll()
+                .where { (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.keyId eq keyId) }
+                .map { it.toTenantKey() }
+                .singleOrNull()
+        }
+
     override fun save(key: TenantKey): TenantKey =
         transaction {
             val insertedId =
@@ -42,11 +64,29 @@ class PostgresTenantKeyRepository(
                     it[publicKey] = key.publicKeyPem
                     it[privateKey] = encryptionService.encrypt(key.privateKeyPem)
                     it[enabled] = key.enabled
+                    it[active] = key.active
                     it[createdAt] = OffsetDateTime.now()
                 } get TenantKeysTable.id
 
             key.copy(id = insertedId)
         }
+
+    override fun rotate(
+        tenantId: TenantId,
+        newKeyId: String,
+        previousKeyId: String,
+    ) = transaction {
+        // Demote old signing key (keep enabled=true for JWKS verification)
+        TenantKeysTable.update({
+            (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.keyId eq previousKeyId)
+        }) { it[active] = false }
+
+        // Promote new signing key
+        TenantKeysTable.update({
+            (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.keyId eq newKeyId)
+        }) { it[active] = true }
+        Unit
+    }
 
     override fun disable(
         tenantId: TenantId,
@@ -56,6 +96,7 @@ class PostgresTenantKeyRepository(
             (TenantKeysTable.tenantId eq tenantId.value) and (TenantKeysTable.keyId eq keyId)
         }) {
             it[enabled] = false
+            it[active] = false
         }
         Unit
     }
@@ -71,6 +112,8 @@ class PostgresTenantKeyRepository(
             publicKeyPem = this[TenantKeysTable.publicKey],
             privateKeyPem = decryptedPrivateKey,
             enabled = this[TenantKeysTable.enabled],
+            active = this[TenantKeysTable.active],
+            createdAt = this[TenantKeysTable.createdAt].toInstant(),
         )
     }
 }

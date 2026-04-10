@@ -14,11 +14,13 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
@@ -64,6 +66,8 @@ fun Route.adminRoutes(
     oauthService: OAuthService? = null,
     selfServiceService: UserSelfServiceService? = null,
     roleRepository: RoleRepository? = null,
+    keyRotationService: KeyRotationService? = null,
+    tenantKeyRepository: TenantKeyRepository? = null,
     baseUrl: String = "",
 ) {
     AdminView.setShellAppInfo(appInfo)
@@ -486,6 +490,13 @@ fun Route.adminRoutes(
                 adminWebhookRoutes(
                     webhookService = webhookService,
                 )
+
+                if (keyRotationService != null && tenantKeyRepository != null) {
+                    adminKeyRotationRoutes(
+                        keyRotationService = keyRotationService,
+                        tenantKeyRepository = tenantKeyRepository,
+                    )
+                }
             }
         }
     }

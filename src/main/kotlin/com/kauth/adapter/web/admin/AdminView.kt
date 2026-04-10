@@ -11,6 +11,7 @@ import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookDelivery
@@ -335,4 +336,15 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
     ): HTML.() -> Unit = createWebhookPageImpl(workspace, allWorkspaces, loggedInAs, error)
+
+    // ── Signing Keys ────────────────────────────────────────────────────
+
+    fun keyManagementPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        keys: List<TenantKey>,
+        error: String? = null,
+        toastMessage: String? = null,
+    ): HTML.() -> Unit = keyManagementPageImpl(workspace, allWorkspaces, loggedInAs, keys, error, toastMessage)
 }

@@ -417,8 +417,11 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink(base, "general", activeSection, "General")
     ctxLink("$base/branding", "branding", activeSection, "Branding")
     ctxLink("$base/smtp", "smtp", activeSection, "SMTP")
+    div("sidebar__divider") {}
     ctxLink("$base/security", "security", activeSection, "Security policy")
+    ctxLink("$base/signing-keys", "signing-keys", activeSection, "Signing Keys")
     ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
+    div("sidebar__divider") {}
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
 }

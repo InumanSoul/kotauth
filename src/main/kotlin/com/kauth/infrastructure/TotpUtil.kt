@@ -1,7 +1,7 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.util.SecureTokens
 import java.nio.ByteBuffer
-import java.security.SecureRandom
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
@@ -29,11 +29,7 @@ object TotpUtil {
     /**
      * Generates a cryptographically random TOTP secret, Base32-encoded.
      */
-    fun generateSecret(): String {
-        val bytes = ByteArray(SECRET_LEN)
-        SecureRandom().nextBytes(bytes)
-        return base32Encode(bytes)
-    }
+    fun generateSecret(): String = base32Encode(SecureTokens.randomBytes(SECRET_LEN))
 
     /**
      * Generates the otpauth:// URI for QR code scanning.

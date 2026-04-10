@@ -54,6 +54,8 @@ class KeyProvisioningService(
                     keyId = keyPair.keyId,
                     publicKeyPem = keyPair.publicKeyPem,
                     privateKeyPem = keyPair.privateKeyPem,
+                    enabled = true,
+                    active = true,
                 ),
             )
             log.info("RS256 key '${keyPair.keyId}' created for tenant '${tenant.slug}'")

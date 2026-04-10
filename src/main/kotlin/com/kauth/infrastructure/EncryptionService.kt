@@ -1,7 +1,7 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.util.SecureTokens
 import java.security.MessageDigest
-import java.security.SecureRandom
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.Mac
@@ -37,7 +37,7 @@ class EncryptionService(
      * Throws [IllegalStateException] if no secret key was provided.
      */
     override fun encrypt(plaintext: String): String {
-        val iv = ByteArray(GCM_IV_LENGTH).also { SecureRandom().nextBytes(it) }
+        val iv = SecureTokens.randomBytes(GCM_IV_LENGTH)
         val cipher = Cipher.getInstance(ALGORITHM)
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_BITS, iv))
         val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))

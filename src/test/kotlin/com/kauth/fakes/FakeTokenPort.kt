@@ -60,4 +60,11 @@ class FakeTokenPort : TokenPort {
     override fun decodeAccessToken(token: String): AccessTokenClaims? = claimsToReturn
 
     override fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>> = jwksToReturn
+
+    var cacheInvalidatedForTenant: TenantId? = null
+        private set
+
+    override fun invalidateSigningKeyCache(tenantId: TenantId) {
+        cacheInvalidatedForTenant = tenantId
+    }
 }

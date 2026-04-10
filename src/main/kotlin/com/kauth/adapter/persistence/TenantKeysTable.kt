@@ -15,6 +15,7 @@ object TenantKeysTable : Table("tenant_keys") {
     val publicKey = text("public_key")
     val privateKey = text("private_key")
     val enabled = bool("enabled").default(true)
+    val active = bool("active").default(false)
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

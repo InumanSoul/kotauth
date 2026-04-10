@@ -58,7 +58,7 @@ internal fun activeSessionsPageImpl(
                             postButton(
                                 action = "/admin/workspaces/${workspace.slug}/sessions/revoke-all",
                                 label = "Revoke All Sessions",
-                                btnClass = "btn btn--warning btn--sm",
+                                btnClass = "btn btn--warning",
                                 confirmMessage = "Revoke all ${sessions.size} active session${if (sessions.size != 1) "s" else ""}? All users will be signed out immediately.",
                             )
                         }

@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.2] - 2026-04-10
+
+### Added
+
+- **Admin-initiated key rotation** — new "Signing Keys" page under Settings where admins can rotate RS256 signing key pairs. The new key becomes the active signer; the old key remains enabled for token verification (served via JWKS) until manually retired. Supports the full key lifecycle: Active → Verification only → Retired
+- **`kid` header on all JWTs** — access tokens, id_tokens, and client credentials tokens now include the `kid` (Key ID) header per RFC 7517. Enables correct key selection during verification after rotation
+- **`kid`-based token verification** — `decodeAccessToken` reads the JWT `kid` header and resolves the specific signing key for verification. Tokens signed by rotated-away (but still enabled) keys verify correctly. Falls back to the active key for legacy tokens without `kid`
+- **`KeyRotationService`** — domain service with `rotate()` and `retireKey()` operations, audit events (`ADMIN_KEY_ROTATED`, `ADMIN_KEY_RETIRED`), and injectable key generation (no infrastructure imports in domain)
+- **Key management admin UI** — table showing all keys (active, verification-only, retired) with `createdAt` timestamps, status badges, rotate button with confirmation dialog, retire button for non-active keys
+- **`TenantKey.active` flag** — distinguishes the signing key from verification-only keys. Enforced by a partial unique index (at most one active key per tenant). Migration V31 adds the column and backfills existing keys
+- **`TenantKey.createdAt`** — mapped from the existing DB column to the domain model, displayed in the key management UI
+- **`TenantKeyRepository.findByKeyId()`** — lookup by kid for verification. `rotate()` — atomic two-UPDATE transaction promoting new key and demoting old. `findAllKeys()` — returns all keys including retired
+- **`TokenPort.invalidateSigningKeyCache()`** — exposed on the port interface so the domain rotation service can trigger cache eviction without importing the adapter
+- **`FakeTenantKeyRepository`** — in-memory test fake for key rotation tests
+- **`SecureTokens` utility** — shared `SecureRandom` singleton in `domain/util/` with `randomBytes()`, `randomBase64Url()`, `randomHex()`. Replaces 12 scattered `SecureRandom()` instantiations across 11 files
+- **Settings sidebar dividers** — visual grouping of settings items into Workspace (General, Branding, SMTP), Security & Identity (Security policy, Signing Keys, Identity Providers), and Developer Integration (API Keys, Webhooks)
+- **23 new tests** — 13 in `KeyRotationServiceTest` (rotate, retire, cross-tenant isolation, multiple rotations) + 10 in `JwtTokenAdapterKeyRotationTest` (kid presence, verification after rotation, retired key rejection, JWKS composition, cross-tenant cache isolation)
+
+### Changed
+
+- **Signing Keys sidebar position** — moved next to "Security policy" (was between API Keys and Webhooks). Security primitives now grouped together
+- **Rotate button** — full-size `btn--primary` in page header (was incorrectly `btn--sm`)
+- **Revoke All Sessions button** — full-size `btn--warning` in page header (was incorrectly `btn--sm`)
+- **Retire confirmation text** — updated to "Active sessions and tokens signed by it will immediately stop working. This cannot be undone."
+- **`TOAST_KEY_RETIRED`** — removed JWKS jargon: "Key retired. Tokens signed with this key will no longer be accepted."
+- **Retire failure** — route now re-renders page with error message (was silently redirecting with no feedback)
+- **`KeyProvisioningService`** — initial key provisioned with `active=true` explicitly
+- **Timestamp formatting** — `KeyRotationViews` aligned to shared `toDisplayString()` (was using a separate inline formatter)
+- **Fully-qualified `WebhookResult`** in routes and tests replaced with proper imports
+
+### Removed
+
+- **`SecureRandom()` scattered instantiations** — 12 ad-hoc instantiations across 11 files replaced by `SecureTokens` singleton
+- **`SecureTokens.nextBytes()`** — unused method removed before shipping
+- **`JwtTokenAdapter.invalidateCache()`** — deprecated method removed, replaced by `invalidateSigningKeyCache()`
+- **`SelfServiceError.EmailDeliveryFailed`** — dead sealed class variant never referenced
+- **Unused `val user` binding** in `confirmAcceptInvite` — findById kept as not-found guard, dropped assignment
+- **Redundant fully-qualified references** in `AdminWebhooksTest` — 6 FQ names replaced with imports
+
+---
+
+## [1.5.1] - 2026-04-10
+
+### Added
+
+- **`AdminRouteContext` + `call.adminContext()`** — extracted repeated session/workspace/wsPairs triple from admin route handlers. `AdminUserRoutes` fully migrated (4 page-rendering handlers use context, 8 POST-only handlers keep direct `WorkspaceAttr` access)
+- **`Parameters.typedId()`** — reusable typed-ID extraction helper. Replaced 33 `?.toIntOrNull()?.let { XxxId(it) }` patterns across 3 route files (UserId, RoleId, GroupId, ApplicationId, SessionId)
+- **`ApplicationCall.resolvedBaseUrl()`** — extracted duplicated base URL construction. Replaced 7 occurrences across 3 files (AdminUserRoutes, SelfServiceRoutes, OAuthProtocolRoutes)
+- **`UserRepository.findByIds()`** — batch query (`WHERE id IN (...)`) for hydrating user lists. Single query replaces N+1 per-member lookups
+- **`RoleGroupService.getUsersInGroup()` / `getUsersForRole()`** — batch-hydrated user lists via `findByIds`. Route handlers no longer call `userRepository.findById` directly (partial ADR-04 fix)
+- **`validatePasswordPolicy()` private helper** — extracted duplicated password policy + history validation from `confirmPasswordReset`, `confirmAcceptInvite`, and `changePassword` into a single 20-line method
+
+### Changed
+
+- **Group detail page** — N+1 query (1 query per member) replaced with single batch query via `getUsersInGroup`
+- **Role detail page** — same fix via `getUsersForRole`
+
+### Fixed
+
+- **`resendVerificationEmail` result silently ignored** — route now branches on `AdminResult.Success`/`Failure` and redirects with error toast on failure
+
+---
+
 ## [1.5.0] - 2026-04-07
 
 ### Added
