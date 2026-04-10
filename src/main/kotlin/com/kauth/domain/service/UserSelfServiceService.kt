@@ -725,7 +725,7 @@ class UserSelfServiceService(
                 log.warn(
                     "Invite email delivery failed tenantId={} userId={}: {}",
                     tenant.id.value,
-                    user.id!!.value,
+                    user.id.value,
                     e.message,
                 )
             }
