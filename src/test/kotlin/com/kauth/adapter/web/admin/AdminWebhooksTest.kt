@@ -1,14 +1,18 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.domain.model.Role
+import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.WebhookResult
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -156,19 +160,13 @@ class AdminWebhooksTest {
         userRepo.add(adminUser)
         val adminRole =
             roleRepo.add(
-                com.kauth.domain.model.Role(
-                    tenantId =
-                        com.kauth.domain.model
-                            .TenantId(1),
+                Role(
+                    tenantId = TenantId(1),
                     name = "admin",
-                    scope = com.kauth.domain.model.RoleScope.TENANT,
+                    scope = RoleScope.TENANT,
                 ),
             )
-        roleRepo.assignRoleToUser(
-            com.kauth.domain.model
-                .UserId(1),
-            adminRole.id!!,
-        )
+        roleRepo.assignRoleToUser(UserId(1), adminRole.id!!)
     }
 
     // =========================================================================
@@ -244,10 +242,10 @@ class AdminWebhooksTest {
                 webhookService.createEndpoint(
                     TenantId(2),
                     "https://hooks.example.com/test",
-                    setOf(com.kauth.domain.model.WebhookEventType.USER_CREATED),
+                    setOf(WebhookEventType.USER_CREATED),
                     "test",
                 )
-            val endpointId = (created as com.kauth.domain.service.WebhookResult.Success).endpoint.id!!
+            val endpointId = (created as WebhookResult.Success).endpoint.id!!
 
             val response =
                 authed.submitForm(
