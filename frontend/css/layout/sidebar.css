@@ -73,3 +73,10 @@
   background: var(--color-accent);
   view-transition-name: sidebar-dot;
 }
+
+u/* Visual divider between sidebar item groups */
+.sidebar__divider {
+  height: 0.5px;
+  background: var(--color-border);
+  margin: var(--space-2) var(--space-4);
+}
