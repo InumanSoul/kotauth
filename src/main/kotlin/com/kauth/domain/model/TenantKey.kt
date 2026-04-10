@@ -22,4 +22,6 @@ data class TenantKey(
     val publicKeyPem: String,
     val privateKeyPem: String,
     val enabled: Boolean = true,
+    /** True if this is the current signing key. Exactly one key per tenant should be active. */
+    val active: Boolean = false,
 )

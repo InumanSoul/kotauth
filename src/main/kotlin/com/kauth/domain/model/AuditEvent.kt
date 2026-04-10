@@ -92,4 +92,7 @@ enum class AuditEventType {
 
     USER_INVITE_SENT,
     USER_INVITE_ACCEPTED,
+
+    ADMIN_KEY_ROTATED,
+    ADMIN_KEY_RETIRED,
 }

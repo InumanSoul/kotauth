@@ -42,6 +42,7 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
@@ -95,6 +96,8 @@ data class ServiceGraph(
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
+    val keyRotationService: KeyRotationService,
+    val tenantKeyRepository: PostgresTenantKeyRepository,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -257,6 +260,15 @@ data class ServiceGraph(
                         ),
                 )
 
+            // -- Key rotation -------------------------------------------------
+            val keyRotationService =
+                KeyRotationService(
+                    tenantKeyRepository = tenantKeyRepository,
+                    tenantRepository = tenantRepository,
+                    tokenPort = tokenAdapter,
+                    auditLog = auditLogAdapter,
+                )
+
             // -- Demo seed ----------------------------------------------------
             if (config.isDemoMode) {
                 DemoSeedService(
@@ -340,6 +352,8 @@ data class ServiceGraph(
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,
+                keyRotationService = keyRotationService,
+                tenantKeyRepository = tenantKeyRepository,
                 applicationScope = applicationScope,
             )
         }
