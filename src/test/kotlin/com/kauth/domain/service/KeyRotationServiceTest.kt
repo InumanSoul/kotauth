@@ -140,4 +140,53 @@ class KeyRotationServiceTest {
         svc.retireKey(TenantId(1), "acme-original", UserId(1))
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_KEY_RETIRED))
     }
+
+    // =========================================================================
+    // Cross-tenant isolation
+    // =========================================================================
+
+    @Test
+    fun `rotate does not affect keys belonging to a different tenant`() {
+        val tenant2 =
+            Tenant(id = TenantId(2), slug = "beta", displayName = "Beta Corp", issuerUrl = null)
+        tenants.add(tenant2)
+        svc.rotate(TenantId(1), UserId(1))
+        val t2Key = keys.findActiveKey(TenantId(2))
+        assertNotNull(t2Key)
+        assertEquals("beta-original", t2Key.keyId, "Tenant 2's key should be unaffected")
+        assertTrue(t2Key.active)
+    }
+
+    @Test
+    fun `retireKey from tenant A cannot retire tenant B key`() {
+        val tenant2 =
+            Tenant(id = TenantId(2), slug = "beta", displayName = "Beta Corp", issuerUrl = null)
+        tenants.add(tenant2)
+        keys.add(
+            TenantKey(
+                tenantId = TenantId(2),
+                keyId = "beta-key",
+                publicKeyPem = "pub2",
+                privateKeyPem = "priv2",
+                enabled = true,
+                active = false,
+            ),
+        )
+        val result = svc.retireKey(TenantId(1), "beta-key", UserId(1))
+        assertIs<AdminResult.Failure>(result)
+    }
+
+    // =========================================================================
+    // Multiple rotations
+    // =========================================================================
+
+    @Test
+    fun `multiple sequential rotations result in exactly one active key`() {
+        svc.rotate(TenantId(1), UserId(1))
+        svc.rotate(TenantId(1), UserId(1))
+        val allKeys = keys.all().filter { it.tenantId == TenantId(1) }
+        val activeKeys = allKeys.filter { it.active }
+        assertEquals(1, activeKeys.size, "Only one key should be active after two rotations")
+        assertEquals(3, allKeys.size, "Should have original + 2 rotated keys")
+    }
 }

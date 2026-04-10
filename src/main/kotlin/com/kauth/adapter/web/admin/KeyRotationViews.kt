@@ -1,10 +1,7 @@
 package com.kauth.adapter.web.admin
 
-import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantKey
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import kotlinx.html.*
 
 internal fun keyManagementPageImpl(
@@ -81,11 +78,7 @@ internal fun keyManagementPageImpl(
                                             span("data-table__id") { +key.keyId }
                                         }
                                         td {
-                                            val dtf =
-                                                DateTimeFormatter
-                                                    .ofPattern("yyyy-MM-dd HH:mm")
-                                                    .withZone(ZoneOffset.UTC)
-                                            +(key.createdAt?.let { dtf.format(it) } ?: "—")
+                                            +(key.createdAt?.toDisplayString() ?: "—")
                                         }
                                         td {
                                             if (key.active) {
