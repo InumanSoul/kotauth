@@ -150,6 +150,16 @@ class KeyRotationServiceTest {
         val tenant2 =
             Tenant(id = TenantId(2), slug = "beta", displayName = "Beta Corp", issuerUrl = null)
         tenants.add(tenant2)
+        keys.add(
+            TenantKey(
+                tenantId = TenantId(2),
+                keyId = "beta-original",
+                publicKeyPem = "pub2",
+                privateKeyPem = "priv2",
+                enabled = true,
+                active = true,
+            ),
+        )
         svc.rotate(TenantId(1), UserId(1))
         val t2Key = keys.findActiveKey(TenantId(2))
         assertNotNull(t2Key)

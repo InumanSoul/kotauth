@@ -9,7 +9,6 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
-import com.kauth.infrastructure.KeyGenerator
 
 /**
  * Domain service for admin-initiated RSA key rotation.
@@ -23,7 +22,19 @@ class KeyRotationService(
     private val tenantRepository: TenantRepository,
     private val tokenPort: TokenPort,
     private val auditLog: AuditLogPort,
+    private val generateKeyPair: (keyId: String) -> KeyPairResult = { kid ->
+        com.kauth.infrastructure.KeyGenerator.generateRsaKeyPair(kid).let {
+            KeyPairResult(it.keyId, it.publicKeyPem, it.privateKeyPem)
+        }
+    },
 ) {
+    /** Injectable key pair result — decouples domain from infrastructure. */
+    data class KeyPairResult(
+        val keyId: String,
+        val publicKeyPem: String,
+        val privateKeyPem: String,
+    )
+
     /**
      * Generates a new RS256 key pair and promotes it to the active signing key.
      * The previous key remains enabled for verification (served via JWKS).
@@ -42,10 +53,7 @@ class KeyRotationService(
                     AdminError.Validation("No active key to rotate from. Provision a key first."),
                 )
 
-        val newKeyPair =
-            KeyGenerator.generateRsaKeyPair(
-                keyId = "${tenant.slug}-${System.currentTimeMillis()}",
-            )
+        val newKeyPair = generateKeyPair("${tenant.slug}-${System.currentTimeMillis()}")
 
         val newKey =
             tenantKeyRepository.save(
