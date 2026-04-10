@@ -284,7 +284,7 @@ class AdminWebhooksTest {
                         username = "admin",
                     ),
                 )
-                call.respond(io.ktor.http.HttpStatusCode.OK, "session set")
+                call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
                 adminService = buildAdminService(),
