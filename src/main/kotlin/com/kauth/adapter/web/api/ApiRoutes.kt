@@ -12,8 +12,8 @@ import com.kauth.domain.service.RoleGroupService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.call
+import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.auth.AuthenticationChecked
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
 import io.ktor.server.response.respond
@@ -51,43 +51,47 @@ fun Route.apiRoutes(
 
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
-            intercept(ApplicationCallPipeline.Call) {
-                val slug =
-                    call.parameters["tenantSlug"]
-                        ?: return@intercept call.respondProblem(
-                            status = HttpStatusCode.BadRequest,
-                            title = "Missing tenant slug",
-                            detail = "The tenantSlug path parameter is required.",
-                        )
+            val apiContextPlugin =
+                createRouteScopedPlugin("ApiContextPlugin") {
+                    on(AuthenticationChecked) { call ->
+                        val slug =
+                            call.parameters["tenantSlug"]
+                                ?: return@on call.respondProblem(
+                                    status = HttpStatusCode.BadRequest,
+                                    title = "Missing tenant slug",
+                                    detail = "The tenantSlug path parameter is required.",
+                                )
 
-                val tenant =
-                    tenantRepository.findBySlug(slug)
-                        ?: return@intercept call.respondProblem(
-                            status = HttpStatusCode.NotFound,
-                            title = "Tenant not found",
-                            detail = "No workspace with slug '$slug' exists.",
-                        )
+                        val tenant =
+                            tenantRepository.findBySlug(slug)
+                                ?: return@on call.respondProblem(
+                                    status = HttpStatusCode.NotFound,
+                                    title = "Tenant not found",
+                                    detail = "No workspace with slug '$slug' exists.",
+                                )
 
-                val principal =
-                    call.principal<ApiKeyPrincipal>()
-                        ?: return@intercept call.respondProblem(
-                            status = HttpStatusCode.Unauthorized,
-                            title = "Unauthorized",
-                            detail = "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
-                        )
+                        val principal =
+                            call.principal<ApiKeyPrincipal>()
+                                ?: return@on call.respondProblem(
+                                    status = HttpStatusCode.Unauthorized,
+                                    title = "Unauthorized",
+                                    detail =
+                                        "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
+                                )
 
-                val resolvedKey =
-                    apiKeyService.validate(principal.rawToken, tenant.id)
-                        ?: return@intercept call.respondProblem(
-                            status = HttpStatusCode.Unauthorized,
-                            title = "Invalid API key",
-                            detail = "The provided API key is invalid, expired, or has been revoked.",
-                        )
+                        val resolvedKey =
+                            apiKeyService.validate(principal.rawToken, tenant.id)
+                                ?: return@on call.respondProblem(
+                                    status = HttpStatusCode.Unauthorized,
+                                    title = "Invalid API key",
+                                    detail = "The provided API key is invalid, expired, or has been revoked.",
+                                )
 
-                call.attributes.put(ApiKeyAttr, resolvedKey)
-                call.attributes.put(TenantIdAttr, tenant.id)
-                proceed()
-            }
+                        call.attributes.put(ApiKeyAttr, resolvedKey)
+                        call.attributes.put(TenantIdAttr, tenant.id)
+                    }
+                }
+            install(apiContextPlugin)
 
             apiUserRoutes(adminService, roleGroupService)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)

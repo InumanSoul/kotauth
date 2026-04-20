@@ -13,8 +13,7 @@ import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.call
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.route
@@ -37,21 +36,25 @@ fun Route.authRoutes(
 ) {
     route("/t/{slug}") {
         // Resolve tenant context once per request
-        intercept(ApplicationCallPipeline.Call) {
-            val slug =
-                call.parameters["slug"]
-                    ?: return@intercept call.respond(HttpStatusCode.BadRequest).also { finish() }
-            val tenant = tenantRepository.findBySlug(slug)
-            call.attributes.put(
-                AuthTenantAttr,
-                AuthTenantContext(
-                    slug = slug,
-                    tenant = tenant,
-                    theme = tenant?.theme ?: TenantTheme.DEFAULT,
-                    workspaceName = tenant?.displayName ?: "KotAuth",
-                ),
-            )
-        }
+        val authTenantPlugin =
+            createRouteScopedPlugin("AuthTenantPlugin") {
+                onCall { call ->
+                    val slug =
+                        call.parameters["slug"]
+                            ?: return@onCall call.respond(HttpStatusCode.BadRequest)
+                    val tenant = tenantRepository.findBySlug(slug)
+                    call.attributes.put(
+                        AuthTenantAttr,
+                        AuthTenantContext(
+                            slug = slug,
+                            tenant = tenant,
+                            theme = tenant?.theme ?: TenantTheme.DEFAULT,
+                            workspaceName = tenant?.displayName ?: "KotAuth",
+                        ),
+                    )
+                }
+            }
+        install(authTenantPlugin)
 
         registerRoutes(
             authService = authService,

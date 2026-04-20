@@ -30,7 +30,7 @@ import io.ktor.server.http.content.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.cachingheaders.*
 import io.ktor.server.plugins.callid.*
-import io.ktor.server.plugins.callloging.*
+import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
@@ -45,6 +45,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import org.slf4j.event.Level
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 
 private val startupLog = LoggerFactory.getLogger("com.kauth.startup")
 
@@ -98,7 +100,7 @@ fun main(args: Array<String> = emptyArray()) {
     // Background cleanup: purge expired sessions every hour
     services.applicationScope.launch {
         while (isActive) {
-            delay(3_600_000) // 1 hour
+            delay(1.hours)
             try {
                 val deleted = services.sessionRepository.deleteExpired()
                 if (deleted > 0) {
@@ -113,7 +115,7 @@ fun main(args: Array<String> = emptyArray()) {
     // Background sweep: retry orphaned webhook deliveries every 5 minutes
     services.applicationScope.launch {
         while (isActive) {
-            delay(5 * 60_000)
+            delay(5.minutes)
             try {
                 services.webhookService.retrySweep()
             } catch (e: Exception) {

@@ -644,7 +644,7 @@ internal fun createUserPageImpl(
                                 required = true
                                 value = prefill.username
                                 placeholder = "johndoe"
-                                autoComplete = false
+                                autoComplete = "off"
                                 attributes["spellcheck"] = "false"
                                 attributes["pattern"] = "[a-zA-Z0-9._-]+"
                             }
@@ -661,7 +661,7 @@ internal fun createUserPageImpl(
                             required = true
                             value = prefill.email
                             placeholder = "john@example.com"
-                            autoComplete = false
+                            autoComplete = "off"
                         }
                     }
                     div("edit-row") {

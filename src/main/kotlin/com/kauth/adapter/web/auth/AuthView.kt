@@ -960,7 +960,7 @@ object AuthView {
                                 input(type = InputType.text, name = "code") {
                                     id = "code"
                                     placeholder = "Enter 6-digit code or recovery code"
-                                    autoComplete = false
+                                    autoComplete = "off"
                                     autoFocus = true
                                     attributes["inputmode"] = "numeric"
                                     attributes["pattern"] = "[0-9a-fA-F]*"

@@ -31,8 +31,7 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.ApplicationCallPipeline
-import io.ktor.server.application.call
+import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.uri
@@ -296,30 +295,32 @@ fun Route.adminRoutes(
         // Session guard
         // ---------------------------------------------------------------
 
-        intercept(ApplicationCallPipeline.Call) {
-            val uri = call.request.uri
-            if (uri.startsWith("/admin/login") || uri.startsWith("/admin/callback")) return@intercept
-            val session = call.sessions.get<AdminSession>()
-            if (session == null) {
-                call.respondRedirect("/admin/login")
-                finish()
-                return@intercept
-            }
-            // Validate the backing DB session hasn't been revoked
-            val dbSessionId = session.adminSessionId
-            if (dbSessionId != null) {
-                val dbSession =
-                    sessionRepository.findById(
-                        com.kauth.domain.model
-                            .SessionId(dbSessionId),
-                    )
-                if (dbSession == null || dbSession.revokedAt != null) {
-                    call.sessions.clear<AdminSession>()
-                    call.respondRedirect("/admin/login")
-                    finish()
+        val adminSessionGuardPlugin =
+            createRouteScopedPlugin("AdminSessionGuardPlugin") {
+                onCall { call ->
+                    val uri = call.request.uri
+                    if (uri.startsWith("/admin/login") || uri.startsWith("/admin/callback")) return@onCall
+                    val session = call.sessions.get<AdminSession>()
+                    if (session == null) {
+                        call.respondRedirect("/admin/login")
+                        return@onCall
+                    }
+                    // Validate the backing DB session hasn't been revoked
+                    val dbSessionId = session.adminSessionId
+                    if (dbSessionId != null) {
+                        val dbSession =
+                            sessionRepository.findById(
+                                com.kauth.domain.model
+                                    .SessionId(dbSessionId),
+                            )
+                        if (dbSession == null || dbSession.revokedAt != null) {
+                            call.sessions.clear<AdminSession>()
+                            call.respondRedirect("/admin/login")
+                        }
+                    }
                 }
             }
-        }
+        install(adminSessionGuardPlugin)
 
         // ---------------------------------------------------------------
         // Smart redirect: last workspace → first workspace → create
@@ -423,22 +424,31 @@ fun Route.adminRoutes(
 
             route("/{slug}") {
                 // Resolve workspace + sidebar pairs once per request
-                intercept(ApplicationCallPipeline.Call) {
-                    val slug =
-                        call.parameters["slug"]
-                            ?: return@intercept call.respond(HttpStatusCode.BadRequest).also { finish() }
-                    val workspace =
-                        tenantRepository.findBySlug(slug)
-                            ?: return@intercept call.respond(HttpStatusCode.NotFound).also { finish() }
-                    val wsPairs =
-                        tenantRepository.findAll().map {
-                            WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl)
+                val workspaceResolverPlugin =
+                    createRouteScopedPlugin("WorkspaceResolverPlugin") {
+                        onCall { call ->
+                            val slug =
+                                call.parameters["slug"]
+                                    ?: return@onCall call.respond(HttpStatusCode.BadRequest)
+                            val workspace =
+                                tenantRepository.findBySlug(slug)
+                                    ?: return@onCall call.respond(HttpStatusCode.NotFound)
+                            val wsPairs =
+                                tenantRepository.findAll().map {
+                                    WorkspaceStub(it.slug, it.displayName, it.theme.logoUrl)
+                                }
+                            call.attributes.put(WorkspaceAttr, workspace)
+                            call.attributes.put(WsPairsAttr, wsPairs)
+                            // Remember last-visited workspace for the /admin redirect
+                            call.response.cookies.append(
+                                "kotauth_last_ws",
+                                slug,
+                                path = "/admin",
+                                maxAge = 86400 * 30L,
+                            )
                         }
-                    call.attributes.put(WorkspaceAttr, workspace)
-                    call.attributes.put(WsPairsAttr, wsPairs)
-                    // Remember last-visited workspace for the /admin redirect
-                    call.response.cookies.append("kotauth_last_ws", slug, path = "/admin", maxAge = 86400 * 30L)
-                }
+                    }
+                install(workspaceResolverPlugin)
 
                 get {
                     val session = call.sessions.get<AdminSession>()!!

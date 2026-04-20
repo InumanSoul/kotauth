@@ -38,8 +38,8 @@ import com.microsoft.playwright.Playwright
 import com.microsoft.playwright.options.WaitUntilState
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.call
 import io.ktor.server.application.install
+import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.netty.NettyApplicationEngine
@@ -64,7 +64,7 @@ import java.net.URL
 
 abstract class E2ETestBase {
     companion object {
-        lateinit var server: NettyApplicationEngine
+        lateinit var server: EmbeddedServer<NettyApplicationEngine, NettyApplicationEngine.Configuration>
         lateinit var playwright: Playwright
         lateinit var browser: Browser
         var port: Int = 0
