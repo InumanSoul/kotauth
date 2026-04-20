@@ -78,36 +78,6 @@ fun DIV.pageHeader(
     }
 }
 
-/**
- * Simpler page header variant with title-row layout (title + inline badges).
- * Used on app-detail where badges sit on the same line as the title.
- */
-fun DIV.pageHeaderWithTitleRow(
-    title: String,
-    titleBadge: (SPAN.() -> Unit)? = null,
-    meta: (DIV.() -> Unit)? = null,
-    actions: (DIV.() -> Unit)? = null,
-) {
-    div("page-header") {
-        div("page-header__left") {
-            div("page-header__identity") {
-                div("page-header__title-row") {
-                    h1("page-header__title") { +title }
-                    if (titleBadge != null) {
-                        span { titleBadge() }
-                    }
-                }
-                if (meta != null) {
-                    div("page-header__meta") { meta() }
-                }
-            }
-        }
-        if (actions != null) {
-            div("page-header__actions") { actions() }
-        }
-    }
-}
-
 /** Starts an ov-card block. Content lambda receives the DIV to add rows. */
 fun DIV.ovCard(content: DIV.() -> Unit) {
     div("ov-card") { content() }
@@ -356,7 +326,7 @@ fun DIV.entityPicker(
         div("entity-picker__input-wrap") {
             input(type = InputType.search, name = "q", classes = "entity-picker__input") {
                 this.placeholder = placeholder
-                autoComplete = false
+                autoComplete = "off"
                 attributes["spellcheck"] = "false"
                 attributes["role"] = "combobox"
                 attributes["aria-autocomplete"] = "list"

@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
@@ -27,6 +28,7 @@ import java.time.Instant
  * Session TTL: 4 hours (configured in Application.kt cookie.maxAgeInSeconds).
  * The cookie is HttpOnly.
  */
+@Serializable
 data class PortalSession(
     val userId: Int,
     val tenantId: Int,

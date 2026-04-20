@@ -29,11 +29,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.5'
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: ktlint check
-        run: gradle ktlintCheck --no-daemon
+        run: ./gradlew ktlintCheck --no-daemon
 
   test:
     name: Test (JDK ${{ matrix.java }})
@@ -55,16 +54,14 @@ jobs:
           distribution: temurin
 
       # setup-gradle handles the Gradle distribution cache and build scan publication.
-      # gradle-version pins the distribution so CI doesn't depend on a committed wrapper JAR.
       # cache-read-only on non-main branches prevents PRs from polluting the main cache.
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.5'
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Run tests
-        run: gradle test --no-daemon --stacktrace
+        run: ./gradlew test --no-daemon --stacktrace
 
       # Always upload the HTML test report so failures are investigatable
       # without needing to reproduce locally.
@@ -96,11 +93,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.5'
           cache-read-only: true
 
       - name: Build fat JAR
-        run: gradle buildFatJar --no-daemon
+        run: ./gradlew buildFatJar --no-daemon
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v4

@@ -1,18 +1,18 @@
-val ktorVersion = "2.3.12"
+val ktorVersion = "3.4.2"
 val exposedVersion = "0.61.0"
 val logbackVersion = "1.5.32"
-val flywayVersion = "11.8.2"
-val logstashEncoderVersion = "8.0"
+val flywayVersion = "12.4.0"
+val logstashEncoderVersion = "8.1"
 
 plugins {
     kotlin("jvm") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
-    id("io.ktor.plugin") version "2.3.12"
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("io.ktor.plugin") version "3.4.2"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
 group = "com.kauth"
-version = "1.5.4"
+version = "1.5.5"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -23,15 +23,6 @@ repositories {
 }
 
 dependencies {
-    // ---- Security: override vulnerable transitive dependencies from Ktor 2.3.x ----
-    constraints {
-        implementation("io.netty:netty-codec-http2:4.1.132.Final") { because("CVE-2026-33870, CVE-2026-33871") }
-        implementation("io.netty:netty-handler:4.1.132.Final") { because("CVE-2026-33870, CVE-2026-33871") }
-        implementation("com.fasterxml.jackson:jackson-bom:2.18.6") { because("GHSA-72hv-8253-57qq") }
-        implementation("com.fasterxml.jackson.core:jackson-core:2.18.6") { because("GHSA-72hv-8253-57qq") }
-        implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6") { because("GHSA-72hv-8253-57qq") }
-    }
-
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-netty:$ktorVersion")
     implementation("io.ktor:ktor-server-auth:$ktorVersion")
@@ -86,10 +77,10 @@ sourceSets {
     }
 }
 
-val e2eTestImplementation by configurations.getting {
+val e2eTestImplementation: Configuration by configurations.getting {
     extendsFrom(configurations.testImplementation.get())
 }
-val e2eTestRuntimeOnly by configurations.getting {
+val e2eTestRuntimeOnly: Configuration by configurations.getting {
     extendsFrom(configurations.testRuntimeOnly.get())
 }
 
@@ -253,24 +244,37 @@ val generateJsSri =
 // Generates src/main/resources/version.properties so the running application
 // can report its own version without parsing build files at runtime.
 // The file is listed in .gitignore — it is produced fresh on every build.
+abstract class GenerateVersionPropertiesTask : DefaultTask() {
+    @get:Input abstract val appVersion: Property<String>
+
+    @get:Input abstract val ktVersion: Property<String>
+
+    @get:Input abstract val ktorVer: Property<String>
+
+    @get:OutputFile abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val out = outputFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(
+            """
+            app.version=${appVersion.get()}
+            kotlin.version=${ktVersion.get()}
+            ktor.version=${ktorVer.get()}
+            """.trimIndent(),
+        )
+    }
+}
+
 val generateVersionProperties =
-    tasks.register("generateVersionProperties") {
+    tasks.register<GenerateVersionPropertiesTask>("generateVersionProperties") {
         description = "Generates version.properties with app and runtime version metadata"
         group = "build"
-
-        val propertiesFile = file("src/main/resources/version.properties")
-        outputs.file(propertiesFile)
-
-        doLast {
-            propertiesFile.parentFile.mkdirs()
-            propertiesFile.writeText(
-                """
-                app.version=${project.version}
-                kotlin.version=1.9.24
-                ktor.version=$ktorVersion
-                """.trimIndent(),
-            )
-        }
+        appVersion.set(project.version.toString())
+        ktVersion.set("2.3.20")
+        ktorVer.set(ktorVersion)
+        outputFile.set(layout.projectDirectory.file("src/main/resources/version.properties"))
     }
 
 // All CSS bundles and version properties must be ready before resources are packaged into the JAR

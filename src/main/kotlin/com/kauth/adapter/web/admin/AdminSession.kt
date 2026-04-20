@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
@@ -10,6 +11,7 @@ import java.time.Instant
  *   2. Standard auth flow (password + MFA if enrolled) completes
  *   3. GET /admin/callback → code exchange → AdminSession set
  */
+@Serializable
 data class AdminSession(
     val userId: Int = 0,
     val tenantId: Int = 0,
