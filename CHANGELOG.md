@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.4] - 2026-04-10
+
+### Changed
+
+- **Exposed ORM upgraded to 0.61.0** — from 0.55.0. Zero code changes required — clean drop-in. Brings bug fixes and performance improvements. Prepares for the eventual Exposed 1.0 migration in v2.0
+- **Flyway upgraded to 11.8.2** — from 9.22.3. Added required `flyway-database-postgresql` artifact (Flyway 10+ split PostgreSQL support into a separate module). Zero code changes to `DatabaseFactory` — the `configure().dataSource().locations().load().migrate()` API is stable across versions
+
+---
+
 ## [1.5.3] - 2026-04-10
 
 ### Security
