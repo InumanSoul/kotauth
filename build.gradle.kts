@@ -5,14 +5,14 @@ val flywayVersion = "9.22.3"
 val logstashEncoderVersion = "8.0"
 
 plugins {
-    kotlin("jvm") version "1.9.24"
-    kotlin("plugin.serialization") version "1.9.24"
+    kotlin("jvm") version "2.3.20"
+    kotlin("plugin.serialization") version "2.3.20"
     id("io.ktor.plugin") version "2.3.12"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
 }
 
 group = "com.kauth"
-version = "1.5.2"
+version = "1.5.3"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -25,8 +25,8 @@ repositories {
 dependencies {
     // ---- Security: override vulnerable transitive dependencies from Ktor 2.3.x ----
     constraints {
-        implementation("io.netty:netty-codec-http2:4.1.124.Final") { because("CVE-2025-55163") }
-        implementation("io.netty:netty-handler:4.1.124.Final") { because("CVE-2025-24970") }
+        implementation("io.netty:netty-codec-http2:4.1.132.Final") { because("CVE-2026-33870, CVE-2026-33871") }
+        implementation("io.netty:netty-handler:4.1.132.Final") { because("CVE-2026-33870, CVE-2026-33871") }
         implementation("com.fasterxml.jackson:jackson-bom:2.18.6") { because("GHSA-72hv-8253-57qq") }
         implementation("com.fasterxml.jackson.core:jackson-core:2.18.6") { because("GHSA-72hv-8253-57qq") }
         implementation("com.fasterxml.jackson.core:jackson-databind:2.18.6") { because("GHSA-72hv-8253-57qq") }

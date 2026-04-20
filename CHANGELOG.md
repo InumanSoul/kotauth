@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.3] - 2026-04-10
+
+### Security
+
+- **Netty upgraded to 4.1.132.Final** — patches CVE-2026-33870 (HTTP request smuggling, High severity) and CVE-2026-33871 (HTTP/2 CONTINUATION frame DoS, High severity). Previous pin at 4.1.124.Final was vulnerable to both
+
+### Changed
+
+- **Kotlin upgraded to 2.3.20** — from 1.9.24. Source-compatible, no breaking changes. Enables K2 compiler, aligns with latest JetBrains toolchain. Gradle deprecation warnings persist (source: Ktor 2.3.12 plugin, resolved when migrating to Ktor 3.x in v2.0)
+- **Dependency upgrade plan rewritten** — `docs/internal/GRADLE_UPGRADE_PLAN.md` now contains a deep migration impact analysis for the v2.0 framework upgrade: Ktor 3.x (2.5 days, 4 intercept→plugin conversions + 30 mechanical changes), Exposed 1.0 (1.5 days, limit/offset + TransactionManager accessor), Flyway 11 (30 min). Total: ~4.25 days. Migrations are independent and ordered: Flyway → Exposed → Ktor
+
+---
+
 ## [1.5.2] - 2026-04-10
 
 ### Added
