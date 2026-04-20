@@ -1,7 +1,7 @@
 val ktorVersion = "2.3.12"
-val exposedVersion = "0.55.0"
+val exposedVersion = "0.61.0"
 val logbackVersion = "1.5.32"
-val flywayVersion = "9.22.3"
+val flywayVersion = "11.8.2"
 val logstashEncoderVersion = "8.0"
 
 plugins {
@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.kauth"
-version = "1.5.3"
+version = "1.5.4"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -53,6 +53,7 @@ dependencies {
     implementation("org.postgresql:postgresql:42.7.10")
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
+    implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("com.auth0:java-jwt:4.5.1")
     implementation("at.favre.lib:bcrypt:0.10.2")
 
