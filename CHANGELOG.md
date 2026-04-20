@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.5] - 2026-04-20
+
+### Changed
+
+- **Ktor upgraded to 3.4.2** — from 2.3.12. Major framework upgrade. All 4 `intercept(ApplicationCallPipeline.Call)` blocks converted to `createRouteScopedPlugin`: `AuthTenantPlugin` (onCall), `AdminSessionGuardPlugin` (onCall), `WorkspaceResolverPlugin` (onCall), and `ApiContextPlugin` (on(AuthenticationChecked) — required for post-auth principal access). `@Serializable` added to `AdminSession` and `PortalSession` for Ktor 3 cookie serialization. `autoComplete = false` updated to `autoComplete = "off"` (kotlinx.html API change, 4 sites). `callloging` import typo fixed to `calllogging`
+- **Gradle upgraded to 9.4.1** — from 8.5. Configuration cache now fully functional (272ms cached re-runs). `generateVersionProperties` task converted from `doLast` closure to proper `DefaultTask` subclass to eliminate `Project` reference serialization issue. Zero deprecation warnings
+- **Flyway upgraded to 12.4.0** — from 11.8.2. Resolves transitive vulnerability. Zero API changes
+- **ktlint plugin upgraded to 14.2.0** — from 12.1.1. Required for Gradle 9 compatibility
+- **logstash-logback-encoder upgraded to 8.1** — from 8.0. Resolves transitive jackson-core 2.17.2 vulnerability (GHSA-72hv-8253-57qq). Jackson version constraint added to force 2.21.0 across all dependency trees
+- **`delay()` calls converted to Duration API** — `delay(3_600_000)` → `delay(1.hours)`, `delay(5 * 60_000)` → `delay(5.minutes)`. Eliminates legacy Long overload warnings
+- **CI workflow updated** — removed hardcoded `gradle-version: '8.5'` from all 3 jobs (lint, test, build). CI now uses the project wrapper (`./gradlew`) to match the committed Gradle version
+- **Dockerfile updated** — build stage changed from `gradle:8-jdk17` to `eclipse-temurin:17-jdk` with `./gradlew` wrapper. Ensures Docker builds use the same Gradle version as local development
+
+### Removed
+
+- **Netty/Jackson version constraints** — Ktor 3.4.2 transitively brings Netty 4.2.9.Final and Jackson 2.21.0, superseding the 4.1.132/2.18.6 pins that were patching Ktor 2.3.x vulnerabilities
+- **`pageHeaderWithTitleRow` function** — unused dead code in AdminComponents.kt
+
+---
+
 ## [1.5.4] - 2026-04-10
 
 ### Changed
