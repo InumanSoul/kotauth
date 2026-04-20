@@ -27,8 +27,8 @@ Closes #
 
 ## Checklist
 
-- [ ] `./gradlew test` passes locally
-- [ ] `./gradlew ktlintCheck` passes (or run `./gradlew ktlintFormat` to auto-fix)
+- [ ] `make test` passes locally
+- [ ] `make lint` passes (or run `./gradlew ktlintFormat` to auto-fix)
 - [ ] New domain logic has no framework imports (hexagonal architecture constraint)
 - [ ] New database changes include a Flyway migration
 - [ ] Public API changes are reflected in `src/main/resources/openapi/v1.yaml`

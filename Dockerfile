@@ -55,10 +55,10 @@ RUN node frontend/scripts/generate-sri.js
 
 
 # ── Stage 2: Kotlin / Gradle build ────────────────────────────────────────
-FROM gradle:8-jdk17 AS kotlin-build
+FROM eclipse-temurin:17-jdk AS kotlin-build
 
-WORKDIR /home/gradle/src
-COPY --chown=gradle:gradle . .
+WORKDIR /app
+COPY . .
 
 # Inject the compiled CSS bundles so Gradle embeds them in the JAR.
 # All CSS tasks are skipped because the output files are already present from Stage 1.
@@ -75,7 +75,7 @@ COPY --from=frontend-build /build/src/main/resources/static/js/kotauth-portal.mi
 COPY --from=frontend-build /build/src/main/resources/static/js/branding.min.js    src/main/resources/static/js/branding.min.js
 COPY --from=frontend-build /build/src/main/resources/js-integrity.properties      src/main/resources/js-integrity.properties
 
-RUN gradle buildFatJar \
+RUN ./gradlew buildFatJar \
       -x installCssDeps \
       -x compileCssAdmin \
       -x compileCssAuth \
@@ -98,6 +98,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 
 EXPOSE 8080
 
-COPY --from=kotlin-build /home/gradle/src/build/libs/*.jar /app/kauth.jar
+COPY --from=kotlin-build /app/build/libs/*.jar /app/kauth.jar
 
 ENTRYPOINT ["java", "-jar", "/app/kauth.jar"]
