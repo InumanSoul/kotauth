@@ -8,7 +8,7 @@ plugins {
     kotlin("jvm") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
     id("io.ktor.plugin") version "3.4.2"
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
+    id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
 group = "com.kauth"
@@ -244,24 +244,37 @@ val generateJsSri =
 // Generates src/main/resources/version.properties so the running application
 // can report its own version without parsing build files at runtime.
 // The file is listed in .gitignore — it is produced fresh on every build.
+abstract class GenerateVersionPropertiesTask : DefaultTask() {
+    @get:Input abstract val appVersion: Property<String>
+
+    @get:Input abstract val ktVersion: Property<String>
+
+    @get:Input abstract val ktorVer: Property<String>
+
+    @get:OutputFile abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun generate() {
+        val out = outputFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(
+            """
+            app.version=${appVersion.get()}
+            kotlin.version=${ktVersion.get()}
+            ktor.version=${ktorVer.get()}
+            """.trimIndent(),
+        )
+    }
+}
+
 val generateVersionProperties =
-    tasks.register("generateVersionProperties") {
+    tasks.register<GenerateVersionPropertiesTask>("generateVersionProperties") {
         description = "Generates version.properties with app and runtime version metadata"
         group = "build"
-
-        val propertiesFile = file("src/main/resources/version.properties")
-        outputs.file(propertiesFile)
-
-        doLast {
-            propertiesFile.parentFile.mkdirs()
-            propertiesFile.writeText(
-                """
-                app.version=${project.version}
-                kotlin.version=2.3.20
-                ktor.version=$ktorVersion
-                """.trimIndent(),
-            )
-        }
+        appVersion.set(project.version.toString())
+        ktVersion.set("2.3.20")
+        ktorVer.set(ktorVersion)
+        outputFile.set(layout.projectDirectory.file("src/main/resources/version.properties"))
     }
 
 // All CSS bundles and version properties must be ready before resources are packaged into the JAR
