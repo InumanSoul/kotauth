@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.8] - 2026-04-21
+
+### Fixed
+
+- **OAuth2 login no longer blocked by `form-action 'self'` CSP directive** — Chromium enforces `form-action` against the entire redirect chain, not just the form's immediate action target. The login `POST /t/{slug}/authorize` would succeed, but the 302 redirect to the SPA's `redirect_uri` (cross-origin by definition) was blocked as a `form-action` violation. Users saw the login screen, filled it in, clicked submit — and nothing happened. Fix: a new `TenantCspPlugin` sets a per-tenant `Content-Security-Policy` header under `/t/{slug}/*` that extends `form-action` with the registered redirect URI origins for the tenant, using the same origin-derivation logic as the CORS plugin (`CorsPort.policyForTenant`). Non-tenant routes (admin, portal, static) keep the strict global `form-action 'self'`. See [ADR-09](docs/adr/ADR-09-tenant-scoped-csp-form-action.md)
+- **CSP policy string extracted to `buildCspPolicy(origins)` helper** — the global `DefaultHeaders` config and the tenant plugin now share one source of truth for standard directives (`default-src`, `script-src`, `style-src`, `font-src`, `img-src`, `form-action`), so adding a directive happens in one place
+
+---
+
 ## [1.5.7] - 2026-04-21
 
 ### Added
