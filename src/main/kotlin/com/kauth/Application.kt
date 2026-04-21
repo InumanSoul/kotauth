@@ -10,6 +10,7 @@ import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
+import com.kauth.adapter.web.plugin.buildCspPolicy
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.adapter.web.versionCheckRoutes
@@ -161,15 +162,7 @@ fun Application.module(
         header("X-Content-Type-Options", "nosniff")
         header("X-Frame-Options", "DENY")
         header("Referrer-Policy", "strict-origin-when-cross-origin")
-        header(
-            "Content-Security-Policy",
-            "default-src 'self'; " +
-                "script-src 'self'; " +
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-                "font-src 'self' https://fonts.gstatic.com; " +
-                "img-src 'self' data: https:; " +
-                "form-action 'self'",
-        )
+        header("Content-Security-Policy", buildCspPolicy())
         header(HttpHeaders.Server, "KotAuth")
         if (config.isHttps) {
             header(
@@ -350,6 +343,7 @@ fun Application.module(
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             corsService = s.corsService,
+            corsPort = s.corsOriginCache,
         )
 
         portalRoutes(
