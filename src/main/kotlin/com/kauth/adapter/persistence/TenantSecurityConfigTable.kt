@@ -23,6 +23,7 @@ object TenantSecurityConfigTable : Table("tenant_security_config") {
     val mfaPolicy = varchar("mfa_policy", 30).default("optional")
     val lockoutMaxAttempts = integer("lockout_max_attempts").default(0)
     val lockoutDurationMinutes = integer("lockout_duration_minutes").default(15)
+    val corsAllowCredentials = bool("cors_allow_credentials").default(false)
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

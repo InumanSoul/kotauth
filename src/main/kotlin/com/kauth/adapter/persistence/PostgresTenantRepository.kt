@@ -121,6 +121,7 @@ class PostgresTenantRepository(
                     it[mfaPolicy] = tenant.securityConfig.mfaPolicy
                     it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
                     it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                    it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
                 }
             if (updatedRows == 0) {
                 TenantSecurityConfigTable.insert {
@@ -135,6 +136,7 @@ class PostgresTenantRepository(
                     it[mfaPolicy] = tenant.securityConfig.mfaPolicy
                     it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
                     it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
+                    it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
                 }
             }
             tenantJoined
@@ -212,6 +214,7 @@ class PostgresTenantRepository(
             mfaPolicy = this[TenantSecurityConfigTable.mfaPolicy],
             lockoutMaxAttempts = this[TenantSecurityConfigTable.lockoutMaxAttempts],
             lockoutDurationMinutes = this[TenantSecurityConfigTable.lockoutDurationMinutes],
+            corsAllowCredentials = this[TenantSecurityConfigTable.corsAllowCredentials],
         )
     }
 

@@ -341,7 +341,10 @@ internal fun createApplicationPageImpl(
                                 "https://app.example.com/callback\nhttps://localhost:3000/callback"
                             +prefill.redirectUris
                         }
-                        div("edit-row__hint") { +"One URI per line. These are allowed OAuth2 callback URLs." }
+                        div("edit-row__hint") {
+                            +"One URI per line. Their origins are automatically CORS-allowed "
+                            +"for SPAs in this workspace."
+                        }
                     }
                 }
             }
@@ -493,7 +496,10 @@ internal fun editApplicationPageImpl(
                                 "https://app.example.com/callback\nhttps://localhost:3000/callback"
                             +application.redirectUris.joinToString("\n")
                         }
-                        div("edit-row__hint") { +"One URI per line." }
+                        div("edit-row__hint") {
+                            +"One URI per line. Their origins are automatically CORS-allowed "
+                            +"for SPAs in this workspace."
+                        }
                     }
                 }
             }

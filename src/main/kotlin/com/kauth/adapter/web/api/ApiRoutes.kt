@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
@@ -8,6 +9,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.http.ContentType
@@ -32,6 +34,7 @@ fun Route.apiRoutes(
     auditLogRepository: AuditLogRepository,
     roleGroupService: RoleGroupService,
     adminService: AdminService,
+    corsService: CorsService? = null,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -51,6 +54,13 @@ fun Route.apiRoutes(
 
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
+            if (corsService != null) {
+                install(TenantCorsPlugin) {
+                    this.corsService = corsService
+                    tenantSlugParam = "tenantSlug"
+                }
+            }
+
             val apiContextPlugin =
                 createRouteScopedPlugin("ApiContextPlugin") {
                     on(AuthenticationChecked) { call ->

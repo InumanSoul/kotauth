@@ -14,6 +14,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
+import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.EmailPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
@@ -46,7 +47,12 @@ class AdminService(
     private val themeRepository: ThemeRepository? = null,
     private val portalConfigRepository: PortalConfigRepository? = null,
     private val emailPort: EmailPort? = null,
+    private val corsPort: CorsPort? = null,
 ) {
+    private fun invalidateCors(tenantId: TenantId) {
+        val port = corsPort ?: return
+        tenantRepository.findById(tenantId)?.slug?.let(port::invalidate)
+    }
     // =========================================================================
     // Workspace settings
     // =========================================================================
@@ -110,6 +116,7 @@ class AdminService(
         mfaPolicy: String = "optional",
         lockoutMaxAttempts: Int = 0,
         lockoutDurationMinutes: Int = 15,
+        corsAllowCredentials: Boolean = false,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -153,10 +160,13 @@ class AdminService(
                         mfaPolicy = mfaPolicy,
                         lockoutMaxAttempts = lockoutMaxAttempts.coerceAtLeast(0),
                         lockoutDurationMinutes = lockoutDurationMinutes.coerceAtLeast(1),
+                        corsAllowCredentials = corsAllowCredentials,
                     ),
             )
 
         val saved = tenantRepository.update(updated)
+
+        corsPort?.invalidate(slug)
 
         auditLog.record(
             AuditEvent(
@@ -614,6 +624,8 @@ class AdminService(
                 redirectUris = resolvedRedirectUris,
             )
 
+        invalidateCors(tenantId)
+
         auditLog.record(
             AuditEvent(
                 tenantId = tenantId,
@@ -646,6 +658,8 @@ class AdminService(
         }
 
         applicationRepository.setEnabled(appId, enabled)
+
+        invalidateCors(tenantId)
 
         auditLog.record(
             AuditEvent(

@@ -1,11 +1,13 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
@@ -33,8 +35,15 @@ fun Route.authRoutes(
     identityProviderRepository: IdentityProviderRepository? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
+    corsService: CorsService? = null,
 ) {
     route("/t/{slug}") {
+        if (corsService != null) {
+            install(TenantCorsPlugin) {
+                this.corsService = corsService
+            }
+        }
+
         // Resolve tenant context once per request
         val authTenantPlugin =
             createRouteScopedPlugin("AuthTenantPlugin") {
