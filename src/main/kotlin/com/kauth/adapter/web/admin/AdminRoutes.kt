@@ -10,6 +10,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
+import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.RoleRepository
@@ -67,6 +68,7 @@ fun Route.adminRoutes(
     roleRepository: RoleRepository? = null,
     keyRotationService: KeyRotationService? = null,
     tenantKeyRepository: TenantKeyRepository? = null,
+    corsPort: CorsPort? = null,
     baseUrl: String = "",
 ) {
     AdminView.setShellAppInfo(appInfo)
@@ -472,6 +474,7 @@ fun Route.adminRoutes(
                 adminApplicationRoutes(
                     adminService = adminService,
                     applicationRepository = applicationRepository,
+                    corsPort = corsPort,
                 )
 
                 adminUserRoutes(

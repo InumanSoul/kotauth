@@ -349,6 +349,7 @@ fun Application.module(
             identityProviderRepository = s.identityProviderRepository,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
+            corsService = s.corsService,
         )
 
         portalRoutes(
@@ -372,6 +373,7 @@ fun Application.module(
             auditLogRepository = s.auditLogRepository,
             roleGroupService = s.roleGroupService,
             adminService = s.adminService,
+            corsService = s.corsService,
         )
 
         adminRoutes(
@@ -395,6 +397,7 @@ fun Application.module(
             roleRepository = s.roleRepository,
             keyRotationService = s.keyRotationService,
             tenantKeyRepository = s.tenantKeyRepository,
+            corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
         )
     }

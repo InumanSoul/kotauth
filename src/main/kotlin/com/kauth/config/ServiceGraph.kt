@@ -6,6 +6,7 @@ import com.kauth.adapter.persistence.PostgresApplicationRepository
 import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
+import com.kauth.adapter.persistence.PostgresCorsAdapter
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
 import com.kauth.adapter.persistence.PostgresGroupRepository
 import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
@@ -26,6 +27,7 @@ import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
+import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
@@ -42,6 +44,7 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
@@ -74,6 +77,8 @@ data class ServiceGraph(
     val socialLoginService: SocialLoginService,
     val apiKeyService: ApiKeyService,
     val webhookService: WebhookService,
+    val corsService: CorsService,
+    val corsOriginCache: CorsOriginCache,
     val tenantRepository: TenantRepository,
     val applicationRepository: ApplicationRepository,
     val userRepository: UserRepository,
@@ -128,6 +133,8 @@ data class ServiceGraph(
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
             val mfaRepository = PostgresMfaRepository(encryptionService)
+            val corsOriginCache = CorsOriginCache(PostgresCorsAdapter())
+            val corsService = CorsService(corsOriginCache)
 
             // -- Key provisioning ---------------------------------------------
             val keyProvisioning =
@@ -220,6 +227,7 @@ data class ServiceGraph(
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
                     emailPort = emailAdapter,
+                    corsPort = corsOriginCache,
                 )
             val roleGroupService =
                 RoleGroupService(
@@ -330,6 +338,8 @@ data class ServiceGraph(
                 socialLoginService = socialLoginService,
                 apiKeyService = apiKeyService,
                 webhookService = webhookService,
+                corsService = corsService,
+                corsOriginCache = corsOriginCache,
                 tenantRepository = tenantRepository,
                 applicationRepository = applicationRepository,
                 userRepository = userRepository,

@@ -775,6 +775,25 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                 }
+
+                // ── Cross-Origin (CORS) ──────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Cross-Origin (CORS)" }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "corsAllowCredentials") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.corsAllowCredentials) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +"Send credentials cross-origin" }
+                            span("check-row__desc") {
+                                +"Off by default. Enable only if your SPA sends cookies cross-origin "
+                                +"to Kotauth (BFF pattern). PKCE public clients using Bearer tokens "
+                                +"do not need this."
+                            }
+                        }
+                    }
+                }
             }
                     }
 }

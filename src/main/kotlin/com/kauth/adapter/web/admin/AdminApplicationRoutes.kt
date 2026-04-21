@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.port.ApplicationRepository
+import com.kauth.domain.port.CorsPort
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import io.ktor.http.HttpStatusCode
@@ -19,6 +20,7 @@ import io.ktor.server.sessions.sessions
 fun Route.adminApplicationRoutes(
     adminService: AdminService,
     applicationRepository: ApplicationRepository,
+    corsPort: CorsPort? = null,
 ) {
     route("/applications") {
         get("/new") {
@@ -80,6 +82,7 @@ fun Route.adminApplicationRoutes(
                 )
             }
             applicationRepository.create(workspace.id, clientId, name, desc, accessType, redirectUris)
+            corsPort?.invalidate(workspace.slug)
             call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
         }
 

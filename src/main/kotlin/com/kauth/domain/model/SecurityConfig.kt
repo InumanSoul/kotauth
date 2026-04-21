@@ -22,6 +22,8 @@ data class SecurityConfig(
     // Account lockout
     val lockoutMaxAttempts: Int = 0,
     val lockoutDurationMinutes: Int = 15,
+    // CORS
+    val corsAllowCredentials: Boolean = false,
 ) {
     /** Lockout is active when max attempts is > 0. */
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0

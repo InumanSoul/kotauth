@@ -13,6 +13,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
+import com.kauth.fakes.FakeCorsPort
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakePasswordHasher
@@ -600,6 +601,70 @@ class AdminServiceTest {
         val result = svc.setApplicationEnabled(appId = ApplicationId(100), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_DISABLED))
+    }
+
+    // =========================================================================
+    // CORS cache invalidation hooks
+    // =========================================================================
+
+    /** Builds a service variant with an observable [FakeCorsPort] wired in. */
+    private fun svcWithCors(corsPort: FakeCorsPort): AdminService =
+        AdminService(
+            tenantRepository = tenants,
+            userRepository = users,
+            applicationRepository = apps,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+            sessionRepository = sessions,
+            selfServiceService = selfService,
+            passwordPolicy = passwordPolicy,
+            corsPort = corsPort,
+        )
+
+    @Test
+    fun `updateWorkspaceSettings invalidates CORS cache for tenant slug`() {
+        val corsPort = FakeCorsPort()
+        val result =
+            svcWithCors(corsPort).updateWorkspaceSettings(
+                slug = "acme",
+                displayName = "Acme Corp",
+                issuerUrl = null,
+                tokenExpirySeconds = 3600L,
+                refreshTokenExpirySeconds = 86400L,
+                registrationEnabled = true,
+                emailVerificationRequired = false,
+                passwordPolicyMinLength = 8,
+                passwordPolicyRequireSpecial = false,
+                mfaPolicy = "optional",
+            )
+        assertIs<AdminResult.Success<Tenant>>(result)
+        assertEquals(listOf("acme"), corsPort.invalidated)
+    }
+
+    @Test
+    fun `updateApplication invalidates CORS cache for tenant slug`() {
+        val corsPort = FakeCorsPort()
+        val result =
+            svcWithCors(corsPort).updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                name = "Renamed",
+            )
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals(listOf("acme"), corsPort.invalidated)
+    }
+
+    @Test
+    fun `setApplicationEnabled invalidates CORS cache for tenant slug`() {
+        val corsPort = FakeCorsPort()
+        val result =
+            svcWithCors(corsPort).setApplicationEnabled(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                enabled = false,
+            )
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(listOf("acme"), corsPort.invalidated)
     }
 
     // =========================================================================

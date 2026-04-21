@@ -320,6 +320,7 @@ fun Route.adminSettingsRoutes(
                     lockoutDurationMinutes =
                         params["lockoutDurationMinutes"]?.toIntOrNull()
                             ?: workspace.securityConfig.lockoutDurationMinutes,
+                    corsAllowCredentials = params["corsAllowCredentials"] == "true",
                 )
         ) {
             is AdminResult.Success ->
