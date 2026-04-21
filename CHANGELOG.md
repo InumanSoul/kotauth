@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.6] - 2026-04-21
+
+### Fixed
+
+- **Fat-jar `META-INF/services/**` files are now merged** — the Ktor Gradle plugin sets `duplicatesStrategy = EXCLUDE` on `shadowJar`, which silently dropped duplicate service-provider files before `ServiceFileTransformer` could concatenate them. In Flyway 10+, location-scanner plugins (`classpath:`, `filesystem:`) are registered via `META-INF/services/org.flywaydb.core.extensibility.Plugin`; the `flyway-database-postgresql` copy overwrote the 29-entry `flyway-core` copy, leaving the registered-prefix list empty. Kotauth crashed on boot with `FlywayException: Unknown prefix for location (should be one of ): classpath:db/callback` (note the empty parens). Fix: `com.gradleup.shadow` added as an explicit plugin, `shadowJar` configured with `duplicatesStrategy = INCLUDE` and `mergeServiceFiles()`. Plugin SPI file in the built jar now has 31 entries including `ClasspathLocationHandlerImpl` and `FilesystemLocationHandler`
+
+---
+
 ## [1.5.5] - 2026-04-20
 
 ### Changed
