@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.7] - 2026-04-21
+
+### Added
+
+- **Multi-tenant CORS policy** — every OIDC endpoint now emits correct `Access-Control-*` headers. Allowed origins are derived automatically from the `client_redirect_uris.uri` of registered, enabled OIDC clients within the tenant: an operator who adds a redirect URI implicitly authorizes that origin for cross-origin SPA traffic to the tenant's token, userinfo, logout, revoke, and introspect endpoints. Discovery (`/.well-known/openid-configuration`) and JWKS (`/protocol/openid-connect/certs`) remain globally readable via `Access-Control-Allow-Origin: *` per OIDC spec. Denied origins produce a structured `WARN cors_denied tenant=X origin=Y method=Z path=P` log line for operator debugging. See [ADR-08](docs/adr/ADR-08-multi-tenant-cors-policy.md)
+- **`Send credentials cross-origin` tenant toggle** — opt-in per-tenant flag on the Security Policy page that enables `Access-Control-Allow-Credentials: true` for BFF / cookie-based cross-origin flows. Default off — standard PKCE public clients using Bearer tokens do not need it
+- **V32 migration** — `tenant_security_config.cors_allow_credentials BOOLEAN NOT NULL DEFAULT FALSE`
+- **`TenantCorsPlugin`** — route-scoped Ktor plugin installed under `/t/{slug}` (auth routes) and `/t/{tenantSlug}/api/v1` (api routes). Handles OPTIONS preflight terminally (204 for allowed origins, 403 for denied) and injects response headers for actual requests. Path-aware: discovery + JWKS get wildcard ACAO; everything else goes through the tenant's origin allowlist
+- **In-process origin cache** — `CorsOriginCache` wraps `PostgresCorsAdapter` with a 60-second TTL; mutations on `AdminService` (`updateApplication`, `setApplicationEnabled`, `updateWorkspaceSettings`) and `AdminApplicationRoutes` client-create invalidate the cache entry for the affected tenant so changes propagate immediately
+
+---
+
 ## [1.5.6] - 2026-04-21
 
 ### Fixed

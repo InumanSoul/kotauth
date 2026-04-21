@@ -30,8 +30,4 @@ class CorsOriginCache(
     override fun invalidate(tenantSlug: String) {
         cache.remove(tenantSlug)
     }
-
-    fun evictAll() {
-        cache.clear()
-    }
 }
