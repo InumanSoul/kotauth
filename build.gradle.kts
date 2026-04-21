@@ -8,11 +8,17 @@ plugins {
     kotlin("jvm") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
     id("io.ktor.plugin") version "3.4.2"
+    id("com.gradleup.shadow") version "9.1.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
 }
 
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    mergeServiceFiles()
+}
+
 group = "com.kauth"
-version = "1.5.5"
+version = "1.5.6"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
