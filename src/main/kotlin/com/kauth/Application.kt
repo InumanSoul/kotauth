@@ -10,6 +10,7 @@ import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
 import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
+import com.kauth.adapter.web.plugin.buildCspPolicy
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.adapter.web.versionCheckRoutes
@@ -34,6 +35,7 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -156,20 +158,14 @@ fun Application.module(
     startTime: Long,
     versionCheckService: VersionCheckService,
 ) {
+    install(XForwardedHeaders)
+
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {
         header("X-Content-Type-Options", "nosniff")
         header("X-Frame-Options", "DENY")
         header("Referrer-Policy", "strict-origin-when-cross-origin")
-        header(
-            "Content-Security-Policy",
-            "default-src 'self'; " +
-                "script-src 'self'; " +
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
-                "font-src 'self' https://fonts.gstatic.com; " +
-                "img-src 'self' data: https:; " +
-                "form-action 'self'",
-        )
+        header("Content-Security-Policy", buildCspPolicy())
         header(HttpHeaders.Server, "KotAuth")
         if (config.isHttps) {
             header(
@@ -350,6 +346,7 @@ fun Application.module(
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             corsService = s.corsService,
+            corsPort = s.corsOriginCache,
         )
 
         portalRoutes(

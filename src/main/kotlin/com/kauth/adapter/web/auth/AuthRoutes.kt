@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
+import com.kauth.adapter.web.plugin.TenantCspPlugin
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
@@ -36,11 +38,17 @@ fun Route.authRoutes(
     baseUrl: String = "",
     encryptionService: EncryptionService,
     corsService: CorsService? = null,
+    corsPort: CorsPort? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
             install(TenantCorsPlugin) {
                 this.corsService = corsService
+            }
+        }
+        if (corsPort != null) {
+            install(TenantCspPlugin) {
+                this.corsPort = corsPort
             }
         }
 

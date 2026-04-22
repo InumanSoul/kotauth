@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.8] - 2026-04-22
+
+### Fixed
+
+- **OAuth2 login no longer blocked by `form-action 'self'` CSP directive** — Chromium enforces `form-action` against the entire redirect chain, not just the form's immediate action target. The login `POST /t/{slug}/authorize` would succeed, but the 302 redirect to the SPA's `redirect_uri` (cross-origin by definition) was blocked as a `form-action` violation. Users saw the login screen, filled it in, clicked submit — and nothing happened. Fix: a new `TenantCspPlugin` sets a per-tenant `Content-Security-Policy` header under `/t/{slug}/*` that extends `form-action` with the registered redirect URI origins for the tenant, using the same origin-derivation logic as the CORS plugin (`CorsPort.policyForTenant`). Non-tenant routes (admin, portal, static) keep the strict global `form-action 'self'`. See [ADR-09](docs/adr/ADR-09-tenant-scoped-csp-form-action.md)
+- **CSP policy string extracted to `buildCspPolicy(origins)` helper** — the global `DefaultHeaders` config and the tenant plugin now share one source of truth for standard directives (`default-src`, `script-src`, `style-src`, `font-src`, `img-src`, `form-action`), so adding a directive happens in one place
+- **Generated URLs now respect `X-Forwarded-*` headers from the reverse proxy** — `install(XForwardedHeaders)` added to the Ktor module, and `ApplicationCall.resolvedBaseUrl()` switched from `request.local` (raw TCP connection, always `http://<container-host>:8080`) to `request.origin` (proxy-aware). Without this, Kotauth running behind a TLS-terminating proxy (OrbStack locally, nginx/Cloudflare/ALB in production) generated `http://` URLs for invite-link emails, password-reset emails, email-verification links, social-login callback URLs, and — when no per-tenant `issuer_url` override is configured — the OIDC discovery document. SPAs that hit the HTTP URL were auto-redirected by the proxy to HTTPS, but the proxy-emitted 301 response carried no CORS headers, so the browser blocked the request mid-chain. `resolvedBaseUrl()` now also omits the port when it's the default for the scheme (`:443` for `https`, `:80` for `http`), producing cleaner URLs. **Operator note:** set `tenants.issuer_url` explicitly in the admin console workspace settings to pin the OIDC issuer to the configured public URL — per the OIDC spec the issuer should be a fixed value, not derived per-request. **Security note:** `XForwardedHeaders` trusts these headers unconditionally; only safe when Kotauth is always behind a proxy that strips client-supplied `X-Forwarded-*` and sets its own (the documented deployment model)
+
+---
+
 ## [1.5.7] - 2026-04-21
 
 ### Added
