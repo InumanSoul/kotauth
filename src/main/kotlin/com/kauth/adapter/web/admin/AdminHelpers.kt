@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.domain.model.Tenant
 import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.origin
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.util.AttributeKey
@@ -62,4 +63,8 @@ fun <T> Parameters.typedId(
  *
  * Example: `http://localhost:8080` or `https://auth.example.com:443`
  */
-fun ApplicationCall.resolvedBaseUrl(): String = request.local.let { "${it.scheme}://${it.serverHost}:${it.serverPort}" }
+fun ApplicationCall.resolvedBaseUrl(): String =
+    request.origin.let {
+        val omitPort = (it.scheme == "https" && it.serverPort == 443) || (it.scheme == "http" && it.serverPort == 80)
+        if (omitPort) "${it.scheme}://${it.serverHost}" else "${it.scheme}://${it.serverHost}:${it.serverPort}"
+    }
