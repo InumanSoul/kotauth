@@ -35,6 +35,7 @@ import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.defaultheaders.*
+import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -157,6 +158,8 @@ fun Application.module(
     startTime: Long,
     versionCheckService: VersionCheckService,
 ) {
+    install(XForwardedHeaders)
+
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {
         header("X-Content-Type-Options", "nosniff")
