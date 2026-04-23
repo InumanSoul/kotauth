@@ -25,10 +25,18 @@ class FakeTokenPort : TokenPort {
     var claimsToReturn: AccessTokenClaims? = null
     var jwksToReturn: List<Map<String, Any>> = emptyList()
 
+    /** Captured on every issueUserTokens call — tests can assert on projected claims. */
+    var lastCustomAccessClaims: Map<String, String> = emptyMap()
+        private set
+    var lastCustomIdClaims: Map<String, String> = emptyMap()
+        private set
+
     fun reset() {
         callCount = 0
         claimsToReturn = null
         jwksToReturn = emptyList()
+        lastCustomAccessClaims = emptyMap()
+        lastCustomIdClaims = emptyMap()
     }
 
     override fun issueUserTokens(
@@ -38,8 +46,12 @@ class FakeTokenPort : TokenPort {
         scopes: List<String>,
         nonce: String?,
         roles: List<Role>,
+        customAccessClaims: Map<String, String>,
+        customIdClaims: Map<String, String>,
     ): TokenResponse {
         val n = ++callCount
+        lastCustomAccessClaims = customAccessClaims
+        lastCustomIdClaims = customIdClaims
         return TokenResponse(
             access_token = "fake.access.${user.username}.$n",
             token_type = "Bearer",

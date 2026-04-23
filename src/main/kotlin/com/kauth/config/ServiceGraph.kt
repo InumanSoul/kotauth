@@ -70,7 +70,12 @@ import kotlinx.coroutines.SupervisorJob
 /**
  * Holds every service and repository needed by the Ktor module.
  * Built once at startup by [create], then passed into the server.
+ *
+ * ArrayInDataClass is suppressed: ByteArray session keys would use
+ * reference equality in the auto-generated equals/hashCode, but this
+ * container is never compared — it is a DI singleton.
  */
+@Suppress("ArrayInDataClass")
 data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
@@ -210,6 +215,17 @@ data class ServiceGraph(
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
                 )
+            // -- User attributes + claim mapping ------------------------------
+            val userAttributeService =
+                UserAttributeService(
+                    userAttributeRepository = userAttributeRepository,
+                    userRepository = userRepository,
+                )
+            val claimMapperService =
+                CachingClaimMapperService(
+                    mapperRepository = tenantClaimMapperRepository,
+                )
+
             val oauthService =
                 OAuthService(
                     tenantRepository = tenantRepository,
@@ -221,6 +237,8 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     roleRepository = roleRepository,
+                    userAttributeRepository = userAttributeRepository,
+                    claimMappersFor = claimMapperService::list,
                 )
             val adminService =
                 AdminService(
@@ -283,17 +301,6 @@ data class ServiceGraph(
                     tenantRepository = tenantRepository,
                     tokenPort = tokenAdapter,
                     auditLog = auditLogAdapter,
-                )
-
-            // -- User attributes + claim mapping ------------------------------
-            val userAttributeService =
-                UserAttributeService(
-                    userAttributeRepository = userAttributeRepository,
-                    userRepository = userRepository,
-                )
-            val claimMapperService =
-                CachingClaimMapperService(
-                    mapperRepository = tenantClaimMapperRepository,
                 )
 
             // -- Demo seed ----------------------------------------------------

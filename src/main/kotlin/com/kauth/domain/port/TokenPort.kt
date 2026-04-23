@@ -14,7 +14,7 @@ import com.kauth.domain.model.User
  * Implementations handle the cryptographic details (RS256 signing, JWKS,
  * key loading). The domain services work exclusively with this abstraction.
  *
- * Implemented by [JwtTokenAdapter].
+ * Implemented by JwtTokenAdapter (in the adapter/token/ package).
  */
 interface TokenPort {
     /**
@@ -25,6 +25,11 @@ interface TokenPort {
      * They are embedded in the token as:
      *   - `realm_access.roles` for tenant-scoped roles
      *   - `resource_access.{clientId}.roles` for client-scoped roles
+     *
+     * [customAccessClaims] and [customIdClaims] are already-projected maps of
+     * claim-name → value from [com.kauth.domain.service.ClaimMapperService].
+     * The adapter stamps each entry onto the corresponding JWT builder without
+     * further logic. Default empty maps preserve pre-feature token shape.
      */
     fun issueUserTokens(
         user: User,
@@ -33,6 +38,8 @@ interface TokenPort {
         scopes: List<String>,
         nonce: String? = null,
         roles: List<Role> = emptyList(),
+        customAccessClaims: Map<String, String> = emptyMap(),
+        customIdClaims: Map<String, String> = emptyMap(),
     ): TokenResponse
 
     /**
