@@ -24,10 +24,11 @@ class UserAttributeServiceTest {
 
     private val tenantId = TenantId(1)
     private val otherTenantId = TenantId(2)
+    private val aliceId = UserId(10)
 
     private val alice =
         User(
-            id = UserId(10),
+            id = aliceId,
             tenantId = tenantId,
             username = "alice",
             email = "alice@acme.com",
@@ -48,17 +49,17 @@ class UserAttributeServiceTest {
 
     @Test
     fun `list - returns empty map when no attributes`() {
-        val result = svc.list(alice.id!!, tenantId)
+        val result = svc.list(aliceId, tenantId)
         assertIs<AttributeResult.Success<Map<String, String>>>(result)
         assertTrue(result.value.isEmpty())
     }
 
     @Test
     fun `list - returns stored attributes`() {
-        svc.upsert(alice.id!!, tenantId, "plan", "trial")
-        svc.upsert(alice.id!!, tenantId, "trial_ends", "2026-05-21")
+        svc.upsert(aliceId, tenantId, "plan", "trial")
+        svc.upsert(aliceId, tenantId, "trial_ends", "2026-05-21")
 
-        val result = svc.list(alice.id!!, tenantId)
+        val result = svc.list(aliceId, tenantId)
         assertIs<AttributeResult.Success<Map<String, String>>>(result)
         assertEquals(mapOf("plan" to "trial", "trial_ends" to "2026-05-21"), result.value)
     }
@@ -71,7 +72,7 @@ class UserAttributeServiceTest {
 
     @Test
     fun `list - wrong tenant returns NotFound`() {
-        val result = svc.list(alice.id!!, otherTenantId)
+        val result = svc.list(aliceId, otherTenantId)
         assertIs<AttributeResult.NotFound>(result)
     }
 
@@ -81,7 +82,7 @@ class UserAttributeServiceTest {
 
     @Test
     fun `upsert - creates new attribute`() {
-        val result = svc.upsert(alice.id!!, tenantId, "plan", "trial")
+        val result = svc.upsert(aliceId, tenantId, "plan", "trial")
         assertIs<AttributeResult.Success<UserAttribute>>(result)
         assertEquals("plan", result.value.key)
         assertEquals("trial", result.value.value)
@@ -89,8 +90,8 @@ class UserAttributeServiceTest {
 
     @Test
     fun `upsert - overwrites existing attribute`() {
-        svc.upsert(alice.id!!, tenantId, "plan", "trial")
-        svc.upsert(alice.id!!, tenantId, "plan", "pro")
+        svc.upsert(aliceId, tenantId, "plan", "trial")
+        svc.upsert(aliceId, tenantId, "plan", "pro")
 
         val stored = attributes.all().single { it.key == "plan" }
         assertEquals("pro", stored.value)
@@ -98,28 +99,28 @@ class UserAttributeServiceTest {
 
     @Test
     fun `upsert - blank key is rejected`() {
-        val result = svc.upsert(alice.id!!, tenantId, "  ", "value")
+        val result = svc.upsert(aliceId, tenantId, "  ", "value")
         assertIs<AttributeResult.ValidationError>(result)
     }
 
     @Test
     fun `upsert - key too long is rejected`() {
         val key = "k".repeat(UserAttribute.MAX_KEY_LENGTH + 1)
-        val result = svc.upsert(alice.id!!, tenantId, key, "v")
+        val result = svc.upsert(aliceId, tenantId, key, "v")
         assertIs<AttributeResult.ValidationError>(result)
     }
 
     @Test
     fun `upsert - value too long is rejected`() {
         val value = "v".repeat(UserAttribute.MAX_VALUE_LENGTH + 1)
-        val result = svc.upsert(alice.id!!, tenantId, "k", value)
+        val result = svc.upsert(aliceId, tenantId, "k", value)
         assertIs<AttributeResult.ValidationError>(result)
     }
 
     @Test
     fun `upsert - exactly at value limit is accepted`() {
         val value = "v".repeat(UserAttribute.MAX_VALUE_LENGTH)
-        val result = svc.upsert(alice.id!!, tenantId, "k", value)
+        val result = svc.upsert(aliceId, tenantId, "k", value)
         assertIs<AttributeResult.Success<UserAttribute>>(result)
     }
 
@@ -132,7 +133,7 @@ class UserAttributeServiceTest {
 
     @Test
     fun `upsert - empty value is allowed`() {
-        val result = svc.upsert(alice.id!!, tenantId, "plan", "")
+        val result = svc.upsert(aliceId, tenantId, "plan", "")
         assertIs<AttributeResult.Success<UserAttribute>>(result)
     }
 
@@ -142,15 +143,15 @@ class UserAttributeServiceTest {
 
     @Test
     fun `delete - removes existing attribute`() {
-        svc.upsert(alice.id!!, tenantId, "plan", "trial")
-        val result = svc.delete(alice.id!!, tenantId, "plan")
+        svc.upsert(aliceId, tenantId, "plan", "trial")
+        val result = svc.delete(aliceId, tenantId, "plan")
         assertIs<AttributeResult.Success<Unit>>(result)
         assertTrue(attributes.all().isEmpty())
     }
 
     @Test
     fun `delete - missing key succeeds silently`() {
-        val result = svc.delete(alice.id!!, tenantId, "nonexistent")
+        val result = svc.delete(aliceId, tenantId, "nonexistent")
         assertIs<AttributeResult.Success<Unit>>(result)
     }
 
@@ -166,9 +167,10 @@ class UserAttributeServiceTest {
 
     @Test
     fun `attributes from different tenants do not bleed`() {
+        val bobId = UserId(20)
         val bob =
             User(
-                id = UserId(20),
+                id = bobId,
                 tenantId = otherTenantId,
                 username = "bob",
                 email = "bob@other.com",
@@ -177,11 +179,11 @@ class UserAttributeServiceTest {
             )
         users.add(bob)
 
-        svc.upsert(alice.id!!, tenantId, "plan", "trial")
-        svc.upsert(bob.id!!, otherTenantId, "plan", "pro")
+        svc.upsert(aliceId, tenantId, "plan", "trial")
+        svc.upsert(bobId, otherTenantId, "plan", "pro")
 
-        val aliceAttrs = svc.list(alice.id!!, tenantId)
-        val bobAttrs = svc.list(bob.id!!, otherTenantId)
+        val aliceAttrs = svc.list(aliceId, tenantId)
+        val bobAttrs = svc.list(bobId, otherTenantId)
 
         assertIs<AttributeResult.Success<Map<String, String>>>(aliceAttrs)
         assertIs<AttributeResult.Success<Map<String, String>>>(bobAttrs)

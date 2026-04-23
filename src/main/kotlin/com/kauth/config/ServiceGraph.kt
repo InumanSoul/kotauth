@@ -17,9 +17,11 @@ import com.kauth.adapter.persistence.PostgresPortalConfigRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
+import com.kauth.adapter.persistence.PostgresTenantClaimMapperRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresThemeRepository
+import com.kauth.adapter.persistence.PostgresUserAttributeRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
@@ -50,9 +52,11 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
+import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
@@ -103,6 +107,8 @@ data class ServiceGraph(
     val socialAccountRepository: PostgresSocialAccountRepository,
     val keyRotationService: KeyRotationService,
     val tenantKeyRepository: PostgresTenantKeyRepository,
+    val userAttributeService: UserAttributeService,
+    val claimMapperService: CachingClaimMapperService,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -133,6 +139,8 @@ data class ServiceGraph(
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
             val mfaRepository = PostgresMfaRepository(encryptionService)
+            val userAttributeRepository = PostgresUserAttributeRepository()
+            val tenantClaimMapperRepository = PostgresTenantClaimMapperRepository()
             val corsOriginCache = CorsOriginCache(PostgresCorsAdapter())
             val corsService = CorsService(corsOriginCache)
 
@@ -277,6 +285,17 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                 )
 
+            // -- User attributes + claim mapping ------------------------------
+            val userAttributeService =
+                UserAttributeService(
+                    userAttributeRepository = userAttributeRepository,
+                    userRepository = userRepository,
+                )
+            val claimMapperService =
+                CachingClaimMapperService(
+                    mapperRepository = tenantClaimMapperRepository,
+                )
+
             // -- Demo seed ----------------------------------------------------
             if (config.isDemoMode) {
                 DemoSeedService(
@@ -364,6 +383,8 @@ data class ServiceGraph(
                 socialAccountRepository = socialAccountRepository,
                 keyRotationService = keyRotationService,
                 tenantKeyRepository = tenantKeyRepository,
+                userAttributeService = userAttributeService,
+                claimMapperService = claimMapperService,
                 applicationScope = applicationScope,
             )
         }
