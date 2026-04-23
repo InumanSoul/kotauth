@@ -6,8 +6,8 @@ import java.time.Instant
  * Represents a machine-to-machine API key for REST API access.
  *
  * The raw key value is NEVER stored here — only the prefix (for display) and the
- * SHA-256 hash (for verification). The plaintext is generated once by [ApiKeyService]
- * and returned to the caller; subsequent calls can only verify or revoke.
+ * SHA-256 hash (for verification). The plaintext is generated once by ApiKeyService
+ * (domain/service/) and returned to the caller; subsequent calls can only verify or revoke.
  *
  * Scopes follow the pattern `resource:action` (e.g. `users:read`, `roles:write`).
  * An empty scope list means no access — valid scopes are defined in [ApiScope].
@@ -44,6 +44,10 @@ object ApiScope {
     const val SESSIONS_READ = "sessions:read"
     const val SESSIONS_WRITE = "sessions:write"
     const val AUDIT_LOGS_READ = "audit_logs:read"
+    const val USER_ATTRIBUTES_READ = "user_attributes:read"
+    const val USER_ATTRIBUTES_WRITE = "user_attributes:write"
+    const val CLAIM_MAPPERS_READ = "claim_mappers:read"
+    const val CLAIM_MAPPERS_WRITE = "claim_mappers:write"
 
     val ALL =
         listOf(
@@ -58,5 +62,9 @@ object ApiScope {
             SESSIONS_READ,
             SESSIONS_WRITE,
             AUDIT_LOGS_READ,
+            USER_ATTRIBUTES_READ,
+            USER_ATTRIBUTES_WRITE,
+            CLAIM_MAPPERS_READ,
+            CLAIM_MAPPERS_WRITE,
         )
 }

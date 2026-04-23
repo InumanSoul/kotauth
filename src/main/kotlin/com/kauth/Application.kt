@@ -370,6 +370,8 @@ fun Application.module(
             auditLogRepository = s.auditLogRepository,
             roleGroupService = s.roleGroupService,
             adminService = s.adminService,
+            userAttributeService = s.userAttributeService,
+            claimMapperService = s.claimMapperService,
             corsService = s.corsService,
         )
 

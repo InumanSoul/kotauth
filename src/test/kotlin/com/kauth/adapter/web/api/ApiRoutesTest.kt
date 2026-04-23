@@ -154,6 +154,20 @@ class ApiRoutesTest {
             auditLog = auditLogPort,
         )
 
+    private val userAttributeRepo = com.kauth.fakes.FakeUserAttributeRepository()
+    private val claimMapperRepo = com.kauth.fakes.FakeTenantClaimMapperRepository()
+
+    private val userAttributeService =
+        com.kauth.domain.service.UserAttributeService(
+            userAttributeRepository = userAttributeRepo,
+            userRepository = userRepo,
+        )
+
+    private val claimMapperService =
+        com.kauth.infrastructure.CachingClaimMapperService(
+            mapperRepository = claimMapperRepo,
+        )
+
     private var rawApiKey: String = ""
 
     @BeforeTest
@@ -170,6 +184,8 @@ class ApiRoutesTest {
         evTokenRepo.clear()
         prTokenRepo.clear()
         emailPort.clear()
+        userAttributeRepo.clear()
+        claimMapperRepo.clear()
 
         tenantRepo.add(tenant)
         tenantRepo.add(otherTenant)
@@ -823,6 +839,8 @@ class ApiRoutesTest {
                 auditLogRepository = auditLogRepo,
                 roleGroupService = roleGroupService,
                 adminService = adminService,
+                userAttributeService = userAttributeService,
+                claimMapperService = claimMapperService,
             )
         }
     }
