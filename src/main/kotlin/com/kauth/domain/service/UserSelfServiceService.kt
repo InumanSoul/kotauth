@@ -817,6 +817,125 @@ class UserSelfServiceService(
             userRepository.findById(token.userId, token.tenantId)!!,
         )
     }
+
+    // =========================================================================
+    // Forced password change (admin-initiated) — TEMP_PASSWORD token flow
+    // =========================================================================
+
+    /**
+     * Generates a 24-hour TEMP_PASSWORD token for [user] and stamps the
+     * [RequiredAction.CHANGE_PASSWORD] flag on their account. Any previous
+     * TEMP_PASSWORD tokens for this user are deleted first — only one
+     * active invitation to rotate at a time.
+     *
+     * Returns the raw token to the caller for one-time display. The raw
+     * value is never stored or logged; only the SHA-256 hash lives in
+     * [prTokenRepo]. The caller (admin route handler) is responsible for
+     * showing it exactly once to the admin.
+     */
+    fun initiateForcedPasswordChange(user: User): SelfServiceResult<String> {
+        val userId = user.id ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        val (rawToken, tokenHash) = generateToken()
+
+        prTokenRepo.deleteByUserAndPurpose(userId, TokenPurpose.TEMP_PASSWORD)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = userId,
+                tenantId = user.tenantId,
+                tokenHash = tokenHash,
+                expiresAt = Instant.now().plusSeconds(24 * 3600), // 24 hours
+                purpose = TokenPurpose.TEMP_PASSWORD,
+            ),
+        )
+
+        val fresh =
+            userRepository.findById(userId, user.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        userRepository.update(
+            fresh.copy(requiredActions = fresh.requiredActions + RequiredAction.CHANGE_PASSWORD),
+        )
+        return SelfServiceResult.Success(rawToken)
+    }
+
+    /**
+     * Consumes a TEMP_PASSWORD token, sets the new password, clears the
+     * [RequiredAction.CHANGE_PASSWORD] flag, records in history, and
+     * revokes all active sessions.
+     *
+     * Same structural shape as [confirmPasswordReset] but with a purpose
+     * guard specific to TEMP_PASSWORD tokens.
+     */
+    fun confirmForcedPasswordChange(
+        rawToken: String,
+        newPassword: String,
+        confirmPassword: String,
+    ): SelfServiceResult<Unit> {
+        val hash = sha256Hex(rawToken)
+        val token =
+            prTokenRepo.findByTokenHash(hash)
+                ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Change-password link is invalid."))
+
+        // Purpose guard — reject PASSWORD_RESET and INVITE tokens routed here by mistake
+        if (token.purpose != TokenPurpose.TEMP_PASSWORD) {
+            return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Change-password link is invalid."))
+        }
+
+        if (!token.isValid) {
+            val msg =
+                if (token.isExpired) {
+                    "Change-password link has expired. Ask your administrator to issue a new one."
+                } else {
+                    "This change-password link has already been used."
+                }
+            return SelfServiceResult.Failure(SelfServiceError.TokenExpired(msg))
+        }
+
+        if (newPassword.isBlank()) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation("Password cannot be empty."))
+        }
+        if (newPassword != confirmPassword) {
+            return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
+        }
+
+        val tenant = tenantRepository.findById(token.tenantId)
+        if (tenant != null) {
+            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
+                ?.let { return SelfServiceResult.Failure(it) }
+        }
+
+        val now = Instant.now()
+        val hashedPassword = passwordHasher.hash(newPassword)
+        userRepository.updatePassword(token.userId, hashedPassword, now)
+        userRepository.resetFailedLogins(token.userId)
+        sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
+        prTokenRepo.markUsed(token.id!!, now)
+
+        val freshUser =
+            userRepository.findById(token.userId, token.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+        userRepository.update(
+            freshUser.copy(requiredActions = freshUser.requiredActions - RequiredAction.CHANGE_PASSWORD),
+        )
+
+        // Record in password history
+        if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+            passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
+        }
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = token.tenantId,
+                userId = token.userId,
+                clientId = null,
+                eventType = AuditEventType.PASSWORD_RESET_COMPLETED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("method" to "forced_change"),
+            ),
+        )
+
+        return SelfServiceResult.Success(Unit)
+    }
 }
 
 // =============================================================================

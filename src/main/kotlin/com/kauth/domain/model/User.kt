@@ -12,6 +12,14 @@ import java.time.Instant
 enum class RequiredAction {
     /** User was created via invite and must set a password before logging in. */
     SET_PASSWORD,
+
+    /**
+     * Admin triggered a forced password change (e.g. after a security incident
+     * or when handing a temporary password to a locked-out user). Checked after
+     * the user's existing password is verified — the user authenticates normally,
+     * then is redirected to a forced-change page before being issued tokens.
+     */
+    CHANGE_PASSWORD,
 }
 
 /**

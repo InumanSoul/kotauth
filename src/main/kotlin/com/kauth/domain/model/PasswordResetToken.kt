@@ -12,6 +12,13 @@ import java.time.Instant
 enum class TokenPurpose {
     PASSWORD_RESET,
     INVITE,
+
+    /**
+     * Admin-initiated forced password change. Shares the reset-token table but
+     * consumed only by the forced-change-password endpoint — cross-purpose use
+     * is rejected at the service layer.
+     */
+    TEMP_PASSWORD,
 }
 
 /**

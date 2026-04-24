@@ -3,6 +3,7 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.BreachedPasswordPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import org.jetbrains.exposed.sql.SortOrder
@@ -27,6 +28,7 @@ import java.time.ZoneOffset
  */
 class PostgresPasswordPolicyAdapter(
     private val passwordHasher: PasswordHasher,
+    private val breachedPasswordChecker: BreachedPasswordPort? = null,
 ) : PasswordPolicyPort {
     override fun validate(
         rawPassword: String,
@@ -63,6 +65,14 @@ class PostgresPasswordPolicyAdapter(
             if (isInHistory(userId, tenant.id, rawPassword, tenant.passwordPolicyHistoryCount)) {
                 return "You cannot reuse any of your last ${tenant.passwordPolicyHistoryCount} passwords."
             }
+        }
+
+        // Breach-corpus check (fail-open: silent pass if the checker is unavailable)
+        if (tenant.securityConfig.hibpCheckEnabled &&
+            breachedPasswordChecker != null &&
+            breachedPasswordChecker.isBreached(rawPassword)
+        ) {
+            return "This password has appeared in a data breach. Please choose a different password."
         }
 
         return null // valid

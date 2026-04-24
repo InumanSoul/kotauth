@@ -122,6 +122,7 @@ class PostgresTenantRepository(
                     it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
                     it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
                     it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
+                    it[hibpCheckEnabled] = tenant.securityConfig.hibpCheckEnabled
                 }
             if (updatedRows == 0) {
                 TenantSecurityConfigTable.insert {
@@ -137,6 +138,7 @@ class PostgresTenantRepository(
                     it[lockoutMaxAttempts] = tenant.securityConfig.lockoutMaxAttempts
                     it[lockoutDurationMinutes] = tenant.securityConfig.lockoutDurationMinutes
                     it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
+                    it[hibpCheckEnabled] = tenant.securityConfig.hibpCheckEnabled
                 }
             }
             tenantJoined
@@ -215,6 +217,7 @@ class PostgresTenantRepository(
             lockoutMaxAttempts = this[TenantSecurityConfigTable.lockoutMaxAttempts],
             lockoutDurationMinutes = this[TenantSecurityConfigTable.lockoutDurationMinutes],
             corsAllowCredentials = this[TenantSecurityConfigTable.corsAllowCredentials],
+            hibpCheckEnabled = this[TenantSecurityConfigTable.hibpCheckEnabled],
         )
     }
 

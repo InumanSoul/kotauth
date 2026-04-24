@@ -24,6 +24,8 @@ data class SecurityConfig(
     val lockoutDurationMinutes: Int = 15,
     // CORS
     val corsAllowCredentials: Boolean = false,
+    // Breach detection — block passwords that appear in HIBP's breach corpus
+    val hibpCheckEnabled: Boolean = false,
 ) {
     /** Lockout is active when max attempts is > 0. */
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0

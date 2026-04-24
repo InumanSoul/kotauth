@@ -134,7 +134,12 @@ data class ServiceGraph(
             val prTokenRepository = PostgresPasswordResetTokenRepository()
             val roleRepository = PostgresRoleRepository()
             val groupRepository = PostgresGroupRepository()
-            val passwordPolicyAdapter = PostgresPasswordPolicyAdapter(passwordHasher)
+            val breachedPasswordChecker = com.kauth.infrastructure.HibpBreachedPasswordAdapter()
+            val passwordPolicyAdapter =
+                PostgresPasswordPolicyAdapter(
+                    passwordHasher = passwordHasher,
+                    breachedPasswordChecker = breachedPasswordChecker,
+                )
             val identityProviderRepository =
                 PostgresIdentityProviderRepository(encryptionService)
             val socialAccountRepository = PostgresSocialAccountRepository()
