@@ -427,7 +427,7 @@ sealed class AuthError {
     ) : AuthError()
 
     /**
-     * The user's password has exceeded the tenant's [passwordPolicyMaxAgeDays] limit.
+     * The user's password has exceeded the tenant's `passwordPolicyMaxAgeDays` limit.
      * The user must reset their password before they can log in.
      * We surface this explicitly (rather than as InvalidCredentials) so the UI can
      * direct the user to the forgot-password flow with an actionable message.
@@ -436,7 +436,7 @@ sealed class AuthError {
 
     /** The account has been locked after too many failed login attempts. */
     class AccountLocked(
-        val lockedUntil: java.time.Instant,
+        @Suppress("unused") val lockedUntil: Instant,
     ) : AuthError()
 
     /** The user was created via invite and has not yet set a password. */

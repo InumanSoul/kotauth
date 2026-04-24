@@ -11,9 +11,7 @@ import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
-import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -29,7 +27,6 @@ fun Route.adminSettingsRoutes(
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
-    encryptionService: EncryptionService,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings

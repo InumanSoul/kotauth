@@ -23,8 +23,8 @@ import org.jetbrains.exposed.sql.update
  * exposed as composed value objects on [Tenant] to keep all existing call sites
  * working without changes.
  *
- * Writes only touch the tenants table — theme updates go through [ThemeRepository]
- * and portal config through [PortalConfigRepository].
+ * Writes only touch the tenants table — theme updates go through ThemeRepository
+ * and portal config through PortalConfigRepository.
  *
  * SMTP password is encrypted/decrypted transparently using [EncryptionPort].
  */

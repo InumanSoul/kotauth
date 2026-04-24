@@ -722,7 +722,7 @@ class AdminService(
     /**
      * Updates SMTP configuration for a workspace.
      * [smtpPassword] should be the raw (plaintext) value — the adapter layer
-     * encrypts it before persistence via [EncryptionService].
+     * encrypts it before persistence via the infrastructure EncryptionService.
      */
     fun updateSmtpConfig(
         slug: String,

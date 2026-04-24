@@ -108,7 +108,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `authenticate returns InvalidCredentials for unknown user — no user enumeration`() {
+    fun `authenticate returns InvalidCredentials for unknown user - no user enumeration`() {
         val result = svc.authenticate("acme", "does-not-exist", "correct-pass")
         // Must be InvalidCredentials, not a "user not found" variant
         assertIs<AuthResult.Failure>(result)
@@ -118,7 +118,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `authenticate returns InvalidCredentials for disabled user — no distinguishing error`() {
+    fun `authenticate returns InvalidCredentials for disabled user - no distinguishing error`() {
         users.clear()
         users.add(activeUser.copy(enabled = false))
 

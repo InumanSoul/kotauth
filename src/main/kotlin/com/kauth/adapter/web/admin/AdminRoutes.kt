@@ -470,7 +470,6 @@ fun Route.adminRoutes(
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
-                    encryptionService = encryptionService,
                 )
 
                 adminApplicationRoutes(
