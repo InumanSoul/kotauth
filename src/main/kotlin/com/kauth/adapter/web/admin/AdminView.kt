@@ -162,6 +162,7 @@ object AdminView {
         userAttributes: Map<String, String> = emptyMap(),
         mappedKeys: Map<String, String> = emptyMap(),
         attributeError: String? = null,
+        tempPasswordLink: String? = null,
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -176,6 +177,7 @@ object AdminView {
             userAttributes,
             mappedKeys,
             attributeError,
+            tempPasswordLink,
         )
 
     fun userAttributeFormPage(

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.1] - 2026-04-24
+
+### Added
+
+- **Three REST endpoints to programmatically onboard and recover users** — closes the gap for SaaS platforms integrating KotAuth as their auth provider (Oriana, etc.) so they no longer need a human admin in the KotAuth console to invite a team member:
+  - `POST /t/{slug}/api/v1/users/invite` — creates a user without a password and emails a 72-hour invite link. The user sets their own password on first login via the existing `/t/{slug}/accept-invite` public page. This is the canonical onboarding path and what SaaS integrators should use by default
+  - `POST /t/{slug}/api/v1/users/{id}/send-reset-email` — admin-triggered password reset email. Idempotent
+  - `POST /t/{slug}/api/v1/users/{id}/temporary-password` — returns a one-time `/t/{slug}/change-password?token=…` URL in the response body (expires 24h). Useful when SMTP is misconfigured or the ops team prefers delivering the link over a trusted channel instead of email. The raw link is not persisted or logged; treat it as a secret
+  - All three are gated by the existing `users:write` scope. Full OpenAPI spec coverage; 12 new integration tests covering happy paths, scope enforcement, tenant isolation, 404s, 409s on duplicates
+- **Admin-initiated temporary password (`CHANGE_PASSWORD` required action)** — admin can force a user to change their password on next login. A new "Set Temporary Password" button on the user detail page generates a 24-hour `TEMP_PASSWORD` token; the admin is shown a one-time reveal panel with a `/t/{slug}/change-password?token=…` link to hand to the user over a secure channel. On next login, `AuthService` rejects credentials with `AuthError.PasswordChangeRequired` (**after** password verification, so the flag is not observable to attackers). New `ForceChangePasswordRoutes` mirrors the invite-accept flow: token validated, password policy enforced, history check applied, all active sessions revoked on success. Supports the admin flow the spec predicted: "user is stuck, admin hands them a temporary link" and "after a security incident, rotate affected users"
+- **HIBP (Have I Been Pwned) breach password detection** — tenant-level opt-in toggle on the Security Policy settings page. New `BreachedPasswordPort` in the domain; `HibpBreachedPasswordAdapter` in infrastructure uses the k-Anonymity range API (only the first 5 hex chars of the SHA-1 hash leave the process), requests `Add-Padding: true` to neutralize response-size side channels. 60-second per-prefix cache — caching by prefix, not by full hash, avoids a timing oracle on repeat checks. Fail-open: any network error, non-200, or timeout allows the password through with a WARN log (external outage must not block registrations). Wired into `PostgresPasswordPolicyAdapter.validate()` behind `tenant.securityConfig.hibpCheckEnabled`. Error message is neutral ("This password has appeared in a data breach") — no mention of HIBP or the provider by name to avoid leaking the check mechanism
+- **`TEMP_PASSWORD` added to `TokenPurpose` enum** — shares the `password_reset_tokens` table with `PASSWORD_RESET` and `INVITE`, differentiated by the `purpose` column. Cross-purpose token usage is rejected at the service layer (a `PASSWORD_RESET` token fed into the force-change endpoint returns `TokenInvalid` and does not consume the token)
+- **`ADMIN_FORCED_PASSWORD_CHANGE` audit event** — records admin-triggered rotations with username in details. Raw token never appears in the audit log
+- **`hibp_check_enabled` column on `tenant_security_config`** — V35 migration, defaults to `FALSE`. Opt-in per tenant
+- **`FakeBreachedPasswordPort`** test double — deterministic breach-set control and `simulateError` for fail-open coverage
+- **23 new tests** — `ForcedPasswordChangeTest` (11: token lifecycle, purpose guard, password policy integration, session revocation, single-use enforcement), `AuthServiceTest` CHANGE_PASSWORD guard (4: check-after-verify ordering, audit event, clear-flag success path), `PasswordPolicyHibpIntegrationTest` (6: toggle on/off, breach detection, fail-open, neutral error message, length check runs first), `HibpBreachedPasswordAdapterTest` (3 smoke: empty input short-circuit, fail-open on unreachable upstream, cache TTL contract)
+
+### Changed
+
+- **`UserSelfServiceService` gained `initiateForcedPasswordChange(user)` and `confirmForcedPasswordChange(token, new, confirm)`** — deliberately separate from `confirmPasswordReset`/`confirmAcceptInvite` to avoid parameterizing purpose-guarded branches. 24-hour token expiry, revokes all sessions on success, records `PASSWORD_RESET_COMPLETED` with `method=forced_change` detail
+- **`AdminService.setTemporaryPassword(userId, tenantId): AdminResult<String>`** — thin wrapper that delegates token lifecycle to `UserSelfServiceService`, emits the admin audit event, and returns the raw token to the caller for one-time display via `FlashStore`. The raw token is never persisted, logged, or emailed
+- **`AdminService.updateWorkspaceSettings`** gained `hibpCheckEnabled: Boolean = false` parameter. The Security Policy page has a new "Breach Detection" toggle card with user-facing copy explaining the k-Anonymity approach and the fail-open guarantee
+- **`PostgresPasswordPolicyAdapter` gained an optional `breachedPasswordChecker: BreachedPasswordPort?` constructor dep** — HIBP check runs last (after length, charset, blacklist, history), only when the tenant toggle is on AND a checker is wired. Absence of the checker is silent ("feature off"), not an error
+- **`RequiredAction` gained `CHANGE_PASSWORD`** — stored as text[] (V30 schema), no migration needed for the enum value itself. Checked in `AuthService.authenticate` AFTER password verification so the flag cannot be enumerated
+- **`AuthError` gained `PasswordChangeRequired`** — web adapter's `toMessage()` returns copy directing the user to the change-password link
+
+### Security
+
+- **`CHANGE_PASSWORD` check order is intentionally after password verify** — unlike `SET_PASSWORD` (which uses a sentinel hash and must short-circuit before verify), `CHANGE_PASSWORD` users have a real password. Checking after verify means invalid-credentials attackers can't distinguish between "valid password, rotation required" and "invalid password" based on response differences
+- **Temporary password token is displayed exactly once via `FlashStore`** — the admin route issues a one-shot redirect with a flash key; the next GET to the user-detail page consumes the value and removes it. Refresh shows only the regular page
+- **No email delivery of the temporary token** — deliberate. Emailing credentials creates a copy in potentially unencrypted mail storage. Admin hands off over a trusted channel
+- **HIBP k-Anonymity is intact** — only 5 hex chars leave the process (~500 possible full hashes per prefix). `Add-Padding: true` neutralizes response-size analysis
+- **HIBP cache is per-prefix, not per-hash** — caching by full hash would create a timing oracle revealing which passwords have been checked recently. Per-prefix grants anonymity within the ~500-hash bucket
+- **HIBP timeout is 5 seconds** — bounded latency on the password-change hot path. Fail-open means a slow HIBP response never blocks users for more than 5 seconds
+- **User-facing error message is neutral** — "This password has appeared in a data breach. Please choose a different password." Does not reveal that a check was performed against HIBP specifically, does not mention "pwned" or the provider name
+- **Fail-open on external dependency failure** — HIBP API outages must not break registrations. WARN logs surface the failures for operators without blocking users
+
+### Infrastructure
+
+- **`HibpBreachedPasswordAdapter` uses JDK `HttpClient`** — zero-dependency choice. One GET with one header is trivial; Ktor's async client would add `ktor-client-cio` to the fat JAR and introduce an extra version to track. Pluggable clock + timeout + base URL for deterministic testing
+
+---
+
 ## [1.6.0-rc1] - 2026-04-24
 
 ### Added

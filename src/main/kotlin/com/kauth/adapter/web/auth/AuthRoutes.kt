@@ -91,6 +91,11 @@ fun Route.authRoutes(
             rateLimiter = registerRateLimiter,
         )
 
+        forceChangePasswordRoutes(
+            selfServiceService = selfServiceService,
+            rateLimiter = registerRateLimiter,
+        )
+
         mfaRoutes(
             oauthService = oauthService,
             mfaService = mfaService,

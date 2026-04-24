@@ -794,6 +794,26 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                 }
+
+                // ── Breach Detection (HIBP) ──────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Breach Detection" }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "hibpCheckEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.hibpCheckEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +"Block passwords found in data breaches" }
+                            span("check-row__desc") {
+                                +"Checks new passwords against the Have I Been Pwned breach corpus "
+                                +"using k-Anonymity (only the first 5 chars of the SHA-1 hash leave "
+                                +"the server). Fails open if HIBP is unreachable — registrations "
+                                +"will not be blocked by outages."
+                            }
+                        }
+                    }
+                }
             }
                     }
 }

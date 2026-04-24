@@ -108,7 +108,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `authenticate returns InvalidCredentials for unknown user — no user enumeration`() {
+    fun `authenticate returns InvalidCredentials for unknown user - no user enumeration`() {
         val result = svc.authenticate("acme", "does-not-exist", "correct-pass")
         // Must be InvalidCredentials, not a "user not found" variant
         assertIs<AuthResult.Failure>(result)
@@ -118,7 +118,7 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `authenticate returns InvalidCredentials for disabled user — no distinguishing error`() {
+    fun `authenticate returns InvalidCredentials for disabled user - no distinguishing error`() {
         users.clear()
         users.add(activeUser.copy(enabled = false))
 
@@ -409,6 +409,63 @@ class AuthServiceTest {
             ),
         )
         val result = svc.authenticate("acme", "alice", "new-pass")
+        assertIs<AuthResult.Success<User>>(result)
+    }
+
+    // =========================================================================
+    // authenticate() — CHANGE_PASSWORD guard (admin-forced password rotation)
+    // =========================================================================
+
+    @Test
+    fun `authenticate returns PasswordChangeRequired after valid password when CHANGE_PASSWORD is set`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                requiredActions = setOf(RequiredAction.CHANGE_PASSWORD),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "correct-pass")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.PasswordChangeRequired>(result.error)
+    }
+
+    @Test
+    fun `authenticate returns InvalidCredentials (not PasswordChangeRequired) on wrong password`() {
+        // CHANGE_PASSWORD check must happen AFTER password verify, otherwise
+        // response differences would leak which accounts have the flag set.
+        users.clear()
+        users.add(
+            activeUser.copy(
+                requiredActions = setOf(RequiredAction.CHANGE_PASSWORD),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "wrong-password")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.InvalidCredentials>(result.error)
+    }
+
+    @Test
+    fun `authenticate PasswordChangeRequired emits LOGIN_FAILED audit event`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                requiredActions = setOf(RequiredAction.CHANGE_PASSWORD),
+            ),
+        )
+        svc.authenticate("acme", "alice", "correct-pass")
+        assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_FAILED))
+    }
+
+    @Test
+    fun `authenticate succeeds after CHANGE_PASSWORD is cleared`() {
+        users.clear()
+        users.add(
+            activeUser.copy(
+                passwordHash = hasher.hash("fresh-pass"),
+                requiredActions = emptySet(),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "fresh-pass")
         assertIs<AuthResult.Success<User>>(result)
     }
 }
