@@ -4,7 +4,9 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.ClaimTokenType
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.UserId
@@ -16,6 +18,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
+import com.kauth.domain.port.UserAttributeRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
@@ -50,7 +53,33 @@ class OAuthService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val roleRepository: RoleRepository? = null,
+    private val userAttributeRepository: UserAttributeRepository? = null,
+    /**
+     * Reader for tenant claim mappers. A lambda (instead of a port interface)
+     * keeps the domain contract trivial while letting the composition root
+     * inject the cached [com.kauth.infrastructure.CachingClaimMapperService].
+     * Default returns empty — preserves pre-feature token shape.
+     */
+    private val claimMappersFor: (TenantId) -> List<TenantClaimMapper> = { _ -> emptyList() },
 ) {
+    /**
+     * Resolves the custom claim maps (access + id) for a user's issued token.
+     * Returns (emptyMap, emptyMap) when either dependency is not wired —
+     * the default adopted by existing tests via the nullable constructor params.
+     */
+    private fun buildCustomClaims(
+        userId: UserId,
+        tenantId: TenantId,
+    ): Pair<Map<String, String>, Map<String, String>> {
+        val repo = userAttributeRepository ?: return emptyMap<String, String>() to emptyMap()
+        val mappers = claimMappersFor(tenantId)
+        if (mappers.isEmpty()) return emptyMap<String, String>() to emptyMap()
+        val attributes = repo.findAll(userId, tenantId)
+        if (attributes.isEmpty()) return emptyMap<String, String>() to emptyMap()
+        val access = ClaimMapperService.projectClaims(mappers, attributes, ClaimTokenType.ACCESS)
+        val id = ClaimMapperService.projectClaims(mappers, attributes, ClaimTokenType.ID)
+        return access to id
+    }
     // -------------------------------------------------------------------------
     // Authorization Code Flow — Step 1: validate request, issue code
     // -------------------------------------------------------------------------
@@ -229,6 +258,7 @@ class OAuthService(
 
         // Resolve effective roles for the user
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
+        val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
         val tokenResponse =
             tokenPort.issueUserTokens(
@@ -238,6 +268,8 @@ class OAuthService(
                 scopes = scopes,
                 nonce = authCode.nonce,
                 roles = effectiveRoles,
+                customAccessClaims = customAccessClaims,
+                customIdClaims = customIdClaims,
             )
 
         // Persist session
@@ -415,6 +447,7 @@ class OAuthService(
 
         // Resolve effective roles for refresh
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
+        val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
         val newTokens =
             tokenPort.issueUserTokens(
@@ -423,6 +456,8 @@ class OAuthService(
                 client = client,
                 scopes = scopes,
                 roles = effectiveRoles,
+                customAccessClaims = customAccessClaims,
+                customIdClaims = customIdClaims,
             )
 
         // Revoke old session, create new (rotation)

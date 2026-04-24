@@ -65,6 +65,8 @@ class JwtTokenAdapter(
         scopes: List<String>,
         nonce: String?,
         roles: List<Role>,
+        customAccessClaims: Map<String, String>,
+        customIdClaims: Map<String, String>,
     ): TokenResponse {
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
@@ -128,6 +130,11 @@ class JwtTokenAdapter(
             }
         }
 
+        // Stamp tenant-configured custom claims (see ClaimMapperService).
+        for ((claimName, value) in customAccessClaims) {
+            accessTokenBuilder.withClaim(claimName, value)
+        }
+
         val accessToken = accessTokenBuilder.sign(activeKey.algorithm)
 
         val idToken =
@@ -143,7 +150,11 @@ class JwtTokenAdapter(
                     .withClaim("name", user.fullName)
                     .withClaim("preferred_username", user.username)
                     .apply { if (nonce != null) withClaim("nonce", nonce) }
-                    .withIssuedAt(Date())
+                    .apply {
+                        for ((claimName, value) in customIdClaims) {
+                            withClaim(claimName, value)
+                        }
+                    }.withIssuedAt(Date())
                     .withExpiresAt(expiresAt)
                     .sign(activeKey.algorithm)
             } else {

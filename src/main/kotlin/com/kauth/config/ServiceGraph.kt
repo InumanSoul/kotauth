@@ -17,9 +17,11 @@ import com.kauth.adapter.persistence.PostgresPortalConfigRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
+import com.kauth.adapter.persistence.PostgresTenantClaimMapperRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresThemeRepository
+import com.kauth.adapter.persistence.PostgresUserAttributeRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
 import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
@@ -50,9 +52,11 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
+import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
@@ -66,7 +70,12 @@ import kotlinx.coroutines.SupervisorJob
 /**
  * Holds every service and repository needed by the Ktor module.
  * Built once at startup by [create], then passed into the server.
+ *
+ * ArrayInDataClass is suppressed: ByteArray session keys would use
+ * reference equality in the auto-generated equals/hashCode, but this
+ * container is never compared — it is a DI singleton.
  */
+@Suppress("ArrayInDataClass")
 data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
@@ -103,6 +112,8 @@ data class ServiceGraph(
     val socialAccountRepository: PostgresSocialAccountRepository,
     val keyRotationService: KeyRotationService,
     val tenantKeyRepository: PostgresTenantKeyRepository,
+    val userAttributeService: UserAttributeService,
+    val claimMapperService: CachingClaimMapperService,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -133,6 +144,8 @@ data class ServiceGraph(
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
             val mfaRepository = PostgresMfaRepository(encryptionService)
+            val userAttributeRepository = PostgresUserAttributeRepository()
+            val tenantClaimMapperRepository = PostgresTenantClaimMapperRepository()
             val corsOriginCache = CorsOriginCache(PostgresCorsAdapter())
             val corsService = CorsService(corsOriginCache)
 
@@ -202,6 +215,17 @@ data class ServiceGraph(
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
                 )
+            // -- User attributes + claim mapping ------------------------------
+            val userAttributeService =
+                UserAttributeService(
+                    userAttributeRepository = userAttributeRepository,
+                    userRepository = userRepository,
+                )
+            val claimMapperService =
+                CachingClaimMapperService(
+                    mapperRepository = tenantClaimMapperRepository,
+                )
+
             val oauthService =
                 OAuthService(
                     tenantRepository = tenantRepository,
@@ -213,6 +237,8 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     roleRepository = roleRepository,
+                    userAttributeRepository = userAttributeRepository,
+                    claimMappersFor = claimMapperService::list,
                 )
             val adminService =
                 AdminService(
@@ -364,6 +390,8 @@ data class ServiceGraph(
                 socialAccountRepository = socialAccountRepository,
                 keyRotationService = keyRotationService,
                 tenantKeyRepository = tenantKeyRepository,
+                userAttributeService = userAttributeService,
+                claimMapperService = claimMapperService,
                 applicationScope = applicationScope,
             )
         }

@@ -68,6 +68,8 @@ fun Route.adminRoutes(
     roleRepository: RoleRepository? = null,
     keyRotationService: KeyRotationService? = null,
     tenantKeyRepository: TenantKeyRepository? = null,
+    userAttributeService: com.kauth.domain.service.UserAttributeService,
+    claimMapperService: com.kauth.infrastructure.CachingClaimMapperService,
     corsPort: CorsPort? = null,
     baseUrl: String = "",
 ) {
@@ -481,6 +483,8 @@ fun Route.adminRoutes(
                     adminService = adminService,
                     roleGroupService = roleGroupService,
                     sessionRepository = sessionRepository,
+                    userAttributeService = userAttributeService,
+                    claimMapperService = claimMapperService,
                 )
 
                 adminSessionAuditRoutes(
@@ -510,6 +514,10 @@ fun Route.adminRoutes(
                         tenantKeyRepository = tenantKeyRepository,
                     )
                 }
+
+                adminClaimMapperRoutes(
+                    claimMapperService = claimMapperService,
+                )
             }
         }
     }

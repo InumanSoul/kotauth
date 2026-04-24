@@ -205,6 +205,15 @@ abstract class E2ETestBase {
                             webhookService = buildWebhookService(),
                             encryptionService = encryptionService,
                             roleRepository = roleRepo,
+                            userAttributeService =
+                                com.kauth.domain.service.UserAttributeService(
+                                    userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),
+                                    userRepository = userRepo,
+                                ),
+                            claimMapperService =
+                                com.kauth.infrastructure.CachingClaimMapperService(
+                                    mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
+                                ),
                         )
                     }
                 }

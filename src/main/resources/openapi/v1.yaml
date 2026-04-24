@@ -33,6 +33,20 @@ info:
     | `sessions:read`      | List active sessions                         |
     | `sessions:write`     | Revoke sessions                              |
     | `audit_logs:read`    | Read audit log events                        |
+    | `user_attributes:read`  | Read custom per-user attributes           |
+    | `user_attributes:write` | Create, update, delete per-user attributes |
+    | `claim_mappers:read`    | List tenant claim mappers                 |
+    | `claim_mappers:write`   | Create, update, delete claim mappers      |
+
+    ## Custom attributes and JWT claims
+
+    You can attach arbitrary key/value string attributes to users and project them
+    into issued JWTs via tenant-level **claim mappers**. Changes take effect on the
+    next access-token issuance (no live-session mutation).
+
+    > **Security note:** attribute values flow unencrypted into JWTs, which are
+    > base64-decodable by anyone in possession of the token. Do not store PII or
+    > secrets as user attributes unless the token consumers are fully trusted.
 
     ## Errors
 
@@ -54,10 +68,8 @@ servers:
     variables:
       baseUrl:
         default: "http://localhost:8080"
-        description: Base URL of your KotAuth instance (e.g. https://auth.yourdomain.com)
       tenantSlug:
         default: "master"
-        description: The slug of the workspace (tenant) to operate on
 
 security:
   - bearerAuth: []
@@ -215,6 +227,56 @@ components:
         details:
           type: object
           additionalProperties: { type: string }
+
+    # ---- User attributes + claim mappers ----
+    UserAttributesDto:
+      type: object
+      required: [attributes]
+      properties:
+        attributes:
+          type: object
+          description: Flat key→value map. Empty object if the user has no attributes.
+          additionalProperties: { type: string }
+
+    UpsertUserAttributeRequest:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: string
+          maxLength: 1024
+          description: The attribute value. Always stored as a string — callers serialize their own types.
+
+    ClaimMapperDto:
+      type: object
+      required: [attributeKey, claimName, includeInAccess, includeInId]
+      properties:
+        attributeKey:    { type: string, maxLength: 64 }
+        claimName:       { type: string, maxLength: 128 }
+        includeInAccess: { type: boolean }
+        includeInId:     { type: boolean }
+
+    ClaimMappersDto:
+      type: object
+      required: [mappers]
+      properties:
+        mappers:
+          type: array
+          items: { $ref: "#/components/schemas/ClaimMapperDto" }
+
+    UpsertClaimMapperRequest:
+      type: object
+      required: [claimName]
+      properties:
+        claimName:
+          type: string
+          maxLength: 128
+          description: |
+            The JWT claim name. Cannot be a reserved OIDC claim name
+            (`sub`, `iss`, `aud`, `exp`, `iat`, `email`, `tenant_id`, etc.).
+            Use a prefix like `custom:department` to avoid collisions.
+        includeInAccess: { type: boolean, default: true }
+        includeInId:     { type: boolean, default: false }
 
   responses:
     Unauthorized:
@@ -739,6 +801,152 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  # ==========================================================================
+  # User Attributes
+  # ==========================================================================
+  /users/{userId}/attributes:
+    get:
+      summary: List all attributes for a user
+      tags: [User Attributes]
+      security: [{ bearerAuth: [user_attributes:read] }]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: User attributes
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserAttributesDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/attributes/{key}:
+    put:
+      summary: Create or update a user attribute
+      description: |
+        Upserts the attribute. Values are strings — callers serialize structured
+        data themselves. Changes propagate to issued JWTs on the next token issuance.
+      tags: [User Attributes]
+      security: [{ bearerAuth: [user_attributes:write] }]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: key
+          required: true
+          schema: { type: string, maxLength: 64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertUserAttributeRequest" }
+      responses:
+        "204": { description: Attribute saved }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      summary: Delete a user attribute
+      description: |
+        Removes the attribute entirely. Different from setting it to an empty
+        string — the claim will not be projected into tokens at all.
+      tags: [User Attributes]
+      security: [{ bearerAuth: [user_attributes:write] }]
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: integer }
+        - in: path
+          name: key
+          required: true
+          schema: { type: string, maxLength: 64 }
+      responses:
+        "204": { description: Attribute deleted (idempotent — 204 even if the key was missing) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Claim Mappers
+  # ==========================================================================
+  /claim-mappers:
+    get:
+      summary: List all claim mappers for the tenant
+      tags: [Claim Mappers]
+      security: [{ bearerAuth: [claim_mappers:read] }]
+      responses:
+        "200":
+          description: Configured claim mappers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClaimMappersDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /claim-mappers/{attributeKey}:
+    put:
+      summary: Create or update a claim mapper
+      description: |
+        Upserts the mapping from `attributeKey` to `claimName`.
+
+        - Reserved OIDC claim names (`sub`, `iss`, `aud`, etc.) return **400**.
+        - Two attribute keys mapping to the same claim name in one tenant
+          return **409 Conflict**.
+        - A tenant may configure at most 20 claim mappers — further writes
+          return **409**.
+      tags: [Claim Mappers]
+      security: [{ bearerAuth: [claim_mappers:write] }]
+      parameters:
+        - in: path
+          name: attributeKey
+          required: true
+          schema: { type: string, maxLength: 64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertClaimMapperRequest" }
+      responses:
+        "204": { description: Mapper saved }
+        "400":
+          description: Reserved claim name
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Duplicate claim name or mapper limit reached
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+    delete:
+      summary: Delete a claim mapper
+      description: |
+        Deleting a mapper immediately stops the claim from appearing in tokens
+        on the next issuance, even if user attributes for that key still exist.
+      tags: [Claim Mappers]
+      security: [{ bearerAuth: [claim_mappers:write] }]
+      parameters:
+        - in: path
+          name: attributeKey
+          required: true
+          schema: { type: string, maxLength: 64 }
+      responses:
+        "204": { description: Mapper deleted (idempotent) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
 tags:
   - name: Users
     description: User lifecycle management
@@ -752,3 +960,7 @@ tags:
     description: Active user sessions
   - name: Audit Logs
     description: Security event audit trail
+  - name: User Attributes
+    description: Per-user custom key/value metadata (projected into JWTs via claim mappers)
+  - name: Claim Mappers
+    description: Tenant-level configuration that projects user attributes into issued JWTs

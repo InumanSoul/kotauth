@@ -2,6 +2,7 @@ package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.service.AdminError
+import com.kauth.domain.service.AttributeResult
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -63,6 +64,48 @@ internal suspend fun ApplicationCall.respondAdminError(error: AdminError): Unit 
                 HttpStatusCode.UnprocessableEntity,
                 "Validation Error",
                 error.message,
+            )
+    }
+
+/** Maps the terminal [AttributeResult] failure variants to Problem+JSON responses. */
+internal suspend fun ApplicationCall.respondAttributeError(result: AttributeResult<*>): Unit =
+    when (result) {
+        is AttributeResult.Success<*> ->
+            respondProblem(
+                HttpStatusCode.InternalServerError,
+                "Unexpected Success",
+                "Internal error: respondAttributeError called with Success.",
+            )
+        is AttributeResult.NotFound ->
+            respondProblem(
+                HttpStatusCode.NotFound,
+                "Not Found",
+                "No ${result.resource} matched the request.",
+            )
+        is AttributeResult.ValidationError ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Validation Error",
+                result.reason,
+            )
+        is AttributeResult.ReservedClaimName ->
+            respondProblem(
+                HttpStatusCode.BadRequest,
+                "Reserved Claim Name",
+                "The claim name '${result.claimName}' is reserved by OIDC/KotAuth and cannot be used. " +
+                    "Use a custom prefix, e.g. 'custom:${result.claimName}'.",
+            )
+        is AttributeResult.DuplicateClaimName ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Duplicate Claim Name",
+                "Another attribute in this tenant already maps to claim name '${result.claimName}'.",
+            )
+        is AttributeResult.LimitReached ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Mapper Limit Reached",
+                "This tenant has reached the maximum of ${result.max} claim mappers.",
             )
     }
 
@@ -132,6 +175,16 @@ data class ProblemDetail(
     val redirectUris: List<String>? = null,
 )
 
+@Serializable data class UpsertUserAttributeRequest(
+    val value: String,
+)
+
+@Serializable data class UpsertClaimMapperRequest(
+    val claimName: String,
+    val includeInAccess: Boolean = true,
+    val includeInId: Boolean = false,
+)
+
 // -- Response DTOs ------------------------------------------------------------
 
 @Serializable data class UserDto(
@@ -187,6 +240,22 @@ data class ProblemDetail(
     val ipAddress: String?,
     val createdAt: String,
     val details: Map<String, String>,
+)
+
+@Serializable data class UserAttributesDto(
+    /** Flat key→value map. Empty if the user has no custom attributes. */
+    val attributes: Map<String, String>,
+)
+
+@Serializable data class ClaimMapperDto(
+    val attributeKey: String,
+    val claimName: String,
+    val includeInAccess: Boolean,
+    val includeInId: Boolean,
+)
+
+@Serializable data class ClaimMappersDto(
+    val mappers: List<ClaimMapperDto>,
 )
 
 // -- Domain → DTO mappers ----------------------------------------------------
@@ -250,4 +319,12 @@ internal fun com.kauth.domain.model.AuditEvent.toApiDto() =
         ipAddress = ipAddress,
         createdAt = isoFormatter.format(createdAt),
         details = details,
+    )
+
+internal fun com.kauth.domain.model.TenantClaimMapper.toApiDto() =
+    ClaimMapperDto(
+        attributeKey = attributeKey,
+        claimName = claimName,
+        includeInAccess = includeInAccess,
+        includeInId = includeInId,
     )

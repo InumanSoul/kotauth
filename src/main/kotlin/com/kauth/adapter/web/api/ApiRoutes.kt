@@ -11,7 +11,9 @@ import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.UserAttributeService
 import com.kauth.infrastructure.ApiKeyPrincipal
+import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
@@ -34,6 +36,8 @@ fun Route.apiRoutes(
     auditLogRepository: AuditLogRepository,
     roleGroupService: RoleGroupService,
     adminService: AdminService,
+    userAttributeService: UserAttributeService,
+    claimMapperService: CachingClaimMapperService,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -107,6 +111,8 @@ fun Route.apiRoutes(
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiApplicationRoutes(applicationRepository, adminService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
+            apiUserAttributeRoutes(userAttributeService)
+            apiClaimMapperRoutes(claimMapperService)
         }
     }
 }
