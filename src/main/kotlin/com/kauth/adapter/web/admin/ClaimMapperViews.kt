@@ -62,8 +62,8 @@ internal fun claimMappersListPageImpl(
                             title = "No claim mappers configured",
                             description =
                                 "Attributes won't appear in JWTs until you map them here. " +
-                                    "Example: map attribute key 'plan' to claim name 'custom:plan' " +
-                                    "to surface a billing tier in your access and ID tokens.",
+                                    "Example: map attribute key 'department' to claim name " +
+                                    "'custom:department' to surface org structure in your access and ID tokens.",
                         )
                     }
                 } else {
@@ -168,19 +168,21 @@ internal fun claimMapperFormPageImpl(
                     div("notice notice--error") { +error }
                 }
 
-                div("ov-card") {
-                    div("ov-card__section-label") { +"Mapper Details" }
-                    form(
-                        action =
-                            if (isEdit) {
-                                "/admin/workspaces/$slug/settings/claim-mappers/${prefill.attributeKey}"
-                            } else {
-                                "/admin/workspaces/$slug/settings/claim-mappers"
-                            },
-                        method = FormMethod.post,
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    ) {
-                        id = "claim-mapper-form"
+                form(
+                    action =
+                        if (isEdit) {
+                            "/admin/workspaces/$slug/settings/claim-mappers/${prefill.attributeKey}"
+                        } else {
+                            "/admin/workspaces/$slug/settings/claim-mappers"
+                        },
+                    method = FormMethod.post,
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                ) {
+                    id = "claim-mapper-form"
+
+                    // ── Mapper details ──────────────────────────────────
+                    div("ov-card") {
+                        div("ov-card__section-label") { +"Mapper Details" }
 
                         div("edit-row") {
                             span("edit-row__label") { +"Attribute Key" }
@@ -189,7 +191,7 @@ internal fun claimMapperFormPageImpl(
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "64"
-                                    placeholder = "plan"
+                                    placeholder = "department"
                                     value = prefill?.attributeKey ?: ""
                                     if (isEdit) readonly = true
                                 }
@@ -206,7 +208,7 @@ internal fun claimMapperFormPageImpl(
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "128"
-                                    placeholder = "custom:plan"
+                                    placeholder = "custom:department"
                                     value = prefill?.claimName ?: ""
                                 }
                                 div("edit-row__hint") {
@@ -215,34 +217,41 @@ internal fun claimMapperFormPageImpl(
                                 }
                             }
                         }
+                    }
 
-                        div("edit-row") {
-                            span("edit-row__label") { +"Include in" }
-                            div {
-                                label("radio-row") {
-                                    input(type = InputType.checkBox, name = "includeInAccess") {
-                                        value = "true"
-                                        if (prefill?.includeInAccess != false) checked = true
-                                    }
-                                    span("radio-row__body") {
-                                        span("radio-row__label") { +"Access Token" }
-                                        span("radio-row__desc") {
-                                            +"Claim appears in the short-lived bearer token sent with API requests."
-                                        }
-                                    }
+                    // ── Token visibility (toggle-row for each) ──────────
+                    div("ov-card") {
+                        div("ov-card__section-label") { +"Token Visibility" }
+
+                        div("toggle-row") {
+                            div("toggle-row__body") {
+                                div("toggle-row__title") { +"Access Token" }
+                                div("toggle-row__desc") {
+                                    +"Include this claim in the short-lived bearer token sent with API requests."
                                 }
-                                label("radio-row") {
-                                    input(type = InputType.checkBox, name = "includeInId") {
-                                        value = "true"
-                                        if (prefill?.includeInId == true) checked = true
-                                    }
-                                    span("radio-row__body") {
-                                        span("radio-row__label") { +"ID Token" }
-                                        span("radio-row__desc") {
-                                            +"Claim appears in the OIDC id_token (consumed by clients to display user info)."
-                                        }
-                                    }
+                            }
+                            label("toggle") {
+                                input(type = InputType.checkBox, name = "includeInAccess") {
+                                    attributes["value"] = "true"
+                                    if (prefill?.includeInAccess != false) checked = true
                                 }
+                                span("toggle__track") { span("toggle__thumb") {} }
+                            }
+                        }
+
+                        div("toggle-row") {
+                            div("toggle-row__body") {
+                                div("toggle-row__title") { +"ID Token" }
+                                div("toggle-row__desc") {
+                                    +"Include this claim in the OIDC id_token consumed by clients to display user info."
+                                }
+                            }
+                            label("toggle") {
+                                input(type = InputType.checkBox, name = "includeInId") {
+                                    attributes["value"] = "true"
+                                    if (prefill?.includeInId == true) checked = true
+                                }
+                                span("toggle__track") { span("toggle__thumb") {} }
                             }
                         }
                     }

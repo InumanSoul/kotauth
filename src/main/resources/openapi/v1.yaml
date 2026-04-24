@@ -274,7 +274,7 @@ components:
           description: |
             The JWT claim name. Cannot be a reserved OIDC claim name
             (`sub`, `iss`, `aud`, `exp`, `iat`, `email`, `tenant_id`, etc.).
-            Use a prefix like `custom:plan` to avoid collisions.
+            Use a prefix like `custom:department` to avoid collisions.
         includeInAccess: { type: boolean, default: true }
         includeInId:     { type: boolean, default: false }
 

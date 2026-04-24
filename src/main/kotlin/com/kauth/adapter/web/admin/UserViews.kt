@@ -945,12 +945,13 @@ internal fun userAttributeFormPageImpl(
                                     classes = setOf("edit-row__field")
                                     required = true
                                     maxLength = "64"
-                                    placeholder = "plan"
+                                    placeholder = "department"
                                     value = prefillKey
                                     if (isEdit) readonly = true
                                 }
                                 div("edit-row__hint") {
-                                    +"Example keys: plan, trial_ends, sifen_env. Keys are opaque to KotAuth."
+                                    +"Any string key. Common examples: department, tier, region, employee_id. "
+                                    +"Keys are opaque to KotAuth."
                                 }
                             }
                         }
@@ -963,7 +964,7 @@ internal fun userAttributeFormPageImpl(
                                     name = "value"
                                     rows = "3"
                                     attributes["maxlength"] = "1024"
-                                    placeholder = "e.g. trial, 2026-05-21, staging"
+                                    placeholder = "e.g. engineering, premium, us-east-1"
                                     +prefillValue
                                 }
                                 div("edit-row__hint") {
