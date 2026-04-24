@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.6.0-rc1] - 2026-04-24
+
+### Added
+
+- **Custom user attributes + JWT claim mapping** — per-user string key/value metadata that admins (or a billing integration) can project into issued JWTs with configurable claim names. Inspired by Keycloak's "User Attributes + Protocol Mappers" and Auth0's `app_metadata`, but deliberately simpler: declarative string-to-string projection only, no scripting, no conditional logic. Enables use cases like `custom:plan = pro`, `custom:trial_ends = 2026-05-21`, `custom:sifen_env = production` flowing through the access/id tokens SPAs and APIs consume. Attribute changes propagate on the next token issuance — worst-case staleness bounded by the 60-second mapper cache TTL
+- **`user_attributes` table** (V33 migration) — per-user key/value with cascade-on-user-delete, `PRIMARY KEY (user_id, key)`, max 64-char key, max 1024-char value (DB `CHECK` constraint + service-layer validation). `idx_user_attributes_tenant_user` covers the hot "all attributes for user X" lookup on token issuance
+- **`tenant_claim_mappers` table** (V34 migration) — tenant-level mapping `(tenant_id, attribute_key) → (claim_name, include_in_access, include_in_id)`. `UNIQUE INDEX (tenant_id, claim_name)` enforces one attribute per claim name within a tenant (race-safe defense-in-depth alongside service validation)
+- **`UserAttribute` + `TenantClaimMapper` domain models** with `MAX_KEY_LENGTH = 64`, `MAX_VALUE_LENGTH = 1024`, `MAX_CLAIM_NAME_LENGTH = 128`, `MAX_MAPPERS_PER_TENANT = 20` (soft cap preventing JWT bloat)
+- **`UserAttributeRepository` + `TenantClaimMapperRepository` ports** — hexagonal separation; Postgres adapters backed by Exposed
+- **`UserAttributeService` + `ClaimMapperService`** domain services with sealed `AttributeResult<T>` type (`Success`, `NotFound`, `ValidationError`, `ReservedClaimName`, `DuplicateClaimName`, `LimitReached`). Reserved OIDC/proprietary claim-name blocklist enforced at write time: 41 names including `sub`, `iss`, `aud`, `exp`, `iat`, `email`, `tenant_id`, `realm_access`, etc. The `projectClaims(mappers, attributes, tokenType)` pure function is the token-issuance hot path — no I/O, safe to call per-token
+- **`CachingClaimMapperService`** infrastructure decorator — 60-second TTL on mapper reads, self-invalidating on writes via a `ClaimMapperCacheInvalidator` fun interface. Pluggable clock for deterministic tests. Cross-tenant isolation: invalidating tenant A's cache doesn't disturb tenant B's
+- **`TokenPort.issueUserTokens` signature extended** with `customAccessClaims: Map<String, String>` and `customIdClaims: Map<String, String>` (both default `emptyMap()` — preserves byte-identical token shape for callers that don't opt in). `JwtTokenAdapter` stamps each map entry onto the appropriate `JWT.create()` builder after roles, before signing. `OAuthService` projects claims via a lambda `(TenantId) -> List<TenantClaimMapper>` injected from the composition root — keeps infrastructure caching out of the domain
+- **Refresh-token flow re-projects claims on every call** — billing systems that flip `plan = trial → pro` see the new claim value in the next refreshed access token, not at the next full login
+- **REST API — 6 endpoints** under `/t/{slug}/api/v1/`: `GET /users/{userId}/attributes`, `PUT/DELETE /users/{userId}/attributes/{key}`, `GET /claim-mappers`, `PUT/DELETE /claim-mappers/{attributeKey}`. 4 new API scopes: `user_attributes:read`, `user_attributes:write`, `claim_mappers:read`, `claim_mappers:write`. Error responses follow RFC 7807 (`application/problem+json`): reserved claim → 400, validation → 422, duplicate claim name → 409, tenant cap → 409
+- **Admin UI — User Attributes section** on the user detail page (between Profile and Active Sessions): table with key/value/edit/delete, "Configure mapping →" link for unmapped keys, `→ custom:claim` badge for mapped keys, delete-confirm copy that dynamically warns about mapper impact
+- **Admin UI — Claim Mappers settings page** at `/admin/workspaces/{slug}/settings/claim-mappers` with sidebar link after Webhooks. Table: attribute key, claim name, Access Token Yes/No badge, ID Token Yes/No badge, Delete. Dedicated New/Edit pages with readonly attribute-key field in edit mode, checkbox toggles for `includeInAccess`/`includeInId`, inline hints pointing to reserved-claim list
+- **OpenAPI v1 spec updated** — 6 new endpoint definitions, 5 new schemas (`UserAttributesDto`, `UpsertUserAttributeRequest`, `ClaimMapperDto`, `ClaimMappersDto`, `UpsertClaimMapperRequest`), 2 new tags (User Attributes, Claim Mappers), PII-in-JWT warning prominent in the feature description
+- **79 new domain/service tests** — `UserAttributeServiceTest` (15), `ClaimMapperServiceTest` (17), `CachingClaimMapperServiceTest` (7), `TokenClaimMappingTest` (12 integration covering full acceptance criteria: attribute+mapper → claim in token, DELETE attribute → claim absent, DELETE mapper → claim absent, zero mappers → byte-identical token, refresh-token re-projection, cross-tenant isolation). 26 new REST API tests (`ApiUserAttributeRoutesTest` + `ApiClaimMapperRoutesTest`). 10 new admin UI tests (`AdminUserAttributesAndClaimMappersTest`)
+
+### Changed
+
+- **`JwtTokenAdapter.issueUserTokens` now takes two extra parameters** (`customAccessClaims`, `customIdClaims`). Both default to `emptyMap()` — existing call sites that do not pass them receive the pre-feature token shape verbatim
+- **`OAuthService` constructor** gained optional `userAttributeRepository: UserAttributeRepository? = null` and `claimMappersFor: (TenantId) -> List<TenantClaimMapper> = { _ -> emptyList() }` parameters. Default-null wiring ensures existing `OAuthService(...)` callers in tests continue to compile and produce zero custom claims
+- **`adminRoutes()` signature** gained required `userAttributeService` + `claimMapperService` parameters. Existing admin test fixtures updated
+- **`ServiceGraph`** wires `UserAttributeService` and `CachingClaimMapperService` and exposes them as fields. The caching decorator registers itself as the `ClaimMapperCacheInvalidator` of its own wrapped `ClaimMapperService` — writes immediately drop the cached mapper list for that tenant
+
+### Security
+
+- **Reserved claim-name blocklist** prevents admins from stomping on standard OIDC and KotAuth-proprietary claims. Attempts return `400 Bad Request` with a specific claim name in the error body, both via API and admin UI
+- **Tenant-scoped `UNIQUE INDEX (tenant_id, claim_name)`** on `tenant_claim_mappers` closes a TOCTOU race between service-layer validation and DB insert — two concurrent writes mapping different attribute keys to the same claim name cannot both succeed
+- **PII warning** added prominently to OpenAPI spec and embedded in admin UI hints: "Attribute values flow unencrypted into JWTs, which are base64-decodable by anyone in possession of the token."
+- **20-mapper soft cap per tenant** prevents JWT-size abuse from admins configuring dozens of claim projections
+
+### Infrastructure
+
+- **Dependency wiring is self-invalidating** — `CachingClaimMapperService` implements `ClaimMapperCacheInvalidator` itself, passes `this` to the wrapped domain `ClaimMapperService` at construction. No mutable lateinit, no circular-reference workarounds
+
+---
+
 ## [1.5.8] - 2026-04-22
 
 ### Fixed
