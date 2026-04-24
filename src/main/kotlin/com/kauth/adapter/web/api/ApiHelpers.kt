@@ -179,6 +179,29 @@ data class ProblemDetail(
     val value: String,
 )
 
+/**
+ * Invite a new user — no password up front. The user will receive an email
+ * with an invite link and set their own password on first login.
+ * Requires SMTP to be configured on the tenant.
+ */
+@Serializable data class InviteUserRequest(
+    val username: String,
+    val email: String,
+    val fullName: String,
+)
+
+/**
+ * Response for admin-triggered temporary-password creation. The raw link is
+ * returned exactly once — callers MUST treat it as a secret and never persist
+ * or log it. Expires in 24 hours.
+ */
+@Serializable data class TemporaryPasswordResponse(
+    /** Full `/t/{slug}/change-password?token=...` URL to share with the user. */
+    val changePasswordUrl: String,
+    /** ISO-8601 expiry timestamp (24 hours from issuance). */
+    val expiresAt: String,
+)
+
 @Serializable data class UpsertClaimMapperRequest(
     val claimName: String,
     val includeInAccess: Boolean = true,

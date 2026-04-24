@@ -127,6 +127,34 @@ components:
         email:    { type: string, format: email }
         fullName: { type: string }
 
+    InviteUserRequest:
+      type: object
+      required: [username, email, fullName]
+      description: |
+        Invite a new user without a password. The user will receive an email
+        with a 72-hour invite link and set their own password on first login.
+        The tenant must have SMTP configured.
+      properties:
+        username: { type: string, maxLength: 128 }
+        email:    { type: string, format: email }
+        fullName: { type: string }
+
+    TemporaryPasswordResponse:
+      type: object
+      required: [changePasswordUrl, expiresAt]
+      description: |
+        Response for POST /users/{userId}/temporary-password. The raw link is
+        returned exactly once. Treat it as a secret and deliver to the user
+        over a trusted channel. Expires 24 hours after issuance.
+      properties:
+        changePasswordUrl:
+          type: string
+          format: uri
+          description: Full `/t/{slug}/change-password?token=…` URL
+        expiresAt:
+          type: string
+          format: date-time
+
     # ---- Roles ----
     RoleDto:
       type: object
@@ -352,6 +380,40 @@ paths:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
+  /users/invite:
+    post:
+      operationId: inviteUser
+      summary: Invite a new user via email
+      tags: [Users]
+      description: |
+        Creates a user without a password and emails them a 72-hour invite
+        link. The user sets their own password on first login. This is the
+        canonical onboarding path for platforms integrating KotAuth as their
+        auth provider — avoids provisioning passwords programmatically.
+
+        Requires SMTP to be configured on the tenant. Returns **422** if SMTP
+        is not ready.
+      security: [{ bearerAuth: [users:write] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InviteUserRequest" }
+      responses:
+        "201":
+          description: User created and invite email queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Username or email already in use
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /users/{userId}:
     parameters:
       - in: path
@@ -400,6 +462,63 @@ paths:
       description: Soft-disables the user. They cannot log in but their data is preserved.
       responses:
         "204": { description: User disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/send-reset-email:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+
+    post:
+      operationId: sendPasswordResetEmail
+      summary: Admin-triggered password reset email
+      tags: [Users]
+      description: |
+        Generates a password-reset token and emails it to the user via the
+        tenant's configured SMTP. Idempotent — safe to call multiple times.
+        Requires SMTP to be configured on the tenant.
+      security: [{ bearerAuth: [users:write] }]
+      responses:
+        "204": { description: Reset email queued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /users/{userId}/temporary-password:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+
+    post:
+      operationId: setTemporaryPassword
+      summary: Generate a one-time temporary-password link
+      tags: [Users]
+      description: |
+        Returns a one-time change-password URL that the user consumes to set
+        a new password. Useful for email-less onboarding flows (ops team
+        delivers the link over a trusted channel) or as a recovery tool when
+        SMTP is misconfigured.
+
+        The link is returned exactly once — the raw value is not persisted
+        or logged on the server. Treat it as a secret. Expires in 24 hours.
+
+        Stamps `CHANGE_PASSWORD` required action on the user — on next login
+        their current credentials are accepted but they are routed to a
+        forced-change-password page before tokens are issued.
+      security: [{ bearerAuth: [users:write] }]
+      responses:
+        "201":
+          description: Temporary-password link generated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TemporaryPasswordResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }

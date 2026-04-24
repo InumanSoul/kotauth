@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.UserId
@@ -7,7 +8,6 @@ import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -52,6 +52,35 @@ internal fun Route.apiUserRoutes(
                         email = body.email,
                         fullName = body.fullName,
                         password = body.password,
+                    )
+            ) {
+                is AdminResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())
+                is AdminResult.Failure -> call.respondAdminError(result.error)
+            }
+        }
+
+        /**
+         * Invite a new user — no password required. User receives an email
+         * with a 72-hour invite link and sets their own password on first login.
+         * Tenant must have SMTP configured. The canonical way to onboard users
+         * for third-party platforms integrating KotAuth as their auth provider.
+         */
+        post("/invite") {
+            requireScope(call, ApiScope.USERS_WRITE) ?: return@post
+            val tenantId = call.attributes[TenantIdAttr]
+            val body = call.receive<InviteUserRequest>()
+            val baseUrl = call.resolvedBaseUrl()
+
+            when (
+                val result =
+                    adminService.createUser(
+                        tenantId = tenantId,
+                        username = body.username,
+                        email = body.email,
+                        fullName = body.fullName,
+                        password = null,
+                        sendInvite = true,
+                        baseUrl = baseUrl,
                     )
             ) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.Created, result.value.toApiDto())
@@ -114,6 +143,71 @@ internal fun Route.apiUserRoutes(
 
                 when (val result = adminService.setUserEnabled(userId, tenantId, false)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                    is AdminResult.Failure -> call.respondAdminError(result.error)
+                }
+            }
+
+            /**
+             * Admin-triggered password reset email. Generates a standard reset
+             * token and sends it via the tenant's configured SMTP. Safe to call
+             * on users with any status — idempotent.
+             */
+            post("/send-reset-email") {
+                requireScope(call, ApiScope.USERS_WRITE) ?: return@post
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId =
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                        ?: return@post call.respondProblem(
+                            HttpStatusCode.BadRequest,
+                            "Invalid user ID",
+                            "userId must be an integer.",
+                        )
+                val baseUrl = call.resolvedBaseUrl()
+                when (val result = adminService.sendPasswordResetEmail(userId, tenantId, baseUrl)) {
+                    is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                    is AdminResult.Failure -> call.respondAdminError(result.error)
+                }
+            }
+
+            /**
+             * Generates a one-time temporary-password link for the user and
+             * returns it in the response. The user is stamped with
+             * CHANGE_PASSWORD required action — on next login the credentials
+             * are accepted but they are routed to a forced-change-password
+             * page. Link expires in 24 hours.
+             *
+             * Response body contains the raw link. Callers MUST treat it as a
+             * secret — do not log, do not email, hand it to the user over a
+             * trusted channel.
+             */
+            post("/temporary-password") {
+                requireScope(call, ApiScope.USERS_WRITE) ?: return@post
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId =
+                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
+                        ?: return@post call.respondProblem(
+                            HttpStatusCode.BadRequest,
+                            "Invalid user ID",
+                            "userId must be an integer.",
+                        )
+                when (val result = adminService.setTemporaryPassword(userId, tenantId)) {
+                    is AdminResult.Success -> {
+                        val slug = call.parameters["tenantSlug"] ?: ""
+                        val baseUrl = call.resolvedBaseUrl()
+                        val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
+                        call.respond(
+                            HttpStatusCode.Created,
+                            TemporaryPasswordResponse(
+                                changePasswordUrl = changeUrl,
+                                expiresAt =
+                                    isoFormatter.format(
+                                        java.time.Instant
+                                            .now()
+                                            .plusSeconds(24 * 3600),
+                                    ),
+                            ),
+                        )
+                    }
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }
             }
