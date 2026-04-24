@@ -166,6 +166,26 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
+        // Admin-initiated forced password change — checked AFTER password verify so
+        // attackers cannot enumerate which users have the CHANGE_PASSWORD flag by
+        // observing response differences on invalid credentials. Unlike SET_PASSWORD
+        // (sentinel hash), these users have a real password and authenticate normally
+        // before being routed to the change-password page.
+        if (RequiredAction.CHANGE_PASSWORD in user.requiredActions) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "password_change_required"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.PasswordChangeRequired)
+        }
+
         // Enforce password expiry if configured and the user has a recorded
         // last-change timestamp. Users created before expiry was enabled (null timestamp)
         // are not affected until they next change their password — prevents mass lockouts
@@ -421,4 +441,10 @@ sealed class AuthError {
 
     /** The user was created via invite and has not yet set a password. */
     object PendingSetup : AuthError()
+
+    /**
+     * Admin forced a password change. Surface to the web adapter so it can
+     * redirect the user to the change-password page instead of issuing tokens.
+     */
+    object PasswordChangeRequired : AuthError()
 }

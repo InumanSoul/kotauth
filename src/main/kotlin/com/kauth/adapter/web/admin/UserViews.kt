@@ -26,6 +26,12 @@ internal fun userDetailPageImpl(
     /** attribute_key -> claim_name for keys that have a mapper configured. */
     mappedKeys: Map<String, String> = emptyMap(),
     attributeError: String? = null,
+    /**
+     * One-time reveal of a forced-change-password link. Shown once when the
+     * admin has just clicked "Set temporary password"; on refresh the flash
+     * slot is empty and the panel is gone.
+     */
+    tempPasswordLink: String? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -86,6 +92,17 @@ internal fun userDetailPageImpl(
                     }
                 }
                 div("user-header__actions") {
+                    if (RequiredAction.SET_PASSWORD !in user.requiredActions) {
+                        postButton(
+                            action =
+                                "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/set-temporary-password",
+                            label = "Set Temporary Password",
+                            btnClass = "btn btn--ghost",
+                            confirmMessage =
+                                "Force this user to change their password on next login? " +
+                                    "A one-time link will be displayed for you to share with them.",
+                        )
+                    }
                     if (workspace.isSmtpReady) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/send-reset-email",
@@ -119,6 +136,33 @@ internal fun userDetailPageImpl(
                     title = "Account temporarily locked",
                     description = "Locked due to repeated failed login attempts. The account will auto-unlock after the lockout period expires, or you can unlock it immediately.",
                 )
+            }
+
+            if (tempPasswordLink != null) {
+                div("notice notice--success") {
+                    div("notice__body") {
+                        style = "flex:1;gap:var(--space-2);"
+                        div("notice__title") { +"Temporary change-password link generated" }
+                        div("notice__desc") {
+                            +"Copy it now — it's valid for 24 hours and will be displayed only once."
+                        }
+                        div("copy-field") {
+                            style = "margin-top:var(--space-2);"
+                            span("copy-field__value") { +tempPasswordLink }
+                            button(type = ButtonType.button) {
+                                classes = setOf("copy-field__btn")
+                                attributes["data-copy"] = tempPasswordLink
+                                title = "Copy"
+                                inlineSvgIcon("copy", "Copy")
+                            }
+                        }
+                        div("notice__desc") {
+                            style = "margin-top:var(--space-2);"
+                            +"Send this link to the user over a secure channel. "
+                            +"The next time they log in normally, they'll also be redirected here."
+                        }
+                    }
+                }
             }
 
             // ── Profile (read mode — swapped via htmx) ──────────────

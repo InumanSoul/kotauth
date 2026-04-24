@@ -117,6 +117,7 @@ class AdminService(
         lockoutMaxAttempts: Int = 0,
         lockoutDurationMinutes: Int = 15,
         corsAllowCredentials: Boolean = false,
+        hibpCheckEnabled: Boolean = false,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -161,6 +162,7 @@ class AdminService(
                         lockoutMaxAttempts = lockoutMaxAttempts.coerceAtLeast(0),
                         lockoutDurationMinutes = lockoutDurationMinutes.coerceAtLeast(1),
                         corsAllowCredentials = corsAllowCredentials,
+                        hibpCheckEnabled = hibpCheckEnabled,
                     ),
             )
 
@@ -830,6 +832,50 @@ class AdminService(
                     ),
                 )
                 AdminResult.Success(Unit)
+            }
+            is SelfServiceResult.Failure ->
+                AdminResult.Failure(AdminError.Validation(result.error.message))
+        }
+    }
+
+    /**
+     * Admin action: force a user to change their password on next login.
+     *
+     * Generates a one-time change-password token (24-hour expiry), stamps
+     * [RequiredAction.CHANGE_PASSWORD] on the account, and returns the raw
+     * token for one-time display in the admin console. The token is never
+     * stored or logged in plaintext.
+     *
+     * On next login, [AuthService] rejects the credentials with
+     * [AuthError.PasswordChangeRequired] and the web adapter redirects the
+     * user to `/t/{slug}/change-password?token={raw}`.
+     *
+     * The returned raw token must be shown to the admin exactly once.
+     */
+    fun setTemporaryPassword(
+        userId: UserId,
+        tenantId: TenantId,
+    ): AdminResult<String> {
+        tenantRepository.findById(tenantId)
+            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        return when (val result = selfServiceService.initiateForcedPasswordChange(user)) {
+            is SelfServiceResult.Success -> {
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenantId,
+                        userId = userId,
+                        clientId = null,
+                        eventType = AuditEventType.ADMIN_FORCED_PASSWORD_CHANGE,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username),
+                    ),
+                )
+                AdminResult.Success(result.value)
             }
             is SelfServiceResult.Failure ->
                 AdminResult.Failure(AdminError.Validation(result.error.message))

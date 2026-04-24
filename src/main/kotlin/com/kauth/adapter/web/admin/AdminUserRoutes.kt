@@ -152,7 +152,14 @@ fun Route.adminUserRoutes(
                         "reset_email_failed" -> "Failed to send password reset email. Check SMTP configuration."
                         "verification_failed" -> "Failed to send verification email. Check SMTP configuration."
                         "invite_send_failed" -> EnglishStrings.TOAST_INVITE_SEND_FAILED
+                        "temp_password_failed" -> "Could not generate a temporary password link. Try again."
                         else -> null
+                    }
+                val tempPasswordLink =
+                    if (savedParam == "temp_password_set") {
+                        FlashStore.take(call.request.queryParameters["flash"])
+                    } else {
+                        null
                     }
                 call.respondHtml(
                     HttpStatusCode.OK,
@@ -168,6 +175,7 @@ fun Route.adminUserRoutes(
                         groups = userGroups,
                         userAttributes = attributes,
                         mappedKeys = mappedKeys,
+                        tempPasswordLink = tempPasswordLink,
                     ),
                 )
             }
@@ -352,6 +360,29 @@ fun Route.adminUserRoutes(
                     is AdminResult.Failure ->
                         call.respondRedirect(
                             "/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_failed",
+                        )
+                }
+            }
+
+            post("/set-temporary-password") {
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
+                val baseUrl = call.resolvedBaseUrl()
+                when (val result = adminService.setTemporaryPassword(userId, workspace.id)) {
+                    is AdminResult.Success -> {
+                        val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
+                        val flashToken = FlashStore.put(changeUrl)
+                        call.respondRedirect(
+                            "/admin/workspaces/$slug/users/${userId.value}?" +
+                                "saved=temp_password_set&flash=$flashToken",
+                        )
+                    }
+                    is AdminResult.Failure ->
+                        call.respondRedirect(
+                            "/admin/workspaces/$slug/users/${userId.value}?saved=temp_password_failed",
                         )
                 }
             }

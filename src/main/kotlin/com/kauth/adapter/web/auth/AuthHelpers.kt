@@ -221,6 +221,9 @@ internal fun AuthError.toMessage(): String =
         is AuthError.PendingSetup ->
             "This account has a pending invitation. Check your email for the invite link, " +
                 "or ask your administrator to resend it."
+        is AuthError.PasswordChangeRequired ->
+            "An administrator has required you to change your password. " +
+                "Follow the link provided to set a new one."
     }
 
 internal fun SocialLoginError.toMessage(): String =
