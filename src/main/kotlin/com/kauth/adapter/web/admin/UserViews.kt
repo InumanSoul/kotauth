@@ -22,6 +22,10 @@ internal fun userDetailPageImpl(
     editError: String? = null,
     roles: List<Role> = emptyList(),
     groups: List<Group> = emptyList(),
+    userAttributes: Map<String, String> = emptyMap(),
+    /** attribute_key -> claim_name for keys that have a mapper configured. */
+    mappedKeys: Map<String, String> = emptyMap(),
+    attributeError: String? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -119,6 +123,15 @@ internal fun userDetailPageImpl(
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
+
+            // ── Custom Attributes ────────────────────────────────────
+            userAttributesSection(
+                workspace = workspace,
+                user = user,
+                attributes = userAttributes,
+                mappedKeys = mappedKeys,
+                error = attributeError,
+            )
 
             // ── Active Sessions ──────────────────────────────────────
             div("ov-card") {
@@ -755,3 +768,214 @@ internal fun createUserPageImpl(
                     }
 }
     }
+
+// ─── User Attributes section (rendered on user detail page) ─────────────────
+
+private fun FlowContent.userAttributesSection(
+    workspace: Tenant,
+    user: User,
+    attributes: Map<String, String>,
+    mappedKeys: Map<String, String>,
+    error: String?,
+) {
+    val slug = workspace.slug
+    val userIdValue = user.id?.value ?: return
+    val base = "/admin/workspaces/$slug/users/$userIdValue/attributes"
+
+    div("ov-card") {
+        div("ov-card__section-label") {
+            span { +"Custom Attributes" }
+            a(href = "$base/new", classes = "btn btn--ghost btn--sm") {
+                +"Add attribute"
+            }
+        }
+
+        if (error != null) {
+            div("notice notice--error") { +error }
+        }
+
+        if (attributes.isEmpty()) {
+            emptyState(
+                iconName = "key",
+                title = "No custom attributes",
+                description =
+                    "Add key-value pairs to this user. Configure how they appear in JWTs under " +
+                        "Settings → Claim Mappers.",
+            )
+        } else {
+            table("data-table") {
+                thead {
+                    tr {
+                        th { +"Key" }
+                        th { +"Value" }
+                        th { style = "width:120px;" }
+                    }
+                }
+                tbody {
+                    attributes.entries
+                        .sortedBy { it.key }
+                        .forEach { (key, value) ->
+                            tr {
+                                td {
+                                    span("data-table__id") { +key }
+                                    val claimName = mappedKeys[key]
+                                    if (claimName != null) {
+                                        div {
+                                            style = "margin-top:4px;"
+                                            span("badge badge--id-muted") { +"→ $claimName" }
+                                        }
+                                    } else {
+                                        div {
+                                            style = "margin-top:4px;font-size:11px;color:var(--color-subtle);"
+                                            a(
+                                                href =
+                                                    "/admin/workspaces/$slug/settings/claim-mappers/new" +
+                                                        "?attributeKey=$key",
+                                            ) { +"Configure mapping →" }
+                                        }
+                                    }
+                                }
+                                td { +value }
+                                td {
+                                    div("data-table__actions") {
+                                        a(
+                                            href = "$base/${encodeUriComponent(key)}/edit",
+                                            classes = "btn btn--ghost btn--sm",
+                                        ) { +"Edit" }
+                                        postButton(
+                                            action = "$base/${encodeUriComponent(key)}/delete",
+                                            label = "Delete",
+                                            btnClass = "btn btn--danger btn--sm",
+                                            confirmMessage =
+                                                if (mappedKeys.containsKey(key)) {
+                                                    "Delete attribute '$key'? The '${mappedKeys[key]}' claim " +
+                                                        "will stop appearing in tokens for this user."
+                                                } else {
+                                                    "Delete attribute '$key'?"
+                                                },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                }
+            }
+        }
+    }
+}
+
+internal fun userAttributeFormPageImpl(
+    workspace: Tenant,
+    user: User,
+    allWorkspaces: List<WorkspaceStub>,
+    loggedInAs: String,
+    existingKey: String? = null,
+    prefillKey: String = "",
+    prefillValue: String = "",
+    error: String? = null,
+): HTML.() -> Unit =
+    {
+        val slug = workspace.slug
+        val userIdValue = user.id?.value ?: 0
+        val isEdit = existingKey != null
+
+        adminShell(
+            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} — ${user.username}",
+            activeRail = "directory",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
+            loggedInAs = loggedInAs,
+            activeAppSection = "users",
+            contentClass = "content-outer",
+        ) {
+            div("content-inner") {
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    slug to "/admin/workspaces/$slug",
+                    "Users" to "/admin/workspaces/$slug/users",
+                    user.username to "/admin/workspaces/$slug/users/$userIdValue",
+                    (if (isEdit) "Edit Attribute" else "Add Attribute") to null,
+                )
+
+                div("page-header") {
+                    div("page-header__left") {
+                        div("page-header__identity") {
+                            h1("page-header__title") {
+                                +(if (isEdit) "Edit Attribute" else "Add Attribute")
+                            }
+                            p("page-header__sub") {
+                                +"Attribute values are stored as strings. They appear in JWTs only when a "
+                                +"claim mapper is configured for the key."
+                            }
+                        }
+                    }
+                    div("page-header__actions") {
+                        button(type = ButtonType.submit, classes = "btn btn--primary") {
+                            attributes["form"] = "attribute-form"
+                            +(if (isEdit) "Save" else "Add Attribute")
+                        }
+                    }
+                }
+
+                if (error != null) {
+                    div("notice notice--error") { +error }
+                }
+
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Attribute Details" }
+                    form(
+                        action =
+                            if (isEdit) {
+                                "/admin/workspaces/$slug/users/$userIdValue/attributes/" +
+                                    encodeUriComponent(existingKey)
+                            } else {
+                                "/admin/workspaces/$slug/users/$userIdValue/attributes"
+                            },
+                        method = FormMethod.post,
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    ) {
+                        id = "attribute-form"
+
+                        div("edit-row") {
+                            span("edit-row__label") { +"Key" }
+                            div {
+                                input(type = InputType.text, name = "key") {
+                                    classes = setOf("edit-row__field")
+                                    required = true
+                                    maxLength = "64"
+                                    placeholder = "plan"
+                                    value = prefillKey
+                                    if (isEdit) readonly = true
+                                }
+                                div("edit-row__hint") {
+                                    +"Example keys: plan, trial_ends, sifen_env. Keys are opaque to KotAuth."
+                                }
+                            }
+                        }
+
+                        div("edit-row") {
+                            span("edit-row__label") { +"Value" }
+                            div {
+                                textArea {
+                                    classes = setOf("edit-row__field")
+                                    name = "value"
+                                    rows = "3"
+                                    attributes["maxlength"] = "1024"
+                                    placeholder = "e.g. trial, 2026-05-21, staging"
+                                    +prefillValue
+                                }
+                                div("edit-row__hint") {
+                                    +"Stored as plain text (max 1024 characters). Callers serialize their own types."
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+private fun encodeUriComponent(input: String): String =
+    java.net.URLEncoder.encode(input, "UTF-8").replace("+", "%20")

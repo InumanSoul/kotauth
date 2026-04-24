@@ -5,10 +5,12 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.UserAttributeService
+import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -23,6 +25,8 @@ fun Route.adminUserRoutes(
     adminService: AdminService,
     roleGroupService: RoleGroupService,
     sessionRepository: SessionRepository,
+    userAttributeService: UserAttributeService,
+    claimMapperService: CachingClaimMapperService,
 ) {
     route("/users") {
         get {
@@ -119,6 +123,14 @@ fun Route.adminUserRoutes(
                 val sessions = sessionRepository.findActiveByUser(ctx.workspace.id, userId)
                 val userRoles = roleGroupService.getRolesForUser(userId)
                 val userGroups = roleGroupService.getGroupsForUser(userId)
+                val attributes =
+                    (userAttributeService.list(userId, ctx.workspace.id) as? AttributeResult.Success)
+                        ?.value
+                        ?: emptyMap()
+                val mappedKeys =
+                    claimMapperService
+                        .list(ctx.workspace.id)
+                        .associate { it.attributeKey to it.claimName }
                 val savedParam = call.request.queryParameters["saved"]
                 val successMsg =
                     when (savedParam) {
@@ -131,6 +143,8 @@ fun Route.adminUserRoutes(
                         "verification_sent" -> EnglishStrings.TOAST_VERIFICATION_SENT
                         "invite_sent" -> EnglishStrings.TOAST_INVITE_SENT
                         "invite_resent" -> EnglishStrings.TOAST_INVITE_RESENT
+                        "attribute_saved" -> "Attribute saved."
+                        "attribute_deleted" -> "Attribute deleted."
                         else -> null
                     }
                 val errorParam =
@@ -152,6 +166,8 @@ fun Route.adminUserRoutes(
                         editError = errorParam,
                         roles = userRoles,
                         groups = userGroups,
+                        userAttributes = attributes,
+                        mappedKeys = mappedKeys,
                     ),
                 )
             }
@@ -356,6 +372,168 @@ fun Route.adminUserRoutes(
                         )
                 }
             }
+
+            // ── Attributes: new form ────────────────────────────────────
+            get("/attributes/new") {
+                val ctx = call.adminContext()
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val user =
+                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
+                    }
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.userAttributeFormPage(
+                        workspace = ctx.workspace,
+                        user = user,
+                        allWorkspaces = ctx.wsPairs,
+                        loggedInAs = ctx.session.username,
+                    ),
+                )
+            }
+
+            // ── Attributes: edit form ───────────────────────────────────
+            get("/attributes/{attrKey}/edit") {
+                val ctx = call.adminContext()
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val attrKey =
+                    call.parameters["attrKey"]
+                        ?: return@get call.respond(HttpStatusCode.BadRequest)
+                val user =
+                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
+                    }
+                val existing =
+                    (userAttributeService.list(userId, ctx.workspace.id) as? AttributeResult.Success)
+                        ?.value
+                        ?.get(attrKey)
+                        ?: return@get call.respondRedirect(
+                            "/admin/workspaces/${ctx.slug}/users/${userId.value}",
+                        )
+                call.respondHtml(
+                    HttpStatusCode.OK,
+                    AdminView.userAttributeFormPage(
+                        workspace = ctx.workspace,
+                        user = user,
+                        allWorkspaces = ctx.wsPairs,
+                        loggedInAs = ctx.session.username,
+                        existingKey = attrKey,
+                        prefillKey = attrKey,
+                        prefillValue = existing,
+                    ),
+                )
+            }
+
+            // ── Attributes: create (POST) ───────────────────────────────
+            post("/attributes") {
+                val ctx = call.adminContext()
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val params = call.receiveParameters()
+                val key = params["key"]?.trim().orEmpty()
+                val value = params["value"] ?: ""
+
+                when (val result = userAttributeService.upsert(userId, ctx.workspace.id, key, value)) {
+                    is AttributeResult.Success ->
+                        call.respondRedirect(
+                            "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_saved",
+                        )
+                    else -> {
+                        val user =
+                            when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                                is AdminResult.Success -> r.value
+                                is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
+                            }
+                        call.respondHtml(
+                            HttpStatusCode.UnprocessableEntity,
+                            AdminView.userAttributeFormPage(
+                                workspace = ctx.workspace,
+                                user = user,
+                                allWorkspaces = ctx.wsPairs,
+                                loggedInAs = ctx.session.username,
+                                prefillKey = key,
+                                prefillValue = value,
+                                error = attributeErrorMessage(result),
+                            ),
+                        )
+                    }
+                }
+            }
+
+            // ── Attributes: update (POST to existing key) ───────────────
+            post("/attributes/{attrKey}") {
+                val ctx = call.adminContext()
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val attrKey =
+                    call.parameters["attrKey"]
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val params = call.receiveParameters()
+                val value = params["value"] ?: ""
+
+                when (val result = userAttributeService.upsert(userId, ctx.workspace.id, attrKey, value)) {
+                    is AttributeResult.Success ->
+                        call.respondRedirect(
+                            "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_saved",
+                        )
+                    else -> {
+                        val user =
+                            when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                                is AdminResult.Success -> r.value
+                                is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
+                            }
+                        call.respondHtml(
+                            HttpStatusCode.UnprocessableEntity,
+                            AdminView.userAttributeFormPage(
+                                workspace = ctx.workspace,
+                                user = user,
+                                allWorkspaces = ctx.wsPairs,
+                                loggedInAs = ctx.session.username,
+                                existingKey = attrKey,
+                                prefillKey = attrKey,
+                                prefillValue = value,
+                                error = attributeErrorMessage(result),
+                            ),
+                        )
+                    }
+                }
+            }
+
+            // ── Attributes: delete ──────────────────────────────────────
+            post("/attributes/{attrKey}/delete") {
+                val ctx = call.adminContext()
+                val userId =
+                    call.parameters.typedId("userId", ::UserId)
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val attrKey =
+                    call.parameters["attrKey"]
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                userAttributeService.delete(userId, ctx.workspace.id, attrKey)
+                call.respondRedirect(
+                    "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_deleted",
+                )
+            }
         }
     }
 }
+
+private fun attributeErrorMessage(result: AttributeResult<*>): String =
+    when (result) {
+        is AttributeResult.Success<*> -> "Unexpected internal state."
+        is AttributeResult.ValidationError -> result.reason
+        is AttributeResult.NotFound -> "${result.resource} not found."
+        is AttributeResult.ReservedClaimName ->
+            "Reserved claim name '${result.claimName}'."
+        is AttributeResult.DuplicateClaimName ->
+            "Duplicate claim name '${result.claimName}'."
+        is AttributeResult.LimitReached ->
+            "Mapper limit of ${result.max} reached."
+    }

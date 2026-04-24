@@ -396,6 +396,8 @@ fun Application.module(
             roleRepository = s.roleRepository,
             keyRotationService = s.keyRotationService,
             tenantKeyRepository = s.tenantKeyRepository,
+            userAttributeService = s.userAttributeService,
+            claimMapperService = s.claimMapperService,
             corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
         )

@@ -34,7 +34,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
@@ -156,16 +155,13 @@ class AdminApiKeysTest {
         val adminRole =
             roleRepo.add(
                 com.kauth.domain.model.Role(
-                    tenantId =
-                        com.kauth.domain.model
-                            .TenantId(1),
+                    tenantId = TenantId(1),
                     name = "admin",
                     scope = com.kauth.domain.model.RoleScope.TENANT,
                 ),
             )
         roleRepo.assignRoleToUser(
-            com.kauth.domain.model
-                .UserId(1),
+            UserId(1),
             adminRole.id!!,
         )
     }
@@ -284,7 +280,7 @@ class AdminApiKeysTest {
                         username = "admin",
                     ),
                 )
-                call.respond(io.ktor.http.HttpStatusCode.OK, "session set")
+                call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
                 adminService = buildAdminService(),
@@ -299,6 +295,15 @@ class AdminApiKeysTest {
                 apiKeyService = apiKeyService,
                 encryptionService = encryptionService,
                 roleRepository = roleRepo,
+                userAttributeService =
+                    com.kauth.domain.service.UserAttributeService(
+                        userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),
+                        userRepository = userRepo,
+                    ),
+                claimMapperService =
+                    com.kauth.infrastructure.CachingClaimMapperService(
+                        mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
+                    ),
             )
         }
     }

@@ -140,10 +140,10 @@ class AdminRoutesTest {
         // Seed admin role and assign to admin user (required for OAuth callback role check)
         val adminRole =
             roleRepo.add(
-                com.kauth.domain.model.Role(
+                Role(
                     tenantId = TenantId(1),
                     name = "admin",
-                    scope = com.kauth.domain.model.RoleScope.TENANT,
+                    scope = RoleScope.TENANT,
                 ),
             )
         roleRepo.assignRoleToUser(UserId(1), adminRole.id!!)
@@ -617,6 +617,15 @@ class AdminRoutesTest {
                 keyProvisioningService = keyProvisioningService,
                 encryptionService = encryptionService,
                 oauthService = null,
+                userAttributeService =
+                    com.kauth.domain.service.UserAttributeService(
+                        userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),
+                        userRepository = userRepo,
+                    ),
+                claimMapperService =
+                    com.kauth.infrastructure.CachingClaimMapperService(
+                        mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
+                    ),
             )
         }
     }
@@ -624,9 +633,9 @@ class AdminRoutesTest {
     /**
      * Test app with a mockk OAuthService stub.
      *
-     * The stub returns an [OAuthResult.Success] whose access_token equals whatever
+     * The stub returns an `OAuthResult.Success` whose access_token equals whatever
      * code was passed in — this lets the test craft a fake JWT as the "code" so that
-     * [decodeJwtPayload] inside the route can parse `sub` and `preferred_username`.
+     * `decodeJwtPayload` inside the route can parse `sub` and `preferred_username`.
      *
      * When [adminRole] is true the admin user is given the "admin" role on the master
      * tenant so the role-check branch succeeds. When false the role check fails → 403.
@@ -691,6 +700,15 @@ class AdminRoutesTest {
                 oauthService = oauthSvcMock,
                 selfServiceService = buildSelfService(),
                 roleRepository = roleRepo,
+                userAttributeService =
+                    com.kauth.domain.service.UserAttributeService(
+                        userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),
+                        userRepository = userRepo,
+                    ),
+                claimMapperService =
+                    com.kauth.infrastructure.CachingClaimMapperService(
+                        mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
+                    ),
             )
         }
     }
@@ -713,12 +731,16 @@ class AdminRoutesTest {
     }
 
     /**
-     * Builds a minimal fake JWT whose payload encodes [userId] and [username]
-     * in the format that [decodeJwtPayload] inside AdminRoutes.kt can parse.
+     * Builds a minimal fake JWT whose payload encodes the userId and username
+     * in the format that `decodeJwtPayload` inside AdminRoutes.kt can parse.
      *
      * Format: "header.payload.sig" where payload is base64url-encoded JSON.
      * The regex inside decodeJwtPayload matches: "key": "value" or "key": 123
+     *
+     * Note: the helper only has one caller inside this file that always passes
+     * (1, "admin") — the param values are locked in by that single use, not a bug.
      */
+    @Suppress("SameParameterValue")
     private fun buildFakeJwt(
         userId: Int,
         username: String,

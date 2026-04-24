@@ -159,7 +159,45 @@ object AdminView {
         editError: String? = null,
         roles: List<Role> = emptyList(),
         groups: List<Group> = emptyList(),
-    ): HTML.() -> Unit = userDetailPageImpl(workspace, user, sessions, allWorkspaces, loggedInAs, successMessage, editError, roles, groups)
+        userAttributes: Map<String, String> = emptyMap(),
+        mappedKeys: Map<String, String> = emptyMap(),
+        attributeError: String? = null,
+    ): HTML.() -> Unit =
+        userDetailPageImpl(
+            workspace,
+            user,
+            sessions,
+            allWorkspaces,
+            loggedInAs,
+            successMessage,
+            editError,
+            roles,
+            groups,
+            userAttributes,
+            mappedKeys,
+            attributeError,
+        )
+
+    fun userAttributeFormPage(
+        workspace: Tenant,
+        user: User,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        existingKey: String? = null,
+        prefillKey: String = "",
+        prefillValue: String = "",
+        error: String? = null,
+    ): HTML.() -> Unit =
+        userAttributeFormPageImpl(
+            workspace,
+            user,
+            allWorkspaces,
+            loggedInAs,
+            existingKey,
+            prefillKey,
+            prefillValue,
+            error,
+        )
 
     // ── User htmx fragments ──────────────────────────────────────────
 
@@ -347,4 +385,25 @@ object AdminView {
         error: String? = null,
         toastMessage: String? = null,
     ): HTML.() -> Unit = keyManagementPageImpl(workspace, allWorkspaces, loggedInAs, keys, error, toastMessage)
+
+    // ── Claim Mappers ───────────────────────────────────────────────────
+
+    fun claimMappersListPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        mappers: List<com.kauth.domain.model.TenantClaimMapper>,
+        error: String? = null,
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        claimMappersListPageImpl(workspace, allWorkspaces, loggedInAs, mappers, error, toastMessage)
+
+    fun claimMapperFormPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        prefill: com.kauth.domain.model.TenantClaimMapper? = null,
+        error: String? = null,
+    ): HTML.() -> Unit =
+        claimMapperFormPageImpl(workspace, allWorkspaces, loggedInAs, prefill, error)
 }

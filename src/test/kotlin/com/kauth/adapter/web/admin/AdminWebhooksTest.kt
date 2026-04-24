@@ -37,7 +37,6 @@ import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
@@ -299,6 +298,15 @@ class AdminWebhooksTest {
                 webhookService = webhookService,
                 encryptionService = encryptionService,
                 roleRepository = roleRepo,
+                userAttributeService =
+                    com.kauth.domain.service.UserAttributeService(
+                        userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),
+                        userRepository = userRepo,
+                    ),
+                claimMapperService =
+                    com.kauth.infrastructure.CachingClaimMapperService(
+                        mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
+                    ),
             )
         }
     }

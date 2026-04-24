@@ -424,4 +424,5 @@ internal fun DIV.renderSettingsCtxPanel(
     div("sidebar__divider") {}
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
+    ctxLink("$base/claim-mappers", "claim-mappers", activeSection, "Claim Mappers")
 }
