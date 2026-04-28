@@ -33,7 +33,7 @@ internal fun Route.selfServiceRoutes(
             }
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.forgotPasswordPage(slug, theme, workspaceName, error = errorMsg, sent = sent),
+            AuthView.forgotPasswordPage(slug, ctx.viewContext, error = errorMsg, sent = sent),
         )
     }
 
@@ -66,7 +66,7 @@ internal fun Route.selfServiceRoutes(
         val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, passwordPolicy = policy),
+            AuthView.resetPasswordPage(slug, ctx.viewContext, token = token, passwordPolicy = policy),
         )
     }
 
@@ -88,8 +88,7 @@ internal fun Route.selfServiceRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.resetPasswordPage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes and try again.",
                     passwordPolicy = policy,
@@ -103,8 +102,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.OK,
                     AuthView.resetPasswordPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         token = token,
                         success = true,
                         passwordPolicy = policy,
@@ -115,8 +113,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.resetPasswordPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         token = token,
                         error = result.error.message,
                         passwordPolicy = policy,

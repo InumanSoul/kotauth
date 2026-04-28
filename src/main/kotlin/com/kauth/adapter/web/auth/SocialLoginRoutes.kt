@@ -66,8 +66,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                     ),
@@ -109,8 +108,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "Login with ${provider.displayName} was cancelled or failed.",
                     enabledProviders = enabledProviders,
                 ),
@@ -129,8 +127,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "Invalid or expired state parameter. Please try signing in again.",
                     enabledProviders = enabledProviders,
                 ),
@@ -144,8 +141,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "State mismatch. Please try signing in again.",
                     enabledProviders = enabledProviders,
                 ),
@@ -185,8 +181,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                     ),
@@ -244,8 +239,7 @@ internal fun Route.socialLoginRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.loginPage(
                                     tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
+                                    ctx = ctx.viewContext,
                                     error = codeResult.error.toDescription(),
                                     enabledProviders = enabledProviders,
                                 ),

@@ -34,7 +34,7 @@ internal fun Route.mfaRoutes(
 
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.mfaChallengePage(slug, theme, workspaceName),
+            AuthView.mfaChallengePage(slug, ctx.viewContext),
         )
     }
 
@@ -53,8 +53,7 @@ internal fun Route.mfaRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.mfaChallengePage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     error = "Too many attempts. Please wait a few minutes and try again.",
                 ),
             )
@@ -83,8 +82,7 @@ internal fun Route.mfaRoutes(
                 HttpStatusCode.Unauthorized,
                 AuthView.mfaChallengePage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     error = "MFA challenge expired. Please log in again.",
                 ),
             )
@@ -107,8 +105,7 @@ internal fun Route.mfaRoutes(
                     HttpStatusCode.Unauthorized,
                     AuthView.mfaChallengePage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         error = "Invalid code. Please try again.",
                     ),
                 )
@@ -134,8 +131,7 @@ internal fun Route.mfaRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.mfaChallengePage(
                                     slug,
-                                    theme,
-                                    workspaceName,
+                                    ctx.viewContext,
                                     error = message,
                                 ),
                             )

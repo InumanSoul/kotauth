@@ -30,8 +30,7 @@ internal fun Route.acceptInviteRoutes(
             HttpStatusCode.OK,
             AuthView.acceptInvitePage(
                 ctx.slug,
-                ctx.theme,
-                ctx.workspaceName,
+                ctx.viewContext,
                 token = token,
                 passwordPolicy = policy,
             ),
@@ -53,8 +52,7 @@ internal fun Route.acceptInviteRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.acceptInvitePage(
                     ctx.slug,
-                    ctx.theme,
-                    ctx.workspaceName,
+                    ctx.viewContext,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes.",
                     passwordPolicy = policy,
@@ -68,8 +66,7 @@ internal fun Route.acceptInviteRoutes(
                     HttpStatusCode.OK,
                     AuthView.acceptInvitePage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         success = true,
                         passwordPolicy = policy,
@@ -80,8 +77,7 @@ internal fun Route.acceptInviteRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.acceptInvitePage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         error = result.error.message,
                         passwordPolicy = policy,

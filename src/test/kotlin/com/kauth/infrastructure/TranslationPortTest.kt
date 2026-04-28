@@ -169,13 +169,11 @@ class TranslationPortTest {
     fun `placeholders fall through to English template substitution on key fallback`(
         @TempDir dir: Path,
     ) {
-        // Spanish bundle does not define PASSWORD_MIN_PLACEHOLDER → fallback to English.
-        // EnglishStrings has it as a function, not a const, so the fallback returns
-        // the key. This documents the boundary: function-based templates don't
-        // participate in i18n until migrated to `{0}` placeholders.
+        // Spanish bundle does not define PASSWORD_MIN_PLACEHOLDER → falls back to the
+        // English template "Minimum {0} characters" and substitutes the argument.
         writeBundle(dir, "es", emptyMap())
         val t = BundleTranslation(dir)
-        assertEquals("PASSWORD_MIN_PLACEHOLDER", t.t("PASSWORD_MIN_PLACEHOLDER", "es", 8))
+        assertEquals("Minimum 8 characters", t.t("PASSWORD_MIN_PLACEHOLDER", "es", 8))
     }
 
     // =========================================================================
