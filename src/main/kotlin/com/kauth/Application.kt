@@ -347,6 +347,7 @@ fun Application.module(
             encryptionService = s.encryptionService,
             corsService = s.corsService,
             corsPort = s.corsOriginCache,
+            translationPort = s.translationPort,
         )
 
         portalRoutes(

@@ -23,12 +23,18 @@ import io.ktor.util.AttributeKey
  * [tenant] is nullable — some auth pages render a default theme when the
  * tenant slug does not match. Handlers that require a non-null tenant
  * (e.g., OAuth protocol endpoints) check `ctx.tenant ?: return 404`.
+ *
+ * [theme] and [workspaceName] are retained as plain fields for views that
+ * have not yet migrated to [ViewContext]. [viewContext] is the canonical
+ * way for new and migrated views to reach `theme + workspaceName + locale +
+ * translator` as a single bundle.
  */
 data class AuthTenantContext(
     val slug: String,
     val tenant: Tenant?,
     val theme: TenantTheme,
     val workspaceName: String,
+    val viewContext: com.kauth.adapter.web.ViewContext,
 )
 
 internal val AuthTenantAttr = AttributeKey<AuthTenantContext>("AuthTenantContext")
