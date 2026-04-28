@@ -24,11 +24,12 @@ import io.ktor.server.routing.post
  *   4. `GET /magic-link/consume?token=…` — token verified, OAuth context from
  *      the cookie used to complete the authorization_code flow
  *
- * Cross-device / expired-cookie flow (v1.7.0):
+ * Cross-device / expired-cookie flow:
  *   Consumption requires the `KOTAUTH_AUTH_CONTEXT` cookie set by the original
  *   `/authorize` request. If absent (different browser, cookie expired after
  *   5 minutes), the user sees a friendly error asking them to open the link in
- *   the same browser or request a new one.
+ *   the same browser. The OAuth-context check runs **before** `consumeMagicLink`,
+ *   so the token is preserved and a same-device retry still works.
  *
  * Gated on `tenant.securityConfig.magicLinkEnabled` — off by default per tenant.
  */
@@ -102,6 +103,27 @@ internal fun Route.magicLinkRoutes(
             return@get call.respondRedirect("/t/${ctx.slug}/magic-link")
         }
 
+        // Check OAuth context BEFORE consuming the token. If absent, the user
+        // is on the wrong device/browser; bailing out here keeps the token
+        // alive so a same-device retry still works. Consuming first would
+        // burn the token on every cross-device tap and turn the friendly
+        // error into a dead end.
+        val oauthParams = call.getAuthContext(encryptionService)
+        if (oauthParams == null) {
+            call.respondHtml(
+                HttpStatusCode.Unauthorized,
+                AuthView.magicLinkErrorPage(
+                    tenantSlug = ctx.slug,
+                    theme = ctx.theme,
+                    workspaceName = ctx.workspaceName,
+                    error =
+                        "To finish signing in, open this link in the same browser where you " +
+                            "requested it — or go back to the sign-in page and request a new link.",
+                ),
+            )
+            return@get
+        }
+
         when (val result = selfServiceService.consumeMagicLink(token)) {
             is SelfServiceResult.Failure -> {
                 call.respondHtml(
@@ -116,26 +138,6 @@ internal fun Route.magicLinkRoutes(
             }
             is SelfServiceResult.Success -> {
                 val user = result.value
-                val oauthParams = call.getAuthContext(encryptionService)
-                if (oauthParams == null) {
-                    // No OAuth context → either cross-device or expired cookie.
-                    // v1.7.0: direct the user to the login page to start a fresh
-                    // session. Their account is verified; they just need to
-                    // re-initiate the flow in this browser.
-                    call.respondHtml(
-                        HttpStatusCode.Unauthorized,
-                        AuthView.magicLinkErrorPage(
-                            tenantSlug = ctx.slug,
-                            theme = ctx.theme,
-                            workspaceName = ctx.workspaceName,
-                            error =
-                                "To finish signing in, open this link in the same browser where you " +
-                                    "requested it — or go back to the sign-in page and request a new link.",
-                        ),
-                    )
-                    return@get
-                }
-
                 val ipAddress = call.request.local.remoteAddress
                 call.completeAuthorizationCodeFlow(
                     slug = ctx.slug,
