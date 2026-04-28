@@ -12,30 +12,6 @@ import kotlin.io.path.extension
 import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.readText
 
-/**
- * `TranslationPort` backed by volume-mounted JSON bundles, with
- * [EnglishStrings] as the always-available English source of truth.
- *
- * Loaded once at startup from the directory pointed to by `bundleDir`.
- * Each `<locale>.json` file is a flat key→value map keyed by the
- * `EnglishStrings` field name:
- *
- * ```
- * # es.json
- * {
- *   "PASSWORD": "Contraseña",
- *   "NEW_PASSWORD": "Nueva contraseña"
- * }
- * ```
- *
- * Behavior:
- *   - English is baked-in. An `en.json` in the bundle dir is ignored with
- *     a WARN log — the JAR's English source of truth is authoritative.
- *   - Unknown locale → falls back to English transparently.
- *   - Locale present, key missing → falls back to English for that key.
- *   - Malformed JSON or non-string values → file is skipped with a WARN log.
- *     Other locales still load.
- */
 class BundleTranslation(
     bundleDir: Path,
     private val fallback: TranslationPort = EnglishOnlyTranslation(),
@@ -44,9 +20,7 @@ class BundleTranslation(
 
     private val bundles: Map<String, Map<String, String>> = loadBundles(bundleDir)
 
-    override val availableLocales: Set<String> =
-        // English is always available regardless of what bundles loaded.
-        bundles.keys + setOf("en")
+    override val availableLocales: Set<String> = bundles.keys + setOf("en")
 
     override fun t(
         key: String,

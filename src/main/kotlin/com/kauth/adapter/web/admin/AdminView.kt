@@ -95,9 +95,11 @@ object AdminView {
         workspace: Tenant,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
+        availableLocales: Set<String> = setOf("en"),
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = brandingPageImpl(workspace, allWorkspaces, loggedInAs, error, saved)
+    ): HTML.() -> Unit =
+        brandingPageImpl(workspace, allWorkspaces, loggedInAs, availableLocales, error, saved)
 
     // ── Application ─────────────────────────────────────────────────────
 

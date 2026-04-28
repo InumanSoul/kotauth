@@ -8,6 +8,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -27,6 +28,7 @@ fun Route.adminSettingsRoutes(
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
+    translationPort: TranslationPort,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -350,7 +352,13 @@ fun Route.adminSettingsRoutes(
         val saved = call.request.queryParameters["saved"] == "true"
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.brandingPage(workspace, wsPairs, session.username, saved = saved),
+            AdminView.brandingPage(
+                workspace,
+                wsPairs,
+                session.username,
+                availableLocales = translationPort.availableLocales,
+                saved = saved,
+            ),
         )
     }
 
@@ -359,6 +367,10 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
         val params = call.receiveParameters()
+        val rawLocale = params["themeDefaultLocale"]?.trim()?.lowercase()
+        val resolvedLocale =
+            rawLocale
+                ?.takeIf { it.isNotBlank() && translationPort.availableLocales.contains(it) }
         val theme =
             TenantTheme(
                 accentColor = params["themeAccentColor"]?.trim() ?: workspace.theme.accentColor,
@@ -374,6 +386,7 @@ fun Route.adminSettingsRoutes(
                 textMuted = params["themeTextMuted"]?.trim() ?: workspace.theme.textMuted,
                 logoUrl = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 faviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                defaultLocale = resolvedLocale,
             )
         when (val result = adminService.updateTheme(slug, theme)) {
             is AdminResult.Success ->
@@ -386,6 +399,7 @@ fun Route.adminSettingsRoutes(
                         workspace,
                         wsPairs,
                         session.username,
+                        availableLocales = translationPort.availableLocales,
                         error = result.error.message,
                     ),
                 )

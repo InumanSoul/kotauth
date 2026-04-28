@@ -2,39 +2,6 @@ package com.kauth.adapter.web
 
 import java.lang.reflect.Modifier
 
-/**
- * Canonical English strings for user-facing UI text.
- *
- * Source of truth for English — baked into the JAR, always available. Non-English
- * locales are opt-in via `KAUTH_I18N_BUNDLE_DIR` (volume-mounted JSON bundles)
- * and fall back to entries in this object when a key is missing from the
- * non-English bundle.
- *
- * Bundle JSON files use the constant **field name** as the key, e.g.:
- * ```
- * { "PASSWORD": "Contraseña", "NEW_PASSWORD": "Nueva contraseña" }
- * ```
- *
- * AuthView migration status (v1.7.2):
- *   Migrated to ViewContext + ctx.t():
- *     - loginPage
- *     - forgotPasswordPage
- *     - resetPasswordPage
- *     - acceptInvitePage
- *     - mfaChallengePage
- *
- *   Pending (still hardcoded English — extract on next touch or explicit pass):
- *     - registerPage
- *     - magicLinkPage
- *     - magicLinkErrorPage
- *     - forceChangePasswordPage
- *     - verifyEmailPage
- *     - socialRegistrationPage
- *
- * `PortalView` and `AdminView` remain under the incremental "extract as you
- * touch" policy.
- */
-
 object EnglishStrings {
     // Password fields
     const val PASSWORD = "Password"

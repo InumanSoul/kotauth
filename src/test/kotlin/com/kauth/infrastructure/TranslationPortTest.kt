@@ -9,16 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/**
- * Tests for the two `TranslationPort` adapters.
- *
- * Coverage:
- *   - `EnglishOnlyTranslation`: baked-in English source, key-as-fallback for
- *     unknowns, locale arg silently ignored, `{N}` placeholder substitution.
- *   - `BundleTranslation`: JSON bundle loading, key fallback to English,
- *     unknown-locale fallback to English, `en.json` ignored, malformed-bundle
- *     resilience, `availableLocales` always includes English.
- */
 class TranslationPortTest {
     // =========================================================================
     // EnglishOnlyTranslation
@@ -67,7 +57,6 @@ class TranslationPortTest {
     ) {
         writeBundle(dir, "es", mapOf("PASSWORD" to "Contraseña"))
         val t = BundleTranslation(dir)
-        // NEW_PASSWORD is not in es.json; must fall back to baked-in English
         assertEquals(EnglishStrings.NEW_PASSWORD, t.t("NEW_PASSWORD", "es"))
     }
 
@@ -77,7 +66,6 @@ class TranslationPortTest {
     ) {
         writeBundle(dir, "es", mapOf("PASSWORD" to "Contraseña"))
         val t = BundleTranslation(dir)
-        // No fr.json mounted — request for French silently returns English
         assertEquals(EnglishStrings.PASSWORD, t.t("PASSWORD", "fr"))
     }
 
@@ -95,8 +83,6 @@ class TranslationPortTest {
     fun `Bundle ignores an en json file in the bundle dir`(
         @TempDir dir: Path,
     ) {
-        // Operator mounts an en.json attempting to override baked-in English —
-        // it must be ignored. The JAR's EnglishStrings stays authoritative.
         writeBundle(dir, "en", mapOf("PASSWORD" to "PWN3D BY ATTACKER"))
         val t = BundleTranslation(dir)
         assertEquals(EnglishStrings.PASSWORD, t.t("PASSWORD", "en"))
@@ -107,7 +93,6 @@ class TranslationPortTest {
         @TempDir dir: Path,
     ) {
         writeBundle(dir, "es", mapOf("PASSWORD" to "Contraseña"))
-        // pt.json is intentionally invalid JSON
         Files.writeString(dir.resolve("pt.json"), "{ this is not json")
         val t = BundleTranslation(dir)
         assertEquals("Contraseña", t.t("PASSWORD", "es"))
@@ -121,7 +106,6 @@ class TranslationPortTest {
     ) {
         val nonExistent = parent.resolve("does-not-exist")
         val t = BundleTranslation(nonExistent)
-        // Must not throw; degrades to English-only behavior
         assertEquals(setOf("en"), t.availableLocales)
         assertEquals(EnglishStrings.PASSWORD, t.t("PASSWORD", "es"))
     }
@@ -140,16 +124,8 @@ class TranslationPortTest {
     // =========================================================================
 
     @Test
-    fun `placeholders are substituted in EnglishOnly templates`() {
-        // Inject a fake template via reflection-resistant route: use a key that
-        // does not exist in EnglishStrings → returned verbatim → exercises only
-        // the substitution code path, not lookup. We rely on the {0} contract.
+    fun `EnglishOnly returns key verbatim even when args are passed for an unknown key`() {
         val t = EnglishOnlyTranslation()
-        // "Welcome, {0}" → "Welcome, alice"
-        // We can't add a key to EnglishStrings from a test, so verify by passing
-        // the template as the key and confirming substitution still applies.
-        // EnglishOnly returns the key when missing — substitution is a no-op
-        // on a literal "{0}"-free key, so add a Bundle test for the real path.
         assertEquals("MISSING", t.t("MISSING", "en", "alice"))
     }
 
@@ -169,8 +145,6 @@ class TranslationPortTest {
     fun `placeholders fall through to English template substitution on key fallback`(
         @TempDir dir: Path,
     ) {
-        // Spanish bundle does not define PASSWORD_MIN_PLACEHOLDER → falls back to the
-        // English template "Minimum {0} characters" and substitutes the argument.
         writeBundle(dir, "es", emptyMap())
         val t = BundleTranslation(dir)
         assertEquals("Minimum 8 characters", t.t("PASSWORD_MIN_PLACEHOLDER", "es", 8))
@@ -203,5 +177,26 @@ class TranslationPortTest {
                 "\"$k\":\"${v.replace("\\", "\\\\").replace("\"", "\\\"")}\""
             }
         Files.writeString(dir.resolve("$locale.json"), json)
+    }
+
+    // =========================================================================
+    // docs/i18n/es.json — sanity check on the shipped sample bundle
+    // =========================================================================
+
+    @Test
+    fun `shipped docs i18n es json parses and resolves a few representative keys`(
+        @TempDir dir: Path,
+    ) {
+        val source = Path.of("docs/i18n/es.json")
+        assertTrue(Files.exists(source), "Sample bundle missing at $source")
+        Files.copy(source, dir.resolve("es.json"))
+
+        val t = BundleTranslation(dir)
+
+        assertTrue(t.availableLocales.contains("es"), "es bundle should have loaded")
+        assertEquals("Contraseña", t.t("PASSWORD", "es"))
+        assertEquals("Iniciar sesión", t.t("LOGIN_SUBMIT", "es"))
+        assertEquals("Mínimo 8 caracteres", t.t("PASSWORD_MIN_PLACEHOLDER", "es", 8))
+        assertEquals("Acme | Iniciar sesión", t.t("AUTH_PAGE_TITLE_LOGIN", "es", "Acme"))
     }
 }

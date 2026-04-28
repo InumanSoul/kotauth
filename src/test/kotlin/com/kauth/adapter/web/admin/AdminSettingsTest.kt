@@ -20,6 +20,7 @@ import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
@@ -27,6 +28,7 @@ import com.kauth.infrastructure.KeyProvisioningService
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -67,6 +69,7 @@ class AdminSettingsTest {
     private val auditLogPort = FakeAuditLogPort()
     private val hasher = FakePasswordHasher()
     private val tokenPort = FakeTokenPort()
+    private val themeRepo = FakeThemeRepository()
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
@@ -122,6 +125,7 @@ class AdminSettingsTest {
             auditLog = auditLogPort,
             sessionRepository = sessionRepo,
             selfServiceService = buildSelfService(),
+            themeRepository = themeRepo,
         )
 
     private fun buildRoleGroupService() =
@@ -140,6 +144,7 @@ class AdminSettingsTest {
         userRepo.clear()
         roleRepo.clear()
         auditLogPort.clear()
+        themeRepo.clear()
         tokenPort.reset()
         tenantRepo.add(masterTenant)
         tenantRepo.add(workspace)
@@ -303,6 +308,68 @@ class AdminSettingsTest {
             val response = authed.get("/admin/workspaces/acme/settings/branding")
 
             assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `GET branding renders Default Locale section with auto-detect option`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/branding").bodyAsText()
+
+            assertTrue(body.contains("Default Locale"), "Locale section header missing")
+            assertTrue(body.contains("themeDefaultLocale"), "Locale select input missing")
+            assertTrue(body.contains("Auto-detect"), "Auto-detect option missing")
+        }
+
+    @Test
+    fun `POST branding silently drops unknown locale not in availableLocales`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeDefaultLocale", "es")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val saved = themeRepo.findByTenantId(workspace.id)?.defaultLocale
+            assertEquals(null, saved, "Unknown locale must not be persisted")
+        }
+
+    @Test
+    fun `POST branding persists locale when present in availableLocales`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/branding",
+                formParameters =
+                    Parameters.build {
+                        append("themeDefaultLocale", "en")
+                    },
+            )
+
+            val saved = themeRepo.findByTenantId(workspace.id)?.defaultLocale
+            assertEquals("en", saved)
         }
 
     @Test

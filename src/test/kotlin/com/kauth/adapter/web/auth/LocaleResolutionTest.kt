@@ -13,10 +13,6 @@ import io.ktor.server.testing.testApplication
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/**
- * Tests for `ApplicationCall.resolveLocale` — the per-request locale picker
- * used to build a `ViewContext`.
- */
 class LocaleResolutionTest {
     private val translationWithEnEs =
         object : TranslationPort {
@@ -90,13 +86,11 @@ class LocaleResolutionTest {
 
     @Test
     fun `first matching tag in Accept-Language wins`() {
-        // de is not available; es is — picker walks the list in order.
         assertEquals("es", runResolution(translationWithEnEs, tenant(), "de,es;q=0.8,en;q=0.5"))
     }
 
     @Test
     fun `Accept-Language with no available tag falls through to tenant default`() {
-        // Header asks fr-only → not available → tenant default es applies
         assertEquals(
             "es",
             runResolution(translationWithEnEs, tenant(defaultLocale = "es"), "fr"),
@@ -119,13 +113,11 @@ class LocaleResolutionTest {
 
     @Test
     fun `tenant default es is normalized when stored uppercase`() {
-        // Defensive: a stale uppercase value still matches "es" in available set
         assertEquals("es", runResolution(translationWithEnEs, tenant(defaultLocale = "ES"), null))
     }
 
     @Test
     fun `tenant default unloaded locale falls through to English`() {
-        // Tenant has fr set but only en+es bundles loaded → English
         assertEquals("en", runResolution(translationWithEnEs, tenant(defaultLocale = "fr"), null))
     }
 
@@ -135,7 +127,6 @@ class LocaleResolutionTest {
 
     @Test
     fun `English-only deployment ignores Accept-Language and tenant defaults`() {
-        // No bundles mounted → only "en" is available regardless of preference
         assertEquals(
             "en",
             runResolution(englishOnlyTranslation, tenant(defaultLocale = "es"), "es-MX,es;q=0.9"),
