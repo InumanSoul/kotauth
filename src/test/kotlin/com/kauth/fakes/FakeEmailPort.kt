@@ -90,4 +90,15 @@ class FakeEmailPort : EmailPort {
         if (shouldFail) throw RuntimeException("SMTP delivery failed")
         _sent.add(SentEmail(to, toName, inviteUrl, workspaceName, "invite"))
     }
+
+    override fun sendMagicLinkEmail(
+        to: String,
+        toName: String,
+        magicLinkUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        if (shouldFail) throw RuntimeException("SMTP delivery failed")
+        _sent.add(SentEmail(to, toName, magicLinkUrl, workspaceName, "magic_link"))
+    }
 }

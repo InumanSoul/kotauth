@@ -96,6 +96,13 @@ fun Route.authRoutes(
             rateLimiter = registerRateLimiter,
         )
 
+        magicLinkRoutes(
+            selfServiceService = selfServiceService,
+            rateLimiter = registerRateLimiter,
+            encryptionService = encryptionService,
+            oauthService = oauthService,
+        )
+
         mfaRoutes(
             oauthService = oauthService,
             mfaService = mfaService,

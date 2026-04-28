@@ -26,6 +26,8 @@ data class SecurityConfig(
     val corsAllowCredentials: Boolean = false,
     // Breach detection — block passwords that appear in HIBP's breach corpus
     val hibpCheckEnabled: Boolean = false,
+    // Passwordless sign-in via emailed one-time link
+    val magicLinkEnabled: Boolean = false,
 ) {
     /** Lockout is active when max attempts is > 0. */
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0

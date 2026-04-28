@@ -2,8 +2,11 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.OAuthError
+import com.kauth.domain.service.OAuthResult
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginError
 import com.kauth.domain.service.SocialLoginNeedsRegistration
 import com.kauth.infrastructure.EncryptionService
@@ -11,6 +14,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondRedirect
 import io.ktor.util.AttributeKey
 
 /**
@@ -323,5 +327,74 @@ internal fun parseSocialPendingCookie(
         )
     } catch (_: Exception) {
         null
+    }
+}
+
+// -- Authorization-code flow completion ----------------------------------------
+
+/**
+ * Shared "issue authorization code and redirect" finalization step.
+ *
+ * Called from any authentication-success point in an OAuth flow:
+ *   - Password login (see [oauthProtocolRoutes])
+ *   - MFA challenge success (see [mfaRoutes])
+ *   - Magic-link consumption (see [magicLinkRoutes])
+ *
+ * Flow:
+ *   1. Validates that [oauthParams] carries a `clientId` + `redirectUri` (400 otherwise).
+ *   2. Requests an authorization code from [oauthService] for [userId].
+ *   3. On success: clears the auth-context cookie, redirects to
+ *      `redirectUri?code=…&state=…`.
+ *   4. On failure: invokes [renderError] with a human-readable message so the
+ *      caller can render its context-appropriate error page (login, mfa, etc.)
+ *
+ * [renderError] is a `suspend` callback because error rendering typically
+ * involves `call.respondHtml(...)`.
+ */
+internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
+    slug: String,
+    userId: UserId,
+    oauthParams: AuthView.OAuthParams,
+    ipAddress: String?,
+    oauthService: OAuthService,
+    renderError: suspend (message: String) -> Unit,
+) {
+    val clientId =
+        oauthParams.clientId
+            ?: return respond(HttpStatusCode.BadRequest, "Missing client_id")
+    val redirectUri =
+        oauthParams.redirectUri
+            ?: return respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+
+    when (
+        val codeResult =
+            oauthService.issueAuthorizationCode(
+                tenantSlug = slug,
+                userId = userId,
+                clientId = clientId,
+                redirectUri = redirectUri,
+                scopes = oauthParams.scope ?: "openid",
+                codeChallenge = oauthParams.codeChallenge,
+                codeChallengeMethod = oauthParams.codeChallengeMethod,
+                nonce = oauthParams.nonce,
+                state = oauthParams.state,
+                ipAddress = ipAddress,
+            )
+    ) {
+        is OAuthResult.Success -> {
+            clearAuthContextCookie(slug)
+            val code = codeResult.value.code
+            val state = oauthParams.state
+            val redirect =
+                buildString {
+                    append(redirectUri)
+                    append("?code=").append(code)
+                    if (!state.isNullOrBlank()) append("&state=").append(state)
+                }
+            respondRedirect(redirect)
+        }
+        is OAuthResult.Failure -> {
+            renderError(codeResult.error.toDescription())
+        }
     }
 }

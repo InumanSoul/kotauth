@@ -28,8 +28,9 @@ import javax.mail.internet.MimeMultipart
  * Emails use plain HTML with no template engine. Each email applies TenantTheme branding
  * (accent color, font family, border radius, logo) via a shared [buildEmailHtml] layout function.
  *
- * The caller ([UserSelfServiceService]) is responsible for checking [Tenant.isSmtpReady]
- * before calling this adapter. If SMTP is not configured, this adapter will throw.
+ * The caller (`UserSelfServiceService` in the domain layer) is responsible for
+ * checking [Tenant.isSmtpReady] before calling this adapter. If SMTP is not
+ * configured, this adapter will throw.
  */
 class SmtpEmailAdapter : EmailPort {
     private val log = LoggerFactory.getLogger(SmtpEmailAdapter::class.java)
@@ -116,6 +117,19 @@ class SmtpEmailAdapter : EmailPort {
         val subject = "You've been invited to join $workspaceName"
         val html = buildInviteHtml(toName, inviteUrl, tenant)
         val text = buildInviteText(toName, inviteUrl, workspaceName)
+        send(to, toName, subject, html, text, tenant)
+    }
+
+    override fun sendMagicLinkEmail(
+        to: String,
+        toName: String,
+        magicLinkUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val subject = "Your sign-in link for $workspaceName"
+        val html = buildMagicLinkHtml(toName, magicLinkUrl, tenant)
+        val text = buildMagicLinkText(toName, magicLinkUrl, workspaceName)
         send(to, toName, subject, html, text, tenant)
     }
 
@@ -385,6 +399,35 @@ class SmtpEmailAdapter : EmailPort {
                 "Click the link below to choose a new one. This link expires in 1 hour.",
         url = url,
         footer = "If you did not request a password reset, you can safely ignore this email.",
+    )
+
+    private fun buildMagicLinkHtml(
+        name: String,
+        url: String,
+        tenant: Tenant,
+    ) = buildEmailHtml(
+        tenant = tenant,
+        heading = "Sign in to ${htmlEscape(tenant.displayName)}",
+        bodyHtml =
+            "Hi ${htmlEscape(name)},<br><br>" +
+                "Click the button below to sign in. This link expires in 15 minutes and can only be used once.",
+        ctaLabel = "Sign in",
+        ctaUrl = url,
+        footerHtml = "If you did not request this link, you can safely ignore this email.",
+    )
+
+    private fun buildMagicLinkText(
+        name: String,
+        url: String,
+        workspace: String,
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "Sign in to $workspace",
+        body =
+            "Hi $name,\n\nClick the link below to sign in. " +
+                "This link expires in 15 minutes and can only be used once.",
+        url = url,
+        footer = "If you did not request this link, you can safely ignore this email.",
     )
 
     private fun buildAccountLockedHtml(

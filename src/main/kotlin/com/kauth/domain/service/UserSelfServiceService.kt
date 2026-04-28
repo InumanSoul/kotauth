@@ -936,6 +936,165 @@ class UserSelfServiceService(
 
         return SelfServiceResult.Success(Unit)
     }
+
+    // =========================================================================
+    // Magic link (passwordless sign-in)
+    // =========================================================================
+
+    /**
+     * Issues a one-time sign-in token, emails the link, and audits the request.
+     *
+     * Always returns [SelfServiceResult.Success] — user enumeration protection.
+     * Silent no-op when:
+     *   - tenant slug doesn't resolve
+     *   - tenant hasn't enabled `magicLinkEnabled` on its security config
+     *   - tenant SMTP isn't configured
+     *   - email doesn't match a user
+     *   - user is disabled
+     *
+     * 15-minute TTL. Any prior unused [TokenPurpose.MAGIC_LINK] for the user
+     * is deleted first — only one active link at a time.
+     */
+    fun initiateMagicLink(
+        email: String,
+        tenantSlug: String,
+        baseUrl: String,
+        ipAddress: String?,
+    ): SelfServiceResult<Unit> {
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return SelfServiceResult.Success(Unit)
+
+        if (!tenant.securityConfig.magicLinkEnabled) return SelfServiceResult.Success(Unit)
+        if (!tenant.isSmtpReady) return SelfServiceResult.Success(Unit)
+
+        val user =
+            userRepository.findByEmail(tenant.id, email.trim().lowercase())
+                ?: return SelfServiceResult.Success(Unit)
+
+        if (!user.enabled) return SelfServiceResult.Success(Unit)
+
+        val (rawToken, tokenHash) = generateToken()
+
+        prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.MAGIC_LINK)
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = user.id,
+                tenantId = tenant.id,
+                tokenHash = tokenHash,
+                expiresAt = Instant.now().plusSeconds(MAGIC_LINK_TTL_SECONDS),
+                purpose = TokenPurpose.MAGIC_LINK,
+                ipAddress = ipAddress,
+            ),
+        )
+
+        val magicLinkUrl = "$baseUrl/t/${tenant.slug}/magic-link/consume?token=$rawToken"
+        emailScope.launch {
+            try {
+                emailPort.sendMagicLinkEmail(user.email, user.fullName, magicLinkUrl, tenant.displayName, tenant)
+            } catch (e: Exception) {
+                log.warn(
+                    "Magic link email delivery failed tenantId={} userId={}: {}",
+                    tenant.id.value,
+                    user.id.value,
+                    e.message,
+                    e,
+                )
+            }
+        }
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = user.id,
+                clientId = null,
+                eventType = AuditEventType.MAGIC_LINK_REQUESTED,
+                ipAddress = ipAddress,
+                userAgent = null,
+            ),
+        )
+
+        return SelfServiceResult.Success(Unit)
+    }
+
+    /**
+     * Consumes a magic-link token. On success returns the user for the caller
+     * to establish a session or resume an OAuth flow.
+     *
+     * Hard no-signs:
+     *   - token unknown, wrong purpose, expired, already used
+     *   - user not found
+     *   - user disabled
+     *   - user has `CHANGE_PASSWORD` required action — admin's rotation intent
+     *     must not be bypassable via a magic-link sign-in
+     *
+     * Clears `SET_PASSWORD` required action on success — the user proved email
+     * ownership, so the invite flow is satisfied. Sets `emailVerified = true`.
+     * Does NOT bypass MFA — the caller still routes the user through the
+     * MFA challenge if [MfaService.shouldChallengeMfa] returns true.
+     */
+    fun consumeMagicLink(rawToken: String): SelfServiceResult<User> {
+        val hash = sha256Hex(rawToken)
+        val token =
+            prTokenRepo.findByTokenHash(hash)
+                ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Sign-in link is invalid."))
+
+        if (token.purpose != TokenPurpose.MAGIC_LINK) {
+            return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Sign-in link is invalid."))
+        }
+
+        if (!token.isValid) {
+            val msg =
+                if (token.isExpired) {
+                    "Sign-in link has expired. Request a new one."
+                } else {
+                    "This sign-in link has already been used."
+                }
+            return SelfServiceResult.Failure(SelfServiceError.TokenExpired(msg))
+        }
+
+        val user =
+            userRepository.findById(token.userId, token.tenantId)
+                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+
+        if (!user.enabled) {
+            return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Sign-in link is invalid."))
+        }
+
+        if (RequiredAction.CHANGE_PASSWORD in user.requiredActions) {
+            return SelfServiceResult.Failure(
+                SelfServiceError.Unauthorized("A password change is required before you can sign in."),
+            )
+        }
+
+        // Magic link proves inbox ownership — mark verified, clear any pending invite action
+        userRepository.update(
+            user.copy(
+                emailVerified = true,
+                requiredActions = user.requiredActions - RequiredAction.SET_PASSWORD,
+            ),
+        )
+
+        prTokenRepo.markUsed(token.id!!, Instant.now())
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = token.tenantId,
+                userId = token.userId,
+                clientId = null,
+                eventType = AuditEventType.MAGIC_LINK_CONSUMED,
+                ipAddress = null,
+                userAgent = null,
+            ),
+        )
+
+        return SelfServiceResult.Success(userRepository.findById(token.userId, token.tenantId)!!)
+    }
+
+    companion object {
+        /** Magic-link validity window. 15 minutes is standard — single click, not a password form. */
+        const val MAGIC_LINK_TTL_SECONDS: Long = 15L * 60L
+    }
 }
 
 // =============================================================================

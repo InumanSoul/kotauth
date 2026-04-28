@@ -25,6 +25,7 @@ object TenantSecurityConfigTable : Table("tenant_security_config") {
     val lockoutDurationMinutes = integer("lockout_duration_minutes").default(15)
     val corsAllowCredentials = bool("cors_allow_credentials").default(false)
     val hibpCheckEnabled = bool("hibp_check_enabled").default(false)
+    val magicLinkEnabled = bool("magic_link_enabled").default(false)
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

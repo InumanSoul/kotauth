@@ -4,11 +4,9 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
-import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -125,52 +123,24 @@ internal fun Route.mfaRoutes(
                 )
 
                 if (oauthParams.isOAuthFlow) {
-                    val clientId =
-                        oauthParams.clientId
-                            ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
-                    val redirectUri =
-                        oauthParams.redirectUri
-                            ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
-
-                    when (
-                        val codeResult =
-                            oauthService.issueAuthorizationCode(
-                                tenantSlug = slug,
-                                userId = UserId(userId),
-                                clientId = clientId,
-                                redirectUri = redirectUri,
-                                scopes = oauthParams.scope ?: "openid",
-                                codeChallenge = oauthParams.codeChallenge,
-                                codeChallengeMethod = oauthParams.codeChallengeMethod,
-                                nonce = oauthParams.nonce,
-                                state = oauthParams.state,
-                                ipAddress = ipAddress,
-                            )
-                    ) {
-                        is OAuthResult.Success -> {
-                            call.clearAuthContextCookie(slug)
-                            val authCode = codeResult.value.code
-                            val state = oauthParams.state
-                            val redirect =
-                                buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!state.isNullOrBlank()) append("&state=").append(state)
-                                }
-                            call.respondRedirect(redirect)
-                        }
-                        is OAuthResult.Failure -> {
+                    call.completeAuthorizationCodeFlow(
+                        slug = slug,
+                        userId = UserId(userId),
+                        oauthParams = oauthParams,
+                        ipAddress = ipAddress,
+                        oauthService = oauthService,
+                        renderError = { message ->
                             call.respondHtml(
                                 HttpStatusCode.BadRequest,
                                 AuthView.mfaChallengePage(
                                     slug,
                                     theme,
                                     workspaceName,
-                                    error = codeResult.error.toDescription(),
+                                    error = message,
                                 ),
                             )
-                        }
-                    }
+                        },
+                    )
                 } else {
                     call.respond(
                         mapOf(

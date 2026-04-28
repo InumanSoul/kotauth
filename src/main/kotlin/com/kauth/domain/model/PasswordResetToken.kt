@@ -19,6 +19,13 @@ enum class TokenPurpose {
      * is rejected at the service layer.
      */
     TEMP_PASSWORD,
+
+    /**
+     * Passwordless sign-in token. Delivered via email, consumed once to
+     * establish a session. 15-minute TTL. Only usable via the magic-link
+     * consume endpoint — cross-purpose use rejected at the service layer.
+     */
+    MAGIC_LINK,
 }
 
 /**

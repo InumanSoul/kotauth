@@ -118,6 +118,7 @@ class AdminService(
         lockoutDurationMinutes: Int = 15,
         corsAllowCredentials: Boolean = false,
         hibpCheckEnabled: Boolean = false,
+        magicLinkEnabled: Boolean = false,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -163,6 +164,7 @@ class AdminService(
                         lockoutDurationMinutes = lockoutDurationMinutes.coerceAtLeast(1),
                         corsAllowCredentials = corsAllowCredentials,
                         hibpCheckEnabled = hibpCheckEnabled,
+                        magicLinkEnabled = magicLinkEnabled,
                     ),
             )
 
