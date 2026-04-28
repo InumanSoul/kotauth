@@ -28,6 +28,13 @@ data class TenantTheme(
     val fontFamily: String = "Inter",
     val logoUrl: String? = null,
     val faviconUrl: String? = null,
+    /**
+     * Tenant's preferred UI locale code (e.g. "en", "es"). Resolution order is
+     * `Accept-Language` header > this value > "en". Null means no preference.
+     * Only locales actually loaded by `TranslationPort.availableLocales` apply —
+     * a stale value referring to an unmounted bundle silently falls back to English.
+     */
+    val defaultLocale: String? = null,
 ) {
     /**
      * Emits a CSS :root block injected as an inline <style> tag before the auth

@@ -23,6 +23,7 @@ object WorkspaceThemeTable : Table("workspace_theme") {
     val textMuted = varchar("text_muted", 30).default("#a1a1aa")
     val logoUrl = varchar("logo_url", 500).nullable()
     val faviconUrl = varchar("favicon_url", 500).nullable()
+    val defaultLocale = varchar("default_locale", 10).nullable()
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

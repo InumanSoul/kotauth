@@ -51,6 +51,7 @@ class PostgresThemeRepository : ThemeRepository {
                     it[textMuted] = theme.textMuted
                     it[logoUrl] = theme.logoUrl
                     it[faviconUrl] = theme.faviconUrl
+                    it[defaultLocale] = theme.defaultLocale
                     it[updatedAt] = OffsetDateTime.now()
                 }
             } else {
@@ -69,6 +70,7 @@ class PostgresThemeRepository : ThemeRepository {
                     it[textMuted] = theme.textMuted
                     it[logoUrl] = theme.logoUrl
                     it[faviconUrl] = theme.faviconUrl
+                    it[defaultLocale] = theme.defaultLocale
                     it[createdAt] = OffsetDateTime.now()
                     it[updatedAt] = OffsetDateTime.now()
                 }
@@ -91,5 +93,6 @@ class PostgresThemeRepository : ThemeRepository {
             textMuted = this[WorkspaceThemeTable.textMuted],
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
+            defaultLocale = this[WorkspaceThemeTable.defaultLocale],
         )
 }
