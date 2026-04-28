@@ -1,13 +1,22 @@
 package com.kauth.adapter.web
 
+import java.lang.reflect.Modifier
+
 /**
  * Canonical English strings for user-facing UI text.
  *
- * Centralized here to prepare for i18n (v2.x). Each string is the reference
- * value that translators will use as the source of truth.
+ * Source of truth for English — baked into the JAR, always available. Non-English
+ * locales are opt-in via `KAUTH_I18N_BUNDLE_DIR` (volume-mounted JSON bundles)
+ * and fall back to entries in this object when a key is missing from the
+ * non-English bundle.
  *
- * Strings are extracted incrementally as views are touched, do not attempt
- * to extract all strings in one pass.
+ * Bundle JSON files use the constant **field name** as the key, e.g.:
+ * ```
+ * { "PASSWORD": "Contraseña", "NEW_PASSWORD": "Nueva contraseña" }
+ * ```
+ *
+ * `AuthView` is the priority migration target. `PortalView` and `AdminView`
+ * remain under the incremental "extract as you touch" policy.
  */
 
 object EnglishStrings {
@@ -77,4 +86,23 @@ object EnglishStrings {
     const val TOAST_KEY_ROTATED =
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
+
+    /**
+     * All `const val String` declarations in this object, keyed by their field name.
+     * Used by the translation infrastructure as the English source of truth for
+     * `EnglishOnlyTranslation` and as the fallback inside `BundleTranslation`.
+     *
+     * Computed once via reflection — the cost is amortized over the application's
+     * lifetime. Function-based templates (e.g. parameterized placeholders) are
+     * intentionally excluded; those use `{0}`-style placeholders in template strings.
+     */
+    val byKey: Map<String, String> by lazy {
+        EnglishStrings::class.java.declaredFields
+            .asSequence()
+            .filter { Modifier.isStatic(it.modifiers) && it.type == String::class.java }
+            .associate { field ->
+                field.isAccessible = true
+                field.name to (field.get(null) as String)
+            }
+    }
 }
