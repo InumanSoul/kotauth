@@ -42,19 +42,9 @@ data class EnvironmentConfig(
     val dbPoolMinIdle: Int,
     val updateCheckEnabled: Boolean,
     val updateCheckUrl: String,
-    /**
-     * Optional directory of `<locale>.json` bundles for non-English UI strings.
-     * Unset → English only (always-on default). When set, `BundleTranslation`
-     * loads each bundle file at startup. English is never sourced from this
-     * directory — the JAR's `EnglishStrings` is authoritative.
-     */
     val i18nBundleDir: String?,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
-
-    /** Database connection config — usable by CLI commands without full server config. */
-    val dbConfig: DbConfig
-        get() = DbConfig(dbUrl, dbUser, dbPassword, dbPoolMaxSize, dbPoolMinIdle)
 
     companion object {
         fun load(): EnvironmentConfig {

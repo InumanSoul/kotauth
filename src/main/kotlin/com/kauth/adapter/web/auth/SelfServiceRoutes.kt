@@ -6,7 +6,6 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -21,8 +20,6 @@ internal fun Route.selfServiceRoutes(
     get("/forgot-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val sent = call.request.queryParameters["sent"] == "true"
         val reason = call.request.queryParameters["reason"]
         val errorMsg =
@@ -56,8 +53,6 @@ internal fun Route.selfServiceRoutes(
     get("/reset-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val token = call.request.queryParameters["token"] ?: ""
 
         if (token.isBlank()) {
@@ -73,8 +68,6 @@ internal fun Route.selfServiceRoutes(
     post("/reset-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
         val ipAddress = call.request.local.remoteAddress
         val params = call.receiveParameters()

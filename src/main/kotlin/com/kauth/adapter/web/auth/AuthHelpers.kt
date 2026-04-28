@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
@@ -17,24 +18,12 @@ import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.util.AttributeKey
 
-/**
- * Tenant context resolved once per request by the auth route intercept.
- *
- * [tenant] is nullable — some auth pages render a default theme when the
- * tenant slug does not match. Handlers that require a non-null tenant
- * (e.g., OAuth protocol endpoints) check `ctx.tenant ?: return 404`.
- *
- * [theme] and [workspaceName] are retained as plain fields for views that
- * have not yet migrated to [ViewContext]. [viewContext] is the canonical
- * way for new and migrated views to reach `theme + workspaceName + locale +
- * translator` as a single bundle.
- */
 data class AuthTenantContext(
     val slug: String,
     val tenant: Tenant?,
     val theme: TenantTheme,
     val workspaceName: String,
-    val viewContext: com.kauth.adapter.web.ViewContext,
+    val viewContext: ViewContext,
 )
 
 internal val AuthTenantAttr = AttributeKey<AuthTenantContext>("AuthTenantContext")

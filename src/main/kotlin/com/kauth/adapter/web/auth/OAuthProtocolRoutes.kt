@@ -231,8 +231,6 @@ internal fun Route.oauthProtocolRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val ipAddress = call.request.local.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
 

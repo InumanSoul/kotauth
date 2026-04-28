@@ -100,20 +100,5 @@ data class TenantTheme(
                 textPrimary = "#111114",
                 textMuted = "#7A7A85",
             )
-
-        /** Minimal monochrome theme with sharp corners. */
-        val SIMPLE =
-            TenantTheme(
-                accentColor = "#111114",
-                accentHoverColor = "#333336",
-                accentForeground = "#FFFFFF",
-                bgDeep = "#FFFFFF",
-                surface = "#FAFAFA",
-                bgInput = "#F4F4F6",
-                borderColor = "#DDDDE0",
-                borderRadius = "0px",
-                textPrimary = "#111114",
-                textMuted = "#6B6B75",
-            )
     }
 }

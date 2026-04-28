@@ -117,14 +117,9 @@ class AuthRoutesTest {
             redirectUris = listOf("https://app.example.com/callback"),
         )
 
-    /** PKCE pair used by the token endpoint tests. */
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
-    /**
-     * Builds a valid signed KOTAUTH_AUTH_CONTEXT cookie value for use in POST /authorize tests.
-     * The payload format mirrors [ApplicationCall.setAuthContextCookie] in AuthHelpers.kt.
-     */
     private fun buildAuthContextCookie(
         responseType: String = "code",
         clientId: String = "spa-app",

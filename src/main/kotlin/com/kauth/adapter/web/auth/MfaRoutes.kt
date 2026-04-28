@@ -24,8 +24,6 @@ internal fun Route.mfaRoutes(
     get("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
@@ -41,8 +39,6 @@ internal fun Route.mfaRoutes(
     post("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress

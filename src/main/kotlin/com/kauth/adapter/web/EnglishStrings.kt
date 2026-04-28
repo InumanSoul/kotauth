@@ -2,6 +2,7 @@ package com.kauth.adapter.web
 
 import java.lang.reflect.Modifier
 
+@Suppress("unused")
 object EnglishStrings {
     // Password fields
     const val PASSWORD = "Password"
