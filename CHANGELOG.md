@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.7.0-rc1] - 2026-04-28
+## [1.7.1] - 2026-04-28
+
+### Fixed
+
+- **Magic-link token-burn race on cross-device tap.** In v1.7.0, `GET /t/{slug}/magic-link/consume` called `consumeMagicLink(token)` **before** checking the `KOTAUTH_AUTH_CONTEXT` cookie. A user who requested the link on their laptop and tapped it on their phone (the modal mobile-email case — iOS opens links in system Safari, not the originating in-app browser) saw the friendly "open this link in the same browser" error, but the token had already been marked consumed. The user's same-device retry on their laptop then failed with "this link has already been used" — turning the friendly error into a hostile dead end. The fix in `MagicLinkRoutes.kt` reorders the consume route to check `getAuthContext` first; if the cookie is absent, the route renders the cross-device error **without** touching the token, leaving it valid for the same-device retry. Caught during cross-device priority analysis (deferred to v1.8.x — see [ADR-10](docs/adr/ADR-10-magic-link-passwordless-signin.md))
+
+### Added
+
+- **`MagicLinkRoutesTest.kt`** — 5 HTTP integration tests covering the regression: cross-device tap preserves the token, same-device flow consumes correctly, the canonical "tap on phone, then retry on laptop" sequence succeeds on the same token, feature toggle off behavior, and `POST /magic-link/send` enumeration safety (always redirects to `?sent=true` regardless of email known/unknown)
+
+### Documentation
+
+- **ADR-04 audit closed.** Re-audit of `AdminRbacRoutes.kt` confirmed all mutations correctly route through `RoleGroupService`/`AdminService`. Three remaining direct repository calls are reads (role-create dropdown population, user-search autocomplete) and are deliberately out of scope per ADR-04, which scopes to **write operations** only. No code change needed; memory note updated to reflect closed status
+
+---
+
+## [1.7.0] - 2026-04-28
 
 ### Added
 
