@@ -79,4 +79,16 @@ interface EmailPort {
         workspaceName: String,
         tenant: Tenant,
     )
+
+    /**
+     * Sends a passwordless sign-in link. [magicLinkUrl] is the full URL with
+     * the raw token as a query parameter; valid for 15 minutes, single-use.
+     */
+    fun sendMagicLinkEmail(
+        to: String,
+        toName: String,
+        magicLinkUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    )
 }

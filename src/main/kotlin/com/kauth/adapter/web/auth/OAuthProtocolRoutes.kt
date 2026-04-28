@@ -162,6 +162,7 @@ internal fun Route.oauthProtocolRoutes(
                         oauthParams = existingContext,
                         enabledProviders = enabledProviders,
                         registrationEnabled = tenant?.registrationEnabled ?: true,
+                        magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                     ),
                 )
                 return@get
@@ -224,6 +225,7 @@ internal fun Route.oauthProtocolRoutes(
                 oauthParams = oauthParams,
                 enabledProviders = enabledProviders,
                 registrationEnabled = tenant.registrationEnabled,
+                magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
             ),
         )
     }
@@ -256,6 +258,7 @@ internal fun Route.oauthProtocolRoutes(
                     error = "Too many login attempts. Please wait a moment and try again.",
                     enabledProviders = enabledProviders,
                     registrationEnabled = tenant?.registrationEnabled ?: true,
+                    magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                 ),
             )
         }
@@ -287,6 +290,7 @@ internal fun Route.oauthProtocolRoutes(
                             oauthParams = oauthParams,
                             enabledProviders = enabledProviders,
                             registrationEnabled = tenant?.registrationEnabled ?: true,
+                            magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                         ),
                     )
                 }
@@ -321,6 +325,7 @@ internal fun Route.oauthProtocolRoutes(
                                     oauthParams = oauthParams,
                                     enabledProviders = enabledProviders,
                                     registrationEnabled = tenant.registrationEnabled,
+                                    magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
                                 ),
                             )
                         }
@@ -341,54 +346,28 @@ internal fun Route.oauthProtocolRoutes(
                     return@post
                 }
 
-                val clientId =
-                    oauthParams.clientId
-                        ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing client_id")
-                val redirectUri =
-                    oauthParams.redirectUri
-                        ?: return@post call.respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
-
-                when (
-                    val codeResult =
-                        oauthService.issueAuthorizationCode(
-                            tenantSlug = slug,
-                            userId = user.id!!,
-                            clientId = clientId,
-                            redirectUri = redirectUri,
-                            scopes = oauthParams.scope ?: "openid",
-                            codeChallenge = oauthParams.codeChallenge,
-                            codeChallengeMethod = oauthParams.codeChallengeMethod,
-                            nonce = oauthParams.nonce,
-                            state = oauthParams.state,
-                            ipAddress = ipAddress,
-                        )
-                ) {
-                    is OAuthResult.Success -> {
-                        call.clearAuthContextCookie(slug)
-                        val code = codeResult.value.code
-                        val redirect =
-                            buildString {
-                                append(redirectUri)
-                                append("?code=").append(code)
-                                if (!oauthParams.state.isNullOrBlank()) append("&state=").append(oauthParams.state)
-                            }
-                        call.respondRedirect(redirect)
-                    }
-                    is OAuthResult.Failure -> {
+                call.completeAuthorizationCodeFlow(
+                    slug = slug,
+                    userId = user.id!!,
+                    oauthParams = oauthParams,
+                    ipAddress = ipAddress,
+                    oauthService = oauthService,
+                    renderError = { message ->
                         call.respondHtml(
                             HttpStatusCode.BadRequest,
                             AuthView.loginPage(
                                 tenantSlug = slug,
                                 theme = theme,
                                 workspaceName = workspaceName,
-                                error = codeResult.error.toDescription(),
+                                error = message,
                                 oauthParams = oauthParams,
                                 enabledProviders = enabledProviders,
                                 registrationEnabled = tenant?.registrationEnabled ?: true,
+                                magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                             ),
                         )
-                    }
-                }
+                    },
+                )
             }
         }
     }

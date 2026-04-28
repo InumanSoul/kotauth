@@ -814,6 +814,25 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                 }
+
+                // ── Passwordless (Magic Link) ────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Passwordless Sign-in" }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "magicLinkEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.magicLinkEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +"Allow sign-in via email magic link" }
+                            span("check-row__desc") {
+                                +"Users can request a one-time sign-in link delivered to their email. "
+                                +"Links expire in 15 minutes and are single-use. MFA still required "
+                                +"when enrolled. Requires SMTP to be configured."
+                            }
+                        }
+                    }
+                }
             }
                     }
 }

@@ -120,6 +120,7 @@ object AuthView {
         oauthParams: OAuthParams = OAuthParams(),
         enabledProviders: List<SocialProvider> = emptyList(),
         registrationEnabled: Boolean = true,
+        magicLinkEnabled: Boolean = false,
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Sign In", theme) }
@@ -194,6 +195,11 @@ object AuthView {
 
                         div("footer-link") {
                             a(href = "/t/$tenantSlug/forgot-password") { +"Forgot password?" }
+                        }
+                        if (magicLinkEnabled) {
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/magic-link") { +"Sign in with an email link instead" }
+                            }
                         }
                         if (registrationEnabled) {
                             div("footer-link") {
@@ -752,6 +758,139 @@ object AuthView {
                                     +EnglishStrings.INVITE_ACCEPT_SUBMIT
                                 }
                             }
+                        }
+                    }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
+                }
+            }
+        }
+
+    // -------------------------------------------------------------------------
+    // Magic link — passwordless sign-in request + error pages
+    // -------------------------------------------------------------------------
+
+    /**
+     * @param sent   True after the send endpoint runs — shows the "check your inbox" copy.
+     *               Always `true` on redirect (user enumeration protection), regardless of
+     *               whether an email was actually dispatched.
+     */
+    fun magicLinkPage(
+        tenantSlug: String,
+        theme: TenantTheme = TenantTheme.DEFAULT,
+        workspaceName: String = "Kotauth",
+        error: String? = null,
+        sent: Boolean = false,
+    ): HTML.() -> Unit =
+        {
+            head { authHead("$workspaceName | Sign in with email", theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +"Sign in with email" }
+
+                        if (sent) {
+                            p("card-subtitle") {
+                                +(
+                                    "If an account exists for that email address, you'll receive a sign-in link " +
+                                        "shortly. The link expires in 15 minutes."
+                                )
+                            }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
+                            }
+                        } else {
+                            p("card-subtitle") {
+                                +(
+                                    "Enter your email address and we'll send you a one-time link to sign in. " +
+                                        "No password needed."
+                                )
+                            }
+
+                            if (error != null) {
+                                div("alert alert-error") { +error }
+                            }
+
+                            form(
+                                action = "/t/$tenantSlug/magic-link/send",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                div("field") {
+                                    label {
+                                        htmlFor = "email"
+                                        +"Email address"
+                                    }
+                                    input(type = InputType.email, name = "email") {
+                                        id = "email"
+                                        placeholder = "you@example.com"
+                                        attributes["autocomplete"] = "email"
+                                        required = true
+                                        attributes["autofocus"] = "true"
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") { +"Send sign-in link" }
+                            }
+
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
+                            }
+                        }
+                    }
+                    p("copyright") {
+                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
+                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                    }
+                }
+            }
+        }
+
+    /**
+     * Shown when a magic-link consumption fails — expired, used, revoked, or
+     * the user has a pending `CHANGE_PASSWORD` required action.
+     */
+    fun magicLinkErrorPage(
+        tenantSlug: String,
+        theme: TenantTheme = TenantTheme.DEFAULT,
+        workspaceName: String = "Kotauth",
+        error: String,
+    ): HTML.() -> Unit =
+        {
+            head { authHead("$workspaceName | Sign in with email", theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (theme.logoUrl != null) {
+                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +"Sign-in link unavailable" }
+                        div("alert alert-error") { +error }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/magic-link") { +"Request a new link" }
+                        }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
                         }
                     }
                     p("copyright") {

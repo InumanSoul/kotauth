@@ -319,6 +319,7 @@ fun Route.adminSettingsRoutes(
                             ?: workspace.securityConfig.lockoutDurationMinutes,
                     corsAllowCredentials = params["corsAllowCredentials"] == "true",
                     hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
+                    magicLinkEnabled = params["magicLinkEnabled"] == "true",
                 )
         ) {
             is AdminResult.Success ->
