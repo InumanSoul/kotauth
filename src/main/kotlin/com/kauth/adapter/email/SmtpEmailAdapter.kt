@@ -28,8 +28,9 @@ import javax.mail.internet.MimeMultipart
  * Emails use plain HTML with no template engine. Each email applies TenantTheme branding
  * (accent color, font family, border radius, logo) via a shared [buildEmailHtml] layout function.
  *
- * The caller ([UserSelfServiceService]) is responsible for checking [Tenant.isSmtpReady]
- * before calling this adapter. If SMTP is not configured, this adapter will throw.
+ * The caller (`UserSelfServiceService` in the domain layer) is responsible for
+ * checking [Tenant.isSmtpReady] before calling this adapter. If SMTP is not
+ * configured, this adapter will throw.
  */
 class SmtpEmailAdapter : EmailPort {
     private val log = LoggerFactory.getLogger(SmtpEmailAdapter::class.java)

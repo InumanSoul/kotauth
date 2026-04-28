@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.0-rc1] - 2026-04-28
+
+### Added
+
+- **Magic-link passwordless sign-in** — emailed one-time link as an alternative to password entry, opt-in per tenant via the new "Passwordless Sign-in" toggle on the Security Policy page (`tenant_security_config.magic_link_enabled`, default `FALSE`). The user clicks "Sign in with an email link instead" on the login page, enters their email, receives a 15-minute single-use link; clicking it from the same browser completes the OAuth authorization-code flow exactly as a password login would. MFA is still enforced on the way through — magic link verifies email possession, not the second factor. Designed for SaaS integrators who want a low-friction sign-in path for users who already trust their email account
+- **`MAGIC_LINK` added to `TokenPurpose` enum** — shares the `password_reset_tokens` table with `PASSWORD_RESET`, `INVITE`, and `TEMP_PASSWORD`. Cross-purpose token use is rejected at the service layer (a `PASSWORD_RESET` token fed into `consumeMagicLink` returns `TokenInvalid` and does not consume the token). Issuing a new magic link supersedes any prior unconsumed magic link for the same user — only one active link at a time
+- **`magic_link_enabled` column on `tenant_security_config`** — V36 migration, defaults to `FALSE`. Opt-in per tenant
+- **`MAGIC_LINK_REQUESTED` and `MAGIC_LINK_CONSUMED` audit events** — request audit captures the IP and tenant; consume audit captures user id and tenant. Raw token never appears in the audit log
+- **`SmtpEmailAdapter.sendMagicLinkEmail`** — themed HTML + plain-text variants. Subject line and copy do not mention "magic link" by name (avoid leaking feature state via subject)
+- **`AuthHelpers.completeAuthorizationCodeFlow` shared helper** — extracted from `OAuthProtocolRoutes` and `MfaRoutes` so the magic-link consume route can resume the authorization-code flow with the same exit semantics (issues code, clears the auth-context cookie, redirects to `redirect_uri?code=…&state=…`). Removes ~40 lines of duplication; the three callers now share one implementation
+- **17 new domain-service tests** in `MagicLinkTest.kt` — initiate happy path with token TTL ≈15 min; prior-token deletion; user-enumeration silent paths (unknown tenant / feature off / SMTP off / unknown user / disabled user); consume happy path (returns user, marks token consumed, sets `email_verified = true`, clears `SET_PASSWORD`); single-use enforcement; rejects unknown / wrong-purpose / expired / disabled-user / `CHANGE_PASSWORD`-required tokens. **791 tests total, 0 failures**
+
+### Changed
+
+- **`UserSelfServiceService` gained `initiateMagicLink(email, tenantSlug, baseUrl, ipAddress)` and `consumeMagicLink(rawToken)`** — both surface as `SelfServiceResult`. `initiateMagicLink` always returns `Success` regardless of branch (user-enumeration protection); silent no-ops cover unknown tenant, disabled feature, missing SMTP, unknown email, disabled user. `consumeMagicLink` marks the user `email_verified = true`, clears `SET_PASSWORD` from `required_actions`, and rejects when `CHANGE_PASSWORD` is required (forced password change is not bypassable via magic link)
+- **`AdminService.updateWorkspaceSettings`** gained `magicLinkEnabled: Boolean = false` parameter
+- **`SecurityConfig`** gained `magicLinkEnabled: Boolean = false` field; persisted via `TenantSecurityConfigTable`/`PostgresTenantRepository`
+- **`EmailPort`** gained `sendMagicLinkEmail(to, toName, magicLinkUrl, workspaceName, tenant)` — consistent shape with the other transactional senders
+
+### Security
+
+- **User-enumeration protection on `POST /magic-link/send`** — same redirect to `?sent=true`, same response page, same status code regardless of whether the email exists, the tenant has the feature enabled, SMTP is configured, or the user is disabled. Rate-limit hits also return the same response — no timing or status-code oracle
+- **15-minute token TTL, single-use, SHA-256 hash at rest** — only the hash is persisted in `password_reset_tokens`. Raw token only exists in the link sent to the user
+- **`CHANGE_PASSWORD` required action blocks consumption** — a user with a forced password change still has to complete that change via the standard force-change flow. Magic link is not a back door around `CHANGE_PASSWORD`
+- **MFA invariant preserved** — after `consumeMagicLink` succeeds, the flow re-enters the standard authorization-code path through `completeAuthorizationCodeFlow`, which routes through MFA when the user has it enrolled. Magic link is not an MFA bypass
+- **Same-device cookie binding** — consumption requires the `KOTAUTH_AUTH_CONTEXT` cookie set by `/authorize`. Cross-device consumption is rejected with a friendly error rather than silently authenticating the user without their requesting OAuth client context. `POST /magic-link/send` refreshes the cookie on each request so the user gets a full 5-minute window from request, not from the original `/authorize`
+- **Rate limit keyed by IP + tenant slug, not email** — rate-limiting by email would create an enumeration oracle (different rate-limit behavior for known vs. unknown emails). Acceptable trade-off because `initiateMagicLink` is enumeration-safe regardless
+
+### Limitations (v1.7.0)
+
+- **Cross-device consumption is not supported.** Click on phone after requesting on laptop → friendly error. v1.7.1 plans to lift this by creating a `PortalSession` directly on consume when no OAuth context is present
+- **No standalone magic-link entry point.** Magic links only bootstrap from inside an `/authorize` request — there is no `/login` page that lets a user request a link without an OAuth client. Same v1.7.1 scope as cross-device consume
+- **Email is the second-strongest factor we have, not the strongest.** Compromised inbox = compromised account when magic links are enabled. Tenants in regulated environments should leave the toggle off and rely on password + MFA. The toggle copy on the Security Policy page makes this trade-off explicit
+
+### Documentation
+
+- **ADR-10 — Magic-link passwordless sign-in.** Captures TTL/single-use rationale, MFA invariant, required-action interaction, same-device cookie binding, password_reset_tokens table reuse, rate-limiting by IP not email, and the v1.7.0 limitations with their v1.7.1 plan
+
+---
+
 ## [1.6.1] - 2026-04-24
 
 ### Added

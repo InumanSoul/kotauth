@@ -947,7 +947,7 @@ class UserSelfServiceService(
      * Always returns [SelfServiceResult.Success] — user enumeration protection.
      * Silent no-op when:
      *   - tenant slug doesn't resolve
-     *   - tenant hasn't enabled [SecurityConfig.magicLinkEnabled]
+     *   - tenant hasn't enabled `magicLinkEnabled` on its security config
      *   - tenant SMTP isn't configured
      *   - email doesn't match a user
      *   - user is disabled

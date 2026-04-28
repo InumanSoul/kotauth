@@ -7,7 +7,6 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond

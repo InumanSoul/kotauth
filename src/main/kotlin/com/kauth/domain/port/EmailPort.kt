@@ -5,12 +5,13 @@ import com.kauth.domain.model.Tenant
 /**
  * Output port — transactional email delivery.
  *
- * Implemented by [SmtpEmailAdapter]. The domain service only calls this port
- * after confirming [Tenant.isSmtpReady] — the adapter itself does not check.
+ * Implemented by `SmtpEmailAdapter` in the adapter layer. Domain services only
+ * call this port after confirming [Tenant.isSmtpReady] — the adapter itself
+ * does not check.
  *
  * Failures (e.g. SMTP unreachable) are thrown as exceptions and caught by the
- * calling service, which returns a [SelfServiceError.EmailDeliveryFailed] result.
- * Email failures must never block the auth hot path (login/register).
+ * calling service. Email failures must never block the auth hot path
+ * (login/register).
  */
 interface EmailPort {
     /**

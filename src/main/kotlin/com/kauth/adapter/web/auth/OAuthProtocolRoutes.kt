@@ -14,7 +14,6 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.queryString
 import io.ktor.server.request.receiveParameters
