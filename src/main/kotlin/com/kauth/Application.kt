@@ -20,6 +20,7 @@ import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.VersionCheckService
+import com.kauth.infrastructure.redis.RedisHealthProbe
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
@@ -83,6 +84,29 @@ fun main(args: Array<String> = emptyArray()) {
 
     val services = ServiceGraph.create(config)
 
+    services.redisClientHolder?.let { holder ->
+        RedisHealthProbe
+            .probe(holder.connection, config.redisStartupProbeTimeoutMs)
+            .onFailure { e ->
+                startupLog.error("Redis startup probe failed: {}", e.message)
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_REDIS_URL is set but Redis is unreachable.    │
+                    │                                                              │
+                    │  Refusing to start: rate limiting must be backed by Redis    │
+                    │  when configured. Falling back to per-replica limiters       │
+                    │  would silently weaken auth-flow protections.                │
+                    │                                                              │
+                    │  Verify the URL, credentials, and network reachability.      │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                kotlin.system.exitProcess(1)
+            }
+        startupLog.info("Redis ready | url={}", config.redisUrl)
+    }
+
     // Background: check for new KotAuth versions every 6 hours
     val versionCheckService =
         VersionCheckService(
@@ -133,6 +157,7 @@ fun main(args: Array<String> = emptyArray()) {
                 gracePeriodMillis = 1_000,
                 timeoutMillis = 5_000,
             )
+            services.redisClientHolder?.shutdown()
         },
     )
 
