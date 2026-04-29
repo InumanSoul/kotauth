@@ -41,7 +41,10 @@ test: ## Run the test suite (no Docker required)
 	./gradlew test
 
 test-redis: ## Run Redis-backed integration tests (Testcontainers, Docker required)
-	./gradlew redisTest
+	@DOCKER_HOST=$$(docker context inspect --format '{{.Endpoints.docker.Host}}') \
+	  DOCKER_API_VERSION=1.43 \
+	  TESTCONTAINERS_RYUK_DISABLED=true \
+	  ./gradlew redisTest
 
 e2e: ## Run E2E browser smoke tests (Playwright, headless)
 	./gradlew e2eTest

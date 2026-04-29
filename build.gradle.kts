@@ -4,7 +4,7 @@ val logbackVersion = "1.5.32"
 val flywayVersion = "12.4.0"
 val logstashEncoderVersion = "8.1"
 val lettuceVersion = "6.5.5.RELEASE"
-val testcontainersVersion = "1.20.4"
+val testcontainersVersion = "1.21.0"
 
 plugins {
     kotlin("jvm") version "2.3.20"
@@ -91,6 +91,14 @@ tasks.register<Test>("redisTest") {
     }
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
+
+    // Forward Docker-related env vars (DOCKER_HOST for OrbStack/Colima/etc.,
+    // DOCKER_API_VERSION to override docker-java's stale default).
+    listOf("DOCKER_HOST", "DOCKER_API_VERSION", "TESTCONTAINERS_RYUK_DISABLED").forEach { name ->
+        System.getenv(name)?.let { environment(name, it) }
+    }
+    // docker-java reads `api.version` as a JVM system property (env var alone is not honored).
+    System.getenv("DOCKER_API_VERSION")?.let { systemProperty("api.version", it) }
 }
 
 // ── E2E smoke tests (Playwright) ─────────────────────────────────────────
