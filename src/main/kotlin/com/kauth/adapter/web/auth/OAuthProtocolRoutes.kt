@@ -24,6 +24,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.json.*
+import java.time.Instant
 
 /**
  * OIDC Core §3.1.2.1 `prompt` values we recognize at GET /authorize.
@@ -37,6 +38,35 @@ import kotlinx.serialization.json.*
  *   identical to `login` in behavior.
  */
 private val OIDC_SUPPORTED_PROMPTS = setOf("none", "login", "consent", "select_account")
+
+/**
+ * Best-effort `sub` claim extraction from an OIDC ID token used as
+ * `id_token_hint`. The token was issued by us in a prior login and the RP is
+ * now hinting at the desired session — we read the sub but do NOT verify the
+ * signature here. Mismatch only makes us fall back to interactive auth, so the
+ * worst case from an attacker-supplied hint is "no silent auth", which is the
+ * safe default. Strict signature verification would harden the flow further;
+ * tracked as a follow-up to v1.8.1.
+ */
+private fun decodeIdTokenSub(token: String): String? =
+    try {
+        val parts = token.split(".")
+        if (parts.size != 3) {
+            null
+        } else {
+            val payload =
+                String(
+                    java.util.Base64
+                        .getUrlDecoder()
+                        .decode(parts[1]),
+                    Charsets.UTF_8,
+                )
+            val element = Json.parseToJsonElement(payload)
+            element.jsonObject["sub"]?.jsonPrimitive?.contentOrNull
+        }
+    } catch (_: Exception) {
+        null
+    }
 
 internal fun Route.oauthProtocolRoutes(
     oauthService: OAuthService,
@@ -108,6 +138,7 @@ internal fun Route.oauthProtocolRoutes(
                         add("email_verified")
                         add("name")
                         add("preferred_username")
+                        add("auth_time")
                     },
                 )
                 put("code_challenge_methods_supported", buildJsonArray { add("S256") })
@@ -244,38 +275,22 @@ internal fun Route.oauthProtocolRoutes(
             ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
 
-        // prompt=none: never show UI. Phase 3 will silent-auth via the SSO cookie;
-        // Phase 2 always returns login_required. We MUST validate the redirect_uri
-        // against the client's registered URIs first — otherwise an attacker can
-        // turn /authorize into an open redirect by supplying a hostile uri here.
-        if ("none" in promptValues) {
-            if (!oauthService.validateRedirectUri(slug, clientId, redirectUri)) {
-                call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf(
-                        "error" to "invalid_request",
-                        "error_description" to "Invalid redirect_uri for client",
-                    ),
-                )
-                return@get
-            }
-            val errorRedirect =
-                buildString {
-                    append(redirectUri)
-                    append("?error=login_required")
-                    append("&error_description=").append(encodeParam("Silent authentication is unavailable"))
-                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
-                }
-            call.respondRedirect(errorRedirect)
-            return@get
-        }
+        val isSilentOnly = "none" in promptValues
+        val forceReauth = promptValues.any { it == "login" || it == "consent" || it == "select_account" }
 
-        // prompt=login / consent / select_account: force interactive re-auth even
-        // if a valid SSO cookie is present. Wiping the cookie now keeps Phase 3's
-        // silent-auth path honest — no chance of an in-progress flow falling
-        // through to the cookie after the user explicitly asked to re-authenticate.
-        if (promptValues.any { it == "login" || it == "consent" || it == "select_account" }) {
-            call.clearSsoCookie(slug)
+        // Open-redirect guard for any flow that may issue a redirect-uri-based response
+        // (silent auth success, prompt=none failure). The validation must happen before
+        // we ever build a redirect string from `redirectUri` query data.
+        val redirectUriTrusted = oauthService.validateRedirectUri(slug, clientId, redirectUri)
+        if (isSilentOnly && !redirectUriTrusted) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to "invalid_request",
+                    "error_description" to "Invalid redirect_uri for client",
+                ),
+            )
+            return@get
         }
 
         val oauthParams =
@@ -289,6 +304,82 @@ internal fun Route.oauthProtocolRoutes(
                 codeChallengeMethod = codeChallengeMethod,
                 nonce = nonce,
             )
+
+        // ---- Silent auth attempt -------------------------------------------
+        // Skip when the RP explicitly asked for a fresh login. Otherwise read
+        // the SSO witness cookie and, if it still matches all the RP's hints
+        // (max_age, id_token_hint, current MFA policy), issue an authorization
+        // code and bounce back to the redirect_uri without showing UI.
+        if (!forceReauth && redirectUriTrusted) {
+            val sso = call.getSsoCookie(encryptionService)
+            if (sso != null && sso.tenantId == tenant.id.value) {
+                val maxAge = q["max_age"]?.toLongOrNull()
+                // max_age=0 is the OIDC sentinel for "force a fresh credential proof now",
+                // so any prior cookie — however recent — fails the check.
+                val withinMaxAge =
+                    when {
+                        maxAge == null -> true
+                        maxAge <= 0L -> false
+                        else -> (Instant.now().epochSecond - sso.authTime.epochSecond) <= maxAge
+                    }
+                val hintSub = q["id_token_hint"]?.let { decodeIdTokenSub(it) }
+                val hintMatches = hintSub == null || hintSub == sso.userId.toString()
+                // If the tenant currently requires MFA but the cookie was minted
+                // before that requirement was satisfied, silent auth is not safe
+                // — fall back to interactive so the policy can re-trigger.
+                val mfaPolicy = tenant.mfaPolicy
+                val mfaSatisfied = sso.mfaCompleted || mfaPolicy == "optional"
+
+                if (withinMaxAge && hintMatches && mfaSatisfied) {
+                    val codeResult =
+                        oauthService.issueAuthorizationCode(
+                            tenantSlug = slug,
+                            userId =
+                                com.kauth.domain.model
+                                    .UserId(sso.userId),
+                            clientId = clientId,
+                            redirectUri = redirectUri,
+                            scopes = scope,
+                            codeChallenge = codeChallenge,
+                            codeChallengeMethod = codeChallengeMethod,
+                            nonce = nonce,
+                            state = state,
+                            ipAddress = call.request.local.remoteAddress,
+                            authTime = sso.authTime,
+                        )
+                    if (codeResult is OAuthResult.Success) {
+                        val redirect =
+                            buildString {
+                                append(redirectUri)
+                                append("?code=").append(codeResult.value.code)
+                                if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                            }
+                        call.respondRedirect(redirect)
+                        return@get
+                    }
+                    // OAuth failure (e.g., PKCE required + missing challenge): fall through
+                    // to the interactive flow; never leak a silent-auth failure to the client.
+                }
+            }
+        }
+
+        // Silent auth did not happen. If the caller said `prompt=none`, surface
+        // login_required per OIDC §3.1.2.6.
+        if (isSilentOnly) {
+            val errorRedirect =
+                buildString {
+                    append(redirectUri)
+                    append("?error=login_required")
+                    append("&error_description=").append(encodeParam("Silent authentication failed"))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                }
+            call.respondRedirect(errorRedirect)
+            return@get
+        }
+
+        if (forceReauth) {
+            call.clearSsoCookie(slug)
+        }
 
         call.setAuthContextCookie(oauthParams, slug, encryptionService, baseUrl.startsWith("https"))
 

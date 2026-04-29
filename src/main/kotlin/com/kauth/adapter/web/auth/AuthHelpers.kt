@@ -473,6 +473,7 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
                 nonce = oauthParams.nonce,
                 state = oauthParams.state,
                 ipAddress = ipAddress,
+                authTime = authTime,
             )
     ) {
         is OAuthResult.Success -> {

@@ -32,6 +32,13 @@ data class AuthorizationCode(
     val expiresAt: Instant,
     val usedAt: Instant? = null,
     val createdAt: Instant = Instant.now(),
+    /**
+     * Moment of the user's most recent interactive credential proof. Surfaces
+     * as the OIDC `auth_time` claim on the ID token (Core §2 / §3.1.3.7).
+     * Null is allowed for backwards compatibility with codes issued before the
+     * field existed; new issuance paths always populate it.
+     */
+    val authTime: Instant? = null,
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isUsed: Boolean get() = usedAt != null

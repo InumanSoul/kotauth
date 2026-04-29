@@ -21,6 +21,7 @@ object AuthorizationCodesTable : Table("authorization_codes") {
     val expiresAt = timestampWithTimeZone("expires_at")
     val usedAt = timestampWithTimeZone("used_at").nullable()
     val createdAt = timestampWithTimeZone("created_at")
+    val authTime = timestampWithTimeZone("auth_time").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

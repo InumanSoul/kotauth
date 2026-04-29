@@ -130,6 +130,7 @@ class OAuthService(
         nonce: String?,
         state: String?,
         ipAddress: String? = null,
+        authTime: Instant = Instant.now(),
     ): OAuthResult<AuthorizationCode> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -171,6 +172,7 @@ class OAuthService(
                 nonce = nonce,
                 state = state,
                 expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS),
+                authTime = authTime,
             )
 
         val saved = authCodeRepository.save(code)
@@ -290,6 +292,7 @@ class OAuthService(
                 roles = effectiveRoles,
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
+                authTime = authCode.authTime,
             )
 
         // Persist session
