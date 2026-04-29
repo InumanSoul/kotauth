@@ -51,7 +51,7 @@ KAUTH_REDIS_PASSWORD=<secret>
 | Concern | Without `KAUTH_REDIS_URL` | With `KAUTH_REDIS_URL` |
 |---|---|---|
 | Rate limiting (login, MFA, register, token) | `InMemoryRateLimiter` per process | Sliding-window Lua script in Redis (atomic) |
-| Sessions | `PostgresSessionRepository` | `RedisSessionRepository` (Phase 2) |
+| Sessions | `PostgresSessionRepository` | `RedisSessionRepository` (TTL-driven cleanup) |
 | Caches (HIBP, CORS, claim mapper) | Per-process JVM memory | Per-process JVM memory (intentionally) |
 | OAuth2 codes, audit log, tenants, users, etc. | PostgreSQL | PostgreSQL |
 
@@ -147,20 +147,49 @@ for any deployment Kotauth is realistically running today.
 
 ## Session storage
 
-When `KAUTH_REDIS_URL` is set, sessions live in Redis with an explicit
-per-key TTL aligned with the session's absolute expiry. There is no
-sweeper task — TTL handles cleanup.
+When `KAUTH_REDIS_URL` is set, sessions live in Redis with per-record
+TTL aligned to `max(expiresAt, refreshExpiresAt)` plus a 7-day retention
+buffer. Redis evicts records automatically — there is no sweeper task.
 
 When `KAUTH_REDIS_URL` is **not** set, sessions live in PostgreSQL via
 `PostgresSessionRepository` (the default since v1.0). The hourly
 `deleteExpired` sweeper continues to run.
 
-You do not flip a flag to switch storage; setting `KAUTH_REDIS_URL`
-flips it. Migrating an existing fleet from Postgres-sessions to
-Redis-sessions effectively logs everyone out (Redis starts empty);
-plan accordingly during a rollout.
+You do not flip a separate flag to switch storage; setting
+`KAUTH_REDIS_URL` flips it. Migrating an existing fleet from
+Postgres-sessions to Redis-sessions effectively logs everyone out
+(Redis starts empty); plan accordingly during a rollout.
 
-> Phase 2 work — see ADR-12 §"Sessions move to Redis when configured".
+### Keyspace layout
+
+```
+kauth:session:rec:{id}                       STRING (JSON)  primary record
+kauth:session:tok:{accessTokenHash}          STRING         access-token → id
+kauth:session:rtok:{refreshTokenHash}        STRING         refresh-token → id
+kauth:session:active:user:{tenant}:{user}    ZSET           (createdAtEpochMs, id)
+kauth:session:active:tenant:{tenant}         ZSET           (createdAtEpochMs, id)
+kauth:session:next-id                        STRING         INCR counter
+```
+
+The active sets are kept in sync on save / revoke and **opportunistically
+reconciled on read** — when a record has been TTL'd out but the set
+member remains, the read path drops it via `ZREM`. This means counts
+returned to the application are exact; the on-disk shape may briefly
+contain orphans before the next read.
+
+### Concurrent-session enforcement
+
+`countActiveByUser` and `revokeOldestForUser` use the per-user ZSET to
+enforce `Tenant.maxConcurrentSessions`. The ZSET is scored by
+`createdAt` epoch-millis so "oldest first" is a single `ZRANGE`.
+
+### Pagination
+
+`findActiveByTenant(limit, offset)` reads the full per-tenant set,
+filters live, sorts newest-first, then paginates. For tenants with
+many active sessions this is O(N) per call and warrants a follow-up if
+it becomes a hotspot in practice. For typical workspaces (≤ a few
+hundred concurrent sessions) it is well below the per-command timeout.
 
 ---
 

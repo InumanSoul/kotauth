@@ -162,25 +162,45 @@ Docker-free; integration tests that exercise the real Lua + redis-cli
 paths are tagged `@Tag("redis")` and run via `make test-redis`
 (Testcontainers).
 
-### Sessions move to Redis when configured (Phase 2)
+### Sessions move to Redis when configured
 
-Sessions today live in PostgreSQL. Phase 2 of v1.8.0 introduces a
-`RedisSessionRepository` that becomes the storage when
-`KAUTH_REDIS_URL` is set; without Redis, the existing
-`PostgresSessionRepository` keeps its current behavior.
+`RedisSessionRepository` becomes the storage when `KAUTH_REDIS_URL` is
+set; without Redis, the existing `PostgresSessionRepository` keeps its
+current behavior. Sessions are inherently ephemeral and
+high-cardinality — well-suited to Redis. We use per-record TTL aligned
+to `max(expiresAt, refreshExpiresAt) + retentionDays`, so cleanup
+happens for free and there is no equivalent to the Postgres "expired
+sessions" sweeper.
 
-Sessions are inherently ephemeral and high-cardinality — well-suited to
-Redis. We use an explicit per-key TTL aligned with the session's
-absolute expiry, so cleanup happens for free and there is no equivalent
-to the Postgres "expired sessions" sweeper.
+The keyspace is:
 
-Session move is in a separate phase because:
+```
+kauth:session:rec:{id}                       primary record (JSON-encoded)
+kauth:session:tok:{accessTokenHash}          access-token index → id
+kauth:session:rtok:{refreshTokenHash}        refresh-token index → id
+kauth:session:active:user:{tenant}:{user}    ZSET — active session ids by user
+kauth:session:active:tenant:{tenant}         ZSET — active session ids by tenant
+kauth:session:next-id                        INCR counter for new ids
+```
 
-- Phase 1 (rate limiter) is the immediate horizontal-scale fix.
-  Operators can ship Phase 1 alone and have a correct multi-replica
-  story already.
-- Phase 2 alters a write-path that exists on every login round-trip;
-  it deserves its own observation window and rollback path.
+Active sets are scored by `createdAt` epoch-millis (so "oldest first"
+is a single `ZRANGE` for `revokeOldestForUser`). The sets are kept in
+sync on save/revoke and **opportunistically reconciled on read** —
+when a record has TTL'd out, the read path drops the orphan member via
+`ZREM`. Counts returned to the application are therefore exact, even
+though the on-disk shape may briefly contain orphans before the next
+read.
+
+The phased rollout is intentional but is now complete — both phases
+ship in v1.8.0:
+
+- Phase 1: `RedisRateLimiter` (rate-limit buckets in Redis).
+- Phase 2: `RedisSessionRepository` (sessions in Redis).
+
+Switching storage is one-way per process: Kotauth doesn't dual-write
+or migrate sessions across Postgres↔Redis. An operator who flips
+`KAUTH_REDIS_URL` on (or off) effectively logs everyone out, since the
+new backend starts empty. This is documented in `docs/REDIS.md`.
 
 ## Consequences
 
