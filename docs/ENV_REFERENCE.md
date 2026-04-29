@@ -159,6 +159,59 @@ DB_POOL_MIN_IDLE=2
 
 ---
 
+## Redis
+
+Optional sidecar for distributed rate limiting and sessions. Single-instance deployments can leave all of these unset. See [REDIS.md](REDIS.md) for the full operator guide.
+
+### `KAUTH_REDIS_URL`
+**Optional.** Default: _unset_ (Redis disabled — in-memory limiter, Postgres sessions)
+
+Setting this turns Redis on. Must start with `redis://` or `rediss://` (TLS). Anything else fails fast at startup.
+
+```
+KAUTH_REDIS_URL=redis://redis:6379
+KAUTH_REDIS_URL=rediss://redis.internal:6380
+```
+
+When set, the server runs a `PING` probe at startup; an unreachable Redis exits with a `FATAL` banner rather than silently degrading to per-replica limits.
+
+---
+
+### `KAUTH_REDIS_USERNAME`
+**Optional.** Default: _unset_
+
+Redis 6+ ACL username. Omit if your Redis only requires a password.
+
+---
+
+### `KAUTH_REDIS_PASSWORD`
+**Optional.** Default: _unset_
+
+Redis password. When `KAUTH_REDIS_USERNAME` is unset, this is sent as the `default`-user credential — works for both Redis 5 (legacy `requirepass`) and Redis 6+ (default ACL user).
+
+---
+
+### `KAUTH_REDIS_TIMEOUT_MS`
+**Optional.** Default: `250`
+
+Connection-level timeout (ms) for the Lettuce client.
+
+---
+
+### `KAUTH_REDIS_COMMAND_TIMEOUT_MS`
+**Optional.** Default: `100`
+
+Per-command ceiling (ms) on the auth hot path. Don't raise without measuring — the rate-limit check sits on every login round-trip and the timeout bounds how long a request thread can block on a sick Redis.
+
+---
+
+### `KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS`
+**Optional.** Default: `2000`
+
+Timeout (ms) for the `PING` probe at startup. Higher in slow networks; lower if you want the gate to fail faster.
+
+---
+
 ## Demo Mode
 
 ### `KAUTH_DEMO_MODE`

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Optional Redis sidecar for distributed rate limiting** — set `KAUTH_REDIS_URL` to back the four limiter buckets (login, register, token, mfa) with a single shared Lettuce connection running a sliding-window Lua script in Redis. Without `KAUTH_REDIS_URL`, the existing `InMemoryRateLimiter` keeps working unchanged. Multi-replica deployments now apply the configured limit across the fleet instead of `limit × replica count`. See [ADR-12](docs/adr/ADR-12-redis-sidecar.md) and [REDIS.md](docs/REDIS.md)
+- **Fail-closed runtime + fail-fast startup** — when Redis is configured and unreachable at startup, the server prints a `FATAL` banner and exits. When Redis is configured and a command throws at runtime, `RedisRateLimiter.isAllowed` rejects the request rather than silently falling back to per-replica state. Both behaviors are deliberate: a "fail open" rate limiter triggers exactly when the operator is least able to investigate
+- **Six new Redis-related env vars** — `KAUTH_REDIS_URL`, `KAUTH_REDIS_USERNAME`, `KAUTH_REDIS_PASSWORD` (credentials split per the existing `DB_URL`/`DB_USER`/`DB_PASSWORD` pattern), plus three timing knobs `KAUTH_REDIS_TIMEOUT_MS` (250), `KAUTH_REDIS_COMMAND_TIMEOUT_MS` (100), `KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS` (2000). Documented in [ENV_REFERENCE.md](docs/ENV_REFERENCE.md)
+- **`redis:7-alpine` service in `docker-compose.dev.yml`** — bundled for local development with persistence disabled (rate-limit buckets and sessions are ephemeral by design). Healthcheck wired so `app` waits for Redis before starting
+- **Testcontainers-backed integration tests** — `RedisRateLimiterIntegrationTest` (7 cases) tagged `@Tag("redis")` and excluded from the default `make test` suite. Run via `make test-redis`; the Makefile target auto-detects the active Docker context (Docker Desktop, OrbStack, Colima) and forwards `DOCKER_HOST` + an explicit `api.version` JVM property so non-Docker-Desktop runtimes work without manual configuration
+
+### Changed
+
+- **`RateLimiterPort` selection in `ServiceGraph`** — branches on `config.redisEnabled` to construct each of the four bucket limiters from either `RedisRateLimiter` or `InMemoryRateLimiter`. Routes are unchanged; the port interface is unchanged
+- **`docs/RATE_LIMITING.md` updated** — adds the Redis implementation section (algorithm, fail-closed contract, key format) and removes the "planned for future release" note that referenced this work
+
+---
+
 ## [1.7.2] - 2026-04-28
 
 ### Added
