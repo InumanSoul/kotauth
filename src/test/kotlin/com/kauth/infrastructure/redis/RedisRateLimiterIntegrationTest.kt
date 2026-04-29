@@ -151,6 +151,30 @@ class RedisRateLimiterIntegrationTest {
     }
 
     @Test
+    fun `fails closed when Redis is unreachable at runtime`() {
+        val limiter =
+            RedisRateLimiter(
+                commands = holder.commands,
+                maxRequests = 5,
+                windowSeconds = 60,
+                keyPrefix = "test-fc",
+            )
+        // Prime the lazy SCRIPT LOAD before pausing — we want to exercise the
+        // runtime fail-closed branch, not the script-load path.
+        assertTrue(limiter.isAllowed("warmup"))
+
+        redis.dockerClient.pauseContainerCmd(redis.containerId).exec()
+        try {
+            assertFalse(limiter.isAllowed("alice"), "isAllowed must reject when Redis is unreachable")
+            assertEquals(0, limiter.remaining("alice"), "remaining must return 0 when Redis is unreachable")
+            // reset() catches RedisException internally and silently no-ops; the contract is "must not throw".
+            limiter.reset("alice")
+        } finally {
+            redis.dockerClient.unpauseContainerCmd(redis.containerId).exec()
+        }
+    }
+
+    @Test
     fun `sliding window expires entries after the window passes`() {
         val limiter =
             RedisRateLimiter(

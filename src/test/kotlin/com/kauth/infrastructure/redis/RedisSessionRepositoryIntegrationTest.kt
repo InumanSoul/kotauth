@@ -171,6 +171,61 @@ class RedisSessionRepositoryIntegrationTest {
     }
 
     @Test
+    fun `findActiveByUser does not leak across tenants`() {
+        repo.save(newSession(tenantId = 1, userId = 7, accessTokenHash = "t1u7"))
+        repo.save(newSession(tenantId = 2, userId = 7, accessTokenHash = "t2u7"))
+
+        val tenant1 = repo.findActiveByUser(TenantId(1), UserId(7))
+        val tenant2 = repo.findActiveByUser(TenantId(2), UserId(7))
+
+        assertEquals(1, tenant1.size)
+        assertEquals("t1u7", tenant1.single().accessTokenHash)
+        assertEquals(1, tenant2.size)
+        assertEquals("t2u7", tenant2.single().accessTokenHash)
+    }
+
+    @Test
+    fun `liveSessions prunes orphan members on the set that is read`() {
+        val saved = repo.save(newSession(userId = 11, accessTokenHash = "orph"))
+        val userKey = "kauth:session:active:user:1:11"
+        val tenantKey = "kauth:session:active:tenant:1"
+        assertEquals(1L, holder.commands.zcard(userKey), "user set seeded")
+        assertEquals(1L, holder.commands.zcard(tenantKey), "tenant set seeded")
+
+        // Simulate Redis TTL evicting the primary record without going through revoke().
+        holder.commands.del("kauth:session:rec:${saved.id!!.value}")
+
+        // Reading the user set both excludes the orphan and prunes it from that set.
+        assertTrue(repo.findActiveByUser(TenantId(1), UserId(11)).isEmpty())
+        assertEquals(0L, holder.commands.zcard(userKey), "user-set orphan should be pruned on read")
+
+        // Pruning is per-set: the tenant set still holds the orphan until it is read.
+        assertEquals(1L, holder.commands.zcard(tenantKey), "tenant set still holds orphan before read")
+        assertEquals(0, repo.countActiveByTenant(TenantId(1)), "count must exclude orphans")
+        assertEquals(0L, holder.commands.zcard(tenantKey), "tenant-set orphan should be pruned on read")
+    }
+
+    @Test
+    fun `save accepts an already-expired session and Redis honors the index TTL`() {
+        val past = Instant.now().minusSeconds(60)
+        val saved =
+            repo.save(
+                newSession(
+                    accessTokenHash = "stale",
+                    createdAt = past.minusSeconds(60),
+                    expiresAt = past,
+                ),
+            )
+
+        // The record itself survives via the retention buffer, but isExpired must report true.
+        assertNotNull(saved.id)
+        assertTrue(repo.findById(saved.id)?.isExpired == true)
+        // Access-token index TTL was coerced to 1s and Redis evicts it almost immediately.
+        Thread.sleep(1_500)
+        assertNull(holder.commands.get("kauth:session:tok:stale"), "expired access-token index should be evicted")
+    }
+
+    @Test
     fun `revoking an unknown session is a no-op`() {
         repo.revoke(SessionId(99_999), Instant.now())
         // Should not throw and should leave Redis untouched.
