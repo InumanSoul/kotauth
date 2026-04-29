@@ -20,7 +20,6 @@ import com.kauth.config.ServiceGraph
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.VersionCheckService
-import com.kauth.infrastructure.redis.RedisHealthProbe
 import io.ktor.http.*
 import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
@@ -85,8 +84,8 @@ fun main(args: Array<String> = emptyArray()) {
     val services = ServiceGraph.create(config)
 
     services.redisClientHolder?.let { holder ->
-        RedisHealthProbe
-            .probe(holder.connection, config.redisStartupProbeTimeoutMs)
+        holder
+            .ping(config.redisStartupProbeTimeoutMs)
             .onFailure { e ->
                 startupLog.error("Redis startup probe failed: {}", e.message)
                 System.err.println(

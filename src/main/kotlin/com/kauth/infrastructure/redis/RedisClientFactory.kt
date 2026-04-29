@@ -9,12 +9,37 @@ import io.lettuce.core.StaticCredentialsProvider
 import io.lettuce.core.api.StatefulRedisConnection
 import io.lettuce.core.api.sync.RedisCommands
 import java.time.Duration
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 class RedisClientHolder internal constructor(
     private val client: RedisClient,
-    val connection: StatefulRedisConnection<String, String>,
+    private val connection: StatefulRedisConnection<String, String>,
 ) {
     val commands: RedisCommands<String, String> = connection.sync()
+
+    /**
+     * Sends `PING` with an explicit timeout independent of the per-command
+     * timeout. Used by the startup probe so a hanging connection at boot can't
+     * stall startup beyond [timeoutMs]. Returns failure when the reply is not
+     * `PONG`, when the timeout fires, or when the underlying call throws.
+     */
+    fun ping(timeoutMs: Long): Result<Unit> {
+        val future = connection.async().ping().toCompletableFuture()
+        return try {
+            val reply = future.get(timeoutMs, TimeUnit.MILLISECONDS)
+            if (reply.equals("PONG", ignoreCase = true)) {
+                Result.success(Unit)
+            } else {
+                Result.failure(IllegalStateException("Redis PING returned unexpected reply: $reply"))
+            }
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            Result.failure(IllegalStateException("Redis PING timed out after ${timeoutMs}ms", e))
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException("Redis PING failed: ${e.message}", e))
+        }
+    }
 
     fun shutdown() {
         connection.close()

@@ -12,14 +12,15 @@ import java.time.Instant
  * Redis-backed session storage. Used when `KAUTH_REDIS_URL` is set;
  * [com.kauth.adapter.persistence.PostgresSessionRepository] is used otherwise.
  *
- * See [RedisKeys] for the keyspace layout. Per-record TTL is `max(expiresAt,
- * refreshExpiresAt) + retentionDays`; Redis expires records automatically so
- * [deleteExpired] is a no-op.
+ * Per-record TTL is `max(expiresAt, refreshExpiresAt) + retentionDays`, so
+ * Redis evicts expired records automatically and [deleteExpired] is a no-op.
  *
- * Active-by-user and active-by-tenant indexes are sorted sets scored by
- * `createdAt` epoch-millis. They are kept in sync on save/revoke, and
- * opportunistically reconciled on read to drop members whose primary record
- * has been TTL'd out.
+ * The active-by-user and active-by-tenant ZSETs are kept in sync on save and
+ * revoke. They are also opportunistically reconciled on read — when a record
+ * has TTL'd out but the ZSET member remains, [liveSessions] drops it via
+ * `ZREM` so the indexes don't accumulate orphans over time.
+ *
+ * @see RedisKeys for the keyspace layout.
  */
 class RedisSessionRepository(
     private val commands: RedisCommands<String, String>,
@@ -28,17 +29,18 @@ class RedisSessionRepository(
     override fun save(session: Session): Session {
         val id = SessionId(commands.incr(RedisKeys.ID_COUNTER).toInt())
         val saved = session.copy(id = id)
+        val nowEpoch = Instant.now().epochSecond
 
-        commands.setex(RedisKeys.record(id), recordTtlSeconds(saved), SessionCodec.encode(saved))
+        commands.setex(RedisKeys.record(id), recordTtlSeconds(saved, nowEpoch), SessionCodec.encode(saved))
         commands.setex(
             RedisKeys.accessTokenIndex(saved.accessTokenHash),
-            secondsUntil(saved.expiresAt),
+            ttlSeconds(saved.expiresAt, nowEpoch),
             id.value.toString(),
         )
         if (saved.refreshTokenHash != null && saved.refreshExpiresAt != null) {
             commands.setex(
                 RedisKeys.refreshTokenIndex(saved.refreshTokenHash),
-                secondsUntil(saved.refreshExpiresAt),
+                ttlSeconds(saved.refreshExpiresAt, nowEpoch),
                 id.value.toString(),
             )
         }
@@ -104,7 +106,12 @@ class RedisSessionRepository(
         val current = findById(sessionId) ?: return false
         if (current.isRevoked) return false
         val updated = current.copy(revokedAt = revokedAt)
-        commands.setex(RedisKeys.record(sessionId), recordTtlSeconds(updated), SessionCodec.encode(updated))
+        val nowEpoch = Instant.now().epochSecond
+        commands.setex(
+            RedisKeys.record(sessionId),
+            recordTtlSeconds(updated, nowEpoch),
+            SessionCodec.encode(updated),
+        )
         updated.userId?.let { uid ->
             commands.zrem(RedisKeys.activeUserSet(updated.tenantId, uid), sessionId.value.toString())
         }
@@ -115,7 +122,7 @@ class RedisSessionRepository(
     override fun findActiveByUser(
         tenantId: TenantId,
         userId: UserId,
-    ): List<Session> = liveSessions(RedisKeys.activeUserSet(tenantId, userId)).sortedByDescending { it.createdAt }
+    ): List<Session> = liveSessions(RedisKeys.activeUserSet(tenantId, userId), newestFirst = true)
 
     override fun findById(id: SessionId): Session? = commands.get(RedisKeys.record(id))?.let(SessionCodec::decode)
 
@@ -124,17 +131,17 @@ class RedisSessionRepository(
         limit: Int,
         offset: Int,
     ): List<Session> =
-        liveSessions(RedisKeys.activeTenantSet(tenantId))
-            .sortedByDescending { it.createdAt }
+        liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst = true)
             .drop(offset)
             .take(limit)
 
-    override fun countActiveByTenant(tenantId: TenantId): Int = liveSessions(RedisKeys.activeTenantSet(tenantId)).size
+    override fun countActiveByTenant(tenantId: TenantId): Int =
+        liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst = false).size
 
     override fun countActiveByUser(
         tenantId: TenantId,
         userId: UserId,
-    ): Int = liveSessions(RedisKeys.activeUserSet(tenantId, userId)).size
+    ): Int = liveSessions(RedisKeys.activeUserSet(tenantId, userId), newestFirst = false).size
 
     override fun revokeOldestForUser(
         tenantId: TenantId,
@@ -156,24 +163,42 @@ class RedisSessionRepository(
     override fun deleteExpired(retentionDays: Int): Int = 0
 
     /**
-     * Reads members of an active-set, fetches their records, and returns the
+     * Reads members of an active-set, batch-MGETs the records, and returns the
      * sessions that are still live (record present, not revoked, not expired).
      * Stale members (record TTL'd out) are opportunistically removed from the
      * set so it doesn't accumulate orphans.
+     *
+     * Round trips: 1 ZRANGE + 1 MGET (+ 1 ZREM only if orphans were found).
      */
-    private fun liveSessions(setKey: String): List<Session> {
-        val members = commands.zrange(setKey, 0, -1)
+    private fun liveSessions(
+        setKey: String,
+        newestFirst: Boolean,
+    ): List<Session> {
+        val members =
+            if (newestFirst) commands.zrevrange(setKey, 0, -1) else commands.zrange(setKey, 0, -1)
         if (members.isEmpty()) return emptyList()
+
+        val keyed = members.map { member -> member to member.toIntOrNull() }
+        val recordKeys = keyed.mapNotNull { (_, id) -> id?.let { RedisKeys.record(SessionId(it)) } }
+
+        val records: Map<String, Session> =
+            if (recordKeys.isEmpty()) {
+                emptyMap()
+            } else {
+                commands
+                    .mget(*recordKeys.toTypedArray())
+                    .filter { it.hasValue() }
+                    .associate { it.key to SessionCodec.decode(it.value) }
+            }
 
         val live = mutableListOf<Session>()
         val toPrune = mutableListOf<String>()
-        for (member in members) {
-            val id = member.toIntOrNull()
+        for ((member, id) in keyed) {
             if (id == null) {
                 toPrune += member
                 continue
             }
-            val session = findById(SessionId(id))
+            val session = records[RedisKeys.record(SessionId(id))]
             when {
                 session == null -> toPrune += member
                 !session.isActive -> toPrune += member
@@ -186,10 +211,16 @@ class RedisSessionRepository(
         return live
     }
 
-    private fun recordTtlSeconds(session: Session): Long {
+    private fun recordTtlSeconds(
+        session: Session,
+        nowEpoch: Long,
+    ): Long {
         val maxExpiry = listOfNotNull(session.expiresAt, session.refreshExpiresAt).max()
-        return secondsUntil(maxExpiry) + retentionDays.toLong() * 86_400L
+        return ttlSeconds(maxExpiry, nowEpoch) + retentionDays.toLong() * 86_400L
     }
 
-    private fun secondsUntil(target: Instant): Long = (target.epochSecond - Instant.now().epochSecond).coerceAtLeast(1L)
+    private fun ttlSeconds(
+        target: Instant,
+        nowEpoch: Long,
+    ): Long = (target.epochSecond - nowEpoch).coerceAtLeast(1L)
 }
