@@ -2,6 +2,7 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthError
@@ -17,6 +18,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.util.AttributeKey
+import java.time.Instant
 
 data class AuthTenantContext(
     val slug: String,
@@ -142,6 +144,84 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
 internal fun ApplicationCall.clearAuthContextCookie(slug: String) {
     response.cookies.append(
         name = AUTH_CONTEXT_COOKIE,
+        value = "",
+        maxAge = 0L,
+        httpOnly = true,
+        path = "/t/$slug",
+    )
+}
+
+// -- SSO session cookie (OIDC silent auth) -------------------------------------
+
+private const val SSO_COOKIE = "KOTAUTH_SSO"
+private const val SSO_COOKIE_VERSION = "v1"
+
+/**
+ * Witness of a successful interactive authentication, scoped to `/t/{slug}`.
+ *
+ * Read by GET /authorize when honoring `prompt=none` to issue an authorization
+ * code without re-prompting the user (OIDC Core §3.1.2.1). The `authTime` value
+ * is the moment the user proved possession of their credentials — for MFA
+ * flows it is the MFA completion time (Keycloak convention), not the
+ * first-factor time. It surfaces as the `auth_time` claim in subsequent ID
+ * tokens, and is the value `max_age` is checked against.
+ */
+internal data class SsoCookieData(
+    val userId: Int,
+    val tenantId: Int,
+    val authTime: Instant,
+    val mfaCompleted: Boolean,
+    val expiresAt: Instant,
+)
+
+internal fun ApplicationCall.setSsoCookie(
+    data: SsoCookieData,
+    slug: String,
+    encryptionService: EncryptionService,
+    secure: Boolean = false,
+) {
+    val payload =
+        listOf(
+            SSO_COOKIE_VERSION,
+            data.userId.toString(),
+            data.tenantId.toString(),
+            data.authTime.epochSecond.toString(),
+            if (data.mfaCompleted) "1" else "0",
+            data.expiresAt.epochSecond.toString(),
+        ).joinToString("|")
+    val maxAge = (data.expiresAt.epochSecond - Instant.now().epochSecond).coerceAtLeast(0L)
+    response.cookies.append(
+        name = SSO_COOKIE,
+        value = encryptionService.signCookie(payload),
+        maxAge = maxAge,
+        httpOnly = true,
+        secure = secure,
+        path = "/t/$slug",
+    )
+}
+
+internal fun ApplicationCall.getSsoCookie(encryptionService: EncryptionService): SsoCookieData? {
+    val raw = request.cookies[SSO_COOKIE] ?: return null
+    val payload = encryptionService.verifyCookie(raw) ?: return null
+    val parts = payload.split("|")
+    if (parts.size != 6 || parts[0] != SSO_COOKIE_VERSION) return null
+    val userId = parts[1].toIntOrNull() ?: return null
+    val tenantId = parts[2].toIntOrNull() ?: return null
+    val authTime = parts[3].toLongOrNull()?.let(Instant::ofEpochSecond) ?: return null
+    val mfaCompleted =
+        when (parts[4]) {
+            "0" -> false
+            "1" -> true
+            else -> return null
+        }
+    val expiresAt = parts[5].toLongOrNull()?.let(Instant::ofEpochSecond) ?: return null
+    if (Instant.now().isAfter(expiresAt)) return null
+    return SsoCookieData(userId, tenantId, authTime, mfaCompleted, expiresAt)
+}
+
+internal fun ApplicationCall.clearSsoCookie(slug: String) {
+    response.cookies.append(
+        name = SSO_COOKIE,
         value = "",
         maxAge = 0L,
         httpOnly = true,
@@ -349,9 +429,15 @@ internal fun parseSocialPendingCookie(
 internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     slug: String,
     userId: UserId,
+    tenantId: TenantId,
     oauthParams: AuthView.OAuthParams,
     ipAddress: String?,
+    authTime: Instant,
+    mfaCompleted: Boolean,
+    ssoTtlSeconds: Long,
+    secure: Boolean,
     oauthService: OAuthService,
+    encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
 ) {
     val clientId =
@@ -360,6 +446,19 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     val redirectUri =
         oauthParams.redirectUri
             ?: return respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+
+    setSsoCookie(
+        SsoCookieData(
+            userId = userId.value,
+            tenantId = tenantId.value,
+            authTime = authTime,
+            mfaCompleted = mfaCompleted,
+            expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
+        ),
+        slug = slug,
+        encryptionService = encryptionService,
+        secure = secure,
+    )
 
     when (
         val codeResult =

@@ -35,6 +35,7 @@ internal fun Route.oauthProtocolRoutes(
     encryptionService: EncryptionService,
     loginRateLimiter: RateLimiterPort,
     baseUrl: String = "",
+    ssoTtlSeconds: Long,
 ) {
     get("/.well-known/openid-configuration") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -290,10 +291,13 @@ internal fun Route.oauthProtocolRoutes(
             }
             is AuthResult.Success -> {
                 val user = result.value
+                if (tenant == null) {
+                    return@post call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
+                }
 
                 // Enforce MFA enrollment policy before issuing a challenge (skip for portal logins)
                 val isPortalLogin = oauthParams.clientId == PortalClientProvisioning.PORTAL_CLIENT_ID
-                if (mfaService != null && tenant != null && !isPortalLogin) {
+                if (mfaService != null && !isPortalLogin) {
                     val mfaPolicy = tenant.mfaPolicy
                     if (mfaPolicy != "optional") {
                         val userRoles =
@@ -341,9 +345,15 @@ internal fun Route.oauthProtocolRoutes(
                 call.completeAuthorizationCodeFlow(
                     slug = slug,
                     userId = user.id!!,
+                    tenantId = tenant.id,
                     oauthParams = oauthParams,
                     ipAddress = ipAddress,
+                    authTime = java.time.Instant.now(),
+                    mfaCompleted = false,
+                    ssoTtlSeconds = ssoTtlSeconds,
+                    secure = baseUrl.startsWith("https"),
                     oauthService = oauthService,
+                    encryptionService = encryptionService,
                     renderError = { message ->
                         call.respondHtml(
                             HttpStatusCode.BadRequest,
@@ -353,8 +363,8 @@ internal fun Route.oauthProtocolRoutes(
                                 error = message,
                                 oauthParams = oauthParams,
                                 enabledProviders = enabledProviders,
-                                registrationEnabled = tenant?.registrationEnabled ?: true,
-                                magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
+                                registrationEnabled = tenant.registrationEnabled,
+                                magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
                             ),
                         )
                     },

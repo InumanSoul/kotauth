@@ -372,6 +372,7 @@ fun Application.module(
             corsService = s.corsService,
             corsPort = s.corsOriginCache,
             translationPort = s.translationPort,
+            ssoTtlSeconds = config.ssoSessionTtlSeconds,
         )
 
         portalRoutes(
