@@ -71,7 +71,7 @@ class LocaleResolutionTest {
     private fun <T> runCaught(block: () -> T): T = block()
 
     // =========================================================================
-    // Accept-Language wins when available
+    // Accept-Language is honored when no tenant default is set
     // =========================================================================
 
     @Test
@@ -119,6 +119,22 @@ class LocaleResolutionTest {
     @Test
     fun `tenant default unloaded locale falls through to English`() {
         assertEquals("en", runResolution(translationWithEnEs, tenant(defaultLocale = "fr"), null))
+    }
+
+    @Test
+    fun `tenant default beats Accept-Language when both are available`() {
+        assertEquals(
+            "es",
+            runResolution(translationWithEnEs, tenant(defaultLocale = "es"), "en-US,en;q=0.9"),
+        )
+    }
+
+    @Test
+    fun `tenant default unloaded locale falls back to Accept-Language match`() {
+        assertEquals(
+            "es",
+            runResolution(translationWithEnEs, tenant(defaultLocale = "fr"), "es-MX"),
+        )
     }
 
     // =========================================================================

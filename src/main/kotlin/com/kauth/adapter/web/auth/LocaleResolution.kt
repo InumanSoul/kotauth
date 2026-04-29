@@ -11,16 +11,16 @@ internal fun ApplicationCall.resolveLocale(
 ): String {
     val available = translation.availableLocales
 
+    tenant?.theme?.defaultLocale?.lowercase()?.let { preferred ->
+        if (preferred in available) return preferred
+    }
+
     request.header("Accept-Language")?.let { header ->
         for (tag in parseAcceptLanguage(header)) {
             if (tag in available) return tag
             val primary = tag.substringBefore("-")
             if (primary in available) return primary
         }
-    }
-
-    tenant?.theme?.defaultLocale?.lowercase()?.let { preferred ->
-        if (preferred in available) return preferred
     }
 
     return "en"

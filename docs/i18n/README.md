@@ -20,10 +20,16 @@ bundles — set `KAUTH_I18N_BUNDLE_DIR` to a directory containing one
 
 ## Locale resolution per request
 
-1. The `Accept-Language` header (first loaded match wins).
-2. The tenant's `defaultLocale` (Branding → Default Locale in the admin UI),
+1. The tenant's `defaultLocale` (Branding → Default Locale in the admin UI),
    if it points to a loaded locale.
+2. The `Accept-Language` header (first loaded match wins).
 3. `"en"`.
+
+The tenant default wins over `Accept-Language` deliberately — workspace
+owners set the language their auth pages render in, and a user on an
+English browser hitting a Spanish-default workspace sees Spanish. When
+no tenant default is set, `Accept-Language` is honored as the user's
+signal.
 
 ## What's covered in v1.7.2
 

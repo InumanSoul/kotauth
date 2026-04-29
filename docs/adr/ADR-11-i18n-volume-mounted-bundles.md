@@ -88,12 +88,17 @@ files they mount.
 
 Per request, in `LocaleResolution.kt`:
 
-1. Browser `Accept-Language` header — first loaded match wins.
-2. Tenant `TenantTheme.defaultLocale` (admin Branding → Default Locale),
+1. Tenant `TenantTheme.defaultLocale` (admin Branding → Default Locale),
    if set and currently loaded.
+2. Browser `Accept-Language` header — first loaded match wins.
 3. `"en"`.
 
-There is no per-user override and no `?lang=` query param in v1.7.2.
+The tenant default beats `Accept-Language` deliberately: in the B2B SaaS
+ICP, the workspace owner configures the language for their team's auth
+pages, and individual users on differently-localized browsers should
+still see the operator's chosen language. When the workspace has no
+default set, `Accept-Language` is honored as the user's signal. There
+is no per-user override and no `?lang=` query param in v1.7.2.
 Operators expressed concern that a session-scoped override would muddy
 audit-log review of multi-tenant flows; we can add it later behind a
 tenant flag if real demand surfaces.
