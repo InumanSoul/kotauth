@@ -69,6 +69,7 @@ import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.redis.RedisClientFactory
 import com.kauth.infrastructure.redis.RedisClientHolder
 import com.kauth.infrastructure.redis.RedisRateLimiter
+import com.kauth.infrastructure.redis.RedisSessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -129,12 +130,28 @@ data class ServiceGraph(
             val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val encryptionService = EncryptionService(config.secretKey)
 
+            // -- Redis client (optional) --------------------------------------
+            // Constructed first so both session storage and rate limiters can
+            // branch on the same holder. Without `KAUTH_REDIS_URL`, this stays
+            // null and the storage falls back to PostgreSQL + InMemory.
+            val redisClientHolder: RedisClientHolder? =
+                config.redisUrl?.let { url ->
+                    RedisClientFactory.create(
+                        url = url,
+                        username = config.redisUsername,
+                        password = config.redisPassword,
+                        commandTimeoutMs = config.redisCommandTimeoutMs,
+                    )
+                }
+
             // -- Repositories -------------------------------------------------
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
             val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
-            val sessionRepository = PostgresSessionRepository()
+            val sessionRepository: SessionRepository =
+                redisClientHolder?.let { RedisSessionRepository(it.commands) }
+                    ?: PostgresSessionRepository()
             val authCodeRepository = PostgresAuthorizationCodeRepository()
             val auditLogRepository = PostgresAuditLogRepository()
             val passwordHasher = BcryptPasswordHasher()
@@ -333,17 +350,6 @@ data class ServiceGraph(
                     baseUrl = config.baseUrl,
                 ).seedIfEmpty()
             }
-
-            // -- Redis client (optional) --------------------------------------
-            val redisClientHolder: RedisClientHolder? =
-                config.redisUrl?.let { url ->
-                    RedisClientFactory.create(
-                        url = url,
-                        username = config.redisUsername,
-                        password = config.redisPassword,
-                        commandTimeoutMs = config.redisCommandTimeoutMs,
-                    )
-                }
 
             // -- Rate limiters ------------------------------------------------
             val loginLimiter: RateLimiterPort =
