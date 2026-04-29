@@ -25,6 +25,19 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import kotlinx.serialization.json.*
 
+/**
+ * OIDC Core §3.1.2.1 `prompt` values we recognize at GET /authorize.
+ *
+ * - `none`: silent auth — never display UI. Phase 3 honors this against the
+ *   SSO witness cookie; Phase 2 always returns `login_required`.
+ * - `login`: force re-auth — always render the login form.
+ * - `consent`: force consent screen. We have no separate consent UI yet, so
+ *   it is treated like `login` for now (server simply re-authenticates).
+ * - `select_account`: account picker. Single-account-per-browser today, so
+ *   identical to `login` in behavior.
+ */
+private val OIDC_SUPPORTED_PROMPTS = setOf("none", "login", "consent", "select_account")
+
 internal fun Route.oauthProtocolRoutes(
     oauthService: OAuthService,
     identityProviderRepository: IdentityProviderRepository?,
@@ -98,6 +111,12 @@ internal fun Route.oauthProtocolRoutes(
                     },
                 )
                 put("code_challenge_methods_supported", buildJsonArray { add("S256") })
+                put(
+                    "prompt_values_supported",
+                    buildJsonArray {
+                        OIDC_SUPPORTED_PROMPTS.forEach { add(it) }
+                    },
+                )
             },
         )
     }
@@ -134,6 +153,35 @@ internal fun Route.oauthProtocolRoutes(
         val nonce = q["nonce"]
         val codeChallenge = q["code_challenge"]
         val codeChallengeMethod = q["code_challenge_method"]
+
+        val promptValues =
+            q["prompt"]
+                ?.trim()
+                ?.split(Regex("\\s+"))
+                ?.filter { it.isNotBlank() }
+                ?: emptyList()
+        val unknownPrompts = promptValues.filterNot { it in OIDC_SUPPORTED_PROMPTS }
+        if (unknownPrompts.isNotEmpty()) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to "invalid_request",
+                    "error_description" to "Unsupported prompt value(s): ${unknownPrompts.joinToString(",")}",
+                ),
+            )
+            return@get
+        }
+        // OIDC Core §3.1.2.1: `none` MUST NOT appear with any other prompt value.
+        if ("none" in promptValues && promptValues.size > 1) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf(
+                    "error" to "invalid_request",
+                    "error_description" to "prompt=none cannot be combined with other prompt values",
+                ),
+            )
+            return@get
+        }
 
         // If no OAuth query params, check for an existing auth context cookie.
         // This handles returning from registration/password-reset during an active OAuth flow.
@@ -195,6 +243,40 @@ internal fun Route.oauthProtocolRoutes(
         val tenant =
             ctx.tenant
                 ?: return@get call.respond(HttpStatusCode.NotFound, mapOf("error" to "tenant_not_found"))
+
+        // prompt=none: never show UI. Phase 3 will silent-auth via the SSO cookie;
+        // Phase 2 always returns login_required. We MUST validate the redirect_uri
+        // against the client's registered URIs first — otherwise an attacker can
+        // turn /authorize into an open redirect by supplying a hostile uri here.
+        if ("none" in promptValues) {
+            if (!oauthService.validateRedirectUri(slug, clientId, redirectUri)) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "Invalid redirect_uri for client",
+                    ),
+                )
+                return@get
+            }
+            val errorRedirect =
+                buildString {
+                    append(redirectUri)
+                    append("?error=login_required")
+                    append("&error_description=").append(encodeParam("Silent authentication is unavailable"))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                }
+            call.respondRedirect(errorRedirect)
+            return@get
+        }
+
+        // prompt=login / consent / select_account: force interactive re-auth even
+        // if a valid SSO cookie is present. Wiping the cookie now keeps Phase 3's
+        // silent-auth path honest — no chance of an in-progress flow falling
+        // through to the cookie after the user explicitly asked to re-authenticate.
+        if (promptValues.any { it == "login" || it == "consent" || it == "select_account" }) {
+            call.clearSsoCookie(slug)
+        }
 
         val oauthParams =
             AuthView.OAuthParams(
