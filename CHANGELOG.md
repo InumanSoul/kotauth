@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.1] - 2026-04-29
+
+### Added
+
+- **OIDC silent SSO across clients on the same tenant** — every successful interactive login now drops a signed `KOTAUTH_SSO` witness cookie path-scoped to `/t/{slug}` (HttpOnly, signed via `EncryptionService.signCookie`, payload `v1|userId|tenantId|authTime|mfaCompleted|expiresAt`). Subsequent visits to `/t/{slug}/authorize` silent-auth by issuing an authorization code without rendering UI. Closes the gap that previously made users land on the portal login screen after signing into a SaaS app. See [ADR-13](docs/adr/ADR-13-oidc-sso-witness-cookie.md)
+- **OIDC `prompt` parameter — full §3.1.2.1 support** — `prompt=none` silent-auths or returns `error=login_required`; `prompt=login`/`consent`/`select_account` clear the SSO cookie and force re-auth. Unknown values and the invalid `none + other` combination return `invalid_request`. Discovery doc advertises `prompt_values_supported`
+- **`auth_time` claim on every ID token** — `JwtTokenAdapter.issueUserTokens` now writes the OIDC `auth_time` claim (epoch seconds) on the ID token. For MFA logins the value is the moment the **second factor was verified** (Keycloak convention), not the first-factor time. Threaded end-to-end: login → `setSsoCookie` → `AuthorizationCode.auth_time` (V38 migration) → ID token. Discovery doc adds `auth_time` to `claims_supported`
+- **OIDC `max_age` parameter** — silent auth refuses to issue when `(now - cookie.authTime) > max_age`. `max_age=0` is treated as the OIDC sentinel meaning "force fresh credential proof now" and always falls through to interactive
+- **OIDC `id_token_hint` parameter** — best-effort `sub` extraction from the hint payload; mismatch with the cookie's `userId` blocks silent auth and falls through to interactive. Signature verification of the hint is a v1.9.x follow-up
+- **Portal silent SSO via `prompt=none`** — `GET /t/{slug}/account/login` builds the OAuth authUrl with `&prompt=none` on first attempt. `/callback` handles the `error=login_required` response by redirecting to `/login?prompt_failed=true` to break the loop and render the form. Two server hops worst case for first-time visitors; zero form pages for users with a valid SSO cookie
+- **`OAuthService.validateRedirectUri(tenantSlug, clientId, redirectUri)`** — new domain method used by GET `/authorize` to validate the redirect_uri against the client's registered list **before** constructing any redirect string. Open-redirect protection for the `prompt=none` failure path
+- **Two new env vars** — `KAUTH_SSO_SESSION_TTL_SECONDS` (default 86400 / 24h) and `KAUTH_SSO_SESSION_MAX_TTL_SECONDS` (default 2592000 / 30d). Validated at startup (`60s ≤ ttl ≤ maxTtl`). Documented in [ENV_REFERENCE.md](docs/ENV_REFERENCE.md)
+- **V38 migration** — `auth_time TIMESTAMPTZ NULL` column on `authorization_codes`. Nullable for backwards compatibility with codes minted before this column existed; new issuance always populates it
+- **Phase 1–5 integration tests** — 4 SSO cookie tests (`SsoCookieTest`), 7 prompt parameter tests (`PromptParamTest`), 13 silent auth tests (`SilentAuthTest`), 2 OIDC end-session tests (`SsoLogoutTest`), 4 portal silent SSO tests (additions to `PortalRoutesTest`). All in default `make test`, no Docker required
+
+### Changed
+
+- **`completeAuthorizationCodeFlow` signature extended** — now accepts `tenantId`, `authTime`, `mfaCompleted`, `ssoTtlSeconds`, `secure`, `encryptionService`. Every call site (password login, MFA challenge, magic-link consume, social login) was updated; `SocialLoginRoutes` was refactored from two inline `issueAuthorizationCode` blocks into a single use of the helper, removing the divergence in code-issuance behavior across credential types
+- **`OAuthService.issueAuthorizationCode` accepts `authTime: Instant = Instant.now()`** — silent auth passes the cookie's `authTime`; interactive paths pass the moment of credential verification. The auth code persists this value for the token-exchange path to read
+- **`TokenPort.issueUserTokens` accepts `authTime: Instant?`** — null preserves pre-feature token shape (refresh-token paths). When set, `JwtTokenAdapter` writes the `auth_time` claim onto the ID token
+- **All three logout paths clear `KOTAUTH_SSO`** — `GET /t/{slug}/protocol/openid-connect/logout`, the corresponding `POST`, and portal `POST /t/{slug}/account/logout`. Without this, logging out then visiting `/account/login` would silent-auth the user straight back in
+
+### Documentation
+
+- **ADR-13 — OIDC silent SSO via path-scoped witness cookie.** Captures the cookie design (path-scope, HMAC-not-JWT, version prefix), `auth_time` plumbing through three layers, the Keycloak-style MFA-completion-time decision, the `mfaCompleted` policy enforcement model, prompt/max_age/id_token_hint semantics, the open-redirect mitigation, threat model, and known limitations (signature-verification of `id_token_hint`, role-aware `required_admins` silent auth, session-bound revocation — all tracked for v1.9.x / v1.10.0)
+
+---
+
 ## [1.8.0] - 2026-04-29
 
 ### Added
