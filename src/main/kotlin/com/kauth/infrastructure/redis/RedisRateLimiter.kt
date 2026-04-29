@@ -17,7 +17,10 @@ class RedisRateLimiter(
 ) : RateLimiterPort {
     private val log = LoggerFactory.getLogger(RedisRateLimiter::class.java)
 
-    @Volatile private var scriptSha: String = commands.scriptLoad(SCRIPT)
+    // Loaded lazily on first call so the constructor never touches Redis.
+    // This keeps `Application.startup` -> `RedisHealthProbe` as the single
+    // place where startup-time Redis I/O can fail and emit the FATAL banner.
+    @Volatile private var scriptSha: String? = null
 
     override fun isAllowed(key: String): Boolean {
         val redisKey = redisKey(key)
@@ -67,30 +70,43 @@ class RedisRateLimiter(
         val nowStr = now.toString()
         val maxStr = maxRequests.toString()
         return try {
-            doEval(redisKey, nowStr, window, maxStr, member)
+            doEval(ensureScriptLoaded(), redisKey, nowStr, window, maxStr, member)
         } catch (e: RedisNoScriptException) {
-            scriptSha = commands.scriptLoad(SCRIPT)
-            doEval(redisKey, nowStr, window, maxStr, member)
+            val reloaded = commands.scriptLoad(SCRIPT).also { scriptSha = it }
+            doEval(reloaded, redisKey, nowStr, window, maxStr, member)
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
+    private fun ensureScriptLoaded(): String {
+        scriptSha?.let { return it }
+        return synchronized(this) {
+            scriptSha ?: commands.scriptLoad(SCRIPT).also { scriptSha = it }
+        }
+    }
+
     private fun doEval(
+        sha: String,
         redisKey: String,
         now: String,
         window: String,
         max: String,
         member: String,
-    ): List<Long> =
-        commands.evalsha<List<Long>>(
-            scriptSha,
-            ScriptOutputType.MULTI,
-            arrayOf(redisKey),
-            now,
-            window,
-            max,
-            member,
-        )
+    ): List<Long> {
+        @Suppress("UNCHECKED_CAST")
+        val raw =
+            commands.evalsha<List<*>>(
+                sha,
+                ScriptOutputType.MULTI,
+                arrayOf(redisKey),
+                now,
+                window,
+                max,
+                member,
+            )
+        return raw.map { element ->
+            (element as? Long) ?: throw RedisException("Unexpected sliding_window.lua return type: $element")
+        }
+    }
 
     companion object {
         private val SCRIPT: String =

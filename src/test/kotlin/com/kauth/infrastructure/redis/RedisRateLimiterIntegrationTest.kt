@@ -29,6 +29,7 @@ class RedisRateLimiterIntegrationTest {
                 url = "redis://${redis.host}:${redis.firstMappedPort}",
                 username = null,
                 password = null,
+                connectTimeoutMs = 1_000,
                 commandTimeoutMs = 500,
             )
     }

@@ -69,14 +69,7 @@ class RedisSessionRepository(
         sessionId: SessionId,
         revokedAt: Instant,
     ) {
-        val current = findById(sessionId) ?: return
-        if (current.isRevoked) return
-        val updated = current.copy(revokedAt = revokedAt)
-        commands.setex(RedisKeys.record(sessionId), recordTtlSeconds(updated), SessionCodec.encode(updated))
-        updated.userId?.let { uid ->
-            commands.zrem(RedisKeys.activeUserSet(updated.tenantId, uid), sessionId.value.toString())
-        }
-        commands.zrem(RedisKeys.activeTenantSet(updated.tenantId), sessionId.value.toString())
+        revokeAndReport(sessionId, revokedAt)
     }
 
     override fun revokeAllForUser(
@@ -85,17 +78,38 @@ class RedisSessionRepository(
         revokedAt: Instant,
     ) {
         commands.zrange(RedisKeys.activeUserSet(tenantId, userId), 0, -1).forEach {
-            it.toIntOrNull()?.let { id -> revoke(SessionId(id), revokedAt) }
+            it.toIntOrNull()?.let { id -> revokeAndReport(SessionId(id), revokedAt) }
         }
     }
 
     override fun revokeAllForTenant(
         tenantId: TenantId,
         revokedAt: Instant,
-    ): Int {
-        val members = commands.zrange(RedisKeys.activeTenantSet(tenantId), 0, -1)
-        members.forEach { it.toIntOrNull()?.let { id -> revoke(SessionId(id), revokedAt) } }
-        return members.size
+    ): Int =
+        commands
+            .zrange(RedisKeys.activeTenantSet(tenantId), 0, -1)
+            .mapNotNull { it.toIntOrNull() }
+            .count { revokeAndReport(SessionId(it), revokedAt) }
+
+    /**
+     * Returns true when a live session was revoked, false when the id either
+     * has no record (orphan ZSET member) or is already revoked. Callers that
+     * report a count to the UI / audit log must use this instead of the raw
+     * ZSET cardinality.
+     */
+    private fun revokeAndReport(
+        sessionId: SessionId,
+        revokedAt: Instant,
+    ): Boolean {
+        val current = findById(sessionId) ?: return false
+        if (current.isRevoked) return false
+        val updated = current.copy(revokedAt = revokedAt)
+        commands.setex(RedisKeys.record(sessionId), recordTtlSeconds(updated), SessionCodec.encode(updated))
+        updated.userId?.let { uid ->
+            commands.zrem(RedisKeys.activeUserSet(updated.tenantId, uid), sessionId.value.toString())
+        }
+        commands.zrem(RedisKeys.activeTenantSet(updated.tenantId), sessionId.value.toString())
+        return true
     }
 
     override fun findActiveByUser(

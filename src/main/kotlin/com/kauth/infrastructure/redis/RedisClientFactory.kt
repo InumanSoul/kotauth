@@ -27,10 +27,11 @@ object RedisClientFactory {
         url: String,
         username: String?,
         password: String?,
+        connectTimeoutMs: Long,
         commandTimeoutMs: Long,
     ): RedisClientHolder {
         val redisUri = RedisURI.create(url)
-        redisUri.timeout = Duration.ofMillis(commandTimeoutMs)
+        redisUri.timeout = Duration.ofMillis(connectTimeoutMs)
         val creds =
             when {
                 username != null -> RedisCredentials.just(username, password ?: "")

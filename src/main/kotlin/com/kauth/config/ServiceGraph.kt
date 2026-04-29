@@ -140,6 +140,7 @@ data class ServiceGraph(
                         url = url,
                         username = config.redisUsername,
                         password = config.redisPassword,
+                        connectTimeoutMs = config.redisTimeoutMs,
                         commandTimeoutMs = config.redisCommandTimeoutMs,
                     )
                 }
