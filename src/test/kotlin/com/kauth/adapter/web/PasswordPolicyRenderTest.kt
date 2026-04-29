@@ -8,6 +8,7 @@ import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import kotlinx.html.HTML
 import kotlinx.html.html
 import kotlinx.html.stream.createHTML
@@ -69,6 +70,13 @@ class PasswordPolicyRenderTest {
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = null,
+        )
+
+    private val viewContext =
+        ViewContext.englishOnly(
+            theme = TenantTheme.DEFAULT,
+            workspaceName = "Acme Corp",
+            translator = EnglishOnlyTranslation(),
         )
 
     // -------------------------------------------------------------------------
@@ -146,7 +154,14 @@ class PasswordPolicyRenderTest {
     @Test
     fun `resetPasswordPage renders data-pw-min-length with configured minimum`() {
         val html =
-            render(AuthView.resetPasswordPage(tenantSlug = "acme", token = "tok123", passwordPolicy = strictPolicy))
+            render(
+                AuthView.resetPasswordPage(
+                    tenantSlug = "acme",
+                    ctx = viewContext,
+                    token = "tok123",
+                    passwordPolicy = strictPolicy,
+                ),
+            )
 
         assertTrue(
             html.contains("""data-pw-min-length="12""""),
@@ -157,7 +172,14 @@ class PasswordPolicyRenderTest {
     @Test
     fun `resetPasswordPage renders all three require attributes when all policy flags are true`() {
         val html =
-            render(AuthView.resetPasswordPage(tenantSlug = "acme", token = "tok123", passwordPolicy = strictPolicy))
+            render(
+                AuthView.resetPasswordPage(
+                    tenantSlug = "acme",
+                    ctx = viewContext,
+                    token = "tok123",
+                    passwordPolicy = strictPolicy,
+                ),
+            )
 
         assertTrue(html.contains("""data-pw-require-upper="true""""), "Expected data-pw-require-upper on reset page")
         assertTrue(html.contains("""data-pw-require-number="true""""), "Expected data-pw-require-number on reset page")
@@ -170,7 +192,14 @@ class PasswordPolicyRenderTest {
     @Test
     fun `resetPasswordPage omits optional require attributes when flags are false`() {
         val html =
-            render(AuthView.resetPasswordPage(tenantSlug = "acme", token = "tok123", passwordPolicy = defaultPolicy))
+            render(
+                AuthView.resetPasswordPage(
+                    tenantSlug = "acme",
+                    ctx = viewContext,
+                    token = "tok123",
+                    passwordPolicy = defaultPolicy,
+                ),
+            )
 
         assertFalse(
             html.contains("data-pw-require-upper"),
@@ -189,7 +218,14 @@ class PasswordPolicyRenderTest {
     @Test
     fun `resetPasswordPage placeholder reflects passwordMinLength`() {
         val html =
-            render(AuthView.resetPasswordPage(tenantSlug = "acme", token = "tok123", passwordPolicy = strictPolicy))
+            render(
+                AuthView.resetPasswordPage(
+                    tenantSlug = "acme",
+                    ctx = viewContext,
+                    token = "tok123",
+                    passwordPolicy = strictPolicy,
+                ),
+            )
 
         assertTrue(
             html.contains("Minimum 12 characters"),

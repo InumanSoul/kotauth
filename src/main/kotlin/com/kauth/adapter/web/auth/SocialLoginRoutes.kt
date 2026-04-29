@@ -8,7 +8,6 @@ import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -28,8 +27,6 @@ internal fun Route.socialLoginRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
@@ -66,8 +63,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                     ),
@@ -82,8 +78,6 @@ internal fun Route.socialLoginRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         val provider =
             SocialProvider.fromValueOrNull(provName)
@@ -109,8 +103,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "Login with ${provider.displayName} was cancelled or failed.",
                     enabledProviders = enabledProviders,
                 ),
@@ -129,8 +122,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "Invalid or expired state parameter. Please try signing in again.",
                     enabledProviders = enabledProviders,
                 ),
@@ -144,8 +136,7 @@ internal fun Route.socialLoginRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
                     tenantSlug = slug,
-                    theme = theme,
-                    workspaceName = workspaceName,
+                    ctx = ctx.viewContext,
                     error = "State mismatch. Please try signing in again.",
                     enabledProviders = enabledProviders,
                 ),
@@ -185,8 +176,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.BadRequest,
                     AuthView.loginPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                     ),
@@ -244,8 +234,7 @@ internal fun Route.socialLoginRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.loginPage(
                                     tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
+                                    ctx = ctx.viewContext,
                                     error = codeResult.error.toDescription(),
                                     enabledProviders = enabledProviders,
                                 ),

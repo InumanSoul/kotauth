@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
+import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.SecurityConfig
@@ -113,8 +114,7 @@ object AuthView {
 
     fun loginPage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
@@ -123,27 +123,27 @@ object AuthView {
         magicLinkEnabled: Boolean = false,
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Sign In", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
                     }
                     div("card") {
-                        h1("card-title") { +"Welcome back" }
-                        p("card-subtitle") { +"Sign in to your account" }
+                        h1("card-title") { +ctx.t("LOGIN_WELCOME_BACK") }
+                        p("card-subtitle") { +ctx.t("LOGIN_SUBTITLE") }
 
                         if (success) {
                             div("alert alert-success") {
-                                +"Account created successfully — please sign in."
+                                +ctx.t("LOGIN_REGISTRATION_SUCCESS")
                             }
                         }
                         if (error != null) {
@@ -158,11 +158,11 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "username"
-                                    +"Username"
+                                    +ctx.t("LOGIN_USERNAME")
                                 }
                                 input(type = InputType.text, name = "username") {
                                     id = "username"
-                                    placeholder = "Enter your username"
+                                    placeholder = ctx.t("LOGIN_USERNAME_PLACEHOLDER")
                                     attributes["autocomplete"] = "username"
                                     required = true
                                     attributes["autofocus"] = "true"
@@ -171,47 +171,47 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "password"
-                                    +"Password"
+                                    +ctx.t("PASSWORD")
                                 }
                                 div("field__input-wrap") {
                                     input(type = InputType.password, name = "password") {
                                         id = "password"
-                                        placeholder = "Enter your password"
+                                        placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
                                         attributes["autocomplete"] = "current-password"
                                         required = true
                                     }
                                     button(type = ButtonType.button, classes = "field__toggle-pw") {
                                         attributes["data-toggle-password"] = "password"
-                                        attributes["aria-label"] = "Show password"
+                                        attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                         attributes["aria-pressed"] = "false"
                                         attributes["data-visible"] = "false"
-                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                        inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                     }
                                 }
                             }
-                            button(type = ButtonType.submit, classes = "btn") { +"Sign In" }
+                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
                         }
 
                         div("footer-link") {
-                            a(href = "/t/$tenantSlug/forgot-password") { +"Forgot password?" }
+                            a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
                         }
                         if (magicLinkEnabled) {
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/magic-link") { +"Sign in with an email link instead" }
+                                a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
                             }
                         }
                         if (registrationEnabled) {
                             div("footer-link") {
-                                +"Don't have an account? "
-                                a(href = "/t/$tenantSlug/register") { +"Create one" }
+                                +ctx.t("LOGIN_NO_ACCOUNT")
+                                a(href = "/t/$tenantSlug/register") { +ctx.t("LOGIN_CREATE_ONE") }
                             }
                         }
 
                         // Social login buttons — only shown when providers are configured
                         if (enabledProviders.isNotEmpty()) {
                             div("social-divider") {
-                                span { +"or continue with" }
+                                span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
                             }
                             div("social-buttons") {
                                 for (prov in enabledProviders) {
@@ -223,15 +223,21 @@ object AuthView {
                                         when (prov) {
                                             SocialProvider.GOOGLE -> {
                                                 span("social-icon") {
-                                                    inlineSvgIcon(iconName= "google-logo", ariaLabel = "Google")
+                                                    inlineSvgIcon(
+                                                        iconName = "google-logo",
+                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
+                                                    )
                                                 }
-                                                +"Continue with Google"
+                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
                                             }
                                             SocialProvider.GITHUB -> {
                                                 span("social-icon") {
-                                                    inlineSvgIcon(iconName= "github-logo", ariaLabel = "GitHub")
+                                                    inlineSvgIcon(
+                                                        iconName = "github-logo",
+                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
+                                                    )
                                                 }
-                                                +"Continue with GitHub"
+                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
                                             }
                                         }
                                     }
@@ -240,8 +246,12 @@ object AuthView {
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }
@@ -448,40 +458,35 @@ object AuthView {
      */
     fun forgotPasswordPage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         error: String? = null,
         sent: Boolean = false,
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Forgot Password", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_FORGOT", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
                     }
                     div("card") {
-                        h1("card-title") { +"Forgot password" }
+                        h1("card-title") { +ctx.t("FORGOT_TITLE") }
 
                         if (sent) {
-                            p("card-subtitle") {
-                                +"If an account exists for that email address, you'll receive a reset link shortly. Check your spam folder if you don't see it."
-                            }
+                            p("card-subtitle") { +ctx.t("FORGOT_SENT_MESSAGE") }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
+                                a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                             }
                         } else {
-                            p(
-                                "card-subtitle",
-                            ) { +"Enter your email address and we'll send you a link to reset your password." }
+                            p("card-subtitle") { +ctx.t("FORGOT_SUBTITLE") }
 
                             if (error != null) {
                                 div("alert alert-error") { +error }
@@ -495,27 +500,31 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "email"
-                                        +"Email address"
+                                        +ctx.t("FORGOT_EMAIL_LABEL")
                                     }
                                     input(type = InputType.email, name = "email") {
                                         id = "email"
-                                        placeholder = "you@example.com"
+                                        placeholder = ctx.t("FORGOT_EMAIL_PLACEHOLDER")
                                         attributes["autocomplete"] = "email"
                                         required = true
                                         attributes["autofocus"] = "true"
                                     }
                                 }
-                                button(type = ButtonType.submit, classes = "btn") { +"Send reset link" }
+                                button(type = ButtonType.submit, classes = "btn") { +ctx.t("FORGOT_SEND_RESET") }
                             }
 
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
+                                a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                             }
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }
@@ -531,40 +540,37 @@ object AuthView {
      */
     fun resetPasswordPage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         token: String,
         error: String? = null,
         success: Boolean = false,
         passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Reset Password", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_RESET", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
                     }
                     div("card") {
-                        h1("card-title") { +"Reset password" }
+                        h1("card-title") { +ctx.t("RESET_TITLE") }
 
                         if (success) {
-                            div("alert alert-success") {
-                                +"Password changed successfully."
-                            }
+                            div("alert alert-success") { +ctx.t("RESET_SUCCESS") }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/account/login") { +"Sign in with your new password" }
+                                a(href = "/t/$tenantSlug/account/login") { +ctx.t("RESET_SIGN_IN_NEW") }
                             }
                         } else {
-                            p("card-subtitle") { +"Enter your new password below." }
+                            p("card-subtitle") { +ctx.t("RESET_SUBTITLE") }
 
                             if (error != null) {
                                 div("alert alert-error") { +error }
@@ -580,12 +586,13 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "new_password"
-                                        +EnglishStrings.NEW_PASSWORD
+                                        +ctx.t("NEW_PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "new_password") {
                                             id = "new_password"
-                                            placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
+                                            placeholder =
+                                                ctx.t("PASSWORD_MIN_PLACEHOLDER", passwordPolicy.passwordMinLength)
                                             attributes["autocomplete"] = "new-password"
                                             required = true
                                             attributes["autofocus"] = "true"
@@ -603,44 +610,49 @@ object AuthView {
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "new_password"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
                                 div("field") {
                                     label {
                                         htmlFor = "confirm_password"
-                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
+                                        +ctx.t("CONFIRM_NEW_PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "confirm_password") {
                                             id = "confirm_password"
-                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
+                                            placeholder = ctx.t("CONFIRM_PASSWORD_PLACEHOLDER")
                                             attributes["autocomplete"] = "new-password"
-                                            attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
+                                            attributes["data-pw-mismatch-msg"] =
+                                                ctx.t("PASSWORDS_DO_NOT_MATCH")
                                             required = true
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "confirm_password"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
-                                button(type = ButtonType.submit, classes = "btn") { +"Change password" }
+                                button(type = ButtonType.submit, classes = "btn") { +ctx.t("RESET_CHANGE_BUTTON") }
                             }
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }
@@ -652,38 +664,37 @@ object AuthView {
 
     fun acceptInvitePage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         token: String,
         error: String? = null,
         success: Boolean = false,
         passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Accept Invitation", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_INVITE", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
                     }
                     div("card") {
-                        h1("card-title") { +"${EnglishStrings.INVITE_WELCOME_TITLE} $workspaceName" }
+                        h1("card-title") { +"${ctx.t("INVITE_WELCOME_TITLE")} ${ctx.workspaceName}" }
 
                         if (success) {
-                            div("alert alert-success") { +EnglishStrings.INVITE_ACCEPT_SUCCESS }
+                            div("alert alert-success") { +ctx.t("INVITE_ACCEPT_SUCCESS") }
                             div("footer-link") {
-                                a(href = "/t/$tenantSlug/account/login") { +EnglishStrings.INVITE_ACCEPT_SIGN_IN }
+                                a(href = "/t/$tenantSlug/account/login") { +ctx.t("INVITE_ACCEPT_SIGN_IN") }
                             }
                         } else {
-                            p("card-subtitle") { +EnglishStrings.INVITE_ACCEPT_SUBTITLE }
+                            p("card-subtitle") { +ctx.t("INVITE_ACCEPT_SUBTITLE") }
 
                             if (error != null) {
                                 div("alert alert-error") { +error }
@@ -699,13 +710,13 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "new_password"
-                                        +EnglishStrings.NEW_PASSWORD
+                                        +ctx.t("NEW_PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "new_password") {
                                             id = "new_password"
                                             placeholder =
-                                                EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
+                                                ctx.t("PASSWORD_MIN_PLACEHOLDER", passwordPolicy.passwordMinLength)
                                             attributes["autocomplete"] = "new-password"
                                             required = true
                                             attributes["autofocus"] = "true"
@@ -723,46 +734,51 @@ object AuthView {
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "new_password"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
                                 div("field") {
                                     label {
                                         htmlFor = "confirm_password"
-                                        +EnglishStrings.CONFIRM_NEW_PASSWORD
+                                        +ctx.t("CONFIRM_NEW_PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "confirm_password") {
                                             id = "confirm_password"
-                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
+                                            placeholder = ctx.t("CONFIRM_PASSWORD_PLACEHOLDER")
                                             attributes["autocomplete"] = "new-password"
-                                            attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
+                                            attributes["data-pw-mismatch-msg"] =
+                                                ctx.t("PASSWORDS_DO_NOT_MATCH")
                                             required = true
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "confirm_password"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
                                 button(type = ButtonType.submit, classes = "btn") {
-                                    +EnglishStrings.INVITE_ACCEPT_SUBMIT
+                                    +ctx.t("INVITE_ACCEPT_SUBMIT")
                                 }
                             }
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }
@@ -1193,29 +1209,28 @@ object AuthView {
 
     fun mfaChallengePage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         error: String? = null,
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Two-Factor Authentication", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_MFA", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
-                        div("brand-tagline") { +"Two-factor authentication" }
+                        div("brand-tagline") { +ctx.t("MFA_TAGLINE") }
                     }
                     div("card") {
-                        h1("card-title") { +"Verify your identity" }
-                        p("card-subtitle") { +"Enter the 6-digit code from your authenticator app, or a recovery code." }
+                        h1("card-title") { +ctx.t("MFA_VERIFY_IDENTITY") }
+                        p("card-subtitle") { +ctx.t("MFA_SUBTITLE") }
 
                         if (error != null) {
                             div("alert alert-error") { +error }
@@ -1225,11 +1240,11 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "code"
-                                    +"Authentication code"
+                                    +ctx.t("MFA_CODE_LABEL")
                                 }
                                 input(type = InputType.text, name = "code") {
                                     id = "code"
-                                    placeholder = "Enter 6-digit code or recovery code"
+                                    placeholder = ctx.t("MFA_CODE_PLACEHOLDER")
                                     autoComplete = "off"
                                     autoFocus = true
                                     attributes["inputmode"] = "numeric"
@@ -1237,16 +1252,20 @@ object AuthView {
                                 }
                             }
 
-                            button(type = ButtonType.submit, classes = "btn") { +"Verify" }
+                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("MFA_VERIFY_BUTTON") }
                         }
 
                         div("footer-link") {
-                            a(href = "/t/$tenantSlug/account/login") { +"Back to sign in" }
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }

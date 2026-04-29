@@ -843,6 +843,7 @@ internal fun brandingPageImpl(
     workspace: Tenant,
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
+    availableLocales: Set<String> = setOf("en"),
     error: String? = null,
     saved: Boolean = false,
 ): HTML.() -> Unit =
@@ -1022,6 +1023,37 @@ internal fun brandingPageImpl(
                                         value = f
                                         if (t.fontFamily == f) selected = true
                                         +f
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Default Locale ─────────────────────────
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Default Locale" }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Language" }
+                                div {
+                                    select {
+                                        name = "themeDefaultLocale"
+                                        classes = setOf("edit-row__field")
+                                        option {
+                                            value = ""
+                                            if (t.defaultLocale.isNullOrBlank()) selected = true
+                                            +"Auto-detect (browser Accept-Language)"
+                                        }
+                                        for (loc in availableLocales.sorted()) {
+                                            option {
+                                                value = loc
+                                                if (t.defaultLocale == loc) selected = true
+                                                +loc
+                                            }
+                                        }
+                                    }
+                                    div("edit-row__hint") {
+                                        +"Fallback language for auth pages when the browser does not"
+                                        +" request a loaded locale. Add bundles via KAUTH_I18N_BUNDLE_DIR"
+                                        +" to expand this list."
                                     }
                                 }
                             }

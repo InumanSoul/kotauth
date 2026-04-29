@@ -155,8 +155,7 @@ internal fun Route.oauthProtocolRoutes(
                     HttpStatusCode.OK,
                     AuthView.loginPage(
                         tenantSlug = slug,
-                        theme = ctx.theme,
-                        workspaceName = ctx.workspaceName,
+                        ctx = ctx.viewContext,
                         success = registered,
                         oauthParams = existingContext,
                         enabledProviders = enabledProviders,
@@ -219,8 +218,7 @@ internal fun Route.oauthProtocolRoutes(
             HttpStatusCode.OK,
             AuthView.loginPage(
                 tenantSlug = slug,
-                theme = tenant.theme,
-                workspaceName = tenant.displayName,
+                ctx = ctx.viewContext,
                 oauthParams = oauthParams,
                 enabledProviders = enabledProviders,
                 registrationEnabled = tenant.registrationEnabled,
@@ -233,8 +231,6 @@ internal fun Route.oauthProtocolRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val ipAddress = call.request.local.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
 
@@ -252,8 +248,7 @@ internal fun Route.oauthProtocolRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.loginPage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     error = "Too many login attempts. Please wait a moment and try again.",
                     enabledProviders = enabledProviders,
                     registrationEnabled = tenant?.registrationEnabled ?: true,
@@ -283,8 +278,7 @@ internal fun Route.oauthProtocolRoutes(
                         HttpStatusCode.Unauthorized,
                         AuthView.loginPage(
                             tenantSlug = slug,
-                            theme = theme,
-                            workspaceName = workspaceName,
+                            ctx = ctx.viewContext,
                             error = result.error.toMessage(),
                             oauthParams = oauthParams,
                             enabledProviders = enabledProviders,
@@ -316,8 +310,7 @@ internal fun Route.oauthProtocolRoutes(
                                 HttpStatusCode.Forbidden,
                                 AuthView.loginPage(
                                     tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
+                                    ctx = ctx.viewContext,
                                     error =
                                         "Multi-factor authentication is required for your account. " +
                                             "Please sign in to the user portal and enable MFA under Security settings.",
@@ -356,8 +349,7 @@ internal fun Route.oauthProtocolRoutes(
                             HttpStatusCode.BadRequest,
                             AuthView.loginPage(
                                 tenantSlug = slug,
-                                theme = theme,
-                                workspaceName = workspaceName,
+                                ctx = ctx.viewContext,
                                 error = message,
                                 oauthParams = oauthParams,
                                 enabledProviders = enabledProviders,

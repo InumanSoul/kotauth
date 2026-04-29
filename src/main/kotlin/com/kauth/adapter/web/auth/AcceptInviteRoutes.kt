@@ -5,7 +5,6 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -30,8 +29,7 @@ internal fun Route.acceptInviteRoutes(
             HttpStatusCode.OK,
             AuthView.acceptInvitePage(
                 ctx.slug,
-                ctx.theme,
-                ctx.workspaceName,
+                ctx.viewContext,
                 token = token,
                 passwordPolicy = policy,
             ),
@@ -53,8 +51,7 @@ internal fun Route.acceptInviteRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.acceptInvitePage(
                     ctx.slug,
-                    ctx.theme,
-                    ctx.workspaceName,
+                    ctx.viewContext,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes.",
                     passwordPolicy = policy,
@@ -68,8 +65,7 @@ internal fun Route.acceptInviteRoutes(
                     HttpStatusCode.OK,
                     AuthView.acceptInvitePage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         success = true,
                         passwordPolicy = policy,
@@ -80,8 +76,7 @@ internal fun Route.acceptInviteRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.acceptInvitePage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         error = result.error.message,
                         passwordPolicy = policy,

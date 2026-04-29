@@ -1,15 +1,8 @@
 package com.kauth.adapter.web
 
-/**
- * Canonical English strings for user-facing UI text.
- *
- * Centralized here to prepare for i18n (v2.x). Each string is the reference
- * value that translators will use as the source of truth.
- *
- * Strings are extracted incrementally as views are touched, do not attempt
- * to extract all strings in one pass.
- */
+import java.lang.reflect.Modifier
 
+@Suppress("unused")
 object EnglishStrings {
     // Password fields
     const val PASSWORD = "Password"
@@ -77,4 +70,82 @@ object EnglishStrings {
     const val TOAST_KEY_ROTATED =
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
+
+    // -------------------------------------------------------------------------
+    // Auth pages — shared chrome (page titles use {0} = workspace name)
+    // -------------------------------------------------------------------------
+    const val AUTH_PAGE_TITLE_LOGIN = "{0} | Sign In"
+    const val AUTH_PAGE_TITLE_FORGOT = "{0} | Forgot Password"
+    const val AUTH_PAGE_TITLE_RESET = "{0} | Reset Password"
+    const val AUTH_PAGE_TITLE_INVITE = "{0} | Accept Invitation"
+    const val AUTH_PAGE_TITLE_MFA = "{0} | Two-Factor Authentication"
+    const val AUTH_COPYRIGHT_TEMPLATE = "© {0} {1}. All rights reserved. Powered by"
+    const val AUTH_KOTAUTH_LINK = "KotAuth"
+    const val AUTH_BACK_TO_SIGN_IN = "Back to sign in"
+    const val AUTH_SHOW_PASSWORD = "Show password"
+    const val AUTH_ICON_SHOW = "show"
+    const val AUTH_ICON_HIDE = "hide"
+    const val PASSWORD_MIN_PLACEHOLDER = "Minimum {0} characters"
+
+    // Login page
+    const val LOGIN_WELCOME_BACK = "Welcome back"
+    const val LOGIN_SUBTITLE = "Sign in to your account"
+    const val LOGIN_REGISTRATION_SUCCESS = "Account created successfully — please sign in."
+    const val LOGIN_USERNAME = "Username"
+    const val LOGIN_USERNAME_PLACEHOLDER = "Enter your username"
+    const val LOGIN_PASSWORD_PLACEHOLDER = "Enter your password"
+    const val LOGIN_SUBMIT = "Sign In"
+    const val LOGIN_FORGOT_PASSWORD = "Forgot password?"
+    const val LOGIN_MAGIC_LINK_LINK = "Sign in with an email link instead"
+    const val LOGIN_NO_ACCOUNT = "Don't have an account? "
+    const val LOGIN_CREATE_ONE = "Create one"
+    const val LOGIN_OR_CONTINUE_WITH = "or continue with"
+    const val LOGIN_CONTINUE_GOOGLE = "Continue with Google"
+    const val LOGIN_CONTINUE_GITHUB = "Continue with GitHub"
+    const val LOGIN_PROVIDER_GOOGLE = "Google"
+    const val LOGIN_PROVIDER_GITHUB = "GitHub"
+
+    // Forgot password page
+    const val FORGOT_TITLE = "Forgot password"
+    const val FORGOT_SUBTITLE = "Enter your email address and we'll send you a link to reset your password."
+    const val FORGOT_SENT_MESSAGE =
+        "If an account exists for that email address, you'll receive a reset link shortly. " +
+            "Check your spam folder if you don't see it."
+    const val FORGOT_EMAIL_LABEL = "Email address"
+    const val FORGOT_EMAIL_PLACEHOLDER = "you@example.com"
+    const val FORGOT_SEND_RESET = "Send reset link"
+
+    // Reset password page
+    const val RESET_TITLE = "Reset password"
+    const val RESET_SUCCESS = "Password changed successfully."
+    const val RESET_SIGN_IN_NEW = "Sign in with your new password"
+    const val RESET_SUBTITLE = "Enter your new password below."
+    const val RESET_CHANGE_BUTTON = "Change password"
+
+    // MFA challenge page
+    const val MFA_TAGLINE = "Two-factor authentication"
+    const val MFA_VERIFY_IDENTITY = "Verify your identity"
+    const val MFA_SUBTITLE = "Enter the 6-digit code from your authenticator app, or a recovery code."
+    const val MFA_CODE_LABEL = "Authentication code"
+    const val MFA_CODE_PLACEHOLDER = "Enter 6-digit code or recovery code"
+    const val MFA_VERIFY_BUTTON = "Verify"
+
+    /**
+     * All `const val String` declarations in this object, keyed by their field name.
+     * Used by the translation infrastructure as the English source of truth for
+     * `EnglishOnlyTranslation` and as the fallback inside `BundleTranslation`.
+     *
+     * Computed once via reflection — the cost is amortized over the application's
+     * lifetime. Function-based templates (e.g. parameterized placeholders) are
+     * intentionally excluded; those use `{0}`-style placeholders in template strings.
+     */
+    val byKey: Map<String, String> by lazy {
+        EnglishStrings::class.java.declaredFields
+            .asSequence()
+            .filter { Modifier.isStatic(it.modifiers) && it.type == String::class.java }
+            .associate { field ->
+                field.isAccessible = true
+                field.name to (field.get(null) as String)
+            }
+    }
 }

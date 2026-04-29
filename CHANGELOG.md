@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.7.2] - 2026-04-28
+
+### Added
+
+- **i18n via volume-mounted JSON bundles** — non-English locales are opt-in: drop a `<locale>.json` file into the directory pointed at by `KAUTH_I18N_BUNDLE_DIR`, restart, done. Each bundle is a flat key→string map keyed by `EnglishStrings` field names (e.g. `"PASSWORD": "Contraseña"`). `{0}`, `{1}` placeholders are substituted at render time. English remains baked into the JAR — vanilla, air-gapped, and quickstart installs work unchanged with zero configuration. An `en.json` in the bundle directory is **ignored with a warn log** (the JAR is authoritative). Malformed JSON or non-string values cause that one file to be skipped; other locales still load. See [ADR-11](docs/adr/ADR-11-i18n-volume-mounted-bundles.md)
+- **`TranslationPort` domain interface + two adapters** — `EnglishOnlyTranslation` (default, sourced from `EnglishStrings.byKey` via reflection) and `BundleTranslation` (opt-in, JSON-backed). `ServiceGraph` selects between them based on whether `KAUTH_I18N_BUNDLE_DIR` is set
+- **`ViewContext` data class** — bundles `theme`, `workspaceName`, `locale`, and a `translator` into a single per-request context. Views call `ctx.t("KEY", arg)` instead of threading locale and translator through every signature. Eight `*View.kt` page functions migrated as part of v1.7.2 (see Changed below)
+- **Per-request locale resolution** — `Accept-Language` header > tenant `TenantTheme.defaultLocale` > `"en"`. No user-level override or `?lang=` query param in this release; resolution is deterministic from headers + tenant config
+- **Tenant default-locale dropdown on the admin Branding page** — only locales currently loaded by `BundleTranslation` appear in the select. "Auto-detect (browser Accept-Language)" is the default option. Submissions referencing an unloaded locale are silently dropped at the route handler before reaching `AdminService.updateTheme`
+- **`default_locale` column on `workspace_theme`** — V37 migration, `VARCHAR(10) NULLABLE`. Stored on `TenantTheme` because operators already conceptualize locale under "branding"
+- **`KAUTH_I18N_BUNDLE_DIR` env var** — parsed in `EnvironmentConfig`. Unset = English-only (the default). Set to a directory = bundle loader scans it once at startup
+- **`docs/i18n/es.json` sample bundle** — Spanish translations covering the five auth pages migrated in this release. Drop into your bundle dir to enable Spanish on `loginPage`, `forgotPasswordPage`, `resetPasswordPage`, `acceptInvitePage`, `mfaChallengePage`. Pages not yet migrated render in English regardless of the active locale
+- **`docs/i18n/README.md`** — operator guide for translation bundles: how loading works, locale resolution per request, how to add a new language, what's covered in v1.7.2 and what isn't
+
+### Changed
+
+- **Five auth view pages migrated to `ctx.t()`** — `AuthView.loginPage`, `forgotPasswordPage`, `resetPasswordPage`, `acceptInvitePage`, `mfaChallengePage`. ~150 hardcoded English strings replaced with translation lookups against `EnglishStrings` keys. Six pages remain hardcoded English (`registerPage`, `magicLinkPage`, `magicLinkErrorPage`, `forceChangePasswordPage`, `verifyEmailPage`, `socialRegistrationPage`) — status documented at the top of `EnglishStrings.kt` and migrated incrementally on next touch
+- **`AdminService.updateTheme` now persists `defaultLocale`** — previously the field on `TenantTheme` was passed in but dropped during sanitization, making the existing data-class field a no-op. Fixed by including `defaultLocale = theme.defaultLocale?.trim()?.lowercase()?.takeIf { it.isNotBlank() }` in the sanitized theme before upsert
+- **`PostgresThemeRepository` and `PostgresTenantRepository` read/write `default_locale`** — wiring through the new column on both upsert and tenant-load paths
+
+### Documentation
+
+- **ADR-11 — i18n via volume-mounted JSON bundles.** Captures English-default constraint, `TranslationPort` shape, bundle loading semantics, locale resolution priority, the `ViewContext` migration pattern, alternatives considered (sidecar, properties files, DB-backed translations) and the v1.7.2 known limitations (no pluralization, six pages still hardcoded, no end-user locale switcher, no hot reload)
+
+### Limitations (v1.7.2)
+
+- **Six auth pages still hardcoded English.** `registerPage`, `magicLinkPage`, `magicLinkErrorPage`, `forceChangePasswordPage`, `verifyEmailPage`, `socialRegistrationPage` will render in English on a Spanish-default tenant until they are migrated. See `EnglishStrings.kt` header comment for the running checklist
+- **Bundles are loaded once at startup.** Editing `es.json` requires a process restart — i18n is operator config, not user content
+- **No `?lang=` override or end-user locale switcher.** Resolution is deterministic from `Accept-Language` + tenant default; a user on a French laptop hitting a Spanish-default tenant cannot pick English without changing their browser
+- **No pluralization.** `{0}` substitution is enough for the keys currently in `EnglishStrings`; ICU MessageFormat is a future `TranslationPort` adapter swap if pluralization becomes a real need
+
+---
+
 ## [1.7.1] - 2026-04-28
 
 ### Fixed

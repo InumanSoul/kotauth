@@ -24,8 +24,6 @@ internal fun Route.mfaRoutes(
     get("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
         if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
@@ -34,15 +32,13 @@ internal fun Route.mfaRoutes(
 
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.mfaChallengePage(slug, theme, workspaceName),
+            AuthView.mfaChallengePage(slug, ctx.viewContext),
         )
     }
 
     post("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
         val ipAddress = call.request.local.remoteAddress
@@ -53,8 +49,7 @@ internal fun Route.mfaRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.mfaChallengePage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     error = "Too many attempts. Please wait a few minutes and try again.",
                 ),
             )
@@ -83,8 +78,7 @@ internal fun Route.mfaRoutes(
                 HttpStatusCode.Unauthorized,
                 AuthView.mfaChallengePage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     error = "MFA challenge expired. Please log in again.",
                 ),
             )
@@ -107,8 +101,7 @@ internal fun Route.mfaRoutes(
                     HttpStatusCode.Unauthorized,
                     AuthView.mfaChallengePage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         error = "Invalid code. Please try again.",
                     ),
                 )
@@ -134,8 +127,7 @@ internal fun Route.mfaRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.mfaChallengePage(
                                     slug,
-                                    theme,
-                                    workspaceName,
+                                    ctx.viewContext,
                                     error = message,
                                 ),
                             )

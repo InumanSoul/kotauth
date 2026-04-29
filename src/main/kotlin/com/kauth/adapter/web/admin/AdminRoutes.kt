@@ -17,6 +17,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -72,6 +73,7 @@ fun Route.adminRoutes(
     claimMapperService: com.kauth.infrastructure.CachingClaimMapperService,
     corsPort: CorsPort? = null,
     baseUrl: String = "",
+    translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
 ) {
     AdminView.setShellAppInfo(appInfo)
 
@@ -470,6 +472,7 @@ fun Route.adminRoutes(
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
+                    translationPort = translationPort,
                 )
 
                 adminApplicationRoutes(

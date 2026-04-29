@@ -28,6 +28,13 @@ data class TenantTheme(
     val fontFamily: String = "Inter",
     val logoUrl: String? = null,
     val faviconUrl: String? = null,
+    /**
+     * Tenant's preferred UI locale code (e.g. "en", "es"). Resolution order is
+     * `Accept-Language` header > this value > "en". Null means no preference.
+     * Only locales actually loaded by `TranslationPort.availableLocales` apply —
+     * a stale value referring to an unmounted bundle silently falls back to English.
+     */
+    val defaultLocale: String? = null,
 ) {
     /**
      * Emits a CSS :root block injected as an inline <style> tag before the auth
@@ -92,21 +99,6 @@ data class TenantTheme(
                 borderRadius = "8px",
                 textPrimary = "#111114",
                 textMuted = "#7A7A85",
-            )
-
-        /** Minimal monochrome theme with sharp corners. */
-        val SIMPLE =
-            TenantTheme(
-                accentColor = "#111114",
-                accentHoverColor = "#333336",
-                accentForeground = "#FFFFFF",
-                bgDeep = "#FFFFFF",
-                surface = "#FAFAFA",
-                bgInput = "#F4F4F6",
-                borderColor = "#DDDDE0",
-                borderRadius = "0px",
-                textPrimary = "#111114",
-                textMuted = "#6B6B75",
             )
     }
 }

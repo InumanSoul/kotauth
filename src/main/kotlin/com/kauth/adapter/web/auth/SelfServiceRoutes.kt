@@ -6,7 +6,6 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.SelfServiceResult
 import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -21,8 +20,6 @@ internal fun Route.selfServiceRoutes(
     get("/forgot-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val sent = call.request.queryParameters["sent"] == "true"
         val reason = call.request.queryParameters["reason"]
         val errorMsg =
@@ -33,7 +30,7 @@ internal fun Route.selfServiceRoutes(
             }
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.forgotPasswordPage(slug, theme, workspaceName, error = errorMsg, sent = sent),
+            AuthView.forgotPasswordPage(slug, ctx.viewContext, error = errorMsg, sent = sent),
         )
     }
 
@@ -56,8 +53,6 @@ internal fun Route.selfServiceRoutes(
     get("/reset-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val token = call.request.queryParameters["token"] ?: ""
 
         if (token.isBlank()) {
@@ -66,15 +61,13 @@ internal fun Route.selfServiceRoutes(
         val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
         call.respondHtml(
             HttpStatusCode.OK,
-            AuthView.resetPasswordPage(slug, theme, workspaceName, token = token, passwordPolicy = policy),
+            AuthView.resetPasswordPage(slug, ctx.viewContext, token = token, passwordPolicy = policy),
         )
     }
 
     post("/reset-password") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
         val ipAddress = call.request.local.remoteAddress
         val params = call.receiveParameters()
@@ -88,8 +81,7 @@ internal fun Route.selfServiceRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.resetPasswordPage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes and try again.",
                     passwordPolicy = policy,
@@ -103,8 +95,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.OK,
                     AuthView.resetPasswordPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         token = token,
                         success = true,
                         passwordPolicy = policy,
@@ -115,8 +106,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.resetPasswordPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         token = token,
                         error = result.error.message,
                         passwordPolicy = policy,

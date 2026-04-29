@@ -216,6 +216,11 @@ class AdminService(
                 textMuted = theme.textMuted.trim().ifBlank { TenantTheme.DEFAULT.textMuted },
                 logoUrl = theme.logoUrl?.trim()?.takeIf { it.isNotBlank() },
                 faviconUrl = theme.faviconUrl?.trim()?.takeIf { it.isNotBlank() },
+                defaultLocale =
+                    theme.defaultLocale
+                        ?.trim()
+                        ?.lowercase()
+                        ?.takeIf { it.isNotBlank() },
             )
 
         val saved = repo.upsert(tenant.id, sanitized)

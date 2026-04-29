@@ -25,6 +25,7 @@ import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
@@ -116,14 +117,9 @@ class AuthRoutesTest {
             redirectUris = listOf("https://app.example.com/callback"),
         )
 
-    /** PKCE pair used by the token endpoint tests. */
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
-    /**
-     * Builds a valid signed KOTAUTH_AUTH_CONTEXT cookie value for use in POST /authorize tests.
-     * The payload format mirrors [ApplicationCall.setAuthContextCookie] in AuthHelpers.kt.
-     */
     private fun buildAuthContextCookie(
         responseType: String = "code",
         clientId: String = "spa-app",
@@ -211,6 +207,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -282,6 +279,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -334,6 +332,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -377,6 +376,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -435,6 +435,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -498,6 +499,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -567,6 +569,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -620,6 +623,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -680,6 +684,7 @@ class AuthRoutesTest {
                         selfServiceService = selfService,
                         // mfaService intentionally omitted
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -714,6 +719,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -752,6 +758,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -793,6 +800,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -830,6 +838,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -877,6 +886,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -911,6 +921,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -948,6 +959,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -981,6 +993,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1012,6 +1025,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1072,6 +1086,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1112,6 +1127,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1150,6 +1166,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1204,6 +1221,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1240,6 +1258,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1290,6 +1309,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1323,6 +1343,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1361,6 +1382,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1415,6 +1437,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1445,6 +1468,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1475,6 +1499,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1535,6 +1560,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1569,6 +1595,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1618,6 +1645,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1650,6 +1678,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1689,6 +1718,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1722,6 +1752,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1765,6 +1796,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1803,6 +1835,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }
@@ -1841,6 +1874,7 @@ class AuthRoutesTest {
                         tokenRateLimiter = tokenLimiter,
                         selfServiceService = selfService,
                         encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
                     )
                 }
             }

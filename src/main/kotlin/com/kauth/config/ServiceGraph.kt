@@ -42,6 +42,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
@@ -56,9 +57,11 @@ import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
+import com.kauth.infrastructure.BundleTranslation
 import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
@@ -114,6 +117,7 @@ data class ServiceGraph(
     val tenantKeyRepository: PostgresTenantKeyRepository,
     val userAttributeService: UserAttributeService,
     val claimMapperService: CachingClaimMapperService,
+    val translationPort: TranslationPort,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -359,6 +363,20 @@ data class ServiceGraph(
                     .getInstance("SHA-256")
                     .digest("admin-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
+            // -- i18n translation port ---------------------------------------
+            // English is always-on (baked-in EnglishStrings). Non-English
+            // locales are opt-in via KAUTH_I18N_BUNDLE_DIR. When unset, the
+            // EnglishOnlyTranslation adapter handles every locale request.
+            val translationPort: TranslationPort =
+                config.i18nBundleDir
+                    ?.let {
+                        BundleTranslation(
+                            java.nio.file.Paths
+                                .get(it),
+                        )
+                    }
+                    ?: EnglishOnlyTranslation()
+
             return ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
@@ -397,6 +415,7 @@ data class ServiceGraph(
                 tenantKeyRepository = tenantKeyRepository,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
+                translationPort = translationPort,
                 applicationScope = applicationScope,
             )
         }

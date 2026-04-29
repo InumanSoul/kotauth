@@ -37,6 +37,8 @@ services:
       - .env
     ports:
       - "8080:8080"
+    volumes:
+      - ./docs/i18n:/etc/kotauth/i18n:ro
     environment:
       # Hard-wired to the local db service — matches POSTGRES_* above.
       # KAUTH_BASE_URL and KAUTH_SECRET_KEY come from env_file (.env) — do not
@@ -44,6 +46,7 @@ services:
       DB_URL: jdbc:postgresql://db:5432/kotauth_db
       DB_USER: postgres
       DB_PASSWORD: password
+      KAUTH_I18N_BUNDLE_DIR: /etc/kotauth/i18n
     depends_on:
       db:
         condition: service_healthy

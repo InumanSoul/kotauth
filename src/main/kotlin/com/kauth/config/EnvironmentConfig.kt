@@ -42,12 +42,9 @@ data class EnvironmentConfig(
     val dbPoolMinIdle: Int,
     val updateCheckEnabled: Boolean,
     val updateCheckUrl: String,
+    val i18nBundleDir: String?,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
-
-    /** Database connection config — usable by CLI commands without full server config. */
-    val dbConfig: DbConfig
-        get() = DbConfig(dbUrl, dbUser, dbPassword, dbPoolMaxSize, dbPoolMinIdle)
 
     companion object {
         fun load(): EnvironmentConfig {
@@ -83,6 +80,7 @@ data class EnvironmentConfig(
                 updateCheckUrl =
                     System.getenv("KAUTH_UPDATE_CHECK_URL")
                         ?: "https://inumansoul.github.io/kotauth/latest.json",
+                i18nBundleDir = System.getenv("KAUTH_I18N_BUNDLE_DIR")?.takeIf { it.isNotBlank() },
             )
         }
 

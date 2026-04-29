@@ -240,6 +240,7 @@ class PostgresTenantRepository(
             textMuted = this[WorkspaceThemeTable.textMuted],
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
+            defaultLocale = this[WorkspaceThemeTable.defaultLocale],
         )
     }
 

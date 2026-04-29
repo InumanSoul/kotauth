@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.adapter.web.plugin.TenantCspPlugin
 import com.kauth.domain.model.TenantTheme
@@ -8,6 +9,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.MfaService
@@ -39,6 +41,7 @@ fun Route.authRoutes(
     encryptionService: EncryptionService,
     corsService: CorsService? = null,
     corsPort: CorsPort? = null,
+    translationPort: TranslationPort,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -60,13 +63,23 @@ fun Route.authRoutes(
                         call.parameters["slug"]
                             ?: return@onCall call.respond(HttpStatusCode.BadRequest)
                     val tenant = tenantRepository.findBySlug(slug)
+                    val theme = tenant?.theme ?: TenantTheme.DEFAULT
+                    val workspaceName = tenant?.displayName ?: "KotAuth"
+                    val locale = call.resolveLocale(tenant, translationPort)
                     call.attributes.put(
                         AuthTenantAttr,
                         AuthTenantContext(
                             slug = slug,
                             tenant = tenant,
-                            theme = tenant?.theme ?: TenantTheme.DEFAULT,
-                            workspaceName = tenant?.displayName ?: "KotAuth",
+                            theme = theme,
+                            workspaceName = workspaceName,
+                            viewContext =
+                                ViewContext(
+                                    theme = theme,
+                                    workspaceName = workspaceName,
+                                    locale = locale,
+                                    translator = translationPort,
+                                ),
                         ),
                     )
                 }
