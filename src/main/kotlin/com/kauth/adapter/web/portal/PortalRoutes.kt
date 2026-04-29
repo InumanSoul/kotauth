@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.auth.clearSsoCookie
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
 import com.kauth.adapter.web.generatePkceVerifier
@@ -105,6 +106,13 @@ fun Route.portalRoutes(
                 path = "/t/$slug/account",
             )
 
+            // Try silent SSO first — if a KOTAUTH_SSO cookie exists from prior
+            // authentication (typically the SaaS app), this redirects with a
+            // code and the user lands on /account/profile without seeing the
+            // login form. /callback handles the prompt=none failure path by
+            // bouncing back here with ?prompt_failed=true to break the loop.
+            val promptFailed = call.request.queryParameters["prompt_failed"] == "true"
+
             val redirectUri = "$baseUrl/t/$slug/account/callback"
             val authEndpoint = "/t/$slug/authorize"
             val authUrl =
@@ -117,6 +125,7 @@ fun Route.portalRoutes(
                     append("&code_challenge=").append(challenge)
                     append("&code_challenge_method=S256")
                     append("&state=").append(state)
+                    if (!promptFailed) append("&prompt=none")
                 }
             call.respondRedirect(authUrl)
         }
@@ -129,6 +138,13 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val code = call.request.queryParameters["code"]
             val error = call.request.queryParameters["error"]
+
+            // Silent SSO miss — the KOTAUTH_SSO cookie was absent or rejected.
+            // Loop back to /login with the marker that suppresses prompt=none on
+            // the next attempt so the user actually sees the form.
+            if (error == "login_required") {
+                return@get call.respondRedirect("/t/$slug/account/login?prompt_failed=true")
+            }
 
             if (oauthService == null || code.isNullOrBlank()) {
                 val desc = error ?: "Authentication failed. Please try again."
@@ -256,6 +272,10 @@ fun Route.portalRoutes(
         post("/logout") {
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             call.sessions.clear<PortalSession>()
+            // Wipe the SSO witness too — otherwise the redirect to /account/login
+            // would silent-auth the user straight back into the session they
+            // just signed out of.
+            call.clearSsoCookie(slug)
             call.respondRedirect("/t/$slug/account/login")
         }
 

@@ -5,14 +5,18 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
+import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.client.request.forms.submitForm
@@ -195,6 +199,82 @@ class PortalRoutesTest {
             assertTrue(response.headers["Location"]?.contains("/t/acme/account/login") == true)
         }
 
+    @Test
+    fun `POST logout clears KOTAUTH_SSO cookie`() =
+        testApplication {
+            application { installTestApp() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/account/logout",
+                    formParameters = Parameters.build { },
+                )
+
+            val setCookie = response.headers.getAll("Set-Cookie") ?: emptyList()
+            val ssoClear = setCookie.firstOrNull { it.startsWith("KOTAUTH_SSO=") }
+            assertTrue(
+                ssoClear != null &&
+                    (
+                        ssoClear.contains("Max-Age=0", ignoreCase = true) ||
+                            ssoClear.startsWith("KOTAUTH_SSO=;")
+                    ),
+                "Portal logout must wipe KOTAUTH_SSO so silent SSO doesn't bring the user back. Was: $setCookie",
+            )
+        }
+
+    // =========================================================================
+    // Phase 5 — portal silent SSO via prompt=none
+    // =========================================================================
+
+    @Test
+    fun `GET login redirects to authorize with prompt=none on first attempt`() =
+        testApplication {
+            application { installTestAppWithOAuth() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/login")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("prompt=none"),
+                "First /login attempt must include prompt=none, was: $location",
+            )
+        }
+
+    @Test
+    fun `GET login with prompt_failed=true OMITS prompt=none to break the loop`() =
+        testApplication {
+            application { installTestAppWithOAuth() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/login?prompt_failed=true")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                !location.contains("prompt=none"),
+                "Loop-break attempt must NOT include prompt=none, was: $location",
+            )
+        }
+
+    @Test
+    fun `GET callback with error=login_required redirects to login with prompt_failed=true`() =
+        testApplication {
+            application { installTestAppWithOAuth() }
+
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/account/callback?error=login_required")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("/t/acme/account/login") && location.contains("prompt_failed=true"),
+                "login_required failure must loop back to /login?prompt_failed=true, was: $location",
+            )
+        }
+
     // =========================================================================
     // Test app wiring
     // =========================================================================
@@ -209,6 +289,38 @@ class PortalRoutesTest {
                 selfServiceService = buildSelfService(),
                 tenantRepository = tenantRepo,
                 encryptionService = encryptionService,
+            )
+        }
+    }
+
+    /**
+     * Wires a real (fake-backed) OAuthService — required for the prompt=none
+     * silent-SSO branch in /login since that branch only fires when oauthService
+     * is non-null.
+     */
+    private fun io.ktor.server.application.Application.installTestAppWithOAuth() {
+        install(ContentNegotiation) { json() }
+        install(Sessions) {
+            cookie<PortalSession>("KOTAUTH_PORTAL")
+        }
+        val oauthService =
+            OAuthService(
+                tenantRepository = tenantRepo,
+                userRepository = userRepo,
+                applicationRepository = FakeApplicationRepository(),
+                sessionRepository = sessionRepo,
+                authCodeRepository = FakeAuthorizationCodeRepository(),
+                tokenPort = FakeTokenPort(),
+                passwordHasher = hasher,
+                auditLog = auditLogPort,
+            )
+        routing {
+            portalRoutes(
+                selfServiceService = buildSelfService(),
+                tenantRepository = tenantRepo,
+                encryptionService = encryptionService,
+                oauthService = oauthService,
+                baseUrl = "http://localhost",
             )
         }
     }

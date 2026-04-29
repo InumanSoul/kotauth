@@ -736,6 +736,7 @@ internal fun Route.oauthProtocolRoutes(
 
     route("/protocol/openid-connect/logout") {
         get {
+            val slug = call.parameters["slug"] ?: "master"
             val bearerToken =
                 extractBearerToken(call)
                     ?: call.request.queryParameters["id_token_hint"]
@@ -745,6 +746,11 @@ internal fun Route.oauthProtocolRoutes(
                 oauthService.endSession(bearerToken, revokeAll, call.request.local.remoteAddress)
             }
 
+            // OIDC end_session must also kill the SSO witness — otherwise the
+            // very next /authorize would silent-auth the user back in via the
+            // KOTAUTH_SSO cookie they just nominally signed out of.
+            call.clearSsoCookie(slug)
+
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
             if (!postLogoutUri.isNullOrBlank()) {
                 // Only allow post-logout redirect to same origin to prevent open redirect
@@ -752,16 +758,15 @@ internal fun Route.oauthProtocolRoutes(
                 if (postLogoutUri.startsWith(origin) || postLogoutUri.startsWith("/")) {
                     call.respondRedirect(postLogoutUri)
                 } else {
-                    val slug = call.parameters["slug"] ?: "master"
                     call.respondRedirect("/t/$slug/authorize")
                 }
             } else {
-                val slug = call.parameters["slug"] ?: "master"
                 call.respondRedirect("/t/$slug/authorize")
             }
         }
 
         post {
+            val slug = call.parameters["slug"] ?: "master"
             val params = call.receiveParameters()
             val token = params["token"] ?: extractBearerToken(call)
 
@@ -770,6 +775,7 @@ internal fun Route.oauthProtocolRoutes(
                 oauthService.endSession(token, revokeAll, call.request.local.remoteAddress)
             }
 
+            call.clearSsoCookie(slug)
             call.respond(HttpStatusCode.OK)
         }
     }
