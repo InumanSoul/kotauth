@@ -24,9 +24,12 @@ Limits are configured in `ServiceGraph.kt` and apply per-IP per-tenant. A user o
 Rate limiting is defined as an outbound port (`RateLimiterPort`) in the domain layer. The route adapters depend only on this interface, enabling implementation swaps without changing any calling code.
 
 ```
-domain/port/RateLimiterPort.kt      interface
-infrastructure/InMemoryRateLimiter.kt   default implementation (single-instance)
+domain/port/RateLimiterPort.kt                    interface
+infrastructure/InMemoryRateLimiter.kt             default — single-instance
+infrastructure/redis/RedisRateLimiter.kt          opt-in — multi-replica, set KAUTH_REDIS_URL
 ```
+
+`ServiceGraph` selects the implementation at startup. The InMemory adapter is the default; the Redis adapter is wired when `KAUTH_REDIS_URL` is set. See [REDIS.md](REDIS.md) and [ADR-12](adr/ADR-12-redis-sidecar.md).
 
 ### Port Interface
 
@@ -77,7 +80,40 @@ This prevents unbounded memory growth during sustained attacks where an attacker
 
 ### When to Swap for Redis
 
-If you run **multiple Kotauth instances** behind a load balancer, the in-memory rate limiter provides no cross-instance protection. A Redis-backed implementation sharing state across instances is planned for a future release. The `RateLimiterPort` interface is designed for this swap — no route or service code changes required. See the [roadmap](ROADMAP.md) for timeline.
+If you run **multiple Kotauth instances** behind a load balancer, the in-memory rate limiter provides no cross-instance protection — each replica enforces the limit independently, so the effective ceiling becomes `configured limit × replica count`.
+
+Set `KAUTH_REDIS_URL` to switch to the Redis-backed limiter. The `RateLimiterPort` interface is identical, so route and service code is unchanged. See [REDIS.md](REDIS.md) for configuration and operational details.
+
+---
+
+## Redis Implementation
+
+When `KAUTH_REDIS_URL` is set, `RedisRateLimiter` replaces `InMemoryRateLimiter` for all four buckets. It uses the same sliding-window semantics so behavior is identical across the configured / unconfigured branch.
+
+### How It Works
+
+The check is implemented as a Lua script (`src/main/resources/redis/sliding_window.lua`) executed via `EVALSHA`:
+
+1. `ZREMRANGEBYSCORE` evicts timestamps older than the window.
+2. `ZCARD` reads the current count.
+3. If the count is at or above `maxRequests`, return rejected.
+4. Otherwise `ZADD` the request timestamp and `PEXPIRE` to refresh the bucket TTL.
+
+The whole script is one round-trip and atomic — two concurrent requests cannot race past the limit.
+
+### Fail-Closed Contract
+
+When Redis is unreachable, `RedisRateLimiter.isAllowed` catches `RedisException` and returns `false` — the request is **rejected**. There is no silent fallback to a per-replica limiter. This is deliberate: a "fail-open" mode triggers exactly when the operator is least able to investigate. See [REDIS.md §"Fail-closed contract"](REDIS.md#fail-closed-contract) for the rationale.
+
+The startup probe (`RedisHealthProbe`) catches a misconfigured or downed Redis before the server accepts a single request, so the runtime fail-closed branch is rare in steady-state operation.
+
+### Key Format
+
+```
+kauth:rl:<bucket>:<key>
+```
+
+Where `<bucket>` is one of `login`, `register`, `token`, `mfa`. The `<key>` portion is the same `{ip}:{slug}` shape as in the InMemory implementation. The prefix lets multiple Kotauth deployments share a Redis instance safely if they namespace by Redis DB or use distinct hosts.
 
 ---
 

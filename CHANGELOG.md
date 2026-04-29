@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.8.0] - 2026-04-29
+
+### Added
+
+- **Optional Redis sidecar for distributed rate limiting and sessions** — set `KAUTH_REDIS_URL` to back the four limiter buckets (login, register, token, mfa) and the session store with a single shared Lettuce connection. Rate limiting uses a sliding-window Lua script; sessions use per-record TTL plus per-user / per-tenant ZSETs scored by `createdAt`. Without `KAUTH_REDIS_URL`, `InMemoryRateLimiter` and `PostgresSessionRepository` keep working unchanged. Multi-replica deployments now apply the configured rate limit across the fleet (instead of `limit × replica count`) and share session state without sticky-session pinning. See [ADR-12](docs/adr/ADR-12-redis-sidecar.md) and [REDIS.md](docs/REDIS.md)
+- **Fail-closed runtime + fail-fast startup** — when Redis is configured and unreachable at startup, the server prints a `FATAL` banner and exits. When Redis is configured and a command throws at runtime, `RedisRateLimiter.isAllowed` rejects the request rather than silently falling back to per-replica state. Both behaviors are deliberate: a "fail open" rate limiter triggers exactly when the operator is least able to investigate
+- **Six new Redis-related env vars** — `KAUTH_REDIS_URL`, `KAUTH_REDIS_USERNAME`, `KAUTH_REDIS_PASSWORD` (credentials split per the existing `DB_URL`/`DB_USER`/`DB_PASSWORD` pattern), plus three timing knobs `KAUTH_REDIS_TIMEOUT_MS` (250), `KAUTH_REDIS_COMMAND_TIMEOUT_MS` (100), `KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS` (2000). Documented in [ENV_REFERENCE.md](docs/ENV_REFERENCE.md)
+- **`redis:7-alpine` service in `docker-compose.dev.yml`** — bundled for local development with persistence disabled (rate-limit buckets and sessions are ephemeral by design). Healthcheck wired so `app` waits for Redis before starting
+- **Testcontainers-backed integration tests** — `RedisRateLimiterIntegrationTest` (8 cases, including a runtime fail-closed assertion that pauses the container) and `RedisSessionRepositoryIntegrationTest` (13 cases, covering save/find/revoke, cross-tenant isolation, orphan pruning of TTL'd records, and past-expiry TTL handling). Both tagged `@Tag("redis")` and excluded from the default `make test` suite. Run via `make test-redis`; the Makefile target auto-detects the active Docker context (Docker Desktop, OrbStack, Colima) and forwards `DOCKER_HOST` + an explicit `api.version` JVM property so non-Docker-Desktop runtimes work without manual configuration
+- **`SessionCodec` round-trip tests** — three unit tests for kotlinx.serialization-based JSON encoding of `Session` (regular, revoked, client_credentials variants). Run as part of the default `make test`
+
+### Changed
+
+- **`RateLimiterPort` and `SessionRepository` selection in `ServiceGraph`** — both branch on `config.redisEnabled` to construct the Redis-backed adapter when `KAUTH_REDIS_URL` is set, or the existing in-memory / PostgreSQL adapter otherwise. Routes and domain services are unchanged; both port interfaces are unchanged
+- **`docs/RATE_LIMITING.md` updated** — adds the Redis implementation section (algorithm, fail-closed contract, key format) and removes the "planned for future release" note that referenced this work
+
+---
+
 ## [1.7.2] - 2026-04-28
 
 ### Added

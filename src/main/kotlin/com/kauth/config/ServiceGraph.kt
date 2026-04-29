@@ -66,6 +66,10 @@ import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
 import com.kauth.infrastructure.PortalClientProvisioning
+import com.kauth.infrastructure.redis.RedisClientFactory
+import com.kauth.infrastructure.redis.RedisClientHolder
+import com.kauth.infrastructure.redis.RedisRateLimiter
+import com.kauth.infrastructure.redis.RedisSessionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -118,6 +122,7 @@ data class ServiceGraph(
     val userAttributeService: UserAttributeService,
     val claimMapperService: CachingClaimMapperService,
     val translationPort: TranslationPort,
+    val redisClientHolder: RedisClientHolder?,
     val applicationScope: CoroutineScope,
 ) {
     companion object {
@@ -125,12 +130,29 @@ data class ServiceGraph(
             val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
             val encryptionService = EncryptionService(config.secretKey)
 
+            // -- Redis client (optional) --------------------------------------
+            // Constructed first so both session storage and rate limiters can
+            // branch on the same holder. Without `KAUTH_REDIS_URL`, this stays
+            // null and the storage falls back to PostgreSQL + InMemory.
+            val redisClientHolder: RedisClientHolder? =
+                config.redisUrl?.let { url ->
+                    RedisClientFactory.create(
+                        url = url,
+                        username = config.redisUsername,
+                        password = config.redisPassword,
+                        connectTimeoutMs = config.redisTimeoutMs,
+                        commandTimeoutMs = config.redisCommandTimeoutMs,
+                    )
+                }
+
             // -- Repositories -------------------------------------------------
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
             val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
-            val sessionRepository = PostgresSessionRepository()
+            val sessionRepository: SessionRepository =
+                redisClientHolder?.let { RedisSessionRepository(it.commands) }
+                    ?: PostgresSessionRepository()
             val authCodeRepository = PostgresAuthorizationCodeRepository()
             val auditLogRepository = PostgresAuditLogRepository()
             val passwordHasher = BcryptPasswordHasher()
@@ -331,26 +353,42 @@ data class ServiceGraph(
             }
 
             // -- Rate limiters ------------------------------------------------
-            val loginLimiter =
-                InMemoryRateLimiter(
-                    maxRequests = 5,
-                    windowSeconds = 60,
-                )
-            val registerLimiter =
-                InMemoryRateLimiter(
-                    maxRequests = 3,
-                    windowSeconds = 300,
-                )
-            val tokenLimiter =
-                InMemoryRateLimiter(
-                    maxRequests = 20,
-                    windowSeconds = 60,
-                )
-            val mfaLimiter =
-                InMemoryRateLimiter(
-                    maxRequests = 5,
-                    windowSeconds = 300,
-                )
+            val loginLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 5,
+                        windowSeconds = 60,
+                        keyPrefix = "login",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60)
+            val registerLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 3,
+                        windowSeconds = 300,
+                        keyPrefix = "register",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 3, windowSeconds = 300)
+            val tokenLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 20,
+                        windowSeconds = 60,
+                        keyPrefix = "token",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 20, windowSeconds = 60)
+            val mfaLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 5,
+                        windowSeconds = 300,
+                        keyPrefix = "mfa",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300)
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -416,6 +454,7 @@ data class ServiceGraph(
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 translationPort = translationPort,
+                redisClientHolder = redisClientHolder,
                 applicationScope = applicationScope,
             )
         }

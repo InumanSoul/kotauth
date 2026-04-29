@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix test e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa
+.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -37,8 +37,14 @@ lint: ## Run ktlint check (all .kt except *View.kt)
 lint-fix: ## Auto-fix lint issues with ktlintFormat
 	./gradlew ktlintFormat
 
-test: ## Run the test suite
+test: ## Run the test suite (no Docker required)
 	./gradlew test
+
+test-redis: ## Run Redis-backed integration tests (Testcontainers, Docker required)
+	@DOCKER_HOST=$$(docker context inspect --format '{{.Endpoints.docker.Host}}') \
+	  DOCKER_API_VERSION=1.43 \
+	  TESTCONTAINERS_RYUK_DISABLED=true \
+	  ./gradlew redisTest
 
 e2e: ## Run E2E browser smoke tests (Playwright, headless)
 	./gradlew e2eTest

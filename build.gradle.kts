@@ -3,6 +3,8 @@ val exposedVersion = "0.61.0"
 val logbackVersion = "1.5.32"
 val flywayVersion = "12.4.0"
 val logstashEncoderVersion = "8.1"
+val lettuceVersion = "6.5.5.RELEASE"
+val testcontainersVersion = "1.21.0"
 
 plugins {
     kotlin("jvm") version "2.3.20"
@@ -18,7 +20,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.7.2"
+version = "1.8.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -59,6 +61,8 @@ dependencies {
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
     implementation("com.sun.mail:javax.mail:1.6.2")
 
+    implementation("io.lettuce:lettuce-core:$lettuceVersion")
+
     // ---- Test dependencies ----
     // Ktor in-memory test engine
     testImplementation("io.ktor:ktor-server-test-host:$ktorVersion")
@@ -68,10 +72,33 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.5")
+    // Testcontainers — Redis integration tests (tagged @Tag("redis"); excluded from `make test`)
+    testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
+    testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("redis")
+    }
+}
+
+tasks.register<Test>("redisTest") {
+    description = "Runs Redis-backed integration tests (Testcontainers, Docker required)"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("redis")
+    }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+
+    // Forward Docker-related env vars (DOCKER_HOST for OrbStack/Colima/etc.,
+    // DOCKER_API_VERSION to override docker-java's stale default).
+    listOf("DOCKER_HOST", "DOCKER_API_VERSION", "TESTCONTAINERS_RYUK_DISABLED").forEach { name ->
+        System.getenv(name)?.let { environment(name, it) }
+    }
+    // docker-java reads `api.version` as a JVM system property (env var alone is not honored).
+    System.getenv("DOCKER_API_VERSION")?.let { systemProperty("api.version", it) }
 }
 
 // ── E2E smoke tests (Playwright) ─────────────────────────────────────────

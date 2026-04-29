@@ -43,8 +43,15 @@ data class EnvironmentConfig(
     val updateCheckEnabled: Boolean,
     val updateCheckUrl: String,
     val i18nBundleDir: String?,
+    val redisUrl: String?,
+    val redisUsername: String?,
+    val redisPassword: String?,
+    val redisTimeoutMs: Long,
+    val redisStartupProbeTimeoutMs: Long,
+    val redisCommandTimeoutMs: Long,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
+    val redisEnabled: Boolean get() = redisUrl != null
 
     companion object {
         fun load(): EnvironmentConfig {
@@ -81,6 +88,13 @@ data class EnvironmentConfig(
                     System.getenv("KAUTH_UPDATE_CHECK_URL")
                         ?: "https://inumansoul.github.io/kotauth/latest.json",
                 i18nBundleDir = System.getenv("KAUTH_I18N_BUNDLE_DIR")?.takeIf { it.isNotBlank() },
+                redisUrl = requireRedisUrl(System.getenv("KAUTH_REDIS_URL")),
+                redisUsername = System.getenv("KAUTH_REDIS_USERNAME")?.takeIf { it.isNotBlank() },
+                redisPassword = System.getenv("KAUTH_REDIS_PASSWORD")?.takeIf { it.isNotBlank() },
+                redisTimeoutMs = System.getenv("KAUTH_REDIS_TIMEOUT_MS")?.toLongOrNull() ?: 250L,
+                redisStartupProbeTimeoutMs =
+                    System.getenv("KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS")?.toLongOrNull() ?: 2000L,
+                redisCommandTimeoutMs = System.getenv("KAUTH_REDIS_COMMAND_TIMEOUT_MS")?.toLongOrNull() ?: 100L,
             )
         }
 
@@ -194,6 +208,29 @@ data class EnvironmentConfig(
                 )
                 exitProcess(1)
             }
+        }
+
+        private fun requireRedisUrl(raw: String?): String? {
+            val url = raw?.takeIf { it.isNotBlank() } ?: return null
+            if (!url.startsWith("redis://") && !url.startsWith("rediss://")) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_REDIS_URL has an unsupported scheme.           │
+                    │                                                              │
+                    │  Expected: redis://host[:port][/db]                          │
+                    │       or:  rediss://host[:port][/db]   (TLS)                 │
+                    │                                                              │
+                    │  Credentials belong in KAUTH_REDIS_USERNAME and              │
+                    │  KAUTH_REDIS_PASSWORD, not in the URL.                       │
+                    │                                                              │
+                    │  Current value: $url
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+            return url
         }
 
         private fun validateLegacySecret(env: String) {
