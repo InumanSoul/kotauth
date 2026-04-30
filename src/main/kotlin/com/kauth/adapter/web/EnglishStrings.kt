@@ -128,6 +128,7 @@ object EnglishStrings {
     const val IMPORT_PASSPHRASE_HINT = "The passphrase used at export time."
     const val IMPORT_SUBMIT_BUTTON = "Import workspace"
     const val IMPORT_LINK_FROM_LIST = "Import from backup"
+    const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."

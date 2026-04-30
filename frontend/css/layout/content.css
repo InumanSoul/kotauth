@@ -157,6 +157,18 @@
 .breadcrumb-sep     { color: var(--color-subtle); }
 .breadcrumb-current { color: var(--color-text); }
 
+/* ── Page footer link — small secondary action below page content ─────── */
+
+.page-footer-link {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.page-footer-link a       { color: var(--color-accent); text-decoration: none; }
+.page-footer-link a:hover { text-decoration: underline; }
+
 /* ── Search / filter bar ─────────────────────────────────────────────────── */
 
 .search-form { margin-bottom: 1rem; }
