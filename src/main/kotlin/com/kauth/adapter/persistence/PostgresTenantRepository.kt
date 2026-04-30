@@ -124,7 +124,6 @@ class PostgresTenantRepository(
                     it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
                     it[hibpCheckEnabled] = tenant.securityConfig.hibpCheckEnabled
                     it[magicLinkEnabled] = tenant.securityConfig.magicLinkEnabled
-                    it[magicLinkTokenTtlMinutes] = tenant.securityConfig.magicLinkTokenTtlMinutes
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
                 }
             if (updatedRows == 0) {
@@ -143,7 +142,6 @@ class PostgresTenantRepository(
                     it[corsAllowCredentials] = tenant.securityConfig.corsAllowCredentials
                     it[hibpCheckEnabled] = tenant.securityConfig.hibpCheckEnabled
                     it[magicLinkEnabled] = tenant.securityConfig.magicLinkEnabled
-                    it[magicLinkTokenTtlMinutes] = tenant.securityConfig.magicLinkTokenTtlMinutes
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
                 }
             }
@@ -225,7 +223,6 @@ class PostgresTenantRepository(
             corsAllowCredentials = this[TenantSecurityConfigTable.corsAllowCredentials],
             hibpCheckEnabled = this[TenantSecurityConfigTable.hibpCheckEnabled],
             magicLinkEnabled = this[TenantSecurityConfigTable.magicLinkEnabled],
-            magicLinkTokenTtlMinutes = this[TenantSecurityConfigTable.magicLinkTokenTtlMinutes],
             passwordLoginEnabled = this[TenantSecurityConfigTable.passwordLoginEnabled],
         )
     }

@@ -119,7 +119,6 @@ class AdminService(
         corsAllowCredentials: Boolean = false,
         hibpCheckEnabled: Boolean = false,
         magicLinkEnabled: Boolean = false,
-        magicLinkTokenTtlMinutes: Int = 15,
         passwordLoginEnabled: Boolean = true,
     ): AdminResult<Tenant> {
         val tenant =
@@ -180,7 +179,6 @@ class AdminService(
                         corsAllowCredentials = corsAllowCredentials,
                         hibpCheckEnabled = hibpCheckEnabled,
                         magicLinkEnabled = magicLinkEnabled,
-                        magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes.coerceIn(1, 1440),
                         passwordLoginEnabled = passwordLoginEnabled,
                     ),
             )

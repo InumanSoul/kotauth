@@ -322,6 +322,7 @@ fun Route.adminSettingsRoutes(
                     corsAllowCredentials = params["corsAllowCredentials"] == "true",
                     hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                     magicLinkEnabled = params["magicLinkEnabled"] == "true",
+                    passwordLoginEnabled = params["requirePasswordless"] != "true",
                 )
         ) {
             is AdminResult.Success ->

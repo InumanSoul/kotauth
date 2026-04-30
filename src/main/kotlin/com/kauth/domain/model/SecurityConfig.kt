@@ -27,7 +27,6 @@ data class SecurityConfig(
     // Breach detection — block passwords that appear in HIBP's breach corpus
     val hibpCheckEnabled: Boolean = false,
     val magicLinkEnabled: Boolean = false,
-    val magicLinkTokenTtlMinutes: Int = 15,
     // Disabling password login affects only the password flow; magic-link and
     // social providers are governed by their own per-tenant config.
     val passwordLoginEnabled: Boolean = true,

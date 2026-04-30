@@ -130,6 +130,19 @@ object EnglishStrings {
     const val IMPORT_LINK_FROM_LIST = "Import from backup"
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
+    // Authentication methods card (workspace security settings — v1.10)
+    const val AUTH_METHODS_CARD_TITLE = "Authentication Methods"
+    const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
+    const val AUTH_METHODS_MAGIC_LINK_DESC =
+        "Users can request a one-time sign-in link delivered to their email. " +
+            "Links expire in 15 minutes and are single-use. MFA still required " +
+            "when enrolled. Requires SMTP to be configured."
+    const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
+    const val AUTH_METHODS_PASSWORDLESS_DESC =
+        "Hides the password form and rejects password-based authentication. " +
+            "Users can still sign in with magic links and any enabled social providers. " +
+            "Email becomes the only first factor — pair with MFA for higher-assurance environments."
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 

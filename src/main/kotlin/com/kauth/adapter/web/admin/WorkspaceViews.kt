@@ -819,21 +819,28 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
-                // ── Passwordless (Magic Link) ────────────────────────
+                // ── Authentication Methods ───────────────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Passwordless Sign-in" }
+                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_CARD_TITLE }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "magicLinkEnabled") {
                             attributes["value"] = "true"
                             if (workspace.securityConfig.magicLinkEnabled) checked = true
                         }
                         div("check-row__body") {
-                            span("check-row__label") { +"Allow sign-in via email magic link" }
-                            span("check-row__desc") {
-                                +"Users can request a one-time sign-in link delivered to their email. "
-                                +"Links expire in 15 minutes and are single-use. MFA still required "
-                                +"when enrolled. Requires SMTP to be configured."
-                            }
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_DESC }
+                        }
+                    }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "requirePasswordless") {
+                            attributes["value"] = "true"
+                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
+                            if (workspace.isMaster) attributes["disabled"] = "disabled"
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
                         }
                     }
                 }
