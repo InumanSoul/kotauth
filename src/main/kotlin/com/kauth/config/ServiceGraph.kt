@@ -32,6 +32,7 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.port.ApplicationRepository
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.BackupEncryptionPort
 import com.kauth.domain.port.GroupRepository
@@ -66,6 +67,7 @@ import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.ExposedTransactionRunner
+import com.kauth.infrastructure.FlywaySchemaHead
 import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
@@ -132,6 +134,9 @@ data class ServiceGraph(
     val backupExporterService: BackupExporterService,
     val backupImporterService: BackupImporterService,
     val backupEncryptionPort: BackupEncryptionPort,
+    val auditLogPort: AuditLogPort,
+    /** Flyway head V-number captured at startup; embedded in backup exports. */
+    val flywaySchemaVersion: Int,
 ) {
     companion object {
         fun create(config: EnvironmentConfig): ServiceGraph {
@@ -412,6 +417,16 @@ data class ServiceGraph(
             // -- Tenant backup/restore (v1.9.0) ------------------------------
             val backupEncryptionPort: BackupEncryptionPort = Pbkdf2AesGcmBackupEncryption()
             val backupTransactionRunner = ExposedTransactionRunner()
+            val flywaySchemaVersion =
+                FlywaySchemaHead.read(
+                    DbConfig(
+                        dbUrl = config.dbUrl,
+                        dbUser = config.dbUser,
+                        dbPassword = config.dbPassword,
+                        dbPoolMaxSize = config.dbPoolMaxSize,
+                        dbPoolMinIdle = config.dbPoolMinIdle,
+                    ),
+                )
             val backupExporterService =
                 BackupExporterService(
                     tenantRepository = tenantRepository,
@@ -500,6 +515,8 @@ data class ServiceGraph(
                 backupExporterService = backupExporterService,
                 backupImporterService = backupImporterService,
                 backupEncryptionPort = backupEncryptionPort,
+                auditLogPort = auditLogAdapter,
+                flywaySchemaVersion = flywaySchemaVersion,
             )
         }
     }

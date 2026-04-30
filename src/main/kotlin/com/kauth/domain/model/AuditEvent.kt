@@ -99,4 +99,7 @@ enum class AuditEventType {
 
     ADMIN_KEY_ROTATED,
     ADMIN_KEY_RETIRED,
+
+    ADMIN_TENANT_EXPORTED,
+    ADMIN_TENANT_IMPORTED,
 }
