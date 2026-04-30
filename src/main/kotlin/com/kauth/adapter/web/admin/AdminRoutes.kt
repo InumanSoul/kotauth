@@ -10,6 +10,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
+import com.kauth.domain.port.BackupEncryptionPort
 import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
@@ -22,6 +23,8 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.BackupExporterService
+import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
@@ -71,6 +74,10 @@ fun Route.adminRoutes(
     tenantKeyRepository: TenantKeyRepository? = null,
     userAttributeService: com.kauth.domain.service.UserAttributeService,
     claimMapperService: com.kauth.infrastructure.CachingClaimMapperService,
+    backupExporterService: BackupExporterService? = null,
+    backupImporterService: BackupImporterService? = null,
+    backupEncryptionPort: BackupEncryptionPort? = null,
+    flywaySchemaVersion: Int = 0,
     corsPort: CorsPort? = null,
     baseUrl: String = "",
     translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
@@ -359,6 +366,15 @@ fun Route.adminRoutes(
                 )
             }
 
+            if (backupImporterService != null && backupEncryptionPort != null) {
+                adminBackupImportRoutes(
+                    tenantRepository = tenantRepository,
+                    backupImporterService = backupImporterService,
+                    backupEncryptionPort = backupEncryptionPort,
+                    currentSchemaVersion = flywaySchemaVersion,
+                )
+            }
+
             get("/new") {
                 val session = call.sessions.get<AdminSession>()!!
                 val wsPairs =
@@ -520,6 +536,16 @@ fun Route.adminRoutes(
                 adminClaimMapperRoutes(
                     claimMapperService = claimMapperService,
                 )
+
+                if (backupExporterService != null && backupEncryptionPort != null) {
+                    adminBackupExportRoutes(
+                        tenantRepository = tenantRepository,
+                        backupExporterService = backupExporterService,
+                        backupEncryptionPort = backupEncryptionPort,
+                        appInfo = appInfo,
+                        currentSchemaVersion = flywaySchemaVersion,
+                    )
+                }
             }
         }
     }

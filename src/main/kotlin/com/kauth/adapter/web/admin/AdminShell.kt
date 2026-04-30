@@ -425,4 +425,6 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
     ctxLink("$base/claim-mappers", "claim-mappers", activeSection, "Claim Mappers")
+    div("sidebar__divider") {}
+    ctxLink("$base/backup", "backup", activeSection, com.kauth.adapter.web.EnglishStrings.BACKUP_NAV_LABEL)
 }

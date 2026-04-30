@@ -71,6 +71,48 @@ object EnglishStrings {
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
 
+    // Tenant backup / restore (v1.9.0)
+    const val BACKUP_NAV_LABEL = "Backup"
+    const val BACKUP_PAGE_TITLE = "Backup workspace"
+    const val BACKUP_PAGE_SUBTITLE =
+        "Export this workspace to an encrypted file. Use the file to restore the workspace " +
+            "elsewhere, or to clone it into a staging environment."
+    const val BACKUP_PASSPHRASE_LABEL = "Backup passphrase"
+    const val BACKUP_PASSPHRASE_HINT =
+        "16+ characters. The exported file is unreadable without it. " +
+            "Kotauth never stores this passphrase — keep it somewhere safe."
+    const val BACKUP_CONFIRM_PASSPHRASE_LABEL = "Confirm passphrase"
+    const val BACKUP_INCLUDE_SIGNING_KEYS_LABEL = "Include RSA signing keys"
+    const val BACKUP_INCLUDE_SIGNING_KEYS_DESC =
+        "Default off. Including the private signing keys lets the destination tenant verify tokens " +
+            "issued before the backup; turn this on only when migrating a live tenant to a new deployment."
+    const val BACKUP_INCLUDE_AUDIT_LOG_LABEL = "Include audit log"
+    const val BACKUP_INCLUDE_AUDIT_LOG_DESC =
+        "Default off. The audit log can be large and may be subject to retention policy."
+    const val BACKUP_CONFIRM_SLUG_LABEL = "Type the workspace slug to confirm"
+    const val BACKUP_CONFIRM_SLUG_HINT_PREFIX = "Type "
+    const val BACKUP_CONFIRM_SLUG_HINT_SUFFIX = " exactly to enable the export button."
+    const val BACKUP_DOWNLOAD_BUTTON = "Export & download"
+    const val BACKUP_REDACTED_HEADING = "What is NOT included"
+    const val BACKUP_REDACTED_INTRO =
+        "These secrets are intentionally redacted. After importing, an operator must regenerate them " +
+            "before the destination workspace is fully functional:"
+
+    const val IMPORT_PAGE_TITLE = "Import workspace from backup"
+    const val IMPORT_PAGE_SUBTITLE =
+        "Restore a previously exported workspace as a new tenant on this deployment."
+    const val IMPORT_FILE_LABEL = "Backup file (.json.enc)"
+    const val IMPORT_NEW_SLUG_LABEL = "New workspace slug"
+    const val IMPORT_NEW_SLUG_HINT =
+        "Lowercase letters, digits, and dashes; 2–50 characters. Must not match an existing workspace."
+    const val IMPORT_PASSPHRASE_LABEL = "Backup passphrase"
+    const val IMPORT_PASSPHRASE_HINT = "The passphrase used at export time."
+    const val IMPORT_SUBMIT_BUTTON = "Import workspace"
+    const val IMPORT_LINK_FROM_LIST = "Import from backup"
+
+    const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
+    const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
+
     // -------------------------------------------------------------------------
     // Auth pages — shared chrome (page titles use {0} = workspace name)
     // -------------------------------------------------------------------------
