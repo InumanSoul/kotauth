@@ -33,6 +33,7 @@ import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
+import com.kauth.domain.port.BackupEncryptionPort
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
@@ -47,6 +48,8 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.BackupExporterService
+import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.MfaService
@@ -62,9 +65,11 @@ import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.DemoSeedService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
+import com.kauth.infrastructure.ExposedTransactionRunner
 import com.kauth.infrastructure.InMemoryRateLimiter
 import com.kauth.infrastructure.KeyEncryptionMigration
 import com.kauth.infrastructure.KeyProvisioningService
+import com.kauth.infrastructure.Pbkdf2AesGcmBackupEncryption
 import com.kauth.infrastructure.PortalClientProvisioning
 import com.kauth.infrastructure.redis.RedisClientFactory
 import com.kauth.infrastructure.redis.RedisClientHolder
@@ -124,6 +129,9 @@ data class ServiceGraph(
     val translationPort: TranslationPort,
     val redisClientHolder: RedisClientHolder?,
     val applicationScope: CoroutineScope,
+    val backupExporterService: BackupExporterService,
+    val backupImporterService: BackupImporterService,
+    val backupEncryptionPort: BackupEncryptionPort,
 ) {
     companion object {
         fun create(config: EnvironmentConfig): ServiceGraph {
@@ -401,6 +409,39 @@ data class ServiceGraph(
                     .getInstance("SHA-256")
                     .digest("admin-session:${config.secretKey}".toByteArray(Charsets.UTF_8))
 
+            // -- Tenant backup/restore (v1.9.0) ------------------------------
+            val backupEncryptionPort: BackupEncryptionPort = Pbkdf2AesGcmBackupEncryption()
+            val backupTransactionRunner = ExposedTransactionRunner()
+            val backupExporterService =
+                BackupExporterService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
+                    groupRepository = groupRepository,
+                    claimMapperRepository = tenantClaimMapperRepository,
+                    identityProviderRepository = identityProviderRepository,
+                    tenantKeyRepository = tenantKeyRepository,
+                    userAttributeRepository = userAttributeRepository,
+                    auditLogRepository = auditLogRepository,
+                )
+            val backupImporterService =
+                BackupImporterService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
+                    groupRepository = groupRepository,
+                    claimMapperRepository = tenantClaimMapperRepository,
+                    identityProviderRepository = identityProviderRepository,
+                    tenantKeyRepository = tenantKeyRepository,
+                    themeRepository = themeRepository,
+                    portalConfigRepository = portalConfigRepository,
+                    userAttributeRepository = userAttributeRepository,
+                    auditLogPort = auditLogAdapter,
+                    transactionRunner = backupTransactionRunner,
+                )
+
             // -- i18n translation port ---------------------------------------
             // English is always-on (baked-in EnglishStrings). Non-English
             // locales are opt-in via KAUTH_I18N_BUNDLE_DIR. When unset, the
@@ -456,6 +497,9 @@ data class ServiceGraph(
                 translationPort = translationPort,
                 redisClientHolder = redisClientHolder,
                 applicationScope = applicationScope,
+                backupExporterService = backupExporterService,
+                backupImporterService = backupImporterService,
+                backupEncryptionPort = backupEncryptionPort,
             )
         }
     }
