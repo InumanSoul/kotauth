@@ -160,7 +160,9 @@
 /* ── Page footer link — small secondary action below page content ─────── */
 
 .page-footer-link {
-  margin-top: var(--space-6);
+  margin-top: var(--space-10);
+  padding-top: var(--space-6);
+  border-top: 0.5px solid var(--color-border);
   text-align: center;
   font-size: var(--text-sm);
   color: var(--color-muted);

@@ -21,6 +21,7 @@ const bundles = [
       src('shared/htmx-config.js'),
       src('shared/confirm-dialog.js'),
       src('shared/password-validation.js'),
+      src('shared/backup-slug-validation.js'),
       src('shared/toast.js'),
       src('admin/settings.js'),
       src('admin/update-check.js'),

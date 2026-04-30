@@ -50,6 +50,7 @@ internal fun workspaceBackupPageImpl(
                     }
                     div("page-header__actions") {
                         button(type = ButtonType.submit) {
+                            id = "backup-export-button"
                             classes = setOf("btn", "btn--primary")
                             attributes["form"] = "backup-export-form"
                             +EnglishStrings.BACKUP_DOWNLOAD_BUTTON
@@ -136,6 +137,8 @@ internal fun workspaceBackupPageImpl(
                                     attributes["pattern"] = java.util.regex.Pattern.quote(slug)
                                     attributes["required"] = "required"
                                     attributes["autocomplete"] = "off"
+                                    attributes["data-confirm-slug"] = slug
+                                    attributes["data-confirm-target"] = "#backup-export-button"
                                     placeholder = slug
                                 }
                                 div("edit-row__hint") {
