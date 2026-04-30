@@ -93,10 +93,29 @@ object EnglishStrings {
     const val BACKUP_CONFIRM_SLUG_HINT_PREFIX = "Type "
     const val BACKUP_CONFIRM_SLUG_HINT_SUFFIX = " exactly to enable the export button."
     const val BACKUP_DOWNLOAD_BUTTON = "Export & download"
-    const val BACKUP_REDACTED_HEADING = "What is NOT included"
-    const val BACKUP_REDACTED_INTRO =
-        "These secrets are intentionally redacted. After importing, an operator must regenerate them " +
-            "before the destination workspace is fully functional:"
+
+    // Export-page top-of-form scope notice — informational, non-blocking
+    const val BACKUP_SCOPE_NOTICE_TITLE = "Some secrets will not be included"
+    const val BACKUP_SCOPE_NOTICE_BODY =
+        "OAuth client secrets, social provider secrets, SMTP password, MFA seeds, and active sessions are " +
+            "redacted from every export. After importing this workspace elsewhere, an operator will need to " +
+            "regenerate them before the destination is fully functional."
+
+    // Import-page top-of-form recovery notice — actionable list of what to redo after import
+    const val IMPORT_RECOVERY_NOTICE_TITLE = "After import, regenerate these secrets"
+    const val IMPORT_RECOVERY_NOTICE_BODY =
+        "These items are not in the backup file and must be reconfigured before the imported workspace " +
+            "is fully functional:"
+    const val IMPORT_RECOVERY_OAUTH_SECRETS =
+        "OAuth client secrets — regenerate per application after import."
+    const val IMPORT_RECOVERY_SOCIAL_SECRETS =
+        "Social provider client secrets — re-enter in Settings › Identity Providers."
+    const val IMPORT_RECOVERY_SMTP_PASSWORD =
+        "SMTP password — reconfigure in Settings › SMTP."
+    const val IMPORT_RECOVERY_MFA_SEEDS =
+        "MFA TOTP seeds and recovery codes — users must re-enroll after import."
+    const val IMPORT_RECOVERY_SESSIONS =
+        "Active sessions, authorization codes, and magic-link tokens were never exported."
 
     const val IMPORT_PAGE_TITLE = "Import workspace from backup"
     const val IMPORT_PAGE_SUBTITLE =

@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -58,6 +59,14 @@ internal fun workspaceBackupPageImpl(
 
                 if (error != null) {
                     div("notice notice--error") { +error }
+                }
+
+                div("notice notice--info") {
+                    span("notice__icon") { inlineSvgIcon("info", "info") }
+                    div("notice__body") {
+                        span("notice__title") { +EnglishStrings.BACKUP_SCOPE_NOTICE_TITLE }
+                        span("notice__desc") { +EnglishStrings.BACKUP_SCOPE_NOTICE_BODY }
+                    }
                 }
 
                 form(
@@ -137,19 +146,6 @@ internal fun workspaceBackupPageImpl(
                             }
                         }
                     }
-
-                    // Redaction notice — operator-facing list of what won't be in the export
-                    div("ov-card") {
-                        div("ov-card__section-label") { +EnglishStrings.BACKUP_REDACTED_HEADING }
-                        p("edit-row__hint") { +EnglishStrings.BACKUP_REDACTED_INTRO }
-                        ul {
-                            li { +"OAuth client secrets — regenerate per application after import." }
-                            li { +"Social provider client secrets — re-enter in Settings → Identity Providers." }
-                            li { +"SMTP password — reconfigure in Settings → SMTP." }
-                            li { +"MFA TOTP seeds and recovery codes — users must re-enroll after import." }
-                            li { +"Active sessions, authorization codes, and magic-link tokens — never exported." }
-                        }
-                    }
                 }
             }
         }
@@ -201,6 +197,21 @@ internal fun importTenantPageImpl(
 
                 if (error != null) {
                     div("notice notice--error") { +error }
+                }
+
+                div("notice notice--info") {
+                    span("notice__icon") { inlineSvgIcon("info", "info") }
+                    div("notice__body") {
+                        span("notice__title") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_TITLE }
+                        span("notice__desc") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_BODY }
+                        ul {
+                            li { +EnglishStrings.IMPORT_RECOVERY_OAUTH_SECRETS }
+                            li { +EnglishStrings.IMPORT_RECOVERY_SOCIAL_SECRETS }
+                            li { +EnglishStrings.IMPORT_RECOVERY_SMTP_PASSWORD }
+                            li { +EnglishStrings.IMPORT_RECOVERY_MFA_SEEDS }
+                            li { +EnglishStrings.IMPORT_RECOVERY_SESSIONS }
+                        }
+                    }
                 }
 
                 form(
