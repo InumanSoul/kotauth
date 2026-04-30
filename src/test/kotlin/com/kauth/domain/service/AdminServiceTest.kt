@@ -1047,7 +1047,8 @@ class AdminServiceTest {
     fun `updateWorkspaceSettings rejects disabling password login on master tenant`() {
         tenants.clear()
         tenants.add(tenant.copy(slug = Tenant.MASTER_SLUG))
-        val result = callUpdateSettings(slug = Tenant.MASTER_SLUG, passwordLoginEnabled = false, magicLinkEnabled = true)
+        val result =
+            callUpdateSettings(slug = Tenant.MASTER_SLUG, passwordLoginEnabled = false, magicLinkEnabled = true)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
