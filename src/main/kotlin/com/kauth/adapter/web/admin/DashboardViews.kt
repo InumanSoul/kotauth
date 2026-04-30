@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -32,6 +33,9 @@ internal fun workspaceListPageImpl(
                     }
                 }
                 div("page-header__actions") {
+                    a("/admin/workspaces/import", classes = "btn btn--ghost") {
+                        +EnglishStrings.IMPORT_LINK_FROM_LIST
+                    }
                     primaryLink("/admin/workspaces/new", "New Workspace")
                 }
             }

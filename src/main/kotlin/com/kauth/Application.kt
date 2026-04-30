@@ -5,6 +5,7 @@ import com.kauth.adapter.web.UpdateBannerConfig
 import com.kauth.adapter.web.admin.AdminSession
 import com.kauth.adapter.web.admin.AdminView
 import com.kauth.adapter.web.admin.WorkspaceStub
+import com.kauth.adapter.web.admin.adminBackupRoutes
 import com.kauth.adapter.web.admin.adminRoutes
 import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.auth.authRoutes
@@ -401,6 +402,17 @@ fun Application.module(
             corsService = s.corsService,
         )
 
+        adminBackupRoutes(
+            apiKeyService = s.apiKeyService,
+            tenantRepository = s.tenantRepository,
+            backupExporterService = s.backupExporterService,
+            backupImporterService = s.backupImporterService,
+            backupEncryptionPort = s.backupEncryptionPort,
+            auditLogPort = s.auditLogPort,
+            currentSchemaVersion = s.flywaySchemaVersion,
+            kotauthVersion = appInfo.version,
+        )
+
         adminRoutes(
             adminService = s.adminService,
             roleGroupService = s.roleGroupService,
@@ -424,6 +436,10 @@ fun Application.module(
             tenantKeyRepository = s.tenantKeyRepository,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
+            backupExporterService = s.backupExporterService,
+            backupImporterService = s.backupImporterService,
+            backupEncryptionPort = s.backupEncryptionPort,
+            flywaySchemaVersion = s.flywaySchemaVersion,
             corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
             translationPort = s.translationPort,

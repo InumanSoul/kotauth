@@ -49,6 +49,12 @@ object ApiScope {
     const val CLAIM_MAPPERS_READ = "claim_mappers:read"
     const val CLAIM_MAPPERS_WRITE = "claim_mappers:write"
 
+    /** Master-tenant only — export a workspace as an encrypted backup. */
+    const val TENANTS_EXPORT = "tenants:export"
+
+    /** Master-tenant only — import an encrypted backup as a new workspace. */
+    const val TENANTS_IMPORT = "tenants:import"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -66,5 +72,7 @@ object ApiScope {
             USER_ATTRIBUTES_WRITE,
             CLAIM_MAPPERS_READ,
             CLAIM_MAPPERS_WRITE,
+            TENANTS_EXPORT,
+            TENANTS_IMPORT,
         )
 }

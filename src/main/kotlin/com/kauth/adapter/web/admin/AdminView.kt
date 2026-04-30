@@ -249,6 +249,24 @@ object AdminView {
 
     // ── Settings ────────────────────────────────────────────────────────
 
+    // ── Backup / Restore (v1.9.0) ──────────────────────────────────────
+
+    fun workspaceBackupPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        error: String? = null,
+    ): HTML.() -> Unit = workspaceBackupPageImpl(workspace, allWorkspaces, loggedInAs, error)
+
+    fun importTenantPage(
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        error: String? = null,
+        prefillSlug: String? = null,
+    ): HTML.() -> Unit = importTenantPageImpl(allWorkspaces, loggedInAs, error, prefillSlug)
+
+    // ── (alphabetical-by-feature handle continues below)
+
     fun smtpSettingsPage(
         workspace: Tenant,
         allWorkspaces: List<WorkspaceStub>,

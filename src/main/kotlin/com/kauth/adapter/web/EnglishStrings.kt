@@ -71,6 +71,68 @@ object EnglishStrings {
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
 
+    // Tenant backup / restore (v1.9.0)
+    const val BACKUP_NAV_LABEL = "Backup"
+    const val BACKUP_PAGE_TITLE = "Backup workspace"
+    const val BACKUP_PAGE_SUBTITLE =
+        "Export this workspace to an encrypted file. Use the file to restore the workspace " +
+            "elsewhere, or to clone it into a staging environment."
+    const val BACKUP_PASSPHRASE_LABEL = "Backup passphrase"
+    const val BACKUP_PASSPHRASE_HINT =
+        "16+ characters. The exported file is unreadable without it. " +
+            "Kotauth never stores this passphrase — keep it somewhere safe."
+    const val BACKUP_CONFIRM_PASSPHRASE_LABEL = "Confirm passphrase"
+    const val BACKUP_INCLUDE_SIGNING_KEYS_LABEL = "Include RSA signing keys"
+    const val BACKUP_INCLUDE_SIGNING_KEYS_DESC =
+        "Default off. Including the private signing keys lets the destination tenant verify tokens " +
+            "issued before the backup; turn this on only when migrating a live tenant to a new deployment."
+    const val BACKUP_INCLUDE_AUDIT_LOG_LABEL = "Include audit log"
+    const val BACKUP_INCLUDE_AUDIT_LOG_DESC =
+        "Default off. The audit log can be large and may be subject to retention policy."
+    const val BACKUP_CONFIRM_SLUG_LABEL = "Type the workspace slug to confirm"
+    const val BACKUP_CONFIRM_SLUG_HINT_PREFIX = "Type "
+    const val BACKUP_CONFIRM_SLUG_HINT_SUFFIX = " exactly to enable the export button."
+    const val BACKUP_DOWNLOAD_BUTTON = "Export & download"
+
+    // Export-page top-of-form scope notice — informational, non-blocking
+    const val BACKUP_SCOPE_NOTICE_TITLE = "Some secrets will not be included"
+    const val BACKUP_SCOPE_NOTICE_BODY =
+        "OAuth client secrets, social provider secrets, SMTP password, MFA seeds, and active sessions are " +
+            "redacted from every export. After importing this workspace elsewhere, an operator will need to " +
+            "regenerate them before the destination is fully functional."
+
+    // Import-page top-of-form recovery notice — actionable list of what to redo after import
+    const val IMPORT_RECOVERY_NOTICE_TITLE = "After import, regenerate these secrets"
+    const val IMPORT_RECOVERY_NOTICE_BODY =
+        "These items are not in the backup file and must be reconfigured before the imported workspace " +
+            "is fully functional:"
+    const val IMPORT_RECOVERY_OAUTH_SECRETS =
+        "OAuth client secrets — regenerate per application after import."
+    const val IMPORT_RECOVERY_SOCIAL_SECRETS =
+        "Social provider client secrets — re-enter in Settings › Identity Providers."
+    const val IMPORT_RECOVERY_SMTP_PASSWORD =
+        "SMTP password — reconfigure in Settings › SMTP."
+    const val IMPORT_RECOVERY_MFA_SEEDS =
+        "MFA TOTP seeds and recovery codes — users must re-enroll after import."
+    const val IMPORT_RECOVERY_SESSIONS =
+        "Active sessions, authorization codes, and magic-link tokens were never exported."
+
+    const val IMPORT_PAGE_TITLE = "Import workspace from backup"
+    const val IMPORT_PAGE_SUBTITLE =
+        "Restore a previously exported workspace as a new tenant on this deployment."
+    const val IMPORT_FILE_LABEL = "Backup file (.json.enc)"
+    const val IMPORT_NEW_SLUG_LABEL = "New workspace slug"
+    const val IMPORT_NEW_SLUG_HINT =
+        "Lowercase letters, digits, and dashes; 2–50 characters. Must not match an existing workspace."
+    const val IMPORT_PASSPHRASE_LABEL = "Backup passphrase"
+    const val IMPORT_PASSPHRASE_HINT = "The passphrase used at export time."
+    const val IMPORT_SUBMIT_BUTTON = "Import workspace"
+    const val IMPORT_LINK_FROM_LIST = "Import from backup"
+    const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
+
+    const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
+    const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
+
     // -------------------------------------------------------------------------
     // Auth pages — shared chrome (page titles use {0} = workspace name)
     // -------------------------------------------------------------------------

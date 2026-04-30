@@ -397,6 +397,10 @@ internal fun createWorkspacePageImpl(
                     }
                 }
             }
+
+            div("page-footer-link") {
+                a(href = "/admin/workspaces/import") { +EnglishStrings.IMPORT_LINK_FROM_CREATE }
+            }
                     }
 }
     }
