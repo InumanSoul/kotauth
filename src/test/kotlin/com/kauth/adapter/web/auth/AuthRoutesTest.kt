@@ -41,6 +41,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
@@ -1948,6 +1949,120 @@ class AuthRoutesTest {
             assertTrue(body.contains("name=\"password\""), "Password input must be present in default mode")
             assertTrue(body.contains("action=\"/t/acme/authorize\""), "Form must post to /authorize")
             assertTrue(body.contains("Forgot password"), "Forgot-password link must be present")
+        }
+
+    @Test
+    fun `GET register hides password fields when passwordLoginEnabled is false`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig =
+                        tenant.securityConfig.copy(
+                            passwordLoginEnabled = false,
+                            magicLinkEnabled = true,
+                        ),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/register")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(!body.contains("name=\"password\""), "Password field must NOT render in passwordless mode")
+            assertTrue(
+                !body.contains("name=\"confirmPassword\""),
+                "Confirm-password field must NOT render in passwordless mode",
+            )
+            assertTrue(body.contains("name=\"email\""), "Email field still required")
+            assertTrue(body.contains("name=\"username\""), "Username field still required")
+            assertTrue(
+                body.contains("we'll email you a sign-in link"),
+                "Subtitle must explain the magic-link flow, got: $body",
+            )
+        }
+
+    @Test
+    fun `POST register in passwordless mode creates user and sends magic link`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig =
+                        tenant.securityConfig.copy(
+                            passwordLoginEnabled = false,
+                            magicLinkEnabled = true,
+                        ),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/register",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "passwordless-newuser")
+                            append("email", "newuser@example.com")
+                            append("fullName", "New User")
+                            // No password / confirmPassword fields submitted
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("/magic-link?sent=true"),
+                "Passwordless registration must redirect to magic-link sent page, got: $location",
+            )
+            verify {
+                selfService.initiateMagicLink(
+                    email = "newuser@example.com",
+                    tenantSlug = "acme",
+                    baseUrl = any(),
+                    ipAddress = any(),
+                )
+            }
+            assertTrue(
+                userRepo.existsByUsername(TenantId(1), "passwordless-newuser"),
+                "User must be persisted after passwordless registration",
+            )
         }
 
     @Test

@@ -5,6 +5,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -17,6 +18,7 @@ import io.ktor.server.routing.post
 
 internal fun Route.registerRoutes(
     authService: AuthService,
+    selfServiceService: UserSelfServiceService,
     registerRateLimiter: RateLimiterPort,
     identityProviderRepository: IdentityProviderRepository?,
     baseUrl: String,
@@ -42,6 +44,7 @@ internal fun Route.registerRoutes(
                 workspaceName,
                 enabledProviders = enabledProviders,
                 passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
+                passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
             ),
         )
     }
@@ -52,6 +55,7 @@ internal fun Route.registerRoutes(
         val tenant = ctx.tenant
         val theme = ctx.theme
         val workspaceName = ctx.workspaceName
+        val passwordlessTenant = tenant?.securityConfig?.passwordLoginEnabled == false
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -71,6 +75,7 @@ internal fun Route.registerRoutes(
                     error = "Too many registration attempts. Please wait a moment.",
                     enabledProviders = enabledProviders,
                     passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
+                    passwordLoginEnabled = !passwordlessTenant,
                 ),
             )
         }
@@ -85,12 +90,22 @@ internal fun Route.registerRoutes(
 
         when (val result = authService.register(slug, username, email, fullName, password, confirmPassword, baseUrl)) {
             is AuthResult.Success -> {
-                // If an OAuth flow is active (auth context cookie), return to it.
-                // Otherwise redirect to the portal login which starts a proper OAuth flow.
-                val hasOAuthContext = call.getAuthContext(encryptionService) != null
-                val redirect =
-                    if (hasOAuthContext) "/t/$slug/authorize?registered=true" else "/t/$slug/account/login"
-                call.respondRedirect(redirect)
+                if (passwordlessTenant) {
+                    // No password the user knows — issue a magic-link so they can complete
+                    // first sign-in. Same enumeration-safe redirect as the normal flow.
+                    selfServiceService.initiateMagicLink(
+                        email = email,
+                        tenantSlug = slug,
+                        baseUrl = baseUrl,
+                        ipAddress = ipAddress,
+                    )
+                    call.respondRedirect("/t/$slug/magic-link?sent=true")
+                } else {
+                    val hasOAuthContext = call.getAuthContext(encryptionService) != null
+                    val redirect =
+                        if (hasOAuthContext) "/t/$slug/authorize?registered=true" else "/t/$slug/account/login"
+                    call.respondRedirect(redirect)
+                }
             }
             is AuthResult.Failure ->
                 call.respondHtml(
@@ -103,6 +118,7 @@ internal fun Route.registerRoutes(
                         prefill = prefill,
                         enabledProviders = enabledProviders,
                         passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
+                        passwordLoginEnabled = !passwordlessTenant,
                     ),
                 )
         }

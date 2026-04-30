@@ -317,11 +317,15 @@ class AuthService(
             return AuthResult.Failure(AuthError.RegistrationDisabled)
         }
 
-        if (!tenant.securityConfig.passwordLoginEnabled) {
+        // Passwordless tenants: registration is allowed only if magic-link is on,
+        // since the user has no other email-based path to actually sign in.
+        val passwordlessMode = !tenant.securityConfig.passwordLoginEnabled
+        if (passwordlessMode && !tenant.securityConfig.magicLinkEnabled) {
             return AuthResult.Failure(AuthError.PasswordLoginDisabled)
         }
 
-        if (username.isBlank() || email.isBlank() || fullName.isBlank() || rawPassword.isBlank()) {
+        val coreFieldsBlank = username.isBlank() || email.isBlank() || fullName.isBlank()
+        if (coreFieldsBlank || (!passwordlessMode && rawPassword.isBlank())) {
             return AuthResult.Failure(AuthError.ValidationError("All fields are required."))
         }
 
@@ -329,16 +333,24 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        val policyError = passwordPolicy?.validate(rawPassword, tenant)
-        if (policyError != null) {
-            return AuthResult.Failure(AuthError.ValidationError(policyError))
-        } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
-            return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
-        }
-
-        if (rawPassword != confirmPassword) {
-            return AuthResult.Failure(AuthError.ValidationError("Passwords do not match."))
-        }
+        // In passwordless mode the password is generated server-side and never used by
+        // the user — skip policy/confirmation checks. The User table still requires a
+        // hash, so we mint a random unguessable secret to satisfy the schema.
+        val effectivePassword =
+            if (passwordlessMode) {
+                generateSyntheticPassword()
+            } else {
+                val policyError = passwordPolicy?.validate(rawPassword, tenant)
+                if (policyError != null) {
+                    return AuthResult.Failure(AuthError.ValidationError(policyError))
+                } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
+                    return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
+                }
+                if (rawPassword != confirmPassword) {
+                    return AuthResult.Failure(AuthError.ValidationError("Passwords do not match."))
+                }
+                rawPassword
+            }
 
         if (userRepository.existsByUsername(tenant.id, username)) {
             return AuthResult.Failure(AuthError.UserAlreadyExists)
@@ -354,12 +366,12 @@ class AuthService(
                 username = username.trim(),
                 email = email.trim().lowercase(),
                 fullName = fullName.trim(),
-                passwordHash = passwordHasher.hash(rawPassword),
+                passwordHash = passwordHasher.hash(effectivePassword),
             )
 
         val savedUser = userRepository.save(newUser)
 
-        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+        if (!passwordlessMode && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
 
@@ -388,6 +400,15 @@ class AuthService(
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    // Two UUIDs concatenated — 256 bits of entropy. Used as the stored hash for
+    // passwordless registrations; the user never sees or types this value.
+    private fun generateSyntheticPassword(): String {
+        val a = java.util.UUID.randomUUID()
+        val b = java.util.UUID.randomUUID()
+        return "$a$b"
+    }
+
     private fun enforceConcurrentSessionLimit(
         tenantId: TenantId,
         userId: UserId,

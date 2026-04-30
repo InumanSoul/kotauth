@@ -308,6 +308,7 @@ object AuthView {
         prefill: RegisterPrefill = RegisterPrefill(),
         enabledProviders: List<SocialProvider> = emptyList(),
         passwordPolicy: SecurityConfig = SecurityConfig(),
+        passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
         {
             head { authHead("$workspaceName | Create Account", theme) }
@@ -326,7 +327,15 @@ object AuthView {
                     }
                     div("card") {
                         h1("card-title") { +"Create account" }
-                        p("card-subtitle") { +"Fill in your details to get started" }
+                        p("card-subtitle") {
+                            +(
+                                if (passwordLoginEnabled) {
+                                    "Fill in your details to get started"
+                                } else {
+                                    "Fill in your details — we'll email you a sign-in link to finish."
+                                }
+                            )
+                        }
 
                         if (error != null) {
                             div("alert alert-error") { +error }
@@ -376,60 +385,64 @@ object AuthView {
                                     required = true
                                 }
                             }
-                            div("divider") {}
-                            div("field") {
-                                label {
-                                    htmlFor = "password"
-                                    +EnglishStrings.PASSWORD
-                                }
-                                div("field__input-wrap") {
-                                    input(type = InputType.password, name = "password") {
-                                        id = "password"
-                                        placeholder = EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
-                                        attributes["autocomplete"] = "new-password"
-                                        required = true
-                                        attributes["data-pw-min-length"] =
-                                            passwordPolicy.passwordMinLength.toString()
-                                        if (passwordPolicy.passwordRequireUppercase) {
-                                            attributes["data-pw-require-upper"] = "true"
+                            if (passwordLoginEnabled) {
+                                div("divider") {}
+                                div("field") {
+                                    label {
+                                        htmlFor = "password"
+                                        +EnglishStrings.PASSWORD
+                                    }
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "password") {
+                                            id = "password"
+                                            placeholder =
+                                                EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
+                                            attributes["autocomplete"] = "new-password"
+                                            required = true
+                                            attributes["data-pw-min-length"] =
+                                                passwordPolicy.passwordMinLength.toString()
+                                            if (passwordPolicy.passwordRequireUppercase) {
+                                                attributes["data-pw-require-upper"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireNumber) {
+                                                attributes["data-pw-require-number"] = "true"
+                                            }
+                                            if (passwordPolicy.passwordRequireSpecial) {
+                                                attributes["data-pw-require-special"] = "true"
+                                            }
                                         }
-                                        if (passwordPolicy.passwordRequireNumber) {
-                                            attributes["data-pw-require-number"] = "true"
-                                        }
-                                        if (passwordPolicy.passwordRequireSpecial) {
-                                            attributes["data-pw-require-special"] = "true"
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "password"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
                                         }
                                     }
-                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
-                                        attributes["data-toggle-password"] = "password"
-                                        attributes["aria-label"] = "Show password"
-                                        attributes["aria-pressed"] = "false"
-                                        attributes["data-visible"] = "false"
-                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
-                                    }
                                 }
-                            }
-                            div("field") {
-                                label {
-                                    htmlFor = "confirmPassword"
-                                    +EnglishStrings.CONFIRM_PASSWORD
-                                }
-                                div("field__input-wrap") {
-                                    input(type = InputType.password, name = "confirmPassword") {
-                                        id = "confirmPassword"
-                                        placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
-                                        attributes["autocomplete"] = "new-password"
-                                        attributes["data-pw-mismatch-msg"] = EnglishStrings.PASSWORDS_DO_NOT_MATCH
-                                        required = true
+                                div("field") {
+                                    label {
+                                        htmlFor = "confirmPassword"
+                                        +EnglishStrings.CONFIRM_PASSWORD
                                     }
-                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
-                                        attributes["data-toggle-password"] = "confirmPassword"
-                                        attributes["aria-label"] = "Show password"
-                                        attributes["aria-pressed"] = "false"
-                                        attributes["data-visible"] = "false"
-                                        inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                        inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "confirmPassword") {
+                                            id = "confirmPassword"
+                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
+                                            attributes["autocomplete"] = "new-password"
+                                            attributes["data-pw-mismatch-msg"] =
+                                                EnglishStrings.PASSWORDS_DO_NOT_MATCH
+                                            required = true
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "confirmPassword"
+                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                        }
                                     }
                                 }
                             }
