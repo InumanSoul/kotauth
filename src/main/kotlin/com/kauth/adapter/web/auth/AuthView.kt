@@ -121,6 +121,7 @@ object AuthView {
         enabledProviders: List<SocialProvider> = emptyList(),
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
+        passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
@@ -139,7 +140,9 @@ object AuthView {
                     }
                     div("card") {
                         h1("card-title") { +ctx.t("LOGIN_WELCOME_BACK") }
-                        p("card-subtitle") { +ctx.t("LOGIN_SUBTITLE") }
+                        p("card-subtitle") {
+                            +ctx.t(if (passwordLoginEnabled) "LOGIN_SUBTITLE" else "LOGIN_PASSWORDLESS_SUBTITLE")
+                        }
 
                         if (success) {
                             div("alert alert-success") {
@@ -150,57 +153,83 @@ object AuthView {
                             div("alert alert-error") { +error }
                         }
 
-                        form(
-                            action = "/t/$tenantSlug/authorize",
-                            encType = FormEncType.applicationXWwwFormUrlEncoded,
-                            method = FormMethod.post,
-                        ) {
-                            div("field") {
-                                label {
-                                    htmlFor = "username"
-                                    +ctx.t("LOGIN_USERNAME")
-                                }
-                                input(type = InputType.text, name = "username") {
-                                    id = "username"
-                                    placeholder = ctx.t("LOGIN_USERNAME_PLACEHOLDER")
-                                    attributes["autocomplete"] = "username"
-                                    required = true
-                                    attributes["autofocus"] = "true"
-                                }
-                            }
-                            div("field") {
-                                label {
-                                    htmlFor = "password"
-                                    +ctx.t("PASSWORD")
-                                }
-                                div("field__input-wrap") {
-                                    input(type = InputType.password, name = "password") {
-                                        id = "password"
-                                        placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
-                                        attributes["autocomplete"] = "current-password"
+                        if (passwordLoginEnabled) {
+                            form(
+                                action = "/t/$tenantSlug/authorize",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                div("field") {
+                                    label {
+                                        htmlFor = "username"
+                                        +ctx.t("LOGIN_USERNAME")
+                                    }
+                                    input(type = InputType.text, name = "username") {
+                                        id = "username"
+                                        placeholder = ctx.t("LOGIN_USERNAME_PLACEHOLDER")
+                                        attributes["autocomplete"] = "username"
                                         required = true
-                                    }
-                                    button(type = ButtonType.button, classes = "field__toggle-pw") {
-                                        attributes["data-toggle-password"] = "password"
-                                        attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
-                                        attributes["aria-pressed"] = "false"
-                                        attributes["data-visible"] = "false"
-                                        inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
-                                        inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
+                                        attributes["autofocus"] = "true"
                                     }
                                 }
+                                div("field") {
+                                    label {
+                                        htmlFor = "password"
+                                        +ctx.t("PASSWORD")
+                                    }
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "password") {
+                                            id = "password"
+                                            placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
+                                            attributes["autocomplete"] = "current-password"
+                                            required = true
+                                        }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
+                                        }
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
                             }
-                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
+
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
+                            }
+                            if (magicLinkEnabled) {
+                                div("footer-link") {
+                                    a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
+                                }
+                            }
+                        } else {
+                            form(
+                                action = "/t/$tenantSlug/magic-link/send",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                div("field") {
+                                    label {
+                                        htmlFor = "email"
+                                        +ctx.t("LOGIN_PASSWORDLESS_EMAIL_LABEL")
+                                    }
+                                    input(type = InputType.email, name = "email") {
+                                        id = "email"
+                                        placeholder = ctx.t("LOGIN_PASSWORDLESS_EMAIL_PLACEHOLDER")
+                                        attributes["autocomplete"] = "email"
+                                        required = true
+                                        attributes["autofocus"] = "true"
+                                    }
+                                }
+                                button(type = ButtonType.submit, classes = "btn") {
+                                    +ctx.t("LOGIN_PASSWORDLESS_SUBMIT")
+                                }
+                            }
                         }
 
-                        div("footer-link") {
-                            a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
-                        }
-                        if (magicLinkEnabled) {
-                            div("footer-link") {
-                                a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
-                            }
-                        }
                         if (registrationEnabled) {
                             div("footer-link") {
                                 +ctx.t("LOGIN_NO_ACCOUNT")
@@ -208,10 +237,14 @@ object AuthView {
                             }
                         }
 
-                        // Social login buttons — only shown when providers are configured
+                        // Social login buttons — only shown when providers are configured.
+                        // Drop the "or continue with" divider in passwordless mode: magic-link
+                        // and social are co-equal primaries, not a fallback to a password form.
                         if (enabledProviders.isNotEmpty()) {
-                            div("social-divider") {
-                                span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
+                            if (passwordLoginEnabled) {
+                                div("social-divider") {
+                                    span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
+                                }
                             }
                             div("social-buttons") {
                                 for (prov in enabledProviders) {

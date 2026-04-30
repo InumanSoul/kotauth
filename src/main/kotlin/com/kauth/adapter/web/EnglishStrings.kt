@@ -180,6 +180,12 @@ object EnglishStrings {
     const val LOGIN_PROVIDER_GOOGLE = "Google"
     const val LOGIN_PROVIDER_GITHUB = "GitHub"
 
+    // Login page — passwordless mode (when tenant disables password sign-in)
+    const val LOGIN_PASSWORDLESS_SUBTITLE = "Sign in with an email link"
+    const val LOGIN_PASSWORDLESS_EMAIL_LABEL = "Email address"
+    const val LOGIN_PASSWORDLESS_EMAIL_PLACEHOLDER = "you@example.com"
+    const val LOGIN_PASSWORDLESS_SUBMIT = "Send sign-in link"
+
     // Forgot password page
     const val FORGOT_TITLE = "Forgot password"
     const val FORGOT_SUBTITLE = "Enter your email address and we'll send you a link to reset your password."

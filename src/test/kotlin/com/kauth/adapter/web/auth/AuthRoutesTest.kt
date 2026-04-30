@@ -1909,6 +1909,108 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.TooManyRequests, response.status)
         }
 
+    // =========================================================================
+    // GET /t/{slug}/authorize — passwordless rendering (v1.10)
+    // =========================================================================
+
+    @Test
+    fun `GET authorize renders password form when passwordLoginEnabled is true`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("name=\"password\""), "Password input must be present in default mode")
+            assertTrue(body.contains("action=\"/t/acme/authorize\""), "Form must post to /authorize")
+            assertTrue(body.contains("Forgot password"), "Forgot-password link must be present")
+        }
+
+    @Test
+    fun `GET authorize hides password form and renders email-only magic-link form when passwordless`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig =
+                        tenant.securityConfig.copy(
+                            passwordLoginEnabled = false,
+                            magicLinkEnabled = true,
+                        ),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                !body.contains("name=\"password\""),
+                "Password input must NOT be present when passwordLoginEnabled=false",
+            )
+            assertTrue(
+                body.contains("action=\"/t/acme/magic-link/send\""),
+                "Form must post to magic-link/send when passwordless",
+            )
+            assertTrue(body.contains("name=\"email\""), "Email input must be present in passwordless mode")
+            assertTrue(
+                !body.contains("Forgot password"),
+                "Forgot-password link must NOT render when passwordless",
+            )
+            assertTrue(
+                !body.contains("or continue with"),
+                "Social divider must NOT render when passwordless (no first-class form to divide from)",
+            )
+        }
+
     // -------------------------------------------------------------------------
     // Utility
     // -------------------------------------------------------------------------
