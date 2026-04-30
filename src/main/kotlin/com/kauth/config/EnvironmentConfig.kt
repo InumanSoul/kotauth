@@ -49,6 +49,8 @@ data class EnvironmentConfig(
     val redisTimeoutMs: Long,
     val redisStartupProbeTimeoutMs: Long,
     val redisCommandTimeoutMs: Long,
+    val ssoSessionTtlSeconds: Long,
+    val ssoSessionMaxTtlSeconds: Long,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
     val redisEnabled: Boolean get() = redisUrl != null
@@ -66,6 +68,10 @@ data class EnvironmentConfig(
 
             val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
             validateAdminBypass(adminBypass)
+
+            val ssoTtl = System.getenv("KAUTH_SSO_SESSION_TTL_SECONDS")?.toLongOrNull() ?: 86_400L
+            val ssoMaxTtl = System.getenv("KAUTH_SSO_SESSION_MAX_TTL_SECONDS")?.toLongOrNull() ?: 2_592_000L
+            validateSsoTtls(ssoTtl, ssoMaxTtl)
 
             return EnvironmentConfig(
                 baseUrl = baseUrl,
@@ -95,7 +101,30 @@ data class EnvironmentConfig(
                 redisStartupProbeTimeoutMs =
                     System.getenv("KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS")?.toLongOrNull() ?: 2000L,
                 redisCommandTimeoutMs = System.getenv("KAUTH_REDIS_COMMAND_TIMEOUT_MS")?.toLongOrNull() ?: 100L,
+                ssoSessionTtlSeconds = ssoTtl,
+                ssoSessionMaxTtlSeconds = ssoMaxTtl,
             )
+        }
+
+        private fun validateSsoTtls(
+            ttl: Long,
+            maxTtl: Long,
+        ) {
+            if (ttl < 60 || maxTtl < 60 || ttl > maxTtl) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: invalid SSO session TTL configuration.               │
+                    │                                                              │
+                    │  KAUTH_SSO_SESSION_TTL_SECONDS must be ≥ 60 and ≤            │
+                    │  KAUTH_SSO_SESSION_MAX_TTL_SECONDS.                          │
+                    │                                                              │
+                    │  Current: ttl=$ttl, maxTtl=$maxTtl
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
         }
 
         private fun requireBaseUrl(): String {

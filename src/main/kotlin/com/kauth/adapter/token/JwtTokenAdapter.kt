@@ -67,6 +67,7 @@ class JwtTokenAdapter(
         roles: List<Role>,
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
+        authTime: java.time.Instant?,
     ): TokenResponse {
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
@@ -150,6 +151,7 @@ class JwtTokenAdapter(
                     .withClaim("name", user.fullName)
                     .withClaim("preferred_username", user.username)
                     .apply { if (nonce != null) withClaim("nonce", nonce) }
+                    .apply { if (authTime != null) withClaim("auth_time", authTime.epochSecond) }
                     .apply {
                         for ((claimName, value) in customIdClaims) {
                             withClaim(claimName, value)

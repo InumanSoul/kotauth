@@ -20,6 +20,8 @@ internal fun Route.mfaRoutes(
     mfaService: MfaService?,
     encryptionService: EncryptionService,
     mfaRateLimiter: RateLimiterPort,
+    ssoTtlSeconds: Long,
+    secure: Boolean,
 ) {
     get("/mfa-challenge") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -116,12 +118,22 @@ internal fun Route.mfaRoutes(
                 )
 
                 if (oauthParams.isOAuthFlow) {
+                    val tenant =
+                        ctx.tenant ?: return@post call.respond(HttpStatusCode.NotFound)
                     call.completeAuthorizationCodeFlow(
                         slug = slug,
                         userId = UserId(userId),
+                        tenantId = tenant.id,
                         oauthParams = oauthParams,
                         ipAddress = ipAddress,
+                        // Keycloak convention: auth_time tracks the moment MFA was completed,
+                        // not the original first-factor (password) check.
+                        authTime = java.time.Instant.now(),
+                        mfaCompleted = true,
+                        ssoTtlSeconds = ssoTtlSeconds,
+                        secure = secure,
                         oauthService = oauthService,
+                        encryptionService = encryptionService,
                         renderError = { message ->
                             call.respondHtml(
                                 HttpStatusCode.BadRequest,

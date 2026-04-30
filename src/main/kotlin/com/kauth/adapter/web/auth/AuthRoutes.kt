@@ -42,6 +42,7 @@ fun Route.authRoutes(
     corsService: CorsService? = null,
     corsPort: CorsPort? = null,
     translationPort: TranslationPort,
+    ssoTtlSeconds: Long = 86_400L,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -114,6 +115,8 @@ fun Route.authRoutes(
             rateLimiter = registerRateLimiter,
             encryptionService = encryptionService,
             oauthService = oauthService,
+            ssoTtlSeconds = ssoTtlSeconds,
+            secure = baseUrl.startsWith("https"),
         )
 
         mfaRoutes(
@@ -121,6 +124,8 @@ fun Route.authRoutes(
             mfaService = mfaService,
             encryptionService = encryptionService,
             mfaRateLimiter = mfaRateLimiter,
+            ssoTtlSeconds = ssoTtlSeconds,
+            secure = baseUrl.startsWith("https"),
         )
 
         socialLoginRoutes(
@@ -129,6 +134,7 @@ fun Route.authRoutes(
             identityProviderRepository = identityProviderRepository,
             encryptionService = encryptionService,
             baseUrl = baseUrl,
+            ssoTtlSeconds = ssoTtlSeconds,
         )
 
         oauthProtocolRoutes(
@@ -141,6 +147,7 @@ fun Route.authRoutes(
             encryptionService = encryptionService,
             loginRateLimiter = loginRateLimiter,
             baseUrl = baseUrl,
+            ssoTtlSeconds = ssoTtlSeconds,
         )
     }
 }

@@ -85,6 +85,26 @@ class OAuthService(
     // -------------------------------------------------------------------------
 
     /**
+     * Verifies a (clientId, redirectUri) pair without issuing a code.
+     *
+     * Open-redirect protection for GET /authorize when handling `prompt=none`:
+     * before bouncing the user back to `redirect_uri?error=login_required`,
+     * the route must confirm the URI actually belongs to a registered, enabled
+     * client. Returns false when the tenant, client, or redirect_uri does not
+     * match — the route should refuse the redirect in that case.
+     */
+    fun validateRedirectUri(
+        tenantSlug: String,
+        clientId: String,
+        redirectUri: String,
+    ): Boolean {
+        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return false
+        val client = applicationRepository.findByClientId(tenant.id, clientId) ?: return false
+        if (!client.enabled) return false
+        return client.redirectUris.contains(redirectUri)
+    }
+
+    /**
      * Validates an authorization request and issues a short-lived code.
      * Called after the user has authenticated successfully.
      *
@@ -110,6 +130,7 @@ class OAuthService(
         nonce: String?,
         state: String?,
         ipAddress: String? = null,
+        authTime: Instant = Instant.now(),
     ): OAuthResult<AuthorizationCode> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -151,6 +172,7 @@ class OAuthService(
                 nonce = nonce,
                 state = state,
                 expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS),
+                authTime = authTime,
             )
 
         val saved = authCodeRepository.save(code)
@@ -270,6 +292,7 @@ class OAuthService(
                 roles = effectiveRoles,
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
+                authTime = authCode.authTime,
             )
 
         // Persist session

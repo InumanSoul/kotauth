@@ -30,6 +30,8 @@ class FakeTokenPort : TokenPort {
         private set
     var lastCustomIdClaims: Map<String, String> = emptyMap()
         private set
+    var lastAuthTime: java.time.Instant? = null
+        private set
 
     fun reset() {
         callCount = 0
@@ -37,6 +39,7 @@ class FakeTokenPort : TokenPort {
         jwksToReturn = emptyList()
         lastCustomAccessClaims = emptyMap()
         lastCustomIdClaims = emptyMap()
+        lastAuthTime = null
     }
 
     override fun issueUserTokens(
@@ -48,10 +51,12 @@ class FakeTokenPort : TokenPort {
         roles: List<Role>,
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
+        authTime: java.time.Instant?,
     ): TokenResponse {
         val n = ++callCount
         lastCustomAccessClaims = customAccessClaims
         lastCustomIdClaims = customIdClaims
+        lastAuthTime = authTime
         return TokenResponse(
             access_token = "fake.access.${user.username}.$n",
             token_type = "Bearer",

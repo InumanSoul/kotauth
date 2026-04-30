@@ -20,7 +20,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.8.0"
+version = "1.8.1"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")

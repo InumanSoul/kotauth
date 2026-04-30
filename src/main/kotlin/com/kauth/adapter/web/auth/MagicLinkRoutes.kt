@@ -38,6 +38,8 @@ internal fun Route.magicLinkRoutes(
     rateLimiter: RateLimiterPort,
     encryptionService: EncryptionService,
     oauthService: OAuthService,
+    ssoTtlSeconds: Long,
+    secure: Boolean,
 ) {
     get("/magic-link") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -138,13 +140,21 @@ internal fun Route.magicLinkRoutes(
             }
             is SelfServiceResult.Success -> {
                 val user = result.value
+                // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
+                val tenant = ctx.tenant
                 val ipAddress = call.request.local.remoteAddress
                 call.completeAuthorizationCodeFlow(
                     slug = ctx.slug,
                     userId = user.id!!,
+                    tenantId = tenant.id,
                     oauthParams = oauthParams,
                     ipAddress = ipAddress,
+                    authTime = java.time.Instant.now(),
+                    mfaCompleted = false,
+                    ssoTtlSeconds = ssoTtlSeconds,
+                    secure = secure,
                     oauthService = oauthService,
+                    encryptionService = encryptionService,
                     renderError = { message ->
                         call.respondHtml(
                             HttpStatusCode.BadRequest,

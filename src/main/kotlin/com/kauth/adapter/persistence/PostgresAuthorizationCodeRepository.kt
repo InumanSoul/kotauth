@@ -32,6 +32,7 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
                     it[expiresAt] = code.expiresAt.toOffsetDateTime()
                     it[usedAt] = code.usedAt?.toOffsetDateTime()
                     it[createdAt] = code.createdAt.toOffsetDateTime()
+                    it[authTime] = code.authTime?.toOffsetDateTime()
                 } get AuthorizationCodesTable.id
 
             code.copy(id = insertedId)
@@ -76,6 +77,7 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
             expiresAt = this[AuthorizationCodesTable.expiresAt].toInstant(),
             usedAt = this[AuthorizationCodesTable.usedAt]?.toInstant(),
             createdAt = this[AuthorizationCodesTable.createdAt].toInstant(),
+            authTime = this[AuthorizationCodesTable.authTime]?.toInstant(),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

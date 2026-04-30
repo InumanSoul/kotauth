@@ -7,6 +7,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import java.time.Instant
 
 /**
  * Port (outbound) — defines what the domain needs from a token provider.
@@ -40,6 +41,13 @@ interface TokenPort {
         roles: List<Role> = emptyList(),
         customAccessClaims: Map<String, String> = emptyMap(),
         customIdClaims: Map<String, String> = emptyMap(),
+        /**
+         * Moment of the user's most recent interactive credential proof.
+         * Surfaces as the OIDC `auth_time` claim on the ID token (Core §2 / §3.1.3.7).
+         * Null is allowed for token-issuance paths that do not have it (refresh
+         * token, legacy callers); silent auth and fresh logins always populate it.
+         */
+        authTime: Instant? = null,
     ): TokenResponse
 
     /**

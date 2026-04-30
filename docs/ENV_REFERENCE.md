@@ -212,6 +212,36 @@ Timeout (ms) for the `PING` probe at startup. Higher in slow networks; lower if 
 
 ---
 
+## OIDC SSO
+
+The two knobs below tune the witness cookie that drives silent SSO across clients on the same tenant. See [ADR-13](adr/ADR-13-oidc-sso-witness-cookie.md) for the design and threat model.
+
+### `KAUTH_SSO_SESSION_TTL_SECONDS`
+**Optional.** Default: `86400` (24 hours)
+
+How long the `KOTAUTH_SSO` cookie lives. Determines the maximum interval over which a user can silent-auth across clients without re-proving credentials. Auth0's default is 24h; Keycloak defaults to 36000s (10h). Lower values trade SSO convenience for tighter session-freshness guarantees.
+
+```
+KAUTH_SSO_SESSION_TTL_SECONDS=86400
+```
+
+The cookie carries its own `expiresAt` timestamp in the signed payload, so this TTL cannot be silently exceeded by a stale cookie minted before the operator tightened the value.
+
+---
+
+### `KAUTH_SSO_SESSION_MAX_TTL_SECONDS`
+**Optional.** Default: `2592000` (30 days)
+
+Operator-side ceiling. `KAUTH_SSO_SESSION_TTL_SECONDS` must be `≤` this value or the server refuses to start (fail-fast at `EnvironmentConfig.load`). Use it to enforce a policy "no SSO session may live longer than X" without trusting individual deployments to keep the per-instance TTL under control.
+
+```
+KAUTH_SSO_SESSION_MAX_TTL_SECONDS=2592000
+```
+
+Validation: both values must be `≥ 60` and `ttl ≤ maxTtl`. Misconfiguration prints a `FATAL` banner and exits.
+
+---
+
 ## Demo Mode
 
 ### `KAUTH_DEMO_MODE`

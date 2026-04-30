@@ -2,7 +2,6 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.port.IdentityProviderRepository
-import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
@@ -22,6 +21,7 @@ internal fun Route.socialLoginRoutes(
     identityProviderRepository: IdentityProviderRepository?,
     encryptionService: EncryptionService,
     baseUrl: String,
+    ssoTtlSeconds: Long,
 ) {
     get("/auth/social/{provider}/redirect") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -200,46 +200,32 @@ internal fun Route.socialLoginRoutes(
             is SocialLoginResult.Success -> {
                 val loginSuccess = result.value
                 if (restoredParams.isOAuthFlow) {
-                    val clientId = restoredParams.clientId ?: return@get call.respond(HttpStatusCode.BadRequest)
-                    val redirectUri =
-                        restoredParams.redirectUri ?: return@get call.respond(HttpStatusCode.BadRequest)
-                    when (
-                        val codeResult =
-                            oauthService.issueAuthorizationCode(
-                                tenantSlug = slug,
-                                userId = loginSuccess.user.id!!,
-                                clientId = clientId,
-                                redirectUri = redirectUri,
-                                scopes = restoredParams.scope ?: "openid",
-                                codeChallenge = restoredParams.codeChallenge,
-                                codeChallengeMethod = restoredParams.codeChallengeMethod,
-                                nonce = restoredParams.nonce,
-                                state = restoredParams.state,
-                                ipAddress = ipAddress,
-                            )
-                    ) {
-                        is OAuthResult.Success -> {
-                            val authCode = codeResult.value.code
-                            val stateParam = restoredParams.state
-                            val redirect =
-                                buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
-                                }
-                            call.respondRedirect(redirect)
-                        }
-                        is OAuthResult.Failure ->
+                    val activeTenant =
+                        tenant ?: return@get call.respond(HttpStatusCode.NotFound)
+                    call.completeAuthorizationCodeFlow(
+                        slug = slug,
+                        userId = loginSuccess.user.id!!,
+                        tenantId = activeTenant.id,
+                        oauthParams = restoredParams,
+                        ipAddress = ipAddress,
+                        authTime = java.time.Instant.now(),
+                        mfaCompleted = false,
+                        ssoTtlSeconds = ssoTtlSeconds,
+                        secure = baseUrl.startsWith("https"),
+                        oauthService = oauthService,
+                        encryptionService = encryptionService,
+                        renderError = { message ->
                             call.respondHtml(
                                 HttpStatusCode.BadRequest,
                                 AuthView.loginPage(
                                     tenantSlug = slug,
                                     ctx = ctx.viewContext,
-                                    error = codeResult.error.toDescription(),
+                                    error = message,
                                     enabledProviders = enabledProviders,
                                 ),
                             )
-                    }
+                        },
+                    )
                 } else {
                     call.respond(loginSuccess.tokens)
                 }
@@ -367,36 +353,19 @@ internal fun Route.socialLoginRoutes(
                 val restoredParams = parseQueryStringToOAuthParams(pending.oauthParamsRaw)
 
                 if (restoredParams.isOAuthFlow) {
-                    val clientId = restoredParams.clientId ?: return@post call.respond(HttpStatusCode.BadRequest)
-                    val redirectUri =
-                        restoredParams.redirectUri ?: return@post call.respond(HttpStatusCode.BadRequest)
-                    when (
-                        val codeResult =
-                            oauthService.issueAuthorizationCode(
-                                tenantSlug = slug,
-                                userId = loginSuccess.user.id!!,
-                                clientId = clientId,
-                                redirectUri = redirectUri,
-                                scopes = restoredParams.scope ?: "openid",
-                                codeChallenge = restoredParams.codeChallenge,
-                                codeChallengeMethod = restoredParams.codeChallengeMethod,
-                                nonce = restoredParams.nonce,
-                                state = restoredParams.state,
-                                ipAddress = ipAddress,
-                            )
-                    ) {
-                        is OAuthResult.Success -> {
-                            val authCode = codeResult.value.code
-                            val stateParam = restoredParams.state
-                            val redirect =
-                                buildString {
-                                    append(redirectUri)
-                                    append("?code=").append(authCode)
-                                    if (!stateParam.isNullOrBlank()) append("&state=").append(stateParam)
-                                }
-                            call.respondRedirect(redirect)
-                        }
-                        is OAuthResult.Failure ->
+                    call.completeAuthorizationCodeFlow(
+                        slug = slug,
+                        userId = loginSuccess.user.id!!,
+                        tenantId = tenant.id,
+                        oauthParams = restoredParams,
+                        ipAddress = ipAddress,
+                        authTime = java.time.Instant.now(),
+                        mfaCompleted = false,
+                        ssoTtlSeconds = ssoTtlSeconds,
+                        secure = baseUrl.startsWith("https"),
+                        oauthService = oauthService,
+                        encryptionService = encryptionService,
+                        renderError = { message ->
                             call.respondHtml(
                                 HttpStatusCode.BadRequest,
                                 AuthView.socialRegistrationPage(
@@ -405,10 +374,11 @@ internal fun Route.socialLoginRoutes(
                                     workspaceName = workspaceName,
                                     providerName = pending.provider.displayName,
                                     email = pending.email,
-                                    error = codeResult.error.toDescription(),
+                                    error = message,
                                 ),
                             )
-                    }
+                        },
+                    )
                 } else {
                     call.respondRedirect("/t/$slug/account/login")
                 }
