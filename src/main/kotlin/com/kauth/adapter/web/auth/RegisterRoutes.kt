@@ -28,8 +28,6 @@ internal fun Route.registerRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
                 identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
@@ -39,9 +37,8 @@ internal fun Route.registerRoutes(
         call.respondHtml(
             HttpStatusCode.OK,
             AuthView.registerPage(
-                slug,
-                theme,
-                workspaceName,
+                tenantSlug = slug,
+                ctx = ctx.viewContext,
                 enabledProviders = enabledProviders,
                 passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
                 passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
@@ -53,8 +50,6 @@ internal fun Route.registerRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val passwordlessTenant = tenant?.securityConfig?.passwordLoginEnabled == false
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
@@ -69,9 +64,8 @@ internal fun Route.registerRoutes(
             return@post call.respondHtml(
                 HttpStatusCode.TooManyRequests,
                 AuthView.registerPage(
-                    slug,
-                    theme,
-                    workspaceName,
+                    tenantSlug = slug,
+                    ctx = ctx.viewContext,
                     error = "Too many registration attempts. Please wait a moment.",
                     enabledProviders = enabledProviders,
                     passwordPolicy = tenant?.securityConfig ?: SecurityConfig(),
@@ -111,9 +105,8 @@ internal fun Route.registerRoutes(
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.registerPage(
-                        slug,
-                        theme,
-                        workspaceName,
+                        tenantSlug = slug,
+                        ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         prefill = prefill,
                         enabledProviders = enabledProviders,

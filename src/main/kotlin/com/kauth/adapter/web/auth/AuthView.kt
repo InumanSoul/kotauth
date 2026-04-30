@@ -294,16 +294,9 @@ object AuthView {
     // Registration page
     // -------------------------------------------------------------------------
 
-    /**
-     * @param tenantSlug  Used to build form action URLs.
-     * @param theme       Visual identity — injected as CSS variables.
-     * @param error       Inline error message from AuthService, or null.
-     * @param prefill     Field values to preserve after a failed submission.
-     */
     fun registerPage(
         tenantSlug: String,
-        theme: TenantTheme = TenantTheme.DEFAULT,
-        workspaceName: String = "Kotauth",
+        ctx: ViewContext,
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
         enabledProviders: List<SocialProvider> = emptyList(),
@@ -311,30 +304,24 @@ object AuthView {
         passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
         {
-            head { authHead("$workspaceName | Create Account", theme) }
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_REGISTER", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
                 div("shell") {
                     div("brand") {
-                        if (theme.logoUrl != null) {
-                            img(src = theme.logoUrl, classes = "brand-logo", alt = workspaceName) {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
                                 width = "180"
                                 height = "48"
                             }
                         } else {
-                            div("brand-name") { +workspaceName }
+                            div("brand-name") { +ctx.workspaceName }
                         }
                     }
                     div("card") {
-                        h1("card-title") { +"Create account" }
+                        h1("card-title") { +ctx.t("REGISTER_TITLE") }
                         p("card-subtitle") {
-                            +(
-                                if (passwordLoginEnabled) {
-                                    "Fill in your details to get started"
-                                } else {
-                                    "Fill in your details — we'll email you a sign-in link to finish."
-                                }
-                            )
+                            +ctx.t(if (passwordLoginEnabled) "REGISTER_SUBTITLE" else "REGISTER_PASSWORDLESS_SUBTITLE")
                         }
 
                         if (error != null) {
@@ -349,11 +336,11 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "fullName"
-                                    +"Full Name"
+                                    +ctx.t("REGISTER_FULL_NAME")
                                 }
                                 input(type = InputType.text, name = "fullName") {
                                     id = "fullName"
-                                    placeholder = "Your full name"
+                                    placeholder = ctx.t("REGISTER_FULL_NAME_PLACEHOLDER")
                                     attributes["autocomplete"] = "name"
                                     value = prefill.fullName
                                     required = true
@@ -362,11 +349,11 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "email"
-                                    +"Email Address"
+                                    +ctx.t("REGISTER_EMAIL")
                                 }
                                 input(type = InputType.email, name = "email") {
                                     id = "email"
-                                    placeholder = "you@example.com"
+                                    placeholder = ctx.t("REGISTER_EMAIL_PLACEHOLDER")
                                     attributes["autocomplete"] = "email"
                                     value = prefill.email
                                     required = true
@@ -375,11 +362,11 @@ object AuthView {
                             div("field") {
                                 label {
                                     htmlFor = "username"
-                                    +"Username"
+                                    +ctx.t("REGISTER_USERNAME")
                                 }
                                 input(type = InputType.text, name = "username") {
                                     id = "username"
-                                    placeholder = "Choose a username"
+                                    placeholder = ctx.t("REGISTER_USERNAME_PLACEHOLDER")
                                     attributes["autocomplete"] = "username"
                                     value = prefill.username
                                     required = true
@@ -390,13 +377,16 @@ object AuthView {
                                 div("field") {
                                     label {
                                         htmlFor = "password"
-                                        +EnglishStrings.PASSWORD
+                                        +ctx.t("PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "password") {
                                             id = "password"
                                             placeholder =
-                                                EnglishStrings.passwordMinPlaceholder(passwordPolicy.passwordMinLength)
+                                                ctx.t(
+                                                    "PASSWORD_MIN_PLACEHOLDER",
+                                                    passwordPolicy.passwordMinLength,
+                                                )
                                             attributes["autocomplete"] = "new-password"
                                             required = true
                                             attributes["data-pw-min-length"] =
@@ -413,45 +403,44 @@ object AuthView {
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "password"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
                                 div("field") {
                                     label {
                                         htmlFor = "confirmPassword"
-                                        +EnglishStrings.CONFIRM_PASSWORD
+                                        +ctx.t("CONFIRM_PASSWORD")
                                     }
                                     div("field__input-wrap") {
                                         input(type = InputType.password, name = "confirmPassword") {
                                             id = "confirmPassword"
-                                            placeholder = EnglishStrings.CONFIRM_PASSWORD_PLACEHOLDER
+                                            placeholder = ctx.t("CONFIRM_PASSWORD_PLACEHOLDER")
                                             attributes["autocomplete"] = "new-password"
-                                            attributes["data-pw-mismatch-msg"] =
-                                                EnglishStrings.PASSWORDS_DO_NOT_MATCH
+                                            attributes["data-pw-mismatch-msg"] = ctx.t("PASSWORDS_DO_NOT_MATCH")
                                             required = true
                                         }
                                         button(type = ButtonType.button, classes = "field__toggle-pw") {
                                             attributes["data-toggle-password"] = "confirmPassword"
-                                            attributes["aria-label"] = "Show password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
                                             attributes["aria-pressed"] = "false"
                                             attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", "show", cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", "hide", cssClass = "icon-eye-off")
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
                                         }
                                     }
                                 }
                             }
-                            button(type = ButtonType.submit, classes = "btn") { +"Create Account" }
+                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("REGISTER_SUBMIT") }
                         }
 
                         div("footer-link") {
-                            +"Already have an account? "
-                            a(href = "/t/$tenantSlug/account/login") { +"Sign in" }
+                            +ctx.t("REGISTER_HAS_ACCOUNT")
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("REGISTER_SIGN_IN") }
                         }
 
                         // Social login buttons — same providers as the login page.
@@ -459,7 +448,7 @@ object AuthView {
                         // yet the callback redirects to complete-registration automatically.
                         if (enabledProviders.isNotEmpty()) {
                             div("social-divider") {
-                                span { +"or sign up with" }
+                                span { +ctx.t("REGISTER_OR_SIGN_UP_WITH") }
                             }
                             div("social-buttons") {
                                 for (prov in enabledProviders) {
@@ -470,15 +459,21 @@ object AuthView {
                                         when (prov) {
                                             SocialProvider.GOOGLE -> {
                                                 span("social-icon") {
-                                                    inlineSvgIcon(iconName = "google-logo", ariaLabel = "Google")
+                                                    inlineSvgIcon(
+                                                        iconName = "google-logo",
+                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
+                                                    )
                                                 }
-                                                +"Continue with Google"
+                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
                                             }
                                             SocialProvider.GITHUB -> {
                                                 span("social-icon") {
-                                                    inlineSvgIcon(iconName = "github-logo", ariaLabel = "GitHub")
+                                                    inlineSvgIcon(
+                                                        iconName = "github-logo",
+                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
+                                                    )
                                                 }
-                                                +"Continue with GitHub"
+                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
                                             }
                                         }
                                     }
@@ -487,8 +482,12 @@ object AuthView {
                         }
                     }
                     p("copyright") {
-                        +"© ${java.time.Year.now()} $workspaceName. All rights reserved. Powered by"
-                        a(href = "https://kotauth.com", target = "_blank") { +"KotAuth" }
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
                     }
                 }
             }

@@ -154,6 +154,7 @@ object EnglishStrings {
     const val AUTH_PAGE_TITLE_RESET = "{0} | Reset Password"
     const val AUTH_PAGE_TITLE_INVITE = "{0} | Accept Invitation"
     const val AUTH_PAGE_TITLE_MFA = "{0} | Two-Factor Authentication"
+    const val AUTH_PAGE_TITLE_REGISTER = "{0} | Create Account"
     const val AUTH_COPYRIGHT_TEMPLATE = "© {0} {1}. All rights reserved. Powered by"
     const val AUTH_KOTAUTH_LINK = "KotAuth"
     const val AUTH_BACK_TO_SIGN_IN = "Back to sign in"
@@ -185,6 +186,21 @@ object EnglishStrings {
     const val LOGIN_PASSWORDLESS_EMAIL_LABEL = "Email address"
     const val LOGIN_PASSWORDLESS_EMAIL_PLACEHOLDER = "you@example.com"
     const val LOGIN_PASSWORDLESS_SUBMIT = "Send sign-in link"
+
+    // Registration page
+    const val REGISTER_TITLE = "Create account"
+    const val REGISTER_SUBTITLE = "Fill in your details to get started"
+    const val REGISTER_PASSWORDLESS_SUBTITLE = "Fill in your details — we'll email you a sign-in link to finish."
+    const val REGISTER_FULL_NAME = "Full Name"
+    const val REGISTER_FULL_NAME_PLACEHOLDER = "Your full name"
+    const val REGISTER_EMAIL = "Email Address"
+    const val REGISTER_EMAIL_PLACEHOLDER = "you@example.com"
+    const val REGISTER_USERNAME = "Username"
+    const val REGISTER_USERNAME_PLACEHOLDER = "Choose a username"
+    const val REGISTER_SUBMIT = "Create Account"
+    const val REGISTER_HAS_ACCOUNT = "Already have an account? "
+    const val REGISTER_SIGN_IN = "Sign in"
+    const val REGISTER_OR_SIGN_UP_WITH = "or sign up with"
 
     // Forgot password page
     const val FORGOT_TITLE = "Forgot password"
