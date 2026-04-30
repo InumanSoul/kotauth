@@ -963,6 +963,8 @@ class AdminServiceTest {
         passwordPolicyMinLength: Int = 8,
         passwordPolicyRequireSpecial: Boolean = false,
         mfaPolicy: String = "optional",
+        magicLinkEnabled: Boolean = false,
+        passwordLoginEnabled: Boolean = true,
     ) = svc.updateWorkspaceSettings(
         slug = slug,
         displayName = displayName,
@@ -974,5 +976,104 @@ class AdminServiceTest {
         passwordPolicyMinLength = passwordPolicyMinLength,
         passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
         mfaPolicy = mfaPolicy,
+        magicLinkEnabled = magicLinkEnabled,
+        passwordLoginEnabled = passwordLoginEnabled,
     )
+
+    // =========================================================================
+    // Password-login toggle — passwordless-only enforcement
+    // =========================================================================
+
+    @Test
+    fun `createUser non-invite path rejects when password login is disabled`() {
+        tenants.clear()
+        tenants.add(tenant.copy(securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = false)))
+        val result =
+            svc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob",
+                password = "any-password",
+                sendInvite = false,
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser invite path still works when password login is disabled`() {
+        tenants.clear()
+        tenants.add(
+            tenant.copy(
+                securityConfig =
+                    tenant.securityConfig.copy(
+                        passwordLoginEnabled = false,
+                        magicLinkEnabled = true,
+                    ),
+            ),
+        )
+        val result =
+            svc.createUser(
+                tenantId = TenantId(1),
+                username = "carol",
+                email = "carol@example.com",
+                fullName = "Carol",
+                sendInvite = true,
+                baseUrl = "https://example.com",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `setTemporaryPassword rejects when password login is disabled`() {
+        tenants.clear()
+        tenants.add(
+            tenant.copy(
+                securityConfig =
+                    tenant.securityConfig.copy(
+                        passwordLoginEnabled = false,
+                        magicLinkEnabled = true,
+                    ),
+            ),
+        )
+        users.add(alice)
+        val result = svc.setTemporaryPassword(UserId(10), TenantId(1))
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings rejects disabling password login on master tenant`() {
+        tenants.clear()
+        tenants.add(tenant.copy(slug = Tenant.MASTER_SLUG))
+        val result = callUpdateSettings(slug = Tenant.MASTER_SLUG, passwordLoginEnabled = false, magicLinkEnabled = true)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings rejects disabling both password and magic link`() {
+        val result = callUpdateSettings(passwordLoginEnabled = false, magicLinkEnabled = false)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings allows passwordless when magic link is enabled`() {
+        val result = callUpdateSettings(passwordLoginEnabled = false, magicLinkEnabled = true)
+        assertIs<AdminResult.Success<Tenant>>(result)
+    }
+
+    @Test
+    fun `updateWorkspaceSettings fires ADMIN_SECURITY_CONFIG_UPDATED when toggle changes`() {
+        callUpdateSettings(passwordLoginEnabled = false, magicLinkEnabled = true)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED))
+    }
+
+    @Test
+    fun `updateWorkspaceSettings does not fire ADMIN_SECURITY_CONFIG_UPDATED when toggle unchanged`() {
+        callUpdateSettings(passwordLoginEnabled = true)
+        assertTrue(!auditLog.hasEvent(AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED))
+    }
 }

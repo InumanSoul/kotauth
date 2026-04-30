@@ -268,6 +268,11 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
         }
 
+        val tenant = tenantRepository.findById(token.tenantId)
+        if (tenant != null && !tenant.securityConfig.passwordLoginEnabled) {
+            return SelfServiceResult.Failure(SelfServiceError.PasswordLoginDisabled())
+        }
+
         if (!token.isValid) {
             val msg =
                 if (token.isExpired) {
@@ -285,7 +290,6 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
         }
 
-        val tenant = tenantRepository.findById(token.tenantId)
         if (tenant != null) {
             validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
                 ?.let { return SelfServiceResult.Failure(it) }
@@ -418,6 +422,10 @@ class UserSelfServiceService(
         val user =
             userRepository.findById(userId, tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
+
+        if (!tenant.securityConfig.passwordLoginEnabled) {
+            return SelfServiceResult.Failure(SelfServiceError.PasswordLoginDisabled())
+        }
 
         if (!passwordHasher.verify(currentPassword, user.passwordHash)) {
             return SelfServiceResult.Failure(SelfServiceError.Validation("Current password is incorrect."))
@@ -753,6 +761,11 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Invite link is invalid."))
         }
 
+        val tenant = tenantRepository.findById(token.tenantId)
+        if (tenant != null && !tenant.securityConfig.passwordLoginEnabled) {
+            return SelfServiceResult.Failure(SelfServiceError.PasswordLoginDisabled())
+        }
+
         if (!token.isValid) {
             val msg =
                 if (token.isExpired) {
@@ -770,7 +783,6 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
         }
 
-        val tenant = tenantRepository.findById(token.tenantId)
         if (tenant != null) {
             validatePasswordPolicy(newPassword, tenant)
                 ?.let { return SelfServiceResult.Failure(it) }
@@ -880,6 +892,11 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Change-password link is invalid."))
         }
 
+        val tenant = tenantRepository.findById(token.tenantId)
+        if (tenant != null && !tenant.securityConfig.passwordLoginEnabled) {
+            return SelfServiceResult.Failure(SelfServiceError.PasswordLoginDisabled())
+        }
+
         if (!token.isValid) {
             val msg =
                 if (token.isExpired) {
@@ -897,7 +914,6 @@ class UserSelfServiceService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
         }
 
-        val tenant = tenantRepository.findById(token.tenantId)
         if (tenant != null) {
             validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
                 ?.let { return SelfServiceResult.Failure(it) }
@@ -1136,5 +1152,9 @@ sealed class SelfServiceError(
 
     class SmtpNotConfigured(
         message: String,
+    ) : SelfServiceError(message)
+
+    class PasswordLoginDisabled(
+        message: String = "Password sign-in is disabled for this workspace.",
     ) : SelfServiceError(message)
 }

@@ -468,4 +468,58 @@ class AuthServiceTest {
         val result = svc.authenticate("acme", "alice", "fresh-pass")
         assertIs<AuthResult.Success<User>>(result)
     }
+
+    // =========================================================================
+    // Password-login toggle
+    // =========================================================================
+
+    @Test
+    fun `authenticate returns PasswordLoginDisabled when tenant policy disables password`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = testTenant.securityConfig.copy(passwordLoginEnabled = false),
+            ),
+        )
+
+        val result = svc.authenticate("acme", "alice", "correct-pass")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.PasswordLoginDisabled>(result.error)
+        assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_REJECTED_POLICY))
+    }
+
+    @Test
+    fun `authenticate does not record LOGIN_FAILED when password is disabled`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = testTenant.securityConfig.copy(passwordLoginEnabled = false),
+            ),
+        )
+        svc.authenticate("acme", "alice", "wrong-pass")
+        assertTrue(!auditLog.hasEvent(AuditEventType.LOGIN_FAILED))
+    }
+
+    @Test
+    fun `register returns PasswordLoginDisabled when tenant policy disables password`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = testTenant.securityConfig.copy(passwordLoginEnabled = false),
+            ),
+        )
+
+        val result =
+            svc.register(
+                tenantSlug = "acme",
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob",
+                rawPassword = "any-pass",
+                confirmPassword = "any-pass",
+                baseUrl = "https://example.com",
+            )
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.PasswordLoginDisabled>(result.error)
+    }
 }

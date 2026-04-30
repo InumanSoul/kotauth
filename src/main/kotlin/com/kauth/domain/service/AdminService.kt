@@ -119,6 +119,8 @@ class AdminService(
         corsAllowCredentials: Boolean = false,
         hibpCheckEnabled: Boolean = false,
         magicLinkEnabled: Boolean = false,
+        magicLinkTokenTtlMinutes: Int = 15,
+        passwordLoginEnabled: Boolean = true,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -139,6 +141,19 @@ class AdminService(
         if (mfaPolicy !in listOf("optional", "required", "required_admins")) {
             return AdminResult.Failure(
                 AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'."),
+            )
+        }
+        if (tenant.isMaster && !passwordLoginEnabled) {
+            return AdminResult.Failure(
+                AdminError.Validation("Password sign-in cannot be disabled on the master workspace."),
+            )
+        }
+        if (!passwordLoginEnabled && !magicLinkEnabled) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "At least one email-based sign-in method must remain enabled. " +
+                        "Enable magic links before disabling password sign-in.",
+                ),
             )
         }
 
@@ -165,6 +180,8 @@ class AdminService(
                         corsAllowCredentials = corsAllowCredentials,
                         hibpCheckEnabled = hibpCheckEnabled,
                         magicLinkEnabled = magicLinkEnabled,
+                        magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes.coerceIn(1, 1440),
+                        passwordLoginEnabled = passwordLoginEnabled,
                     ),
             )
 
@@ -183,6 +200,20 @@ class AdminService(
                 details = mapOf("slug" to slug, "displayName" to displayName),
             ),
         )
+
+        if (tenant.securityConfig.passwordLoginEnabled != passwordLoginEnabled) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED,
+                    ipAddress = null,
+                    userAgent = null,
+                    details = mapOf("field" to "passwordLoginEnabled", "value" to passwordLoginEnabled.toString()),
+                ),
+            )
+        }
 
         return AdminResult.Success(saved)
     }
@@ -312,6 +343,13 @@ class AdminService(
             resolvedPasswordHash = User.SENTINEL_PASSWORD_HASH
             resolvedRequiredActions = setOf(RequiredAction.SET_PASSWORD)
         } else {
+            if (!tenant.securityConfig.passwordLoginEnabled) {
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Password sign-in is disabled for this workspace. Send an invite instead.",
+                    ),
+                )
+            }
             val pw =
                 password
                     ?: return AdminResult.Failure(AdminError.Validation("Password is required."))
@@ -863,8 +901,14 @@ class AdminService(
         userId: UserId,
         tenantId: TenantId,
     ): AdminResult<String> {
-        tenantRepository.findById(tenantId)
-            ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        if (!tenant.securityConfig.passwordLoginEnabled) {
+            return AdminResult.Failure(
+                AdminError.Validation("Password sign-in is disabled for this workspace."),
+            )
+        }
         val user =
             userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))

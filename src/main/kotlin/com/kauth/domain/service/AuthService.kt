@@ -61,6 +61,21 @@ class AuthService(
             tenantRepository.findBySlug(tenantSlug)
                 ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
+        if (!tenant.securityConfig.passwordLoginEnabled) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_REJECTED_POLICY,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "password_login_disabled"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.PasswordLoginDisabled)
+        }
+
         if (username.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
@@ -302,6 +317,10 @@ class AuthService(
             return AuthResult.Failure(AuthError.RegistrationDisabled)
         }
 
+        if (!tenant.securityConfig.passwordLoginEnabled) {
+            return AuthResult.Failure(AuthError.PasswordLoginDisabled)
+        }
+
         if (username.isBlank() || email.isBlank() || fullName.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.ValidationError("All fields are required."))
         }
@@ -447,4 +466,7 @@ sealed class AuthError {
      * redirect the user to the change-password page instead of issuing tokens.
      */
     object PasswordChangeRequired : AuthError()
+
+    /** Tenant policy disables password authentication. Surface so the UI can direct the user to passwordless paths. */
+    object PasswordLoginDisabled : AuthError()
 }
