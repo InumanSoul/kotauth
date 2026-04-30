@@ -268,8 +268,7 @@ internal fun Route.socialLoginRoutes(
             HttpStatusCode.OK,
             AuthView.socialRegistrationPage(
                 tenantSlug = slug,
-                theme = theme,
-                workspaceName = workspaceName,
+                ctx = ctx.viewContext,
                 providerName = pending.provider.displayName,
                 email = pending.email,
                 prefillUsername = suggestedUsername,
@@ -324,8 +323,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         providerName = pending.provider.displayName,
                         email = pending.email,
                         prefillUsername = chosenUsername,
@@ -339,8 +337,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.InternalServerError,
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         providerName = pending.provider.displayName,
                         email = pending.email,
                         error = "An unexpected error occurred. Please try again.",
@@ -376,8 +373,7 @@ internal fun Route.socialLoginRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.socialRegistrationPage(
                                     tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
+                                    ctx = ctx.viewContext,
                                     providerName = pending.provider.displayName,
                                     email = pending.email,
                                     error = message,
