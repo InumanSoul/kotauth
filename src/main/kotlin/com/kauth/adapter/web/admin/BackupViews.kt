@@ -76,6 +76,7 @@ internal fun workspaceBackupPageImpl(
                     method = FormMethod.post,
                 ) {
                     id = "backup-export-form"
+                    attributes["data-toast-on-submit"] = EnglishStrings.TOAST_BACKUP_EXPORTED
 
                     // Passphrase + confirm
                     div("ov-card") {
