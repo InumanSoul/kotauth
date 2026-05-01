@@ -386,11 +386,13 @@ fun Application.module(
             socialAccountRepository = s.socialAccountRepository,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
+            translationPort = s.translationPort,
         )
 
         launcherRoutes(
             launcherService = s.launcherService,
             tenantRepository = s.tenantRepository,
+            translationPort = s.translationPort,
             sessionRepository = s.sessionRepository,
         )
 

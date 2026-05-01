@@ -5,7 +5,7 @@ import com.kauth.domain.port.TranslationPort
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.header
 
-internal fun ApplicationCall.resolveLocale(
+fun ApplicationCall.resolveLocale(
     tenant: Tenant?,
     translation: TranslationPort,
 ): String {

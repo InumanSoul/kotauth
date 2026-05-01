@@ -9,6 +9,7 @@ import com.kauth.domain.service.LauncherService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import io.ktor.client.request.get
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.install
@@ -83,6 +84,7 @@ class LauncherRoutesTest {
             launcherRoutes(
                 launcherService = LauncherService(appRepo, roleRepo),
                 tenantRepository = tenantRepo,
+                translationPort = EnglishOnlyTranslation(),
             )
         }
     }

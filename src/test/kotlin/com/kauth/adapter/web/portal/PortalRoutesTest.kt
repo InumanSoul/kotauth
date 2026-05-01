@@ -19,6 +19,7 @@ import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
@@ -289,6 +290,7 @@ class PortalRoutesTest {
                 selfServiceService = buildSelfService(),
                 tenantRepository = tenantRepo,
                 encryptionService = encryptionService,
+                translationPort = EnglishOnlyTranslation(),
             )
         }
     }
@@ -321,6 +323,7 @@ class PortalRoutesTest {
                 encryptionService = encryptionService,
                 oauthService = oauthService,
                 baseUrl = "http://localhost",
+                translationPort = EnglishOnlyTranslation(),
             )
         }
     }

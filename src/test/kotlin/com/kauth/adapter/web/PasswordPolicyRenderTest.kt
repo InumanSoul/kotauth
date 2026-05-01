@@ -244,8 +244,7 @@ class PasswordPolicyRenderTest {
                 PortalView.securityPage(
                     slug = "acme",
                     session = portalSession,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = viewContext,
                     sessions = emptyList(),
                     successMsg = null,
                     errorMsg = null,
@@ -266,8 +265,7 @@ class PasswordPolicyRenderTest {
                 PortalView.securityPage(
                     slug = "acme",
                     session = portalSession,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = viewContext,
                     sessions = emptyList(),
                     successMsg = null,
                     errorMsg = null,
@@ -293,8 +291,7 @@ class PasswordPolicyRenderTest {
                 PortalView.securityPage(
                     slug = "acme",
                     session = portalSession,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = viewContext,
                     sessions = emptyList(),
                     successMsg = null,
                     errorMsg = null,

@@ -1,10 +1,13 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.ViewContext
+import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.service.LauncherService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -27,6 +30,7 @@ import io.ktor.server.sessions.*
 fun Route.launcherRoutes(
     launcherService: LauncherService,
     tenantRepository: TenantRepository,
+    translationPort: TranslationPort,
     sessionRepository: SessionRepository? = null,
 ) {
     get("/t/{slug}/launcher") {
@@ -38,13 +42,20 @@ fun Route.launcherRoutes(
 
         val apps = launcherService.resolveLauncherApps(UserId(session.userId), TenantId(session.tenantId))
 
+        val ctx =
+            ViewContext(
+                theme = tenant.theme,
+                workspaceName = tenant.displayName,
+                locale = call.resolveLocale(tenant, translationPort),
+                translator = translationPort,
+            )
+
         call.respondHtml(
             HttpStatusCode.OK,
             PortalView.launcherPage(
                 slug = slug,
                 session = session,
-                theme = tenant.theme,
-                workspaceName = tenant.displayName,
+                ctx = ctx,
                 layout = tenant.portalConfig.layout,
                 apps = apps,
             ),

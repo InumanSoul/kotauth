@@ -1,11 +1,13 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
+import com.kauth.infrastructure.EnglishOnlyTranslation
 import kotlinx.html.HTML
 import kotlinx.html.html
 import kotlinx.html.stream.createHTML
@@ -29,6 +31,13 @@ class LauncherViewRenderTest {
             tenantId = 1,
             tenantSlug = "acme",
             username = "alice",
+        )
+
+    private val ctx =
+        ViewContext.englishOnly(
+            theme = TenantTheme.DEFAULT,
+            workspaceName = "Acme Corp",
+            translator = EnglishOnlyTranslation(),
         )
 
     private fun launcherApp(
@@ -57,8 +66,7 @@ class LauncherViewRenderTest {
                 PortalView.launcherPage(
                     slug = "acme",
                     session = session,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = ctx,
                     layout = PortalLayout.SIDEBAR,
                     apps = emptyList(),
                 ),
@@ -76,8 +84,7 @@ class LauncherViewRenderTest {
                 PortalView.launcherPage(
                     slug = "acme",
                     session = session,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = ctx,
                     layout = PortalLayout.SIDEBAR,
                     apps = listOf(launcherApp(100, "Tasks App", url = "http://localhost/tasks")),
                 ),
@@ -97,8 +104,7 @@ class LauncherViewRenderTest {
                 PortalView.launcherPage(
                     slug = "acme",
                     session = session,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = ctx,
                     layout = PortalLayout.SIDEBAR,
                     apps =
                         listOf(
@@ -119,8 +125,7 @@ class LauncherViewRenderTest {
                 PortalView.launcherPage(
                     slug = "acme",
                     session = session,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = ctx,
                     layout = PortalLayout.SIDEBAR,
                     apps = listOf(launcherApp(100, "Reports", iconUrl = null)),
                 ),
@@ -138,8 +143,7 @@ class LauncherViewRenderTest {
                 PortalView.launcherPage(
                     slug = "acme",
                     session = session,
-                    theme = TenantTheme.DEFAULT,
-                    workspaceName = "Acme Corp",
+                    ctx = ctx,
                     layout = PortalLayout.SIDEBAR,
                     apps = emptyList(),
                 ),
