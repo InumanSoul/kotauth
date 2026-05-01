@@ -6,6 +6,7 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.adapter.web.demoBanner
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
@@ -484,6 +485,63 @@ object PortalView {
         }
 
     // =========================================================================
+    // App launcher page
+    // =========================================================================
+
+    fun launcherPage(
+        slug: String,
+        session: PortalSession,
+        theme: TenantTheme,
+        workspaceName: String,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
+        apps: List<Application>,
+    ): HTML.() -> Unit = {
+        head { portalPageHead("${EnglishStrings.LAUNCHER_PAGE_TITLE} — $workspaceName", theme, layout) }
+        body {
+            portalShell(slug, workspaceName, session.username, "launcher", layout, theme.logoUrl) {
+                div(classes = "page-header") {
+                    h1(classes = "page-header__title") { +EnglishStrings.LAUNCHER_PAGE_TITLE }
+                    p(classes = "page-header__subtitle") { +EnglishStrings.LAUNCHER_PAGE_SUBTITLE }
+                }
+
+                if (apps.isEmpty()) {
+                    div(classes = "launcher-empty") {
+                        div(classes = "launcher-empty__title") { +EnglishStrings.LAUNCHER_EMPTY_TITLE }
+                        div(classes = "launcher-empty__body") { +EnglishStrings.LAUNCHER_EMPTY_BODY }
+                    }
+                } else {
+                    div(classes = "launcher-grid") {
+                        apps.forEach { app -> launcherTile(app) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun FlowContent.launcherTile(app: Application) {
+        val launcherUrl = app.launcherUrl ?: return
+        a(href = launcherUrl, classes = "launcher-tile") {
+            target = "_blank"
+            attributes["rel"] = "noopener noreferrer"
+            attributes["aria-label"] = "${app.name} — ${EnglishStrings.LAUNCHER_OPEN_IN_NEW_TAB}"
+            div(classes = "launcher-tile__icon") {
+                if (!app.iconUrl.isNullOrBlank()) {
+                    img(src = app.iconUrl, alt = "") {
+                        attributes["onerror"] =
+                            "this.replaceWith(Object.assign(document.createElement('span')," +
+                            "{textContent:this.dataset.fallback}))"
+                        attributes["data-fallback"] =
+                            (app.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                    }
+                } else {
+                    +(app.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                }
+            }
+            div(classes = "launcher-tile__name") { +app.name }
+        }
+    }
+
+    // =========================================================================
     // MFA management page
     //   mfaEnabled = false  →  setup flow (QR + recovery codes + verification)
     //   mfaEnabled = true   →  active state + disable option
@@ -924,6 +982,10 @@ object PortalView {
         activePage: String,
         linkClass: String,
     ) {
+        a(
+            href = "/t/$slug/launcher",
+            classes = "$linkClass${if (activePage == "launcher") " is-active" else ""}",
+        ) { +EnglishStrings.LAUNCHER_NAV }
         a(
             href = "/t/$slug/account/profile",
             classes = "$linkClass${if (activePage == "profile") " is-active" else ""}",

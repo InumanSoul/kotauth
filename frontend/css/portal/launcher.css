@@ -1,0 +1,90 @@
+/* frontend/css/portal/launcher.css
+ *
+ * App launcher — grid of application tiles in the portal.
+ * Each tile renders as a card with an icon, name, and link.
+ * Empty state is shown when the user has no entitled apps.
+ */
+
+.launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.launcher-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 16px;
+  background: var(--color-surface);
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-text);
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  text-align: center;
+}
+
+.launcher-tile:hover,
+.launcher-tile:focus-visible {
+  border-color: var(--color-accent-border);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.launcher-tile__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent-bg);
+  border: 0.5px solid var(--color-accent-border);
+  font-size: 1.25rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.launcher-tile__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.launcher-tile__name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.launcher-empty {
+  background: var(--color-surface);
+  border: 0.5px dashed var(--color-border-md);
+  border-radius: var(--radius);
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.launcher-empty__title {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 6px;
+}
+
+.launcher-empty__body {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  max-width: 380px;
+  margin: 0 auto;
+}

@@ -40,6 +40,15 @@ object EnglishStrings {
     const val PORTAL_MY_ACCOUNT = "My Account"
     const val PORTAL_ACCOUNT = "Account"
 
+    // Portal — app launcher
+    const val LAUNCHER_NAV = "Applications"
+    const val LAUNCHER_PAGE_TITLE = "Applications"
+    const val LAUNCHER_PAGE_SUBTITLE = "Apps you can access in this workspace"
+    const val LAUNCHER_OPEN_IN_NEW_TAB = "Open in a new tab"
+    const val LAUNCHER_EMPTY_TITLE = "No applications available"
+    const val LAUNCHER_EMPTY_BODY =
+        "Ask your workspace admin to grant you access to one or more applications."
+
     // Portal — connected accounts section (profile page)
     const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"
