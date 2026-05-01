@@ -303,6 +303,9 @@ internal fun AuthError.toMessage(): String =
         is AuthError.PasswordChangeRequired ->
             "An administrator has required you to change your password. " +
                 "Follow the link provided to set a new one."
+        is AuthError.PasswordLoginDisabled ->
+            "Password sign-in is disabled for this workspace. " +
+                "Use the email link option or sign in with a configured social provider."
     }
 
 internal fun SocialLoginError.toMessage(): String =

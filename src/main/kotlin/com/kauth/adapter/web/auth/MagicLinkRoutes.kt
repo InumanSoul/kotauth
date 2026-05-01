@@ -51,8 +51,7 @@ internal fun Route.magicLinkRoutes(
             HttpStatusCode.OK,
             AuthView.magicLinkPage(
                 tenantSlug = ctx.slug,
-                theme = ctx.theme,
-                workspaceName = ctx.workspaceName,
+                ctx = ctx.viewContext,
                 sent = sent,
             ),
         )
@@ -116,8 +115,7 @@ internal fun Route.magicLinkRoutes(
                 HttpStatusCode.Unauthorized,
                 AuthView.magicLinkErrorPage(
                     tenantSlug = ctx.slug,
-                    theme = ctx.theme,
-                    workspaceName = ctx.workspaceName,
+                    ctx = ctx.viewContext,
                     error =
                         "To finish signing in, open this link in the same browser where you " +
                             "requested it — or go back to the sign-in page and request a new link.",
@@ -132,8 +130,7 @@ internal fun Route.magicLinkRoutes(
                     HttpStatusCode.Unauthorized,
                     AuthView.magicLinkErrorPage(
                         tenantSlug = ctx.slug,
-                        theme = ctx.theme,
-                        workspaceName = ctx.workspaceName,
+                        ctx = ctx.viewContext,
                         error = result.error.message,
                     ),
                 )
@@ -160,8 +157,7 @@ internal fun Route.magicLinkRoutes(
                             HttpStatusCode.BadRequest,
                             AuthView.magicLinkErrorPage(
                                 tenantSlug = ctx.slug,
-                                theme = ctx.theme,
-                                workspaceName = ctx.workspaceName,
+                                ctx = ctx.viewContext,
                                 error = message,
                             ),
                         )

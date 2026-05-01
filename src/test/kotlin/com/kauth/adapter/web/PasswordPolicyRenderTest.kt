@@ -85,21 +85,21 @@ class PasswordPolicyRenderTest {
 
     @Test
     fun `registerPage renders data-pw-min-length with configured minimum`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = strictPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = strictPolicy))
 
         assertTrue(html.contains("""data-pw-min-length="12""""), "Expected data-pw-min-length=\"12\" in rendered HTML")
     }
 
     @Test
     fun `registerPage renders data-pw-min-length with default minimum when policy is default`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = defaultPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = defaultPolicy))
 
         assertTrue(html.contains("""data-pw-min-length="8""""), "Expected data-pw-min-length=\"8\" for default policy")
     }
 
     @Test
     fun `registerPage renders all three require attributes when all policy flags are true`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = strictPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = strictPolicy))
 
         assertTrue(html.contains("""data-pw-require-upper="true""""), "Expected data-pw-require-upper attribute")
         assertTrue(html.contains("""data-pw-require-number="true""""), "Expected data-pw-require-number attribute")
@@ -108,14 +108,14 @@ class PasswordPolicyRenderTest {
 
     @Test
     fun `registerPage omits data-pw-require-upper when flag is false`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = defaultPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = defaultPolicy))
 
         assertFalse(html.contains("data-pw-require-upper"), "data-pw-require-upper must not appear when flag is false")
     }
 
     @Test
     fun `registerPage omits data-pw-require-number when flag is false`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = defaultPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = defaultPolicy))
 
         assertFalse(
             html.contains("data-pw-require-number"),
@@ -125,7 +125,7 @@ class PasswordPolicyRenderTest {
 
     @Test
     fun `registerPage omits data-pw-require-special when flag is false`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = defaultPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = defaultPolicy))
 
         assertFalse(
             html.contains("data-pw-require-special"),
@@ -135,14 +135,14 @@ class PasswordPolicyRenderTest {
 
     @Test
     fun `registerPage placeholder reflects passwordMinLength`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = strictPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = strictPolicy))
 
         assertTrue(html.contains("Minimum 12 characters"), "Placeholder must embed configured minimum length")
     }
 
     @Test
     fun `registerPage placeholder uses default minimum length when policy is default`() {
-        val html = render(AuthView.registerPage(tenantSlug = "acme", passwordPolicy = defaultPolicy))
+        val html = render(AuthView.registerPage(tenantSlug = "acme", ctx = viewContext, passwordPolicy = defaultPolicy))
 
         assertTrue(html.contains("Minimum 8 characters"), "Placeholder must embed default minimum length")
     }

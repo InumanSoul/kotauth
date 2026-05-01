@@ -66,6 +66,7 @@ internal fun Route.socialLoginRoutes(
                         ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
+                        passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     ),
                 )
             }
@@ -106,6 +107,7 @@ internal fun Route.socialLoginRoutes(
                     ctx = ctx.viewContext,
                     error = "Login with ${provider.displayName} was cancelled or failed.",
                     enabledProviders = enabledProviders,
+                    passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                 ),
             )
             return@get
@@ -125,6 +127,7 @@ internal fun Route.socialLoginRoutes(
                     ctx = ctx.viewContext,
                     error = "Invalid or expired state parameter. Please try signing in again.",
                     enabledProviders = enabledProviders,
+                    passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                 ),
             )
             return@get
@@ -139,6 +142,7 @@ internal fun Route.socialLoginRoutes(
                     ctx = ctx.viewContext,
                     error = "State mismatch. Please try signing in again.",
                     enabledProviders = enabledProviders,
+                    passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                 ),
             )
             return@get
@@ -179,6 +183,7 @@ internal fun Route.socialLoginRoutes(
                         ctx = ctx.viewContext,
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
+                        passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     ),
                 )
             }
@@ -222,6 +227,7 @@ internal fun Route.socialLoginRoutes(
                                     ctx = ctx.viewContext,
                                     error = message,
                                     enabledProviders = enabledProviders,
+                                    passwordLoginEnabled = activeTenant.securityConfig.passwordLoginEnabled,
                                 ),
                             )
                         },
@@ -262,8 +268,7 @@ internal fun Route.socialLoginRoutes(
             HttpStatusCode.OK,
             AuthView.socialRegistrationPage(
                 tenantSlug = slug,
-                theme = theme,
-                workspaceName = workspaceName,
+                ctx = ctx.viewContext,
                 providerName = pending.provider.displayName,
                 email = pending.email,
                 prefillUsername = suggestedUsername,
@@ -318,8 +323,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         providerName = pending.provider.displayName,
                         email = pending.email,
                         prefillUsername = chosenUsername,
@@ -333,8 +337,7 @@ internal fun Route.socialLoginRoutes(
                     HttpStatusCode.InternalServerError,
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
-                        theme = theme,
-                        workspaceName = workspaceName,
+                        ctx = ctx.viewContext,
                         providerName = pending.provider.displayName,
                         email = pending.email,
                         error = "An unexpected error occurred. Please try again.",
@@ -370,8 +373,7 @@ internal fun Route.socialLoginRoutes(
                                 HttpStatusCode.BadRequest,
                                 AuthView.socialRegistrationPage(
                                     tenantSlug = slug,
-                                    theme = theme,
-                                    workspaceName = workspaceName,
+                                    ctx = ctx.viewContext,
                                     providerName = pending.provider.displayName,
                                     email = pending.email,
                                     error = message,

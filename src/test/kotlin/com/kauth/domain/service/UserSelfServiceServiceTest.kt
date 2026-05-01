@@ -1181,4 +1181,77 @@ class UserSelfServiceServiceTest {
         assertIs<SelfServiceResult.Failure>(result)
         assertIs<SelfServiceError.TokenInvalid>(result.error)
     }
+
+    // =========================================================================
+    // Password-login toggle — passwordless-only enforcement
+    // =========================================================================
+
+    private fun disablePasswordLoginOnSmtpTenant() {
+        tenants.clear()
+        tenants.add(
+            smtpTenant.copy(
+                securityConfig = smtpTenant.securityConfig.copy(passwordLoginEnabled = false),
+            ),
+        )
+    }
+
+    @Test
+    fun `confirmPasswordReset returns PasswordLoginDisabled when toggle is off`() {
+        disablePasswordLoginOnSmtpTenant()
+        val rawToken = "valid-reset"
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256(rawToken),
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.PASSWORD_RESET,
+            ),
+        )
+        val result = svc.confirmPasswordReset(rawToken, "new-pass-123", "new-pass-123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.PasswordLoginDisabled>(result.error)
+    }
+
+    @Test
+    fun `changePassword returns PasswordLoginDisabled when toggle is off`() {
+        disablePasswordLoginOnSmtpTenant()
+        val result =
+            svc.changePassword(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                currentPassword = "current-pass",
+                newPassword = "new-pass-123",
+                confirmPassword = "new-pass-123",
+            )
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.PasswordLoginDisabled>(result.error)
+    }
+
+    @Test
+    fun `confirmAcceptInvite returns PasswordLoginDisabled when toggle is off`() {
+        disablePasswordLoginOnSmtpTenant()
+        val rawToken = seedInviteToken()
+        val result = svc.confirmAcceptInvite(rawToken, "new-pass-123", "new-pass-123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.PasswordLoginDisabled>(result.error)
+    }
+
+    @Test
+    fun `confirmForcedPasswordChange returns PasswordLoginDisabled when toggle is off`() {
+        disablePasswordLoginOnSmtpTenant()
+        val rawToken = "forced-change"
+        prTokenRepo.create(
+            PasswordResetToken(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                tokenHash = sha256(rawToken),
+                expiresAt = Instant.now().plusSeconds(3600),
+                purpose = TokenPurpose.TEMP_PASSWORD,
+            ),
+        )
+        val result = svc.confirmForcedPasswordChange(rawToken, "new-pass-123", "new-pass-123")
+        assertIs<SelfServiceResult.Failure>(result)
+        assertIs<SelfServiceError.PasswordLoginDisabled>(result.error)
+    }
 }

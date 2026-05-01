@@ -61,6 +61,21 @@ class AuthService(
             tenantRepository.findBySlug(tenantSlug)
                 ?: return AuthResult.Failure(AuthError.TenantNotFound)
 
+        if (!tenant.securityConfig.passwordLoginEnabled) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_REJECTED_POLICY,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "password_login_disabled"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.PasswordLoginDisabled)
+        }
+
         if (username.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
@@ -302,7 +317,15 @@ class AuthService(
             return AuthResult.Failure(AuthError.RegistrationDisabled)
         }
 
-        if (username.isBlank() || email.isBlank() || fullName.isBlank() || rawPassword.isBlank()) {
+        // Passwordless tenants: registration is allowed only if magic-link is on,
+        // since the user has no other email-based path to actually sign in.
+        val passwordlessMode = !tenant.securityConfig.passwordLoginEnabled
+        if (passwordlessMode && !tenant.securityConfig.magicLinkEnabled) {
+            return AuthResult.Failure(AuthError.PasswordLoginDisabled)
+        }
+
+        val coreFieldsBlank = username.isBlank() || email.isBlank() || fullName.isBlank()
+        if (coreFieldsBlank || (!passwordlessMode && rawPassword.isBlank())) {
             return AuthResult.Failure(AuthError.ValidationError("All fields are required."))
         }
 
@@ -310,16 +333,24 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
-        val policyError = passwordPolicy?.validate(rawPassword, tenant)
-        if (policyError != null) {
-            return AuthResult.Failure(AuthError.ValidationError(policyError))
-        } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
-            return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
-        }
-
-        if (rawPassword != confirmPassword) {
-            return AuthResult.Failure(AuthError.ValidationError("Passwords do not match."))
-        }
+        // In passwordless mode the password is generated server-side and never used by
+        // the user — skip policy/confirmation checks. The User table still requires a
+        // hash, so we mint a random unguessable secret to satisfy the schema.
+        val effectivePassword =
+            if (passwordlessMode) {
+                generateSyntheticPassword()
+            } else {
+                val policyError = passwordPolicy?.validate(rawPassword, tenant)
+                if (policyError != null) {
+                    return AuthResult.Failure(AuthError.ValidationError(policyError))
+                } else if (passwordPolicy == null && rawPassword.length < tenant.passwordPolicyMinLength) {
+                    return AuthResult.Failure(AuthError.WeakPassword(tenant.passwordPolicyMinLength))
+                }
+                if (rawPassword != confirmPassword) {
+                    return AuthResult.Failure(AuthError.ValidationError("Passwords do not match."))
+                }
+                rawPassword
+            }
 
         if (userRepository.existsByUsername(tenant.id, username)) {
             return AuthResult.Failure(AuthError.UserAlreadyExists)
@@ -335,12 +366,12 @@ class AuthService(
                 username = username.trim(),
                 email = email.trim().lowercase(),
                 fullName = fullName.trim(),
-                passwordHash = passwordHasher.hash(rawPassword),
+                passwordHash = passwordHasher.hash(effectivePassword),
             )
 
         val savedUser = userRepository.save(newUser)
 
-        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
+        if (!passwordlessMode && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
 
@@ -369,6 +400,15 @@ class AuthService(
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    // Two UUIDs concatenated — 256 bits of entropy. Used as the stored hash for
+    // passwordless registrations; the user never sees or types this value.
+    private fun generateSyntheticPassword(): String {
+        val a = java.util.UUID.randomUUID()
+        val b = java.util.UUID.randomUUID()
+        return "$a$b"
+    }
+
     private fun enforceConcurrentSessionLimit(
         tenantId: TenantId,
         userId: UserId,
@@ -447,4 +487,7 @@ sealed class AuthError {
      * redirect the user to the change-password page instead of issuing tokens.
      */
     object PasswordChangeRequired : AuthError()
+
+    /** Tenant policy disables password authentication. Surface so the UI can direct the user to passwordless paths. */
+    object PasswordLoginDisabled : AuthError()
 }

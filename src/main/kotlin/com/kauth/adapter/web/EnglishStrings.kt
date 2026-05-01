@@ -130,6 +130,19 @@ object EnglishStrings {
     const val IMPORT_LINK_FROM_LIST = "Import from backup"
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
+    // Authentication methods card (workspace security settings — v1.10)
+    const val AUTH_METHODS_CARD_TITLE = "Authentication Methods"
+    const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
+    const val AUTH_METHODS_MAGIC_LINK_DESC =
+        "Users can request a one-time sign-in link delivered to their email. " +
+            "Links expire in 15 minutes and are single-use. MFA still required " +
+            "when enrolled. Requires SMTP to be configured."
+    const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
+    const val AUTH_METHODS_PASSWORDLESS_DESC =
+        "Hides the password form and rejects password-based authentication. " +
+            "Users can still sign in with magic links and any enabled social providers. " +
+            "Email becomes the only first factor — pair with MFA for higher-assurance environments."
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 
@@ -141,6 +154,10 @@ object EnglishStrings {
     const val AUTH_PAGE_TITLE_RESET = "{0} | Reset Password"
     const val AUTH_PAGE_TITLE_INVITE = "{0} | Accept Invitation"
     const val AUTH_PAGE_TITLE_MFA = "{0} | Two-Factor Authentication"
+    const val AUTH_PAGE_TITLE_REGISTER = "{0} | Create Account"
+    const val AUTH_PAGE_TITLE_MAGIC_LINK = "{0} | Sign in with email"
+    const val AUTH_PAGE_TITLE_FORCE_CHANGE = "{0} | Change Password"
+    const val AUTH_PAGE_TITLE_VERIFY_EMAIL = "{0} | Email Verification"
     const val AUTH_COPYRIGHT_TEMPLATE = "© {0} {1}. All rights reserved. Powered by"
     const val AUTH_KOTAUTH_LINK = "KotAuth"
     const val AUTH_BACK_TO_SIGN_IN = "Back to sign in"
@@ -167,6 +184,27 @@ object EnglishStrings {
     const val LOGIN_PROVIDER_GOOGLE = "Google"
     const val LOGIN_PROVIDER_GITHUB = "GitHub"
 
+    // Login page — passwordless mode (when tenant disables password sign-in)
+    const val LOGIN_PASSWORDLESS_SUBTITLE = "Sign in with an email link"
+    const val LOGIN_PASSWORDLESS_EMAIL_LABEL = "Email address"
+    const val LOGIN_PASSWORDLESS_EMAIL_PLACEHOLDER = "you@example.com"
+    const val LOGIN_PASSWORDLESS_SUBMIT = "Send sign-in link"
+
+    // Registration page
+    const val REGISTER_TITLE = "Create account"
+    const val REGISTER_SUBTITLE = "Fill in your details to get started"
+    const val REGISTER_PASSWORDLESS_SUBTITLE = "Fill in your details — we'll email you a sign-in link to finish."
+    const val REGISTER_FULL_NAME = "Full Name"
+    const val REGISTER_FULL_NAME_PLACEHOLDER = "Your full name"
+    const val REGISTER_EMAIL = "Email Address"
+    const val REGISTER_EMAIL_PLACEHOLDER = "you@example.com"
+    const val REGISTER_USERNAME = "Username"
+    const val REGISTER_USERNAME_PLACEHOLDER = "Choose a username"
+    const val REGISTER_SUBMIT = "Create Account"
+    const val REGISTER_HAS_ACCOUNT = "Already have an account? "
+    const val REGISTER_SIGN_IN = "Sign in"
+    const val REGISTER_OR_SIGN_UP_WITH = "or sign up with"
+
     // Forgot password page
     const val FORGOT_TITLE = "Forgot password"
     const val FORGOT_SUBTITLE = "Enter your email address and we'll send you a link to reset your password."
@@ -183,6 +221,44 @@ object EnglishStrings {
     const val RESET_SIGN_IN_NEW = "Sign in with your new password"
     const val RESET_SUBTITLE = "Enter your new password below."
     const val RESET_CHANGE_BUTTON = "Change password"
+
+    // Magic-link request page
+    const val MAGIC_LINK_TITLE = "Sign in with email"
+    const val MAGIC_LINK_SUBTITLE_FORM =
+        "Enter your email address and we'll send you a one-time link to sign in. " +
+            "No password needed."
+    const val MAGIC_LINK_SUBTITLE_SENT =
+        "If an account exists for that email address, you'll receive a sign-in link " +
+            "shortly. The link expires in 15 minutes."
+    const val MAGIC_LINK_EMAIL_LABEL = "Email address"
+    const val MAGIC_LINK_EMAIL_PLACEHOLDER = "you@example.com"
+    const val MAGIC_LINK_SUBMIT = "Send sign-in link"
+
+    // Magic-link error page
+    const val MAGIC_LINK_ERROR_TITLE = "Sign-in link unavailable"
+    const val MAGIC_LINK_REQUEST_NEW = "Request a new link"
+
+    // Force change password page
+    const val FORCE_CHANGE_TITLE = "Change your password"
+    const val FORCE_CHANGE_SUBTITLE_LINE1 = "An administrator has required you to change your password. "
+    const val FORCE_CHANGE_SUBTITLE_LINE2 = "Pick a new one to continue."
+    const val FORCE_CHANGE_SUCCESS =
+        "Your password has been changed. All existing sessions have been signed out."
+    const val FORCE_CHANGE_GO_SIGN_IN = "Go to sign in"
+    const val FORCE_CHANGE_SUBMIT = "Change Password"
+
+    // Verify email page
+    const val VERIFY_EMAIL_TITLE = "Email verification"
+    const val VERIFY_EMAIL_PROBLEM = "There was a problem with your verification link."
+    const val VERIFY_EMAIL_SIGN_IN = "Sign in to your account"
+
+    // Social registration page
+    const val SOCIAL_REG_TITLE = "One last step"
+    const val SOCIAL_REG_SUBTITLE = "You're signing in with {0}. Choose a username to complete your account."
+    const val SOCIAL_REG_EMAIL_FROM = "Email (from {0})"
+    const val SOCIAL_REG_FULL_NAME_PLACEHOLDER = "Your display name"
+    const val SOCIAL_REG_USERNAME_PLACEHOLDER = "letters, numbers, underscores"
+    const val SOCIAL_REG_SUBMIT = "Create account"
 
     // MFA challenge page
     const val MFA_TAGLINE = "Two-factor authentication"

@@ -26,6 +26,7 @@ object TenantSecurityConfigTable : Table("tenant_security_config") {
     val corsAllowCredentials = bool("cors_allow_credentials").default(false)
     val hibpCheckEnabled = bool("hibp_check_enabled").default(false)
     val magicLinkEnabled = bool("magic_link_enabled").default(false)
+    val passwordLoginEnabled = bool("password_login_enabled").default(true)
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

@@ -37,8 +37,7 @@ internal fun Route.forceChangePasswordRoutes(
             HttpStatusCode.OK,
             AuthView.forceChangePasswordPage(
                 ctx.slug,
-                ctx.theme,
-                ctx.workspaceName,
+                ctx.viewContext,
                 token = token,
                 passwordPolicy = policy,
             ),
@@ -60,8 +59,7 @@ internal fun Route.forceChangePasswordRoutes(
                 HttpStatusCode.TooManyRequests,
                 AuthView.forceChangePasswordPage(
                     ctx.slug,
-                    ctx.theme,
-                    ctx.workspaceName,
+                    ctx.viewContext,
                     token = token,
                     error = "Too many attempts. Please wait a few minutes.",
                     passwordPolicy = policy,
@@ -78,8 +76,7 @@ internal fun Route.forceChangePasswordRoutes(
                     HttpStatusCode.OK,
                     AuthView.forceChangePasswordPage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         success = true,
                         passwordPolicy = policy,
@@ -90,8 +87,7 @@ internal fun Route.forceChangePasswordRoutes(
                     HttpStatusCode.UnprocessableEntity,
                     AuthView.forceChangePasswordPage(
                         ctx.slug,
-                        ctx.theme,
-                        ctx.workspaceName,
+                        ctx.viewContext,
                         token = token,
                         error = result.error.message,
                         passwordPolicy = policy,

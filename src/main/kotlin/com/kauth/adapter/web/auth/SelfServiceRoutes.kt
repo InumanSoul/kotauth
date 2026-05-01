@@ -118,8 +118,6 @@ internal fun Route.selfServiceRoutes(
     get("/verify-email") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
-        val theme = ctx.theme
-        val workspaceName = ctx.workspaceName
         val token = call.request.queryParameters["token"] ?: ""
 
         if (token.isBlank()) {
@@ -127,8 +125,7 @@ internal fun Route.selfServiceRoutes(
                 HttpStatusCode.BadRequest,
                 AuthView.verifyEmailPage(
                     slug,
-                    theme,
-                    workspaceName,
+                    ctx.viewContext,
                     success = false,
                     message = "Verification link is missing or invalid.",
                 ),
@@ -141,8 +138,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.OK,
                     AuthView.verifyEmailPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         success = true,
                         message = "Your email address has been verified successfully.",
                     ),
@@ -152,8 +148,7 @@ internal fun Route.selfServiceRoutes(
                     HttpStatusCode.BadRequest,
                     AuthView.verifyEmailPage(
                         slug,
-                        theme,
-                        workspaceName,
+                        ctx.viewContext,
                         success = false,
                         message = result.error.message,
                     ),
