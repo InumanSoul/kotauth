@@ -147,6 +147,25 @@ object EnglishStrings {
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"
     const val CONNECTED_ACCOUNTS_EMPTY = "No social accounts connected."
 
+    // Impersonation banner (portal) — shown when an admin acts as a tenant user
+    const val IMPERSONATION_BANNER_LEAD = "Impersonating"
+    const val IMPERSONATION_BANNER_SIGNED_IN_AS = "Signed in as"
+    const val IMPERSONATION_BANNER_AUDITED = "actions are recorded"
+    const val IMPERSONATION_BANNER_END = "End session"
+    const val IMPERSONATION_DISABLED_TOOLTIP = "Unavailable during impersonation"
+
+    // Admin user-detail page — Impersonate action
+    const val IMPERSONATE_BUTTON = "Impersonate user"
+    const val IMPERSONATE_CONFIRM =
+        "You will be signed into the portal as this user. " +
+            "All actions are recorded in the audit log."
+    const val IMPERSONATE_REPLACE_CONFIRM =
+        "You are already impersonating another user. " +
+            "Starting a new session will end that one. Continue?"
+    const val IMPERSONATE_FAILED_DISABLED = "Cannot impersonate a disabled user."
+    const val IMPERSONATE_FAILED_LOCKED = "Cannot impersonate a temporarily locked user."
+    const val IMPERSONATE_FAILED_GENERIC = "Could not start impersonation."
+
     // Invite Users feature
     const val INVITE_WELCOME_TITLE = "Welcome to"
     const val INVITE_ACCEPT_SUBTITLE = "Set a password to activate your account."

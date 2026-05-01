@@ -42,12 +42,22 @@ fun Route.launcherRoutes(
 
         val apps = launcherService.resolveLauncherApps(UserId(session.userId), TenantId(session.tenantId))
 
+        val impersonation =
+            if (session.isImpersonation) {
+                com.kauth.adapter.web.ImpersonationContext(
+                    adminUsername = session.impersonatorAdminUsername.orEmpty(),
+                    targetUsername = session.username,
+                )
+            } else {
+                null
+            }
         val ctx =
             ViewContext(
                 theme = tenant.theme,
                 workspaceName = tenant.displayName,
                 locale = call.resolveLocale(tenant, translationPort),
                 translator = translationPort,
+                impersonation = impersonation,
             )
 
         call.respondHtml(

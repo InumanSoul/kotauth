@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.portal
 
 import com.kauth.adapter.web.ViewContext
+import com.kauth.adapter.web.admin.portalImpersonationStopRoute
 import com.kauth.adapter.web.auth.clearSsoCookie
 import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
@@ -75,14 +76,26 @@ fun Route.portalRoutes(
     baseUrl: String = "",
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
+    impersonationService: com.kauth.domain.service.ImpersonationService? = null,
 ) {
     fun ApplicationCall.portalViewContext(tenant: Tenant?): ViewContext {
         val theme = tenant?.theme ?: TenantTheme.DEFAULT
+        val portal = sessions.get<PortalSession>()
+        val impersonation =
+            if (portal != null && portal.isImpersonation) {
+                com.kauth.adapter.web.ImpersonationContext(
+                    adminUsername = portal.impersonatorAdminUsername.orEmpty(),
+                    targetUsername = portal.username,
+                )
+            } else {
+                null
+            }
         return ViewContext(
             theme = theme,
             workspaceName = tenant?.displayName ?: "KotAuth",
             locale = resolveLocale(tenant, translationPort),
             translator = translationPort,
+            impersonation = impersonation,
         )
     }
     route("/t/{slug}/account") {
@@ -284,6 +297,10 @@ fun Route.portalRoutes(
             }
         }
 
+        if (impersonationService != null) {
+            portalImpersonationStopRoute(impersonationService)
+        }
+
         post("/logout") {
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             call.sessions.clear<PortalSession>()
@@ -374,6 +391,9 @@ fun Route.portalRoutes(
         post("/delete") {
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
             val confirmUsername = call.receiveParameters()["confirm_username"]?.trim() ?: ""
 
             if (!confirmUsername.equals(session.username, ignoreCase = true)) {
@@ -425,6 +445,9 @@ fun Route.portalRoutes(
         post("/change-password") {
             val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@post call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation) {
+                return@post call.respond(HttpStatusCode.Forbidden)
+            }
             val params = call.receiveParameters()
             val current = params["current_password"] ?: ""
             val newPw = params["new_password"] ?: ""

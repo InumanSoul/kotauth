@@ -125,6 +125,19 @@ internal fun userDetailPageImpl(
                         attributes["hx-swap"] = "outerHTML"
                         +"Edit Profile"
                     }
+                    if (
+                        !workspace.isMaster &&
+                        user.enabled &&
+                        !user.isLocked &&
+                        RequiredAction.SET_PASSWORD !in user.requiredActions
+                    ) {
+                        postButton(
+                            action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
+                            label = EnglishStrings.IMPERSONATE_BUTTON,
+                            btnClass = "btn btn--primary",
+                            confirmMessage = EnglishStrings.IMPERSONATE_CONFIRM,
+                        )
+                    }
                 }
             }
 

@@ -1,0 +1,72 @@
+/* frontend/css/portal/impersonation.css
+ *
+ * Sticky banner shown above the portal shell while an admin is acting as a
+ * tenant user. Warning-amber tone signals "non-standard operating mode"
+ * without implying anything is broken. Sits above the topbar/sidebar so it
+ * is the first thing visible on every portal page during impersonation.
+ */
+
+.impersonation-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  width: 100%;
+  background: var(--color-amber-bg);
+  border-bottom: 0.5px solid var(--color-amber-border);
+  color: var(--color-text);
+}
+
+.impersonation-banner__inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.impersonation-banner__copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.impersonation-banner__lead {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.impersonation-banner__lead strong {
+  font-weight: 600;
+  color: var(--color-amber);
+}
+
+.impersonation-banner__sub {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.impersonation-banner__form {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Push the sticky portal topbar/sidebar down so the banner does not overlap
+   with their own sticky positioning. The banner reserves ~52px of vertical
+   space; both shells respond by pulling their `top` from 0 to that height. */
+body:has(.impersonation-banner) .portal-topbar,
+body:has(.impersonation-banner) .portal-tabnav {
+  top: auto;
+}

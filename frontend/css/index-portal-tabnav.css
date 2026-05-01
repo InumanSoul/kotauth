@@ -38,6 +38,9 @@
 /* ── App launcher page ────────────────────────────────────────────────── */
 @import "./portal/launcher.css";
 
+/* ── Impersonation banner (admin-acting-as-user) ────────────────────────── */
+@import "./portal/impersonation.css";
+
 /* ── Password validation checklist ─────────────────────────────────────── */
 @import "./components/password-validation.css";
 @import "./components/toast.css";
