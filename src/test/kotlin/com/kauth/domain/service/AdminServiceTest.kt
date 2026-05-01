@@ -592,6 +592,99 @@ class AdminServiceTest {
         assertEquals(listOf("http://localhost/callback"), result.value.redirectUris)
     }
 
+    @Test
+    fun `updateApplication - launcherUrl matching redirect origin succeeds`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                launcherUrl = "http://localhost/home",
+                launcherVisible = true,
+                launcherDisplayOrder = 5,
+            )
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals("http://localhost/home", result.value.launcherUrl)
+        assertEquals(true, result.value.launcherVisible)
+        assertEquals(5, result.value.launcherDisplayOrder)
+    }
+
+    @Test
+    fun `updateApplication - launcherUrl mismatched origin rejected`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                launcherUrl = "https://attacker.example.com/home",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateApplication - launcherUrl with non-http scheme rejected`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                launcherUrl = "javascript:alert(1)",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateApplication - launcherUrl rejected when no redirect URIs registered`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                redirectUris = emptyList(),
+                launcherUrl = "http://localhost/home",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateApplication - blank launcherUrl clears value`() {
+        apps.clear()
+        apps.add(testApp.copy(launcherUrl = "http://localhost/home"))
+
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                launcherUrl = "   ",
+            )
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals(null, result.value.launcherUrl)
+    }
+
+    @Test
+    fun `updateApplication - iconUrl with non-http scheme rejected`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                iconUrl = "javascript:alert(1)",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateApplication - iconUrl on a different origin is allowed`() {
+        // Icons may be served from a CDN, unlike launcher URLs.
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                iconUrl = "https://cdn.example.com/icon.svg",
+            )
+        assertIs<AdminResult.Success<Application>>(result)
+        assertEquals("https://cdn.example.com/icon.svg", result.value.iconUrl)
+    }
+
     // =========================================================================
     // setApplicationEnabled
     // =========================================================================

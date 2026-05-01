@@ -119,12 +119,20 @@ class PostgresApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        launcherUrl: String?,
+        iconUrl: String?,
+        launcherVisible: Boolean,
+        launcherDisplayOrder: Int,
     ): Application =
         transaction {
             ClientsTable.update({ ClientsTable.id eq appId.value }) {
                 it[ClientsTable.name] = name
                 it[ClientsTable.description] = description
                 it[ClientsTable.accessType] = AccessType.fromValue(accessType)
+                it[ClientsTable.launcherUrl] = launcherUrl
+                it[ClientsTable.iconUrl] = iconUrl
+                it[ClientsTable.launcherVisible] = launcherVisible
+                it[ClientsTable.launcherDisplayOrder] = launcherDisplayOrder
             }
             // Replace all redirect URIs atomically
             ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId.value }
@@ -169,5 +177,9 @@ class PostgresApplicationRepository : ApplicationRepository {
             enabled = this[ClientsTable.enabled],
             redirectUris = uris,
             tokenExpiryOverride = this[ClientsTable.tokenExpiryOverride],
+            launcherUrl = this[ClientsTable.launcherUrl],
+            iconUrl = this[ClientsTable.iconUrl],
+            launcherVisible = this[ClientsTable.launcherVisible],
+            launcherDisplayOrder = this[ClientsTable.launcherDisplayOrder],
         )
 }

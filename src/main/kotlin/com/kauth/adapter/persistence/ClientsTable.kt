@@ -32,6 +32,10 @@ object ClientsTable : Table("clients") {
         )
     val tokenExpiryOverride = integer("token_expiry_override").nullable()
     val enabled = bool("enabled").default(true)
+    val launcherUrl = varchar("launcher_url", 500).nullable()
+    val iconUrl = varchar("icon_url", 500).nullable()
+    val launcherVisible = bool("launcher_visible").default(true)
+    val launcherDisplayOrder = integer("launcher_display_order").default(0)
 
     override val primaryKey = PrimaryKey(id)
 }

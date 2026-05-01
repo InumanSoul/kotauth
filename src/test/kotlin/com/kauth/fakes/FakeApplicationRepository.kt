@@ -84,6 +84,10 @@ class FakeApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        launcherUrl: String?,
+        iconUrl: String?,
+        launcherVisible: Boolean,
+        launcherDisplayOrder: Int,
     ): Application {
         val updated =
             store[appId.value]!!.copy(
@@ -91,6 +95,10 @@ class FakeApplicationRepository : ApplicationRepository {
                 description = description,
                 accessType = AccessType.fromValue(accessType),
                 redirectUris = redirectUris,
+                launcherUrl = launcherUrl,
+                iconUrl = iconUrl,
+                launcherVisible = launcherVisible,
+                launcherDisplayOrder = launcherDisplayOrder,
             )
         store[appId.value] = updated
         return updated
