@@ -193,6 +193,12 @@
   "CONNECTED_ACCOUNTS_SUBTITLE": "Proveedores sociales vinculados a tu cuenta",
   "CONNECTED_ACCOUNTS_EMPTY": "No hay cuentas sociales conectadas.",
 
+  "IMPERSONATION_BANNER_LEAD": "Suplantando a",
+  "IMPERSONATION_BANNER_SIGNED_IN_AS": "Conectado como",
+  "IMPERSONATION_BANNER_AUDITED": "las acciones quedan registradas",
+  "IMPERSONATION_BANNER_END": "Finalizar sesión",
+  "IMPERSONATION_DISABLED_TOOLTIP": "No disponible durante la suplantación",
+
   "LAUNCHER_NAV": "Aplicaciones",
   "LAUNCHER_PAGE_TITLE": "Aplicaciones",
   "LAUNCHER_PAGE_SUBTITLE": "Aplicaciones a las que tienes acceso en este espacio de trabajo",
