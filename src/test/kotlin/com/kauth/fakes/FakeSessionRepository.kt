@@ -101,4 +101,16 @@ class FakeSessionRepository : SessionRepository {
         toDelete.forEach { store.remove(it.id?.value) }
         return toDelete.size
     }
+
+    override fun findActiveByImpersonator(parentSessionId: SessionId): List<Session> =
+        store.values.filter { it.impersonatorSessionId == parentSessionId && it.isActive }
+
+    override fun revokeAllByImpersonator(
+        parentSessionId: SessionId,
+        revokedAt: Instant,
+    ): Int {
+        val active = store.values.filter { it.impersonatorSessionId == parentSessionId && it.isActive }
+        active.forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
+        return active.size
+    }
 }

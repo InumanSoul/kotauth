@@ -32,5 +32,7 @@ internal object RedisKeys {
 
     fun activeTenantSet(tenantId: TenantId) = "$PREFIX:active:tenant:${tenantId.value}"
 
+    fun impersonatorSet(parentId: SessionId) = "$PREFIX:impersonator:${parentId.value}"
+
     const val ID_COUNTER = "$PREFIX:next-id"
 }

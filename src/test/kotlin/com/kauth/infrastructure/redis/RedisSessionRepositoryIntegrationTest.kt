@@ -232,6 +232,32 @@ class RedisSessionRepositoryIntegrationTest {
         assertTrue(holder.commands.dbsize() == 0L)
     }
 
+    @Test
+    fun `findActiveByImpersonator returns only children of the given parent`() {
+        val admin = repo.save(newSession(userId = 10, accessTokenHash = "admin"))
+        val child1 = repo.save(newSession(userId = 20, accessTokenHash = "imp1", impersonatorSessionId = admin.id))
+        val child2 = repo.save(newSession(userId = 21, accessTokenHash = "imp2", impersonatorSessionId = admin.id))
+        repo.save(newSession(userId = 22, accessTokenHash = "unrelated"))
+
+        val children = repo.findActiveByImpersonator(admin.id!!)
+
+        assertEquals(setOf(child1.id, child2.id), children.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `revokeAllByImpersonator revokes all active children and skips revoked ones`() {
+        val admin = repo.save(newSession(userId = 10, accessTokenHash = "admin"))
+        repo.save(newSession(userId = 20, accessTokenHash = "imp1", impersonatorSessionId = admin.id))
+        repo.save(newSession(userId = 21, accessTokenHash = "imp2", impersonatorSessionId = admin.id))
+
+        val firstSweep = repo.revokeAllByImpersonator(admin.id!!)
+        assertEquals(2, firstSweep)
+        assertTrue(repo.findActiveByImpersonator(admin.id!!).isEmpty())
+
+        // A second call should report zero — already-revoked children are not double-counted.
+        assertEquals(0, repo.revokeAllByImpersonator(admin.id!!))
+    }
+
     private fun newSession(
         tenantId: Int = 1,
         userId: Int? = 1,
@@ -241,6 +267,7 @@ class RedisSessionRepositoryIntegrationTest {
         createdAt: Instant = Instant.now(),
         expiresAt: Instant = createdAt.plusSeconds(3600),
         refreshExpiresAt: Instant? = null,
+        impersonatorSessionId: SessionId? = null,
     ) = Session(
         tenantId = TenantId(tenantId),
         userId = userId?.let { UserId(it) },
@@ -255,5 +282,6 @@ class RedisSessionRepositoryIntegrationTest {
         refreshExpiresAt = refreshExpiresAt,
         lastActivityAt = createdAt,
         revokedAt = null,
+        impersonatorSessionId = impersonatorSessionId,
     )
 }

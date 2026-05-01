@@ -33,6 +33,7 @@ class PostgresSessionRepository : SessionRepository {
                     it[refreshExpiresAt] = session.refreshExpiresAt?.toOffsetDateTime()
                     it[lastActivityAt] = session.lastActivityAt.toOffsetDateTime()
                     it[revokedAt] = session.revokedAt?.toOffsetDateTime()
+                    it[impersonatorSessionId] = session.impersonatorSessionId?.value
                 } get SessionsTable.id
 
             session.copy(id = SessionId(insertedId))
@@ -212,6 +213,32 @@ class PostgresSessionRepository : SessionRepository {
         Unit
     }
 
+    override fun findActiveByImpersonator(parentSessionId: SessionId): List<Session> =
+        transaction {
+            val now = OffsetDateTime.now()
+            SessionsTable
+                .selectAll()
+                .where {
+                    (SessionsTable.impersonatorSessionId eq parentSessionId.value) and
+                        (SessionsTable.revokedAt.isNull()) and
+                        (SessionsTable.expiresAt greater now)
+                }.map { it.toSession() }
+        }
+
+    override fun revokeAllByImpersonator(
+        parentSessionId: SessionId,
+        revokedAt: Instant,
+    ): Int =
+        transaction {
+            val ts = revokedAt.toOffsetDateTime()
+            SessionsTable.update({
+                (SessionsTable.impersonatorSessionId eq parentSessionId.value) and
+                    (SessionsTable.revokedAt.isNull())
+            }) {
+                it[SessionsTable.revokedAt] = ts
+            }
+        }
+
     override fun deleteExpired(retentionDays: Int): Int =
         transaction {
             val cutoff = OffsetDateTime.now().minusDays(retentionDays.toLong())
@@ -248,6 +275,7 @@ class PostgresSessionRepository : SessionRepository {
             refreshExpiresAt = this[SessionsTable.refreshExpiresAt]?.toInstant(),
             lastActivityAt = this[SessionsTable.lastActivityAt].toInstant(),
             revokedAt = this[SessionsTable.revokedAt]?.toInstant(),
+            impersonatorSessionId = this[SessionsTable.impersonatorSessionId]?.let { SessionId(it) },
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

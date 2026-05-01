@@ -12,6 +12,10 @@ import java.time.Instant
  * Refresh token rotation: each refresh creates a new Session and revokes the old one.
  *
  * [userId] is null for client_credentials sessions (machine-to-machine).
+ *
+ * [impersonatorSessionId] is set on impersonation sessions and points to the
+ * admin's own session row. When non-null, [userId] is the impersonated user
+ * and the admin's identity lives one hop away through the parent session.
  */
 data class Session(
     val id: SessionId? = null,
@@ -28,8 +32,10 @@ data class Session(
     val refreshExpiresAt: Instant? = null,
     val lastActivityAt: Instant = Instant.now(),
     val revokedAt: Instant? = null,
+    val impersonatorSessionId: SessionId? = null,
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null
     val isActive: Boolean get() = !isExpired && !isRevoked
+    val isImpersonation: Boolean get() = impersonatorSessionId != null
 }
