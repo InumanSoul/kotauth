@@ -36,4 +36,15 @@ data class PortalSession(
     val username: String,
     val portalSessionId: Int? = null,
     val createdAt: Long = Instant.now().epochSecond,
-)
+    /**
+     * When this portal session is the result of an admin impersonating a user,
+     * these three fields capture the originating admin so the banner can render
+     * the "Signed in as admin" caption and the "End session" form can revoke
+     * the right server-side row. All three are non-null together, or all null.
+     */
+    val impersonatorAdminUserId: Int? = null,
+    val impersonatorAdminUsername: String? = null,
+    val impersonatorAdminSessionId: Int? = null,
+) {
+    val isImpersonation: Boolean get() = impersonatorAdminSessionId != null
+}

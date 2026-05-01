@@ -82,4 +82,19 @@ interface SessionRepository {
      * Returns the number of rows deleted. Used by the background cleanup job.
      */
     fun deleteExpired(retentionDays: Int = 7): Int
+
+    /**
+     * Returns active impersonation sessions whose parent is [parentSessionId].
+     * Used to cascade revocation when the admin's own session is revoked.
+     */
+    fun findActiveByImpersonator(parentSessionId: SessionId): List<Session>
+
+    /**
+     * Revokes all active impersonation sessions whose parent is [parentSessionId].
+     * No-op if none exist. Returns the number of rows revoked.
+     */
+    fun revokeAllByImpersonator(
+        parentSessionId: SessionId,
+        revokedAt: Instant = Instant.now(),
+    ): Int
 }

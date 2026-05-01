@@ -27,6 +27,7 @@
 /* ── Portal layout: centered tabs ──────────────────────────────────────── */
 @import "./portal/shell-tabnav.css";
 @import "./portal/tabnav.css";
+@import "./portal/user-menu.css";
 
 /* ── Portal content components ─────────────────────────────────────────── */
 @import "./portal/section.css";
@@ -37,6 +38,9 @@
 
 /* ── App launcher page ────────────────────────────────────────────────── */
 @import "./portal/launcher.css";
+
+/* ── Impersonation banner (admin-acting-as-user) ────────────────────────── */
+@import "./portal/impersonation.css";
 
 /* ── Password validation checklist ─────────────────────────────────────── */
 @import "./components/password-validation.css";

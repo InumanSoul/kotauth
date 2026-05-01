@@ -387,6 +387,7 @@ fun Application.module(
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,
+            impersonationService = s.impersonationService,
         )
 
         launcherRoutes(
@@ -445,6 +446,7 @@ fun Application.module(
             tenantKeyRepository = s.tenantKeyRepository,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
+            impersonationService = s.impersonationService,
             backupExporterService = s.backupExporterService,
             backupImporterService = s.backupImporterService,
             backupEncryptionPort = s.backupEncryptionPort,

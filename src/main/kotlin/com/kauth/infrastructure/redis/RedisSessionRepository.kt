@@ -50,6 +50,9 @@ class RedisSessionRepository(
             commands.zadd(RedisKeys.activeUserSet(saved.tenantId, uid), score, id.value.toString())
         }
         commands.zadd(RedisKeys.activeTenantSet(saved.tenantId), score, id.value.toString())
+        saved.impersonatorSessionId?.let { parentId ->
+            commands.zadd(RedisKeys.impersonatorSet(parentId), score, id.value.toString())
+        }
 
         return saved
     }
@@ -72,6 +75,7 @@ class RedisSessionRepository(
         revokedAt: Instant,
     ) {
         revokeAndReport(sessionId, revokedAt)
+        revokeAllByImpersonator(sessionId, revokedAt)
     }
 
     override fun revokeAllForUser(
@@ -80,7 +84,10 @@ class RedisSessionRepository(
         revokedAt: Instant,
     ) {
         commands.zrange(RedisKeys.activeUserSet(tenantId, userId), 0, -1).forEach {
-            it.toIntOrNull()?.let { id -> revokeAndReport(SessionId(id), revokedAt) }
+            it.toIntOrNull()?.let { id ->
+                revokeAndReport(SessionId(id), revokedAt)
+                revokeAllByImpersonator(SessionId(id), revokedAt)
+            }
         }
     }
 
@@ -161,6 +168,18 @@ class RedisSessionRepository(
      * so the background sweeper in `Application.kt` stays storage-agnostic.
      */
     override fun deleteExpired(retentionDays: Int): Int = 0
+
+    override fun findActiveByImpersonator(parentSessionId: SessionId): List<Session> =
+        liveSessions(RedisKeys.impersonatorSet(parentSessionId), newestFirst = true)
+
+    override fun revokeAllByImpersonator(
+        parentSessionId: SessionId,
+        revokedAt: Instant,
+    ): Int =
+        commands
+            .zrange(RedisKeys.impersonatorSet(parentSessionId), 0, -1)
+            .mapNotNull { it.toIntOrNull() }
+            .count { revokeAndReport(SessionId(it), revokedAt) }
 
     /**
      * Reads members of an active-set, batch-MGETs the records, and returns the

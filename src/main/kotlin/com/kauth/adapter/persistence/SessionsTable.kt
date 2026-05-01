@@ -21,6 +21,7 @@ object SessionsTable : Table("sessions") {
     val refreshExpiresAt = timestampWithTimeZone("refresh_expires_at").nullable()
     val lastActivityAt = timestampWithTimeZone("last_activity_at")
     val revokedAt = timestampWithTimeZone("revoked_at").nullable()
+    val impersonatorSessionId = integer("impersonator_session_id").references(id).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

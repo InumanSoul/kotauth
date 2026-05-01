@@ -10,6 +10,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TokenPort
 import com.kauth.domain.util.SecureTokens
@@ -68,6 +69,7 @@ class JwtTokenAdapter(
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
+        actingSubject: UserId?,
     ): TokenResponse {
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
@@ -136,6 +138,12 @@ class JwtTokenAdapter(
             accessTokenBuilder.withClaim(claimName, value)
         }
 
+        // RFC 8693 §4.1: nested `act` claim identifies the acting party
+        // during impersonation. `sub` remains the impersonated user.
+        if (actingSubject != null) {
+            accessTokenBuilder.withClaim("act", mapOf("sub" to actingSubject.value.toString()))
+        }
+
         val accessToken = accessTokenBuilder.sign(activeKey.algorithm)
 
         val idToken =
@@ -155,6 +163,10 @@ class JwtTokenAdapter(
                     .apply {
                         for ((claimName, value) in customIdClaims) {
                             withClaim(claimName, value)
+                        }
+                    }.apply {
+                        if (actingSubject != null) {
+                            withClaim("act", mapOf("sub" to actingSubject.value.toString()))
                         }
                     }.withIssuedAt(Date())
                     .withExpiresAt(expiresAt)
@@ -251,6 +263,14 @@ class JwtTokenAdapter(
                     emptyMap()
                 }
 
+            val actingSubject =
+                try {
+                    val act = verified.getClaim("act").asMap()
+                    act?.get("sub") as? String
+                } catch (_: Exception) {
+                    null
+                }
+
             AccessTokenClaims(
                 sub = verified.subject ?: "",
                 iss = verified.issuer ?: "",
@@ -263,6 +283,7 @@ class JwtTokenAdapter(
                 expiresAt = verified.expiresAtAsInstant?.epochSecond ?: 0L,
                 realmRoles = realmRoles,
                 resourceRoles = resourceRoles,
+                actingSubject = actingSubject,
             )
         } catch (e: Exception) {
             log.debug("Token decode failed: ${e.message}")

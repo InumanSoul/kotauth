@@ -64,6 +64,34 @@ class SessionCodecTest {
     }
 
     @Test
+    fun `round-trip preserves the impersonator parent session id`() {
+        val now = Instant.parse("2026-04-29T12:00:00Z")
+        val original =
+            Session(
+                id = SessionId(2),
+                tenantId = TenantId(1),
+                userId = UserId(99),
+                clientId = null,
+                accessTokenHash = "imp",
+                refreshTokenHash = null,
+                scopes = "openid",
+                ipAddress = null,
+                userAgent = null,
+                createdAt = now,
+                expiresAt = now.plusSeconds(60),
+                refreshExpiresAt = null,
+                lastActivityAt = now,
+                revokedAt = null,
+                impersonatorSessionId = SessionId(1),
+            )
+
+        val decoded = SessionCodec.decode(SessionCodec.encode(original))
+
+        assertEquals(original, decoded)
+        assertEquals(true, decoded.isImpersonation)
+    }
+
+    @Test
     fun `round-trip handles a client_credentials session (null userId)`() {
         val now = Instant.parse("2026-04-29T12:00:00Z")
         val original =

@@ -7,6 +7,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.port.TokenPort
 
 /**
@@ -32,6 +33,8 @@ class FakeTokenPort : TokenPort {
         private set
     var lastAuthTime: java.time.Instant? = null
         private set
+    var lastActingSubject: UserId? = null
+        private set
 
     fun reset() {
         callCount = 0
@@ -40,6 +43,7 @@ class FakeTokenPort : TokenPort {
         lastCustomAccessClaims = emptyMap()
         lastCustomIdClaims = emptyMap()
         lastAuthTime = null
+        lastActingSubject = null
     }
 
     override fun issueUserTokens(
@@ -52,18 +56,21 @@ class FakeTokenPort : TokenPort {
         customAccessClaims: Map<String, String>,
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
+        actingSubject: UserId?,
     ): TokenResponse {
         val n = ++callCount
         lastCustomAccessClaims = customAccessClaims
         lastCustomIdClaims = customIdClaims
         lastAuthTime = authTime
+        lastActingSubject = actingSubject
+        val subjectMarker = if (actingSubject != null) "imp.${actingSubject.value}." else ""
         return TokenResponse(
-            access_token = "fake.access.${user.username}.$n",
+            access_token = "fake.access.$subjectMarker${user.username}.$n",
             token_type = "Bearer",
             expires_in = tenant.tokenExpirySeconds,
-            refresh_token = "fake.refresh.${user.username}.$n",
+            refresh_token = "fake.refresh.$subjectMarker${user.username}.$n",
             refresh_expires_in = tenant.refreshTokenExpirySeconds,
-            id_token = if ("openid" in scopes) "fake.id.${user.username}.$n" else null,
+            id_token = if ("openid" in scopes) "fake.id.$subjectMarker${user.username}.$n" else null,
             scope = scopes.joinToString(" "),
         )
     }

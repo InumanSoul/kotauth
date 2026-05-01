@@ -39,6 +39,7 @@ class FakeSessionRepository : SessionRepository {
         revokedAt: Instant,
     ) {
         store[sessionId.value]?.let { store[sessionId.value] = it.copy(revokedAt = revokedAt) }
+        cascadeImpersonatorChildren(sessionId, revokedAt)
     }
 
     override fun revokeAllForUser(
@@ -48,6 +49,18 @@ class FakeSessionRepository : SessionRepository {
     ) {
         store.values
             .filter { it.tenantId == tenantId && it.userId == userId && it.isActive }
+            .forEach {
+                store[it.id!!.value] = it.copy(revokedAt = revokedAt)
+                cascadeImpersonatorChildren(it.id, revokedAt)
+            }
+    }
+
+    private fun cascadeImpersonatorChildren(
+        parentSessionId: SessionId,
+        revokedAt: Instant,
+    ) {
+        store.values
+            .filter { it.impersonatorSessionId == parentSessionId && it.isActive }
             .forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
     }
 
@@ -100,5 +113,17 @@ class FakeSessionRepository : SessionRepository {
         val toDelete = store.values.filter { it.expiresAt.isBefore(cutoff) || (it.revokedAt?.isBefore(cutoff) == true) }
         toDelete.forEach { store.remove(it.id?.value) }
         return toDelete.size
+    }
+
+    override fun findActiveByImpersonator(parentSessionId: SessionId): List<Session> =
+        store.values.filter { it.impersonatorSessionId == parentSessionId && it.isActive }
+
+    override fun revokeAllByImpersonator(
+        parentSessionId: SessionId,
+        revokedAt: Instant,
+    ): Int {
+        val active = store.values.filter { it.impersonatorSessionId == parentSessionId && it.isActive }
+        active.forEach { store[it.id!!.value] = it.copy(revokedAt = revokedAt) }
+        return active.size
     }
 }

@@ -254,36 +254,51 @@ object PortalView {
                                     +ctx.t("PORTAL_DELETE_ACCOUNT_DESC")
                                 }
                             }
-                            button(
-                                type = ButtonType.button,
-                                classes = "btn btn--danger",
-                            ) {
-                                attributes["data-action"] = "toggle-delete-confirm"
-                                +ctx.t("PORTAL_DELETE_ACCOUNT_BUTTON")
+                            if (ctx.impersonation != null) {
+                                span(classes = "tooltip-wrap") {
+                                    attributes["data-tooltip"] = ctx.t("IMPERSONATION_DISABLED_TOOLTIP")
+                                    button(
+                                        type = ButtonType.button,
+                                        classes = "btn btn--danger",
+                                    ) {
+                                        disabled = true
+                                        +ctx.t("PORTAL_DELETE_ACCOUNT_BUTTON")
+                                    }
+                                }
+                            } else {
+                                button(
+                                    type = ButtonType.button,
+                                    classes = "btn btn--danger",
+                                ) {
+                                    attributes["data-action"] = "toggle-delete-confirm"
+                                    +ctx.t("PORTAL_DELETE_ACCOUNT_BUTTON")
+                                }
                             }
                         }
-                        div(classes = "confirm-block") {
-                            id = "delete-confirm"
-                            p(classes = "confirm-block__label") {
-                                +ctx.t("PORTAL_DELETE_CONFIRM_PREFIX")
-                                code { +session.username }
-                                +" to confirm deletion"
-                            }
-                            form(
-                                action = "/t/$slug/account/delete",
-                                method = FormMethod.post,
-                            ) {
-                                div(classes = "confirm-block__row") {
-                                    input(type = InputType.text, name = "confirm_username") {
-                                        classes = setOf("confirm-block__input")
-                                        placeholder = session.username
-                                        required = true
-                                        attributes["autocomplete"] = "off"
+                        if (ctx.impersonation == null) {
+                            div(classes = "confirm-block") {
+                                id = "delete-confirm"
+                                p(classes = "confirm-block__label") {
+                                    +ctx.t("PORTAL_DELETE_CONFIRM_PREFIX")
+                                    code { +session.username }
+                                    +" to confirm deletion"
+                                }
+                                form(
+                                    action = "/t/$slug/account/delete",
+                                    method = FormMethod.post,
+                                ) {
+                                    div(classes = "confirm-block__row") {
+                                        input(type = InputType.text, name = "confirm_username") {
+                                            classes = setOf("confirm-block__input")
+                                            placeholder = session.username
+                                            required = true
+                                            attributes["autocomplete"] = "off"
+                                        }
+                                        button(
+                                            type = ButtonType.submit,
+                                            classes = "btn btn--danger",
+                                        ) { +ctx.t("PORTAL_DELETE_CONFIRM_BUTTON") }
                                     }
-                                    button(
-                                        type = ButtonType.submit,
-                                        classes = "btn btn--danger",
-                                    ) { +ctx.t("PORTAL_DELETE_CONFIRM_BUTTON") }
                                 }
                             }
                         }
@@ -391,8 +406,19 @@ object PortalView {
                                     span(classes = "edit-actions__note") {
                                         +ctx.t("PORTAL_SECURITY_SIGNOUT_NOTE")
                                     }
-                                    button(type = ButtonType.submit, classes = "btn btn--primary") {
-                                        +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD")
+                                    if (ctx.impersonation != null) {
+                                        span(classes = "tooltip-wrap") {
+                                            attributes["data-tooltip"] =
+                                                ctx.t("IMPERSONATION_DISABLED_TOOLTIP")
+                                            button(type = ButtonType.submit, classes = "btn btn--primary") {
+                                                disabled = true
+                                                +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD")
+                                            }
+                                        }
+                                    } else {
+                                        button(type = ButtonType.submit, classes = "btn btn--primary") {
+                                            +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD")
+                                        }
                                     }
                                 }
                             }
@@ -859,6 +885,7 @@ object PortalView {
         content: DIV.() -> Unit,
     ) {
         demoBanner()
+        impersonationBanner(slug, ctx)
         when (layout) {
             PortalLayout.SIDEBAR -> portalShellSidenav(slug, ctx, username, activePage, content)
             PortalLayout.CENTERED -> portalShellTabnav(slug, ctx, username, activePage, content)
@@ -1001,6 +1028,46 @@ object PortalView {
             .mapNotNull { it.firstOrNull()?.uppercaseChar() }
             .joinToString("")
             .ifEmpty { "K" }
+
+    /**
+     * Sticky, full-width banner shown above the portal shell while the admin
+     * is impersonating a user. No-op when [ViewContext.impersonation] is null.
+     * The "End session" form posts to `/t/{slug}/account/impersonation/stop`.
+     */
+    private fun BODY.impersonationBanner(
+        slug: String,
+        ctx: ViewContext,
+    ) {
+        val info = ctx.impersonation ?: return
+        div("impersonation-banner") {
+            attributes["role"] = "status"
+            div("impersonation-banner__inner") {
+                div("impersonation-banner__copy") {
+                    div("impersonation-banner__lead") {
+                        +ctx.t("IMPERSONATION_BANNER_LEAD")
+                        +" "
+                        strong { +info.targetUsername }
+                    }
+                    div("impersonation-banner__sub") {
+                        +ctx.t("IMPERSONATION_BANNER_SIGNED_IN_AS")
+                        +" "
+                        +info.adminUsername
+                        +" — "
+                        +ctx.t("IMPERSONATION_BANNER_AUDITED")
+                    }
+                }
+                form(
+                    action = "/t/$slug/account/impersonation/stop",
+                    method = FormMethod.post,
+                    classes = "impersonation-banner__form",
+                ) {
+                    button(type = ButtonType.submit, classes = "btn btn--ghost btn--sm") {
+                        +ctx.t("IMPERSONATION_BANNER_END")
+                    }
+                }
+            }
+        }
+    }
 
     private fun FlowContent.portalUserMenu(
         slug: String,

@@ -7,6 +7,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import java.time.Instant
 
 /**
@@ -48,6 +49,13 @@ interface TokenPort {
          * token, legacy callers); silent auth and fresh logins always populate it.
          */
         authTime: Instant? = null,
+        /**
+         * The acting party when this token is issued under impersonation.
+         * When non-null, the adapter stamps a nested `act` claim on both the
+         * access token and id_token per RFC 8693 §4.1, with `act.sub` set to
+         * the acting user's id. `sub` remains the impersonated user.
+         */
+        actingSubject: UserId? = null,
     ): TokenResponse
 
     /**

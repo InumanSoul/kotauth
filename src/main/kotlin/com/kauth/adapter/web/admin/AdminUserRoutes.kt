@@ -3,9 +3,11 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AttributeResult
+import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.infrastructure.CachingClaimMapperService
@@ -27,6 +29,8 @@ fun Route.adminUserRoutes(
     sessionRepository: SessionRepository,
     userAttributeService: UserAttributeService,
     claimMapperService: CachingClaimMapperService,
+    impersonationService: ImpersonationService? = null,
+    userRepository: UserRepository? = null,
 ) {
     route("/users") {
         get {
@@ -145,6 +149,7 @@ fun Route.adminUserRoutes(
                         "invite_resent" -> EnglishStrings.TOAST_INVITE_RESENT
                         "attribute_saved" -> "Attribute saved."
                         "attribute_deleted" -> "Attribute deleted."
+                        "impersonation_ended" -> "Impersonation session ended."
                         else -> null
                     }
                 val errorParam =
@@ -153,6 +158,10 @@ fun Route.adminUserRoutes(
                         "verification_failed" -> "Failed to send verification email. Check SMTP configuration."
                         "invite_send_failed" -> EnglishStrings.TOAST_INVITE_SEND_FAILED
                         "temp_password_failed" -> "Could not generate a temporary password link. Try again."
+                        "impersonation_disabled" -> EnglishStrings.IMPERSONATE_FAILED_DISABLED
+                        "impersonation_locked" -> EnglishStrings.IMPERSONATE_FAILED_LOCKED
+                        "impersonation_not_found" -> EnglishStrings.IMPERSONATE_FAILED_GENERIC
+                        "impersonation_failed" -> EnglishStrings.IMPERSONATE_FAILED_GENERIC
                         else -> null
                     }
                 val tempPasswordLink =
@@ -328,6 +337,14 @@ fun Route.adminUserRoutes(
                 val slug = workspace.slug
                 sessionRepository.revokeAllForUser(workspace.id, userId)
                 call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=sessions_revoked")
+            }
+
+            if (impersonationService != null && userRepository != null) {
+                adminUserImpersonationRoute(
+                    impersonationService = impersonationService,
+                    sessionRepository = sessionRepository,
+                    userRepository = userRepository,
+                )
             }
 
             post("/send-verification") {

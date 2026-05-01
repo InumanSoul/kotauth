@@ -74,6 +74,7 @@ fun Route.adminRoutes(
     tenantKeyRepository: TenantKeyRepository? = null,
     userAttributeService: com.kauth.domain.service.UserAttributeService,
     claimMapperService: com.kauth.infrastructure.CachingClaimMapperService,
+    impersonationService: com.kauth.domain.service.ImpersonationService? = null,
     backupExporterService: BackupExporterService? = null,
     backupImporterService: BackupImporterService? = null,
     backupEncryptionPort: BackupEncryptionPort? = null,
@@ -503,6 +504,8 @@ fun Route.adminRoutes(
                     sessionRepository = sessionRepository,
                     userAttributeService = userAttributeService,
                     claimMapperService = claimMapperService,
+                    impersonationService = impersonationService,
+                    userRepository = userRepository,
                 )
 
                 adminSessionAuditRoutes(

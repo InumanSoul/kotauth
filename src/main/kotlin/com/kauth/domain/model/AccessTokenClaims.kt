@@ -21,4 +21,9 @@ data class AccessTokenClaims(
     val expiresAt: Long,
     val realmRoles: List<String> = emptyList(),
     val resourceRoles: Map<String, List<String>> = emptyMap(),
+    /**
+     * RFC 8693 acting subject. Non-null when the token was issued under
+     * impersonation; carries the admin user id who initiated the impersonation.
+     */
+    val actingSubject: String? = null,
 )

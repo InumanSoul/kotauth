@@ -66,12 +66,16 @@
 }
 
 /* User menu collapses to avatar-only at top-bar size to avoid the
-   trigger consuming half the bar width. */
+   trigger consuming half the bar width. Both width:auto rules override
+   the base width:100% so the user-menu hugs its content instead of
+   stretching to fill the right side of the topbar. */
 .portal-topbar .portal-user-menu {
   width: auto;
+  flex-shrink: 0;
 }
 
 .portal-topbar .portal-user-menu__trigger {
+  width: auto;
   padding: 4px 8px;
   gap: 8px;
 }
