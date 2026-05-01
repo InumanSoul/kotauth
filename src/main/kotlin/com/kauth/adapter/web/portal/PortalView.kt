@@ -3,10 +3,12 @@ package com.kauth.adapter.web.portal
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
-import com.kauth.adapter.web.inlineSvgIcon
-import com.kauth.domain.model.SecurityConfig
+import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
+import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.PortalLayout
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.TenantTheme
@@ -35,20 +37,19 @@ object PortalView {
 
     fun loginPage(
         slug: String,
-        workspaceName: String,
-        theme: TenantTheme,
+        ctx: ViewContext,
         error: String?,
     ): HTML.() -> Unit =
         {
-            head { authPageHead("$workspaceName | Sign In", theme) }
+            head { authPageHead("${ctx.workspaceName} | ${ctx.t("PORTAL_LOGIN_SUBMIT")}", ctx.theme) }
             body {
                 demoBanner()
                 div("brand") {
-                    div("brand-name") { +workspaceName }
+                    div("brand-name") { +ctx.workspaceName }
                 }
                 div("card") {
-                    h1("card-title") { +"Account" }
-                    p("card-subtitle") { +"Sign in to manage your account" }
+                    h1("card-title") { +ctx.t("PORTAL_LOGIN_TITLE") }
+                    p("card-subtitle") { +ctx.t("PORTAL_LOGIN_SUBTITLE") }
 
                     if (!error.isNullOrBlank()) {
                         div("alert alert-error") { +error }
@@ -62,11 +63,11 @@ object PortalView {
                         div("field") {
                             label {
                                 htmlFor = "username"
-                                +"Username"
+                                +ctx.t("PORTAL_LOGIN_USERNAME")
                             }
                             input(type = InputType.text, name = "username") {
                                 id = "username"
-                                placeholder = "Enter your username"
+                                placeholder = ctx.t("PORTAL_LOGIN_USERNAME_PLACEHOLDER")
                                 attributes["autocomplete"] = "username"
                                 required = true
                                 attributes["autofocus"] = "true"
@@ -75,20 +76,20 @@ object PortalView {
                         div("field") {
                             label {
                                 htmlFor = "password"
-                                +"Password"
+                                +ctx.t("PORTAL_LOGIN_PASSWORD")
                             }
                             input(type = InputType.password, name = "password") {
                                 id = "password"
-                                placeholder = "Enter your password"
+                                placeholder = ctx.t("PORTAL_LOGIN_PASSWORD_PLACEHOLDER")
                                 attributes["autocomplete"] = "current-password"
                                 required = true
                             }
                         }
-                        button(type = ButtonType.submit, classes = "btn") { +"Sign in" }
+                        button(type = ButtonType.submit, classes = "btn") { +ctx.t("PORTAL_LOGIN_SUBMIT") }
                     }
 
                     div("footer-link") {
-                        a(href = "/t/$slug/forgot-password") { +"Forgot password?" }
+                        a(href = "/t/$slug/forgot-password") { +ctx.t("PORTAL_LOGIN_FORGOT") }
                     }
                 }
             }
@@ -101,8 +102,7 @@ object PortalView {
     fun profilePage(
         slug: String,
         session: PortalSession,
-        theme: TenantTheme,
-        workspaceName: String,
+        ctx: ViewContext,
         layout: PortalLayout = PortalLayout.SIDEBAR,
         successMsg: String?,
         errorMsg: String?,
@@ -111,15 +111,15 @@ object PortalView {
         connectedAccounts: List<SocialAccount> = emptyList(),
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Profile — $workspaceName", theme, layout) }
+            head { portalPageHead("${ctx.t("PORTAL_PROFILE_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
             body {
                 if (successMsg != null) {
                     attributes["data-toast-msg"] = EnglishStrings.TOAST_PROFILE_UPDATED
                 }
-                portalShell(slug, workspaceName, session.username, "profile", layout, theme.logoUrl) {
+                portalShell(slug, ctx, session.username, "profile", layout) {
                     div(classes = "page-header") {
-                        h1(classes = "page-header__title") { +"Profile" }
-                        p(classes = "page-header__subtitle") { +"Manage your personal information" }
+                        h1(classes = "page-header__title") { +ctx.t("PORTAL_PROFILE_TITLE") }
+                        p(classes = "page-header__subtitle") { +ctx.t("PORTAL_PROFILE_SUBTITLE") }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -145,21 +145,21 @@ object PortalView {
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "username"
-                                        +"Username"
+                                        +ctx.t("PORTAL_PROFILE_USERNAME")
                                     }
                                     input(type = InputType.text, name = "username") {
                                         classes = setOf("edit-field__input", "edit-field__input--mono", "edit-field__input--disabled")
                                         id = "username"
                                         value = session.username
                                         disabled = true
-                                        title = "Username cannot be changed"
+                                        title = ctx.t("PORTAL_PROFILE_USERNAME_HINT")
                                     }
-                                    p(classes = "edit-field__hint") { +"Username cannot be changed after account creation." }
+                                    p(classes = "edit-field__hint") { +ctx.t("PORTAL_PROFILE_USERNAME_HINT") }
                                 }
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "email"
-                                        +"Email address"
+                                        +ctx.t("PORTAL_PROFILE_EMAIL")
                                     }
                                     input(type = InputType.email, name = "email") {
                                         classes = setOf("edit-field__input")
@@ -173,7 +173,7 @@ object PortalView {
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "full_name"
-                                        +"Full name"
+                                        +ctx.t("PORTAL_PROFILE_FULL_NAME")
                                     }
                                     input(type = InputType.text, name = "full_name") {
                                         classes = setOf("edit-field__input")
@@ -184,7 +184,9 @@ object PortalView {
                                     }
                                 }
                                 div(classes = "edit-actions") {
-                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Save changes" }
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                                        +ctx.t("PORTAL_PROFILE_SAVE")
+                                    }
                                 }
                             }
                         }
@@ -197,22 +199,22 @@ object PortalView {
                             div(classes = "portal-section__header-left") {
                                 span(classes = "portal-section__title") {
                                     id = "connected-accounts-title"
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_TITLE
+                                    +ctx.t("CONNECTED_ACCOUNTS_TITLE")
                                 }
                                 span(classes = "portal-section__subtitle") {
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                    +ctx.t("CONNECTED_ACCOUNTS_SUBTITLE")
                                 }
                             }
                         }
                         if (connectedAccounts.isEmpty()) {
                             div(classes = "portal-section__body") {
                                 p(classes = "portal-empty") {
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_EMPTY
+                                    +ctx.t("CONNECTED_ACCOUNTS_EMPTY")
                                 }
                             }
                         } else {
                             ul(classes = "social-accounts-list") {
-                                attributes["aria-label"] = EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                attributes["aria-label"] = ctx.t("CONNECTED_ACCOUNTS_SUBTITLE")
                                 for (account in connectedAccounts) {
                                     li(classes = "social-accounts-list__item") {
                                         div(classes = "social-accounts-list__provider") {
@@ -241,13 +243,15 @@ object PortalView {
 
                     div(classes = "danger-zone") {
                         div(classes = "danger-zone__header") {
-                            span(classes = "danger-zone__header-title") { +"Danger zone" }
+                            span(classes = "danger-zone__header-title") { +ctx.t("PORTAL_DANGER_ZONE") }
                         }
                         div(classes = "danger-zone__item") {
                             div(classes = "danger-zone__item-info") {
-                                div(classes = "danger-zone__item-title") { +"Delete account" }
+                                div(classes = "danger-zone__item-title") {
+                                    +ctx.t("PORTAL_DELETE_ACCOUNT_TITLE")
+                                }
                                 div(classes = "danger-zone__item-desc") {
-                                    +"Permanently deletes your account, profile, and all associated data. This cannot be undone."
+                                    +ctx.t("PORTAL_DELETE_ACCOUNT_DESC")
                                 }
                             }
                             button(
@@ -255,13 +259,13 @@ object PortalView {
                                 classes = "btn btn--danger",
                             ) {
                                 attributes["data-action"] = "toggle-delete-confirm"
-                                +"Delete account"
+                                +ctx.t("PORTAL_DELETE_ACCOUNT_BUTTON")
                             }
                         }
                         div(classes = "confirm-block") {
                             id = "delete-confirm"
                             p(classes = "confirm-block__label") {
-                                +"Type "
+                                +ctx.t("PORTAL_DELETE_CONFIRM_PREFIX")
                                 code { +session.username }
                                 +" to confirm deletion"
                             }
@@ -279,7 +283,7 @@ object PortalView {
                                     button(
                                         type = ButtonType.submit,
                                         classes = "btn btn--danger",
-                                    ) { +"Confirm delete" }
+                                    ) { +ctx.t("PORTAL_DELETE_CONFIRM_BUTTON") }
                                 }
                             }
                         }
@@ -295,8 +299,7 @@ object PortalView {
     fun securityPage(
         slug: String,
         session: PortalSession,
-        theme: TenantTheme,
-        workspaceName: String,
+        ctx: ViewContext,
         layout: PortalLayout = PortalLayout.SIDEBAR,
         sessions: List<Session>,
         currentSessionId: Int? = null,
@@ -305,15 +308,15 @@ object PortalView {
         passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
-            head { portalPageHead("Security — $workspaceName", theme, layout) }
+            head { portalPageHead("${ctx.t("PORTAL_SECURITY_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
             body {
                 if (successMsg != null) {
                     attributes["data-toast-msg"] = EnglishStrings.TOAST_PASSWORD_CHANGED
                 }
-                portalShell(slug, workspaceName, session.username, "security", layout, theme.logoUrl) {
+                portalShell(slug, ctx, session.username, "security", layout) {
                     div(classes = "page-header") {
-                        h1(classes = "page-header__title") { +"Security" }
-                        p(classes = "page-header__subtitle") { +"Password and active sessions" }
+                        h1(classes = "page-header__title") { +ctx.t("PORTAL_SECURITY_TITLE") }
+                        p(classes = "page-header__subtitle") { +ctx.t("PORTAL_SECURITY_SUBTITLE") }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }
@@ -322,7 +325,9 @@ object PortalView {
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
                             div(classes = "portal-section__header-left") {
-                                span(classes = "portal-section__title") { +"Change password" }
+                                span(classes = "portal-section__title") {
+                                    +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD")
+                                }
                             }
                         }
                         div(classes = "portal-section__body") {
@@ -335,7 +340,7 @@ object PortalView {
                                 div(classes = "edit-field") {
                                     label(classes = "edit-field__label") {
                                         htmlFor = "current_password"
-                                        +"Current password"
+                                        +ctx.t("PORTAL_SECURITY_CURRENT_PASSWORD")
                                     }
                                     input(type = InputType.password, name = "current_password") {
                                         classes = setOf("edit-field__input")
@@ -384,9 +389,11 @@ object PortalView {
                                 }
                                 div(classes = "edit-actions") {
                                     span(classes = "edit-actions__note") {
-                                        +"Changing your password signs you out of all active sessions"
+                                        +ctx.t("PORTAL_SECURITY_SIGNOUT_NOTE")
                                     }
-                                    button(type = ButtonType.submit, classes = "btn btn--primary") { +"Change password" }
+                                    button(type = ButtonType.submit, classes = "btn btn--primary") {
+                                        +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD")
+                                    }
                                 }
                             }
                         }
@@ -395,8 +402,12 @@ object PortalView {
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
                             div(classes = "portal-section__header-left") {
-                                span(classes = "portal-section__title") { +"Active sessions" }
-                                span(classes = "portal-section__subtitle") { +"Devices currently signed into your account" }
+                                span(classes = "portal-section__title") {
+                                    +ctx.t("PORTAL_SECURITY_ACTIVE_SESSIONS")
+                                }
+                                span(classes = "portal-section__subtitle") {
+                                    +ctx.t("PORTAL_SECURITY_SESSIONS_SUBTITLE")
+                                }
                             }
                             if (sessions.size > 1) {
                                 form(
@@ -409,22 +420,22 @@ object PortalView {
                                     ) {
                                         attributes["data-confirm"] =
                                             "Sign out of all other sessions? Only your current session will remain active."
-                                        +"Revoke all others"
+                                        +ctx.t("PORTAL_SECURITY_REVOKE_OTHERS")
                                     }
                                 }
                             }
                         }
                         if (sessions.isEmpty()) {
                             div(classes = "portal-section__body") {
-                                p(classes = "portal-empty") { +"No active sessions found." }
+                                p(classes = "portal-empty") { +ctx.t("PORTAL_SECURITY_NO_SESSIONS") }
                             }
                         } else {
                             table(classes = "sessions-table") {
                                 thead {
                                     tr {
-                                        th { +"Device / IP" }
-                                        th { +"Started" }
-                                        th { +"Expires" }
+                                        th { +ctx.t("PORTAL_SECURITY_TABLE_DEVICE") }
+                                        th { +ctx.t("PORTAL_SECURITY_TABLE_STARTED") }
+                                        th { +ctx.t("PORTAL_SECURITY_TABLE_EXPIRES") }
                                         th { +"" }
                                     }
                                 }
@@ -436,7 +447,9 @@ object PortalView {
                                                 div(classes = "session-device-label") {
                                                     +UserAgentParser.parse(s.userAgent)
                                                     if (isCurrent) {
-                                                        span(classes = "session-current-pill") { +"Current" }
+                                                        span(classes = "session-current-pill") {
+                                                            +ctx.t("PORTAL_SECURITY_CURRENT_PILL")
+                                                        }
                                                     }
                                                 }
                                                 span(classes = "session-ip") { +(s.ipAddress ?: "—") }
@@ -454,7 +467,7 @@ object PortalView {
                                                         classes = "btn btn--danger btn--sm btn--disabled",
                                                     ) {
                                                         disabled = true
-                                                        +"Revoke"
+                                                        +ctx.t("PORTAL_SECURITY_REVOKE")
                                                     }
                                                 } else {
                                                     form(
@@ -467,7 +480,7 @@ object PortalView {
                                                         ) {
                                                             attributes["data-confirm"] =
                                                                 "Revoke this session? The user will be signed out immediately."
-                                                            +"Revoke"
+                                                            +ctx.t("PORTAL_SECURITY_REVOKE")
                                                         }
                                                     }
                                                 }
@@ -484,6 +497,65 @@ object PortalView {
         }
 
     // =========================================================================
+    // App launcher page
+    // =========================================================================
+
+    fun launcherPage(
+        slug: String,
+        session: PortalSession,
+        ctx: ViewContext,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
+        apps: List<Application>,
+    ): HTML.() -> Unit = {
+        head { portalPageHead("${ctx.t("LAUNCHER_PAGE_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
+        body {
+            portalShell(slug, ctx, session.username, "launcher", layout) {
+                div(classes = "page-header") {
+                    h1(classes = "page-header__title") { +ctx.t("LAUNCHER_PAGE_TITLE") }
+                    p(classes = "page-header__subtitle") { +ctx.t("LAUNCHER_PAGE_SUBTITLE") }
+                }
+
+                if (apps.isEmpty()) {
+                    div(classes = "launcher-empty") {
+                        div(classes = "launcher-empty__title") { +ctx.t("LAUNCHER_EMPTY_TITLE") }
+                        div(classes = "launcher-empty__body") { +ctx.t("LAUNCHER_EMPTY_BODY") }
+                    }
+                } else {
+                    div(classes = "launcher-grid") {
+                        apps.forEach { app -> launcherTile(app, ctx) }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun FlowContent.launcherTile(
+        app: Application,
+        ctx: ViewContext,
+    ) {
+        val launcherUrl = app.launcherUrl ?: return
+        a(href = launcherUrl, classes = "launcher-tile") {
+            target = "_blank"
+            attributes["rel"] = "noopener noreferrer"
+            attributes["aria-label"] = "${app.name} — ${ctx.t("LAUNCHER_OPEN_IN_NEW_TAB")}"
+            div(classes = "launcher-tile__icon") {
+                if (!app.iconUrl.isNullOrBlank()) {
+                    img(src = app.iconUrl, alt = "") {
+                        attributes["onerror"] =
+                            "this.replaceWith(Object.assign(document.createElement('span')," +
+                            "{textContent:this.dataset.fallback}))"
+                        attributes["data-fallback"] =
+                            (app.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                    }
+                } else {
+                    +(app.name.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
+                }
+            }
+            div(classes = "launcher-tile__name") { +app.name }
+        }
+    }
+
+    // =========================================================================
     // MFA management page
     //   mfaEnabled = false  →  setup flow (QR + recovery codes + verification)
     //   mfaEnabled = true   →  active state + disable option
@@ -492,8 +564,7 @@ object PortalView {
     fun mfaPage(
         slug: String,
         session: PortalSession,
-        theme: TenantTheme,
-        workspaceName: String,
+        ctx: ViewContext,
         layout: PortalLayout = PortalLayout.SIDEBAR,
         mfaEnabled: Boolean,
         successMsg: String? = null,
@@ -501,17 +572,17 @@ object PortalView {
         noticeMsg: String? = null,
     ): HTML.() -> Unit = {
         head {
-            portalPageHead("Two-Factor Auth — $workspaceName", theme, layout)
+            portalPageHead("${ctx.t("PORTAL_NAV_MFA")} — ${ctx.workspaceName}", ctx.theme, layout)
         }
         body {
             attributes["data-tenant-slug"] = slug
             if (successMsg != null) {
                 attributes["data-toast-msg"] = EnglishStrings.TOAST_MFA_SETUP
             }
-            portalShell(slug, workspaceName, session.username, "mfa", layout, theme.logoUrl) {
+            portalShell(slug, ctx, session.username, "mfa", layout) {
                 div(classes = "page-header") {
-                    h1(classes = "page-header__title") { +"Two-Factor Authentication" }
-                    p(classes = "page-header__subtitle") { +"Protect your account with an authenticator app" }
+                    h1(classes = "page-header__title") { +ctx.t("PORTAL_MFA_TITLE") }
+                    p(classes = "page-header__subtitle") { +ctx.t("PORTAL_MFA_SUBTITLE") }
                 }
 
                 if (!noticeMsg.isNullOrBlank()) {
@@ -528,25 +599,24 @@ object PortalView {
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
                             div {
-                                div(classes = "portal-section__title") { +"Authenticator app" }
+                                div(classes = "portal-section__title") {
+                                    +ctx.t("PORTAL_MFA_AUTHENTICATOR_APP")
+                                }
                             }
                             span(classes = "badge badge--active") {
                                 span(classes = "badge__dot") {}
-                                +"Active"
+                                +ctx.t("PORTAL_MFA_ACTIVE")
                             }
                         }
                         div(classes = "portal-section__body") {
-                            p { +"Two-factor authentication is protecting your account." }
+                            p { +ctx.t("PORTAL_MFA_PROTECTING") }
                             p {
                                 style = "margin-top:6px"
-                                +"When you sign in you'll be asked for a 6-digit code from your authenticator app."
+                                +ctx.t("PORTAL_MFA_SIGNIN_HINT")
                             }
                             p(classes = "form-hint") {
                                 style = "margin-top:8px"
-                                +(
-                                    "Recovery codes were displayed once when you set up two-factor authentication. " +
-                                        "To generate new codes, remove and re-enable two-factor authentication."
-                                )
+                                +ctx.t("PORTAL_MFA_RECOVERY_HINT")
                             }
 
                             div(classes = "divider") {}
@@ -555,27 +625,24 @@ object PortalView {
                                 id = "disable-btn-row"
                                 button(classes = "btn btn--danger") {
                                     attributes["data-action"] = "show-disable-confirm"
-                                    +"Remove authenticator"
+                                    +ctx.t("PORTAL_MFA_REMOVE")
                                 }
                             }
                             div {
                                 id = "disable-confirm"
                                 style = "display:none"
                                 div(classes = "alert-warning") {
-                                    +(
-                                        "This will remove your authenticator app and disable two-factor authentication. " +
-                                            "Your account will only be protected by your password."
-                                    )
+                                    +ctx.t("PORTAL_MFA_REMOVE_WARNING")
                                 }
                                 div(classes = "mfa-action-row") {
                                     button(classes = "btn btn--danger") {
                                         id = "disable-btn"
                                         attributes["data-action"] = "disable-mfa"
-                                        +"Yes, remove authenticator"
+                                        +ctx.t("PORTAL_MFA_REMOVE_CONFIRM")
                                     }
                                     button(classes = "btn btn--ghost") {
                                         attributes["data-action"] = "hide-disable-confirm"
-                                        +"Cancel"
+                                        +ctx.t("PORTAL_MFA_CANCEL")
                                     }
                                 }
                             }
@@ -585,22 +652,24 @@ object PortalView {
                     div(classes = "portal-section") {
                         div(classes = "portal-section__header") {
                             div {
-                                div(classes = "portal-section__title") { +"Authenticator app" }
+                                div(classes = "portal-section__title") {
+                                    +ctx.t("PORTAL_MFA_AUTHENTICATOR_APP")
+                                }
                             }
                             span(classes = "badge badge--warning") {
                                 span(classes = "badge__dot") {}
-                                +"Not configured"
+                                +ctx.t("PORTAL_MFA_NOT_CONFIGURED")
                             }
                         }
                         div(classes = "portal-section__body") {
                             div {
                                 id = "mfa-step-1"
                                 p(classes = "form-hint") {
-                                    +"Use an authenticator app to generate one-time codes. Once enabled, you'll need your phone every time you sign in. Save your recovery codes somewhere safe before finishing setup."
+                                    +ctx.t("PORTAL_MFA_SETUP_INTRO")
                                 }
-                                div( classes = "compatible-apps" ) {
+                                div(classes = "compatible-apps") {
                                     p {
-                                        +"Compatible Apps"
+                                        +ctx.t("PORTAL_MFA_COMPATIBLE_APPS")
                                     }
                                     ul(classes = "compatible-apps__list") {
                                         span(classes = "compatible-apps__item") { +"Google Authenticator" }
@@ -613,7 +682,7 @@ object PortalView {
                                 button(classes = "btn btn--primary") {
                                     id = "start-btn"
                                     attributes["data-action"] = "start-enrollment"
-                                    +"Set up authenticator"
+                                    +ctx.t("PORTAL_MFA_SETUP_BUTTON")
                                 }
                                 div(classes = "alert alert-error") {
                                     id = "enroll-error"
@@ -627,11 +696,11 @@ object PortalView {
 
                                 p(classes = "mfa-step-heading") { +"1. Scan this QR code" }
                                 p(classes = "form-hint") {
-                                    +"Open your authenticator app and scan the QR code below to add your account."
+                                    +ctx.t("PORTAL_MFA_SCAN_INSTRUCTION")
                                 }
                                 div(classes = "qr-container") { id = "qr-code" }
                                 p(classes = "form-hint") {
-                                    +"Can't scan? Enter this key manually: "
+                                    +ctx.t("PORTAL_MFA_MANUAL_KEY")
                                     span(classes = "mfa-secret-key") { id = "setup-key" }
                                 }
 
@@ -639,17 +708,17 @@ object PortalView {
 
                                 p(classes = "mfa-step-heading") { +"2. Save your recovery codes" }
                                 p {
-                                    +"If you ever lose access to your authenticator app, use one of these codes to sign in. Each code works only once."
+                                    +ctx.t("PORTAL_MFA_RECOVERY_CODES_INTRO")
                                 }
                                 div(classes = "alert-warning") {
-                                    +"Save these codes now — they won't be shown again after you leave this page."
+                                    +ctx.t("PORTAL_MFA_SAVE_CODES")
                                 }
                                 div(classes = "recovery-codes-grid") { id = "recovery-codes" }
                                 button(classes = "btn btn--ghost") {
                                     id = "copy-codes-btn"
                                     style = "margin-bottom: 4px;"
                                     attributes["data-action"] = "copy-codes"
-                                    +"Copy codes"
+                                    +ctx.t("PORTAL_MFA_COPY_CODES")
                                 }
 
                                 label(classes = "mfa-confirm-label") {
@@ -666,12 +735,12 @@ object PortalView {
                                     div(classes = "divider") {}
                                     p(classes = "mfa-step-heading") { +"3. Verify your setup" }
                                     p {
-                                        +"Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+                                        +ctx.t("PORTAL_MFA_VERIFY_INSTRUCTION")
                                     }
                                     div(classes = "edit-field") {
                                         label(classes = "edit-field__label") {
                                             htmlFor = "totp-code"
-                                            +"Verification code"
+                                            +ctx.t("PORTAL_MFA_VERIFICATION_CODE")
                                         }
                                         input(type = InputType.text, name = "code") {
                                             classes = setOf("edit-field__input", "edit-field__input--mono")
@@ -690,7 +759,7 @@ object PortalView {
                                     button(classes = "btn btn--primary") {
                                         id = "verify-btn"
                                         attributes["data-action"] = "verify-enrollment"
-                                        +"Confirm setup"
+                                        +ctx.t("PORTAL_MFA_CONFIRM_SETUP")
                                     }
                                 }
                             }
@@ -783,17 +852,16 @@ object PortalView {
 
     private fun BODY.portalShell(
         slug: String,
-        workspaceName: String,
+        ctx: ViewContext,
         username: String,
         activePage: String,
         layout: PortalLayout,
-        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
         demoBanner()
         when (layout) {
-            PortalLayout.SIDEBAR -> portalShellSidenav(slug, workspaceName, username, activePage, logoUrl, content)
-            PortalLayout.CENTERED -> portalShellTabnav(slug, workspaceName, username, activePage, logoUrl, content)
+            PortalLayout.SIDEBAR -> portalShellSidenav(slug, ctx, username, activePage, content)
+            PortalLayout.CENTERED -> portalShellTabnav(slug, ctx, username, activePage, content)
         }
 
         // Shared confirmation dialog — same pattern as admin shell
@@ -803,7 +871,7 @@ object PortalView {
                 div("confirm-dialog__body") {
                     p("confirm-dialog__title") {
                         id = "confirm-dialog-title"
-                        +"Confirm"
+                        +ctx.t("PORTAL_CONFIRM_TITLE")
                     }
                     p("confirm-dialog__message") {
                         id = "confirm-dialog-message"
@@ -812,11 +880,11 @@ object PortalView {
                 div("confirm-dialog__actions") {
                     button(classes = "btn btn--ghost") {
                         id = "confirm-dialog-cancel"
-                        +"Cancel"
+                        +ctx.t("PORTAL_CONFIRM_CANCEL")
                     }
                     button(classes = "btn btn--danger") {
                         id = "confirm-dialog-ok"
-                        +"Confirm"
+                        +ctx.t("PORTAL_CONFIRM_OK")
                     }
                 }
             }
@@ -825,47 +893,37 @@ object PortalView {
 
     private fun BODY.portalShellSidenav(
         slug: String,
-        workspaceName: String,
+        ctx: ViewContext,
         username: String,
         activePage: String,
-        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
+        val logoUrl = ctx.theme.logoUrl
         aside(classes = "portal-sidebar") {
             div(classes = "portal-sidebar__brand") {
                 if (logoUrl != null) {
-                    img(src = logoUrl, alt = workspaceName, classes = "portal-sidebar__brand-logo") {
+                    img(src = logoUrl, alt = ctx.workspaceName, classes = "portal-sidebar__brand-logo") {
                         width = "32"
                         height = "32"
                     }
                 } else {
                     div(classes = "portal-sidebar__brand-mark") {
-                        +workspaceInitials(workspaceName)
+                        +workspaceInitials(ctx.workspaceName)
                     }
                 }
                 div(classes = "portal-sidebar__brand-info") {
-                    span(classes = "portal-sidebar__org") { +workspaceName }
-                    span(classes = "portal-sidebar__app") { +EnglishStrings.PORTAL_MY_ACCOUNT }
+                    span(classes = "portal-sidebar__org") { +ctx.workspaceName }
+                    span(classes = "portal-sidebar__app") { +ctx.t("PORTAL_MY_ACCOUNT") }
                 }
             }
             nav(classes = "portal-nav") {
                 attributes["role"] = "navigation"
-                attributes["aria-label"] = "Account settings"
-                span(classes = "portal-nav__label") { +EnglishStrings.PORTAL_ACCOUNT }
-                portalNavItems(slug, activePage, "portal-nav__item")
+                attributes["aria-label"] = ctx.t("PORTAL_TOPBAR_TITLE")
+                span(classes = "portal-nav__label") { +ctx.t("PORTAL_ACCOUNT") }
+                portalNavItems(slug, ctx, activePage, "portal-nav__item")
             }
             div(classes = "portal-sidebar__footer") {
-                div(classes = "portal-user") {
-                    div(classes = "portal-user__avatar") {
-                        attributes["aria-hidden"] = "true"
-                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
-                    }
-                    div(classes = "portal-user__info") {
-                        span(classes = "portal-user__name") { +username }
-                        span(classes = "portal-user__handle") { +"@$username" }
-                    }
-                }
-                portalSignOutButton(slug, "portal-signout")
+                portalUserMenu(slug, ctx, username, openUpward = true)
             }
         }
         div(classes = "portal-main-wrap") {
@@ -875,45 +933,36 @@ object PortalView {
 
     private fun BODY.portalShellTabnav(
         slug: String,
-        workspaceName: String,
+        ctx: ViewContext,
         username: String,
         activePage: String,
-        logoUrl: String? = null,
         content: DIV.() -> Unit,
     ) {
-        val initials = workspaceInitials(workspaceName)
+        val logoUrl = ctx.theme.logoUrl
+        val initials = workspaceInitials(ctx.workspaceName)
 
         header(classes = "portal-topbar") {
             div(classes = "portal-topbar__inner") {
                 div(classes = "portal-topbar__brand") {
                     if (logoUrl != null) {
-                        img(src = logoUrl, alt = workspaceName, classes = "portal-topbar__brand-logo") {
+                        img(src = logoUrl, alt = ctx.workspaceName, classes = "portal-topbar__brand-logo") {
                             width = "28"
                             height = "28"
                         }
                     } else {
                         div(classes = "portal-topbar__brand-mark") { +initials }
                     }
-                    span(classes = "portal-topbar__org") { +workspaceName }
+                    span(classes = "portal-topbar__org") { +ctx.workspaceName }
                 }
-                div(classes = "portal-topbar__sep") { attributes["aria-hidden"] = "true" }
-                span(classes = "portal-topbar__page-title") { +"Account settings" }
                 div(classes = "portal-topbar__spacer") {}
-                div(classes = "portal-topbar__user") {
-                    div(classes = "portal-topbar__avatar") {
-                        attributes["aria-label"] = "Signed in as $username"
-                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
-                    }
-                    span(classes = "portal-topbar__username") { +username }
-                }
-                portalSignOutButton(slug, "portal-topbar__signout")
+                portalUserMenu(slug, ctx, username, openUpward = false)
             }
         }
         nav(classes = "portal-tabnav") {
             attributes["role"] = "navigation"
-            attributes["aria-label"] = "Account sections"
+            attributes["aria-label"] = ctx.t("PORTAL_TOPBAR_TITLE")
             div(classes = "portal-tabnav__inner") {
-                portalNavItems(slug, activePage, "portal-tabnav__item")
+                portalNavItems(slug, ctx, activePage, "portal-tabnav__item")
             }
         }
         div(classes = "portal-content") { content() }
@@ -921,21 +970,26 @@ object PortalView {
 
     private fun FlowContent.portalNavItems(
         slug: String,
+        ctx: ViewContext,
         activePage: String,
         linkClass: String,
     ) {
         a(
+            href = "/t/$slug/launcher",
+            classes = "$linkClass${if (activePage == "launcher") " is-active" else ""}",
+        ) { +ctx.t("LAUNCHER_NAV") }
+        a(
             href = "/t/$slug/account/profile",
             classes = "$linkClass${if (activePage == "profile") " is-active" else ""}",
-        ) { +"Profile" }
+        ) { +ctx.t("PORTAL_NAV_PROFILE") }
         a(
             href = "/t/$slug/account/security",
             classes = "$linkClass${if (activePage == "security") " is-active" else ""}",
-        ) { +"Security" }
+        ) { +ctx.t("PORTAL_NAV_SECURITY") }
         a(
             href = "/t/$slug/account/mfa",
             classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
-        ) { +"Two-Factor Auth" }
+        ) { +ctx.t("PORTAL_NAV_MFA") }
     }
 
     // ─── Shared helpers ────────────────────────────────────────────────────
@@ -948,15 +1002,52 @@ object PortalView {
             .joinToString("")
             .ifEmpty { "K" }
 
-    private fun FlowContent.portalSignOutButton(
+    private fun FlowContent.portalUserMenu(
         slug: String,
-        cssClass: String,
+        ctx: ViewContext,
+        username: String,
+        openUpward: Boolean,
     ) {
-        form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-            button(type = ButtonType.submit, classes = cssClass) {
-                attributes["aria-label"] = EnglishStrings.PORTAL_SIGN_OUT
-                inlineSvgIcon("logout", EnglishStrings.PORTAL_SIGN_OUT)
-                +EnglishStrings.PORTAL_SIGN_OUT
+        val signOut = ctx.t("PORTAL_SIGN_OUT")
+        val avatarChar = username.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        val rootClass =
+            buildString {
+                append("portal-user-menu")
+                if (openUpward) append(" portal-user-menu--upward")
+            }
+        div(classes = rootClass) {
+            attributes["data-user-menu"] = "true"
+            button(
+                type = ButtonType.button,
+                classes = "portal-user-menu__trigger",
+            ) {
+                attributes["data-action"] = "toggle-user-menu"
+                attributes["aria-haspopup"] = "menu"
+                attributes["aria-expanded"] = "false"
+                attributes["aria-label"] = ctx.t("PORTAL_USER_MENU_OPEN")
+                div(classes = "portal-user-menu__avatar") {
+                    attributes["aria-hidden"] = "true"
+                    +avatarChar
+                }
+                div(classes = "portal-user-menu__info") {
+                    span(classes = "portal-user-menu__name") { +username }
+                    span(classes = "portal-user-menu__handle") { +"@$username" }
+                }
+                span(classes = "portal-user-menu__chevron") {
+                    attributes["aria-hidden"] = "true"
+                    inlineSvgIcon("chevron-down", "")
+                }
+            }
+            div(classes = "portal-user-menu__panel") {
+                attributes["role"] = "menu"
+                attributes["hidden"] = "hidden"
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-user-menu__item") {
+                        attributes["role"] = "menuitem"
+                        inlineSvgIcon("logout", signOut)
+                        +signOut
+                    }
+                }
             }
         }
     }

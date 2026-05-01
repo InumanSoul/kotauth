@@ -13,6 +13,7 @@ import com.kauth.adapter.web.healthRoutes
 import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.plugin.buildCspPolicy
 import com.kauth.adapter.web.portal.PortalSession
+import com.kauth.adapter.web.portal.launcherRoutes
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.adapter.web.versionCheckRoutes
 import com.kauth.adapter.web.welcomeRoutes
@@ -385,6 +386,14 @@ fun Application.module(
             socialAccountRepository = s.socialAccountRepository,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
+            translationPort = s.translationPort,
+        )
+
+        launcherRoutes(
+            launcherService = s.launcherService,
+            tenantRepository = s.tenantRepository,
+            translationPort = s.translationPort,
+            sessionRepository = s.sessionRepository,
         )
 
         apiRoutes(

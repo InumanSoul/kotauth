@@ -22,6 +22,14 @@ data class Application(
     val redirectUris: List<String> = emptyList(),
     /** Per-client override for access token lifetime in seconds. Null means use tenant/server default. */
     val tokenExpiryOverride: Int? = null,
+    /** Public-facing URL the launcher tile navigates to. Null = app omitted from the launcher. */
+    val launcherUrl: String? = null,
+    /** Optional icon URL for the launcher tile. Null falls back to a first-letter SVG. */
+    val iconUrl: String? = null,
+    /** Admin-controlled toggle to hide a configured app from the launcher without unsetting the URL. */
+    val launcherVisible: Boolean = true,
+    /** Admin-controlled sort order in the launcher; ties broken by name. */
+    val launcherDisplayOrder: Int = 0,
 )
 
 enum class AccessType(

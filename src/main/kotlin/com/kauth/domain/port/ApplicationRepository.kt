@@ -40,13 +40,17 @@ interface ApplicationRepository {
         redirectUris: List<String>,
     ): Application
 
-    /** Updates mutable fields (name, description, accessType, redirectUris). clientId is immutable. */
+    /** Updates mutable fields. clientId is immutable. */
     fun update(
         appId: ApplicationId,
         name: String,
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        launcherUrl: String? = null,
+        iconUrl: String? = null,
+        launcherVisible: Boolean = true,
+        launcherDisplayOrder: Int = 0,
     ): Application
 
     /** Enables or disables the application. */

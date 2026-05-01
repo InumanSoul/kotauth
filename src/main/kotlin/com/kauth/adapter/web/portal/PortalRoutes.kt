@@ -1,15 +1,20 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.auth.clearSsoCookie
+import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
 import com.kauth.adapter.web.generatePkceVerifier
 import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.SocialAccountRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
@@ -69,7 +74,17 @@ fun Route.portalRoutes(
     socialAccountRepository: SocialAccountRepository? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
+    translationPort: TranslationPort,
 ) {
+    fun ApplicationCall.portalViewContext(tenant: Tenant?): ViewContext {
+        val theme = tenant?.theme ?: TenantTheme.DEFAULT
+        return ViewContext(
+            theme = theme,
+            workspaceName = tenant?.displayName ?: "KotAuth",
+            locale = resolveLocale(tenant, translationPort),
+            translator = translationPort,
+        )
+    }
     route("/t/{slug}/account") {
         // ------------------------------------------------------------------
         // Login — redirect to standard OAuth auth endpoint (PKCE)
@@ -85,7 +100,7 @@ fun Route.portalRoutes(
                 val error = call.request.queryParameters["error"]
                 return@get call.respondHtml(
                     HttpStatusCode.OK,
-                    PortalView.loginPage(slug, tenant.displayName, tenant.theme, error),
+                    PortalView.loginPage(slug, call.portalViewContext(tenant), error),
                 )
             }
 
@@ -265,7 +280,7 @@ fun Route.portalRoutes(
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
             } else {
-                call.respondRedirect("/t/$slug/account/profile")
+                call.respondRedirect("/t/$slug/launcher")
             }
         }
 
@@ -320,10 +335,9 @@ fun Route.portalRoutes(
             call.respondHtml(
                 HttpStatusCode.OK,
                 PortalView.profilePage(
-                    slug,
-                    session,
-                    tenant.theme,
-                    tenant.displayName,
+                    slug = slug,
+                    session = session,
+                    ctx = call.portalViewContext(tenant),
                     layout = tenant.portalConfig.layout,
                     successMsg = successMsg,
                     errorMsg = errorMsg,
@@ -395,10 +409,9 @@ fun Route.portalRoutes(
             call.respondHtml(
                 HttpStatusCode.OK,
                 PortalView.securityPage(
-                    slug,
-                    session,
-                    tenant.theme,
-                    tenant.displayName,
+                    slug = slug,
+                    session = session,
+                    ctx = call.portalViewContext(tenant),
                     layout = tenant.portalConfig.layout,
                     sessions = sessions,
                     currentSessionId = session.portalSessionId,
@@ -482,8 +495,7 @@ fun Route.portalRoutes(
                 PortalView.mfaPage(
                     slug = slug,
                     session = session,
-                    theme = tenant.theme,
-                    workspaceName = tenant.displayName,
+                    ctx = call.portalViewContext(tenant),
                     layout = tenant.portalConfig.layout,
                     mfaEnabled = mfaEnabled,
                     successMsg = successMsg,

@@ -40,6 +40,108 @@ object EnglishStrings {
     const val PORTAL_MY_ACCOUNT = "My Account"
     const val PORTAL_ACCOUNT = "Account"
 
+    // Portal — app launcher
+    const val LAUNCHER_NAV = "Applications"
+    const val LAUNCHER_PAGE_TITLE = "Applications"
+    const val LAUNCHER_PAGE_SUBTITLE = "Apps you can access in this workspace"
+    const val LAUNCHER_OPEN_IN_NEW_TAB = "Open in a new tab"
+    const val LAUNCHER_EMPTY_TITLE = "No applications available"
+    const val LAUNCHER_EMPTY_BODY =
+        "Ask your workspace admin to grant you access to one or more applications."
+
+    // Portal — login page (account portal entry)
+    const val PORTAL_LOGIN_TITLE = "Account"
+    const val PORTAL_LOGIN_SUBTITLE = "Sign in to manage your account"
+    const val PORTAL_LOGIN_USERNAME = "Username"
+    const val PORTAL_LOGIN_USERNAME_PLACEHOLDER = "Enter your username"
+    const val PORTAL_LOGIN_PASSWORD = "Password"
+    const val PORTAL_LOGIN_PASSWORD_PLACEHOLDER = "Enter your password"
+    const val PORTAL_LOGIN_SUBMIT = "Sign in"
+    const val PORTAL_LOGIN_FORGOT = "Forgot password?"
+
+    // Portal — navigation labels
+    const val PORTAL_NAV_PROFILE = "Profile"
+    const val PORTAL_NAV_SECURITY = "Security"
+    const val PORTAL_NAV_MFA = "Two-Factor Auth"
+    const val PORTAL_TOPBAR_TITLE = "Account settings"
+
+    // Portal — profile page
+    const val PORTAL_PROFILE_TITLE = "Profile"
+    const val PORTAL_PROFILE_SUBTITLE = "Manage your personal information"
+    const val PORTAL_PROFILE_USERNAME = "Username"
+    const val PORTAL_PROFILE_USERNAME_HINT = "Username cannot be changed after account creation."
+    const val PORTAL_PROFILE_EMAIL = "Email address"
+    const val PORTAL_PROFILE_FULL_NAME = "Full name"
+    const val PORTAL_PROFILE_SAVE = "Save changes"
+    const val PORTAL_DANGER_ZONE = "Danger zone"
+    const val PORTAL_DELETE_ACCOUNT_TITLE = "Delete account"
+    const val PORTAL_DELETE_ACCOUNT_DESC =
+        "Permanently deletes your account, profile, and all associated data. This cannot be undone."
+    const val PORTAL_DELETE_ACCOUNT_BUTTON = "Delete account"
+    const val PORTAL_DELETE_CONFIRM_PREFIX = "Type "
+    const val PORTAL_DELETE_CONFIRM_BUTTON = "Confirm delete"
+
+    // Portal — security page
+    const val PORTAL_SECURITY_TITLE = "Security"
+    const val PORTAL_SECURITY_SUBTITLE = "Password and active sessions"
+    const val PORTAL_SECURITY_CHANGE_PASSWORD = "Change password"
+    const val PORTAL_SECURITY_CURRENT_PASSWORD = "Current password"
+    const val PORTAL_SECURITY_SIGNOUT_NOTE = "Changing your password signs you out of all active sessions"
+    const val PORTAL_SECURITY_ACTIVE_SESSIONS = "Active sessions"
+    const val PORTAL_SECURITY_SESSIONS_SUBTITLE = "Devices currently signed into your account"
+    const val PORTAL_SECURITY_REVOKE_OTHERS = "Revoke all others"
+    const val PORTAL_SECURITY_NO_SESSIONS = "No active sessions found."
+    const val PORTAL_SECURITY_TABLE_DEVICE = "Device / IP"
+    const val PORTAL_SECURITY_TABLE_STARTED = "Started"
+    const val PORTAL_SECURITY_TABLE_EXPIRES = "Expires"
+    const val PORTAL_SECURITY_CURRENT_PILL = "Current"
+    const val PORTAL_SECURITY_REVOKE = "Revoke"
+
+    // Portal — MFA page
+    const val PORTAL_MFA_TITLE = "Two-Factor Authentication"
+    const val PORTAL_MFA_SUBTITLE = "Protect your account with an authenticator app"
+    const val PORTAL_MFA_AUTHENTICATOR_APP = "Authenticator app"
+    const val PORTAL_MFA_ACTIVE = "Active"
+    const val PORTAL_MFA_PROTECTING = "Two-factor authentication is protecting your account."
+    const val PORTAL_MFA_SIGNIN_HINT =
+        "When you sign in you'll be asked for a 6-digit code from your authenticator app."
+    const val PORTAL_MFA_RECOVERY_HINT =
+        "Recovery codes were displayed once when you set up two-factor authentication. " +
+            "To generate new codes, remove and re-enable two-factor authentication."
+    const val PORTAL_MFA_REMOVE = "Remove authenticator"
+    const val PORTAL_MFA_REMOVE_WARNING =
+        "This will remove your authenticator app and disable two-factor authentication. " +
+            "Your account will only be protected by your password."
+    const val PORTAL_MFA_REMOVE_CONFIRM = "Yes, remove authenticator"
+    const val PORTAL_MFA_CANCEL = "Cancel"
+    const val PORTAL_MFA_NOT_CONFIGURED = "Not configured"
+    const val PORTAL_MFA_SETUP_INTRO =
+        "Use an authenticator app to generate one-time codes. Once enabled, you'll need your phone " +
+            "every time you sign in. Save your recovery codes somewhere safe before finishing setup."
+    const val PORTAL_MFA_COMPATIBLE_APPS = "Compatible Apps"
+    const val PORTAL_MFA_SETUP_BUTTON = "Set up authenticator"
+    const val PORTAL_MFA_SCAN_INSTRUCTION =
+        "Open your authenticator app and scan the QR code below to add your account."
+    const val PORTAL_MFA_MANUAL_KEY = "Can't scan? Enter this key manually: "
+    const val PORTAL_MFA_RECOVERY_CODES_INTRO =
+        "If you ever lose access to your authenticator app, use one of these codes to sign in. " +
+            "Each code works only once."
+    const val PORTAL_MFA_SAVE_CODES =
+        "Save these codes now — they won't be shown again after you leave this page."
+    const val PORTAL_MFA_COPY_CODES = "Copy codes"
+    const val PORTAL_MFA_VERIFY_INSTRUCTION =
+        "Enter the 6-digit code shown in your authenticator app to confirm everything is working."
+    const val PORTAL_MFA_VERIFICATION_CODE = "Verification code"
+    const val PORTAL_MFA_CONFIRM_SETUP = "Confirm setup"
+
+    // Portal — confirm dialog
+    const val PORTAL_CONFIRM_TITLE = "Confirm"
+    const val PORTAL_CONFIRM_CANCEL = "Cancel"
+    const val PORTAL_CONFIRM_OK = "Confirm"
+
+    // Portal — user menu (avatar dropdown)
+    const val PORTAL_USER_MENU_OPEN = "Open user menu"
+
     // Portal — connected accounts section (profile page)
     const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"

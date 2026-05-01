@@ -53,6 +53,28 @@ class AdminService(
         val port = corsPort ?: return
         tenantRepository.findById(tenantId)?.slug?.let(port::invalidate)
     }
+
+    /**
+     * Returns the http(s) origin (scheme://host[:port]) of [url], or null if the
+     * URL is not a parseable absolute http/https URL. Used to compare launcher
+     * URL origins against registered redirect URI origins.
+     */
+    private fun extractHttpOrigin(url: String): String? =
+        try {
+            val uri = java.net.URI(url)
+            val scheme = uri.scheme?.lowercase()
+            val host = uri.host
+            if (scheme != "http" && scheme != "https") {
+                null
+            } else if (host.isNullOrBlank()) {
+                null
+            } else {
+                val port = if (uri.port != -1) ":${uri.port}" else ""
+                "$scheme://$host$port"
+            }
+        } catch (_: Exception) {
+            null
+        }
     // =========================================================================
     // Workspace settings
     // =========================================================================
@@ -635,6 +657,10 @@ class AdminService(
         description: String? = null,
         accessType: String? = null,
         redirectUris: List<String>? = null,
+        launcherUrl: String? = null,
+        iconUrl: String? = null,
+        launcherVisible: Boolean? = null,
+        launcherDisplayOrder: Int? = null,
     ): AdminResult<Application> {
         val app =
             applicationRepository.findById(appId)
@@ -655,9 +681,45 @@ class AdminService(
             }
         val resolvedAccessType = accessType ?: app.accessType.value
         val resolvedRedirectUris = redirectUris ?: app.redirectUris
+        val resolvedLauncherUrl =
+            if (launcherUrl != null) launcherUrl.trim().takeIf { it.isNotBlank() } else app.launcherUrl
+        val resolvedIconUrl =
+            if (iconUrl != null) iconUrl.trim().takeIf { it.isNotBlank() } else app.iconUrl
+        val resolvedLauncherVisible = launcherVisible ?: app.launcherVisible
+        val resolvedLauncherDisplayOrder = launcherDisplayOrder ?: app.launcherDisplayOrder
 
         if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
+        }
+
+        // Origin validation prevents a phishing surface where a compromised admin sets the
+        // tile to an attacker-controlled host. Mitigation: launcher URL must share origin
+        // with one of the application's already-registered redirect URIs.
+        if (resolvedLauncherUrl != null) {
+            val launcherOrigin =
+                extractHttpOrigin(resolvedLauncherUrl)
+                    ?: return AdminResult.Failure(
+                        AdminError.Validation("Launcher URL must be a valid http or https URL."),
+                    )
+            val redirectOrigins = resolvedRedirectUris.mapNotNull { extractHttpOrigin(it) }.toSet()
+            if (redirectOrigins.isEmpty()) {
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Add at least one redirect URI on the same origin before setting a launcher URL.",
+                    ),
+                )
+            }
+            if (launcherOrigin !in redirectOrigins) {
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Launcher URL origin '$launcherOrigin' must match one of the registered redirect URI origins.",
+                    ),
+                )
+            }
+        }
+
+        if (resolvedIconUrl != null && extractHttpOrigin(resolvedIconUrl) == null) {
+            return AdminResult.Failure(AdminError.Validation("Icon URL must be a valid http or https URL."))
         }
 
         val updated =
@@ -667,6 +729,10 @@ class AdminService(
                 description = resolvedDescription,
                 accessType = resolvedAccessType,
                 redirectUris = resolvedRedirectUris,
+                launcherUrl = resolvedLauncherUrl,
+                iconUrl = resolvedIconUrl,
+                launcherVisible = resolvedLauncherVisible,
+                launcherDisplayOrder = resolvedLauncherDisplayOrder,
             )
 
         invalidateCors(tenantId)

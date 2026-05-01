@@ -43,6 +43,7 @@ const bundles = [
       src('shared/password-validation.js'),
       src('shared/toast.js'),
       src('portal/mfa.js'),
+      src('portal/user-menu.js'),
     ],
   },
   {
