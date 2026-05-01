@@ -27,6 +27,7 @@
 /* ── Portal layout: centered tabs ──────────────────────────────────────── */
 @import "./portal/shell-tabnav.css";
 @import "./portal/tabnav.css";
+@import "./portal/user-menu.css";
 
 /* ── Portal content components ─────────────────────────────────────────── */
 @import "./portal/section.css";

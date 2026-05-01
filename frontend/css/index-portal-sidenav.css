@@ -27,6 +27,7 @@
 /* ── Portal layout: sidebar ────────────────────────────────────────────── */
 @import "./portal/shell-sidenav.css";
 @import "./portal/nav.css";
+@import "./portal/user-menu.css";
 
 /* ── Portal content components ─────────────────────────────────────────── */
 @import "./portal/section.css";
