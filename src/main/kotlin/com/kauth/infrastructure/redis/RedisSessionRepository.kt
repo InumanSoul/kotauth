@@ -75,6 +75,7 @@ class RedisSessionRepository(
         revokedAt: Instant,
     ) {
         revokeAndReport(sessionId, revokedAt)
+        revokeAllByImpersonator(sessionId, revokedAt)
     }
 
     override fun revokeAllForUser(
@@ -83,7 +84,10 @@ class RedisSessionRepository(
         revokedAt: Instant,
     ) {
         commands.zrange(RedisKeys.activeUserSet(tenantId, userId), 0, -1).forEach {
-            it.toIntOrNull()?.let { id -> revokeAndReport(SessionId(id), revokedAt) }
+            it.toIntOrNull()?.let { id ->
+                revokeAndReport(SessionId(id), revokedAt)
+                revokeAllByImpersonator(SessionId(id), revokedAt)
+            }
         }
     }
 

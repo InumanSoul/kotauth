@@ -52,6 +52,7 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
@@ -97,6 +98,7 @@ data class ServiceGraph(
     val adminService: AdminService,
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
+    val impersonationService: ImpersonationService,
     val selfServiceService: UserSelfServiceService,
     val mfaService: MfaService,
     val socialLoginService: SocialLoginService,
@@ -315,6 +317,14 @@ data class ServiceGraph(
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
                 )
+            val impersonationService =
+                ImpersonationService(
+                    userRepository = userRepository,
+                    tenantRepository = tenantRepository,
+                    sessionRepository = sessionRepository,
+                    tokenPort = tokenAdapter,
+                    auditLog = auditLogAdapter,
+                )
             val mfaService =
                 MfaService(
                     mfaRepository = mfaRepository,
@@ -484,6 +494,7 @@ data class ServiceGraph(
                 adminService = adminService,
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
+                impersonationService = impersonationService,
                 selfServiceService = selfServiceService,
                 mfaService = mfaService,
                 socialLoginService = socialLoginService,

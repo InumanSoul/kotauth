@@ -73,6 +73,7 @@ class PostgresSessionRepository : SessionRepository {
         SessionsTable.update({ SessionsTable.id eq sessionId.value }) {
             it[SessionsTable.revokedAt] = revokedAt.toOffsetDateTime()
         }
+        revokeAllByImpersonator(sessionId, revokedAt)
         Unit
     }
 
@@ -82,6 +83,14 @@ class PostgresSessionRepository : SessionRepository {
         revokedAt: Instant,
     ) = transaction {
         val ts = revokedAt.toOffsetDateTime()
+        val affectedIds =
+            SessionsTable
+                .select(SessionsTable.id)
+                .where {
+                    (SessionsTable.tenantId eq tenantId.value) and
+                        (SessionsTable.userId eq userId.value) and
+                        (SessionsTable.revokedAt.isNull())
+                }.map { it[SessionsTable.id] }
         SessionsTable.update({
             (SessionsTable.tenantId eq tenantId.value) and
                 (SessionsTable.userId eq userId.value) and
@@ -89,6 +98,7 @@ class PostgresSessionRepository : SessionRepository {
         }) {
             it[SessionsTable.revokedAt] = ts
         }
+        affectedIds.forEach { revokeAllByImpersonator(SessionId(it), revokedAt) }
         Unit
     }
 
