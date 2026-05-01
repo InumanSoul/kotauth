@@ -145,15 +145,24 @@ fun Route.adminApplicationRoutes(
                         ?.lines()
                         ?.map { it.trim() }
                         ?.filter { it.isNotBlank() } ?: emptyList()
+                val launcherUrl = params["launcherUrl"]?.trim().orEmpty()
+                val iconUrl = params["iconUrl"]?.trim().orEmpty()
+                val launcherVisible = params["launcherVisible"] == "true"
+                val launcherDisplayOrder =
+                    params["launcherDisplayOrder"]?.trim()?.toIntOrNull()?.coerceIn(0, 9999) ?: 0
                 when (
                     val result =
                         adminService.updateApplication(
-                            app.id,
-                            workspace.id,
-                            name,
-                            desc,
-                            accessType,
-                            redirectUris,
+                            appId = app.id,
+                            tenantId = workspace.id,
+                            name = name,
+                            description = desc,
+                            accessType = accessType,
+                            redirectUris = redirectUris,
+                            launcherUrl = launcherUrl,
+                            iconUrl = iconUrl,
+                            launcherVisible = launcherVisible,
+                            launcherDisplayOrder = launcherDisplayOrder,
                         )
                 ) {
                     is AdminResult.Success ->

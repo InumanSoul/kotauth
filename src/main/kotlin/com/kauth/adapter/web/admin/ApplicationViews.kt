@@ -161,6 +161,50 @@ internal fun applicationDetailPageImpl(
                 }
             }
 
+            // ── Launcher ───────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") {
+                    +"Launcher"
+                    a(
+                        href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                        classes = "btn btn--ghost btn--sm",
+                    ) { +"Configure" }
+                }
+                if (application.launcherUrl.isNullOrBlank()) {
+                    emptyState(
+                        iconName = "redirect",
+                        title = "Not in the launcher",
+                        description = "Set a launcher URL to surface this app in the workspace launcher.",
+                    ) {
+                        a(
+                            href = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/edit",
+                            classes = "empty-state__cta",
+                        ) { +"+ Set launcher URL" }
+                    }
+                } else {
+                    ovRowMono("Launcher URL", application.launcherUrl!!, copyable = true)
+                    if (!application.iconUrl.isNullOrBlank()) {
+                        ovRowMono("Icon URL", application.iconUrl!!, copyable = true)
+                    } else {
+                        ovRowMuted("Icon URL", "Using letter fallback")
+                    }
+                    ovRow("Visibility") {
+                        if (application.launcherVisible) {
+                            span("badge badge--active") {
+                                span("badge__dot") {}
+                                +"Visible"
+                            }
+                        } else {
+                            span("badge badge--inactive") {
+                                span("badge__dot") {}
+                                +"Hidden"
+                            }
+                        }
+                    }
+                    ovRowText("Display order", application.launcherDisplayOrder.toString())
+                }
+            }
+
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
@@ -499,6 +543,73 @@ internal fun editApplicationPageImpl(
                         div("edit-row__hint") {
                             +"One URI per line. Their origins are automatically CORS-allowed "
                             +"for SPAs in this workspace."
+                        }
+                    }
+                }
+            }
+
+            // ── Launcher card ──────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Launcher" }
+                div("edit-row") {
+                    span("edit-row__label") { +"Launcher URL" }
+                    div {
+                        input(type = InputType.url, name = "launcherUrl") {
+                            attributes["form"] = "edit-app-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "launcherUrl"
+                            placeholder = "https://app.example.com/"
+                            value = application.launcherUrl ?: ""
+                        }
+                        div("edit-row__hint") {
+                            +"Public URL the launcher tile navigates to. Leave blank to omit "
+                            +"this app from the workspace launcher. Origin must match one of the "
+                            +"redirect URIs above."
+                        }
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Icon URL" }
+                    div {
+                        input(type = InputType.url, name = "iconUrl") {
+                            attributes["form"] = "edit-app-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "iconUrl"
+                            placeholder = "https://cdn.example.com/icon.svg"
+                            value = application.iconUrl ?: ""
+                        }
+                        div("edit-row__hint") {
+                            +"Optional. May be served from a different origin (e.g. CDN). "
+                            +"Falls back to the first letter of the app name when blank or unreachable."
+                        }
+                    }
+                }
+                label("check-row") {
+                    input(type = InputType.checkBox, name = "launcherVisible") {
+                        attributes["form"] = "edit-app-form"
+                        if (application.launcherVisible) checked = true
+                        attributes["value"] = "true"
+                    }
+                    div("check-row__body") {
+                        span("check-row__label") { +"Show in launcher" }
+                        span("check-row__desc") {
+                            +"Hide this app from the launcher without unsetting the URL above."
+                        }
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Display order" }
+                    div {
+                        input(type = InputType.number, name = "launcherDisplayOrder") {
+                            attributes["form"] = "edit-app-form"
+                            classes = setOf("edit-row__field")
+                            this.id = "launcherDisplayOrder"
+                            attributes["min"] = "0"
+                            attributes["max"] = "9999"
+                            value = application.launcherDisplayOrder.toString()
+                        }
+                        div("edit-row__hint") {
+                            +"Lower numbers appear first. Ties are broken alphabetically by name."
                         }
                     }
                 }
