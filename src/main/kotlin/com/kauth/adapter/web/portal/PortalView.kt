@@ -199,22 +199,22 @@ object PortalView {
                             div(classes = "portal-section__header-left") {
                                 span(classes = "portal-section__title") {
                                     id = "connected-accounts-title"
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_TITLE
+                                    +ctx.t("CONNECTED_ACCOUNTS_TITLE")
                                 }
                                 span(classes = "portal-section__subtitle") {
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                    +ctx.t("CONNECTED_ACCOUNTS_SUBTITLE")
                                 }
                             }
                         }
                         if (connectedAccounts.isEmpty()) {
                             div(classes = "portal-section__body") {
                                 p(classes = "portal-empty") {
-                                    +EnglishStrings.CONNECTED_ACCOUNTS_EMPTY
+                                    +ctx.t("CONNECTED_ACCOUNTS_EMPTY")
                                 }
                             }
                         } else {
                             ul(classes = "social-accounts-list") {
-                                attributes["aria-label"] = EnglishStrings.CONNECTED_ACCOUNTS_SUBTITLE
+                                attributes["aria-label"] = ctx.t("CONNECTED_ACCOUNTS_SUBTITLE")
                                 for (account in connectedAccounts) {
                                     li(classes = "social-accounts-list__item") {
                                         div(classes = "social-accounts-list__provider") {
@@ -923,17 +923,7 @@ object PortalView {
                 portalNavItems(slug, ctx, activePage, "portal-nav__item")
             }
             div(classes = "portal-sidebar__footer") {
-                div(classes = "portal-user") {
-                    div(classes = "portal-user__avatar") {
-                        attributes["aria-hidden"] = "true"
-                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
-                    }
-                    div(classes = "portal-user__info") {
-                        span(classes = "portal-user__name") { +username }
-                        span(classes = "portal-user__handle") { +"@$username" }
-                    }
-                }
-                portalSignOutButton(slug, ctx, "portal-signout")
+                portalUserMenu(slug, ctx, username, openUpward = true)
             }
         }
         div(classes = "portal-main-wrap") {
@@ -964,17 +954,8 @@ object PortalView {
                     }
                     span(classes = "portal-topbar__org") { +ctx.workspaceName }
                 }
-                div(classes = "portal-topbar__sep") { attributes["aria-hidden"] = "true" }
-                span(classes = "portal-topbar__page-title") { +ctx.t("PORTAL_TOPBAR_TITLE") }
                 div(classes = "portal-topbar__spacer") {}
-                div(classes = "portal-topbar__user") {
-                    div(classes = "portal-topbar__avatar") {
-                        attributes["aria-label"] = "Signed in as $username"
-                        +(username.firstOrNull()?.uppercaseChar()?.toString() ?: "?")
-                    }
-                    span(classes = "portal-topbar__username") { +username }
-                }
-                portalSignOutButton(slug, ctx, "portal-topbar__signout")
+                portalUserMenu(slug, ctx, username, openUpward = false)
             }
         }
         nav(classes = "portal-tabnav") {
@@ -1021,17 +1002,52 @@ object PortalView {
             .joinToString("")
             .ifEmpty { "K" }
 
-    private fun FlowContent.portalSignOutButton(
+    private fun FlowContent.portalUserMenu(
         slug: String,
         ctx: ViewContext,
-        cssClass: String,
+        username: String,
+        openUpward: Boolean,
     ) {
         val signOut = ctx.t("PORTAL_SIGN_OUT")
-        form(action = "/t/$slug/account/logout", method = FormMethod.post) {
-            button(type = ButtonType.submit, classes = cssClass) {
-                attributes["aria-label"] = signOut
-                inlineSvgIcon("logout", signOut)
-                +signOut
+        val avatarChar = username.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        val rootClass =
+            buildString {
+                append("portal-user-menu")
+                if (openUpward) append(" portal-user-menu--upward")
+            }
+        div(classes = rootClass) {
+            attributes["data-user-menu"] = "true"
+            button(
+                type = ButtonType.button,
+                classes = "portal-user-menu__trigger",
+            ) {
+                attributes["data-action"] = "toggle-user-menu"
+                attributes["aria-haspopup"] = "menu"
+                attributes["aria-expanded"] = "false"
+                attributes["aria-label"] = ctx.t("PORTAL_USER_MENU_OPEN")
+                div(classes = "portal-user-menu__avatar") {
+                    attributes["aria-hidden"] = "true"
+                    +avatarChar
+                }
+                div(classes = "portal-user-menu__info") {
+                    span(classes = "portal-user-menu__name") { +username }
+                    span(classes = "portal-user-menu__handle") { +"@$username" }
+                }
+                span(classes = "portal-user-menu__chevron") {
+                    attributes["aria-hidden"] = "true"
+                    inlineSvgIcon("chevron-down", "")
+                }
+            }
+            div(classes = "portal-user-menu__panel") {
+                attributes["role"] = "menu"
+                attributes["hidden"] = "hidden"
+                form(action = "/t/$slug/account/logout", method = FormMethod.post) {
+                    button(type = ButtonType.submit, classes = "portal-user-menu__item") {
+                        attributes["role"] = "menuitem"
+                        inlineSvgIcon("logout", signOut)
+                        +signOut
+                    }
+                }
             }
         }
     }

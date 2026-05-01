@@ -139,6 +139,9 @@ object EnglishStrings {
     const val PORTAL_CONFIRM_CANCEL = "Cancel"
     const val PORTAL_CONFIRM_OK = "Confirm"
 
+    // Portal — user menu (avatar dropdown)
+    const val PORTAL_USER_MENU_OPEN = "Open user menu"
+
     // Portal — connected accounts section (profile page)
     const val CONNECTED_ACCOUNTS_TITLE = "Connected accounts"
     const val CONNECTED_ACCOUNTS_SUBTITLE = "Social providers linked to your account"

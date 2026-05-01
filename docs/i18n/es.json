@@ -187,6 +187,12 @@
   "PORTAL_CONFIRM_CANCEL": "Cancelar",
   "PORTAL_CONFIRM_OK": "Confirmar",
 
+  "PORTAL_USER_MENU_OPEN": "Abrir menú de usuario",
+
+  "CONNECTED_ACCOUNTS_TITLE": "Cuentas conectadas",
+  "CONNECTED_ACCOUNTS_SUBTITLE": "Proveedores sociales vinculados a tu cuenta",
+  "CONNECTED_ACCOUNTS_EMPTY": "No hay cuentas sociales conectadas.",
+
   "LAUNCHER_NAV": "Aplicaciones",
   "LAUNCHER_PAGE_TITLE": "Aplicaciones",
   "LAUNCHER_PAGE_SUBTITLE": "Aplicaciones a las que tienes acceso en este espacio de trabajo",

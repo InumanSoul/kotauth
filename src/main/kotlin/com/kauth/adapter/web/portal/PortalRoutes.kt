@@ -280,7 +280,7 @@ fun Route.portalRoutes(
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
             } else {
-                call.respondRedirect("/t/$slug/account/profile")
+                call.respondRedirect("/t/$slug/launcher")
             }
         }
 
