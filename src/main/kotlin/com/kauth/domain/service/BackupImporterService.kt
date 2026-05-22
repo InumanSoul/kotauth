@@ -148,6 +148,8 @@ class BackupImporterService(
                             corsAllowCredentials = corsAllowCredentials,
                             hibpCheckEnabled = hibpCheckEnabled,
                             magicLinkEnabled = magicLinkEnabled,
+                            magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
+                            passwordLoginEnabled = passwordLoginEnabled,
                         )
                     },
                 smtpHost = tb.smtp.host,

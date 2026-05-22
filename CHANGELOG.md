@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.1] - 2026-05-22
+
+Polish release. Closes long-deferred small items, two impersonation
+discoverability fixes promised in v1.10.0, a real bug in the backup format,
+and one developer-experience improvement.
+
+### Added
+
+- **Per-tenant magic-link token TTL** — magic-link expiry was a hardcoded 15
+  minutes; tenants can now configure it in workspace Security settings (range
+  1–1440 minutes, default 15). The `MAGIC_LINK_REQUESTED` audit event also now
+  records the TTL that was applied, so post-incident analysis can correlate
+  "expired before user clicked" reports against the configured window. V44
+  Flyway migration adds the column; one constant read in
+  `UserSelfServiceService.initiateMagicLink` becomes a per-tenant lookup. Was
+  feature-backlog item #9, started as a free-rider in V39 and reverted
+- **Impersonation events have their own audit-log filter group** — the
+  workspace audit log dropdown gains an "Impersonation" optgroup before
+  "Admin Actions". Filtering to impersonation-only is now a one-click action
+  instead of scrolling a dropdown of 30 ADMIN_* events
+- **"Recent Impersonations" panel on the admin user-detail page** — when a
+  user has been impersonated, the page renders a compact table of the last
+  5 impersonations of that user (admin username + timestamp), pulled from
+  the audit log. Empty when none — no noise on regular users. For operator
+  incident response: "was this user impersonated, and by whom?" no longer
+  requires opening the audit log and filtering by hand
+- **`admin_username` in `ADMIN_IMPERSONATION_STARTED` audit details** — the
+  event already carried the admin's user id; the username is now stored
+  alongside so consumers (the new panel, log scrapers, future tooling) do not
+  need a cross-tenant user lookup to render attribution
+- **ADR-14 — admin impersonation session model** — documents the
+  parallel-sessions + RFC 8693 `act` claim + cascade-revocation choices made
+  in v1.10.0, and the alternatives we rejected
+- **`make run` target — fast inner loop without full Docker rebuilds** —
+  starts only `db` + `redis` in Docker and runs the JAR locally via
+  `./gradlew run` with safe dev-only env vars. Avoids the multi-minute Docker
+  rebuild on every Kotlin change. The existing `make up` (full Docker stack,
+  build from source) is unchanged and remains the right target for verifying
+  the production container before pushing
+
+### Changed
+
+- **"Impersonate user" button is rendered disabled (with tooltip)** instead
+  of being hidden when the target user is disabled, locked, or has a pending
+  invite. Discoverability matters — an admin investigating a problem user
+  used to wonder where the action went; now they see the button with an
+  explanation of why it is unavailable
+- **Magic-link admin-settings copy** — the help text on the existing "Allow
+  sign-in via email magic link" toggle no longer hardcodes "15 minutes";
+  it points to the new TTL field below
+
+### Fixed
+
+- **Backup/restore loses `passwordLoginEnabled`** — a tenant configured as
+  passwordless (v1.10.0+) would silently come back as password-enabled after
+  a restore, because `SecurityConfigBackup` was missing the field. Now
+  included; old backups still import (the field has a default of `true`,
+  which matches the historical behavior). The new `magicLinkTokenTtlMinutes`
+  field is also included with a default of 15
+- **`MAGIC_LINK_TTL_SECONDS` constant removed** — it had been bypassed by the
+  per-tenant lookup but the stale 15-minute value was still readable from
+  the class
+
+### Notes
+
+- 4 new tests covering the per-tenant TTL behavior (honors configured value,
+  defaults to 15, records on audit, coerces 1..1440 at the service layer)
+- **`detekt` was evaluated and explicitly deferred** — ktlint covers
+  formatting; detekt's complexity findings would largely confirm what
+  `wc -l` already shows on the large service classes, and the baseline-file
+  maintenance cost is not yet earned by the codebase. Reconsider when the
+  team is actively splitting service classes or adopts coroutines broadly
+- **Docker compose layout was reviewed and judged sound** — six files looks
+  like a lot but each has a distinct purpose (quickstart, base, dev,
+  external-db, demo overlay, prod TLS overlay). The quickstart file was
+  given a maintainer-note comment about drift from the base stack; a deeper
+  refactor via `include:` is possible but the merge semantics are subtle and
+  the current overlay design is the right pattern
+
+---
+
 ## [1.11.0] - 2026-05-22
 
 ### Added

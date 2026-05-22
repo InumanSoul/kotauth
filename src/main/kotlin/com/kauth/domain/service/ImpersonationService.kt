@@ -50,6 +50,7 @@ class ImpersonationService(
      */
     fun startImpersonation(
         adminUserId: UserId,
+        adminUsername: String,
         adminSessionId: SessionId,
         targetTenantId: TenantId,
         targetUserId: UserId,
@@ -126,6 +127,7 @@ class ImpersonationService(
                     mapOf(
                         "target_user_id" to target.id!!.value.toString(),
                         "target_username" to target.username,
+                        "admin_username" to adminUsername,
                         "admin_session_id" to adminSessionId.value.toString(),
                         "impersonation_session_id" to saved.id!!.value.toString(),
                     ),

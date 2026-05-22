@@ -166,6 +166,11 @@ object EnglishStrings {
     const val IMPERSONATE_FAILED_LOCKED = "Cannot impersonate a temporarily locked user."
     const val IMPERSONATE_FAILED_GENERIC = "Could not start impersonation."
 
+    // Disabled-state tooltips on the Impersonate button
+    const val IMPERSONATE_BLOCKED_DISABLED = "Cannot impersonate a disabled user."
+    const val IMPERSONATE_BLOCKED_LOCKED = "Cannot impersonate a temporarily locked user."
+    const val IMPERSONATE_BLOCKED_PENDING = "Cannot impersonate a user who hasn't activated their account."
+
     // Invite Users feature
     const val INVITE_WELCOME_TITLE = "Welcome to"
     const val INVITE_ACCEPT_SUBTITLE = "Set a password to activate your account."
@@ -256,8 +261,12 @@ object EnglishStrings {
     const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
     const val AUTH_METHODS_MAGIC_LINK_DESC =
         "Users can request a one-time sign-in link delivered to their email. " +
-            "Links expire in 15 minutes and are single-use. MFA still required " +
-            "when enrolled. Requires SMTP to be configured."
+            "Links are single-use and expire after the window set below. MFA still " +
+            "required when enrolled. Requires SMTP to be configured."
+    const val AUTH_METHODS_MAGIC_LINK_TTL_LABEL = "Magic link expiry"
+    const val AUTH_METHODS_MAGIC_LINK_TTL_HINT =
+        "Minutes before a magic link expires. 1–1440 (default 15). " +
+            "Raise it for slow corporate mail relays; lower it for high-assurance tenants."
     const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
     const val AUTH_METHODS_PASSWORDLESS_DESC =
         "Hides the password form and rejects password-based authentication. " +

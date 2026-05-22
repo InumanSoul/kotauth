@@ -832,6 +832,18 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_DESC }
                         }
                     }
+                    div("edit-row") {
+                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_LABEL }
+                        div {
+                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "1"
+                                attributes["max"] = "1440"
+                                value = workspace.securityConfig.magicLinkTokenTtlMinutes.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_HINT }
+                        }
+                    }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "requirePasswordless") {
                             attributes["value"] = "true"

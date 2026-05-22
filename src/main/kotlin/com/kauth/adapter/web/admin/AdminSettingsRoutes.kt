@@ -322,6 +322,9 @@ fun Route.adminSettingsRoutes(
                     corsAllowCredentials = params["corsAllowCredentials"] == "true",
                     hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                     magicLinkEnabled = params["magicLinkEnabled"] == "true",
+                    magicLinkTokenTtlMinutes =
+                        params["magicLinkTokenTtlMinutes"]?.toIntOrNull()
+                            ?: workspace.securityConfig.magicLinkTokenTtlMinutes,
                     passwordLoginEnabled = params["requirePasswordless"] != "true",
                 )
         ) {

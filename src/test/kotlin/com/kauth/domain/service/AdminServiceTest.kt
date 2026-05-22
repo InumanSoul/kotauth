@@ -1057,6 +1057,7 @@ class AdminServiceTest {
         passwordPolicyRequireSpecial: Boolean = false,
         mfaPolicy: String = "optional",
         magicLinkEnabled: Boolean = false,
+        magicLinkTokenTtlMinutes: Int = 15,
         passwordLoginEnabled: Boolean = true,
     ) = svc.updateWorkspaceSettings(
         slug = slug,
@@ -1070,8 +1071,24 @@ class AdminServiceTest {
         passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
         mfaPolicy = mfaPolicy,
         magicLinkEnabled = magicLinkEnabled,
+        magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
         passwordLoginEnabled = passwordLoginEnabled,
     )
+
+    @Test
+    fun `updateWorkspaceSettings coerces magic-link TTL into the 1 to 1440 range`() {
+        val tooHigh = callUpdateSettings(magicLinkTokenTtlMinutes = 99_999)
+        assertIs<AdminResult.Success<Tenant>>(tooHigh)
+        assertEquals(1440, tooHigh.value.securityConfig.magicLinkTokenTtlMinutes)
+
+        val tooLow = callUpdateSettings(magicLinkTokenTtlMinutes = 0)
+        assertIs<AdminResult.Success<Tenant>>(tooLow)
+        assertEquals(1, tooLow.value.securityConfig.magicLinkTokenTtlMinutes)
+
+        val inRange = callUpdateSettings(magicLinkTokenTtlMinutes = 45)
+        assertIs<AdminResult.Success<Tenant>>(inRange)
+        assertEquals(45, inRange.value.securityConfig.magicLinkTokenTtlMinutes)
+    }
 
     // =========================================================================
     // Password-login toggle — passwordless-only enforcement

@@ -9,8 +9,15 @@ import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import kotlinx.html.*
+import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+
+/** One row in the user-detail "Recent impersonations" panel. */
+data class ImpersonationRecord(
+    val adminUsername: String,
+    val startedAt: Instant,
+)
 
 internal fun userDetailPageImpl(
     workspace: Tenant,
@@ -32,6 +39,7 @@ internal fun userDetailPageImpl(
      * slot is empty and the panel is gone.
      */
     tempPasswordLink: String? = null,
+    recentImpersonations: List<ImpersonationRecord> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -125,18 +133,32 @@ internal fun userDetailPageImpl(
                         attributes["hx-swap"] = "outerHTML"
                         +"Edit Profile"
                     }
-                    if (
-                        !workspace.isMaster &&
-                        user.enabled &&
-                        !user.isLocked &&
-                        RequiredAction.SET_PASSWORD !in user.requiredActions
-                    ) {
-                        postButton(
-                            action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
-                            label = EnglishStrings.IMPERSONATE_BUTTON,
-                            btnClass = "btn btn--primary",
-                            confirmMessage = EnglishStrings.IMPERSONATE_CONFIRM,
-                        )
+                    if (!workspace.isMaster) {
+                        val impersonateBlockedReason =
+                            when {
+                                !user.enabled -> EnglishStrings.IMPERSONATE_BLOCKED_DISABLED
+                                user.isLocked -> EnglishStrings.IMPERSONATE_BLOCKED_LOCKED
+                                RequiredAction.SET_PASSWORD in user.requiredActions ->
+                                    EnglishStrings.IMPERSONATE_BLOCKED_PENDING
+                                else -> null
+                            }
+                        if (impersonateBlockedReason == null) {
+                            postButton(
+                                action =
+                                    "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
+                                label = EnglishStrings.IMPERSONATE_BUTTON,
+                                btnClass = "btn btn--primary",
+                                confirmMessage = EnglishStrings.IMPERSONATE_CONFIRM,
+                            )
+                        } else {
+                            span("tooltip-wrap") {
+                                attributes["data-tooltip"] = impersonateBlockedReason
+                                button(classes = "btn btn--primary") {
+                                    disabled = true
+                                    +EnglishStrings.IMPERSONATE_BUTTON
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -250,6 +272,29 @@ internal fun userDetailPageImpl(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Recent impersonations ────────────────────────────────
+            if (recentImpersonations.isNotEmpty()) {
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Recent Impersonations" }
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Admin" }
+                                th { +"Started" }
+                            }
+                        }
+                        tbody {
+                            recentImpersonations.forEach { record ->
+                                tr {
+                                    td { span("data-table__name") { +record.adminUsername } }
+                                    td { +record.startedAt.toDisplayString() }
                                 }
                             }
                         }
