@@ -8,9 +8,11 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
+import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
@@ -42,6 +44,8 @@ class AuthService(
     private val sessionRepository: SessionRepository,
     private val selfServiceService: UserSelfServiceService? = null,
     private val passwordPolicy: PasswordPolicyPort? = null,
+    private val applicationRepository: ApplicationRepository? = null,
+    private val roleRepository: RoleRepository? = null,
 ) {
     /**
      * Authenticates a user and returns the User domain object.
@@ -308,6 +312,13 @@ class AuthService(
         rawPassword: String,
         confirmPassword: String,
         baseUrl: String,
+        /**
+         * The `client_id` of the OAuth client whose `/authorize` flow this
+         * registration originated from. When set, that client's configured
+         * default roles are granted to the new user. Null for non-OAuth
+         * registrations (no defaults are granted).
+         */
+        originatingClientId: String? = null,
     ): AuthResult<User> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -375,6 +386,8 @@ class AuthService(
             passwordPolicy.recordPasswordHistory(savedUser.id!!, tenant.id, newUser.passwordHash)
         }
 
+        grantClientDefaultRoles(tenant.id, savedUser.id!!, originatingClientId)
+
         auditLog.record(
             AuditEvent(
                 tenantId = tenant.id,
@@ -400,6 +413,25 @@ class AuthService(
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Grants the originating client's configured default roles to a freshly
+     * registered user. No-op when there is no originating client, the client
+     * is unknown, or the repositories were not wired (test setups).
+     */
+    private fun grantClientDefaultRoles(
+        tenantId: TenantId,
+        userId: UserId,
+        originatingClientId: String?,
+    ) {
+        if (originatingClientId == null) return
+        val apps = applicationRepository ?: return
+        val roles = roleRepository ?: return
+        val app = apps.findByClientId(tenantId, originatingClientId) ?: return
+        roles.findDefaultRolesForClient(app.id).forEach { role ->
+            roles.assignRoleToUser(userId, role.id!!)
+        }
+    }
 
     // Two UUIDs concatenated — 256 bits of entropy. Used as the stored hash for
     // passwordless registrations; the user never sees or types this value.

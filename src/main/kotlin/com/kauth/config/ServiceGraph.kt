@@ -262,6 +262,8 @@ data class ServiceGraph(
                     sessionRepository = sessionRepository,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
                 )
             // -- User attributes + claim mapping ------------------------------
             val userAttributeService =
@@ -353,6 +355,8 @@ data class ServiceGraph(
                             SocialProvider.GOOGLE to GoogleOAuthAdapter(),
                             SocialProvider.GITHUB to GitHubOAuthAdapter(),
                         ),
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
                 )
 
             // -- Key rotation -------------------------------------------------

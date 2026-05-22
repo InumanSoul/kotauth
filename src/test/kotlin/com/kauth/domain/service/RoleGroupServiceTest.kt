@@ -620,4 +620,134 @@ class RoleGroupServiceTest {
         assertEquals(0, svc.getGroupsForUser(UserId(10)).size)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_GROUP_MEMBER_REMOVED))
     }
+
+    // =========================================================================
+    // Client default roles
+    // =========================================================================
+
+    private fun tenantRole(name: String) =
+        roles.add(Role(tenantId = TenantId(1), name = name, scope = RoleScope.TENANT))
+
+    private fun clientRole(
+        name: String,
+        client: ApplicationId,
+    ) = roles.add(Role(tenantId = TenantId(1), name = name, scope = RoleScope.CLIENT, clientId = client))
+
+    @Test
+    fun `setClientDefaultRoles persists a tenant-scoped role`() {
+        val applicant = tenantRole("applicant")
+
+        val result = svc.setClientDefaultRoles(TenantId(1), testApp.id, listOf(applicant.id!!))
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(listOf("applicant"), roles.findDefaultRolesForClient(testApp.id).map { it.name })
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_UPDATED))
+    }
+
+    @Test
+    fun `setClientDefaultRoles accepts a client-scoped role for the same client`() {
+        val viewer = clientRole("viewer", testApp.id)
+
+        val result = svc.setClientDefaultRoles(TenantId(1), testApp.id, listOf(viewer.id!!))
+
+        assertIs<AdminResult.Success<Unit>>(result)
+    }
+
+    @Test
+    fun `setClientDefaultRoles rejects a client-scoped role from a different client`() {
+        val otherApp =
+            apps.add(testApp.copy(id = ApplicationId(0), clientId = "other-app", name = "Other"))
+        val foreignRole = clientRole("foreign", otherApp.id)
+
+        val result = svc.setClientDefaultRoles(TenantId(1), testApp.id, listOf(foreignRole.id!!))
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertTrue(roles.findDefaultRolesForClient(testApp.id).isEmpty())
+    }
+
+    @Test
+    fun `setClientDefaultRoles rejects a role from another tenant`() {
+        val foreignTenantRole =
+            roles.add(Role(tenantId = TenantId(2), name = "elsewhere", scope = RoleScope.TENANT))
+
+        val result = svc.setClientDefaultRoles(TenantId(1), testApp.id, listOf(foreignTenantRole.id!!))
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `setClientDefaultRoles rejects an unknown application`() {
+        val applicant = tenantRole("applicant")
+
+        val result = svc.setClientDefaultRoles(TenantId(1), ApplicationId(9999), listOf(applicant.id!!))
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `getClientDefaultRoles returns the configured set`() {
+        val applicant = tenantRole("applicant")
+        svc.setClientDefaultRoles(TenantId(1), testApp.id, listOf(applicant.id!!))
+
+        val result = svc.getClientDefaultRoles(TenantId(1), testApp.id)
+
+        assertIs<AdminResult.Success<List<Role>>>(result)
+        assertEquals(listOf("applicant"), result.value.map { it.name })
+    }
+
+    // =========================================================================
+    // resolveRole — role-by-name or numeric id
+    // =========================================================================
+
+    @Test
+    fun `resolveRole resolves a numeric id`() {
+        val role = tenantRole("applicant")
+
+        val result = svc.resolveRole(TenantId(1), role.id!!.value.toString())
+
+        assertIs<AdminResult.Success<Role>>(result)
+        assertEquals(role.id, result.value.id)
+    }
+
+    @Test
+    fun `resolveRole resolves a unique role name`() {
+        val role = tenantRole("onboarding.applicant")
+
+        val result = svc.resolveRole(TenantId(1), "onboarding.applicant")
+
+        assertIs<AdminResult.Success<Role>>(result)
+        assertEquals(role.id, result.value.id)
+    }
+
+    @Test
+    fun `resolveRole rejects a name that is ambiguous across scopes`() {
+        tenantRole("staff")
+        clientRole("staff", testApp.id)
+
+        val result = svc.resolveRole(TenantId(1), "staff")
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `resolveRole returns NotFound for an unknown name`() {
+        val result = svc.resolveRole(TenantId(1), "ghost-role")
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `resolveRole returns NotFound for a numeric id in another tenant`() {
+        val foreign = roles.add(Role(tenantId = TenantId(2), name = "x", scope = RoleScope.TENANT))
+
+        val result = svc.resolveRole(TenantId(1), foreign.id!!.value.toString())
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
 }
