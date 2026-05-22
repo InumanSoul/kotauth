@@ -36,6 +36,7 @@ object ClientsTable : Table("clients") {
     val iconUrl = varchar("icon_url", 500).nullable()
     val launcherVisible = bool("launcher_visible").default(true)
     val launcherDisplayOrder = integer("launcher_display_order").default(0)
+    val audience = varchar("audience", 200).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

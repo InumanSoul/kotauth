@@ -82,7 +82,21 @@ internal fun Route.registerRoutes(
         val confirmPassword = params["confirmPassword"] ?: ""
         val prefill = RegisterPrefill(username = username, email = email, fullName = fullName)
 
-        when (val result = authService.register(slug, username, email, fullName, password, confirmPassword, baseUrl)) {
+        val originatingClientId = call.getAuthContext(encryptionService)?.clientId
+
+        when (
+            val result =
+                authService.register(
+                    tenantSlug = slug,
+                    username = username,
+                    email = email,
+                    fullName = fullName,
+                    rawPassword = password,
+                    confirmPassword = confirmPassword,
+                    baseUrl = baseUrl,
+                    originatingClientId = originatingClientId,
+                )
+        ) {
             is AuthResult.Success -> {
                 if (passwordlessTenant) {
                     // No password the user knows — issue a magic-link so they can complete

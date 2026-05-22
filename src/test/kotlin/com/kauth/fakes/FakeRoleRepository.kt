@@ -22,6 +22,9 @@ class FakeRoleRepository : RoleRepository {
     // userId -> set of roleIds
     private val userRoles = mutableMapOf<Int, MutableSet<Int>>()
 
+    // clientId -> ordered list of default roleIds
+    private val clientDefaultRoles = mutableMapOf<Int, MutableList<Int>>()
+
     fun add(role: Role): Role {
         val r = if (role.id == null) role.copy(id = RoleId(nextId++)) else role
         store[r.id!!.value] = r
@@ -32,6 +35,7 @@ class FakeRoleRepository : RoleRepository {
         store.clear()
         composites.clear()
         userRoles.clear()
+        clientDefaultRoles.clear()
         nextId = 1
     }
 
@@ -140,5 +144,18 @@ class FakeRoleRepository : RoleRepository {
             }
         }
         return allRoleIds.mapNotNull { store[it] }.filter { it.tenantId == tenantId }
+    }
+
+    override fun findDefaultRolesForClient(clientId: ApplicationId): List<Role> =
+        clientDefaultRoles[clientId.value]
+            ?.mapNotNull { store[it] }
+            ?.sortedBy { it.name }
+            ?: emptyList()
+
+    override fun setDefaultRolesForClient(
+        clientId: ApplicationId,
+        roleIds: List<RoleId>,
+    ) {
+        clientDefaultRoles[clientId.value] = roleIds.distinct().map { it.value }.toMutableList()
     }
 }

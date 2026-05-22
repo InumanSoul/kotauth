@@ -30,6 +30,12 @@ data class Application(
     val launcherVisible: Boolean = true,
     /** Admin-controlled sort order in the launcher; ties broken by name. */
     val launcherDisplayOrder: Int = 0,
+    /**
+     * Custom access-token `aud` claim. Null falls back to [clientId], then the
+     * tenant slug. Lets one client mint tokens for a resource server whose
+     * identifier differs from the client_id.
+     */
+    val audience: String? = null,
 )
 
 enum class AccessType(

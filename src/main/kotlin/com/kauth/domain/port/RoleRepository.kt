@@ -78,4 +78,18 @@ interface RoleRepository {
         userId: UserId,
         tenantId: TenantId,
     ): List<Role>
+
+    // Client default roles — granted on self-registration through a client
+
+    /** Returns the roles configured as defaults for [clientId]. */
+    fun findDefaultRolesForClient(clientId: ApplicationId): List<Role>
+
+    /**
+     * Replaces the full set of default roles for [clientId] with [roleIds].
+     * Atomic — clears the prior set, then inserts the new one.
+     */
+    fun setDefaultRolesForClient(
+        clientId: ApplicationId,
+        roleIds: List<RoleId>,
+    )
 }

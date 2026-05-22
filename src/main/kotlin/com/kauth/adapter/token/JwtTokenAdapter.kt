@@ -73,7 +73,8 @@ class JwtTokenAdapter(
     ): TokenResponse {
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
-        val audience = client?.clientId ?: tenant.slug
+        // Per-client custom audience falls back to the client_id, then the tenant slug.
+        val audience = client?.audience ?: client?.clientId ?: tenant.slug
         val subject = user.id!!.value.toString()
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)

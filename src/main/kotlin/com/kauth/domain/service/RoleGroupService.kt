@@ -327,12 +327,112 @@ class RoleGroupService(
         return AdminResult.Success(Unit)
     }
 
+    /**
+     * Resolves a role reference that is either a numeric role id or a role
+     * name. Names are matched tenant-wide; an ambiguous name (the same name
+     * used in more than one scope) is rejected so the caller falls back to
+     * the numeric id. Lets integrators address roles by stable name instead
+     * of an environment-specific SERIAL id.
+     */
+    fun resolveRole(
+        tenantId: TenantId,
+        ref: String,
+    ): AdminResult<Role> {
+        ref.trim().toIntOrNull()?.let { idValue ->
+            val role = roleRepository.findById(RoleId(idValue))
+            return if (role != null && role.tenantId == tenantId) {
+                AdminResult.Success(role)
+            } else {
+                AdminResult.Failure(AdminError.NotFound("Role not found."))
+            }
+        }
+        val matches = roleRepository.findByTenantId(tenantId).filter { it.name == ref.trim() }
+        return when (matches.size) {
+            0 -> AdminResult.Failure(AdminError.NotFound("No role named '${ref.trim()}'."))
+            1 -> AdminResult.Success(matches.single())
+            else ->
+                AdminResult.Failure(
+                    AdminError.Validation(
+                        "Role name '${ref.trim()}' is ambiguous across scopes — use the numeric role id.",
+                    ),
+                )
+        }
+    }
+
     fun getRolesForUser(userId: UserId): List<Role> = roleRepository.findRolesForUser(userId)
 
     fun getEffectiveRolesForUser(
         userId: UserId,
         tenantId: TenantId,
     ): List<Role> = roleRepository.resolveEffectiveRoles(userId, tenantId)
+
+    // =========================================================================
+    // Client default roles — granted automatically on self-registration
+    // =========================================================================
+
+    /** Returns the roles configured as registration defaults for [clientId]. */
+    fun getClientDefaultRoles(
+        tenantId: TenantId,
+        clientId: ApplicationId,
+    ): AdminResult<List<Role>> {
+        val app = applicationRepository.findById(clientId)
+        if (app == null || app.tenantId != tenantId) {
+            return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
+        }
+        return AdminResult.Success(roleRepository.findDefaultRolesForClient(clientId))
+    }
+
+    /**
+     * Replaces the full set of default roles for [clientId].
+     *
+     * Scope guard: a client-scoped role may only be a default for its own
+     * client — otherwise the table becomes a privilege-escalation vector
+     * (client A handing out client B's roles to every new user).
+     */
+    fun setClientDefaultRoles(
+        tenantId: TenantId,
+        clientId: ApplicationId,
+        roleIds: List<RoleId>,
+    ): AdminResult<Unit> {
+        val app = applicationRepository.findById(clientId)
+        if (app == null || app.tenantId != tenantId) {
+            return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
+        }
+        val distinct = roleIds.distinct()
+        for (roleId in distinct) {
+            val role =
+                roleRepository.findById(roleId)
+                    ?: return AdminResult.Failure(AdminError.NotFound("Role not found."))
+            if (role.tenantId != tenantId) {
+                return AdminResult.Failure(
+                    AdminError.Validation("Role '${role.name}' does not belong to this workspace."),
+                )
+            }
+            if (role.scope == RoleScope.CLIENT && role.clientId != clientId) {
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Role '${role.name}' is scoped to a different application and cannot be a default here.",
+                    ),
+                )
+            }
+        }
+
+        roleRepository.setDefaultRolesForClient(clientId, distinct)
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = clientId,
+                eventType = AuditEventType.ADMIN_CLIENT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("change" to "default_roles", "count" to distinct.size.toString()),
+            ),
+        )
+
+        return AdminResult.Success(Unit)
+    }
 
     // =========================================================================
     // Group CRUD

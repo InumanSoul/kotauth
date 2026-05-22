@@ -2,7 +2,6 @@ package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.ApiScope
-import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
@@ -213,20 +212,31 @@ internal fun Route.apiUserRoutes(
             }
 
             route("/roles") {
-                post("/{roleId}") {
+                // {roleRef} accepts either a numeric role id or a role name —
+                // see RoleGroupService.resolveRole.
+                post("/{roleRef}") {
                     requireScope(call, ApiScope.USERS_WRITE) ?: return@post
                     val tenantId = call.attributes[TenantIdAttr]
                     val userId =
                         call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
                             ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Invalid user ID", "")
-                    val roleId =
-                        call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
-                            ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Invalid role ID", "")
-                    roleGroupService.assignRoleToUser(userId, roleId, tenantId)
-                    call.respond(HttpStatusCode.NoContent, "")
+                    val roleRef =
+                        call.parameters["roleRef"]
+                            ?: return@post call.respondProblem(HttpStatusCode.BadRequest, "Missing role", "")
+                    when (val resolved = roleGroupService.resolveRole(tenantId, roleRef)) {
+                        is AdminResult.Success ->
+                            when (
+                                val assigned =
+                                    roleGroupService.assignRoleToUser(userId, resolved.value.id!!, tenantId)
+                            ) {
+                                is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                                is AdminResult.Failure -> call.respondAdminError(assigned.error)
+                            }
+                        is AdminResult.Failure -> call.respondAdminError(resolved.error)
+                    }
                 }
 
-                delete("/{roleId}") {
+                delete("/{roleRef}") {
                     requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
                     val tenantId = call.attributes[TenantIdAttr]
                     val userId =
@@ -236,15 +246,20 @@ internal fun Route.apiUserRoutes(
                                 "Invalid user ID",
                                 "",
                             )
-                    val roleId =
-                        call.parameters["roleId"]?.toIntOrNull()?.let { RoleId(it) }
-                            ?: return@delete call.respondProblem(
-                                HttpStatusCode.BadRequest,
-                                "Invalid role ID",
-                                "",
-                            )
-                    roleGroupService.unassignRoleFromUser(userId, roleId, tenantId)
-                    call.respond(HttpStatusCode.NoContent, "")
+                    val roleRef =
+                        call.parameters["roleRef"]
+                            ?: return@delete call.respondProblem(HttpStatusCode.BadRequest, "Missing role", "")
+                    when (val resolved = roleGroupService.resolveRole(tenantId, roleRef)) {
+                        is AdminResult.Success ->
+                            when (
+                                val removed =
+                                    roleGroupService.unassignRoleFromUser(userId, resolved.value.id!!, tenantId)
+                            ) {
+                                is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                                is AdminResult.Failure -> call.respondAdminError(removed.error)
+                            }
+                        is AdminResult.Failure -> call.respondAdminError(resolved.error)
+                    }
                 }
             }
         }

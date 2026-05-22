@@ -302,6 +302,8 @@ internal fun Route.socialLoginRoutes(
         val chosenFullName = params["full_name"]?.trim()
         val ipAddress = call.request.local.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
+        val originatingClientId =
+            parseQueryStringToOAuthParams(pending.oauthParamsRaw).clientId
 
         when (
             val result =
@@ -316,6 +318,7 @@ internal fun Route.socialLoginRoutes(
                     chosenUsername = chosenUsername,
                     ipAddress = ipAddress,
                     userAgent = userAgent,
+                    originatingClientId = originatingClientId,
                 )
         ) {
             is SocialLoginResult.Failure -> {

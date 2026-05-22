@@ -109,7 +109,7 @@ fun Route.apiRoutes(
 
             apiUserRoutes(adminService, roleGroupService)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
-            apiApplicationRoutes(applicationRepository, adminService)
+            apiApplicationRoutes(applicationRepository, adminService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)

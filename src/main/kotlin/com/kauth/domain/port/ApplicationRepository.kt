@@ -51,6 +51,7 @@ interface ApplicationRepository {
         iconUrl: String? = null,
         launcherVisible: Boolean = true,
         launcherDisplayOrder: Int = 0,
+        audience: String? = null,
     ): Application
 
     /** Enables or disables the application. */

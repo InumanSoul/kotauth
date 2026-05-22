@@ -38,3 +38,16 @@ object UserRolesTable : Table("user_roles") {
 
     override val primaryKey = PrimaryKey(userId, roleId)
 }
+
+/**
+ * Exposed ORM mapping for 'client_default_roles' (V42).
+ *
+ * Roles granted automatically to a user who self-registers through the
+ * associated OAuth client's /authorize flow.
+ */
+object ClientDefaultRolesTable : Table("client_default_roles") {
+    val clientId = integer("client_id") references ClientsTable.id
+    val roleId = integer("role_id") references RolesTable.id
+
+    override val primaryKey = PrimaryKey(clientId, roleId)
+}
