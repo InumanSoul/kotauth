@@ -123,6 +123,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         iconUrl: String?,
         launcherVisible: Boolean,
         launcherDisplayOrder: Int,
+        audience: String?,
     ): Application =
         transaction {
             ClientsTable.update({ ClientsTable.id eq appId.value }) {
@@ -133,6 +134,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                 it[ClientsTable.iconUrl] = iconUrl
                 it[ClientsTable.launcherVisible] = launcherVisible
                 it[ClientsTable.launcherDisplayOrder] = launcherDisplayOrder
+                it[ClientsTable.audience] = audience
             }
             // Replace all redirect URIs atomically
             ClientRedirectUrisTable.deleteWhere { ClientRedirectUrisTable.clientId eq appId.value }
@@ -181,5 +183,6 @@ class PostgresApplicationRepository : ApplicationRepository {
             iconUrl = this[ClientsTable.iconUrl],
             launcherVisible = this[ClientsTable.launcherVisible],
             launcherDisplayOrder = this[ClientsTable.launcherDisplayOrder],
+            audience = this[ClientsTable.audience],
         )
 }

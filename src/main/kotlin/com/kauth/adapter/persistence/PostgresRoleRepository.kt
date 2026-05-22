@@ -315,6 +315,33 @@ class PostgresRoleRepository : RoleRepository {
     }
 
     // -------------------------------------------------------------------------
+    // Client default roles
+    // -------------------------------------------------------------------------
+
+    override fun findDefaultRolesForClient(clientId: ApplicationId): List<Role> =
+        transaction {
+            (ClientDefaultRolesTable innerJoin RolesTable)
+                .selectAll()
+                .where { ClientDefaultRolesTable.clientId eq clientId.value }
+                .orderBy(RolesTable.name)
+                .map { it.toRole() }
+        }
+
+    override fun setDefaultRolesForClient(
+        clientId: ApplicationId,
+        roleIds: List<RoleId>,
+    ): Unit =
+        transaction {
+            ClientDefaultRolesTable.deleteWhere { ClientDefaultRolesTable.clientId eq clientId.value }
+            if (roleIds.isNotEmpty()) {
+                ClientDefaultRolesTable.batchInsert(roleIds.distinct()) { roleId ->
+                    this[ClientDefaultRolesTable.clientId] = clientId.value
+                    this[ClientDefaultRolesTable.roleId] = roleId.value
+                }
+            }
+        }
+
+    // -------------------------------------------------------------------------
     // Row mapping
     // -------------------------------------------------------------------------
 
