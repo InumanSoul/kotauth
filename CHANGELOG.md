@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.11.0] - 2026-05-22
+
+### Added
+
+#### Client default roles
+
+- **Per-application default roles granted at self-registration** — an admin can configure a set of roles that are assigned automatically to any user who self-registers through a given OAuth application. When a user completes registration via an application's `/authorize` flow, every role associated with that application is granted to the new user, so their very first token already carries the intended roles. Eliminates the common integration friction where a Backend-for-Frontend has to detect the missing role after login, call the admin API to assign it, and force a token refresh — and the tenant-wide admin API key that pattern required. Standard IAM capability, modelled on Keycloak's "default roles" and Auth0's post-registration Actions
+- **Grant-at-registration semantics** — default roles are granted when the user account is created through a self-registration flow, attributed to the originating OAuth client. A returning user who later registers their first OAuth client through a different application does **not** retroactively receive that client's defaults — silently gaining roles by signing into a new app is a privilege-escalation surprise. Default roles are also **not** applied to admin-created or invite-accepted users — an admin creating a user already has full role control. Applies to both the password-registration path (`AuthService.register`) and the social-registration path (`SocialLoginService.completeSocialRegistration`) identically
+- **V42 `client_default_roles` table** — a clean `(client_id, role_id)` join table, both columns `ON DELETE CASCADE`. The composite primary key doubles as the lookup index. New `RoleRepository.findDefaultRolesForClient` / `setDefaultRolesForClient` (atomic full-set replace) port methods, implemented for both Postgres and the in-memory test fake
+- **Admin UI — "Registration Defaults" card** on the application detail page (`/admin/workspaces/{slug}/applications/{clientId}`) — lists the configured default roles in a table with per-row removal, plus a dropdown + "Add Role" control. The dropdown is server-filtered to only the roles that are valid here (tenant-scoped roles and this application's own client-scoped roles), so an invalid selection is never offered. Mirrors the existing "Composite Children" card pattern exactly
+- **Admin API — `GET` and `PUT /t/{slug}/api/v1/applications/{appId}/default-roles`** — read the configured set, or replace it atomically with a `{ "roleIds": [...] }` body. `GET` is scoped to `applications:read`, `PUT` to `applications:write`
+- **Role-assignment admin API accepts a role name** — `POST`/`DELETE /t/{slug}/api/v1/users/{userId}/roles/{roleRef}` now resolves `{roleRef}` as either a numeric role id (unchanged) or a role name. Role ids are environment-specific `SERIAL` values unknown at build time; addressing a role by its stable name removes a per-environment lookup or config value for integrators. A name that is ambiguous across scopes (the same name used as both a tenant-scoped and a client-scoped role) is rejected with a clear message pointing back to the numeric id
+
+#### Custom token audience
+
+- **Per-application token audience** — an application can now declare the `aud` claim its issued JWTs carry, instead of `aud` always equalling the `client_id`. Lets one OAuth client mint tokens for a resource server whose identifier differs from the client_id, without overloading `client_id` itself or registering a throwaway client named after the audience. V43 migration adds a nullable `audience` column to `clients`; `JwtTokenAdapter` resolves the access-token audience as `audience → client_id → tenant slug`. Configurable via a "Token Audience" field on the application edit page and the `audience` field on the application admin API. This is deliberately a single configurable value, not RFC 8707 Resource Indicators — the column solves the real multi-resource-server case at minimal cost
+- **`Application.audience` field** — surfaced on the application admin API DTO and threaded through `ApplicationRepository.update` and `AdminService.updateApplication` (rejects values over 200 characters)
+
+### Changed
+
+- **`AuthService` and `SocialLoginService`** gained optional `applicationRepository` + `roleRepository` constructor dependencies and an `originatingClientId` parameter on their registration methods. The originating `client_id` is threaded from the register route via the OAuth auth-context cookie and from the social-registration route via the pending-registration cookie's stored OAuth parameters. Defaults preserve the prior behavior — no originating client means no default roles
+- **`RoleGroupService`** gained `getClientDefaultRoles`, `setClientDefaultRoles`, and `resolveRole` (numeric-id-or-name resolution). `setClientDefaultRoles` records an `ADMIN_CLIENT_UPDATED` audit event
+- **`ServiceGraph`** wires the new repository dependencies into `AuthService` and `SocialLoginService`; `adminApplicationRoutes` and `apiApplicationRoutes` now receive `RoleGroupService`
+
+### Security
+
+- **Cross-client privilege-escalation guard** — `RoleGroupService.setClientDefaultRoles` rejects associating a client-scoped role that belongs to a *different* application as a default for this one, and rejects roles from another tenant. Without this guard the `client_default_roles` table would let a compromised or careless admin hand out another application's roles to every new user. The admin-console dropdown is also pre-filtered so an invalid role is never even presented
+- **Default roles are independent of the email-verification gate** — roles are granted at account creation regardless of whether the tenant requires email verification. A role is a claim about who the user is; the `email_verified` token claim is a separate gate enforced by the resource server. Resource servers that require verified email continue to enforce it on the token, unaffected
+
+### Notes
+
+- Both features are generic, integrator-agnostic IAM capabilities. They were prompted by an internal onboarding-BFF integration but nothing integration-specific appears in the schema, domain model, or API
+- 30 new tests — repository-contract tests for the default-roles store, `RoleGroupService` tests for the scope guard and name resolution, registration-grant tests across the password and social paths, `JwtTokenAdapter` audience-resolution tests, and admin-API integration tests including the cross-client rejection
+
+---
+
 ## [1.10.0] - 2026-04-30
 
 ### Added
