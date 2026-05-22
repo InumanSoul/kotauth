@@ -992,13 +992,14 @@ class UserSelfServiceService(
 
         val (rawToken, tokenHash) = generateToken()
 
+        val ttlMinutes = tenant.securityConfig.magicLinkTokenTtlMinutes.coerceIn(1, 1440)
         prTokenRepo.deleteByUserAndPurpose(user.id!!, TokenPurpose.MAGIC_LINK)
         prTokenRepo.create(
             PasswordResetToken(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(MAGIC_LINK_TTL_SECONDS),
+                expiresAt = Instant.now().plusSeconds(ttlMinutes * 60L),
                 purpose = TokenPurpose.MAGIC_LINK,
                 ipAddress = ipAddress,
             ),
@@ -1027,6 +1028,7 @@ class UserSelfServiceService(
                 eventType = AuditEventType.MAGIC_LINK_REQUESTED,
                 ipAddress = ipAddress,
                 userAgent = null,
+                details = mapOf("ttl_minutes" to ttlMinutes.toString()),
             ),
         )
 
@@ -1105,11 +1107,6 @@ class UserSelfServiceService(
         )
 
         return SelfServiceResult.Success(userRepository.findById(token.userId, token.tenantId)!!)
-    }
-
-    companion object {
-        /** Magic-link validity window. 15 minutes is standard — single click, not a password form. */
-        const val MAGIC_LINK_TTL_SECONDS: Long = 15L * 60L
     }
 }
 

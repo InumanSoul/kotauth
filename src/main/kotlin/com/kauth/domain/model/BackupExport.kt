@@ -90,6 +90,9 @@ data class SecurityConfigBackup(
     val corsAllowCredentials: Boolean,
     val hibpCheckEnabled: Boolean,
     val magicLinkEnabled: Boolean,
+    // Defaulted so backups taken before these fields existed still import.
+    val magicLinkTokenTtlMinutes: Int = 15,
+    val passwordLoginEnabled: Boolean = true,
 )
 
 @Serializable

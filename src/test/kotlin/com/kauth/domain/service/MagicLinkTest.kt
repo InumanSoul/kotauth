@@ -1,5 +1,6 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
@@ -146,6 +147,54 @@ class MagicLinkTest {
         svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
         val tokens = prTokenRepo.all().filter { it.purpose == TokenPurpose.MAGIC_LINK }
         assertEquals(1, tokens.size, "Second request must supersede the first")
+    }
+
+    @Test
+    fun `initiate honors the tenant's configured magic-link TTL`() {
+        tenants.clear()
+        tenants.add(
+            enabledTenant.copy(
+                securityConfig = SecurityConfig(magicLinkEnabled = true, magicLinkTokenTtlMinutes = 45),
+            ),
+        )
+
+        val before = java.time.Instant.now()
+        svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
+        val token = prTokenRepo.all().single { it.purpose == TokenPurpose.MAGIC_LINK }
+
+        val ttlSeconds =
+            java.time.Duration
+                .between(before, token.expiresAt)
+                .seconds
+        assertTrue(ttlSeconds in 2640..2760, "Expiry should be ~45 minutes out, was ${ttlSeconds}s")
+    }
+
+    @Test
+    fun `initiate defaults to a 15-minute TTL when not configured`() {
+        val before = java.time.Instant.now()
+        svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
+        val token = prTokenRepo.all().single { it.purpose == TokenPurpose.MAGIC_LINK }
+
+        val ttlSeconds =
+            java.time.Duration
+                .between(before, token.expiresAt)
+                .seconds
+        assertTrue(ttlSeconds in 840..960, "Expiry should be ~15 minutes out, was ${ttlSeconds}s")
+    }
+
+    @Test
+    fun `initiate records the TTL on the MAGIC_LINK_REQUESTED audit event`() {
+        tenants.clear()
+        tenants.add(
+            enabledTenant.copy(
+                securityConfig = SecurityConfig(magicLinkEnabled = true, magicLinkTokenTtlMinutes = 30),
+            ),
+        )
+
+        svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
+
+        val event = auditLog.events.single { it.eventType == AuditEventType.MAGIC_LINK_REQUESTED }
+        assertEquals("30", event.details["ttl_minutes"])
     }
 
     @Test

@@ -111,6 +111,8 @@ class BackupExporterService(
                             corsAllowCredentials = corsAllowCredentials,
                             hibpCheckEnabled = hibpCheckEnabled,
                             magicLinkEnabled = magicLinkEnabled,
+                            magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
+                            passwordLoginEnabled = passwordLoginEnabled,
                         )
                     },
                 theme =

@@ -27,6 +27,8 @@ data class SecurityConfig(
     // Breach detection — block passwords that appear in HIBP's breach corpus
     val hibpCheckEnabled: Boolean = false,
     val magicLinkEnabled: Boolean = false,
+    // Magic-link expiry window, in minutes. Range 1-1440 enforced at the service layer.
+    val magicLinkTokenTtlMinutes: Int = 15,
     // Disabling password login affects only the password flow; magic-link and
     // social providers are governed by their own per-tenant config.
     val passwordLoginEnabled: Boolean = true,
