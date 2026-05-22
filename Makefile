@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa
+.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa run infra-up
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -78,6 +78,25 @@ down: ## Stop and remove containers
 
 nuke: ## Stop containers and wipe volumes (destroys the database)
 	$(COMPOSE_DEV) down -v
+
+# Fast inner loop — start only the infrastructure (db + redis) in Docker and
+# run the JAR directly on the host. Avoids the multi-minute Docker rebuild on
+# every Kotlin change. Use this for IDE-driven work.
+infra-up: ## Start only db + redis in Docker, wait for healthchecks
+	$(COMPOSE_DEV) up -d --wait db redis
+
+run: infra-up ## Run Kotauth locally against Docker-hosted db + redis (fast inner loop)
+	@env \
+	  KAUTH_BASE_URL=http://localhost:8080 \
+	  KAUTH_ENV=development \
+	  KAUTH_SECRET_KEY=dev-only-not-for-production-replace-this-secret-key \
+	  DB_HOST=localhost \
+	  DB_PORT=5432 \
+	  DB_USER=postgres \
+	  DB_PASSWORD=password \
+	  DB_NAME=kotauth_db \
+	  KAUTH_REDIS_URL=redis://localhost:6379 \
+	  ./gradlew run
 
 logs: ## Follow app container logs
 	$(COMPOSE_DEV) logs -f app

@@ -7,6 +7,11 @@
 #
 # This file is for local evaluation only. For production, see docker/docker-compose.yml
 # and the deployment guide: https://kotauth.com/deployment/production/
+#
+# MAINTAINER NOTE: this file is intentionally self-contained for zero-config
+# eval. It mirrors the service shape of docker/docker-compose.yml. When you
+# change healthchecks, add a service (e.g. redis), or update the image tag in
+# the base stack, mirror the change here too — there is no automatic sync.
 # ──────────────────────────────────────────────────────────────────────────────
 
 name: kotauth-quickstart
