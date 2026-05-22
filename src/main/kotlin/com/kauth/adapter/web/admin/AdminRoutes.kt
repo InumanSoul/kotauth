@@ -507,6 +507,7 @@ fun Route.adminRoutes(
                     claimMapperService = claimMapperService,
                     impersonationService = impersonationService,
                     userRepository = userRepository,
+                    auditLogRepository = auditLogRepository,
                 )
 
                 adminSessionAuditRoutes(

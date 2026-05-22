@@ -56,6 +56,7 @@ fun Route.adminUserImpersonationRoute(
         val result =
             impersonationService.startImpersonation(
                 adminUserId = UserId(ctx.session.userId),
+                adminUsername = ctx.session.username,
                 adminSessionId = adminSessionId,
                 targetTenantId = ctx.workspace.id,
                 targetUserId = userId,

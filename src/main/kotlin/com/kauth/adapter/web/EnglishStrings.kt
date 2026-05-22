@@ -166,6 +166,11 @@ object EnglishStrings {
     const val IMPERSONATE_FAILED_LOCKED = "Cannot impersonate a temporarily locked user."
     const val IMPERSONATE_FAILED_GENERIC = "Could not start impersonation."
 
+    // Disabled-state tooltips on the Impersonate button
+    const val IMPERSONATE_BLOCKED_DISABLED = "Cannot impersonate a disabled user."
+    const val IMPERSONATE_BLOCKED_LOCKED = "Cannot impersonate a temporarily locked user."
+    const val IMPERSONATE_BLOCKED_PENDING = "Cannot impersonate a user who hasn't activated their account."
+
     // Invite Users feature
     const val INVITE_WELCOME_TITLE = "Welcome to"
     const val INVITE_ACCEPT_SUBTITLE = "Set a password to activate your account."

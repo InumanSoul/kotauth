@@ -106,6 +106,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = customerTenant.id,
                 targetUserId = target.id!!,
@@ -125,6 +126,7 @@ class ImpersonationServiceTest {
     fun `startImpersonation passes admin id as actingSubject so tokens carry the act claim`() {
         service.startImpersonation(
             adminUserId = admin.id!!,
+            adminUsername = admin.username,
             adminSessionId = adminSession.id!!,
             targetTenantId = customerTenant.id,
             targetUserId = target.id!!,
@@ -138,6 +140,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = customerTenant.id,
                 targetUserId = target.id!!,
@@ -149,6 +152,7 @@ class ImpersonationServiceTest {
         assertEquals(customerTenant.id, event.tenantId)
         assertEquals(target.id!!.value.toString(), event.details["target_user_id"])
         assertEquals(target.username, event.details["target_username"])
+        assertEquals(admin.username, event.details["admin_username"])
         assertEquals(adminSession.id!!.value.toString(), event.details["admin_session_id"])
         val sessionId = (result as AdminResult.Success).value.impersonationSessionId
         assertEquals(sessionId.value.toString(), event.details["impersonation_session_id"])
@@ -170,6 +174,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = masterTenant.id,
                 targetUserId = masterUser.id!!,
@@ -190,6 +195,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = otherTenant.id,
                 targetUserId = target.id!!,
@@ -209,6 +215,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = customerTenant.id,
                 targetUserId = disabled.id!!,
@@ -233,6 +240,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = customerTenant.id,
                 targetUserId = locked.id!!,
@@ -249,6 +257,7 @@ class ImpersonationServiceTest {
         val result =
             service.startImpersonation(
                 adminUserId = admin.id!!,
+                adminUsername = admin.username,
                 adminSessionId = adminSession.id!!,
                 targetTenantId = customerTenant.id,
                 targetUserId = target.id!!,
@@ -264,6 +273,7 @@ class ImpersonationServiceTest {
             (
                 service.startImpersonation(
                     adminUserId = admin.id!!,
+                    adminUsername = admin.username,
                     adminSessionId = adminSession.id!!,
                     targetTenantId = customerTenant.id,
                     targetUserId = target.id!!,
@@ -290,6 +300,7 @@ class ImpersonationServiceTest {
             (
                 service.startImpersonation(
                     adminUserId = admin.id!!,
+                    adminUsername = admin.username,
                     adminSessionId = adminSession.id!!,
                     targetTenantId = customerTenant.id,
                     targetUserId = target.id!!,
@@ -325,6 +336,7 @@ class ImpersonationServiceTest {
             (
                 service.startImpersonation(
                     adminUserId = admin.id!!,
+                    adminUsername = admin.username,
                     adminSessionId = adminSession.id!!,
                     targetTenantId = customerTenant.id,
                     targetUserId = target.id!!,
@@ -345,6 +357,7 @@ class ImpersonationServiceTest {
             (
                 service.startImpersonation(
                     adminUserId = admin.id!!,
+                    adminUsername = admin.username,
                     adminSessionId = adminSession.id!!,
                     targetTenantId = customerTenant.id,
                     targetUserId = target.id!!,
@@ -364,6 +377,7 @@ class ImpersonationServiceTest {
             (
                 service.startImpersonation(
                     adminUserId = admin.id!!,
+                    adminUsername = admin.username,
                     adminSessionId = adminSession.id!!,
                     targetTenantId = customerTenant.id,
                     targetUserId = target.id!!,

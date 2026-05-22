@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
@@ -31,6 +33,7 @@ fun Route.adminUserRoutes(
     claimMapperService: CachingClaimMapperService,
     impersonationService: ImpersonationService? = null,
     userRepository: UserRepository? = null,
+    auditLogRepository: AuditLogRepository? = null,
 ) {
     route("/users") {
         get {
@@ -170,6 +173,22 @@ fun Route.adminUserRoutes(
                     } else {
                         null
                     }
+                val recentImpersonations =
+                    auditLogRepository?.let { repo ->
+                        repo
+                            .findByTenant(
+                                ctx.workspace.id,
+                                AuditEventType.ADMIN_IMPERSONATION_STARTED,
+                                limit = 200,
+                            ).filter { it.details["target_user_id"] == userId.value.toString() }
+                            .take(5)
+                            .map {
+                                ImpersonationRecord(
+                                    adminUsername = it.details["admin_username"].orEmpty().ifBlank { "—" },
+                                    startedAt = it.createdAt,
+                                )
+                            }
+                    } ?: emptyList()
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
@@ -185,6 +204,7 @@ fun Route.adminUserRoutes(
                         userAttributes = attributes,
                         mappedKeys = mappedKeys,
                         tempPasswordLink = tempPasswordLink,
+                        recentImpersonations = recentImpersonations,
                     ),
                 )
             }
