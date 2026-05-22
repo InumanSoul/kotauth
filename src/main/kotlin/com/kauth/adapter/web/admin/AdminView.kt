@@ -118,7 +118,19 @@ object AdminView {
         allApps: List<Application>,
         loggedInAs: String,
         newSecret: String? = null,
-    ): HTML.() -> Unit = applicationDetailPageImpl(workspace, application, allWorkspaces, allApps, loggedInAs, newSecret)
+        defaultRoles: List<com.kauth.domain.model.Role> = emptyList(),
+        availableDefaultRoles: List<com.kauth.domain.model.Role> = emptyList(),
+    ): HTML.() -> Unit =
+        applicationDetailPageImpl(
+            workspace,
+            application,
+            allWorkspaces,
+            allApps,
+            loggedInAs,
+            newSecret,
+            defaultRoles,
+            availableDefaultRoles,
+        )
 
     fun editApplicationPage(
         workspace: Tenant,

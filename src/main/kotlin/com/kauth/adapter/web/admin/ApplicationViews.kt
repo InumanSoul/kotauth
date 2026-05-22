@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -24,6 +25,9 @@ internal fun applicationDetailPageImpl(
     allApps: List<Application>,
     loggedInAs: String,
     newSecret: String? = null,
+    defaultRoles: List<Role> = emptyList(),
+    // Tenant-scoped + this app's client-scoped roles, minus those already set.
+    availableDefaultRoles: List<Role> = emptyList(),
 ): HTML.() -> Unit =
     {
         val appPairs = allApps.map { it.clientId to it.name }
@@ -202,6 +206,81 @@ internal fun applicationDetailPageImpl(
                         }
                     }
                     ovRowText("Display order", application.launcherDisplayOrder.toString())
+                }
+            }
+
+            // ── Registration Defaults ──────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") { +"Registration Defaults" }
+                if (defaultRoles.isEmpty()) {
+                    p("edit-row__hint") {
+                        style = "padding:8px 16px 12px;"
+                        +"No default roles configured — roles added here are granted "
+                        +"automatically to users who self-register through this app."
+                    }
+                } else {
+                    p("edit-row__hint") {
+                        style = "padding:0 16px 4px;"
+                        +"Roles granted automatically to users who self-register through this "
+                        +"application. Does not affect users created by an admin."
+                    }
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Role" }
+                                th { style = "width:80px;" }
+                            }
+                        }
+                        tbody {
+                            defaultRoles.forEach { role ->
+                                tr {
+                                    td { span("data-table__name") { +role.name } }
+                                    td {
+                                        form(
+                                            action =
+                                                "/admin/workspaces/${workspace.slug}/applications/" +
+                                                    "${application.clientId}/default-roles/remove",
+                                            method = FormMethod.post,
+                                        ) {
+                                            input(type = InputType.hidden, name = "roleId") {
+                                                value = role.id?.value.toString()
+                                            }
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                +"Remove"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (availableDefaultRoles.isNotEmpty()) {
+                    div("edit-actions") {
+                        form(
+                            action =
+                                "/admin/workspaces/${workspace.slug}/applications/" +
+                                    "${application.clientId}/default-roles",
+                            method = FormMethod.post,
+                        ) {
+                            style = "display:flex; align-items:center; gap:8px;"
+                            select {
+                                classes = setOf("edit-row__field", "edit-row__field--select")
+                                name = "roleId"
+                                availableDefaultRoles.forEach { role ->
+                                    option {
+                                        value = role.id?.value.toString()
+                                        +role.name
+                                    }
+                                }
+                            }
+                            button(type = ButtonType.submit) {
+                                classes = setOf("btn", "btn--primary")
+                                +"Add Role"
+                            }
+                        }
+                    }
                 }
             }
 
@@ -543,6 +622,23 @@ internal fun editApplicationPageImpl(
                         div("edit-row__hint") {
                             +"One URI per line. Their origins are automatically CORS-allowed "
                             +"for SPAs in this workspace."
+                        }
+                    }
+                }
+                div("edit-row") {
+                    span("edit-row__label") { +"Token Audience" }
+                    div {
+                        input(type = InputType.text, name = "audience") {
+                            attributes["form"] = "edit-app-form"
+                            classes = setOf("edit-row__field", "edit-row__field--mono")
+                            this.id = "audience"
+                            placeholder = "https://api.example.com"
+                            value = application.audience ?: ""
+                        }
+                        div("edit-row__hint") {
+                            +"Sets the "
+                            code { +"aud" }
+                            +" claim in issued JWTs. Leave blank to use the client ID as the audience."
                         }
                     }
                 }

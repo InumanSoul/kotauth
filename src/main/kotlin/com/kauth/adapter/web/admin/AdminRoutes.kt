@@ -495,6 +495,7 @@ fun Route.adminRoutes(
                 adminApplicationRoutes(
                     adminService = adminService,
                     applicationRepository = applicationRepository,
+                    roleGroupService = roleGroupService,
                     corsPort = corsPort,
                 )
 

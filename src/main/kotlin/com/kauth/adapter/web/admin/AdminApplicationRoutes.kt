@@ -1,9 +1,13 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.RoleId
+import com.kauth.domain.model.RoleScope
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.CorsPort
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -20,6 +24,7 @@ import io.ktor.server.sessions.sessions
 fun Route.adminApplicationRoutes(
     adminService: AdminService,
     applicationRepository: ApplicationRepository,
+    roleGroupService: RoleGroupService,
     corsPort: CorsPort? = null,
 ) {
     route("/applications") {
@@ -98,6 +103,23 @@ fun Route.adminApplicationRoutes(
                 val wsPairs = call.attributes[WsPairsAttr]
                 val allApps = applicationRepository.findByTenantId(workspace.id)
                 val newSecret = FlashStore.take(call.request.queryParameters["flash"])
+
+                val defaultRoles =
+                    when (val r = roleGroupService.getClientDefaultRoles(workspace.id, app.id)) {
+                        is AdminResult.Success -> r.value
+                        is AdminResult.Failure -> emptyList()
+                    }
+                val defaultRoleIds = defaultRoles.mapNotNull { it.id }.toSet()
+                // Only tenant-scoped roles and this app's own client-scoped roles are
+                // eligible — see RoleGroupService.setClientDefaultRoles scope guard.
+                val availableDefaultRoles =
+                    roleGroupService
+                        .listRoles(workspace.id)
+                        .filter { role ->
+                            role.id !in defaultRoleIds &&
+                                (role.scope == RoleScope.TENANT || role.clientId == app.id)
+                        }
+
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.applicationDetailPage(
@@ -107,6 +129,8 @@ fun Route.adminApplicationRoutes(
                         allApps,
                         session.username,
                         newSecret,
+                        defaultRoles,
+                        availableDefaultRoles,
                     ),
                 )
             }
@@ -150,6 +174,7 @@ fun Route.adminApplicationRoutes(
                 val launcherVisible = params["launcherVisible"] == "true"
                 val launcherDisplayOrder =
                     params["launcherDisplayOrder"]?.trim()?.toIntOrNull()?.coerceIn(0, 9999) ?: 0
+                val audience = params["audience"]?.trim().orEmpty()
                 when (
                     val result =
                         adminService.updateApplication(
@@ -163,6 +188,7 @@ fun Route.adminApplicationRoutes(
                             iconUrl = iconUrl,
                             launcherVisible = launcherVisible,
                             launcherDisplayOrder = launcherDisplayOrder,
+                            audience = audience,
                         )
                 ) {
                     is AdminResult.Success ->
@@ -216,6 +242,55 @@ fun Route.adminApplicationRoutes(
                         call.respond(HttpStatusCode.BadRequest, result.error.message)
                 }
             }
+
+            post("/default-roles") {
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
+                val clientId =
+                    call.parameters["clientId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val app =
+                    applicationRepository.findByClientId(workspace.id, clientId)
+                        ?: return@post call.respond(HttpStatusCode.NotFound)
+                val roleId =
+                    call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                updateDefaultRoles(app.id, workspace.id, roleGroupService) { current ->
+                    current + roleId
+                }
+                call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+            }
+
+            post("/default-roles/remove") {
+                val workspace = call.attributes[WorkspaceAttr]
+                val slug = workspace.slug
+                val clientId =
+                    call.parameters["clientId"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+                val app =
+                    applicationRepository.findByClientId(workspace.id, clientId)
+                        ?: return@post call.respond(HttpStatusCode.NotFound)
+                val roleId =
+                    call.receiveParameters()["roleId"]?.toIntOrNull()?.let { RoleId(it) }
+                        ?: return@post call.respond(HttpStatusCode.BadRequest)
+                updateDefaultRoles(app.id, workspace.id, roleGroupService) { current ->
+                    current - roleId
+                }
+                call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+            }
         }
     }
+}
+
+/** Read-modify-write of a client's default roles — the admin console mutates one at a time. */
+private fun updateDefaultRoles(
+    appId: ApplicationId,
+    tenantId: com.kauth.domain.model.TenantId,
+    roleGroupService: RoleGroupService,
+    transform: (List<RoleId>) -> List<RoleId>,
+) {
+    val current =
+        when (val r = roleGroupService.getClientDefaultRoles(tenantId, appId)) {
+            is AdminResult.Success -> r.value.mapNotNull { it.id }
+            is AdminResult.Failure -> return
+        }
+    roleGroupService.setClientDefaultRoles(tenantId, appId, transform(current).distinct())
 }

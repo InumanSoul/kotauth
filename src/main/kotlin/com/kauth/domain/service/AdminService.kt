@@ -661,6 +661,7 @@ class AdminService(
         iconUrl: String? = null,
         launcherVisible: Boolean? = null,
         launcherDisplayOrder: Int? = null,
+        audience: String? = null,
     ): AdminResult<Application> {
         val app =
             applicationRepository.findById(appId)
@@ -687,9 +688,15 @@ class AdminService(
             if (iconUrl != null) iconUrl.trim().takeIf { it.isNotBlank() } else app.iconUrl
         val resolvedLauncherVisible = launcherVisible ?: app.launcherVisible
         val resolvedLauncherDisplayOrder = launcherDisplayOrder ?: app.launcherDisplayOrder
+        val resolvedAudience =
+            if (audience != null) audience.trim().takeIf { it.isNotBlank() } else app.audience
 
         if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
+        }
+
+        if (resolvedAudience != null && resolvedAudience.length > 200) {
+            return AdminResult.Failure(AdminError.Validation("Token audience must be 200 characters or fewer."))
         }
 
         // Origin validation prevents a phishing surface where a compromised admin sets the
@@ -733,6 +740,7 @@ class AdminService(
                 iconUrl = resolvedIconUrl,
                 launcherVisible = resolvedLauncherVisible,
                 launcherDisplayOrder = resolvedLauncherDisplayOrder,
+                audience = resolvedAudience,
             )
 
         invalidateCors(tenantId)

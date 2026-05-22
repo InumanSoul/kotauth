@@ -811,6 +811,88 @@ class ApiRoutesTest {
         }
 
     // =========================================================================
+    // Client default roles
+    // =========================================================================
+
+    @Test
+    fun `GET default-roles is empty for a fresh application`() =
+        testApplication {
+            application { installTestApp() }
+            val app =
+                appRepo.create(TenantId(1), "spa", "SPA", null, "public", listOf("https://spa.test/cb"))
+
+            val response =
+                client.get("/t/acme/api/v1/applications/${app.id.value}/default-roles") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsText().contains("\"total\":0"))
+        }
+
+    @Test
+    fun `PUT default-roles sets the roles and GET returns them`() =
+        testApplication {
+            application { installTestApp() }
+            val app =
+                appRepo.create(TenantId(1), "spa", "SPA", null, "public", listOf("https://spa.test/cb"))
+            val role =
+                (
+                    roleGroupService.createRole(
+                        TenantId(1),
+                        "applicant",
+                        null,
+                        com.kauth.domain.model.RoleScope.TENANT,
+                        null,
+                    ) as AdminResult.Success
+                ).value
+
+            val put =
+                client.put("/t/acme/api/v1/applications/${app.id.value}/default-roles") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"roleIds":[${role.id!!.value}]}""")
+                }
+            assertEquals(HttpStatusCode.OK, put.status)
+            assertTrue(put.bodyAsText().contains("applicant"))
+
+            val get =
+                client.get("/t/acme/api/v1/applications/${app.id.value}/default-roles") {
+                    bearerAuth(rawApiKey)
+                }
+            assertTrue(get.bodyAsText().contains("applicant"))
+        }
+
+    @Test
+    fun `PUT default-roles rejects a client-scoped role from another application`() =
+        testApplication {
+            application { installTestApp() }
+            val appA =
+                appRepo.create(TenantId(1), "app-a", "App A", null, "public", listOf("https://a.test/cb"))
+            val appB =
+                appRepo.create(TenantId(1), "app-b", "App B", null, "public", listOf("https://b.test/cb"))
+            val foreignRole =
+                (
+                    roleGroupService.createRole(
+                        TenantId(1),
+                        "b-only",
+                        null,
+                        com.kauth.domain.model.RoleScope.CLIENT,
+                        appB.id,
+                    ) as AdminResult.Success
+                ).value
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${appA.id.value}/default-roles") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"roleIds":[${foreignRole.id!!.value}]}""")
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    // =========================================================================
     // Test application wiring
     // =========================================================================
 

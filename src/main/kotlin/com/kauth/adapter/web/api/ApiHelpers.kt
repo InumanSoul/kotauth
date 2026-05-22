@@ -173,6 +173,11 @@ data class ProblemDetail(
     val description: String? = null,
     val accessType: String? = null,
     val redirectUris: List<String>? = null,
+    val audience: String? = null,
+)
+
+@Serializable data class SetDefaultRolesRequest(
+    val roleIds: List<Int>,
 )
 
 @Serializable data class UpsertUserAttributeRequest(
@@ -244,6 +249,7 @@ data class ProblemDetail(
     val accessType: String,
     val enabled: Boolean,
     val redirectUris: List<String>,
+    val audience: String? = null,
 )
 
 @Serializable data class SessionDto(
@@ -321,6 +327,7 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
         accessType = accessType.name.lowercase(),
         enabled = enabled,
         redirectUris = redirectUris,
+        audience = audience,
     )
 
 internal fun com.kauth.domain.model.Session.toApiDto() =
