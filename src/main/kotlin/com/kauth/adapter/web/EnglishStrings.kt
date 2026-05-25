@@ -273,6 +273,20 @@ object EnglishStrings {
             "Users can still sign in with magic links and any enabled social providers. " +
             "Email becomes the only first factor — pair with MFA for higher-assurance environments."
 
+    const val AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL =
+        "Allow sign-up via Email OTP admin API"
+    const val AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC =
+        "When enabled, calls to the send-otp admin API create a passwordless user " +
+            "if the email doesn't already exist. Keep off unless an external onboarding " +
+            "flow (BFF, partner SPA) needs find-or-create semantics — opening this surface " +
+            "is a new account-creation channel."
+    const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL =
+        "Cross-challenge OTP failure threshold"
+    const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT =
+        "After this many failed OTP challenges, the user is locked using the existing " +
+            "lockout window above. 0 disables the cross-challenge guard (per-challenge cap " +
+            "of 5 still applies)."
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 

@@ -135,6 +135,8 @@ data class ServiceGraph(
     val registerRateLimiter: RateLimiterPort,
     val tokenRateLimiter: RateLimiterPort,
     val mfaRateLimiter: RateLimiterPort,
+    val otpEmailRateLimiter: RateLimiterPort,
+    val otpIpRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
@@ -327,6 +329,7 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
+                    emailBrandingRepository = emailBrandingRepository,
                     emailPort = emailAdapter,
                     corsPort = corsOriginCache,
                 )
@@ -448,6 +451,24 @@ data class ServiceGraph(
                         keyPrefix = "mfa",
                     )
                 } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300)
+            val otpEmailLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 3,
+                        windowSeconds = 900,
+                        keyPrefix = "otp_email",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 3, windowSeconds = 900)
+            val otpIpLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 10,
+                        windowSeconds = 900,
+                        keyPrefix = "otp_ip",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 10, windowSeconds = 900)
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -555,6 +576,8 @@ data class ServiceGraph(
                 registerRateLimiter = registerLimiter,
                 tokenRateLimiter = tokenLimiter,
                 mfaRateLimiter = mfaLimiter,
+                otpEmailRateLimiter = otpEmailLimiter,
+                otpIpRateLimiter = otpIpLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,

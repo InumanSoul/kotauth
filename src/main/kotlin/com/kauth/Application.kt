@@ -434,6 +434,9 @@ fun Application.module(
             adminService = s.adminService,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
+            emailOtpService = s.emailOtpService,
+            otpEmailRateLimiter = s.otpEmailRateLimiter,
+            otpIpRateLimiter = s.otpIpRateLimiter,
             corsService = s.corsService,
         )
 

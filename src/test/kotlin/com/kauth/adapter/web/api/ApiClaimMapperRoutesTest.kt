@@ -355,6 +355,9 @@ class ApiClaimMapperRoutesTest {
                     ),
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
+                emailOtpService = stubEmailOtpService(),
+                otpEmailRateLimiter = AlwaysAllowLimiter(),
+                otpIpRateLimiter = AlwaysAllowLimiter(),
             )
         }
     }

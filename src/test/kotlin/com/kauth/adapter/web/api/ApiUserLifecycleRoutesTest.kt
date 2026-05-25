@@ -383,6 +383,9 @@ class ApiUserLifecycleRoutesTest {
                 adminService = adminService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
+                emailOtpService = stubEmailOtpService(),
+                otpEmailRateLimiter = AlwaysAllowLimiter(),
+                otpIpRateLimiter = AlwaysAllowLimiter(),
             )
         }
     }
