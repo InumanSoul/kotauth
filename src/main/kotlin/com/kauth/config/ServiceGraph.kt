@@ -7,6 +7,7 @@ import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresCorsAdapter
+import com.kauth.adapter.persistence.PostgresEmailOtpChallengeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
 import com.kauth.adapter.persistence.PostgresGroupRepository
 import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
@@ -18,6 +19,7 @@ import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantClaimMapperRepository
+import com.kauth.adapter.persistence.PostgresTenantEmailBrandingRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresThemeRepository
@@ -35,6 +37,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.BackupEncryptionPort
+import com.kauth.domain.port.EmailOtpChallengeRepository
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
@@ -42,6 +45,7 @@ import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
@@ -117,6 +121,8 @@ data class ServiceGraph(
     val identityProviderRepository: IdentityProviderRepository,
     val portalConfigRepository: PortalConfigRepository,
     val themeRepository: ThemeRepository,
+    val emailBrandingRepository: TenantEmailBrandingRepository,
+    val emailOtpChallengeRepository: EmailOtpChallengeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
     val adminClientProvisioning: AdminClientProvisioning,
@@ -188,6 +194,8 @@ data class ServiceGraph(
             val socialAccountRepository = PostgresSocialAccountRepository()
             val portalConfigRepository = PostgresPortalConfigRepository()
             val themeRepository = PostgresThemeRepository()
+            val emailBrandingRepository = PostgresTenantEmailBrandingRepository()
+            val emailOtpChallengeRepository = PostgresEmailOtpChallengeRepository()
             val apiKeyRepository = PostgresApiKeyRepository()
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
@@ -474,6 +482,7 @@ data class ServiceGraph(
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
                     userAttributeRepository = userAttributeRepository,
+                    emailBrandingRepository = emailBrandingRepository,
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                 )
@@ -517,6 +526,8 @@ data class ServiceGraph(
                 identityProviderRepository = identityProviderRepository,
                 portalConfigRepository = portalConfigRepository,
                 themeRepository = themeRepository,
+                emailBrandingRepository = emailBrandingRepository,
+                emailOtpChallengeRepository = emailOtpChallengeRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
                 adminClientProvisioning = adminClientProvisioning,

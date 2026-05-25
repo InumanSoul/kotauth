@@ -115,4 +115,22 @@ class FakeUserRepository : UserRepository {
         val user = store[userId.value] ?: return
         store[userId.value] = user.copy(failedLoginAttempts = 0, lockedUntil = null)
     }
+
+    override fun recordFailedOtpChallenge(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    ) {
+        val user = store[userId.value] ?: return
+        store[userId.value] =
+            user.copy(
+                failedOtpChallenges = newCount,
+                lockedUntil = lockedUntil ?: user.lockedUntil,
+            )
+    }
+
+    override fun resetFailedOtpChallenges(userId: UserId) {
+        val user = store[userId.value] ?: return
+        store[userId.value] = user.copy(failedOtpChallenges = 0)
+    }
 }

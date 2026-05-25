@@ -32,6 +32,10 @@ data class SecurityConfig(
     // Disabling password login affects only the password flow; magic-link and
     // social providers are governed by their own per-tenant config.
     val passwordLoginEnabled: Boolean = true,
+    // send-otp does NOT create a user when this is false; the response is still uniform.
+    val emailOtpSignupEnabled: Boolean = false,
+    // Cross-challenge failed-OTP threshold. 0 disables.
+    val emailOtpLockoutThreshold: Int = 5,
 ) {
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0
 }

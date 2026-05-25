@@ -5,6 +5,7 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventBackup
 import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.ClaimMapperBackup
+import com.kauth.domain.model.EmailBrandingBackup
 import com.kauth.domain.model.ExportManifest
 import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
@@ -113,6 +114,8 @@ class BackupExporterService(
                             magicLinkEnabled = magicLinkEnabled,
                             magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
                             passwordLoginEnabled = passwordLoginEnabled,
+                            emailOtpSignupEnabled = emailOtpSignupEnabled,
+                            emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                         )
                     },
                 theme =
@@ -145,6 +148,16 @@ class BackupExporterService(
                         tlsEnabled = tenant.smtpTlsEnabled,
                         enabled = tenant.smtpEnabled,
                     ),
+                emailBranding =
+                    tenant.emailBranding?.let { branding ->
+                        EmailBrandingBackup(
+                            brandName = branding.brandName,
+                            brandColorHex = branding.brandColorHex,
+                            brandLogoUrl = branding.brandLogoUrl,
+                            supportEmail = branding.supportEmail,
+                            fromDisplayName = branding.fromDisplayName,
+                        )
+                    },
             )
 
         val applicationBackups =

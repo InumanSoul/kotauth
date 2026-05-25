@@ -4,6 +4,7 @@ import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantEmailBranding
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.EncryptionPort
@@ -48,6 +49,11 @@ class PostgresTenantRepository(
                 JoinType.LEFT,
                 onColumn = TenantsTable.id,
                 otherColumn = TenantSecurityConfigTable.tenantId,
+            ).join(
+                TenantEmailBrandingTable,
+                JoinType.LEFT,
+                onColumn = TenantsTable.id,
+                otherColumn = TenantEmailBrandingTable.tenantId,
             )
 
     override fun findBySlug(slug: String): Tenant? =
@@ -126,6 +132,8 @@ class PostgresTenantRepository(
                     it[magicLinkEnabled] = tenant.securityConfig.magicLinkEnabled
                     it[magicLinkTokenTtlMinutes] = tenant.securityConfig.magicLinkTokenTtlMinutes
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
+                    it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
+                    it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                 }
             if (updatedRows == 0) {
                 TenantSecurityConfigTable.insert {
@@ -145,6 +153,8 @@ class PostgresTenantRepository(
                     it[magicLinkEnabled] = tenant.securityConfig.magicLinkEnabled
                     it[magicLinkTokenTtlMinutes] = tenant.securityConfig.magicLinkTokenTtlMinutes
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
+                    it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
+                    it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
                 }
             }
             tenantJoined
@@ -204,6 +214,7 @@ class PostgresTenantRepository(
             smtpEnabled = this[TenantsTable.smtpEnabled],
             maxConcurrentSessions = this[TenantsTable.maxConcurrentSessions],
             portalConfig = toPortalConfig(),
+            emailBranding = toEmailBranding(),
         )
     }
 
@@ -227,6 +238,21 @@ class PostgresTenantRepository(
             magicLinkEnabled = this[TenantSecurityConfigTable.magicLinkEnabled],
             magicLinkTokenTtlMinutes = this[TenantSecurityConfigTable.magicLinkTokenTtlMinutes],
             passwordLoginEnabled = this[TenantSecurityConfigTable.passwordLoginEnabled],
+            emailOtpSignupEnabled = this[TenantSecurityConfigTable.emailOtpSignupEnabled],
+            emailOtpLockoutThreshold = this[TenantSecurityConfigTable.emailOtpLockoutThreshold],
+        )
+    }
+
+    private fun ResultRow.toEmailBranding(): TenantEmailBranding? {
+        val id = getOrNull(TenantEmailBrandingTable.id) ?: return null
+        return TenantEmailBranding(
+            id = id,
+            tenantId = TenantId(this[TenantEmailBrandingTable.tenantId]),
+            brandName = this[TenantEmailBrandingTable.brandName],
+            brandColorHex = this[TenantEmailBrandingTable.brandColorHex],
+            brandLogoUrl = this[TenantEmailBrandingTable.brandLogoUrl],
+            supportEmail = this[TenantEmailBrandingTable.supportEmail],
+            fromDisplayName = this[TenantEmailBrandingTable.fromDisplayName],
         )
     }
 

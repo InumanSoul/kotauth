@@ -28,6 +28,8 @@ object TenantSecurityConfigTable : Table("tenant_security_config") {
     val magicLinkEnabled = bool("magic_link_enabled").default(false)
     val magicLinkTokenTtlMinutes = integer("magic_link_token_ttl_minutes").default(15)
     val passwordLoginEnabled = bool("password_login_enabled").default(true)
+    val emailOtpSignupEnabled = bool("email_otp_signup_enabled").default(false)
+    val emailOtpLockoutThreshold = integer("email_otp_lockout_threshold").default(5)
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

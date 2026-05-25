@@ -25,6 +25,7 @@ object ApiKeysTable : Table("api_keys") {
     val expiresAt = timestampWithTimeZone("expires_at").nullable()
     val lastUsedAt = timestampWithTimeZone("last_used_at").nullable()
     val enabled = bool("enabled").default(true)
+    val bootstrapName = varchar("bootstrap_name", 128).nullable()
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)
@@ -46,6 +47,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
                     it[scopes] = apiKey.scopes.joinToString(",")
                     it[expiresAt] = apiKey.expiresAt?.toOffsetDateTime()
                     it[enabled] = apiKey.enabled
+                    it[bootstrapName] = apiKey.bootstrapName
                     it[createdAt] = apiKey.createdAt.toOffsetDateTime()
                 } get ApiKeysTable.id
 
@@ -133,6 +135,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
             expiresAt = expires?.toInstant(),
             lastUsedAt = lastUsed?.toInstant(),
             enabled = this[ApiKeysTable.enabled],
+            bootstrapName = this[ApiKeysTable.bootstrapName],
             createdAt = created.toInstant(),
         )
     }

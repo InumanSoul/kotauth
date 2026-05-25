@@ -36,6 +36,8 @@ data class Tenant(
     val maxConcurrentSessions: Int? = null, // null = unlimited
     // Portal UI configuration (loaded from workspace_portal_config via LEFT JOIN)
     val portalConfig: PortalConfig = PortalConfig(),
+    // Per-tenant transactional email branding; null means inherit defaults.
+    val emailBranding: TenantEmailBranding? = null,
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG

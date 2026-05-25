@@ -27,6 +27,7 @@ object UsersTable : Table("users") {
 
     val failedLoginAttempts = integer("failed_login_attempts").default(0)
     val lockedUntil = timestampWithTimeZone("locked_until").nullable()
+    val failedOtpChallenges = integer("failed_otp_challenges").default(0)
 
     val createdAt = timestampWithTimeZone("created_at")
 

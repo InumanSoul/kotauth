@@ -28,6 +28,7 @@ import com.kauth.fakes.FakeIdentityProviderRepository
 import com.kauth.fakes.FakePortalConfigRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantClaimMapperRepository
+import com.kauth.fakes.FakeTenantEmailBrandingRepository
 import com.kauth.fakes.FakeTenantKeyRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeThemeRepository
@@ -78,6 +79,7 @@ class BackupExportImportTest {
     private val destThemes = FakeThemeRepository()
     private val destPortal = FakePortalConfigRepository()
     private val destAttrs = FakeUserAttributeRepository()
+    private val destEmailBranding = FakeTenantEmailBrandingRepository()
     private val destAuditPort = FakeAuditLogPort()
     private val txRunner = FakeTransactionRunner()
 
@@ -108,6 +110,7 @@ class BackupExportImportTest {
             themeRepository = destThemes,
             portalConfigRepository = destPortal,
             userAttributeRepository = destAttrs,
+            emailBrandingRepository = destEmailBranding,
             auditLogPort = destAuditPort,
             transactionRunner = txRunner,
         )
