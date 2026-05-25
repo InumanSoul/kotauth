@@ -266,24 +266,17 @@ class SocialLoginService(
         return issueTokens(newUser, tenant, provider, isNewUser = true, ipAddress, userAgent)
     }
 
-    /**
-     * Grants the originating client's configured default roles to a freshly
-     * registered social user. Mirrors [AuthService.grantClientDefaultRoles] —
-     * password and social registration paths must behave identically.
-     */
     private fun grantClientDefaultRoles(
         tenantId: TenantId,
         userId: com.kauth.domain.model.UserId,
         originatingClientId: String?,
-    ) {
-        if (originatingClientId == null) return
-        val apps = applicationRepository ?: return
-        val roles = roleRepository ?: return
-        val app = apps.findByClientId(tenantId, originatingClientId) ?: return
-        roles.findDefaultRolesForClient(app.id).forEach { role ->
-            roles.assignRoleToUser(userId, role.id!!)
-        }
-    }
+    ) = applyClientDefaultRolesGrant(
+        tenantId,
+        userId,
+        originatingClientId,
+        applicationRepository,
+        roleRepository,
+    )
 
     // -------------------------------------------------------------------------
     // Private helpers

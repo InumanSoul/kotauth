@@ -85,6 +85,31 @@ fun main(args: Array<String> = emptyArray()) {
 
     val services = ServiceGraph.create(config)
 
+    config.bootstrapApiKeysJson?.let { json ->
+        runCatching { com.kauth.config.parseBootstrapApiKeyEntries(json) }
+            .onFailure { e ->
+                startupLog.error("KAUTH_BOOTSTRAP_API_KEYS parse failed: {}", e.message)
+                kotlin.system.exitProcess(1)
+            }.getOrNull()
+            ?.let { entries ->
+                when (val result = services.apiKeyBootstrapService.ensureBootstrapped(entries)) {
+                    is com.kauth.domain.service.ApiKeyBootstrapService.Result.Failure -> {
+                        startupLog.error("KAUTH_BOOTSTRAP_API_KEYS: {}", result.message)
+                        kotlin.system.exitProcess(1)
+                    }
+                    is com.kauth.domain.service.ApiKeyBootstrapService.Result.Provisioned ->
+                        result.applied.forEach { o ->
+                            startupLog.info(
+                                "Bootstrap API key '{}' for tenant '{}' — {}",
+                                o.name,
+                                o.tenantSlug,
+                                o.action.name.lowercase(),
+                            )
+                        }
+                }
+            }
+    }
+
     services.redisClientHolder?.let { holder ->
         holder
             .ping(config.redisStartupProbeTimeoutMs)

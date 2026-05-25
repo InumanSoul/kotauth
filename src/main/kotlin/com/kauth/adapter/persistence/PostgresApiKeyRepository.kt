@@ -117,6 +117,33 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         Unit
     }
 
+    override fun findByTenantAndName(
+        tenantId: TenantId,
+        name: String,
+    ): ApiKey? =
+        transaction {
+            ApiKeysTable
+                .selectAll()
+                .where { (ApiKeysTable.tenantId eq tenantId.value) and (ApiKeysTable.name eq name) }
+                .map { it.toApiKey() }
+                .singleOrNull()
+        }
+
+    override fun updateBootstrap(
+        id: Int,
+        keyHash: String,
+        scopes: List<String>,
+        bootstrapName: String,
+    ) = transaction {
+        ApiKeysTable.update({ ApiKeysTable.id eq id }) {
+            it[ApiKeysTable.keyHash] = keyHash
+            it[ApiKeysTable.scopes] = scopes.joinToString(",")
+            it[ApiKeysTable.enabled] = true
+            it[ApiKeysTable.bootstrapName] = bootstrapName
+        }
+        Unit
+    }
+
     // -------------------------------------------------------------------------
     // Mapper
     // -------------------------------------------------------------------------

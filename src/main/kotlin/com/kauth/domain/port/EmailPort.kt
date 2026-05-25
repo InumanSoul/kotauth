@@ -92,4 +92,14 @@ interface EmailPort {
         workspaceName: String,
         tenant: Tenant,
     )
+
+    /** Sends a one-time 6-digit numeric code with no clickable link. */
+    fun sendEmailOtpEmail(
+        to: String,
+        toName: String,
+        code: String,
+        expiresInMinutes: Long,
+        workspaceName: String,
+        tenant: Tenant,
+    )
 }

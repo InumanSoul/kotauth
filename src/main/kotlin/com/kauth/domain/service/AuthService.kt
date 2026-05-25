@@ -414,24 +414,17 @@ class AuthService(
     // Helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Grants the originating client's configured default roles to a freshly
-     * registered user. No-op when there is no originating client, the client
-     * is unknown, or the repositories were not wired (test setups).
-     */
     private fun grantClientDefaultRoles(
         tenantId: TenantId,
         userId: UserId,
         originatingClientId: String?,
-    ) {
-        if (originatingClientId == null) return
-        val apps = applicationRepository ?: return
-        val roles = roleRepository ?: return
-        val app = apps.findByClientId(tenantId, originatingClientId) ?: return
-        roles.findDefaultRolesForClient(app.id).forEach { role ->
-            roles.assignRoleToUser(userId, role.id!!)
-        }
-    }
+    ) = applyClientDefaultRolesGrant(
+        tenantId,
+        userId,
+        originatingClientId,
+        applicationRepository,
+        roleRepository,
+    )
 
     // Two UUIDs concatenated — 256 bits of entropy. Used as the stored hash for
     // passwordless registrations; the user never sees or types this value.

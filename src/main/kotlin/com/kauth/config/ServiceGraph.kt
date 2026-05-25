@@ -51,11 +51,13 @@ import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
@@ -106,7 +108,9 @@ data class ServiceGraph(
     val selfServiceService: UserSelfServiceService,
     val mfaService: MfaService,
     val socialLoginService: SocialLoginService,
+    val emailOtpService: EmailOtpService,
     val apiKeyService: ApiKeyService,
+    val apiKeyBootstrapService: ApiKeyBootstrapService,
     val webhookService: WebhookService,
     val corsService: CorsService,
     val corsOriginCache: CorsOriginCache,
@@ -298,6 +302,19 @@ data class ServiceGraph(
                     userAttributeRepository = userAttributeRepository,
                     claimMappersFor = claimMapperService::list,
                 )
+            val emailOtpService =
+                EmailOtpService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
+                    challengeRepository = emailOtpChallengeRepository,
+                    applicationRepository = applicationRepository,
+                    authorizationCodeRepository = authCodeRepository,
+                    emailPort = emailAdapter,
+                    auditLog = auditLogAdapter,
+                    roleRepository = roleRepository,
+                )
+            val apiKeyBootstrapService =
+                ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
             val adminService =
                 AdminService(
                     tenantRepository = tenantRepository,
@@ -511,7 +528,9 @@ data class ServiceGraph(
                 selfServiceService = selfServiceService,
                 mfaService = mfaService,
                 socialLoginService = socialLoginService,
+                emailOtpService = emailOtpService,
                 apiKeyService = apiKeyService,
+                apiKeyBootstrapService = apiKeyBootstrapService,
                 webhookService = webhookService,
                 corsService = corsService,
                 corsOriginCache = corsOriginCache,

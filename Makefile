@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa run infra-up
+.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -111,6 +111,9 @@ generate-key: ## Generate a cryptographically secure KAUTH_SECRET_KEY
 
 reset-mfa: ## Reset MFA for an admin user (usage: make reset-mfa USER=admin)
 	@java -jar build/libs/kotauth-all.jar cli reset-admin-mfa --username=$(USER)
+
+generate-api-key: ## Mint a bootstrap API key + SHA-256 (usage: make generate-api-key TENANT=zion)
+	@java -jar build/libs/kotauth-all.jar cli hash-api-key --tenant=$(TENANT)
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 

@@ -9,6 +9,7 @@ object CliRunner {
             "reset-admin-mfa" -> ResetAdminMfaCommand.execute(args.drop(1))
             "export-tenant" -> ExportTenantCommand.execute(args.drop(1))
             "import-tenant" -> ImportTenantCommand.execute(args.drop(1))
+            "hash-api-key" -> HashApiKeyCommand.execute(args.drop(1))
             null, "--help", "-h" -> printUsage()
             else -> {
                 System.err.println("Unknown CLI command: ${args.first()}")
@@ -28,6 +29,8 @@ object CliRunner {
               reset-admin-mfa --username=<name>  Reset MFA for an admin user
               export-tenant <slug> ...           Export a tenant to an encrypted backup file
               import-tenant <file> ...           Import an encrypted backup as a new tenant
+              hash-api-key [--key=<v>] [--tenant=<slug>]
+                                                 Print SHA-256 for KAUTH_BOOTSTRAP_API_KEYS
 
             Examples:
               java -jar kauth.jar cli generate-secret-key
