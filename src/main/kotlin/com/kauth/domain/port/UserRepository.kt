@@ -83,4 +83,14 @@ interface UserRepository {
 
     /** Clears the failed login counter and removes any active lockout on [userId]. */
     fun resetFailedLogins(userId: UserId)
+
+    /** Increments cross-challenge failed-OTP counter; locks the account when [lockedUntil] is non-null. */
+    fun recordFailedOtpChallenge(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    )
+
+    /** Resets [User.failedOtpChallenges] to 0. */
+    fun resetFailedOtpChallenges(userId: UserId)
 }

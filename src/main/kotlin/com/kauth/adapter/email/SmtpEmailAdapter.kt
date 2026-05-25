@@ -133,6 +133,20 @@ class SmtpEmailAdapter : EmailPort {
         send(to, toName, subject, html, text, tenant)
     }
 
+    override fun sendEmailOtpEmail(
+        to: String,
+        toName: String,
+        code: String,
+        expiresInMinutes: Long,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        val subject = "Your sign-in code for $workspaceName"
+        val html = buildEmailOtpHtml(toName, code, expiresInMinutes, tenant)
+        val text = buildEmailOtpText(toName, code, expiresInMinutes, workspaceName)
+        send(to, toName, subject, html, text, tenant)
+    }
+
     private fun send(
         to: String,
         toName: String,
@@ -201,7 +215,9 @@ class SmtpEmailAdapter : EmailPort {
         val fromAddress =
             InternetAddress(
                 tenant.smtpFromAddress ?: error("SMTP from address not configured"),
-                tenant.smtpFromName ?: workspaceDisplayName(tenant),
+                tenant.emailBranding?.fromDisplayName
+                    ?: tenant.smtpFromName
+                    ?: workspaceDisplayName(tenant),
             )
 
         val message =
@@ -239,7 +255,7 @@ class SmtpEmailAdapter : EmailPort {
         }
     }
 
-    private fun workspaceDisplayName(tenant: Tenant) = tenant.displayName
+    private fun workspaceDisplayName(tenant: Tenant) = tenant.emailBranding?.brandName ?: tenant.displayName
 
     // -------------------------------------------------------------------------
     // Shared layout builders
@@ -262,14 +278,18 @@ class SmtpEmailAdapter : EmailPort {
         ctaLabel: String? = null,
         ctaUrl: String? = null,
         footerHtml: String,
+        embeddedHtml: String? = null,
     ): String {
         val theme = tenant.theme
-        val workspace = htmlEscape(tenant.displayName)
+        val branding = tenant.emailBranding
+        val workspace = htmlEscape(branding?.brandName ?: tenant.displayName)
         val font = "${htmlEscape(theme.fontFamily)}, sans-serif"
+        val accent = branding?.brandColorHex ?: theme.accentColor
+        val logoUrl = branding?.brandLogoUrl ?: theme.logoUrl
 
         val logoSection =
-            if (theme.logoUrl != null) {
-                """<img src="${htmlEscape(theme.logoUrl)}" alt="$workspace" border="0" """ +
+            if (logoUrl != null) {
+                """<img src="${htmlEscape(logoUrl)}" alt="$workspace" border="0" """ +
                     """style="max-height:40px;max-width:200px;margin:0 0 16px 0;display:block;">"""
             } else {
                 ""
@@ -278,23 +298,29 @@ class SmtpEmailAdapter : EmailPort {
         val safeCtaUrl = ctaUrl?.let { htmlEscape(it) }
         val safeCtaLabel = ctaLabel?.let { htmlEscape(it) }
         val radius = htmlEscape(theme.borderRadius)
+        val supportLine =
+            branding?.supportEmail?.let {
+                """<br>Need help? Contact <a href="mailto:${htmlEscape(it)}" """ +
+                    """style="color:#71717a;">${htmlEscape(it)}</a>."""
+            } ?: ""
 
         val ctaSection =
             if (safeCtaLabel != null && safeCtaUrl != null) {
                 """
-                <a href="$safeCtaUrl" style="display:inline-block;padding:12px 24px;background:${theme.accentColor};color:${theme.accentForeground};border-radius:$radius;text-decoration:none;font-size:14px;font-weight:600;">
+                <a href="$safeCtaUrl" style="display:inline-block;padding:12px 24px;background:$accent;color:${theme.accentForeground};border-radius:$radius;text-decoration:none;font-size:14px;font-weight:600;">
                   $safeCtaLabel
                 </a>
                 <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                  $footerHtml<br>
+                  $footerHtml$supportLine<br>
                   If the button doesn't work, copy this link:<br>
                   <a href="$safeCtaUrl" style="color:#71717a;word-break:break-all;">$safeCtaUrl</a>
                 </p>
                 """.trimIndent()
             } else {
                 """
+                ${embeddedHtml ?: ""}
                 <p style="font-size:12px;color:#71717a;margin:24px 0 0 0;line-height:1.5;">
-                  $footerHtml
+                  $footerHtml$supportLine
                 </p>
                 """.trimIndent()
             }
@@ -557,6 +583,47 @@ class SmtpEmailAdapter : EmailPort {
         footer =
             "If you weren't expecting this, you can safely ignore this email. " +
                 "No account will be activated without clicking the link above.",
+    )
+
+    private fun buildEmailOtpHtml(
+        name: String,
+        code: String,
+        expiresInMinutes: Long,
+        tenant: Tenant,
+    ): String {
+        val codeBlock =
+            """
+            <div style="font-family:monospace;font-size:32px;letter-spacing:6px;font-weight:600;padding:20px;border-radius:${htmlEscape(
+                tenant.theme.borderRadius,
+            )};background:#f4f4f5;color:#09090b;text-align:center;margin:0 0 24px 0;">
+              ${htmlEscape(code)}
+            </div>
+            """.trimIndent()
+        return buildEmailHtml(
+            tenant = tenant,
+            heading = "Your sign-in code",
+            bodyHtml =
+                "Hi ${htmlEscape(name)},<br><br>" +
+                    "Use this $expiresInMinutes-minute code to finish signing in. " +
+                    "Don't share it with anyone.",
+            footerHtml = "If you didn't request a code, you can safely ignore this email.",
+            embeddedHtml = codeBlock,
+        )
+    }
+
+    private fun buildEmailOtpText(
+        name: String,
+        code: String,
+        expiresInMinutes: Long,
+        workspace: String,
+    ) = buildEmailText(
+        workspace = workspace,
+        heading = "Your sign-in code",
+        body =
+            "Hi $name,\n\nYour $expiresInMinutes-minute sign-in code is:\n\n" +
+                "    $code\n\nDon't share it with anyone.",
+        url = null,
+        footer = "If you didn't request a code, you can safely ignore this email.",
     )
 
     private fun htmlEscape(s: String) =

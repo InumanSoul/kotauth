@@ -127,6 +127,11 @@ class ApiKeyService(
 
     fun listForTenant(tenantId: TenantId): List<ApiKey> = apiKeyRepository.findByTenantId(tenantId)
 
+    fun findById(
+        id: Int,
+        tenantId: TenantId,
+    ): ApiKey? = apiKeyRepository.findById(id, tenantId)
+
     fun revoke(
         id: Int,
         tenantId: TenantId,

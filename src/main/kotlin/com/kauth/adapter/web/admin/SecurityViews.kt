@@ -495,7 +495,12 @@ internal fun apiKeysListPageImpl(
                 tbody {
                     apiKeys.forEach { key ->
                         tr {
-                            td { span("key-table__name") { +key.name } }
+                            td {
+                                span("key-table__name") { +key.name }
+                                if (key.bootstrapName != null) {
+                                    span("badge badge--neutral badge--inline") { +"Bootstrapped" }
+                                }
+                            }
                             td { span("key-table__meta") { +"${key.keyPrefix}\u2026" } }
                             td {
                                 span("key-table__meta") { +key.scopes.joinToString(", ") }
@@ -529,28 +534,35 @@ internal fun apiKeysListPageImpl(
                                 span(badgeCls) { +(if (key.enabled) "Active" else "Revoked") }
                             }
                             td {
-                                if (key.enabled) {
-                                    form(
-                                        action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/revoke",
-                                        method = FormMethod.post,
-                                    ) {
-                                        button(type = ButtonType.submit) {
-                                            classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
-                                            attributes["data-confirm"] = "Revoke this API key? This cannot be undone."
-                                            +"Revoke"
+                                when {
+                                    key.bootstrapName != null ->
+                                        span("key-table__meta") {
+                                            title = "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 edit the env var to rotate or revoke."
+                                            +"Env-managed"
                                         }
-                                    }
-                                } else {
-                                    form(
-                                        action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/delete",
-                                        method = FormMethod.post,
-                                    ) {
-                                        button(type = ButtonType.submit) {
-                                            classes = setOf("btn", "btn--ghost", "btn--sm")
-                                            attributes["data-confirm"] = "Delete this key?"
-                                            +"Delete"
+                                    key.enabled ->
+                                        form(
+                                            action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/revoke",
+                                            method = FormMethod.post,
+                                        ) {
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm", "btn--danger")
+                                                attributes["data-confirm"] =
+                                                    "Revoke this API key? This cannot be undone."
+                                                +"Revoke"
+                                            }
                                         }
-                                    }
+                                    else ->
+                                        form(
+                                            action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/delete",
+                                            method = FormMethod.post,
+                                        ) {
+                                            button(type = ButtonType.submit) {
+                                                classes = setOf("btn", "btn--ghost", "btn--sm")
+                                                attributes["data-confirm"] = "Delete this key?"
+                                                +"Delete"
+                                            }
+                                        }
                                 }
                             }
                         }

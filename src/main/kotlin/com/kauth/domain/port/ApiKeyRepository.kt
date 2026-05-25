@@ -18,6 +18,20 @@ interface ApiKeyRepository {
     /** Returns all keys for a tenant ordered by createdAt DESC. Includes disabled keys. */
     fun findByTenantId(tenantId: TenantId): List<ApiKey>
 
+    /** Lookup by unique (tenant_id, name). Returns null when missing. */
+    fun findByTenantAndName(
+        tenantId: TenantId,
+        name: String,
+    ): ApiKey?
+
+    /** Updates an existing key's hash + scopes + enabled flag. Used by the bootstrap upsert path. */
+    fun updateBootstrap(
+        id: Int,
+        keyHash: String,
+        scopes: List<String>,
+        bootstrapName: String,
+    )
+
     /** Finds a specific key by id, scoped to tenant. */
     fun findById(
         id: Int,

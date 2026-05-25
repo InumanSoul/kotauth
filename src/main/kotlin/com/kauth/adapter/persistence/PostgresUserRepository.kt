@@ -208,6 +208,28 @@ class PostgresUserRepository : UserRepository {
             Unit
         }
 
+    override fun recordFailedOtpChallenge(
+        userId: UserId,
+        newCount: Int,
+        lockedUntil: Instant?,
+    ) = transaction {
+        UsersTable.update({ UsersTable.id eq userId.value }) {
+            it[failedOtpChallenges] = newCount
+            if (lockedUntil != null) {
+                it[UsersTable.lockedUntil] = OffsetDateTime.ofInstant(lockedUntil, ZoneOffset.UTC)
+            }
+        }
+        Unit
+    }
+
+    override fun resetFailedOtpChallenges(userId: UserId) =
+        transaction {
+            UsersTable.update({ UsersTable.id eq userId.value }) {
+                it[failedOtpChallenges] = 0
+            }
+            Unit
+        }
+
     private fun ResultRow.toUser(): User =
         User(
             id = UserId(this[UsersTable.id]),
@@ -226,6 +248,7 @@ class PostgresUserRepository : UserRepository {
             mfaEnabled = this[UsersTable.mfaEnabled],
             failedLoginAttempts = this[UsersTable.failedLoginAttempts],
             lockedUntil = this[UsersTable.lockedUntil]?.toInstant(),
+            failedOtpChallenges = this[UsersTable.failedOtpChallenges],
             createdAt = this[UsersTable.createdAt].toInstant(),
         )
 

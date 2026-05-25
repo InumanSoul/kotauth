@@ -855,6 +855,31 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
                         }
                     }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
+                        }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL }
+                        div {
+                            input(type = InputType.number, name = "emailOtpLockoutThreshold") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "50"
+                                value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
+                                if (!workspace.securityConfig.emailOtpSignupEnabled) {
+                                    attributes["disabled"] = "disabled"
+                                }
+                            }
+                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
+                        }
+                    }
                 }
             }
                     }
@@ -1046,6 +1071,64 @@ internal fun brandingPageImpl(
                                         value = f
                                         if (t.fontFamily == f) selected = true
                                         +f
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Email Branding (v1.12.0) ────────────────
+                        val eb = workspace.emailBranding
+                        div("ov-card") {
+                            div("ov-card__section-label") { +"Email Branding" }
+                            div("ov-card__desc") {
+                                +"Applied to every transactional email (OTP, magic link, "
+                                +"password reset, invite, account locked). Envelope sender "
+                                +"stays operator-controlled — set From display name only."
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Brand name" }
+                                input(type = InputType.text, name = "emailBrandName") {
+                                    classes = setOf("edit-row__field")
+                                    value = eb?.brandName ?: ""
+                                    attributes["placeholder"] = workspace.displayName
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Brand color (hex)" }
+                                input(type = InputType.text, name = "emailBrandColor") {
+                                    classes = setOf("edit-row__field", "edit-row__field--mono")
+                                    value = eb?.brandColorHex ?: ""
+                                    attributes["placeholder"] = workspace.theme.accentColor
+                                    attributes["pattern"] = "^#[0-9a-fA-F]{3,6}$"
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Logo URL" }
+                                input(type = InputType.url, name = "emailBrandLogoUrl") {
+                                    classes = setOf("edit-row__field")
+                                    value = eb?.brandLogoUrl ?: ""
+                                    attributes["placeholder"] = workspace.theme.logoUrl ?: "https://example.com/logo.png"
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Support email" }
+                                input(type = InputType.email, name = "emailSupportEmail") {
+                                    classes = setOf("edit-row__field")
+                                    value = eb?.supportEmail ?: ""
+                                    attributes["placeholder"] = "support@example.com"
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"From display name" }
+                                div {
+                                    input(type = InputType.text, name = "emailFromDisplayName") {
+                                        classes = setOf("edit-row__field")
+                                        value = eb?.fromDisplayName ?: ""
+                                        attributes["placeholder"] = workspace.smtpFromName ?: workspace.displayName
+                                    }
+                                    div("edit-row__hint") {
+                                        +"Display name only. The sender address is set in SMTP "
+                                        +"configuration and cannot be changed per workspace."
                                     }
                                 }
                             }

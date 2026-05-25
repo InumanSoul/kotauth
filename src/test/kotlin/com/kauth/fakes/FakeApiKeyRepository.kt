@@ -59,4 +59,26 @@ class FakeApiKeyRepository : ApiKeyRepository {
             store.remove(id)
         }
     }
+
+    override fun findByTenantAndName(
+        tenantId: TenantId,
+        name: String,
+    ): ApiKey? = store.values.find { it.tenantId == tenantId && it.name == name }
+
+    override fun updateBootstrap(
+        id: Int,
+        keyHash: String,
+        scopes: List<String>,
+        bootstrapName: String,
+    ) {
+        store[id]?.let {
+            store[id] =
+                it.copy(
+                    keyHash = keyHash,
+                    scopes = scopes,
+                    enabled = true,
+                    bootstrapName = bootstrapName,
+                )
+        }
+    }
 }

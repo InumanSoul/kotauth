@@ -4,12 +4,14 @@ import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
+import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.infrastructure.ApiKeyPrincipal
@@ -38,6 +40,9 @@ fun Route.apiRoutes(
     adminService: AdminService,
     userAttributeService: UserAttributeService,
     claimMapperService: CachingClaimMapperService,
+    emailOtpService: EmailOtpService,
+    otpEmailRateLimiter: RateLimiterPort,
+    otpIpRateLimiter: RateLimiterPort,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -113,6 +118,7 @@ fun Route.apiRoutes(
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)
+            apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
         }
     }
 }

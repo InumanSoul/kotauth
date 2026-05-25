@@ -326,6 +326,10 @@ fun Route.adminSettingsRoutes(
                         params["magicLinkTokenTtlMinutes"]?.toIntOrNull()
                             ?: workspace.securityConfig.magicLinkTokenTtlMinutes,
                     passwordLoginEnabled = params["requirePasswordless"] != "true",
+                    emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
+                    emailOtpLockoutThreshold =
+                        params["emailOtpLockoutThreshold"]?.toIntOrNull()
+                            ?: workspace.securityConfig.emailOtpLockoutThreshold,
                 )
         ) {
             is AdminResult.Success ->
@@ -393,8 +397,35 @@ fun Route.adminSettingsRoutes(
                 defaultLocale = resolvedLocale,
             )
         when (val result = adminService.updateTheme(slug, theme)) {
-            is AdminResult.Success ->
-                call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
+            is AdminResult.Success -> {
+                val emailBrandingResult =
+                    adminService.updateEmailBranding(
+                        slug,
+                        com.kauth.domain.model.TenantEmailBranding(
+                            tenantId = workspace.id,
+                            brandName = params["emailBrandName"],
+                            brandColorHex = params["emailBrandColor"],
+                            brandLogoUrl = params["emailBrandLogoUrl"],
+                            supportEmail = params["emailSupportEmail"],
+                            fromDisplayName = params["emailFromDisplayName"],
+                        ),
+                    )
+                if (emailBrandingResult is AdminResult.Failure) {
+                    val wsPairs = call.attributes[WsPairsAttr]
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AdminView.brandingPage(
+                            workspace,
+                            wsPairs,
+                            session.username,
+                            availableLocales = translationPort.availableLocales,
+                            error = emailBrandingResult.error.message,
+                        ),
+                    )
+                } else {
+                    call.respondRedirect("/admin/workspaces/$slug/settings/branding?saved=true")
+                }
+            }
             is AdminResult.Failure -> {
                 val wsPairs = call.attributes[WsPairsAttr]
                 call.respondHtml(

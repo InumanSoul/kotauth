@@ -7,6 +7,7 @@ import com.kauth.adapter.persistence.PostgresAuditLogAdapter
 import com.kauth.adapter.persistence.PostgresAuditLogRepository
 import com.kauth.adapter.persistence.PostgresAuthorizationCodeRepository
 import com.kauth.adapter.persistence.PostgresCorsAdapter
+import com.kauth.adapter.persistence.PostgresEmailOtpChallengeRepository
 import com.kauth.adapter.persistence.PostgresEmailVerificationTokenRepository
 import com.kauth.adapter.persistence.PostgresGroupRepository
 import com.kauth.adapter.persistence.PostgresIdentityProviderRepository
@@ -18,6 +19,7 @@ import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
 import com.kauth.adapter.persistence.PostgresTenantClaimMapperRepository
+import com.kauth.adapter.persistence.PostgresTenantEmailBrandingRepository
 import com.kauth.adapter.persistence.PostgresTenantKeyRepository
 import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresThemeRepository
@@ -35,6 +37,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.BackupEncryptionPort
+import com.kauth.domain.port.EmailOtpChallengeRepository
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
@@ -42,16 +45,19 @@ import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
@@ -102,7 +108,9 @@ data class ServiceGraph(
     val selfServiceService: UserSelfServiceService,
     val mfaService: MfaService,
     val socialLoginService: SocialLoginService,
+    val emailOtpService: EmailOtpService,
     val apiKeyService: ApiKeyService,
+    val apiKeyBootstrapService: ApiKeyBootstrapService,
     val webhookService: WebhookService,
     val corsService: CorsService,
     val corsOriginCache: CorsOriginCache,
@@ -117,6 +125,8 @@ data class ServiceGraph(
     val identityProviderRepository: IdentityProviderRepository,
     val portalConfigRepository: PortalConfigRepository,
     val themeRepository: ThemeRepository,
+    val emailBrandingRepository: TenantEmailBrandingRepository,
+    val emailOtpChallengeRepository: EmailOtpChallengeRepository,
     val keyProvisioningService: KeyProvisioningService,
     val portalClientProvisioning: PortalClientProvisioning,
     val adminClientProvisioning: AdminClientProvisioning,
@@ -125,6 +135,8 @@ data class ServiceGraph(
     val registerRateLimiter: RateLimiterPort,
     val tokenRateLimiter: RateLimiterPort,
     val mfaRateLimiter: RateLimiterPort,
+    val otpEmailRateLimiter: RateLimiterPort,
+    val otpIpRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
@@ -188,6 +200,8 @@ data class ServiceGraph(
             val socialAccountRepository = PostgresSocialAccountRepository()
             val portalConfigRepository = PostgresPortalConfigRepository()
             val themeRepository = PostgresThemeRepository()
+            val emailBrandingRepository = PostgresTenantEmailBrandingRepository()
+            val emailOtpChallengeRepository = PostgresEmailOtpChallengeRepository()
             val apiKeyRepository = PostgresApiKeyRepository()
             val webhookEndpointRepository = PostgresWebhookEndpointRepository()
             val webhookDeliveryRepository = PostgresWebhookDeliveryRepository()
@@ -290,6 +304,19 @@ data class ServiceGraph(
                     userAttributeRepository = userAttributeRepository,
                     claimMappersFor = claimMapperService::list,
                 )
+            val emailOtpService =
+                EmailOtpService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
+                    challengeRepository = emailOtpChallengeRepository,
+                    applicationRepository = applicationRepository,
+                    authorizationCodeRepository = authCodeRepository,
+                    emailPort = emailAdapter,
+                    auditLog = auditLogAdapter,
+                    roleRepository = roleRepository,
+                )
+            val apiKeyBootstrapService =
+                ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
             val adminService =
                 AdminService(
                     tenantRepository = tenantRepository,
@@ -302,6 +329,7 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
+                    emailBrandingRepository = emailBrandingRepository,
                     emailPort = emailAdapter,
                     corsPort = corsOriginCache,
                 )
@@ -423,6 +451,24 @@ data class ServiceGraph(
                         keyPrefix = "mfa",
                     )
                 } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300)
+            val otpEmailLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 3,
+                        windowSeconds = 900,
+                        keyPrefix = "otp_email",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 3, windowSeconds = 900)
+            val otpIpLimiter: RateLimiterPort =
+                redisClientHolder?.let {
+                    RedisRateLimiter(
+                        commands = it.commands,
+                        maxRequests = 10,
+                        windowSeconds = 900,
+                        keyPrefix = "otp_ip",
+                    )
+                } ?: InMemoryRateLimiter(maxRequests = 10, windowSeconds = 900)
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -474,6 +520,7 @@ data class ServiceGraph(
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
                     userAttributeRepository = userAttributeRepository,
+                    emailBrandingRepository = emailBrandingRepository,
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                 )
@@ -502,7 +549,9 @@ data class ServiceGraph(
                 selfServiceService = selfServiceService,
                 mfaService = mfaService,
                 socialLoginService = socialLoginService,
+                emailOtpService = emailOtpService,
                 apiKeyService = apiKeyService,
+                apiKeyBootstrapService = apiKeyBootstrapService,
                 webhookService = webhookService,
                 corsService = corsService,
                 corsOriginCache = corsOriginCache,
@@ -517,6 +566,8 @@ data class ServiceGraph(
                 identityProviderRepository = identityProviderRepository,
                 portalConfigRepository = portalConfigRepository,
                 themeRepository = themeRepository,
+                emailBrandingRepository = emailBrandingRepository,
+                emailOtpChallengeRepository = emailOtpChallengeRepository,
                 keyProvisioningService = keyProvisioning,
                 portalClientProvisioning = portalClientProvisioning,
                 adminClientProvisioning = adminClientProvisioning,
@@ -525,6 +576,8 @@ data class ServiceGraph(
                 registerRateLimiter = registerLimiter,
                 tokenRateLimiter = tokenLimiter,
                 mfaRateLimiter = mfaLimiter,
+                otpEmailRateLimiter = otpEmailLimiter,
+                otpIpRateLimiter = otpIpLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,

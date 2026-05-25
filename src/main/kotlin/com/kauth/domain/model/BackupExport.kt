@@ -73,6 +73,17 @@ data class TenantBackup(
     val theme: ThemeBackup,
     val portalConfig: PortalConfigBackup,
     val smtp: SmtpConfigBackup,
+    // Null for backups taken before email branding existed.
+    val emailBranding: EmailBrandingBackup? = null,
+)
+
+@Serializable
+data class EmailBrandingBackup(
+    val brandName: String? = null,
+    val brandColorHex: String? = null,
+    val brandLogoUrl: String? = null,
+    val supportEmail: String? = null,
+    val fromDisplayName: String? = null,
 )
 
 @Serializable
@@ -93,6 +104,8 @@ data class SecurityConfigBackup(
     // Defaulted so backups taken before these fields existed still import.
     val magicLinkTokenTtlMinutes: Int = 15,
     val passwordLoginEnabled: Boolean = true,
+    val emailOtpSignupEnabled: Boolean = false,
+    val emailOtpLockoutThreshold: Int = 5,
 )
 
 @Serializable

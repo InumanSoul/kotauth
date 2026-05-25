@@ -24,6 +24,8 @@ data class ApiKey(
     val expiresAt: Instant? = null,
     val lastUsedAt: Instant? = null,
     val enabled: Boolean = true,
+    /** Non-null when provisioned via `KAUTH_BOOTSTRAP_API_KEYS` — admin UI marks these read-only. */
+    val bootstrapName: String? = null,
     val createdAt: Instant = Instant.now(),
 )
 
@@ -55,6 +57,12 @@ object ApiScope {
     /** Master-tenant only — import an encrypted backup as a new workspace. */
     const val TENANTS_IMPORT = "tenants:import"
 
+    /** Send an email OTP challenge for an applicant (find-or-create user). */
+    const val AUTH_SEND_OTP = "auth:send-otp"
+
+    /** Verify an email OTP challenge and exchange it for an authorization code. */
+    const val AUTH_VERIFY_OTP = "auth:verify-otp"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -74,5 +82,7 @@ object ApiScope {
             CLAIM_MAPPERS_WRITE,
             TENANTS_EXPORT,
             TENANTS_IMPORT,
+            AUTH_SEND_OTP,
+            AUTH_VERIFY_OTP,
         )
 }

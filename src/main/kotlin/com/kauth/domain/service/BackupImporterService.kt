@@ -28,6 +28,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantClaimMapperRepository
+import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
@@ -79,6 +80,7 @@ class BackupImporterService(
     private val themeRepository: ThemeRepository,
     private val portalConfigRepository: PortalConfigRepository,
     private val userAttributeRepository: UserAttributeRepository,
+    private val emailBrandingRepository: TenantEmailBrandingRepository,
     private val auditLogPort: AuditLogPort?,
     private val transactionRunner: TransactionRunner,
 ) {
@@ -150,6 +152,8 @@ class BackupImporterService(
                             magicLinkEnabled = magicLinkEnabled,
                             magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
                             passwordLoginEnabled = passwordLoginEnabled,
+                            emailOtpSignupEnabled = emailOtpSignupEnabled,
+                            emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                         )
                     },
                 smtpHost = tb.smtp.host,
@@ -195,6 +199,19 @@ class BackupImporterService(
                     }.getOrDefault(com.kauth.domain.model.PortalLayout.SIDEBAR),
             ),
         )
+
+        tb.emailBranding?.let { eb ->
+            emailBrandingRepository.upsert(
+                com.kauth.domain.model.TenantEmailBranding(
+                    tenantId = createdTenant.id,
+                    brandName = eb.brandName,
+                    brandColorHex = eb.brandColorHex,
+                    brandLogoUrl = eb.brandLogoUrl,
+                    supportEmail = eb.supportEmail,
+                    fromDisplayName = eb.fromDisplayName,
+                ),
+            )
+        }
 
         export.signingKeys?.forEach { keyBackup ->
             tenantKeyRepository.save(

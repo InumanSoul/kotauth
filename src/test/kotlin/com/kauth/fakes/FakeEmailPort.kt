@@ -101,4 +101,28 @@ class FakeEmailPort : EmailPort {
         if (shouldFail) throw RuntimeException("SMTP delivery failed")
         _sent.add(SentEmail(to, toName, magicLinkUrl, workspaceName, "magic_link"))
     }
+
+    private val _otps = mutableListOf<SentOtp>()
+    val otps: List<SentOtp> get() = _otps.toList()
+
+    data class SentOtp(
+        val to: String,
+        val toName: String,
+        val code: String,
+        val expiresInMinutes: Long,
+        val workspaceName: String,
+    )
+
+    override fun sendEmailOtpEmail(
+        to: String,
+        toName: String,
+        code: String,
+        expiresInMinutes: Long,
+        workspaceName: String,
+        tenant: Tenant,
+    ) {
+        if (shouldFail) throw RuntimeException("SMTP delivery failed")
+        _sent.add(SentEmail(to, toName, "", workspaceName, "email_otp"))
+        _otps.add(SentOtp(to, toName, code, expiresInMinutes, workspaceName))
+    }
 }

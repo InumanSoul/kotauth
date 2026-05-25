@@ -8,6 +8,7 @@ import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.model.TenantEmailBranding
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
@@ -20,6 +21,7 @@ import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.SessionRepository
+import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.UserRepository
@@ -46,6 +48,7 @@ class AdminService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val themeRepository: ThemeRepository? = null,
     private val portalConfigRepository: PortalConfigRepository? = null,
+    private val emailBrandingRepository: TenantEmailBrandingRepository? = null,
     private val emailPort: EmailPort? = null,
     private val corsPort: CorsPort? = null,
 ) {
@@ -143,6 +146,8 @@ class AdminService(
         magicLinkEnabled: Boolean = false,
         magicLinkTokenTtlMinutes: Int = 15,
         passwordLoginEnabled: Boolean = true,
+        emailOtpSignupEnabled: Boolean = false,
+        emailOtpLockoutThreshold: Int = 5,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -204,6 +209,8 @@ class AdminService(
                         magicLinkEnabled = magicLinkEnabled,
                         magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes.coerceIn(1, 1440),
                         passwordLoginEnabled = passwordLoginEnabled,
+                        emailOtpSignupEnabled = emailOtpSignupEnabled,
+                        emailOtpLockoutThreshold = emailOtpLockoutThreshold.coerceIn(0, 50),
                     ),
             )
 
@@ -290,6 +297,55 @@ class AdminService(
             ),
         )
 
+        return AdminResult.Success(saved)
+    }
+
+    /**
+     * Upserts per-tenant transactional email branding. Empty/blank fields clear
+     * the override and fall back to the tenant defaults at send time.
+     */
+    fun updateEmailBranding(
+        slug: String,
+        branding: TenantEmailBranding,
+    ): AdminResult<TenantEmailBranding> {
+        val repo =
+            emailBrandingRepository
+                ?: return AdminResult.Success(branding) // soft no-op for tests / minimal deployments
+        val tenant =
+            tenantRepository.findBySlug(slug)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
+
+        val supportEmail = branding.supportEmail?.trim()?.takeIf { it.isNotBlank() }
+        if (supportEmail != null && "@" !in supportEmail) {
+            return AdminResult.Failure(AdminError.Validation("Support email must be a valid address."))
+        }
+        val color = branding.brandColorHex?.trim()?.takeIf { it.isNotBlank() }
+        if (color != null && !color.matches(Regex("^#[0-9a-fA-F]{3,6}$"))) {
+            return AdminResult.Failure(AdminError.Validation("Brand color must be a hex value like #1FBCFF."))
+        }
+
+        val sanitized =
+            TenantEmailBranding(
+                tenantId = tenant.id,
+                brandName = branding.brandName?.trim()?.takeIf { it.isNotBlank() },
+                brandColorHex = color,
+                brandLogoUrl = branding.brandLogoUrl?.trim()?.takeIf { it.isNotBlank() },
+                supportEmail = supportEmail,
+                fromDisplayName = branding.fromDisplayName?.trim()?.takeIf { it.isNotBlank() },
+            )
+
+        val saved = repo.upsert(sanitized)
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_TENANT_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("slug" to slug, "action" to "email_branding_updated"),
+            ),
+        )
         return AdminResult.Success(saved)
     }
 

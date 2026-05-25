@@ -51,6 +51,7 @@ data class EnvironmentConfig(
     val redisCommandTimeoutMs: Long,
     val ssoSessionTtlSeconds: Long,
     val ssoSessionMaxTtlSeconds: Long,
+    val bootstrapApiKeysJson: String?,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
     val redisEnabled: Boolean get() = redisUrl != null
@@ -103,6 +104,7 @@ data class EnvironmentConfig(
                 redisCommandTimeoutMs = System.getenv("KAUTH_REDIS_COMMAND_TIMEOUT_MS")?.toLongOrNull() ?: 100L,
                 ssoSessionTtlSeconds = ssoTtl,
                 ssoSessionMaxTtlSeconds = ssoMaxTtl,
+                bootstrapApiKeysJson = System.getenv("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
             )
         }
 

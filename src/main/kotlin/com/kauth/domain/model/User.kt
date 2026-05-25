@@ -43,6 +43,7 @@ data class User(
     val mfaEnabled: Boolean = false,
     val failedLoginAttempts: Int = 0,
     val lockedUntil: Instant? = null,
+    val failedOtpChallenges: Int = 0,
     val createdAt: Instant? = null,
 ) {
     /** True when the account is currently locked out (lockout window has not yet expired). */

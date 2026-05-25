@@ -87,7 +87,14 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
         val slug = workspace.slug
         val keyId =
             call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        apiKeyService?.revoke(keyId, workspace.id)
+        val svc = apiKeyService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
+        if (svc.findById(keyId, workspace.id)?.bootstrapName != null) {
+            return@post call.respond(
+                HttpStatusCode.Forbidden,
+                "Bootstrapped keys can only be revoked via KAUTH_BOOTSTRAP_API_KEYS.",
+            )
+        }
+        svc.revoke(keyId, workspace.id)
         call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
     }
 
@@ -96,7 +103,14 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
         val slug = workspace.slug
         val keyId =
             call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        apiKeyService?.delete(keyId, workspace.id)
+        val svc = apiKeyService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
+        if (svc.findById(keyId, workspace.id)?.bootstrapName != null) {
+            return@post call.respond(
+                HttpStatusCode.Forbidden,
+                "Bootstrapped keys can only be deleted via KAUTH_BOOTSTRAP_API_KEYS.",
+            )
+        }
+        svc.delete(keyId, workspace.id)
         call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
     }
 }

@@ -7,6 +7,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.0] - 2026-05-25
+
+Three agnostic IAM primitives driven by the second round of Zion-onboarding
+integration needs. Together they unlock email-first passwordless onboarding
+for any future Kotauth consumer — not just the BFF that requested them.
+
+### Added
+
+- **Email OTP passwordless primitive** — new admin API endpoints
+  `POST /t/{slug}/api/v1/auth/send-otp` and `POST /.../verify-otp`. send-otp
+  generates a 6-digit numeric code (SHA-256 stored, 10-minute TTL), sends a
+  branded email, and returns an opaque `challengeId`. verify-otp validates
+  the code, stamps `email_verified=true`, and returns a single-use
+  authorization code the caller exchanges at the standard OIDC `/token`
+  endpoint. Per-email + per-IP rate limits via the existing Redis (or
+  in-memory) limiter; constant-time response posture at the route layer;
+  audit events `EMAIL_OTP_SENT` / `EMAIL_OTP_VERIFIED` / `EMAIL_OTP_REJECTED`
+  / `EMAIL_OTP_LOCKOUT`. Use cases beyond onboarding: step-up auth on
+  sensitive actions, email-change verification, cross-device login. See
+  ADR-15
+- **Find-or-create user from send-otp** — per-tenant
+  `email_otp_signup_enabled` flag (default off) on Security settings. When
+  enabled, send-otp atomically creates a passwordless user if the email
+  doesn't already exist. The originating `client_id` flows through to the
+  v1.11.0 default-roles grant and the authorization code's bound client,
+  so a freshly created user receives the client's default role bundle and
+  gets a token with the configured audience. Uniform response shape either
+  way — the BFF cannot distinguish new from returning users
+- **Cross-challenge OTP lockout defence** — per-tenant
+  `email_otp_lockout_threshold` (default 5) trips the existing
+  `locked_until` window when a user fails N consecutive challenges. The
+  same `EmailPort.sendAccountLockedEmail` template fires with OTP abuse as
+  the reason; audit event `EMAIL_OTP_LOCKOUT` carries the threshold and
+  duration. Locked users get a uniform `too_many_attempts` response — the
+  lockout never leaks to the BFF. Per-challenge attempt cap stays at 5
+- **Per-tenant transactional email branding** — new
+  `tenant_email_branding` table (1:1 with tenants) carrying `brand_name`,
+  `brand_color_hex`, `brand_logo_url`, `support_email`,
+  `from_display_name`. Composed into the `Tenant` aggregate so all six
+  existing email templates (verification, magic link, password reset,
+  account locked, invite, password changed) inherit the branding for free
+  — no per-template wiring. New branding editor card on the workspace
+  Branding settings page; falls back to tenant defaults when fields are
+  blank. The envelope sender (`from_email`) stays operator-controlled for
+  DKIM/SPF/DMARC alignment — see ADR-15
+- **Boot-time admin API keys via `KAUTH_BOOTSTRAP_API_KEYS`** — JSON
+  env var parsed at startup. Idempotent upsert by `(tenant_id, name)` —
+  a typo on the tenant slug or scope is a fail-fast process exit, not a
+  silent half-startup. Rotating a key = edit the hash in the env var.
+  Bootstrapped rows are flagged in the admin UI with a "Bootstrapped"
+  badge and an "Env-managed" action column; revoke/delete is refused with
+  a 403 to keep the env var as the single source of truth. Closes the
+  v1.11.0 deferred item that became blocking when the BFF needed a key
+  baked into CI
+- **`cli hash-api-key` subcommand + `make generate-api-key TENANT=<slug>`** —
+  operator helper that mints a fresh key in the `kauth_<slug>_<random>`
+  format and prints the plaintext (capture once) and the SHA-256 (paste
+  into the env var). `--key=<plaintext>` mode hashes a supplied value
+- **New API scopes** — `auth:send-otp` and `auth:verify-otp` added to the
+  `ApiScope.ALL` catalog. Keys can be scoped narrowly to the OTP surface
+- **ADR-15 — email-OTP passwordless primitive** — documents the
+  find-or-create posture, originating-client plumbing, constant-time
+  approach, cross-challenge lockout, `from_email` DKIM lock, and
+  `EmailTemplatePort` deferral
+
+### Changed
+
+- **Email adapter resolves branding through one shared layout function** —
+  `buildEmailHtml` in `SmtpEmailAdapter` now reads `tenant.emailBranding`
+  for brand name, color, logo, and support-email footer. From display name
+  resolution chain is `tenant.emailBranding?.fromDisplayName ?:
+  tenant.smtpFromName ?: tenant.displayName` — tenants who previously
+  customized only the SMTP `from_name` keep their existing behavior
+- **`grantClientDefaultRoles` extracted to a shared helper** — the
+  four-liner in `AuthService` and `SocialLoginService` (introduced by
+  v1.11.0) is now a top-level `applyClientDefaultRolesGrant` in
+  `domain/service/`. The new `EmailOtpService` uses the same helper so
+  all three registration paths grant the same default-role bundle for
+  the same originating client
+
+### Notes
+
+- Hosted login-page Email OTP is intentionally out of scope for v1.12.0
+  and tracked for v1.13.0. `EmailOtpService` was designed consumer-agnostic
+  so the hosted page wires in without re-plumbing
+- The `originatingClientId` plumbing requires the BFF's confidential client
+  to have at least one redirect URI registered. A missing redirect URI
+  makes verify-otp return 422 `invalid_client`. Operator configuration
+  requirement, documented in ADR-15
+- V45 migration creates `email_otp_challenges`, adds
+  `email_otp_signup_enabled` and `email_otp_lockout_threshold` columns to
+  `tenant_security_config`, and adds `failed_otp_challenges` to `users`.
+  V46 creates `tenant_email_branding`. V47 adds `(tenant_id, name) UNIQUE`
+  and `bootstrap_name` to `api_keys`
+- Backup/restore round-trips the new `SecurityConfig` fields and the
+  `tenant_email_branding` row. Old backups still import — all new fields
+  have safe defaults
+- 25 new tests (13 service, 6 OTP-route integration, 6 bootstrap-service)
+
+---
+
 ## [1.11.1] - 2026-05-22
 
 Polish release. Closes long-deferred small items, two impersonation
