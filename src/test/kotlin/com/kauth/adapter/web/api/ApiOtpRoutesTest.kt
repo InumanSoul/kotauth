@@ -251,6 +251,55 @@ class ApiOtpRoutesTest {
                 }
             assertEquals(HttpStatusCode.UnprocessableEntity, verify.status)
             assertTrue("""invalid_otp""" in verify.bodyAsText())
+            assertEquals("application/problem+json", verify.headers["Content-Type"])
+        }
+
+    @Test
+    fun `verify-otp rejects a challenge from a different tenant`() =
+        testApplication {
+            application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
+            val otherTenant =
+                tenants.add(
+                    Tenant(
+                        id = TenantId(0),
+                        slug = "other",
+                        displayName = "Other",
+                        issuerUrl = null,
+                    ),
+                )
+            val otherUser =
+                users.add(
+                    com.kauth.domain.model.User(
+                        tenantId = otherTenant.id,
+                        username = "alien",
+                        email = "alien@other.test",
+                        fullName = "Alien",
+                        passwordHash = "x",
+                    ),
+                )
+            challenges.create(
+                com.kauth.domain.model.EmailOtpChallenge(
+                    userId = otherUser.id!!,
+                    tenantId = otherTenant.id,
+                    challengeId = "alien-handle",
+                    codeHash =
+                        com.kauth.domain.util
+                            .sha256Hex("123456"),
+                    expiresAt =
+                        java.time.Instant
+                            .now()
+                            .plusSeconds(600),
+                ),
+            )
+
+            val verify =
+                client.post("/t/zion/api/v1/auth/verify-otp") {
+                    bearerAuth(verifyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"challengeId":"alien-handle","otp":"123456"}""")
+                }
+            assertEquals(HttpStatusCode.UnprocessableEntity, verify.status)
+            assertTrue("""invalid_otp""" in verify.bodyAsText())
         }
 
     private fun io.ktor.server.application.Application.installApp(

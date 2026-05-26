@@ -127,8 +127,22 @@ class BackupExportImportTest {
                     displayName = "Acme Corp",
                     issuerUrl = "https://acme.example.com",
                     tokenExpirySeconds = 7200,
-                    securityConfig = SecurityConfig(magicLinkEnabled = true, mfaPolicy = "required"),
+                    securityConfig =
+                        SecurityConfig(
+                            magicLinkEnabled = true,
+                            mfaPolicy = "required",
+                            emailOtpSignupEnabled = true,
+                            emailOtpLockoutThreshold = 3,
+                        ),
                     theme = TenantTheme.LIGHT,
+                    emailBranding =
+                        com.kauth.domain.model.TenantEmailBranding(
+                            tenantId = TenantId(0),
+                            brandName = "Acme",
+                            brandColorHex = "#1FBCFF",
+                            supportEmail = "support@acme.test",
+                            fromDisplayName = "Acme Support",
+                        ),
                 ),
             )
 
@@ -446,6 +460,22 @@ class BackupExportImportTest {
         assertEquals(mapOf("department" to "engineering"), destAttrs.findAll(alice.id!!, newTenantId))
         val aliceGroups = destGroups.findGroupsForUser(alice.id)
         assertEquals(setOf("engineering"), aliceGroups.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `import preserves OTP security config fields and email branding`() {
+        val export = exportSuccessful(ExportOptions())
+        importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
+        val restored = destTenants.findBySlug("acme-staging")!!
+
+        assertTrue(restored.securityConfig.emailOtpSignupEnabled)
+        assertEquals(3, restored.securityConfig.emailOtpLockoutThreshold)
+
+        val branding = destEmailBranding.findByTenantId(restored.id)!!
+        assertEquals("Acme", branding.brandName)
+        assertEquals("#1FBCFF", branding.brandColorHex)
+        assertEquals("support@acme.test", branding.supportEmail)
+        assertEquals("Acme Support", branding.fromDisplayName)
     }
 
     @Test

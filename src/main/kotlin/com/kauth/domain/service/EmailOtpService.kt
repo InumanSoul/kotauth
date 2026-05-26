@@ -142,7 +142,6 @@ class EmailOtpService(
                 userAgent = null,
                 details =
                     mapOf(
-                        "source" to "admin_api",
                         "resend_count" to challenge.resendCount.toString(),
                         "originating_client_id" to (originatingClientId ?: ""),
                     ),
@@ -278,6 +277,8 @@ class EmailOtpService(
         )
     }
 
+    // Back-channel issuance — PKCE not required (ADR-15). Scopes are fixed for now;
+    // TODO(v1.13): derive from client.allowedScopes once that field exists.
     private fun issueAuthorizationCodeFor(
         tenant: Tenant,
         userId: UserId,

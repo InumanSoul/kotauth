@@ -36,6 +36,9 @@ import com.kauth.domain.util.SecureTokens
  *
  * Discriminated-union results ([AdminResult]) propagate errors explicitly
  * without exceptions, keeping the web adapter free of try/catch noise.
+ *
+ * TODO(v1.13): extract WorkspaceSettingsService, AdminUserService, and
+ * ApplicationManagementService — three clean dependency clusters already exist.
  */
 class AdminService(
     private val tenantRepository: TenantRepository,

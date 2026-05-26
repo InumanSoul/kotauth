@@ -20,6 +20,7 @@ import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordPolicyPort
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
+import com.kauth.fakes.FakeTenantEmailBrandingRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
 import kotlinx.coroutines.CoroutineScope
@@ -47,6 +48,7 @@ class AdminServiceTest {
     private val evTokenRepo = FakeEmailVerificationTokenRepository()
     private val prTokenRepo = FakePasswordResetTokenRepository()
     private val emailPort = FakeEmailPort()
+    private val emailBranding = FakeTenantEmailBrandingRepository()
 
     private val selfService =
         UserSelfServiceService(
@@ -72,6 +74,7 @@ class AdminServiceTest {
             sessionRepository = sessions,
             selfServiceService = selfService,
             passwordPolicy = passwordPolicy,
+            emailBrandingRepository = emailBranding,
         )
 
     private val tenant =
@@ -1199,5 +1202,85 @@ class AdminServiceTest {
     fun `updateWorkspaceSettings does not fire ADMIN_SECURITY_CONFIG_UPDATED when toggle unchanged`() {
         callUpdateSettings(passwordLoginEnabled = true)
         assertTrue(!auditLog.hasEvent(AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED))
+    }
+
+    @Test
+    fun `updateEmailBranding rejects an invalid hex color`() {
+        val result =
+            svc.updateEmailBranding(
+                tenant.slug,
+                com.kauth.domain.model.TenantEmailBranding(
+                    tenantId = tenant.id,
+                    brandColorHex = "not-a-color",
+                ),
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateEmailBranding rejects a support email without an at sign`() {
+        val result =
+            svc.updateEmailBranding(
+                tenant.slug,
+                com.kauth.domain.model.TenantEmailBranding(
+                    tenantId = tenant.id,
+                    supportEmail = "support-without-at",
+                ),
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateEmailBranding returns NotFound for unknown tenant slug`() {
+        val result =
+            svc.updateEmailBranding(
+                "nope",
+                com.kauth.domain.model
+                    .TenantEmailBranding(tenantId = TenantId(99)),
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `updateEmailBranding persists sanitised fields on success`() {
+        val result =
+            svc.updateEmailBranding(
+                tenant.slug,
+                com.kauth.domain.model.TenantEmailBranding(
+                    tenantId = tenant.id,
+                    brandName = "  Acme  ",
+                    brandColorHex = "#1FBCFF",
+                    supportEmail = "support@acme.com",
+                    fromDisplayName = "  Acme Support  ",
+                ),
+            )
+        assertIs<AdminResult.Success<com.kauth.domain.model.TenantEmailBranding>>(result)
+        val saved = emailBranding.findByTenantId(tenant.id)!!
+        assertEquals("Acme", saved.brandName)
+        assertEquals("Acme Support", saved.fromDisplayName)
+    }
+
+    @Test
+    fun `updateEmailBranding is a soft no-op when the repository is not wired`() {
+        val withoutRepo =
+            AdminService(
+                tenantRepository = tenants,
+                userRepository = users,
+                applicationRepository = apps,
+                passwordHasher = hasher,
+                auditLog = auditLog,
+                sessionRepository = sessions,
+                selfServiceService = selfService,
+            )
+        val result =
+            withoutRepo.updateEmailBranding(
+                tenant.slug,
+                com.kauth.domain.model
+                    .TenantEmailBranding(tenantId = tenant.id),
+            )
+        assertIs<AdminResult.Success<com.kauth.domain.model.TenantEmailBranding>>(result)
     }
 }

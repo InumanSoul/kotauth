@@ -26,6 +26,10 @@ would have failed in Postgres at boot for any tenant slug ≥ 3 chars.
   longer save a client with zero redirect URIs. Previously the surface
   showed up only at use-time as a 422 `invalid_client` from verify-otp.
   ADR-15 follow-up
+- **`EMAIL_OTP_SENT` audit detail no longer carries `source=admin_api`** —
+  the OTP send path isn't admin-API-exclusive (v1.13 hosted page will
+  share the code). A `source=admin_api` filter for compliance would have
+  produced false positives
 
 ### Added
 
@@ -59,13 +63,30 @@ would have failed in Postgres at boot for any tenant slug ≥ 3 chars.
   `AuthService`, `SocialLoginService`, `*Views`, and the test suite —
   build output is now warning-free except for the unrelated Ktor
   `Principal` deprecation
+- **`ServiceGraph` rate-limiter wiring** — 6 nearly-identical
+  Redis-or-in-memory blocks collapse to a `buildRateLimiter(max,
+  windowSecs, prefix)` factory
+- **`EMAIL_OTP_*` audit events get coloured badges** — verified is green,
+  rejected and lockout are red. Default neutral was misleading
 
 ### Notes
 
-- 1 new regression test (`default keyPrefix fits the 16-char column
-  ceiling for any tenant slug`)
-- 1 new service test (`updateApplication - rejects when redirect URIs
-  is empty`)
+- New regression and coverage tests:
+  - `default keyPrefix fits the 16-char column ceiling for any tenant slug`
+  - `updateApplication - rejects when redirect URIs is empty`
+  - `sendOtp swallows SMTP failure but still records the audit event`
+  - `verifyOtp on the stale handle after resend returns InvalidOtp`
+  - 4 `updateEmailBranding` validation paths (hex, support email, NotFound,
+    persisted sanitised fields)
+  - `updateEmailBranding is a soft no-op when the repository is not wired`
+  - `import preserves OTP security config fields and email branding`
+    (closes the v1.12.0 backup round-trip blind spot)
+  - `verify-otp rejects a challenge from a different tenant`
+  - Content-Type problem+json header assertion on the wrong-code path
+- ADR-15 follow-ups noted in code: PKCE-bypass rationale + scope-derivation
+  TODO on `EmailOtpService.issueAuthorizationCodeFor`; future-split TODO on
+  `AdminService` (`WorkspaceSettings` / `AdminUser` / `ApplicationManagement`
+  earmarked for v1.13)
 - Next: **v1.13.0** ships the hosted login-page Email OTP — same
   `EmailOtpService` consumer-agnostic core, plus the auth-page views
   and challenge-id session-state for the browser-driven flow

@@ -338,6 +338,7 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_CLIENT_ENABLED,
         AuditEventType.ADMIN_USER_PASSWORD_RESET,
         AuditEventType.ACCOUNT_UNLOCKED,
+        AuditEventType.EMAIL_OTP_VERIFIED,
         -> "badge--active"
 
         AuditEventType.LOGIN_FAILED,
@@ -347,6 +348,8 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_USER_DISABLED,
         AuditEventType.ADMIN_CLIENT_DISABLED,
         AuditEventType.USER_ACCOUNT_DISABLED_SELF,
+        AuditEventType.EMAIL_OTP_REJECTED,
+        AuditEventType.EMAIL_OTP_LOCKOUT,
         -> "badge--danger"
 
         AuditEventType.LOGIN_RATE_LIMITED,
