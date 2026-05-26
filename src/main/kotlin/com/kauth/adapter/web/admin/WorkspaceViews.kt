@@ -845,17 +845,6 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     label("check-row") {
-                        input(type = InputType.checkBox, name = "requirePasswordless") {
-                            attributes["value"] = "true"
-                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
-                            if (workspace.isMaster) attributes["disabled"] = "disabled"
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
-                        }
-                    }
-                    label("check-row") {
                         input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
                             attributes["value"] = "true"
                             if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
@@ -863,6 +852,9 @@ internal fun securityPolicyPageImpl(
                         div("check-row__body") {
                             span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
+                            if (!workspace.isSmtpReady) {
+                                span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
+                            }
                         }
                     }
                     div("edit-row") {
@@ -878,6 +870,17 @@ internal fun securityPolicyPageImpl(
                                 }
                             }
                             div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
+                        }
+                    }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "requirePasswordless") {
+                            attributes["value"] = "true"
+                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
+                            if (workspace.isMaster) attributes["disabled"] = "disabled"
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
                         }
                     }
                 }

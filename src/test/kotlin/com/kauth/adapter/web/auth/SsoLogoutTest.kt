@@ -151,7 +151,7 @@ class SsoLogoutTest {
         val ssoClear = setCookie.firstOrNull { it.startsWith("KOTAUTH_SSO=") }
         assertTrue(ssoClear != null, "KOTAUTH_SSO clear directive must be present, was: $setCookie")
         assertTrue(
-            ssoClear!!.contains("Max-Age=0", ignoreCase = true) || ssoClear.startsWith("KOTAUTH_SSO=;"),
+            ssoClear.contains("Max-Age=0", ignoreCase = true) || ssoClear.startsWith("KOTAUTH_SSO=;"),
             "KOTAUTH_SSO cookie must be cleared with Max-Age=0, was: $ssoClear",
         )
     }

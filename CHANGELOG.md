@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.12.1] - 2026-05-26
+
+Polish release closing the ADR-15 follow-ups, the UX-review deferred items,
+and the OTP observability gaps before v1.13.0 hosted-page work begins.
+Also fixes a `keyPrefix` overflow bug in the v1.12.0 bootstrap path that
+would have failed in Postgres at boot for any tenant slug ≥ 3 chars.
+
+### Fixed
+
+- **`KAUTH_BOOTSTRAP_API_KEYS` default `keyPrefix` overflowed the
+  `api_keys.key_prefix` `VARCHAR(16)` column** — the v1.12.0 default
+  `"kauth_${slug}_bootstrap"` produced strings up to 20 chars. Failed
+  silently in the in-memory fake and only surfaced against Postgres at
+  boot. Default now truncates to fit; the fake repository enforces the
+  16-char ceiling so the regression class is caught at test time
+- **Redirect-URI presence validated at client save** — admins can no
+  longer save a client with zero redirect URIs. Previously the surface
+  showed up only at use-time as a 422 `invalid_client` from verify-otp.
+  ADR-15 follow-up
+
+### Added
+
+- **OpenAPI spec covers the OTP endpoints + new scopes** — `/auth/send-otp`
+  and `/auth/verify-otp` documented with request/response schemas,
+  status codes (202 / 200 / 410 / 422 / 429), and the `auth:send-otp` /
+  `auth:verify-otp` scopes. The `/api/docs` Swagger page is now complete
+- **"Email OTP" audit-log filter group** — `EMAIL_OTP_*` events get
+  their own optgroup in the workspace audit log dropdown, before the
+  generic "Email & Password" group. Same first-match-wins pattern v1.11.1
+  used for the "Impersonation" group
+- **"Recent OTP activity" panel on the admin user-detail page** — mirrors
+  the "Recent Impersonations" panel from v1.11.1. Shows last 5
+  `EMAIL_OTP_SENT/VERIFIED/REJECTED/LOCKOUT` events for the user
+- **SMTP-not-configured signal for OTP** — sends now log a WARN with
+  tenant slug + email + exception class when delivery fails. The admin
+  Security settings card warns operators when the OTP signup toggle is
+  enabled against an SMTP-unready tenant
+
+### Changed
+
+- **Auth Methods card reorders so the magic-link and OTP pairs stay
+  grouped** — the passwordless-only toggle moves to the bottom of the
+  card. It governs the whole password channel, not magic links
+  specifically, so sandwiching it between the two passwordless rows
+  was misleading
+- **Bootstrap API key rows use an inline info icon with `aria-label`** —
+  replaces the title-only tooltip on "Env-managed" that wasn't
+  discoverable on keyboard or touch
+- **33 `Unnecessary non-null assertion` compiler warnings cleared** across
+  `AuthService`, `SocialLoginService`, `*Views`, and the test suite —
+  build output is now warning-free except for the unrelated Ktor
+  `Principal` deprecation
+
+### Notes
+
+- 1 new regression test (`default keyPrefix fits the 16-char column
+  ceiling for any tenant slug`)
+- 1 new service test (`updateApplication - rejects when redirect URIs
+  is empty`)
+- Next: **v1.13.0** ships the hosted login-page Email OTP — same
+  `EmailOtpService` consumer-agnostic core, plus the auth-page views
+  and challenge-id session-state for the browser-driven flow
+
+---
+
 ## [1.12.0] - 2026-05-25
 
 Three agnostic IAM primitives driven by the second round of Zion-onboarding

@@ -99,7 +99,7 @@ class ApiKeyBootstrapServiceTest {
                 ApiKey(
                     tenantId = tenant.id,
                     name = "zion-public-bff",
-                    keyPrefix = "kauth_zion_bootstrap",
+                    keyPrefix = "kauth_zion",
                     keyHash = "hash-v1",
                     scopes = listOf(ApiScope.AUTH_SEND_OTP),
                     enabled = false,
@@ -137,6 +137,26 @@ class ApiKeyBootstrapServiceTest {
                 ),
             )
         assertTrue(result is ApiKeyBootstrapService.Result.Failure)
+    }
+
+    @Test
+    fun `default keyPrefix fits the 16-char column ceiling for any tenant slug`() {
+        val veryLong = "very-long-brokerage-name-12345"
+        tenants.add(Tenant(id = TenantId(0), slug = veryLong, displayName = "X", issuerUrl = null))
+        val result =
+            service.ensureBootstrapped(
+                listOf(
+                    ApiKeyBootstrapService.Entry(
+                        tenantSlug = veryLong,
+                        name = "bff",
+                        scopes = listOf(ApiScope.AUTH_SEND_OTP),
+                        keyHash = "h",
+                    ),
+                ),
+            )
+        assertTrue(result is ApiKeyBootstrapService.Result.Provisioned)
+        val saved = apiKeys.findByTenantAndName(tenants.findBySlug(veryLong)!!.id, "bff")!!
+        assertTrue(saved.keyPrefix.length <= 16, "keyPrefix '${saved.keyPrefix}' must fit varchar(16)")
     }
 
     @Test

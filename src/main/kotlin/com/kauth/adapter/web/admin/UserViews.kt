@@ -19,6 +19,13 @@ data class ImpersonationRecord(
     val startedAt: Instant,
 )
 
+data class OtpActivityRecord(
+    val eventType: String,
+    val ipAddress: String?,
+    val reason: String?,
+    val occurredAt: Instant,
+)
+
 internal fun userDetailPageImpl(
     workspace: Tenant,
     user: User,
@@ -40,6 +47,7 @@ internal fun userDetailPageImpl(
      */
     tempPasswordLink: String? = null,
     recentImpersonations: List<ImpersonationRecord> = emptyList(),
+    recentOtpActivity: List<OtpActivityRecord> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -295,6 +303,36 @@ internal fun userDetailPageImpl(
                                 tr {
                                     td { span("data-table__name") { +record.adminUsername } }
                                     td { +record.startedAt.toDisplayString() }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (recentOtpActivity.isNotEmpty()) {
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Recent OTP Activity" }
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Event" }
+                                th { +"IP" }
+                                th { +"Reason" }
+                                th { +"When" }
+                            }
+                        }
+                        tbody {
+                            recentOtpActivity.forEach { record ->
+                                tr {
+                                    td {
+                                        span("data-table__name") {
+                                            +record.eventType.removePrefix("EMAIL_OTP_").lowercase()
+                                        }
+                                    }
+                                    td { +(record.ipAddress ?: "—") }
+                                    td { +(record.reason ?: "—") }
+                                    td { +record.occurredAt.toDisplayString() }
                                 }
                             }
                         }

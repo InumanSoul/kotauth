@@ -753,6 +753,15 @@ class AdminService(
             return AdminResult.Failure(AdminError.Validation("Name is required."))
         }
 
+        if (resolvedRedirectUris.isEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "At least one redirect URI is required. The authorization code flow " +
+                        "(including email-OTP back-channel exchange) needs a registered URI to bind to.",
+                ),
+            )
+        }
+
         if (resolvedAudience != null && resolvedAudience.length > 200) {
             return AdminResult.Failure(AdminError.Validation("Token audience must be 200 characters or fewer."))
         }

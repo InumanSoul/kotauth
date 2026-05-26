@@ -198,7 +198,7 @@ class WebhookServiceTest {
         val disabled = svc.listEndpoints(TenantId(1)).first()
         assertEquals(false, disabled.enabled)
 
-        svc.toggleEndpoint(created.id!!, tenantId = TenantId(1), enabled = true)
+        svc.toggleEndpoint(created.id, tenantId = TenantId(1), enabled = true)
         val reenabled = svc.listEndpoints(TenantId(1)).first()
         assertEquals(true, reenabled.enabled)
     }

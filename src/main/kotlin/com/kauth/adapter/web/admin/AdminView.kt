@@ -178,6 +178,7 @@ object AdminView {
         attributeError: String? = null,
         tempPasswordLink: String? = null,
         recentImpersonations: List<ImpersonationRecord> = emptyList(),
+        recentOtpActivity: List<OtpActivityRecord> = emptyList(),
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -194,6 +195,7 @@ object AdminView {
             attributeError,
             tempPasswordLink,
             recentImpersonations,
+            recentOtpActivity,
         )
 
     fun userAttributeFormPage(

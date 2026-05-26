@@ -198,14 +198,15 @@ internal fun auditLogPageImpl(
                                 +"All events"
                             }
                             // Order matters — each event lands in the first group it
-                            // matches, so "Impersonation" must precede "Admin Actions"
-                            // to claim the ADMIN_IMPERSONATION_* events.
+                            // matches. "Impersonation" must precede "Admin Actions" and
+                            // "Email OTP" must precede "Email & Password".
                             val groups = linkedMapOf(
                                 "Login & Registration" to listOf("LOGIN_", "REGISTER_", "ACCOUNT_"),
                                 "Tokens & Authorization" to listOf("TOKEN_", "AUTHORIZATION_CODE_"),
                                 "Sessions" to listOf("SESSION_"),
                                 "Impersonation" to listOf("ADMIN_IMPERSONATION_"),
                                 "Admin Actions" to listOf("ADMIN_"),
+                                "Email OTP" to listOf("EMAIL_OTP_"),
                                 "Email & Password" to listOf("EMAIL_", "PASSWORD_"),
                                 "User Self-Service" to listOf("USER_"),
                                 "MFA" to listOf("MFA_"),

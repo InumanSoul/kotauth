@@ -26,8 +26,12 @@ class ApiKeyBootstrapService(
         val name: String,
         val scopes: List<String>,
         val keyHash: String,
-        val keyPrefix: String = "kauth_${tenantSlug}_bootstrap",
+        val keyPrefix: String? = null,
     )
+
+    companion object {
+        internal fun defaultKeyPrefix(tenantSlug: String): String = "kauth_$tenantSlug".take(16)
+    }
 
     sealed class Result {
         data class Provisioned(
@@ -63,13 +67,14 @@ class ApiKeyBootstrapService(
                 )
             }
 
+            val resolvedPrefix = (entry.keyPrefix ?: defaultKeyPrefix(entry.tenantSlug)).take(16)
             val existing = apiKeyRepository.findByTenantAndName(tenant.id, entry.name)
             if (existing == null) {
                 apiKeyRepository.save(
                     ApiKey(
                         tenantId = tenant.id,
                         name = entry.name,
-                        keyPrefix = entry.keyPrefix,
+                        keyPrefix = resolvedPrefix,
                         keyHash = entry.keyHash,
                         scopes = entry.scopes,
                         enabled = true,

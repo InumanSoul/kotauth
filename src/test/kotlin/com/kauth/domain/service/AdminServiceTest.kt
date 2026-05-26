@@ -633,6 +633,19 @@ class AdminServiceTest {
     }
 
     @Test
+    fun `updateApplication - rejects when redirect URIs is empty`() {
+        val result =
+            svc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                redirectUris = emptyList(),
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertTrue(result.error.message.contains("redirect URI", ignoreCase = true))
+    }
+
+    @Test
     fun `updateApplication - launcherUrl rejected when no redirect URIs registered`() {
         val result =
             svc.updateApplication(

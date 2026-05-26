@@ -252,10 +252,10 @@ class RedisSessionRepositoryIntegrationTest {
 
         val firstSweep = repo.revokeAllByImpersonator(admin.id!!)
         assertEquals(2, firstSweep)
-        assertTrue(repo.findActiveByImpersonator(admin.id!!).isEmpty())
+        assertTrue(repo.findActiveByImpersonator(admin.id).isEmpty())
 
         // A second call should report zero — already-revoked children are not double-counted.
-        assertEquals(0, repo.revokeAllByImpersonator(admin.id!!))
+        assertEquals(0, repo.revokeAllByImpersonator(admin.id))
     }
 
     private fun newSession(

@@ -186,8 +186,8 @@ class BackupExportImportTest {
                     parentGroupId = parentGroup.id!!,
                 ),
             )
-        sourceGroups.assignRoleToGroup(parentGroup.id!!, parentRole.id!!)
-        sourceGroups.assignRoleToGroup(childGroup.id!!, childRole.id!!)
+        sourceGroups.assignRoleToGroup(parentGroup.id, parentRole.id)
+        sourceGroups.assignRoleToGroup(childGroup.id!!, childRole.id)
 
         val alice =
             sourceUsers.add(
@@ -220,9 +220,9 @@ class BackupExportImportTest {
         sourceAttrs.upsert(
             UserAttribute(alice.id!!, tenant.id, "department", "engineering", Instant.now()),
         )
-        sourceRoles.assignRoleToUser(alice.id!!, parentRole.id!!)
-        sourceGroups.addUserToGroup(alice.id!!, parentGroup.id!!)
-        sourceGroups.addUserToGroup(bob.id!!, childGroup.id!!)
+        sourceRoles.assignRoleToUser(alice.id, parentRole.id)
+        sourceGroups.addUserToGroup(alice.id, parentGroup.id)
+        sourceGroups.addUserToGroup(bob.id!!, childGroup.id)
 
         sourceMappers.upsert(
             TenantClaimMapper(
@@ -260,7 +260,7 @@ class BackupExportImportTest {
         sourceAudit.add(
             AuditEvent(
                 tenantId = tenant.id,
-                userId = alice.id!!,
+                userId = alice.id,
                 clientId = app.id,
                 eventType = AuditEventType.LOGIN_SUCCESS,
                 ipAddress = "10.0.0.1",
@@ -444,7 +444,7 @@ class BackupExportImportTest {
                 .first { it.username == "alice" }
 
         assertEquals(mapOf("department" to "engineering"), destAttrs.findAll(alice.id!!, newTenantId))
-        val aliceGroups = destGroups.findGroupsForUser(alice.id!!)
+        val aliceGroups = destGroups.findGroupsForUser(alice.id)
         assertEquals(setOf("engineering"), aliceGroups.map { it.name }.toSet())
     }
 

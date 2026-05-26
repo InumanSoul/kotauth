@@ -286,6 +286,9 @@ object EnglishStrings {
         "After this many failed OTP challenges, the user is locked using the existing " +
             "lockout window above. 0 disables the cross-challenge guard (per-challenge cap " +
             "of 5 still applies)."
+    const val AUTH_METHODS_EMAIL_OTP_SMTP_WARN =
+        "SMTP is not configured for this workspace — OTP emails will fail silently until " +
+            "you configure SMTP under workspace settings."
 
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."

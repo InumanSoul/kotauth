@@ -71,6 +71,8 @@ fun Route.adminApplicationRoutes(
                         clientId,
                     ) -> "Client ID '$clientId' already exists."
                     name.isBlank() -> "Name is required."
+                    redirectUris.isEmpty() ->
+                        "At least one redirect URI is required. The authorization code flow needs a registered URI to bind to."
                     else -> null
                 }
             if (error != null) {
