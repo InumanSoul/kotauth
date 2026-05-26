@@ -234,7 +234,9 @@ object AdminView {
         workspace: Tenant,
         user: User,
         editError: String? = null,
-    ): String = renderFragment { userProfileEditFragment(workspace, user, editError) }
+        roles: List<Role> = emptyList(),
+        groups: List<Group> = emptyList(),
+    ): String = renderFragment { userProfileEditFragment(workspace, user, editError, roles, groups) }
 
     // ── Sessions & Audit ────────────────────────────────────────────────
 

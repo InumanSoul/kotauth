@@ -323,6 +323,8 @@ fun Route.adminUserRoutes(
                                     ctx.workspace,
                                     user,
                                     editError = result.error.message,
+                                    roles = roleGroupService.getRolesForUser(userId),
+                                    groups = roleGroupService.getGroupsForUser(userId),
                                 ),
                                 ContentType.Text.Html,
                                 HttpStatusCode.UnprocessableEntity,
