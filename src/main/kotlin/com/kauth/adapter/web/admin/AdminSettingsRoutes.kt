@@ -398,14 +398,15 @@ fun Route.adminSettingsRoutes(
             )
         when (val result = adminService.updateTheme(slug, theme)) {
             is AdminResult.Success -> {
+                val existingBranding = workspace.emailBranding
                 val emailBrandingResult =
                     adminService.updateEmailBranding(
                         slug,
                         com.kauth.domain.model.TenantEmailBranding(
                             tenantId = workspace.id,
-                            brandName = params["emailBrandName"],
-                            brandColorHex = params["emailBrandColor"],
-                            brandLogoUrl = params["emailBrandLogoUrl"],
+                            brandName = existingBranding?.brandName,
+                            brandColorHex = existingBranding?.brandColorHex,
+                            brandLogoUrl = existingBranding?.brandLogoUrl,
                             supportEmail = params["emailSupportEmail"],
                             fromDisplayName = params["emailFromDisplayName"],
                         ),
