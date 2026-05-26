@@ -19,6 +19,13 @@ data class ImpersonationRecord(
     val startedAt: Instant,
 )
 
+data class OtpActivityRecord(
+    val eventType: String,
+    val ipAddress: String?,
+    val reason: String?,
+    val occurredAt: Instant,
+)
+
 internal fun userDetailPageImpl(
     workspace: Tenant,
     user: User,
@@ -40,6 +47,7 @@ internal fun userDetailPageImpl(
      */
     tempPasswordLink: String? = null,
     recentImpersonations: List<ImpersonationRecord> = emptyList(),
+    recentOtpActivity: List<OtpActivityRecord> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -302,6 +310,36 @@ internal fun userDetailPageImpl(
                 }
             }
 
+            if (recentOtpActivity.isNotEmpty()) {
+                div("ov-card") {
+                    div("ov-card__section-label") { +"Recent OTP Activity" }
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Event" }
+                                th { +"IP" }
+                                th { +"Reason" }
+                                th { +"When" }
+                            }
+                        }
+                        tbody {
+                            recentOtpActivity.forEach { record ->
+                                tr {
+                                    td {
+                                        span("data-table__name") {
+                                            +record.eventType.removePrefix("EMAIL_OTP_").lowercase()
+                                        }
+                                    }
+                                    td { +(record.ipAddress ?: "—") }
+                                    td { +(record.reason ?: "—") }
+                                    td { +record.occurredAt.toDisplayString() }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
@@ -428,6 +466,8 @@ internal fun DIV.userProfileEditFragment(
     workspace: Tenant,
     user: User,
     editError: String? = null,
+    roles: List<Role> = emptyList(),
+    groups: List<Group> = emptyList(),
 ) {
     div {
         id = "profile-section"
@@ -471,6 +511,16 @@ internal fun DIV.userProfileEditFragment(
                         value = user.fullName
                     }
                 }
+                readOnlyBadgesRow(
+                    label = "Roles",
+                    items = roles.map { it.name },
+                    manageUrl = "/admin/workspaces/${workspace.slug}/roles",
+                )
+                readOnlyBadgesRow(
+                    label = "Groups",
+                    items = groups.map { it.name },
+                    manageUrl = "/admin/workspaces/${workspace.slug}/groups",
+                )
                 div("edit-actions") {
                     button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
                         +"Save changes"
@@ -484,6 +534,31 @@ internal fun DIV.userProfileEditFragment(
                         +"Cancel"
                     }
                 }
+            }
+        }
+    }
+}
+
+private fun FlowContent.readOnlyBadgesRow(
+    label: String,
+    items: List<String>,
+    manageUrl: String,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +label }
+        div {
+            div("read-only-badges") {
+                if (items.isEmpty()) {
+                    span("edit-row__hint") { +"None assigned" }
+                } else {
+                    items.forEach { name ->
+                        span("badge badge--id-muted") { +name }
+                    }
+                }
+            }
+            div("edit-row__hint") {
+                +"Managed elsewhere — "
+                a(href = manageUrl) { +"manage ${label.lowercase()}" }
             }
         }
     }
@@ -898,7 +973,7 @@ private fun FlowContent.userAttributesSection(
 
         if (attributes.isEmpty()) {
             emptyState(
-                iconName = "key",
+                iconName = "code",
                 title = "No custom attributes",
                 description =
                     "Add key-value pairs to this user. Configure how they appear in JWTs under " +

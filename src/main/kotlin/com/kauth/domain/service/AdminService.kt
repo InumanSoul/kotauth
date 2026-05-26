@@ -36,6 +36,9 @@ import com.kauth.domain.util.SecureTokens
  *
  * Discriminated-union results ([AdminResult]) propagate errors explicitly
  * without exceptions, keeping the web adapter free of try/catch noise.
+ *
+ * TODO(v1.13): extract WorkspaceSettingsService, AdminUserService, and
+ * ApplicationManagementService — three clean dependency clusters already exist.
  */
 class AdminService(
     private val tenantRepository: TenantRepository,
@@ -751,6 +754,15 @@ class AdminService(
 
         if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
+        }
+
+        if (resolvedRedirectUris.isEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "At least one redirect URI is required. The authorization code flow " +
+                        "(including email-OTP back-channel exchange) needs a registered URI to bind to.",
+                ),
+            )
         }
 
         if (resolvedAudience != null && resolvedAudience.length > 200) {

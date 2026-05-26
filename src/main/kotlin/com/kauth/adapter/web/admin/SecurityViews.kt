@@ -300,7 +300,7 @@ internal fun identityProvidersPageImpl(
                             div("provider-header__name") {
                                 +prov.displayName
                                 if (isConfigured) {
-                                    val badgeCls = if (existing!!.enabled) "badge badge--active" else "badge badge--inactive"
+                                    val badgeCls = if (existing.enabled) "badge badge--active" else "badge badge--inactive"
                                     span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
                                 } else {
                                     span("badge badge--inactive") { +"Not configured" }
@@ -535,11 +535,18 @@ internal fun apiKeysListPageImpl(
                             }
                             td {
                                 when {
-                                    key.bootstrapName != null ->
-                                        span("key-table__meta") {
-                                            title = "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 edit the env var to rotate or revoke."
-                                            +"Env-managed"
+                                    key.bootstrapName != null -> {
+                                        val bootstrapHint =
+                                            "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 edit the env var to rotate or revoke."
+                                        span("key-table__meta key-table__meta--with-icon") {
+                                            attributes["aria-label"] = bootstrapHint
+                                            +"Env-managed "
+                                            span("inline-help") {
+                                                title = bootstrapHint
+                                                inlineSvgIcon("info", "Bootstrap key information")
+                                            }
                                         }
+                                    }
                                     key.enabled ->
                                         form(
                                             action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/revoke",

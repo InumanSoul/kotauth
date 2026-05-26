@@ -364,7 +364,7 @@ class SsoCookieTest {
                     ?: error("KOTAUTH_SSO must be set on MFA challenge success. Set-Cookie: $setCookie")
 
             val payload = parseSsoCookie(ssoValue)
-            assertEquals(alice.id!!.value, payload.userId)
+            assertEquals(alice.id.value, payload.userId)
             assertEquals(true, payload.mfaCompleted, "MFA-completed login must record mfaCompleted=true")
         }
 

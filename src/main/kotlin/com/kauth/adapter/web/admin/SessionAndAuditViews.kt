@@ -198,14 +198,15 @@ internal fun auditLogPageImpl(
                                 +"All events"
                             }
                             // Order matters — each event lands in the first group it
-                            // matches, so "Impersonation" must precede "Admin Actions"
-                            // to claim the ADMIN_IMPERSONATION_* events.
+                            // matches. "Impersonation" must precede "Admin Actions" and
+                            // "Email OTP" must precede "Email & Password".
                             val groups = linkedMapOf(
                                 "Login & Registration" to listOf("LOGIN_", "REGISTER_", "ACCOUNT_"),
                                 "Tokens & Authorization" to listOf("TOKEN_", "AUTHORIZATION_CODE_"),
                                 "Sessions" to listOf("SESSION_"),
                                 "Impersonation" to listOf("ADMIN_IMPERSONATION_"),
                                 "Admin Actions" to listOf("ADMIN_"),
+                                "Email OTP" to listOf("EMAIL_OTP_"),
                                 "Email & Password" to listOf("EMAIL_", "PASSWORD_"),
                                 "User Self-Service" to listOf("USER_"),
                                 "MFA" to listOf("MFA_"),
@@ -337,6 +338,7 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_CLIENT_ENABLED,
         AuditEventType.ADMIN_USER_PASSWORD_RESET,
         AuditEventType.ACCOUNT_UNLOCKED,
+        AuditEventType.EMAIL_OTP_VERIFIED,
         -> "badge--active"
 
         AuditEventType.LOGIN_FAILED,
@@ -346,6 +348,8 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.ADMIN_USER_DISABLED,
         AuditEventType.ADMIN_CLIENT_DISABLED,
         AuditEventType.USER_ACCOUNT_DISABLED_SELF,
+        AuditEventType.EMAIL_OTP_REJECTED,
+        AuditEventType.EMAIL_OTP_LOCKOUT,
         -> "badge--danger"
 
         AuditEventType.LOGIN_RATE_LIMITED,

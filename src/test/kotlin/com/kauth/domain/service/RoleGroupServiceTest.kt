@@ -358,7 +358,7 @@ class RoleGroupServiceTest {
     @Test
     fun `addChildRole - self reference`() {
         val role = (svc.createRole(TenantId(1), "self", null, RoleScope.TENANT, null) as AdminResult.Success).value
-        val result = svc.addChildRole(parentRoleId = role.id!!, childRoleId = role.id!!, tenantId = TenantId(1))
+        val result = svc.addChildRole(parentRoleId = role.id!!, childRoleId = role.id, tenantId = TenantId(1))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
@@ -371,8 +371,8 @@ class RoleGroupServiceTest {
 
         // a -> b -> c, then try c -> a (would create cycle)
         svc.addChildRole(a.id!!, b.id!!, TenantId(1))
-        svc.addChildRole(b.id!!, c.id!!, TenantId(1))
-        val result = svc.addChildRole(c.id!!, a.id!!, TenantId(1))
+        svc.addChildRole(b.id, c.id!!, TenantId(1))
+        val result = svc.addChildRole(c.id, a.id, TenantId(1))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
         assertTrue(result.error.message.contains("circular"))
@@ -391,7 +391,7 @@ class RoleGroupServiceTest {
         val parent = (svc.createRole(TenantId(1), "parent", null, RoleScope.TENANT, null) as AdminResult.Success).value
         val child = (svc.createRole(TenantId(1), "child", null, RoleScope.TENANT, null) as AdminResult.Success).value
         svc.addChildRole(parent.id!!, child.id!!, TenantId(1))
-        val result = svc.removeChildRole(parent.id!!, child.id!!, TenantId(1))
+        val result = svc.removeChildRole(parent.id, child.id, TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
     }
 
@@ -444,7 +444,7 @@ class RoleGroupServiceTest {
     fun `unassignRoleFromUser - success`() {
         val role = (svc.createRole(TenantId(1), "admin", null, RoleScope.TENANT, null) as AdminResult.Success).value
         svc.assignRoleToUser(userId = UserId(10), roleId = role.id!!, tenantId = TenantId(1))
-        val result = svc.unassignRoleFromUser(userId = UserId(10), roleId = role.id!!, tenantId = TenantId(1))
+        val result = svc.unassignRoleFromUser(userId = UserId(10), roleId = role.id, tenantId = TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(0, svc.getRolesForUser(UserId(10)).size)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_ROLE_UNASSIGNED))
@@ -455,7 +455,7 @@ class RoleGroupServiceTest {
         val parent = (svc.createRole(TenantId(1), "parent", null, RoleScope.TENANT, null) as AdminResult.Success).value
         val child = (svc.createRole(TenantId(1), "child", null, RoleScope.TENANT, null) as AdminResult.Success).value
         svc.addChildRole(parent.id!!, child.id!!, TenantId(1))
-        svc.assignRoleToUser(UserId(10), parent.id!!, TenantId(1))
+        svc.assignRoleToUser(UserId(10), parent.id, TenantId(1))
         val effective = svc.getEffectiveRolesForUser(UserId(10), TenantId(1))
         assertEquals(2, effective.size, "Should include parent + child")
         assertTrue(effective.any { it.name == "parent" })
@@ -580,7 +580,7 @@ class RoleGroupServiceTest {
         val group = (svc.createGroup(TenantId(1), "eng", null, null) as AdminResult.Success).value
         val role = (svc.createRole(TenantId(1), "admin", null, RoleScope.TENANT, null) as AdminResult.Success).value
         svc.assignRoleToGroup(group.id!!, role.id!!, TenantId(1))
-        val result = svc.unassignRoleFromGroup(group.id!!, role.id!!, TenantId(1))
+        val result = svc.unassignRoleFromGroup(group.id, role.id, TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
     }
 
@@ -607,7 +607,7 @@ class RoleGroupServiceTest {
         val result = svc.addUserToGroup(UserId(10), group.id!!, TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(1, svc.getGroupsForUser(UserId(10)).size)
-        assertEquals(1, svc.getUserIdsInGroup(group.id!!).size)
+        assertEquals(1, svc.getUserIdsInGroup(group.id).size)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_GROUP_MEMBER_ADDED))
     }
 
@@ -615,7 +615,7 @@ class RoleGroupServiceTest {
     fun `removeUserFromGroup - success`() {
         val group = (svc.createGroup(TenantId(1), "eng", null, null) as AdminResult.Success).value
         svc.addUserToGroup(UserId(10), group.id!!, TenantId(1))
-        val result = svc.removeUserFromGroup(UserId(10), group.id!!, TenantId(1))
+        val result = svc.removeUserFromGroup(UserId(10), group.id, TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(0, svc.getGroupsForUser(UserId(10)).size)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_GROUP_MEMBER_REMOVED))

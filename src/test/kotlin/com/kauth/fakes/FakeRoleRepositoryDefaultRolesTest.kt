@@ -66,7 +66,7 @@ class FakeRoleRepositoryDefaultRolesTest {
     @Test
     fun `setDefaultRolesForClient de-duplicates repeated role ids`() {
         val viewer = role("viewer")
-        roles.setDefaultRolesForClient(clientId, listOf(viewer.id!!, viewer.id!!))
+        roles.setDefaultRolesForClient(clientId, listOf(viewer.id!!, viewer.id))
 
         assertEquals(1, roles.findDefaultRolesForClient(clientId).size)
     }

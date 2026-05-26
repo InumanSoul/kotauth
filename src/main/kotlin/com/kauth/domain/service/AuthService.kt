@@ -401,7 +401,7 @@ class AuthService(
 
         if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
             try {
-                selfServiceService.initiateEmailVerification(savedUser.id!!, tenant.id, baseUrl)
+                selfServiceService.initiateEmailVerification(savedUser.id, tenant.id, baseUrl)
             } catch (_: Exception) {
                 // non-fatal
             }

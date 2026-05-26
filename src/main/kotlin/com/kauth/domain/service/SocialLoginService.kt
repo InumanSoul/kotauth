@@ -261,7 +261,7 @@ class SocialLoginService(
             ),
         )
 
-        grantClientDefaultRoles(tenant.id, newUser.id!!, originatingClientId)
+        grantClientDefaultRoles(tenant.id, newUser.id, originatingClientId)
 
         return issueTokens(newUser, tenant, provider, isNewUser = true, ipAddress, userAgent)
     }

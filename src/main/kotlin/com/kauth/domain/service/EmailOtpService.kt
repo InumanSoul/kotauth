@@ -18,6 +18,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.sha256Hex
+import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Clock
@@ -49,6 +50,8 @@ class EmailOtpService(
     private val roleRepository: RoleRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
+    private val log = LoggerFactory.getLogger(EmailOtpService::class.java)
+
     companion object {
         const val OTP_TTL_MINUTES: Long = 10
         const val MAX_ATTEMPTS_PER_CHALLENGE: Int = 5
@@ -109,18 +112,25 @@ class EmailOtpService(
                 ),
             )
 
-        runCatching {
-            emailPort.sendEmailOtpEmail(
-                to = user.email,
-                toName = user.fullName,
-                code = rawCode,
-                expiresInMinutes = OTP_TTL_MINUTES,
-                workspaceName = tenant.emailBranding?.brandName ?: tenant.displayName,
-                tenant = tenant,
+        val deliveryFailure =
+            runCatching {
+                emailPort.sendEmailOtpEmail(
+                    to = user.email,
+                    toName = user.fullName,
+                    code = rawCode,
+                    expiresInMinutes = OTP_TTL_MINUTES,
+                    workspaceName = tenant.emailBranding?.brandName ?: tenant.displayName,
+                    tenant = tenant,
+                )
+            }.exceptionOrNull()
+        if (deliveryFailure != null) {
+            log.warn(
+                "OTP email delivery failed: tenant={} email={} reason={}",
+                tenant.slug,
+                user.email,
+                deliveryFailure.javaClass.simpleName,
             )
         }
-        // SMTP failures are swallowed so the audit trail still records the send attempt and the
-        // BFF response stays uniform — the user can request a resend.
 
         auditLog.record(
             AuditEvent(
@@ -132,7 +142,6 @@ class EmailOtpService(
                 userAgent = null,
                 details =
                     mapOf(
-                        "source" to "admin_api",
                         "resend_count" to challenge.resendCount.toString(),
                         "originating_client_id" to (originatingClientId ?: ""),
                     ),
@@ -268,6 +277,8 @@ class EmailOtpService(
         )
     }
 
+    // Back-channel issuance — PKCE not required (ADR-15). Scopes are fixed for now;
+    // TODO(v1.13): derive from client.allowedScopes once that field exists.
     private fun issueAuthorizationCodeFor(
         tenant: Tenant,
         userId: UserId,

@@ -845,17 +845,6 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     label("check-row") {
-                        input(type = InputType.checkBox, name = "requirePasswordless") {
-                            attributes["value"] = "true"
-                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
-                            if (workspace.isMaster) attributes["disabled"] = "disabled"
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
-                        }
-                    }
-                    label("check-row") {
                         input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
                             attributes["value"] = "true"
                             if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
@@ -863,6 +852,9 @@ internal fun securityPolicyPageImpl(
                         div("check-row__body") {
                             span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
+                            if (!workspace.isSmtpReady) {
+                                span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
+                            }
                         }
                     }
                     div("edit-row") {
@@ -878,6 +870,17 @@ internal fun securityPolicyPageImpl(
                                 }
                             }
                             div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
+                        }
+                    }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "requirePasswordless") {
+                            attributes["value"] = "true"
+                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
+                            if (workspace.isMaster) attributes["disabled"] = "disabled"
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
                         }
                     }
                 }
@@ -924,7 +927,7 @@ internal fun brandingPageImpl(
                     div("page-header__identity") {
                         h1("page-header__title") { +"Branding" }
                         p("page-header__sub") {
-                            +"Customize the appearance of ${workspace.displayName}'s auth pages."
+                            +"Customize the appearance of ${workspace.displayName}'s auth pages and email identity."
                         }
                     }
                 }
@@ -1076,46 +1079,21 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        // ── Email Branding (v1.12.0) ────────────────
+                        // ── Email Identity ──────────────────────────
                         val eb = workspace.emailBranding
                         div("ov-card") {
-                            div("ov-card__section-label") { +"Email Branding" }
-                            div("ov-card__desc") {
-                                +"Applied to every transactional email (OTP, magic link, "
-                                +"password reset, invite, account locked). Envelope sender "
-                                +"stays operator-controlled — set From display name only."
-                            }
-                            div("edit-row") {
-                                span("edit-row__label") { +"Brand name" }
-                                input(type = InputType.text, name = "emailBrandName") {
-                                    classes = setOf("edit-row__field")
-                                    value = eb?.brandName ?: ""
-                                    attributes["placeholder"] = workspace.displayName
-                                }
-                            }
-                            div("edit-row") {
-                                span("edit-row__label") { +"Brand color (hex)" }
-                                input(type = InputType.text, name = "emailBrandColor") {
-                                    classes = setOf("edit-row__field", "edit-row__field--mono")
-                                    value = eb?.brandColorHex ?: ""
-                                    attributes["placeholder"] = workspace.theme.accentColor
-                                    attributes["pattern"] = "^#[0-9a-fA-F]{3,6}$"
-                                }
-                            }
-                            div("edit-row") {
-                                span("edit-row__label") { +"Logo URL" }
-                                input(type = InputType.url, name = "emailBrandLogoUrl") {
-                                    classes = setOf("edit-row__field")
-                                    value = eb?.brandLogoUrl ?: ""
-                                    attributes["placeholder"] = workspace.theme.logoUrl ?: "https://example.com/logo.png"
-                                }
-                            }
+                            div("ov-card__section-label") { +"Email Identity" }
                             div("edit-row") {
                                 span("edit-row__label") { +"Support email" }
-                                input(type = InputType.email, name = "emailSupportEmail") {
-                                    classes = setOf("edit-row__field")
-                                    value = eb?.supportEmail ?: ""
-                                    attributes["placeholder"] = "support@example.com"
+                                div {
+                                    input(type = InputType.email, name = "emailSupportEmail") {
+                                        classes = setOf("edit-row__field")
+                                        value = eb?.supportEmail ?: ""
+                                        attributes["placeholder"] = "support@example.com"
+                                    }
+                                    div("edit-row__hint") {
+                                        +"Shown in transactional email footers. Optional."
+                                    }
                                 }
                             }
                             div("edit-row") {
@@ -1128,7 +1106,8 @@ internal fun brandingPageImpl(
                                     }
                                     div("edit-row__hint") {
                                         +"Display name only. The sender address is set in SMTP "
-                                        +"configuration and cannot be changed per workspace."
+                                        +"configuration and cannot be changed per workspace. "
+                                        +"Brand name, color, and logo are inherited from the theme above."
                                     }
                                 }
                             }

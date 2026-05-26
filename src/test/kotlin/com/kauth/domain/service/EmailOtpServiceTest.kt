@@ -164,6 +164,46 @@ class EmailOtpServiceTest {
     }
 
     @Test
+    fun `sendOtp swallows SMTP failure but still records the audit event`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "alice",
+                email = "alice@acme.test",
+                fullName = "Alice",
+                passwordHash = "x",
+            ),
+        )
+        email.shouldFail = true
+
+        val result = newService().sendOtp(tenant.slug, "alice@acme.test")
+
+        assertTrue(result is OtpSendResult.Success)
+        assertEquals(AuditEventType.EMAIL_OTP_SENT, audit.events.single().eventType)
+    }
+
+    @Test
+    fun `verifyOtp on the stale handle after resend returns InvalidOtp`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "alice",
+                email = "alice@acme.test",
+                fullName = "Alice",
+                passwordHash = "x",
+            ),
+        )
+        val service = newService()
+        val first = service.sendOtp(tenant.slug, "alice@acme.test") as OtpSendResult.Success
+        service.sendOtp(tenant.slug, "alice@acme.test")
+
+        val result = service.verifyOtp(tenant.slug, first.challengeId, "123456")
+
+        assertTrue(result is OtpVerifyResult.Failure)
+        assertEquals(OtpError.InvalidOtp, result.error)
+    }
+
+    @Test
     fun `sendOtp returns TenantNotFound for unknown slug`() {
         val result = newService().sendOtp("nope", "x@y.test")
         assertTrue(result is OtpSendResult.Failure)

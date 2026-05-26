@@ -37,6 +37,8 @@ info:
     | `user_attributes:write` | Create, update, delete per-user attributes |
     | `claim_mappers:read`    | List tenant claim mappers                 |
     | `claim_mappers:write`   | Create, update, delete claim mappers      |
+    | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
+    | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
 
     ## Custom attributes and JWT claims
 
@@ -305,6 +307,66 @@ components:
             Use a prefix like `custom:department` to avoid collisions.
         includeInAccess: { type: boolean, default: true }
         includeInId:     { type: boolean, default: false }
+
+    SendOtpRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Applicant email address. Lowercased + trimmed server-side.
+        originatingClientId:
+          type: string
+          description: |
+            OAuth client_id that triggered the send. Required at verify-otp
+            time to bind the authorization code to a registered client. The
+            client must have at least one redirect URI configured.
+
+    SendOtpResponse:
+      type: object
+      required: [challengeId, expiresAt]
+      properties:
+        challengeId:
+          type: string
+          description: Opaque 64-char handle. Pass back unchanged to verify-otp.
+        expiresAt:
+          type: string
+          format: date-time
+          description: ISO-8601 expiry timestamp (10 minutes from issuance).
+
+    VerifyOtpRequest:
+      type: object
+      required: [challengeId, otp]
+      properties:
+        challengeId:
+          type: string
+          description: The opaque handle returned from send-otp.
+        otp:
+          type: string
+          minLength: 6
+          maxLength: 6
+          description: The 6-digit numeric code received in email.
+
+    VerifyOtpResponse:
+      type: object
+      required: [authorizationCode, expiresAt, redirectUri]
+      properties:
+        authorizationCode:
+          type: string
+          description: |
+            Single-use OAuth authorization code bound to the originating
+            client. Exchange at `/protocol/openid-connect/token` using the
+            standard `authorization_code` grant. TTL 60 seconds.
+        expiresAt:
+          type: string
+          format: date-time
+        redirectUri:
+          type: string
+          description: |
+            The redirect URI the code was bound to (the first one registered
+            on the originating client). The caller MUST echo this exact
+            value at the `/token` exchange.
 
   responses:
     Unauthorized:
@@ -1066,6 +1128,105 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  /auth/send-otp:
+    post:
+      summary: Send an email OTP challenge
+      description: |
+        Generates a 6-digit code (10-minute TTL), persists its SHA-256 hash,
+        and sends a branded email. Returns an opaque `challengeId` the caller
+        forwards to `/auth/verify-otp`.
+
+        Find-or-create semantics are gated by the tenant's
+        `email_otp_signup_enabled` flag (default off). When off and the email
+        doesn't already exist, the response shape is identical to the
+        happy path — no enumeration leak. Response timing is padded
+        toward a constant target to defend against latency-based enumeration.
+
+        Per-email and per-IP rate limits apply (3/email/15min, 10/IP/15min by
+        default).
+
+        `originatingClientId` is required for the verify-otp authorization-code
+        issuance to bind the resulting code to a confidential client. The
+        client must have at least one redirect URI registered.
+      tags: [Auth — Email OTP]
+      security: [{ bearerAuth: [auth:send-otp] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SendOtpRequest" }
+      responses:
+        "202":
+          description: Challenge issued (uniform — same shape for new and returning users)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SendOtpResponse" }
+        "400":
+          description: Invalid email
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Tenant not found
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "429":
+          description: Rate limit exceeded
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+  /auth/verify-otp:
+    post:
+      summary: Verify an email OTP challenge
+      description: |
+        Validates the 6-digit code against the stored SHA-256 in constant
+        time. On success, stamps `email_verified=true` on the user, grants
+        any client-default roles configured for `originatingClientId`, and
+        issues a single-use OAuth authorization code (60-second TTL) bound
+        to the originating client. Exchange the code at the standard
+        `/protocol/openid-connect/token` endpoint using the returned
+        `redirectUri`.
+
+        Per-challenge attempt cap is 5; over the cap the challenge is killed.
+        N consecutive failed challenges (per-tenant
+        `email_otp_lockout_threshold`, default 5) lock the user using the
+        tenant's existing lockout window. The lock never leaks back —
+        locked users always get `too_many_attempts`.
+      tags: [Auth — Email OTP]
+      security: [{ bearerAuth: [auth:verify-otp] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyOtpRequest" }
+      responses:
+        "200":
+          description: Code verified; authorization code issued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerifyOtpResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Tenant not found
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "410":
+          description: Challenge expired
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422":
+          description: Invalid code, too many attempts, or originating client misconfigured
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
 tags:
   - name: Users
     description: User lifecycle management
@@ -1083,3 +1244,8 @@ tags:
     description: Per-user custom key/value metadata (projected into JWTs via claim mappers)
   - name: Claim Mappers
     description: Tenant-level configuration that projects user attributes into issued JWTs
+  - name: Auth — Email OTP
+    description: |
+      Email-OTP passwordless primitive — send a 6-digit code, verify it,
+      and exchange the resulting authorization code at the standard
+      `/token` endpoint. See ADR-15.

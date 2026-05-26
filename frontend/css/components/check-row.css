@@ -92,3 +92,11 @@
   color: var(--color-subtle);
   line-height: 1.5;
 }
+
+.check-row__warn {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--color-amber);
+  line-height: 1.5;
+}

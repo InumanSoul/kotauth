@@ -186,9 +186,9 @@ internal fun applicationDetailPageImpl(
                         ) { +"+ Set launcher URL" }
                     }
                 } else {
-                    ovRowMono("Launcher URL", application.launcherUrl!!, copyable = true)
+                    ovRowMono("Launcher URL", application.launcherUrl, copyable = true)
                     if (!application.iconUrl.isNullOrBlank()) {
-                        ovRowMono("Icon URL", application.iconUrl!!, copyable = true)
+                        ovRowMono("Icon URL", application.iconUrl, copyable = true)
                     } else {
                         ovRowMuted("Icon URL", "Using letter fallback")
                     }

@@ -415,60 +415,26 @@ data class ServiceGraph(
             }
 
             // -- Rate limiters ------------------------------------------------
-            val loginLimiter: RateLimiterPort =
+            fun buildRateLimiter(
+                max: Int,
+                windowSecs: Long,
+                prefix: String,
+            ): RateLimiterPort =
                 redisClientHolder?.let {
                     RedisRateLimiter(
                         commands = it.commands,
-                        maxRequests = 5,
-                        windowSeconds = 60,
-                        keyPrefix = "login",
+                        maxRequests = max,
+                        windowSeconds = windowSecs,
+                        keyPrefix = prefix,
                     )
-                } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 60)
-            val registerLimiter: RateLimiterPort =
-                redisClientHolder?.let {
-                    RedisRateLimiter(
-                        commands = it.commands,
-                        maxRequests = 3,
-                        windowSeconds = 300,
-                        keyPrefix = "register",
-                    )
-                } ?: InMemoryRateLimiter(maxRequests = 3, windowSeconds = 300)
-            val tokenLimiter: RateLimiterPort =
-                redisClientHolder?.let {
-                    RedisRateLimiter(
-                        commands = it.commands,
-                        maxRequests = 20,
-                        windowSeconds = 60,
-                        keyPrefix = "token",
-                    )
-                } ?: InMemoryRateLimiter(maxRequests = 20, windowSeconds = 60)
-            val mfaLimiter: RateLimiterPort =
-                redisClientHolder?.let {
-                    RedisRateLimiter(
-                        commands = it.commands,
-                        maxRequests = 5,
-                        windowSeconds = 300,
-                        keyPrefix = "mfa",
-                    )
-                } ?: InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300)
-            val otpEmailLimiter: RateLimiterPort =
-                redisClientHolder?.let {
-                    RedisRateLimiter(
-                        commands = it.commands,
-                        maxRequests = 3,
-                        windowSeconds = 900,
-                        keyPrefix = "otp_email",
-                    )
-                } ?: InMemoryRateLimiter(maxRequests = 3, windowSeconds = 900)
-            val otpIpLimiter: RateLimiterPort =
-                redisClientHolder?.let {
-                    RedisRateLimiter(
-                        commands = it.commands,
-                        maxRequests = 10,
-                        windowSeconds = 900,
-                        keyPrefix = "otp_ip",
-                    )
-                } ?: InMemoryRateLimiter(maxRequests = 10, windowSeconds = 900)
+                } ?: InMemoryRateLimiter(maxRequests = max, windowSeconds = windowSecs)
+
+            val loginLimiter = buildRateLimiter(max = 5, windowSecs = 60, prefix = "login")
+            val registerLimiter = buildRateLimiter(max = 3, windowSecs = 300, prefix = "register")
+            val tokenLimiter = buildRateLimiter(max = 20, windowSecs = 60, prefix = "token")
+            val mfaLimiter = buildRateLimiter(max = 5, windowSecs = 300, prefix = "mfa")
+            val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
+            val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =

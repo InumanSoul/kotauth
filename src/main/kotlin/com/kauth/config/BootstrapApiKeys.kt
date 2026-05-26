@@ -23,7 +23,7 @@ fun parseBootstrapApiKeyEntries(json: String): List<ApiKeyBootstrapService.Entry
             name = e.name,
             scopes = e.scopes,
             keyHash = e.keyHash,
-            keyPrefix = e.keyPrefix ?: "kauth_${e.tenant}_bootstrap",
+            keyPrefix = e.keyPrefix,
         )
     }
 }

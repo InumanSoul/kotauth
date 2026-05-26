@@ -28,6 +28,12 @@
   gap: var(--space-2);
 }
 
+.ov-card .empty-state {
+  border: none;
+  background: transparent;
+  padding: var(--space-6) var(--space-4);
+}
+
 .empty-state__icon {
   width: 32px;
   height: 32px;

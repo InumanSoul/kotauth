@@ -20,6 +20,9 @@ class FakeApiKeyRepository : ApiKeyRepository {
     fun all(): List<ApiKey> = store.values.toList()
 
     override fun save(apiKey: ApiKey): ApiKey {
+        require(apiKey.keyPrefix.length <= 16) {
+            "keyPrefix '${apiKey.keyPrefix}' (${apiKey.keyPrefix.length}) exceeds varchar(16)"
+        }
         val k = if (apiKey.id == null) apiKey.copy(id = nextId++) else apiKey
         store[k.id!!] = k
         return k
