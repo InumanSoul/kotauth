@@ -95,6 +95,8 @@ internal fun ApplicationCall.setAuthContextCookie(
     slug: String,
     encryptionService: EncryptionService,
     secure: Boolean = false,
+    otpChallengeId: String? = null,
+    otpEmail: String? = null,
 ) {
     val payload =
         listOf(
@@ -107,6 +109,8 @@ internal fun ApplicationCall.setAuthContextCookie(
             params.codeChallengeMethod ?: "",
             params.nonce ?: "",
             System.currentTimeMillis().toString(),
+            otpChallengeId ?: "",
+            otpEmail ?: "",
         ).joinToString("|")
     response.cookies.append(
         name = AUTH_CONTEXT_COOKIE,
@@ -123,7 +127,7 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
     val raw = request.cookies[AUTH_CONTEXT_COOKIE] ?: return null
     val payload = encryptionService.verifyCookie(raw) ?: return null
     val parts = payload.split("|")
-    if (parts.size != 9) return null
+    if (parts.size < 9) return null
     val timestamp = parts[8].toLongOrNull() ?: return null
     if (System.currentTimeMillis() - timestamp > 300_000) return null
     val params =
@@ -138,6 +142,24 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
             nonce = parts[7].ifBlank { null },
         )
     return if (params.isOAuthFlow) params else null
+}
+
+data class OtpFlowContext(
+    val challengeId: String,
+    val email: String,
+)
+
+/** Reads the OTP challenge ID + email carried alongside OAuth params in the auth-context cookie. */
+internal fun ApplicationCall.getOtpFlowContext(encryptionService: EncryptionService): OtpFlowContext? {
+    val raw = request.cookies[AUTH_CONTEXT_COOKIE] ?: return null
+    val payload = encryptionService.verifyCookie(raw) ?: return null
+    val parts = payload.split("|")
+    if (parts.size < 11) return null
+    val timestamp = parts[8].toLongOrNull() ?: return null
+    if (System.currentTimeMillis() - timestamp > 300_000) return null
+    val challengeId = parts[9].ifBlank { null } ?: return null
+    val email = parts[10].ifBlank { null } ?: return null
+    return OtpFlowContext(challengeId, email)
 }
 
 /** Clears the auth context cookie after successful code issuance. */

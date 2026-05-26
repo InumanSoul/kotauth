@@ -227,7 +227,7 @@ class EmailOtpService(
             ),
         )
 
-        return OtpVerifyResult.Success(authCode.code, authCode.expiresAt, authCode.redirectUri)
+        return OtpVerifyResult.Success(user.id, authCode.code, authCode.expiresAt, authCode.redirectUri)
     }
 
     private fun trackCrossChallengeFailure(
@@ -357,6 +357,7 @@ sealed class OtpSendResult {
 
 sealed class OtpVerifyResult {
     data class Success(
+        val userId: UserId,
         val authorizationCode: String,
         val codeExpiresAt: Instant,
         val redirectUri: String,

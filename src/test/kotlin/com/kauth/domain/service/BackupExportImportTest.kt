@@ -133,6 +133,7 @@ class BackupExportImportTest {
                             mfaPolicy = "required",
                             emailOtpSignupEnabled = true,
                             emailOtpLockoutThreshold = 3,
+                            emailOtpLoginEnabled = true,
                         ),
                     theme = TenantTheme.LIGHT,
                     emailBranding =
@@ -470,6 +471,7 @@ class BackupExportImportTest {
 
         assertTrue(restored.securityConfig.emailOtpSignupEnabled)
         assertEquals(3, restored.securityConfig.emailOtpLockoutThreshold)
+        assertTrue(restored.securityConfig.emailOtpLoginEnabled)
 
         val branding = destEmailBranding.findByTenantId(restored.id)!!
         assertEquals("Acme", branding.brandName)

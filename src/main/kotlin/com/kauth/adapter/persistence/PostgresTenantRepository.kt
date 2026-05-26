@@ -134,6 +134,7 @@ class PostgresTenantRepository(
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
+                    it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
                 }
             if (updatedRows == 0) {
                 TenantSecurityConfigTable.insert {
@@ -155,6 +156,7 @@ class PostgresTenantRepository(
                     it[passwordLoginEnabled] = tenant.securityConfig.passwordLoginEnabled
                     it[emailOtpSignupEnabled] = tenant.securityConfig.emailOtpSignupEnabled
                     it[emailOtpLockoutThreshold] = tenant.securityConfig.emailOtpLockoutThreshold
+                    it[emailOtpLoginEnabled] = tenant.securityConfig.emailOtpLoginEnabled
                 }
             }
             tenantJoined
@@ -240,6 +242,7 @@ class PostgresTenantRepository(
             passwordLoginEnabled = this[TenantSecurityConfigTable.passwordLoginEnabled],
             emailOtpSignupEnabled = this[TenantSecurityConfigTable.emailOtpSignupEnabled],
             emailOtpLockoutThreshold = this[TenantSecurityConfigTable.emailOtpLockoutThreshold],
+            emailOtpLoginEnabled = this[TenantSecurityConfigTable.emailOtpLoginEnabled],
         )
     }
 

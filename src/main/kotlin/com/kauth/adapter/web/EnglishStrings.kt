@@ -303,6 +303,7 @@ object EnglishStrings {
     const val AUTH_PAGE_TITLE_MFA = "{0} | Two-Factor Authentication"
     const val AUTH_PAGE_TITLE_REGISTER = "{0} | Create Account"
     const val AUTH_PAGE_TITLE_MAGIC_LINK = "{0} | Sign in with email"
+    const val AUTH_PAGE_TITLE_EMAIL_OTP = "{0} | Sign in with email code"
     const val AUTH_PAGE_TITLE_FORCE_CHANGE = "{0} | Change Password"
     const val AUTH_PAGE_TITLE_VERIFY_EMAIL = "{0} | Email Verification"
     const val AUTH_COPYRIGHT_TEMPLATE = "© {0} {1}. All rights reserved. Powered by"
@@ -384,6 +385,25 @@ object EnglishStrings {
     // Magic-link error page
     const val MAGIC_LINK_ERROR_TITLE = "Sign-in link unavailable"
     const val MAGIC_LINK_REQUEST_NEW = "Request a new link"
+
+    // Email-OTP login pages (v1.13.0 — hosted browser flow)
+    const val EMAIL_OTP_TITLE = "Sign in with email code"
+    const val EMAIL_OTP_SUBTITLE_FORM =
+        "Enter your email address and we'll send you a 6-digit code to sign in."
+    const val EMAIL_OTP_EMAIL_LABEL = "Email address"
+    const val EMAIL_OTP_EMAIL_PLACEHOLDER = "you@example.com"
+    const val EMAIL_OTP_SEND_SUBMIT = "Send code"
+    const val EMAIL_OTP_VERIFY_TITLE = "Enter your sign-in code"
+    const val EMAIL_OTP_VERIFY_SUBTITLE =
+        "Check your inbox for a 6-digit code. It expires in 10 minutes."
+    const val EMAIL_OTP_VERIFY_RESENT =
+        "A new code has been sent. The previous code is no longer valid."
+    const val EMAIL_OTP_CODE_LABEL = "Sign-in code"
+    const val EMAIL_OTP_CODE_PLACEHOLDER = "000000"
+    const val EMAIL_OTP_VERIFY_SUBMIT = "Sign in"
+    const val EMAIL_OTP_RESEND = "Resend code"
+    const val EMAIL_OTP_USE_DIFFERENT_EMAIL = "Use a different email"
+    const val EMAIL_OTP_ERROR_TITLE = "Sign-in code unavailable"
 
     // Force change password page
     const val FORCE_CHANGE_TITLE = "Change your password"

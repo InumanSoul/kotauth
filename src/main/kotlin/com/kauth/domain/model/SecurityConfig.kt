@@ -36,6 +36,7 @@ data class SecurityConfig(
     val emailOtpSignupEnabled: Boolean = false,
     // Cross-challenge failed-OTP threshold. 0 disables.
     val emailOtpLockoutThreshold: Int = 5,
+    val emailOtpLoginEnabled: Boolean = false,
 ) {
     val isLockoutEnabled: Boolean get() = lockoutMaxAttempts > 0
 }
