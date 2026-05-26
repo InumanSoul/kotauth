@@ -330,6 +330,7 @@ fun Route.adminSettingsRoutes(
                     emailOtpLockoutThreshold =
                         params["emailOtpLockoutThreshold"]?.toIntOrNull()
                             ?: workspace.securityConfig.emailOtpLockoutThreshold,
+                    emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
                 )
         ) {
             is AdminResult.Success ->

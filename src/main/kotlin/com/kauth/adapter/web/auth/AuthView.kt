@@ -122,6 +122,7 @@ object AuthView {
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
+        emailOtpLoginEnabled: Boolean = false,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
@@ -200,9 +201,18 @@ object AuthView {
                             div("footer-link") {
                                 a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
                             }
-                            if (magicLinkEnabled) {
-                                div("footer-link") {
-                                    a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
+                            if (magicLinkEnabled || emailOtpLoginEnabled) {
+                                div("passwordless-options") {
+                                    if (magicLinkEnabled) {
+                                        div("footer-link") {
+                                            a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
+                                        }
+                                    }
+                                    if (emailOtpLoginEnabled) {
+                                        div("footer-link") {
+                                            a(href = "/t/$tenantSlug/email-otp") { +ctx.t("LOGIN_EMAIL_OTP_LINK") }
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -226,6 +236,11 @@ object AuthView {
                                 }
                                 button(type = ButtonType.submit, classes = "btn") {
                                     +ctx.t("LOGIN_PASSWORDLESS_SUBMIT")
+                                }
+                            }
+                            if (emailOtpLoginEnabled) {
+                                div("footer-link") {
+                                    a(href = "/t/$tenantSlug/email-otp") { +ctx.t("LOGIN_EMAIL_OTP_LINK") }
                                 }
                             }
                         }

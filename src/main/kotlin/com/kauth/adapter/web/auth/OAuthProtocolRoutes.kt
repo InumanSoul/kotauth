@@ -242,6 +242,7 @@ internal fun Route.oauthProtocolRoutes(
                         registrationEnabled = tenant?.registrationEnabled ?: true,
                         magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                        emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                     ),
                 )
                 return@get
@@ -399,6 +400,7 @@ internal fun Route.oauthProtocolRoutes(
                 registrationEnabled = tenant.registrationEnabled,
                 magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
+                emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
             ),
         )
     }
@@ -430,6 +432,7 @@ internal fun Route.oauthProtocolRoutes(
                     registrationEnabled = tenant?.registrationEnabled ?: true,
                     magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                    emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                 ),
             )
         }
@@ -462,6 +465,7 @@ internal fun Route.oauthProtocolRoutes(
                             registrationEnabled = tenant?.registrationEnabled ?: true,
                             magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
                             passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                            emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         ),
                     )
                 }
@@ -500,6 +504,7 @@ internal fun Route.oauthProtocolRoutes(
                                     registrationEnabled = tenant.registrationEnabled,
                                     magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
                                     passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
+                                    emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                 ),
                             )
                         }
@@ -544,6 +549,7 @@ internal fun Route.oauthProtocolRoutes(
                                 registrationEnabled = tenant.registrationEnabled,
                                 magicLinkEnabled = tenant.securityConfig.magicLinkEnabled,
                                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
+                                emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                             ),
                         )
                     },

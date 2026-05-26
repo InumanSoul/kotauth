@@ -273,6 +273,12 @@ object EnglishStrings {
             "Users can still sign in with magic links and any enabled social providers. " +
             "Email becomes the only first factor — pair with MFA for higher-assurance environments."
 
+    const val AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL =
+        "Allow sign-in via Email OTP code"
+    const val AUTH_METHODS_EMAIL_OTP_LOGIN_DESC =
+        "Adds a \"Sign in with email code\" option to the hosted login page. The user " +
+            "enters their email, receives a 6-digit code, and types it in. Independent " +
+            "of the magic-link toggle above. Requires SMTP."
     const val AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL =
         "Allow sign-up via Email OTP admin API"
     const val AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC =
@@ -324,6 +330,7 @@ object EnglishStrings {
     const val LOGIN_SUBMIT = "Sign In"
     const val LOGIN_FORGOT_PASSWORD = "Forgot password?"
     const val LOGIN_MAGIC_LINK_LINK = "Sign in with an email link instead"
+    const val LOGIN_EMAIL_OTP_LINK = "Sign in with an email code instead"
     const val LOGIN_NO_ACCOUNT = "Don't have an account? "
     const val LOGIN_CREATE_ONE = "Create one"
     const val LOGIN_OR_CONTINUE_WITH = "or continue with"

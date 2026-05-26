@@ -151,6 +151,7 @@ class AdminService(
         passwordLoginEnabled: Boolean = true,
         emailOtpSignupEnabled: Boolean = false,
         emailOtpLockoutThreshold: Int = 5,
+        emailOtpLoginEnabled: Boolean = false,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
@@ -214,6 +215,7 @@ class AdminService(
                         passwordLoginEnabled = passwordLoginEnabled,
                         emailOtpSignupEnabled = emailOtpSignupEnabled,
                         emailOtpLockoutThreshold = emailOtpLockoutThreshold.coerceIn(0, 50),
+                        emailOtpLoginEnabled = emailOtpLoginEnabled,
                     ),
             )
 
