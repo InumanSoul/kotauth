@@ -17,6 +17,14 @@
 .footer-link a            { color: var(--color-accent); text-decoration: none; }
 .footer-link a:hover      { text-decoration: underline; }
 
+.passwordless-options {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+.passwordless-options .footer-link { margin-top: 0.6rem; }
+.passwordless-options .footer-link:first-child { margin-top: 0.5rem; }
+
 /* Horizontal divider */
 .divider {
   height: 1px;

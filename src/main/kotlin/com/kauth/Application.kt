@@ -400,6 +400,8 @@ fun Application.module(
             corsPort = s.corsOriginCache,
             translationPort = s.translationPort,
             ssoTtlSeconds = config.ssoSessionTtlSeconds,
+            emailOtpService = s.emailOtpService,
+            otpIpRateLimiter = s.otpIpRateLimiter,
         )
 
         portalRoutes(

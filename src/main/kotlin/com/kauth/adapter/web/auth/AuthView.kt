@@ -122,6 +122,7 @@ object AuthView {
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
+        emailOtpLoginEnabled: Boolean = false,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
@@ -200,9 +201,18 @@ object AuthView {
                             div("footer-link") {
                                 a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
                             }
-                            if (magicLinkEnabled) {
-                                div("footer-link") {
-                                    a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
+                            if (magicLinkEnabled || emailOtpLoginEnabled) {
+                                div("passwordless-options") {
+                                    if (magicLinkEnabled) {
+                                        div("footer-link") {
+                                            a(href = "/t/$tenantSlug/magic-link") { +ctx.t("LOGIN_MAGIC_LINK_LINK") }
+                                        }
+                                    }
+                                    if (emailOtpLoginEnabled) {
+                                        div("footer-link") {
+                                            a(href = "/t/$tenantSlug/email-otp") { +ctx.t("LOGIN_EMAIL_OTP_LINK") }
+                                        }
+                                    }
                                 }
                             }
                         } else {
@@ -226,6 +236,11 @@ object AuthView {
                                 }
                                 button(type = ButtonType.submit, classes = "btn") {
                                     +ctx.t("LOGIN_PASSWORDLESS_SUBMIT")
+                                }
+                            }
+                            if (emailOtpLoginEnabled) {
+                                div("footer-link") {
+                                    a(href = "/t/$tenantSlug/email-otp") { +ctx.t("LOGIN_EMAIL_OTP_LINK") }
                                 }
                             }
                         }
@@ -898,6 +913,194 @@ object AuthView {
                             div("footer-link") {
                                 a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                             }
+                        }
+                    }
+                    p("copyright") {
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+            }
+        }
+
+    fun emailOtpEnterEmailPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        error: String? = null,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_EMAIL_OTP", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +ctx.workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +ctx.t("EMAIL_OTP_TITLE") }
+                        p("card-subtitle") { +ctx.t("EMAIL_OTP_SUBTITLE_FORM") }
+                        if (error != null) {
+                            div("alert alert-error") { +error }
+                        }
+                        form(
+                            action = "/t/$tenantSlug/email-otp/send",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method = FormMethod.post,
+                        ) {
+                            div("field") {
+                                label {
+                                    htmlFor = "email"
+                                    +ctx.t("EMAIL_OTP_EMAIL_LABEL")
+                                }
+                                input(type = InputType.email, name = "email") {
+                                    id = "email"
+                                    placeholder = ctx.t("EMAIL_OTP_EMAIL_PLACEHOLDER")
+                                    attributes["autocomplete"] = "email"
+                                    required = true
+                                    attributes["autofocus"] = "true"
+                                }
+                            }
+                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("EMAIL_OTP_SEND_SUBMIT") }
+                        }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
+                        }
+                    }
+                    p("copyright") {
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+            }
+        }
+
+    fun emailOtpEnterCodePage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        email: String,
+        error: String? = null,
+        resent: Boolean = false,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_EMAIL_OTP", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +ctx.workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +ctx.t("EMAIL_OTP_VERIFY_TITLE") }
+                        p("card-subtitle") {
+                            +ctx.t("EMAIL_OTP_VERIFY_SUBTITLE")
+                            +" "
+                            span { style = "font-weight:500;"; +email }
+                        }
+                        if (resent) {
+                            div("alert alert-success") { +ctx.t("EMAIL_OTP_VERIFY_RESENT") }
+                        }
+                        if (error != null) {
+                            div("alert alert-error") { +error }
+                        }
+                        form(
+                            action = "/t/$tenantSlug/email-otp/verify",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method = FormMethod.post,
+                        ) {
+                            div("field") {
+                                label {
+                                    htmlFor = "code"
+                                    +ctx.t("EMAIL_OTP_CODE_LABEL")
+                                }
+                                input(type = InputType.text, name = "code") {
+                                    id = "code"
+                                    placeholder = ctx.t("EMAIL_OTP_CODE_PLACEHOLDER")
+                                    attributes["autocomplete"] = "one-time-code"
+                                    attributes["inputmode"] = "numeric"
+                                    attributes["pattern"] = "\\d{6}"
+                                    attributes["maxlength"] = "6"
+                                    required = true
+                                    attributes["autofocus"] = "true"
+                                }
+                            }
+                            button(type = ButtonType.submit, classes = "btn") { +ctx.t("EMAIL_OTP_VERIFY_SUBMIT") }
+                        }
+                        form(
+                            action = "/t/$tenantSlug/email-otp/send",
+                            encType = FormEncType.applicationXWwwFormUrlEncoded,
+                            method = FormMethod.post,
+                        ) {
+                            style = "margin-top:16px;text-align:center;"
+                            input(type = InputType.hidden, name = "email") { value = email }
+                            input(type = InputType.hidden, name = "resend") { value = "true" }
+                            button(type = ButtonType.submit, classes = "btn-link") { +ctx.t("EMAIL_OTP_RESEND") }
+                        }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/email-otp") { +ctx.t("EMAIL_OTP_USE_DIFFERENT_EMAIL") }
+                        }
+                    }
+                    p("copyright") {
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+            }
+        }
+
+    fun emailOtpErrorPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        error: String,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_EMAIL_OTP", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                div("shell") {
+                    div("brand") {
+                        if (ctx.theme.logoUrl != null) {
+                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
+                                width = "180"
+                                height = "48"
+                            }
+                        } else {
+                            div("brand-name") { +ctx.workspaceName }
+                        }
+                    }
+                    div("card") {
+                        h1("card-title") { +ctx.t("EMAIL_OTP_ERROR_TITLE") }
+                        div("alert alert-error") { +error }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/email-otp") { +ctx.t("EMAIL_OTP_USE_DIFFERENT_EMAIL") }
+                        }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                         }
                     }
                     p("copyright") {

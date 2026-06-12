@@ -222,3 +222,55 @@ re-plumbing.
   least that long. Acceptable for an onboarding flow; would be unacceptable
   on a hot login path. The hosted-page (v1.13) work should reconsider the
   budget when the same primitive serves browser-driven UX.
+
+## v1.13.0 addendum — hosted login-page Email OTP
+
+The admin-API surface from v1.12.0 served BFF-driven onboarding. v1.13.0
+ships the browser-driven equivalent: a two-step hosted login page (enter
+email → enter 6-digit code). `EmailOtpService` was deliberately built
+consumer-agnostic; the v1.13.0 work added only route + view +
+session-state.
+
+**Decisions specific to the hosted-page flow:**
+
+- **Two-page flow with separate URLs** — Auth0 / Stytch / Clerk standard;
+  step 1 captures the email for analytics even if step 2 is abandoned.
+- **Single 6-digit input** with `inputmode=numeric pattern=\d{6}
+  autocomplete=one-time-code` — the 6-box pattern breaks paste on Android
+  and prevents iOS SMS autofill (which only fires on a single field).
+- **60-second resend cooldown** server-enforced — Auth0 / Stytch
+  benchmark.
+- **Constant-time budget reduced from 800ms → 200ms** for the browser
+  path. 800ms makes the hosted UX feel broken. 200ms still defeats the
+  timing-enumeration vector and is unobservable in browser UX.
+- **No same-browser guard** — cross-device is the failure mode OTP was
+  introduced to solve. Magic-link's `KOTAUTH_AUTH_CONTEXT` cookie guard
+  is intentionally not applied to OTP consume.
+- **Session state via `KOTAUTH_AUTH_CONTEXT` cookie extension** — added
+  two fields (`otpChallengeId`, `otpEmail`) at positions 10 and 11.
+  Backward-compatible: legacy 9-field cookies continue to parse via
+  `parts.size < 9 → null`. A second cookie would have been cleaner in
+  isolation but doubles the auth-flow cookie surface for no functional
+  win.
+- **MFA chain reuses `completeAuthorizationCodeFlow(mfaCompleted=false)`**
+  — same hook magic-link uses. TOTP-enrolled users still get challenged.
+- **`OtpVerifyResult.Success` carries `userId`** so the hosted route can
+  enter the MFA-aware completion helper directly without round-tripping
+  through `AuthorizationCodeRepository.findByCode`. Existing admin-API
+  consumers ignore the new field.
+- **`emailOtpLoginEnabled` is a separate toggle from
+  `emailOtpSignupEnabled`** — they govern different security axes.
+  Login-OTP is a passwordless option for existing users; signup-OTP is
+  an account-creation channel for BFFs. Coupling them would be wrong.
+- **Picker placement: drawer next to magic-link** — when
+  `passwordLoginEnabled=true`, OTP sits in a "passwordless options"
+  drawer alongside the magic-link link, not as a primary CTA. When
+  `passwordLoginEnabled=false`, the magic-link form is the primary and
+  OTP is a footer link below it. Hard-coded in `AuthView` (no plugin
+  registry).
+
+**Operator footgun closed in v1.13:** the OTP cross-challenge lockout
+threshold field was previously disabled based on `emailOtpSignupEnabled`
+only. Enabling login-OTP without signup would have left the login flow
+without a brute-force guard. The disable condition now checks both
+toggles.

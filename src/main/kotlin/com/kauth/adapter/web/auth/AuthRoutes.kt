@@ -43,6 +43,8 @@ fun Route.authRoutes(
     corsPort: CorsPort? = null,
     translationPort: TranslationPort,
     ssoTtlSeconds: Long = 86_400L,
+    emailOtpService: com.kauth.domain.service.EmailOtpService? = null,
+    otpIpRateLimiter: RateLimiterPort? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -119,6 +121,17 @@ fun Route.authRoutes(
             ssoTtlSeconds = ssoTtlSeconds,
             secure = baseUrl.startsWith("https"),
         )
+
+        if (emailOtpService != null && otpIpRateLimiter != null) {
+            emailOtpLoginRoutes(
+                emailOtpService = emailOtpService,
+                oauthService = oauthService,
+                perIpLimiter = otpIpRateLimiter,
+                encryptionService = encryptionService,
+                ssoTtlSeconds = ssoTtlSeconds,
+                secure = baseUrl.startsWith("https"),
+            )
+        }
 
         mfaRoutes(
             oauthService = oauthService,

@@ -845,6 +845,16 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                     label("check-row") {
+                        input(type = InputType.checkBox, name = "emailOtpLoginEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.securityConfig.emailOtpLoginEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL }
+                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_DESC }
+                        }
+                    }
+                    label("check-row") {
                         input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
                             attributes["value"] = "true"
                             if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
@@ -852,9 +862,14 @@ internal fun securityPolicyPageImpl(
                         div("check-row__body") {
                             span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
-                            if (!workspace.isSmtpReady) {
-                                span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
-                            }
+                        }
+                    }
+                    val anyEmailOtpEnabled =
+                        workspace.securityConfig.emailOtpLoginEnabled ||
+                            workspace.securityConfig.emailOtpSignupEnabled
+                    if (anyEmailOtpEnabled && !workspace.isSmtpReady) {
+                        div("check-row__body") {
+                            span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
                         }
                     }
                     div("edit-row") {
@@ -865,7 +880,7 @@ internal fun securityPolicyPageImpl(
                                 attributes["min"] = "0"
                                 attributes["max"] = "50"
                                 value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
-                                if (!workspace.securityConfig.emailOtpSignupEnabled) {
+                                if (!anyEmailOtpEnabled) {
                                     attributes["disabled"] = "disabled"
                                 }
                             }

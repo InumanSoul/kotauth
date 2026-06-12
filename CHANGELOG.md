@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.13.0] - 2026-05-26
+
+Hosted Email OTP login. v1.12.0 shipped Email OTP as an admin-API primitive
+for partner BFFs. v1.13.0 ships the browser-driven equivalent — a two-step
+hosted login page where end users enter their email, receive a 6-digit
+code, and sign in. `EmailOtpService` was built consumer-agnostic in v1.12.0;
+this release is route + view + session-state.
+
+### Added
+
+- **`/email-otp` and `/email-otp/verify` hosted login pages** — two-step
+  flow (enter email → receive 6-digit code → enter code → sign in).
+  Single `<input>` with `autocomplete="one-time-code"` triggers native
+  iOS/Android SMS autofill on a single field (the 6-box pattern breaks
+  paste + autofill on Android). MFA chain reuses
+  `completeAuthorizationCodeFlow(mfaCompleted=false)` so TOTP-enrolled
+  users still get challenged
+- **Per-tenant `emailOtpLoginEnabled` toggle** — new V48 migration adds
+  `email_otp_login_enabled` to `tenant_security_config`. Independent of
+  `emailOtpSignupEnabled` (which gates the BFF find-or-create path)
+- **Login-method picker entry** — when the toggle is on, the hosted login
+  page shows a "Sign in with an email code instead" footer link next to
+  the existing magic-link link. Both passwordless alternatives are
+  visually grouped under a thin top-border separator so the
+  forgot-password row stays distinct
+- **`KOTAUTH_AUTH_CONTEXT` cookie carries OTP flow state** — extended
+  with two new fields (`otpChallengeId`, `otpEmail`) so the code-entry
+  page knows which challenge and email to display. Backward-compatible:
+  legacy 9-field cookies still parse, the OTP fields are optional
+- **Resend code from the verify page** — hidden-form button reuses the
+  same `/email-otp/send` endpoint. The service-layer resend invalidates
+  the prior challenge (shipped v1.12.0); the route updates the cookie
+  with the new challenge ID and flashes "code resent"
+- **`EnglishStrings` for the hosted OTP pages** — `EMAIL_OTP_TITLE` +
+  subtitle + email/code labels + submit + resend + error copy, plus
+  `LOGIN_EMAIL_OTP_LINK` for the picker entry
+
+### Changed
+
+- **Auth Methods card** in Security settings reordered to put the
+  login-side toggle before the BFF-side signup toggle (login is the
+  primary use case; signup is BFF-only)
+- **SMTP-not-configured warning consolidated** — when either OTP toggle
+  is enabled and SMTP is missing, a single inline warning renders
+  between the two toggles instead of duplicating on each
+- **OTP cross-challenge lockout threshold** now disables only when
+  BOTH login and signup toggles are off (previously only checked
+  signup, which would have left the login flow without a brute-force
+  guard — security fix)
+- **`OtpVerifyResult.Success`** carries `userId` so the hosted route
+  can enter the MFA-aware completion helper directly. Existing admin-API
+  consumers ignore the new field
+
+### Notes
+
+- Constant-time padding for the hosted flow is **200ms** (vs **800ms**
+  for the BFF). 800ms made the hosted UX feel broken; 200ms still
+  defeats timing enumeration. Documented in ADR-15
+- No same-browser guard on the OTP consume — that's the failure mode
+  OTP solves (corporate scanners prefetching magic-link URLs,
+  cross-device email clients). Documented in ADR-15
+- **AdminService split** (`WorkspaceSettingsService` / `AdminUserService`
+  / `ApplicationManagementService`) was originally planned for this
+  release but deferred to a dedicated v1.13.1 polish PR. The 1145-LOC
+  service + 24 callers + test redistribution carried unjustified risk
+  alongside a flagship feature. The `TODO(v1.13)` comment in
+  `AdminService.kt` stays as the marker
+- **`EmailTemplatePort` extraction** remains deferred (per ADR-15) —
+  `SmtpEmailAdapter` is ~700 lines, still below the 800-line trigger,
+  and no second consumer surfaced this release
+- 5 new route integration tests (`EmailOtpLoginRoutesTest`) + extended
+  backup round-trip assertion for the new field
+
+---
+
 ## [1.12.1] - 2026-05-26
 
 Polish release closing the ADR-15 follow-ups, the UX-review deferred items,
