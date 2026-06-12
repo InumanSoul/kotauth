@@ -279,9 +279,30 @@ Intended for deployments like `demo.kotauth.com` where visitors should see a pop
 
 | Workspace | Username | Password |
 |---|---|---|
-| Master (admin console) | `admin` | `changeme123!` |
+| Master (admin console) | `admin` | `Demo1234!` |
 | Acme Corp | `sarah.chen` | `Demo1234!` |
 | Startup Labs | `jordan.lee` | `Demo1234!` |
+
+---
+
+## Admin Bootstrap
+
+### `KAUTH_BOOTSTRAP_ADMIN_PASSWORD`
+**Optional.** Default: _unset_
+
+The initial password assigned to the seeded `admin` user when Kotauth boots against a fresh database. The seeded admin can sign in directly with this password and rotate it from Profile → Security after first login — no token-redemption flow is required.
+
+Resolution order:
+
+1. **`KAUTH_BOOTSTRAP_ADMIN_PASSWORD` set** — used as-is. Must be at least 12 characters and contain upper, lower, and digit; otherwise startup fails.
+2. **`KAUTH_DEMO_MODE=true`** — uses the documented demo password (`Demo1234!`). Demo mode is rejected in production by the secret-key check.
+3. **Otherwise** — Kotauth generates a 128-bit random password and prints it once to **stdout** at boot inside a clearly-framed banner. Capture the log on first run and store the password.
+
+```
+KAUTH_BOOTSTRAP_ADMIN_PASSWORD=<a strong operator-chosen password>
+```
+
+The legacy default `changeme123!` is removed. Operators who scripted around it must either set this variable or read the random password from the first-boot log.
 
 ---
 

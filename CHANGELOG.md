@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.1] - 2026-06-12
+
+Closes the published-default admin credential window flagged in the
+2026-06-11 security audit.
+
+> **BREAKING CHANGE**
+>
+> The seeded `admin` user is no longer assigned the documented password
+> `changeme123!`. Operators who scripted around that literal must either
+> set `KAUTH_BOOTSTRAP_ADMIN_PASSWORD` or capture the random password
+> printed once to stdout on first boot. See
+> [ENV_REFERENCE.md](docs/ENV_REFERENCE.md#kauth_bootstrap_admin_password).
+
+### Security
+
+- **Default admin credential is gone** — the publicly-documented
+  `changeme123!` password is removed from the codebase, image, and docs.
+  On a fresh database the seeded `admin` is provisioned from
+  `KAUTH_BOOTSTRAP_ADMIN_PASSWORD` if set, otherwise from a 128-bit
+  cryptographically random password printed once to stdout in a clearly
+  framed banner. The high-entropy ephemeral credential is the rotation
+  gate — only the operator who captured the boot log can use it
+- **`KAUTH_BOOTSTRAP_ADMIN_PASSWORD` fail-fast validation** — must be at
+  least 12 characters with upper, lower, and digit; weak values abort
+  startup with a boxed FATAL message rather than silently seeding a poor
+  credential
+- **Demo mode unchanged** — `KAUTH_DEMO_MODE=true` still provisions a
+  fixed, documented demo password (`Demo1234!`, aligned with the
+  existing demo-tenant users) so demo deployments stay usable. Demo
+  mode is already rejected in production by the quickstart-secret check
+
+### Changed
+
+- Demo banner now displays `admin / Demo1234!` to match the new seeded
+  demo credentials
+- The `CHANGE_PASSWORD` required action introduced in 1.14.0 is **no
+  longer set on the seeded admin**. That flag is paired with an
+  admin-issued `TEMP_PASSWORD` token, which the seed path cannot
+  produce, so it locked the operator out of their own instance. The
+  rotation guarantee is now provided by the unique-per-instance random
+  password itself
+
+---
+
 ## [1.14.0] - 2026-06-11
 
 Security hardening release implementing Tier 1 of an internal security audit.
