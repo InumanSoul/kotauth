@@ -118,6 +118,18 @@ class AuthRoutesTest {
             redirectUris = listOf("https://app.example.com/callback"),
         )
 
+    private val confidentialApp =
+        Application(
+            id = ApplicationId(2),
+            tenantId = TenantId(1),
+            clientId = "backend-app",
+            name = "Backend",
+            description = null,
+            accessType = AccessType.CONFIDENTIAL,
+            enabled = true,
+            redirectUris = listOf("https://backend.example.com/callback"),
+        )
+
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
     private val pkceChallenge = sha256Base64Url(pkceVerifier)
 
@@ -183,6 +195,7 @@ class AuthRoutesTest {
         tenantRepo.add(tenant)
         userRepo.add(user)
         appRepo.add(publicApp)
+        appRepo.add(confidentialApp, secretHash = hasher.hash("secret123"))
     }
 
     // =========================================================================
@@ -1446,10 +1459,46 @@ class AuthRoutesTest {
             val response =
                 client.submitForm(
                     url = "/t/acme/protocol/openid-connect/revoke",
-                    formParameters = Parameters.build { append("token", accessToken) },
+                    formParameters =
+                        Parameters.build {
+                            append("token", accessToken)
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
                 )
 
             assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `POST revoke returns 401 without client credentials`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/revoke",
+                    formParameters = Parameters.build { append("token", "any-token") },
+                )
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status, "RFC 7009 §2.1: caller must authenticate")
         }
 
     @Test
@@ -1477,7 +1526,12 @@ class AuthRoutesTest {
             val response =
                 client.submitForm(
                     url = "/t/acme/protocol/openid-connect/revoke",
-                    formParameters = Parameters.build { append("token", "completely-unknown-token") },
+                    formParameters =
+                        Parameters.build {
+                            append("token", "completely-unknown-token")
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
                 )
 
             assertEquals(HttpStatusCode.OK, response.status, "RFC 7009: always return 200")
@@ -1508,7 +1562,11 @@ class AuthRoutesTest {
             val response =
                 client.submitForm(
                     url = "/t/acme/protocol/openid-connect/revoke",
-                    formParameters = Parameters.build { },
+                    formParameters =
+                        Parameters.build {
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
                 )
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -1569,13 +1627,49 @@ class AuthRoutesTest {
             val response =
                 client.submitForm(
                     url = "/t/acme/protocol/openid-connect/introspect",
-                    formParameters = Parameters.build { append("token", accessToken) },
+                    formParameters =
+                        Parameters.build {
+                            append("token", accessToken)
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
                 )
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertTrue(body.contains("\"active\":true") || body.contains("\"active\": true"))
             assertTrue(body.contains("\"sub\":\"10\"") || body.contains("\"sub\": \"10\""))
+        }
+
+    @Test
+    fun `POST introspect returns 401 without client credentials`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        selfServiceService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters = Parameters.build { append("token", "any-token") },
+                )
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status, "RFC 7662 §2.1: caller must authenticate")
         }
 
     @Test
@@ -1604,7 +1698,12 @@ class AuthRoutesTest {
             val response =
                 client.submitForm(
                     url = "/t/acme/protocol/openid-connect/introspect",
-                    formParameters = Parameters.build { append("token", "unknown-token") },
+                    formParameters =
+                        Parameters.build {
+                            append("token", "unknown-token")
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
                 )
 
             assertEquals(HttpStatusCode.OK, response.status)

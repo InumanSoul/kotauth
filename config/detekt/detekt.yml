@@ -1,0 +1,71 @@
+# Detekt configuration — complexity and code-smell analysis only.
+# Formatting is owned by ktlint (make lint); style rules that overlap are disabled.
+# *View.kt files (kotlinx.html DSL) are excluded, mirroring the ktlint exemption.
+
+build:
+  maxIssues: 0
+
+config:
+  validation: true
+
+complexity:
+  active: true
+  LargeClass:
+    active: true
+    threshold: 600
+    excludes: ['**/*View.kt']
+  LongMethod:
+    active: true
+    threshold: 80
+    excludes: ['**/*View.kt']
+  LongParameterList:
+    active: true
+    functionThreshold: 8
+    constructorThreshold: 10
+    ignoreDefaultParameters: true
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 18
+  TooManyFunctions:
+    active: true
+    thresholdInClasses: 25
+    thresholdInFiles: 30
+    ignorePrivate: true
+    excludes: ['**/*View.kt']
+  NestedBlockDepth:
+    active: true
+    threshold: 5
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: false # Route handlers intentionally catch broadly and translate to StatusPages
+  SwallowedException:
+    active: true
+    ignoredExceptionTypes:
+      - 'InterruptedException'
+      - 'NumberFormatException'
+
+potential-bugs:
+  active: true
+
+coroutines:
+  active: true
+
+performance:
+  active: true
+  SpreadOperator:
+    active: false # Redis MGET/ZREM use spread intentionally
+
+style:
+  active: false # ktlint owns style/formatting
+
+naming:
+  active: true
+  excludes: ['**/test/**'] # backtick test names
+
+comments:
+  active: false
+
+empty-blocks:
+  active: true

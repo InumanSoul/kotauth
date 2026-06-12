@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.14.0] - 2026-06-11
+
+Security hardening release implementing Tier 1 of an internal security audit.
+
+> **BREAKING CHANGES**
+>
+> 1. `/protocol/openid-connect/introspect` and `/revoke` now require
+>    confidential-client authentication (Basic auth or `client_id` +
+>    `client_secret` form params). Anonymous callers receive `401`.
+> 2. Deployments behind a reverse proxy (other than the bundled Caddy
+>    overlay, which sets it automatically) must set
+>    `KAUTH_TRUSTED_PROXY=true` to keep resolving real client IPs.
+> 3. `DB_PASSWORD` is now required — startup fails fast when unset.
+> 4. Confidential clients must send `client_secret` on the
+>    `refresh_token` grant.
+
+### Security
+
+- **Refresh grant now authenticates confidential clients** — `refresh_token`
+  grant requests for confidential clients must include a valid
+  `client_secret` (RFC 6749 §6). Previously only the public `client_id` was
+  checked, so a leaked refresh token was redeemable without credentials
+- **`/introspect` and `/revoke` require client authentication** — both
+  endpoints now mandate confidential-client credentials via Basic auth or
+  form post (RFC 7662 §2.1, RFC 7009 §2.1) and respond `401 invalid_client`
+  otherwise. Revocation is additionally tenant-scoped. **Breaking:** callers
+  using these endpoints anonymously must now send client credentials
+- **Refresh-token replay detection** — rotated refresh tokens are remembered
+  (`sessions.revocation_reason`, V48); presenting one again is treated as
+  token theft per the OAuth 2.0 Security BCP: every session for the user is
+  revoked and a `refresh_token_replay_detected` audit event is recorded.
+  Tokens invalidated by logout do not cascade
+- **Forwarded headers are now opt-in** (`KAUTH_TRUSTED_PROXY`, default off) —
+  previously `X-Forwarded-For` was always honored, letting clients on
+  directly-exposed deployments spoof per-IP rate-limit buckets for login,
+  token, MFA, and OTP endpoints. The Caddy production overlay enables it
+  automatically. **Breaking:** proxied deployments not using the bundled
+  overlay must set `KAUTH_TRUSTED_PROXY=true` to keep real client IPs
+- **`DB_PASSWORD` is required** — the silent `"password"` fallback is
+  removed; startup fails fast with guidance when unset
+- **Quickstart secret key refused in production** — the publicly-committed
+  `KAUTH_SECRET_KEY` from `docker-compose.quickstart.yml` aborts startup
+  when `KAUTH_ENV=production`
+- **Seeded admin must change password on first login** — the default
+  `admin` user is created with the `CHANGE_PASSWORD` required action
+- **Dev compose binds Postgres/Redis to loopback** — `127.0.0.1:5432` and
+  `127.0.0.1:6379` instead of all interfaces
+
+---
+
 ## [1.13.0] - 2026-05-26
 
 Hosted Email OTP login. v1.12.0 shipped Email OTP as an admin-API primitive

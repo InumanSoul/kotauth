@@ -42,7 +42,12 @@ services:
   # The app service inherits port 8080 from docker-compose.yml.
   # Block it at the firewall level so only Caddy handles public traffic.
   # Example (ufw): ufw deny 8080
-  app: {}
+  app:
+    environment:
+      # Caddy overwrites X-Forwarded-For with the real client IP, so it is
+      # safe to honor forwarded headers here. Never set this without a
+      # reverse proxy in front — it lets clients spoof rate-limit IPs.
+      KAUTH_TRUSTED_PROXY: "true"
 
 volumes:
   caddy_data:

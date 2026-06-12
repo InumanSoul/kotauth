@@ -70,11 +70,19 @@ class RedisSessionRepository(
         return session.takeIf { Instant.now().isBefore(refreshExpires) }
     }
 
+    override fun findByRefreshTokenHash(hash: String): Session? {
+        // The refresh index lives until refresh expiry, so rotated-token replay
+        // is detectable for the token's full lifetime; afterwards it fails closed.
+        val id = commands.get(RedisKeys.refreshTokenIndex(hash))?.toIntOrNull() ?: return null
+        return findById(SessionId(id))
+    }
+
     override fun revoke(
         sessionId: SessionId,
         revokedAt: Instant,
+        reason: String?,
     ) {
-        revokeAndReport(sessionId, revokedAt)
+        revokeAndReport(sessionId, revokedAt, reason)
         revokeAllByImpersonator(sessionId, revokedAt)
     }
 
@@ -109,10 +117,11 @@ class RedisSessionRepository(
     private fun revokeAndReport(
         sessionId: SessionId,
         revokedAt: Instant,
+        reason: String? = null,
     ): Boolean {
         val current = findById(sessionId) ?: return false
         if (current.isRevoked) return false
-        val updated = current.copy(revokedAt = revokedAt)
+        val updated = current.copy(revokedAt = revokedAt, revocationReason = reason)
         val nowEpoch = Instant.now().epochSecond
         commands.setex(
             RedisKeys.record(sessionId),

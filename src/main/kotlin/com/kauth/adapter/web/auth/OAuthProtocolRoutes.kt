@@ -663,6 +663,7 @@ internal fun Route.oauthProtocolRoutes(
                                     "invalid_client",
                                     "client_id required",
                                 ),
+                            clientSecret = formClientSecret,
                             ipAddress = ipAddress,
                             userAgent = userAgent,
                         )
@@ -708,6 +709,7 @@ internal fun Route.oauthProtocolRoutes(
     }
 
     post("/protocol/openid-connect/revoke") {
+        val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val params = call.receiveParameters()
         val token =
             params["token"] ?: return@post call.respond(
@@ -717,8 +719,18 @@ internal fun Route.oauthProtocolRoutes(
                     put("error_description", "token parameter is required")
                 },
             )
+        val (clientId, clientSecret) = extractClientCredentials(call, params)
 
-        oauthService.revokeToken(token)
+        // RFC 7009 §2.1: the caller must authenticate before any revocation
+        if (!oauthService.revokeToken(slug, token, clientId, clientSecret)) {
+            return@post call.respond(
+                HttpStatusCode.Unauthorized,
+                buildJsonObject {
+                    put("error", "invalid_client")
+                    put("error_description", "Client authentication failed")
+                },
+            )
+        }
         call.respond(HttpStatusCode.OK)
     }
 
@@ -727,8 +739,17 @@ internal fun Route.oauthProtocolRoutes(
         val token = params["token"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val typeHint = params["token_type_hint"]
         val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val (clientId, clientSecret) = extractClientCredentials(call, params)
 
-        when (val result = oauthService.introspectToken(slug, token, typeHint)) {
+        when (val result = oauthService.introspectToken(slug, token, clientId, clientSecret, typeHint)) {
+            is IntrospectionResult.Unauthorized ->
+                call.respond(
+                    HttpStatusCode.Unauthorized,
+                    buildJsonObject {
+                        put("error", "invalid_client")
+                        put("error_description", "Client authentication failed")
+                    },
+                )
             is IntrospectionResult.Inactive ->
                 call.respond(buildJsonObject { put("active", false) })
             is IntrospectionResult.Active ->

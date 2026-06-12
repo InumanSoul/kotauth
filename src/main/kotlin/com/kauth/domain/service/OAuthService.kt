@@ -1,11 +1,13 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
+import com.kauth.domain.model.Application
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
@@ -420,16 +422,19 @@ class OAuthService(
 
     /**
      * Rotates a refresh token: validates the old token, issues new tokens,
-     * revokes the old session, creates a new session.
+     * revokes the old session (reason "rotated"), creates a new session.
      *
-     * Implements refresh token rotation (RFC 6749 Security BCP).
-     * Replay detection: if a used refresh token is presented, all sessions
-     * for that user are revoked (token theft assumption).
+     * Implements refresh token rotation (OAuth 2.0 Security BCP).
+     * Replay detection: presenting a refresh token that was already rotated
+     * revokes all sessions for that user (token theft assumption). Tokens
+     * invalidated by logout or admin revocation do NOT cascade — a benign
+     * client retry after logout must not destroy unrelated sessions.
      */
     fun refreshTokens(
         tenantSlug: String,
         refreshToken: String,
         clientId: String,
+        clientSecret: String? = null,
         ipAddress: String? = null,
         userAgent: String? = null,
     ): OAuthResult<TokenResponse> {
@@ -441,8 +446,7 @@ class OAuthService(
         val session = sessionRepository.findActiveByRefreshTokenHash(hash)
 
         if (session == null) {
-            // Could be replay — we can't know if it was ever valid, so just reject
-            return OAuthResult.Failure(OAuthError.InvalidGrant("Invalid or expired refresh token"))
+            return handlePossibleRefreshReplay(tenant, hash, ipAddress, userAgent)
         }
 
         if (session.userId == null) {
@@ -466,6 +470,17 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidGrant("Refresh token was not issued to this client"))
         }
 
+        // RFC 6749 §6: confidential clients must authenticate on the refresh grant
+        if (client != null && client.accessType == AccessType.CONFIDENTIAL) {
+            if (clientSecret == null) {
+                return OAuthResult.Failure(OAuthError.InvalidClient("client_secret required for confidential clients"))
+            }
+            val storedHash = applicationRepository.findClientSecretHash(client.id)
+            if (storedHash == null || !passwordHasher.verify(clientSecret, storedHash)) {
+                return OAuthResult.Failure(OAuthError.InvalidClient("Invalid client_secret"))
+            }
+        }
+
         val scopes = session.scopes.split(" ").filter { it.isNotBlank() }
 
         // Resolve effective roles for refresh
@@ -484,7 +499,7 @@ class OAuthService(
             )
 
         // Revoke old session, create new (rotation)
-        sessionRepository.revoke(session.id!!)
+        sessionRepository.revoke(session.id!!, reason = Session.REVOCATION_REASON_ROTATED)
         sessionRepository.save(
             Session(
                 tenantId = tenant.id,
@@ -517,23 +532,67 @@ class OAuthService(
         return OAuthResult.Success(newTokens)
     }
 
+    /**
+     * Handles a refresh-token presentation that missed the active-session lookup.
+     * If the hash matches a session revoked by rotation, this is a replayed
+     * refresh token (OAuth 2.0 Security BCP §4.14.2: assume theft) — revoke
+     * every session the user has and record an audit event.
+     */
+    private fun handlePossibleRefreshReplay(
+        tenant: Tenant,
+        hash: String,
+        ipAddress: String?,
+        userAgent: String?,
+    ): OAuthResult<TokenResponse> {
+        val stale = sessionRepository.findByRefreshTokenHash(hash)
+        if (stale != null &&
+            stale.tenantId == tenant.id &&
+            stale.revocationReason == Session.REVOCATION_REASON_ROTATED &&
+            stale.userId != null
+        ) {
+            sessionRepository.revokeAllForUser(stale.tenantId, stale.userId)
+            auditLog.record(
+                AuditEvent(
+                    tenantId = stale.tenantId,
+                    userId = stale.userId,
+                    clientId = stale.clientId,
+                    eventType = AuditEventType.SESSION_REVOKED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "refresh_token_replay_detected"),
+                ),
+            )
+        }
+        return OAuthResult.Failure(OAuthError.InvalidGrant("Invalid or expired refresh token"))
+    }
+
     // -------------------------------------------------------------------------
     // Token Introspection (RFC 7662)
     // -------------------------------------------------------------------------
 
     /**
      * Returns active status and claims for a token.
-     * Only accessible to authenticated clients (server-side only, not public).
+     *
+     * RFC 7662 §2.1: the endpoint MUST authenticate the caller. Only
+     * confidential clients of the tenant may introspect; invalid or missing
+     * credentials return [IntrospectionResult.Unauthorized] so the route can
+     * respond 401 instead of leaking an inactive/active distinction.
      */
     fun introspectToken(
         tenantSlug: String,
         token: String,
+        clientId: String?,
+        clientSecret: String?,
         tokenTypeHint: String? = null,
     ): IntrospectionResult {
         // Resolve tenant — unknown slugs always return inactive per RFC 7662
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
                 ?: return IntrospectionResult.Inactive
+
+        if (authenticateConfidentialClient(tenant.id, clientId, clientSecret) == null) {
+            return IntrospectionResult.Unauthorized
+        }
 
         val hash = sha256Hex(token)
 
@@ -576,13 +635,28 @@ class OAuthService(
 
     /**
      * Revokes an access or refresh token by hash lookup in the sessions table.
-     * Always returns success per RFC 7009 (don't leak token validity).
+     *
+     * RFC 7009 §2.1: the caller must authenticate. Returns false when client
+     * authentication fails (route responds 401). After successful auth,
+     * unknown tokens are a silent no-op per spec (don't leak token validity).
+     * Only sessions belonging to the authenticated client's tenant are revocable.
      */
-    fun revokeToken(token: String) {
+    fun revokeToken(
+        tenantSlug: String,
+        token: String,
+        clientId: String?,
+        clientSecret: String?,
+    ): Boolean {
+        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return false
+        authenticateConfidentialClient(tenant.id, clientId, clientSecret) ?: return false
+
         val hash = sha256Hex(token)
         val byAccess = sessionRepository.findActiveByAccessTokenHash(hash)
         val byRefresh = sessionRepository.findActiveByRefreshTokenHash(hash)
-        val session = byAccess ?: byRefresh ?: return // No-op per spec
+        val session = byAccess ?: byRefresh ?: return true // No-op per spec
+
+        // Tenant isolation: an authenticated client may only revoke its tenant's tokens
+        if (session.tenantId != tenant.id) return true
 
         session.id?.let {
             sessionRepository.revoke(it)
@@ -597,6 +671,25 @@ class OAuthService(
                 ),
             )
         }
+        return true
+    }
+
+    /**
+     * Authenticates a confidential client by id + secret within a tenant.
+     * Returns the client on success, null on any failure (unknown client,
+     * public client, missing or invalid secret). Public clients are rejected:
+     * introspection/revocation callers must be able to hold a secret.
+     */
+    private fun authenticateConfidentialClient(
+        tenantId: TenantId,
+        clientId: String?,
+        clientSecret: String?,
+    ): Application? {
+        if (clientId.isNullOrBlank() || clientSecret.isNullOrBlank()) return null
+        val client = applicationRepository.findByClientId(tenantId, clientId) ?: return null
+        if (client.accessType != AccessType.CONFIDENTIAL || !client.enabled) return null
+        val storedHash = applicationRepository.findClientSecretHash(client.id) ?: return null
+        return if (passwordHasher.verify(clientSecret, storedHash)) client else null
     }
 
     // -------------------------------------------------------------------------
@@ -737,6 +830,9 @@ sealed class OAuthError {
 
 sealed class IntrospectionResult {
     object Inactive : IntrospectionResult()
+
+    /** Caller failed RFC 7662 §2.1 client authentication — route responds 401. */
+    object Unauthorized : IntrospectionResult()
 
     data class Active(
         val sub: String,

@@ -12,6 +12,7 @@ plugins {
     id("io.ktor.plugin") version "3.4.2"
     id("com.gradleup.shadow") version "9.1.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
+    id("io.gitlab.arturbosch.detekt") version "1.23.8"
 }
 
 tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
@@ -321,6 +322,15 @@ tasks.named("processResources") {
         generateVersionProperties,
         generateJsSri,
     )
+}
+
+detekt {
+    // ktlint owns formatting; detekt owns complexity/code-smell analysis.
+    buildUponDefaultConfig = true
+    config.setFrom(files("config/detekt/detekt.yml"))
+    baseline = file("config/detekt/baseline.xml")
+    source.setFrom(files("src/main/kotlin"))
+    parallel = true
 }
 
 ktlint {

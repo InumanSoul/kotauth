@@ -136,7 +136,15 @@ object DatabaseFactory {
                     it[fullName] = "KotAuth Administrator"
                     it[emailVerified] = false
                     it[enabled] = true
+                    // The default password is documented and weak — force rotation
+                    // on first login via the CHANGE_PASSWORD required action.
+                    it[requiredActions] = listOf("CHANGE_PASSWORD")
                 } get UsersTable.id
+
+            System.err.println(
+                "[WARN] Seeded default admin user 'admin' with a documented default password. " +
+                    "A password change is enforced on first login.",
+            )
 
             // Assign admin role (created by V28) to the default admin user
             val adminRoleId =

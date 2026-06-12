@@ -39,6 +39,7 @@ internal object SessionCodec {
         val refreshExpiresAt: String?,
         val lastActivityAt: String,
         val revokedAt: String?,
+        val revocationReason: String? = null,
         val impersonatorSessionId: Int? = null,
     )
 
@@ -58,6 +59,7 @@ internal object SessionCodec {
             refreshExpiresAt = refreshExpiresAt?.toString(),
             lastActivityAt = lastActivityAt.toString(),
             revokedAt = revokedAt?.toString(),
+            revocationReason = revocationReason,
             impersonatorSessionId = impersonatorSessionId?.value,
         )
 
@@ -77,6 +79,7 @@ internal object SessionCodec {
             refreshExpiresAt = refreshExpiresAt?.let(Instant::parse),
             lastActivityAt = Instant.parse(lastActivityAt),
             revokedAt = revokedAt?.let(Instant::parse),
+            revocationReason = revocationReason,
             impersonatorSessionId = impersonatorSessionId?.let { SessionId(it) },
         )
 }
