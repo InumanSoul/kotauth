@@ -209,7 +209,16 @@ fun Application.module(
     startTime: Long,
     versionCheckService: VersionCheckService,
 ) {
-    install(XForwardedHeaders)
+    // Forwarded headers are attacker-controlled unless a trusted reverse proxy
+    // strips/sets them. Honoring them on a directly-exposed instance lets
+    // clients spoof X-Forwarded-For and bypass every per-IP rate limit.
+    // Only enable behind a proxy that overwrites these headers (see ENV_REFERENCE).
+    if (config.trustedProxy) {
+        install(XForwardedHeaders)
+        startupLog.info("KAUTH_TRUSTED_PROXY=true — honoring X-Forwarded-* headers for client IPs")
+    } else {
+        startupLog.info("Forwarded headers ignored (KAUTH_TRUSTED_PROXY not set) — using socket peer IPs")
+    }
 
     // -- Security headers ----------------------------------------------------
     install(DefaultHeaders) {

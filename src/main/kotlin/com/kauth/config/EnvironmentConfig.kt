@@ -15,7 +15,7 @@ data class DbConfig(
             DbConfig(
                 dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
                 dbUser = System.getenv("DB_USER") ?: "postgres",
-                dbPassword = System.getenv("DB_PASSWORD") ?: "password",
+                dbPassword = EnvironmentConfig.requireDbPassword(System.getenv("DB_PASSWORD")),
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
             )
@@ -52,6 +52,7 @@ data class EnvironmentConfig(
     val ssoSessionTtlSeconds: Long,
     val ssoSessionMaxTtlSeconds: Long,
     val bootstrapApiKeysJson: String?,
+    val trustedProxy: Boolean,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
     val redisEnabled: Boolean get() = redisUrl != null
@@ -66,6 +67,7 @@ data class EnvironmentConfig(
             validateLegacySecret(env)
 
             val secretKey = requireSecretKey(System.getenv("KAUTH_SECRET_KEY"))
+            validateQuickstartSecret(secretKey, env)
 
             val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
             validateAdminBypass(adminBypass)
@@ -83,7 +85,7 @@ data class EnvironmentConfig(
                     System.getenv("DB_URL")
                         ?: "jdbc:postgresql://localhost:5432/kauth_db",
                 dbUser = System.getenv("DB_USER") ?: "postgres",
-                dbPassword = System.getenv("DB_PASSWORD") ?: "password",
+                dbPassword = requireDbPassword(System.getenv("DB_PASSWORD")),
                 isDemoMode =
                     System
                         .getenv("KAUTH_DEMO_MODE")
@@ -105,6 +107,7 @@ data class EnvironmentConfig(
                 ssoSessionTtlSeconds = ssoTtl,
                 ssoSessionMaxTtlSeconds = ssoMaxTtl,
                 bootstrapApiKeysJson = System.getenv("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
+                trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
             )
         }
 
@@ -220,6 +223,49 @@ data class EnvironmentConfig(
             }
             return secretKey
         }
+
+        internal fun requireDbPassword(dbPassword: String?): String {
+            if (dbPassword.isNullOrBlank()) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: DB_PASSWORD environment variable is not set.        │
+                    │                                                              │
+                    │  KotAuth no longer falls back to a default database          │
+                    │  password. Set DB_PASSWORD to the PostgreSQL password        │
+                    │  for the configured DB_USER.                                 │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+            return dbPassword
+        }
+
+        private fun validateQuickstartSecret(
+            secretKey: String,
+            env: String,
+        ) {
+            if (env == "production" && secretKey == QUICKSTART_SECRET_KEY) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_SECRET_KEY is the publicly-known quickstart   │
+                    │  value. Refusing to start in production mode.                │
+                    │                                                              │
+                    │  This key is committed to the public repository — anyone     │
+                    │  can decrypt secrets at rest and forge session cookies.      │
+                    │                                                              │
+                    │  Generate a unique key:  openssl rand -hex 32                │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+        }
+
+        /** The KAUTH_SECRET_KEY committed in docker-compose.quickstart.yml — dev/demo only. */
+        private const val QUICKSTART_SECRET_KEY = "a]1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4"
 
         private fun validateAdminBypass(adminBypass: Boolean) {
             if (adminBypass) {

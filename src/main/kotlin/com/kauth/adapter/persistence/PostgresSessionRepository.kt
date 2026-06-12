@@ -33,6 +33,7 @@ class PostgresSessionRepository : SessionRepository {
                     it[refreshExpiresAt] = session.refreshExpiresAt?.toOffsetDateTime()
                     it[lastActivityAt] = session.lastActivityAt.toOffsetDateTime()
                     it[revokedAt] = session.revokedAt?.toOffsetDateTime()
+                    it[revocationReason] = session.revocationReason
                     it[impersonatorSessionId] = session.impersonatorSessionId?.value
                 } get SessionsTable.id
 
@@ -66,12 +67,23 @@ class PostgresSessionRepository : SessionRepository {
                 .singleOrNull()
         }
 
+    override fun findByRefreshTokenHash(hash: String): Session? =
+        transaction {
+            SessionsTable
+                .selectAll()
+                .where { SessionsTable.refreshTokenHash eq hash }
+                .map { it.toSession() }
+                .singleOrNull()
+        }
+
     override fun revoke(
         sessionId: SessionId,
         revokedAt: Instant,
+        reason: String?,
     ) = transaction {
         SessionsTable.update({ SessionsTable.id eq sessionId.value }) {
             it[SessionsTable.revokedAt] = revokedAt.toOffsetDateTime()
+            it[SessionsTable.revocationReason] = reason
         }
         revokeAllByImpersonator(sessionId, revokedAt)
         Unit
@@ -285,6 +297,7 @@ class PostgresSessionRepository : SessionRepository {
             refreshExpiresAt = this[SessionsTable.refreshExpiresAt]?.toInstant(),
             lastActivityAt = this[SessionsTable.lastActivityAt].toInstant(),
             revokedAt = this[SessionsTable.revokedAt]?.toInstant(),
+            revocationReason = this[SessionsTable.revocationReason],
             impersonatorSessionId = this[SessionsTable.impersonatorSessionId]?.let { SessionId(it) },
         )
 

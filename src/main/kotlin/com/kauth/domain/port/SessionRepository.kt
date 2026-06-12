@@ -20,10 +20,19 @@ interface SessionRepository {
     /** Looks up an active session by refresh token hash. */
     fun findActiveByRefreshTokenHash(hash: String): Session?
 
+    /**
+     * Looks up a session by refresh token hash regardless of revocation or
+     * expiry state. Used for refresh-token replay detection: a hash matching
+     * a session revoked with [Session.REVOCATION_REASON_ROTATED] means a
+     * rotated token was replayed.
+     */
+    fun findByRefreshTokenHash(hash: String): Session?
+
     /** Marks a session as revoked. No-op if already revoked. */
     fun revoke(
         sessionId: SessionId,
         revokedAt: Instant = Instant.now(),
+        reason: String? = null,
     )
 
     /** Revokes all active sessions for a user within a tenant. */

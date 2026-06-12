@@ -127,10 +127,27 @@ DB_USER=kotauth
 ### `DB_PASSWORD`
 **Required.**
 
-PostgreSQL password.
+PostgreSQL password. The server refuses to start when unset — there is no
+default fallback.
 
 ```
 DB_PASSWORD=changeme
+```
+
+---
+
+### `KAUTH_TRUSTED_PROXY`
+**Optional.** Default: `false`
+
+When `true`, Kotauth honors `X-Forwarded-For` / `X-Forwarded-Proto` headers
+to resolve client IPs. **Only enable this behind a reverse proxy that
+overwrites these headers** (the bundled Caddy production overlay sets it
+automatically). On a directly-exposed instance, leaving this off is what
+prevents clients from spoofing their IP to bypass per-IP rate limits on
+login, token, MFA, and OTP endpoints.
+
+```
+KAUTH_TRUSTED_PROXY=true
 ```
 
 ---

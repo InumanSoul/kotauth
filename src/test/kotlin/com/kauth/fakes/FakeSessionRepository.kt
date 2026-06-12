@@ -34,11 +34,16 @@ class FakeSessionRepository : SessionRepository {
     override fun findActiveByRefreshTokenHash(hash: String) =
         store.values.find { it.refreshTokenHash == hash && it.isActive }
 
+    override fun findByRefreshTokenHash(hash: String) = store.values.find { it.refreshTokenHash == hash }
+
     override fun revoke(
         sessionId: SessionId,
         revokedAt: Instant,
+        reason: String?,
     ) {
-        store[sessionId.value]?.let { store[sessionId.value] = it.copy(revokedAt = revokedAt) }
+        store[sessionId.value]?.let {
+            store[sessionId.value] = it.copy(revokedAt = revokedAt, revocationReason = reason)
+        }
         cascadeImpersonatorChildren(sessionId, revokedAt)
     }
 

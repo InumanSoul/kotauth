@@ -32,10 +32,20 @@ data class Session(
     val refreshExpiresAt: Instant? = null,
     val lastActivityAt: Instant = Instant.now(),
     val revokedAt: Instant? = null,
+    val revocationReason: String? = null,
     val impersonatorSessionId: SessionId? = null,
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null
     val isActive: Boolean get() = !isExpired && !isRevoked
     val isImpersonation: Boolean get() = impersonatorSessionId != null
+
+    companion object {
+        /**
+         * Revocation reason set when a session is superseded by refresh-token
+         * rotation. Presenting the rotated refresh token again is treated as
+         * theft (OAuth 2.0 Security BCP) — unlike logout/admin revocation.
+         */
+        const val REVOCATION_REASON_ROTATED = "rotated"
+    }
 }

@@ -501,15 +501,196 @@ class OAuthServiceTest {
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
     }
 
+    @Test
+    fun `refreshTokens replay of rotated token revokes all user sessions and audits`() {
+        val firstRefreshToken = establishSession(client = publicClient)
+
+        val refreshResult =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = firstRefreshToken,
+                clientId = "spa-app",
+            )
+        assertIs<OAuthResult.Success<*>>(refreshResult)
+
+        // Attacker replays the rotated token — theft assumption kicks in
+        svc.refreshTokens(
+            tenantSlug = "acme",
+            refreshToken = firstRefreshToken,
+            clientId = "spa-app",
+        )
+
+        assertTrue(
+            sessions.all().filter { it.userId == UserId(10) }.none { it.isActive },
+            "Replay of a rotated refresh token must revoke every session for the user",
+        )
+        assertTrue(
+            auditLog.events.any {
+                it.eventType == AuditEventType.SESSION_REVOKED &&
+                    it.details["reason"] == "refresh_token_replay_detected"
+            },
+            "Replay must record a refresh_token_replay_detected audit event",
+        )
+    }
+
+    @Test
+    fun `refreshTokens replay after logout does not cascade to other sessions`() {
+        val refreshToken = establishSession(client = publicClient)
+        val otherSession =
+            sessions.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = publicClient.id,
+                    accessTokenHash = sha256Hex("other-device-access"),
+                    refreshTokenHash = sha256Hex("other-device-refresh"),
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                    refreshExpiresAt = Instant.now().plusSeconds(86400),
+                ),
+            )
+
+        // Logout-style revocation (no rotation reason)
+        val loggedOut = sessions.findByRefreshTokenHash(sha256Hex(refreshToken))!!
+        sessions.revoke(loggedOut.id!!)
+
+        // A benign client retry after logout must NOT destroy unrelated sessions
+        val result =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = refreshToken,
+                clientId = "spa-app",
+            )
+        assertIs<OAuthResult.Failure>(result)
+        assertTrue(
+            sessions.findById(otherSession.id!!)!!.isActive,
+            "Logout replay must not cascade to the user's other sessions",
+        )
+    }
+
+    @Test
+    fun `refreshTokens requires client_secret for confidential clients`() {
+        val refreshToken = establishSession(client = confidentialClient, clientSecret = "secret123")
+
+        // Missing secret → invalid_client
+        val noSecret =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = refreshToken,
+                clientId = "backend-app",
+            )
+        assertIs<OAuthResult.Failure>(noSecret)
+        assertIs<OAuthError.InvalidClient>(noSecret.error)
+
+        // Wrong secret → invalid_client
+        val wrongSecret =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = refreshToken,
+                clientId = "backend-app",
+                clientSecret = "wrong-secret",
+            )
+        assertIs<OAuthResult.Failure>(wrongSecret)
+        assertIs<OAuthError.InvalidClient>(wrongSecret.error)
+
+        // Correct secret → rotation succeeds
+        val ok =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = refreshToken,
+                clientId = "backend-app",
+                clientSecret = "secret123",
+            )
+        assertIs<OAuthResult.Success<*>>(ok)
+    }
+
+    /** Runs the full code flow for [client] and returns the issued refresh token. */
+    private fun establishSession(
+        client: Application,
+        clientSecret: String? = null,
+    ): String {
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = client.clientId,
+                redirectUri = client.redirectUris.first(),
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
+        val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
+        val exchangeResult =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = client.clientId,
+                redirectUri = client.redirectUris.first(),
+                codeVerifier = pkceVerifier,
+                clientSecret = clientSecret,
+            )
+        return (exchangeResult as OAuthResult.Success<*>)
+            .value
+            .let { it as com.kauth.domain.model.TokenResponse }
+            .refresh_token!!
+    }
+
     // =========================================================================
     // introspectToken
     // =========================================================================
 
     @Test
     fun `introspectToken returns Inactive for unknown token`() {
-        val result = svc.introspectToken(tenantSlug = "acme", token = "unknown-token")
+        val result = introspectAsBackend("unknown-token")
         assertIs<IntrospectionResult.Inactive>(result)
     }
+
+    @Test
+    fun `introspectToken returns Unauthorized without client credentials`() {
+        val result =
+            svc.introspectToken(
+                tenantSlug = "acme",
+                token = "any-token",
+                clientId = null,
+                clientSecret = null,
+            )
+        assertIs<IntrospectionResult.Unauthorized>(result)
+    }
+
+    @Test
+    fun `introspectToken returns Unauthorized for wrong client secret`() {
+        val result =
+            svc.introspectToken(
+                tenantSlug = "acme",
+                token = "any-token",
+                clientId = "backend-app",
+                clientSecret = "wrong-secret",
+            )
+        assertIs<IntrospectionResult.Unauthorized>(result)
+    }
+
+    @Test
+    fun `introspectToken returns Unauthorized for public client credentials`() {
+        // RFC 7662: only clients able to hold a secret may introspect
+        val result =
+            svc.introspectToken(
+                tenantSlug = "acme",
+                token = "any-token",
+                clientId = "spa-app",
+                clientSecret = "irrelevant",
+            )
+        assertIs<IntrospectionResult.Unauthorized>(result)
+    }
+
+    private fun introspectAsBackend(token: String) =
+        svc.introspectToken(
+            tenantSlug = "acme",
+            token = token,
+            clientId = "backend-app",
+            clientSecret = "secret123",
+        )
 
     @Test
     fun `introspectToken returns Inactive when session exists but token cannot be decoded`() {
@@ -529,7 +710,7 @@ class OAuthServiceTest {
         // FakeTokenPort.decodeAccessToken returns null by default
         tokens.claimsToReturn = null
 
-        val result = svc.introspectToken(tenantSlug = "acme", token = accessToken)
+        val result = introspectAsBackend(accessToken)
         assertIs<IntrospectionResult.Inactive>(result)
     }
 
@@ -561,7 +742,7 @@ class OAuthServiceTest {
                 expiresAt = expiresAt,
             )
 
-        val result = svc.introspectToken(tenantSlug = "acme", token = accessToken)
+        val result = introspectAsBackend(accessToken)
         assertIs<IntrospectionResult.Active>(result)
         assertEquals("10", result.sub)
         assertEquals("alice", result.username)
@@ -575,9 +756,31 @@ class OAuthServiceTest {
     // =========================================================================
 
     @Test
-    fun `revokeToken - unknown token is a no-op`() {
-        svc.revokeToken("nonexistent-token")
-        // No exception — per RFC 7009 always returns success
+    fun `revokeToken - unknown token is a no-op after successful client auth`() {
+        val ok = svc.revokeToken("acme", "nonexistent-token", "backend-app", "secret123")
+        assertTrue(ok, "Per RFC 7009 unknown tokens still return success")
+    }
+
+    @Test
+    fun `revokeToken - fails client authentication without credentials`() {
+        val accessToken = "access-not-revocable"
+        val session =
+            sessions.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = publicClient.id,
+                    accessTokenHash = sha256Hex(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+
+        val ok = svc.revokeToken("acme", accessToken, null, null)
+
+        assertEquals(false, ok, "Missing credentials must fail RFC 7009 client auth")
+        assertNull(sessions.findById(session.id!!)?.revokedAt, "Session must not be revoked")
     }
 
     @Test
@@ -596,7 +799,7 @@ class OAuthServiceTest {
                 ),
             )
 
-        svc.revokeToken(accessToken)
+        svc.revokeToken("acme", accessToken, "backend-app", "secret123")
 
         val revoked = sessions.findById(session.id!!)
         assertNotNull(revoked)
@@ -621,7 +824,7 @@ class OAuthServiceTest {
                 ),
             )
 
-        svc.revokeToken(refreshToken)
+        svc.revokeToken("acme", refreshToken, "backend-app", "secret123")
 
         val revoked = sessions.findById(session.id!!)
         assertNotNull(revoked)

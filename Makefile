@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up
+.PHONY: help css css-admin css-auth js lint lint-fix detekt detekt-baseline test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,12 @@ lint: ## Run ktlint check (all .kt except *View.kt)
 
 lint-fix: ## Auto-fix lint issues with ktlintFormat
 	./gradlew ktlintFormat
+
+detekt: ## Run detekt complexity/code-smell analysis
+	./gradlew detekt
+
+detekt-baseline: ## Regenerate the detekt baseline (accepts current debt)
+	./gradlew detektBaseline
 
 test: ## Run the test suite (no Docker required)
 	./gradlew test
