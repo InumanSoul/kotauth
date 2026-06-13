@@ -32,7 +32,7 @@ fun BODY.demoBanner() {
             +"Data resets periodically · Admin: "
             code { +"admin" }
             +" / "
-            code { +"changeme123!" }
+            code { +"Demo1234!" }
             +" · Acme: "
             code { +"sarah.chen" }
             +" / "

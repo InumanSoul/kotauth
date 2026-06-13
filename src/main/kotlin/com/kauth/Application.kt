@@ -81,6 +81,8 @@ fun main(args: Array<String> = emptyArray()) {
         password = config.dbPassword,
         poolMaxSize = config.dbPoolMaxSize,
         poolMinIdle = config.dbPoolMinIdle,
+        bootstrapAdminPassword = config.bootstrapAdminPassword,
+        isDemoMode = config.isDemoMode,
     )
 
     val services = ServiceGraph.create(config)

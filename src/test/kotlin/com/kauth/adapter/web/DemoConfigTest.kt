@@ -51,7 +51,7 @@ class DemoConfigTest {
         val html = renderBanner()
 
         assertTrue(html.contains("admin"), "Should show admin username")
-        assertTrue(html.contains("changeme123!"), "Should show admin password")
+        assertTrue(html.contains("Demo1234!"), "Should show admin password")
     }
 
     @Test

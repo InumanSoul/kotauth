@@ -246,7 +246,7 @@ The `-v` flag destroys the database volume. On restart, Flyway re-migrates from 
 
 | Login page | Username | Password |
 |---|---|---|
-| `/admin` (master workspace) | `admin` | `changeme123!` |
+| `/admin` (master workspace) | `admin` | `Demo1234!` |
 | `/t/acme/login` | `sarah.chen` | `Demo1234!` |
 | `/t/startup-labs/login` | `jordan.lee` | `Demo1234!` |
 

@@ -52,6 +52,7 @@ data class EnvironmentConfig(
     val ssoSessionTtlSeconds: Long,
     val ssoSessionMaxTtlSeconds: Long,
     val bootstrapApiKeysJson: String?,
+    val bootstrapAdminPassword: String?,
     val trustedProxy: Boolean,
 ) {
     val isHttps: Boolean get() = baseUrl.startsWith("https://")
@@ -75,6 +76,10 @@ data class EnvironmentConfig(
             val ssoTtl = System.getenv("KAUTH_SSO_SESSION_TTL_SECONDS")?.toLongOrNull() ?: 86_400L
             val ssoMaxTtl = System.getenv("KAUTH_SSO_SESSION_MAX_TTL_SECONDS")?.toLongOrNull() ?: 2_592_000L
             validateSsoTtls(ssoTtl, ssoMaxTtl)
+
+            val bootstrapAdminPassword =
+                System.getenv("KAUTH_BOOTSTRAP_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
+            bootstrapAdminPassword?.let(::validateBootstrapAdminPassword)
 
             return EnvironmentConfig(
                 baseUrl = baseUrl,
@@ -107,6 +112,7 @@ data class EnvironmentConfig(
                 ssoSessionTtlSeconds = ssoTtl,
                 ssoSessionMaxTtlSeconds = ssoMaxTtl,
                 bootstrapApiKeysJson = System.getenv("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
+                bootstrapAdminPassword = bootstrapAdminPassword,
                 trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
             )
         }
@@ -308,6 +314,25 @@ data class EnvironmentConfig(
                 exitProcess(1)
             }
             return url
+        }
+
+        private fun validateBootstrapAdminPassword(password: String) {
+            val error =
+                com.kauth.infrastructure.AdminBootstrapPassword
+                    .validateOperatorPassword(password) ?: return
+            System.err.println(
+                """
+                ┌──────────────────────────────────────────────────────────────┐
+                │  FATAL: KAUTH_BOOTSTRAP_ADMIN_PASSWORD is too weak.          │
+                │                                                              │
+                │  $error
+                │                                                              │
+                │  Either set a stronger password or unset the variable to     │
+                │  let Kotauth generate one and print it to stdout at boot.    │
+                └──────────────────────────────────────────────────────────────┘
+                """.trimIndent(),
+            )
+            exitProcess(1)
         }
 
         private fun validateLegacySecret(env: String) {
