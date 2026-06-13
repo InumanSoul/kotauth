@@ -11,6 +11,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.WorkspaceSettingsUpdate
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeCorsPort
@@ -733,19 +734,7 @@ class AdminServiceTest {
     @Test
     fun `updateWorkspaceSettings invalidates CORS cache for tenant slug`() {
         val corsPort = FakeCorsPort()
-        val result =
-            svcWithCors(corsPort).updateWorkspaceSettings(
-                slug = "acme",
-                displayName = "Acme Corp",
-                issuerUrl = null,
-                tokenExpirySeconds = 3600L,
-                refreshTokenExpirySeconds = 86400L,
-                registrationEnabled = true,
-                emailVerificationRequired = false,
-                passwordPolicyMinLength = 8,
-                passwordPolicyRequireSpecial = false,
-                mfaPolicy = "optional",
-            )
+        val result = svcWithCors(corsPort).updateWorkspaceSettings("acme", defaultSettingsUpdate())
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals(listOf("acme"), corsPort.invalidated)
     }
@@ -1076,20 +1065,50 @@ class AdminServiceTest {
         magicLinkTokenTtlMinutes: Int = 15,
         passwordLoginEnabled: Boolean = true,
     ) = svc.updateWorkspaceSettings(
-        slug = slug,
-        displayName = displayName,
-        issuerUrl = issuerUrl,
-        tokenExpirySeconds = tokenExpirySeconds,
-        refreshTokenExpirySeconds = refreshTokenExpirySeconds,
-        registrationEnabled = registrationEnabled,
-        emailVerificationRequired = emailVerificationRequired,
-        passwordPolicyMinLength = passwordPolicyMinLength,
-        passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
-        mfaPolicy = mfaPolicy,
-        magicLinkEnabled = magicLinkEnabled,
-        magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
-        passwordLoginEnabled = passwordLoginEnabled,
+        slug,
+        defaultSettingsUpdate().copy(
+            displayName = displayName,
+            issuerUrl = issuerUrl,
+            tokenExpirySeconds = tokenExpirySeconds,
+            refreshTokenExpirySeconds = refreshTokenExpirySeconds,
+            registrationEnabled = registrationEnabled,
+            emailVerificationRequired = emailVerificationRequired,
+            passwordPolicyMinLength = passwordPolicyMinLength,
+            passwordPolicyRequireSpecial = passwordPolicyRequireSpecial,
+            mfaPolicy = mfaPolicy,
+            magicLinkEnabled = magicLinkEnabled,
+            magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes,
+            passwordLoginEnabled = passwordLoginEnabled,
+        ),
     )
+
+    private fun defaultSettingsUpdate() =
+        WorkspaceSettingsUpdate(
+            displayName = "Acme Corp",
+            issuerUrl = null,
+            tokenExpirySeconds = 3600L,
+            refreshTokenExpirySeconds = 86400L,
+            registrationEnabled = true,
+            emailVerificationRequired = false,
+            passwordPolicyMinLength = 8,
+            passwordPolicyRequireSpecial = false,
+            passwordPolicyRequireUppercase = false,
+            passwordPolicyRequireNumber = false,
+            passwordPolicyHistoryCount = 0,
+            passwordPolicyMaxAgeDays = 0,
+            passwordPolicyBlacklistEnabled = false,
+            mfaPolicy = "optional",
+            lockoutMaxAttempts = 0,
+            lockoutDurationMinutes = 15,
+            corsAllowCredentials = false,
+            hibpCheckEnabled = false,
+            magicLinkEnabled = false,
+            magicLinkTokenTtlMinutes = 15,
+            passwordLoginEnabled = true,
+            emailOtpSignupEnabled = false,
+            emailOtpLockoutThreshold = 5,
+            emailOtpLoginEnabled = false,
+        )
 
     @Test
     fun `updateWorkspaceSettings coerces magic-link TTL into the 1 to 1440 range`() {

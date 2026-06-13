@@ -6,6 +6,7 @@ import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.WorkspaceSettingsUpdate
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TranslationPort
@@ -50,27 +51,16 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
         val params = call.receiveParameters()
-        when (
-            val result =
-                adminService.updateWorkspaceSettings(
-                    slug = slug,
-                    displayName = params["displayName"]?.trim() ?: "",
-                    issuerUrl = params["issuerUrl"]?.trim()?.takeIf { it.isNotBlank() },
-                    tokenExpirySeconds = params["tokenExpirySeconds"]?.toLongOrNull() ?: 3600L,
-                    refreshTokenExpirySeconds =
-                        params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
-                    registrationEnabled = params["registrationEnabled"] == "true",
-                    emailVerificationRequired = params["emailVerificationRequired"] == "true",
-                    passwordPolicyMinLength = workspace.passwordPolicyMinLength,
-                    passwordPolicyRequireSpecial = workspace.passwordPolicyRequireSpecial,
-                    passwordPolicyRequireUppercase = workspace.passwordPolicyRequireUppercase,
-                    passwordPolicyRequireNumber = workspace.passwordPolicyRequireNumber,
-                    passwordPolicyHistoryCount = workspace.passwordPolicyHistoryCount,
-                    passwordPolicyMaxAgeDays = workspace.passwordPolicyMaxAgeDays,
-                    passwordPolicyBlacklistEnabled = workspace.passwordPolicyBlacklistEnabled,
-                    mfaPolicy = workspace.mfaPolicy,
-                )
-        ) {
+        val update =
+            WorkspaceSettingsUpdate.from(workspace).copy(
+                displayName = params["displayName"]?.trim() ?: "",
+                issuerUrl = params["issuerUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                tokenExpirySeconds = params["tokenExpirySeconds"]?.toLongOrNull() ?: 3600L,
+                refreshTokenExpirySeconds = params["refreshTokenExpirySeconds"]?.toLongOrNull() ?: 86400L,
+                registrationEnabled = params["registrationEnabled"] == "true",
+                emailVerificationRequired = params["emailVerificationRequired"] == "true",
+            )
+        when (val result = adminService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success -> {
                 val portalLayout =
                     params["portalLayout"]?.let { runCatching { PortalLayout.valueOf(it) }.getOrNull() }
@@ -295,44 +285,31 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
         val params = call.receiveParameters()
-        when (
-            val result =
-                adminService.updateWorkspaceSettings(
-                    slug = slug,
-                    displayName = workspace.displayName,
-                    issuerUrl = workspace.issuerUrl,
-                    tokenExpirySeconds = workspace.tokenExpirySeconds,
-                    refreshTokenExpirySeconds = workspace.refreshTokenExpirySeconds,
-                    registrationEnabled = workspace.registrationEnabled,
-                    emailVerificationRequired = workspace.emailVerificationRequired,
-                    passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
-                    passwordPolicyRequireSpecial = params["passwordPolicyRequireSpecial"] == "true",
-                    passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
-                    passwordPolicyRequireNumber = params["passwordPolicyRequireNumber"] == "true",
-                    passwordPolicyHistoryCount = params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: 0,
-                    passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
-                    passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
-                    mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
-                    lockoutMaxAttempts =
-                        params["lockoutMaxAttempts"]?.toIntOrNull()
-                            ?: workspace.securityConfig.lockoutMaxAttempts,
-                    lockoutDurationMinutes =
-                        params["lockoutDurationMinutes"]?.toIntOrNull()
-                            ?: workspace.securityConfig.lockoutDurationMinutes,
-                    corsAllowCredentials = params["corsAllowCredentials"] == "true",
-                    hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
-                    magicLinkEnabled = params["magicLinkEnabled"] == "true",
-                    magicLinkTokenTtlMinutes =
-                        params["magicLinkTokenTtlMinutes"]?.toIntOrNull()
-                            ?: workspace.securityConfig.magicLinkTokenTtlMinutes,
-                    passwordLoginEnabled = params["requirePasswordless"] != "true",
-                    emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
-                    emailOtpLockoutThreshold =
-                        params["emailOtpLockoutThreshold"]?.toIntOrNull()
-                            ?: workspace.securityConfig.emailOtpLockoutThreshold,
-                    emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
-                )
-        ) {
+        val s = workspace.securityConfig
+        val update =
+            WorkspaceSettingsUpdate.from(workspace).copy(
+                passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
+                passwordPolicyRequireSpecial = params["passwordPolicyRequireSpecial"] == "true",
+                passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
+                passwordPolicyRequireNumber = params["passwordPolicyRequireNumber"] == "true",
+                passwordPolicyHistoryCount = params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: 0,
+                passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
+                passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
+                mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
+                lockoutMaxAttempts = params["lockoutMaxAttempts"]?.toIntOrNull() ?: s.lockoutMaxAttempts,
+                lockoutDurationMinutes = params["lockoutDurationMinutes"]?.toIntOrNull() ?: s.lockoutDurationMinutes,
+                corsAllowCredentials = params["corsAllowCredentials"] == "true",
+                hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
+                magicLinkEnabled = params["magicLinkEnabled"] == "true",
+                magicLinkTokenTtlMinutes =
+                    params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
+                passwordLoginEnabled = params["requirePasswordless"] != "true",
+                emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
+                emailOtpLockoutThreshold =
+                    params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
+                emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
+            )
+        when (val result = adminService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
             is AdminResult.Failure -> {
