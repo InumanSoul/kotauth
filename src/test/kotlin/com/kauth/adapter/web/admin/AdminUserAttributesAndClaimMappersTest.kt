@@ -402,6 +402,9 @@ class AdminUserAttributesAndClaimMappersTest {
             }
             adminRoutes(
                 adminService = buildAdminService(),
+                workspaceSettingsService =
+                    com.kauth.domain.service
+                        .WorkspaceSettingsService(tenantRepo, auditLogPort),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

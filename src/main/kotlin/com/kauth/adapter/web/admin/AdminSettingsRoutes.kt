@@ -13,6 +13,7 @@ import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
@@ -26,6 +27,7 @@ import io.ktor.server.sessions.sessions
 
 fun Route.adminSettingsRoutes(
     adminService: AdminService,
+    workspaceSettingsService: WorkspaceSettingsService,
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
@@ -60,12 +62,12 @@ fun Route.adminSettingsRoutes(
                 registrationEnabled = params["registrationEnabled"] == "true",
                 emailVerificationRequired = params["emailVerificationRequired"] == "true",
             )
-        when (val result = adminService.updateWorkspaceSettings(slug, update)) {
+        when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success -> {
                 val portalLayout =
                     params["portalLayout"]?.let { runCatching { PortalLayout.valueOf(it) }.getOrNull() }
                 if (portalLayout != null) {
-                    adminService.updatePortalLayout(slug, portalLayout)
+                    workspaceSettingsService.updatePortalLayout(slug, portalLayout)
                 }
                 call.respondRedirect("/admin/workspaces/$slug/settings?saved=true")
             }
@@ -309,7 +311,7 @@ fun Route.adminSettingsRoutes(
                     params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
             )
-        when (val result = adminService.updateWorkspaceSettings(slug, update)) {
+        when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
             is AdminResult.Failure -> {
@@ -374,11 +376,11 @@ fun Route.adminSettingsRoutes(
                 faviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 defaultLocale = resolvedLocale,
             )
-        when (val result = adminService.updateTheme(slug, theme)) {
+        when (val result = workspaceSettingsService.updateTheme(slug, theme)) {
             is AdminResult.Success -> {
                 val existingBranding = workspace.emailBranding
                 val emailBrandingResult =
-                    adminService.updateEmailBranding(
+                    workspaceSettingsService.updateEmailBranding(
                         slug,
                         com.kauth.domain.model.TenantEmailBranding(
                             tenantId = workspace.id,

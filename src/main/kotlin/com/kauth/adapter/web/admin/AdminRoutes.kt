@@ -53,6 +53,7 @@ import io.ktor.server.sessions.set
 
 fun Route.adminRoutes(
     adminService: AdminService,
+    workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
     roleGroupService: RoleGroupService,
     appInfo: AppInfo,
     tenantRepository: TenantRepository,
@@ -402,7 +403,7 @@ fun Route.adminRoutes(
                         registrationEnabled = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
                     )
-                when (val result = adminService.createWorkspace(slug, displayName, issuerUrl)) {
+                when (val result = workspaceSettingsService.createWorkspace(slug, displayName, issuerUrl)) {
                     is AdminResult.Failure -> {
                         val wsPairs =
                             tenantRepository.findAll().map {
@@ -486,6 +487,7 @@ fun Route.adminRoutes(
 
                 adminSettingsRoutes(
                     adminService = adminService,
+                    workspaceSettingsService = workspaceSettingsService,
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,

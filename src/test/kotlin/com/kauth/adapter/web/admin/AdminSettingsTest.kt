@@ -9,6 +9,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuditLogRepository
@@ -125,6 +126,12 @@ class AdminSettingsTest {
             auditLog = auditLogPort,
             sessionRepository = sessionRepo,
             selfServiceService = buildSelfService(),
+        )
+
+    private fun buildWorkspaceSettingsService() =
+        WorkspaceSettingsService(
+            tenantRepository = tenantRepo,
+            auditLog = auditLogPort,
             themeRepository = themeRepo,
         )
 
@@ -416,6 +423,7 @@ class AdminSettingsTest {
             }
             adminRoutes(
                 adminService = buildAdminService(),
+                workspaceSettingsService = buildWorkspaceSettingsService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

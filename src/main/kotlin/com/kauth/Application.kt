@@ -466,6 +466,7 @@ fun Application.module(
 
         adminRoutes(
             adminService = s.adminService,
+            workspaceSettingsService = s.workspaceSettingsService,
             roleGroupService = s.roleGroupService,
             appInfo = appInfo,
             tenantRepository = s.tenantRepository,

@@ -68,6 +68,7 @@ import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.BundleTranslation
 import com.kauth.infrastructure.CachingClaimMapperService
@@ -102,6 +103,7 @@ data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
     val adminService: AdminService,
+    val workspaceSettingsService: WorkspaceSettingsService,
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
@@ -327,10 +329,16 @@ data class ServiceGraph(
                     sessionRepository = sessionRepository,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                    emailPort = emailAdapter,
+                    corsPort = corsOriginCache,
+                )
+            val workspaceSettingsService =
+                WorkspaceSettingsService(
+                    tenantRepository = tenantRepository,
+                    auditLog = auditLogAdapter,
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
                     emailBrandingRepository = emailBrandingRepository,
-                    emailPort = emailAdapter,
                     corsPort = corsOriginCache,
                 )
             val roleGroupService =
@@ -509,6 +517,7 @@ data class ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
                 adminService = adminService,
+                workspaceSettingsService = workspaceSettingsService,
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
                 impersonationService = impersonationService,

@@ -75,6 +75,12 @@ class AdminServiceTest {
             sessionRepository = sessions,
             selfServiceService = selfService,
             passwordPolicy = passwordPolicy,
+        )
+
+    private val wsSvc =
+        WorkspaceSettingsService(
+            tenantRepository = tenants,
+            auditLog = auditLog,
             emailBrandingRepository = emailBranding,
         )
 
@@ -734,7 +740,13 @@ class AdminServiceTest {
     @Test
     fun `updateWorkspaceSettings invalidates CORS cache for tenant slug`() {
         val corsPort = FakeCorsPort()
-        val result = svcWithCors(corsPort).updateWorkspaceSettings("acme", defaultSettingsUpdate())
+        val ws =
+            WorkspaceSettingsService(
+                tenantRepository = tenants,
+                auditLog = auditLog,
+                corsPort = corsPort,
+            )
+        val result = ws.updateWorkspaceSettings("acme", defaultSettingsUpdate())
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals(listOf("acme"), corsPort.invalidated)
     }
@@ -895,28 +907,28 @@ class AdminServiceTest {
 
     @Test
     fun `createWorkspace - returns Validation failure when slug is blank`() {
-        val result = svc.createWorkspace(slug = "  ", displayName = "New Corp", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "  ", displayName = "New Corp", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createWorkspace - returns Validation failure when slug has uppercase or special chars`() {
-        val result = svc.createWorkspace(slug = "New_Corp!", displayName = "New Corp", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "New_Corp!", displayName = "New Corp", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createWorkspace - returns Validation failure when slug is master`() {
-        val result = svc.createWorkspace(slug = "master", displayName = "Master", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "master", displayName = "Master", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createWorkspace - returns Validation failure when displayName is blank`() {
-        val result = svc.createWorkspace(slug = "new-corp", displayName = "  ", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "new-corp", displayName = "  ", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
@@ -924,14 +936,14 @@ class AdminServiceTest {
     @Test
     fun `createWorkspace - returns Validation failure when slug already exists`() {
         // "acme" was seeded in @BeforeTest
-        val result = svc.createWorkspace(slug = "acme", displayName = "Acme Duplicate", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "acme", displayName = "Acme Duplicate", issuerUrl = null)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `createWorkspace - returns Success with created tenant on valid input`() {
-        val result = svc.createWorkspace(slug = "beta-corp", displayName = "Beta Corp", issuerUrl = null)
+        val result = wsSvc.createWorkspace(slug = "beta-corp", displayName = "Beta Corp", issuerUrl = null)
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals("beta-corp", result.value.slug)
         assertEquals("Beta Corp", result.value.displayName)
@@ -939,7 +951,7 @@ class AdminServiceTest {
 
     @Test
     fun `createWorkspace - emits ADMIN_TENANT_CREATED audit event`() {
-        svc.createWorkspace(slug = "gamma-corp", displayName = "Gamma Corp", issuerUrl = null)
+        wsSvc.createWorkspace(slug = "gamma-corp", displayName = "Gamma Corp", issuerUrl = null)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_TENANT_CREATED))
     }
 
@@ -1064,7 +1076,7 @@ class AdminServiceTest {
         magicLinkEnabled: Boolean = false,
         magicLinkTokenTtlMinutes: Int = 15,
         passwordLoginEnabled: Boolean = true,
-    ) = svc.updateWorkspaceSettings(
+    ) = wsSvc.updateWorkspaceSettings(
         slug,
         defaultSettingsUpdate().copy(
             displayName = displayName,
@@ -1226,7 +1238,7 @@ class AdminServiceTest {
     @Test
     fun `updateEmailBranding rejects an invalid hex color`() {
         val result =
-            svc.updateEmailBranding(
+            wsSvc.updateEmailBranding(
                 tenant.slug,
                 com.kauth.domain.model.TenantEmailBranding(
                     tenantId = tenant.id,
@@ -1240,7 +1252,7 @@ class AdminServiceTest {
     @Test
     fun `updateEmailBranding rejects a support email without an at sign`() {
         val result =
-            svc.updateEmailBranding(
+            wsSvc.updateEmailBranding(
                 tenant.slug,
                 com.kauth.domain.model.TenantEmailBranding(
                     tenantId = tenant.id,
@@ -1254,7 +1266,7 @@ class AdminServiceTest {
     @Test
     fun `updateEmailBranding returns NotFound for unknown tenant slug`() {
         val result =
-            svc.updateEmailBranding(
+            wsSvc.updateEmailBranding(
                 "nope",
                 com.kauth.domain.model
                     .TenantEmailBranding(tenantId = TenantId(99)),
@@ -1266,7 +1278,7 @@ class AdminServiceTest {
     @Test
     fun `updateEmailBranding persists sanitised fields on success`() {
         val result =
-            svc.updateEmailBranding(
+            wsSvc.updateEmailBranding(
                 tenant.slug,
                 com.kauth.domain.model.TenantEmailBranding(
                     tenantId = tenant.id,
@@ -1285,14 +1297,9 @@ class AdminServiceTest {
     @Test
     fun `updateEmailBranding is a soft no-op when the repository is not wired`() {
         val withoutRepo =
-            AdminService(
+            WorkspaceSettingsService(
                 tenantRepository = tenants,
-                userRepository = users,
-                applicationRepository = apps,
-                passwordHasher = hasher,
                 auditLog = auditLog,
-                sessionRepository = sessions,
-                selfServiceService = selfService,
             )
         val result =
             withoutRepo.updateEmailBranding(
