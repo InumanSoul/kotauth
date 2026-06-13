@@ -13,6 +13,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.WorkspaceSettingsUpdate
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.CorsPort
@@ -122,134 +123,123 @@ class AdminService(
         return AdminResult.Success(tenant)
     }
 
-    /**
-     * Updates all mutable workspace settings. Slug is immutable.
-     * Returns [AdminResult.Failure] with a user-visible message on validation errors.
-     */
     fun updateWorkspaceSettings(
         slug: String,
-        displayName: String,
-        issuerUrl: String?,
-        tokenExpirySeconds: Long,
-        refreshTokenExpirySeconds: Long,
-        registrationEnabled: Boolean,
-        emailVerificationRequired: Boolean,
-        passwordPolicyMinLength: Int,
-        passwordPolicyRequireSpecial: Boolean,
-        passwordPolicyRequireUppercase: Boolean = false,
-        passwordPolicyRequireNumber: Boolean = false,
-        passwordPolicyHistoryCount: Int = 0,
-        passwordPolicyMaxAgeDays: Int = 0,
-        passwordPolicyBlacklistEnabled: Boolean = false,
-        mfaPolicy: String = "optional",
-        lockoutMaxAttempts: Int = 0,
-        lockoutDurationMinutes: Int = 15,
-        corsAllowCredentials: Boolean = false,
-        hibpCheckEnabled: Boolean = false,
-        magicLinkEnabled: Boolean = false,
-        magicLinkTokenTtlMinutes: Int = 15,
-        passwordLoginEnabled: Boolean = true,
-        emailOtpSignupEnabled: Boolean = false,
-        emailOtpLockoutThreshold: Int = 5,
-        emailOtpLoginEnabled: Boolean = false,
+        update: WorkspaceSettingsUpdate,
     ): AdminResult<Tenant> {
         val tenant =
             tenantRepository.findBySlug(slug)
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
 
-        if (displayName.isBlank()) {
-            return AdminResult.Failure(AdminError.Validation("Display name is required."))
-        }
-        if (tokenExpirySeconds < 60) {
-            return AdminResult.Failure(AdminError.Validation("Token expiry must be at least 60 seconds."))
-        }
-        if (refreshTokenExpirySeconds < tokenExpirySeconds) {
-            return AdminResult.Failure(AdminError.Validation("Refresh token expiry must be ≥ access token expiry."))
-        }
-        if (passwordPolicyMinLength < 4 || passwordPolicyMinLength > 128) {
-            return AdminResult.Failure(AdminError.Validation("Password minimum length must be between 4 and 128."))
-        }
-        if (mfaPolicy !in listOf("optional", "required", "required_admins")) {
-            return AdminResult.Failure(
-                AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'."),
-            )
-        }
-        if (tenant.isMaster && !passwordLoginEnabled) {
-            return AdminResult.Failure(
-                AdminError.Validation("Password sign-in cannot be disabled on the master workspace."),
-            )
-        }
-        if (!passwordLoginEnabled && !magicLinkEnabled) {
-            return AdminResult.Failure(
-                AdminError.Validation(
-                    "At least one email-based sign-in method must remain enabled. " +
-                        "Enable magic links before disabling password sign-in.",
-                ),
-            )
-        }
+        validateWorkspaceSettings(update, tenant)?.let { return AdminResult.Failure(it) }
 
-        val updated =
-            tenant.copy(
-                displayName = displayName.trim(),
-                issuerUrl = issuerUrl?.trim()?.takeIf { it.isNotBlank() },
-                tokenExpirySeconds = tokenExpirySeconds,
-                refreshTokenExpirySeconds = refreshTokenExpirySeconds,
-                registrationEnabled = registrationEnabled,
-                emailVerificationRequired = emailVerificationRequired,
-                securityConfig =
-                    tenant.securityConfig.copy(
-                        passwordMinLength = passwordPolicyMinLength,
-                        passwordRequireSpecial = passwordPolicyRequireSpecial,
-                        passwordRequireUppercase = passwordPolicyRequireUppercase,
-                        passwordRequireNumber = passwordPolicyRequireNumber,
-                        passwordHistoryCount = passwordPolicyHistoryCount.coerceIn(0, 24),
-                        passwordMaxAgeDays = passwordPolicyMaxAgeDays.coerceIn(0, 365),
-                        passwordBlacklistEnabled = passwordPolicyBlacklistEnabled,
-                        mfaPolicy = mfaPolicy,
-                        lockoutMaxAttempts = lockoutMaxAttempts.coerceAtLeast(0),
-                        lockoutDurationMinutes = lockoutDurationMinutes.coerceAtLeast(1),
-                        corsAllowCredentials = corsAllowCredentials,
-                        hibpCheckEnabled = hibpCheckEnabled,
-                        magicLinkEnabled = magicLinkEnabled,
-                        magicLinkTokenTtlMinutes = magicLinkTokenTtlMinutes.coerceIn(1, 1440),
-                        passwordLoginEnabled = passwordLoginEnabled,
-                        emailOtpSignupEnabled = emailOtpSignupEnabled,
-                        emailOtpLockoutThreshold = emailOtpLockoutThreshold.coerceIn(0, 50),
-                        emailOtpLoginEnabled = emailOtpLoginEnabled,
-                    ),
-            )
-
+        val updated = applyWorkspaceSettings(tenant, update)
         val saved = tenantRepository.update(updated)
 
         corsPort?.invalidate(slug)
+        recordWorkspaceSettingsAudit(tenant, update)
 
+        return AdminResult.Success(saved)
+    }
+
+    private fun validateWorkspaceSettings(
+        update: WorkspaceSettingsUpdate,
+        tenant: Tenant,
+    ): AdminError.Validation? {
+        if (update.displayName.isBlank()) {
+            return AdminError.Validation("Display name is required.")
+        }
+        if (update.tokenExpirySeconds < 60) {
+            return AdminError.Validation("Token expiry must be at least 60 seconds.")
+        }
+        if (update.refreshTokenExpirySeconds < update.tokenExpirySeconds) {
+            return AdminError.Validation("Refresh token expiry must be ≥ access token expiry.")
+        }
+        if (update.passwordPolicyMinLength < 4 || update.passwordPolicyMinLength > 128) {
+            return AdminError.Validation("Password minimum length must be between 4 and 128.")
+        }
+        if (update.mfaPolicy !in listOf("optional", "required", "required_admins")) {
+            return AdminError.Validation("MFA policy must be 'optional', 'required', or 'required_admins'.")
+        }
+        if (tenant.isMaster && !update.passwordLoginEnabled) {
+            return AdminError.Validation("Password sign-in cannot be disabled on the master workspace.")
+        }
+        if (!update.passwordLoginEnabled && !update.magicLinkEnabled) {
+            return AdminError.Validation(
+                "At least one email-based sign-in method must remain enabled. " +
+                    "Enable magic links before disabling password sign-in.",
+            )
+        }
+        return null
+    }
+
+    private fun applyWorkspaceSettings(
+        tenant: Tenant,
+        update: WorkspaceSettingsUpdate,
+    ): Tenant =
+        tenant.copy(
+            displayName = update.displayName.trim(),
+            issuerUrl = update.issuerUrl?.trim()?.takeIf { it.isNotBlank() },
+            tokenExpirySeconds = update.tokenExpirySeconds,
+            refreshTokenExpirySeconds = update.refreshTokenExpirySeconds,
+            registrationEnabled = update.registrationEnabled,
+            emailVerificationRequired = update.emailVerificationRequired,
+            securityConfig =
+                tenant.securityConfig.copy(
+                    passwordMinLength = update.passwordPolicyMinLength,
+                    passwordRequireSpecial = update.passwordPolicyRequireSpecial,
+                    passwordRequireUppercase = update.passwordPolicyRequireUppercase,
+                    passwordRequireNumber = update.passwordPolicyRequireNumber,
+                    passwordHistoryCount = update.passwordPolicyHistoryCount.coerceIn(0, 24),
+                    passwordMaxAgeDays = update.passwordPolicyMaxAgeDays.coerceIn(0, 365),
+                    passwordBlacklistEnabled = update.passwordPolicyBlacklistEnabled,
+                    mfaPolicy = update.mfaPolicy,
+                    lockoutMaxAttempts = update.lockoutMaxAttempts.coerceAtLeast(0),
+                    lockoutDurationMinutes = update.lockoutDurationMinutes.coerceAtLeast(1),
+                    corsAllowCredentials = update.corsAllowCredentials,
+                    hibpCheckEnabled = update.hibpCheckEnabled,
+                    magicLinkEnabled = update.magicLinkEnabled,
+                    magicLinkTokenTtlMinutes = update.magicLinkTokenTtlMinutes.coerceIn(1, 1440),
+                    passwordLoginEnabled = update.passwordLoginEnabled,
+                    emailOtpSignupEnabled = update.emailOtpSignupEnabled,
+                    emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),
+                    emailOtpLoginEnabled = update.emailOtpLoginEnabled,
+                ),
+        )
+
+    private fun recordWorkspaceSettingsAudit(
+        before: Tenant,
+        update: WorkspaceSettingsUpdate,
+    ) {
         auditLog.record(
             AuditEvent(
-                tenantId = tenant.id,
+                tenantId = before.id,
                 userId = null,
                 clientId = null,
                 eventType = AuditEventType.ADMIN_TENANT_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("slug" to slug, "displayName" to displayName),
+                details = mapOf("slug" to before.slug, "displayName" to update.displayName),
             ),
         )
 
-        if (tenant.securityConfig.passwordLoginEnabled != passwordLoginEnabled) {
+        if (before.securityConfig.passwordLoginEnabled != update.passwordLoginEnabled) {
             auditLog.record(
                 AuditEvent(
-                    tenantId = tenant.id,
+                    tenantId = before.id,
                     userId = null,
                     clientId = null,
                     eventType = AuditEventType.ADMIN_SECURITY_CONFIG_UPDATED,
                     ipAddress = null,
                     userAgent = null,
-                    details = mapOf("field" to "passwordLoginEnabled", "value" to passwordLoginEnabled.toString()),
+                    details =
+                        mapOf(
+                            "field" to "passwordLoginEnabled",
+                            "value" to update.passwordLoginEnabled.toString(),
+                        ),
                 ),
             )
         }
-
-        return AdminResult.Success(saved)
     }
 
     /**
