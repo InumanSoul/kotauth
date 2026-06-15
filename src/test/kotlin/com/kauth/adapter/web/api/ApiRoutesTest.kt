@@ -120,7 +120,7 @@ class ApiRoutesTest {
             tenantRepository = tenantRepo,
         )
 
-    private val selfServiceService =
+    private val accountSelfService =
         CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
@@ -138,7 +138,7 @@ class ApiRoutesTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            credentialFlowService = selfServiceService,
+            credentialFlowService = accountSelfService,
         )
 
     private val adminUserService =
@@ -148,7 +148,7 @@ class ApiRoutesTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            credentialFlowService = selfServiceService,
+            credentialFlowService = accountSelfService,
         )
 
     private val applicationManagementService =

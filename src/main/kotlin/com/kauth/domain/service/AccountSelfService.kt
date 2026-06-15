@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
-class UserSelfServiceService(
+class AccountSelfService(
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository,
     private val sessionRepository: SessionRepository,
@@ -32,7 +32,7 @@ class UserSelfServiceService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    private val log = LoggerFactory.getLogger(UserSelfServiceService::class.java)
+    private val log = LoggerFactory.getLogger(AccountSelfService::class.java)
 
     fun getProfile(
         userId: UserId,

@@ -20,6 +20,7 @@ import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.ApiKeyService
@@ -29,7 +30,6 @@ import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.EncryptionService
@@ -71,7 +71,7 @@ fun Route.adminRoutes(
     webhookService: WebhookService? = null,
     encryptionService: EncryptionService,
     oauthService: OAuthService? = null,
-    selfServiceService: UserSelfServiceService? = null,
+    accountSelfService: AccountSelfService? = null,
     roleRepository: RoleRepository? = null,
     keyRotationService: KeyRotationService? = null,
     tenantKeyRepository: TenantKeyRepository? = null,
@@ -264,7 +264,7 @@ fun Route.adminRoutes(
 
             // Find the session record created by the token exchange
             val latestSession =
-                selfServiceService
+                accountSelfService
                     ?.getActiveSessions(UserId(userId), masterTenant.id)
                     ?.maxByOrNull { it.createdAt }
 
@@ -288,7 +288,7 @@ fun Route.adminRoutes(
         post("/logout") {
             val session = call.sessions.get<AdminSession>()
             if (session?.adminSessionId != null) {
-                selfServiceService?.revokeSession(
+                accountSelfService?.revokeSession(
                     UserId(session.userId),
                     TenantId(session.tenantId),
                     com.kauth.domain.model

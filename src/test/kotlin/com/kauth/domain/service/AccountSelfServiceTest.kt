@@ -33,12 +33,12 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * Unit tests for [UserSelfServiceService].
+ * Unit tests for [AccountSelfService].
  *
  * Covers: email verification, forgot password, profile update, password change, session management.
  * All I/O replaced by in-memory fakes.
  */
-class UserSelfServiceServiceTest {
+class AccountSelfServiceTest {
     private val tenants = FakeTenantRepository()
     private val users = FakeUserRepository()
     private val sessions = FakeSessionRepository()
@@ -80,7 +80,7 @@ class UserSelfServiceServiceTest {
         )
 
     private val accountSvc =
-        UserSelfServiceService(
+        AccountSelfService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -92,7 +92,7 @@ class UserSelfServiceServiceTest {
         )
 
     private val accountSvcNoPolicy =
-        UserSelfServiceService(
+        AccountSelfService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,

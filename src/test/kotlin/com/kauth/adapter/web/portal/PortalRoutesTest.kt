@@ -5,8 +5,8 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.OAuthService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -74,7 +74,7 @@ class PortalRoutesTest {
         )
 
     private fun buildSelfService() =
-        UserSelfServiceService(
+        AccountSelfService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -283,7 +283,7 @@ class PortalRoutesTest {
         }
         routing {
             portalRoutes(
-                selfServiceService = buildSelfService(),
+                accountSelfService = buildSelfService(),
                 tenantRepository = tenantRepo,
                 encryptionService = encryptionService,
                 translationPort = EnglishOnlyTranslation(),
@@ -314,7 +314,7 @@ class PortalRoutesTest {
             )
         routing {
             portalRoutes(
-                selfServiceService = buildSelfService(),
+                accountSelfService = buildSelfService(),
                 tenantRepository = tenantRepo,
                 encryptionService = encryptionService,
                 oauthService = oauthService,

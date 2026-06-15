@@ -16,13 +16,13 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.SocialAccountRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
+import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
@@ -67,7 +67,7 @@ import kotlinx.serialization.json.putJsonArray
  * if no valid PortalSession cookie is found.
  */
 fun Route.portalRoutes(
-    selfServiceService: UserSelfServiceService,
+    accountSelfService: AccountSelfService,
     tenantRepository: TenantRepository,
     sessionRepository: SessionRepository? = null,
     mfaService: MfaService? = null,
@@ -261,7 +261,7 @@ fun Route.portalRoutes(
             }
 
             val latestSession =
-                selfServiceService
+                accountSelfService
                     .getActiveSessions(UserId(userId), tenantObj.id)
                     .maxByOrNull { it.createdAt }
 
@@ -342,7 +342,7 @@ fun Route.portalRoutes(
             val errorMsg = call.request.queryParameters["error"]
 
             val user =
-                when (val r = selfServiceService.getProfile(UserId(session.userId), TenantId(session.tenantId))) {
+                when (val r = accountSelfService.getProfile(UserId(session.userId), TenantId(session.tenantId))) {
                     is SelfServiceResult.Success -> r.value
                     is SelfServiceResult.Failure -> null
                 }
@@ -374,7 +374,7 @@ fun Route.portalRoutes(
 
             when (
                 val result =
-                    selfServiceService.updateProfile(
+                    accountSelfService.updateProfile(
                         UserId(session.userId),
                         TenantId(session.tenantId),
                         email,
@@ -402,7 +402,7 @@ fun Route.portalRoutes(
                 )
             }
 
-            when (val result = selfServiceService.disableAccount(UserId(session.userId), TenantId(session.tenantId))) {
+            when (val result = accountSelfService.disableAccount(UserId(session.userId), TenantId(session.tenantId))) {
                 is SelfServiceResult.Success -> {
                     call.sessions.clear<PortalSession>()
                     call.respondRedirect(
@@ -422,7 +422,7 @@ fun Route.portalRoutes(
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val sessions = selfServiceService.getActiveSessions(UserId(session.userId), TenantId(session.tenantId))
+            val sessions = accountSelfService.getActiveSessions(UserId(session.userId), TenantId(session.tenantId))
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]
 
@@ -455,7 +455,7 @@ fun Route.portalRoutes(
 
             when (
                 val result =
-                    selfServiceService.changePassword(
+                    accountSelfService.changePassword(
                         UserId(session.userId),
                         TenantId(session.tenantId),
                         current,
@@ -482,7 +482,7 @@ fun Route.portalRoutes(
                 call.parameters["sessionId"]?.toIntOrNull()?.let { SessionId(it) }
                     ?: return@post call.respond(HttpStatusCode.BadRequest)
 
-            selfServiceService.revokeSession(UserId(session.userId), TenantId(session.tenantId), sessionId)
+            accountSelfService.revokeSession(UserId(session.userId), TenantId(session.tenantId), sessionId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
         }
 
@@ -495,7 +495,7 @@ fun Route.portalRoutes(
                     "/t/$slug/account/security?error=${encodeParam("Could not identify current session.")}",
                 )
             }
-            selfServiceService.revokeOtherSessions(UserId(session.userId), TenantId(session.tenantId), keepId)
+            accountSelfService.revokeOtherSessions(UserId(session.userId), TenantId(session.tenantId), keepId)
             call.respondRedirect("/t/$slug/account/security?saved=true")
         }
 

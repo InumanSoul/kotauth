@@ -50,6 +50,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
@@ -69,7 +70,6 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
@@ -113,7 +113,7 @@ data class ServiceGraph(
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
     val credentialFlowService: CredentialFlowService,
-    val selfServiceService: UserSelfServiceService,
+    val accountSelfService: AccountSelfService,
     val mfaService: MfaService,
     val socialLoginService: SocialLoginService,
     val emailOtpService: EmailOtpService,
@@ -274,8 +274,8 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     emailScope = applicationScope,
                 )
-            val selfServiceService =
-                UserSelfServiceService(
+            val accountSelfService =
+                AccountSelfService(
                     userRepository = userRepository,
                     tenantRepository = tenantRepository,
                     sessionRepository = sessionRepository,
@@ -554,7 +554,7 @@ data class ServiceGraph(
                 launcherService = launcherService,
                 impersonationService = impersonationService,
                 credentialFlowService = credentialFlowService,
-                selfServiceService = selfServiceService,
+                accountSelfService = accountSelfService,
                 mfaService = mfaService,
                 socialLoginService = socialLoginService,
                 emailOtpService = emailOtpService,
