@@ -10,9 +10,9 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -157,7 +157,7 @@ class SsoCookieTest {
         )
 
     private fun selfService() =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -181,7 +181,7 @@ class SsoCookieTest {
                     loginRateLimiter = limiter,
                     registerRateLimiter = limiter,
                     tokenRateLimiter = limiter,
-                    selfServiceService = selfService(),
+                    credentialFlowService = selfService(),
                     mfaService = mfaService,
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),

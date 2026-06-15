@@ -10,8 +10,8 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuditLogRepository
@@ -93,8 +93,8 @@ class AdminRoutesTest {
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -111,7 +111,7 @@ class AdminRoutesTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAdminUserService() =
@@ -121,7 +121,7 @@ class AdminRoutesTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAppMgmtService() =
@@ -723,7 +723,6 @@ class AdminRoutesTest {
                 keyProvisioningService = keyProvisioningService,
                 encryptionService = encryptionService,
                 oauthService = oauthSvcMock,
-                selfServiceService = buildSelfService(),
                 roleRepository = roleRepo,
                 userAttributeService =
                     com.kauth.domain.service.UserAttributeService(

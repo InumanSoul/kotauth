@@ -59,6 +59,7 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.KeyRotationService
@@ -111,6 +112,7 @@ data class ServiceGraph(
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
+    val credentialFlowService: CredentialFlowService,
     val selfServiceService: UserSelfServiceService,
     val mfaService: MfaService,
     val socialLoginService: SocialLoginService,
@@ -259,8 +261,8 @@ data class ServiceGraph(
 
             // -- Domain services ----------------------------------------------
             val emailAdapter = SmtpEmailAdapter()
-            val selfServiceService =
-                UserSelfServiceService(
+            val credentialFlowService =
+                CredentialFlowService(
                     userRepository = userRepository,
                     tenantRepository = tenantRepository,
                     sessionRepository = sessionRepository,
@@ -268,6 +270,17 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     evTokenRepo = evTokenRepository,
                     prTokenRepo = prTokenRepository,
+                    emailPort = emailAdapter,
+                    passwordPolicy = passwordPolicyAdapter,
+                    emailScope = applicationScope,
+                )
+            val selfServiceService =
+                UserSelfServiceService(
+                    userRepository = userRepository,
+                    tenantRepository = tenantRepository,
+                    sessionRepository = sessionRepository,
+                    passwordHasher = passwordHasher,
+                    auditLog = auditLogAdapter,
                     emailPort = emailAdapter,
                     passwordPolicy = passwordPolicyAdapter,
                     emailScope = applicationScope,
@@ -280,7 +293,7 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     sessionRepository = sessionRepository,
-                    selfServiceService = selfServiceService,
+                    credentialFlowService = credentialFlowService,
                     passwordPolicy = passwordPolicyAdapter,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
@@ -328,7 +341,7 @@ data class ServiceGraph(
                     tenantRepository = tenantRepository,
                     userRepository = userRepository,
                     auditLog = auditLogAdapter,
-                    selfServiceService = selfServiceService,
+                    credentialFlowService = credentialFlowService,
                 )
             val applicationManagementService =
                 ApplicationManagementService(
@@ -345,7 +358,7 @@ data class ServiceGraph(
                     sessionRepository = sessionRepository,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
-                    selfServiceService = selfServiceService,
+                    credentialFlowService = credentialFlowService,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
                 )
@@ -540,6 +553,7 @@ data class ServiceGraph(
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
                 impersonationService = impersonationService,
+                credentialFlowService = credentialFlowService,
                 selfServiceService = selfServiceService,
                 mfaService = mfaService,
                 socialLoginService = socialLoginService,

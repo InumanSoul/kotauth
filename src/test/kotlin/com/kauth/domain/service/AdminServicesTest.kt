@@ -45,8 +45,8 @@ class AdminServicesTest {
     private val emailPort = FakeEmailPort()
     private val emailBranding = FakeTenantEmailBrandingRepository()
 
-    private val selfService =
-        UserSelfServiceService(
+    private val credentialFlowService =
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -64,7 +64,7 @@ class AdminServicesTest {
             tenantRepository = tenants,
             userRepository = users,
             auditLog = auditLog,
-            selfServiceService = selfService,
+            credentialFlowService = credentialFlowService,
         )
 
     private val appSvc =
@@ -89,7 +89,7 @@ class AdminServicesTest {
             sessionRepository = sessions,
             passwordHasher = hasher,
             auditLog = auditLog,
-            selfServiceService = selfService,
+            credentialFlowService = credentialFlowService,
             passwordPolicy = passwordPolicy,
             emailPort = emailPort,
         )

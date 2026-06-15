@@ -400,7 +400,7 @@ fun Application.module(
             registerRateLimiter = s.registerRateLimiter,
             tokenRateLimiter = s.tokenRateLimiter,
             mfaRateLimiter = s.mfaRateLimiter,
-            selfServiceService = s.selfServiceService,
+            credentialFlowService = s.credentialFlowService,
             mfaService = s.mfaService,
             roleRepository = s.roleRepository,
             socialLoginService = s.socialLoginService,

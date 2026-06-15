@@ -11,8 +11,8 @@ import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -112,8 +112,8 @@ class MagicLinkRoutesTest {
 
     private val limiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
 
-    private fun selfService() =
-        UserSelfServiceService(
+    private fun credentialFlowService() =
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -198,7 +198,7 @@ class MagicLinkRoutesTest {
                     loginRateLimiter = limiter,
                     registerRateLimiter = limiter,
                     tokenRateLimiter = limiter,
-                    selfServiceService = selfService(),
+                    credentialFlowService = credentialFlowService(),
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),
                 )
@@ -215,7 +215,7 @@ class MagicLinkRoutesTest {
             application(appBlock())
 
             // Issue the magic link
-            selfService().initiateMagicLink(
+            credentialFlowService().initiateMagicLink(
                 email = "alice@acme.com",
                 tenantSlug = "acme",
                 baseUrl = "http://localhost",
@@ -240,7 +240,7 @@ class MagicLinkRoutesTest {
         testApplication {
             application(appBlock())
 
-            selfService().initiateMagicLink(
+            credentialFlowService().initiateMagicLink(
                 email = "alice@acme.com",
                 tenantSlug = "acme",
                 baseUrl = "http://localhost",
@@ -272,7 +272,7 @@ class MagicLinkRoutesTest {
         testApplication {
             application(appBlock())
 
-            selfService().initiateMagicLink(
+            credentialFlowService().initiateMagicLink(
                 email = "alice@acme.com",
                 tenantSlug = "acme",
                 baseUrl = "http://localhost",

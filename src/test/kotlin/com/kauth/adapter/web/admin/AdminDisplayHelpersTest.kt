@@ -9,7 +9,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminUserService
-import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
@@ -46,7 +46,7 @@ class AdminDisplayHelpersTest {
     private val emailPort = FakeEmailPort()
 
     private val selfService =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -66,7 +66,7 @@ class AdminDisplayHelpersTest {
             sessionRepository = sessions,
             passwordHasher = hasher,
             auditLog = auditLog,
-            selfServiceService = selfService,
+            credentialFlowService = selfService,
             passwordPolicy = passwordPolicy,
         )
 

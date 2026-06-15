@@ -9,8 +9,8 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -107,8 +107,8 @@ class AdminApiKeysTest {
             enabled = true,
         )
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -125,7 +125,7 @@ class AdminApiKeysTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAdminUserService() =
@@ -135,7 +135,7 @@ class AdminApiKeysTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAppMgmtService() =

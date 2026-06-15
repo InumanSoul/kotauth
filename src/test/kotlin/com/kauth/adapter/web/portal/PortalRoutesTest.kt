@@ -11,9 +11,7 @@ import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailPort
-import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakePasswordHasher
-import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
@@ -82,8 +80,6 @@ class PortalRoutesTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            evTokenRepo = FakeEmailVerificationTokenRepository(),
-            prTokenRepo = FakePasswordResetTokenRepository(),
             emailPort = FakeEmailPort(),
             emailScope = CoroutineScope(Dispatchers.Unconfined),
         )

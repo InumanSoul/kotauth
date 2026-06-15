@@ -11,8 +11,8 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -108,7 +108,7 @@ class ApiUserLifecycleRoutesTest {
     private val apiKeyService = ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
 
     private val selfServiceService =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -125,7 +125,7 @@ class ApiUserLifecycleRoutesTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = selfServiceService,
+            credentialFlowService = selfServiceService,
         )
 
     private val adminUserService =
@@ -135,7 +135,7 @@ class ApiUserLifecycleRoutesTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = selfServiceService,
+            credentialFlowService = selfServiceService,
         )
 
     private val applicationManagementService =

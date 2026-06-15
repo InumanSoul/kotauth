@@ -3,8 +3,8 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.SelfServiceResult
-import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
@@ -14,7 +14,7 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
 internal fun Route.selfServiceRoutes(
-    selfServiceService: UserSelfServiceService,
+    credentialFlowService: CredentialFlowService,
     registerRateLimiter: RateLimiterPort,
 ) {
     get("/forgot-password") {
@@ -46,7 +46,7 @@ internal fun Route.selfServiceRoutes(
             return@post call.respondRedirect("/t/$slug/forgot-password?sent=true")
         }
 
-        selfServiceService.initiateForgotPassword(email, slug, callbackBaseUrl, ipAddress)
+        credentialFlowService.initiateForgotPassword(email, slug, callbackBaseUrl, ipAddress)
         call.respondRedirect("/t/$slug/forgot-password?sent=true")
     }
 
@@ -89,7 +89,7 @@ internal fun Route.selfServiceRoutes(
             )
         }
 
-        when (val result = selfServiceService.confirmPasswordReset(token, newPassword, confirmPassword)) {
+        when (val result = credentialFlowService.confirmPasswordReset(token, newPassword, confirmPassword)) {
             is SelfServiceResult.Success ->
                 call.respondHtml(
                     HttpStatusCode.OK,
@@ -132,7 +132,7 @@ internal fun Route.selfServiceRoutes(
             )
         }
 
-        when (val result = selfServiceService.confirmEmailVerification(token)) {
+        when (val result = credentialFlowService.confirmEmailVerification(token)) {
             is SelfServiceResult.Success ->
                 call.respondHtml(
                     HttpStatusCode.OK,

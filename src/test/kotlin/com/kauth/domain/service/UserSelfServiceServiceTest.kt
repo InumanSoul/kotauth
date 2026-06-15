@@ -52,7 +52,7 @@ class UserSelfServiceServiceTest {
     private val testEmailScope = CoroutineScope(Dispatchers.Unconfined)
 
     private val svc =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -65,9 +65,8 @@ class UserSelfServiceServiceTest {
             emailScope = testEmailScope,
         )
 
-    // Service instance WITHOUT password policy (fallback to minLength check)
     private val svcNoPolicyPort =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -75,6 +74,30 @@ class UserSelfServiceServiceTest {
             auditLog = auditLog,
             evTokenRepo = evTokenRepo,
             prTokenRepo = prTokenRepo,
+            emailPort = emailPort,
+            passwordPolicy = null,
+            emailScope = testEmailScope,
+        )
+
+    private val accountSvc =
+        UserSelfServiceService(
+            userRepository = users,
+            tenantRepository = tenants,
+            sessionRepository = sessions,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+            emailPort = emailPort,
+            passwordPolicy = passwordPolicy,
+            emailScope = testEmailScope,
+        )
+
+    private val accountSvcNoPolicy =
+        UserSelfServiceService(
+            userRepository = users,
+            tenantRepository = tenants,
+            sessionRepository = sessions,
+            passwordHasher = hasher,
+            auditLog = auditLog,
             emailPort = emailPort,
             passwordPolicy = null,
             emailScope = testEmailScope,
@@ -561,7 +584,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - user not found`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(999),
                 tenantId = TenantId(1),
                 email = "x@x.com",
@@ -574,7 +597,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - tenant mismatch`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(10),
                 tenantId = TenantId(99),
                 email = "x@x.com",
@@ -589,7 +612,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - invalid email`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 email = "not-an-email",
@@ -602,7 +625,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - blank full name`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 email = "alice@example.com",
@@ -615,7 +638,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - duplicate email`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 email = "verified@example.com",
@@ -630,7 +653,7 @@ class UserSelfServiceServiceTest {
     fun `updateProfile - email change resets emailVerified`() {
         // Start with verified user
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(11),
                 tenantId = TenantId(1),
                 email = "newemail@example.com",
@@ -648,7 +671,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `updateProfile - same email does not reset emailVerified`() {
         val result =
-            svc.updateProfile(
+            accountSvc.updateProfile(
                 userId = UserId(11),
                 tenantId = TenantId(1),
                 email = "verified@example.com",
@@ -665,7 +688,7 @@ class UserSelfServiceServiceTest {
 
     @Test
     fun `updateProfile - success records audit event`() {
-        svc.updateProfile(
+        accountSvc.updateProfile(
             userId = UserId(10),
             tenantId = TenantId(1),
             email = "alice@example.com",
@@ -681,7 +704,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - tenant not found`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(999),
                 currentPassword = "current-pass",
@@ -695,7 +718,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - user not found`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(999),
                 tenantId = TenantId(1),
                 currentPassword = "x",
@@ -709,7 +732,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - tenant mismatch`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(2),
                 currentPassword = "current-pass",
@@ -725,7 +748,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - wrong current password`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "wrong",
@@ -740,7 +763,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - blank new password`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -754,7 +777,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - passwords do not match`() {
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -769,7 +792,7 @@ class UserSelfServiceServiceTest {
     fun `changePassword - policy violation`() {
         passwordPolicy.validationError = "Must include special char"
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -788,7 +811,7 @@ class UserSelfServiceServiceTest {
             hasher.hash("reused-pass"),
         )
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -803,7 +826,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `changePassword - no policy port falls back to minLength`() {
         val result =
-            svcNoPolicyPort.changePassword(
+            accountSvcNoPolicy.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -829,7 +852,7 @@ class UserSelfServiceServiceTest {
             ),
         )
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",
@@ -887,7 +910,7 @@ class UserSelfServiceServiceTest {
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
         )
-        val result = svc.getActiveSessions(userId = UserId(10), tenantId = TenantId(1))
+        val result = accountSvc.getActiveSessions(userId = UserId(10), tenantId = TenantId(1))
         assertEquals(2, result.size)
     }
 
@@ -898,7 +921,7 @@ class UserSelfServiceServiceTest {
     @Test
     fun `revokeSession - session not found`() {
         val result =
-            svc.revokeSession(
+            accountSvc.revokeSession(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 sessionId = SessionId(999),
@@ -922,7 +945,7 @@ class UserSelfServiceServiceTest {
                 ),
             )
         val result =
-            svc.revokeSession(
+            accountSvc.revokeSession(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 sessionId = session.id!!,
@@ -946,7 +969,7 @@ class UserSelfServiceServiceTest {
                 ),
             )
         val result =
-            svc.revokeSession(
+            accountSvc.revokeSession(
                 userId = UserId(10),
                 tenantId = TenantId(2),
                 sessionId = session.id!!,
@@ -970,7 +993,7 @@ class UserSelfServiceServiceTest {
                 ),
             )
         val result =
-            svc.revokeSession(
+            accountSvc.revokeSession(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 sessionId = session.id!!,
@@ -1217,7 +1240,7 @@ class UserSelfServiceServiceTest {
     fun `changePassword returns PasswordLoginDisabled when toggle is off`() {
         disablePasswordLoginOnSmtpTenant()
         val result =
-            svc.changePassword(
+            accountSvc.changePassword(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 currentPassword = "current-pass",

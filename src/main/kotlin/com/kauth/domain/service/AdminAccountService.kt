@@ -13,7 +13,7 @@ class AdminAccountService(
     private val tenantRepository: TenantRepository,
     private val userRepository: UserRepository,
     private val auditLog: AuditLogPort,
-    private val selfServiceService: UserSelfServiceService,
+    private val credentialFlowService: CredentialFlowService,
 ) {
     fun updateSmtpConfig(
         slug: String,
@@ -94,7 +94,7 @@ class AdminAccountService(
 
         return when (
             val result =
-                selfServiceService.initiateForgotPassword(
+                credentialFlowService.initiateForgotPassword(
                     user.email,
                     tenant.slug,
                     baseUrl,
@@ -136,7 +136,7 @@ class AdminAccountService(
             userRepository.findById(userId, tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
 
-        return when (val result = selfServiceService.initiateForcedPasswordChange(user)) {
+        return when (val result = credentialFlowService.initiateForcedPasswordChange(user)) {
             is SelfServiceResult.Success -> {
                 auditLog.record(
                     AuditEvent(
@@ -161,7 +161,7 @@ class AdminAccountService(
         tenantId: TenantId,
         baseUrl: String,
     ): AdminResult<Unit> =
-        when (val result = selfServiceService.initiateEmailVerification(userId, tenantId, baseUrl)) {
+        when (val result = credentialFlowService.initiateEmailVerification(userId, tenantId, baseUrl)) {
             is SelfServiceResult.Success -> AdminResult.Success(Unit)
             is SelfServiceResult.Failure -> AdminResult.Failure(AdminError.Validation(result.error.message))
         }
