@@ -8,7 +8,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserAttribute
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
@@ -340,26 +340,43 @@ class AdminUserAttributesAndClaimMappersTest {
     // Shared wiring
     // -------------------------------------------------------------------------
 
-    private fun buildAdminService() =
-        AdminService(
-            tenantRepository = tenantRepo,
+    private fun buildSelfService() =
+        UserSelfServiceService(
             userRepository = userRepo,
-            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
+        )
+
+    private fun buildAdminService() =
+        AdminAccountService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
             sessionRepository = sessionRepo,
-            selfServiceService =
-                UserSelfServiceService(
-                    userRepository = userRepo,
-                    tenantRepository = tenantRepo,
-                    sessionRepository = sessionRepo,
-                    passwordHasher = hasher,
-                    auditLog = auditLogPort,
-                    evTokenRepo = FakeEmailVerificationTokenRepository(),
-                    prTokenRepo = FakePasswordResetTokenRepository(),
-                    emailPort = FakeEmailPort(),
-                    emailScope = CoroutineScope(Dispatchers.Unconfined),
-                ),
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAppMgmtService() =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private fun buildRoleGroupService() =
@@ -401,7 +418,12 @@ class AdminUserAttributesAndClaimMappersTest {
                 call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
-                adminService = buildAdminService(),
+                accountService = buildAdminService(),
+                workspaceSettingsService =
+                    com.kauth.domain.service
+                        .WorkspaceSettingsService(tenantRepo, auditLogPort),
+                adminUserService = buildAdminUserService(),
+                applicationManagementService = buildAppMgmtService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

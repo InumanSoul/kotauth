@@ -6,8 +6,8 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.RoleGroupService
@@ -26,7 +26,8 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
 fun Route.adminUserRoutes(
-    adminService: AdminService,
+    accountService: AdminAccountService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
     sessionRepository: SessionRepository,
     userAttributeService: UserAttributeService,
@@ -43,7 +44,7 @@ fun Route.adminUserRoutes(
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
             val pageSize = 25
-            val totalCount = adminService.countUsers(ctx.workspace.id, search)
+            val totalCount = adminUserService.countUsers(ctx.workspace.id, search)
             val totalPages = ((totalCount + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
             val page =
                 (
@@ -52,7 +53,7 @@ fun Route.adminUserRoutes(
                         ?.coerceAtLeast(1) ?: 1
                 ).coerceAtMost(totalPages)
             val offset = (page - 1) * pageSize
-            val users = adminService.listUsers(ctx.workspace.id, search, limit = pageSize, offset = offset)
+            val users = adminUserService.listUsers(ctx.workspace.id, search, limit = pageSize, offset = offset)
             call.respondHtml(
                 HttpStatusCode.OK,
                 AdminView.userListPage(
@@ -88,7 +89,7 @@ fun Route.adminUserRoutes(
             val baseUrl = call.resolvedBaseUrl()
             when (
                 val result =
-                    adminService.createUser(
+                    adminUserService.createUser(
                         ctx.workspace.id,
                         username,
                         email,
@@ -123,7 +124,7 @@ fun Route.adminUserRoutes(
                     call.parameters.typedId("userId", ::UserId)
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val user =
-                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
@@ -215,7 +216,7 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    when (val r = adminService.getUser(userId, workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
@@ -237,7 +238,7 @@ fun Route.adminUserRoutes(
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val user =
-                    when (val r = adminService.getUser(userId, workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
@@ -253,7 +254,7 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                when (adminService.unlockUser(userId, workspace.id)) {
+                when (accountService.unlockUser(userId, workspace.id)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=unlocked")
                     is AdminResult.Failure ->
@@ -268,12 +269,12 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val user =
-                    when (val r = adminService.getUser(userId, workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
                     }
                 val toastKey = if (user.enabled) "disabled" else "enabled"
-                when (adminService.toggleUserEnabled(userId, workspace.id)) {
+                when (adminUserService.toggleUserEnabled(userId, workspace.id)) {
                     is AdminResult.Success ->
                         call.respondRedirect(
                             "/admin/workspaces/$slug/users/${userId.value}?saved=$toastKey",
@@ -289,7 +290,7 @@ fun Route.adminUserRoutes(
                     call.parameters.typedId("userId", ::UserId)
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val user =
-                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
                     }
@@ -297,7 +298,7 @@ fun Route.adminUserRoutes(
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
                 val isHtmx = call.request.headers["HX-Request"] == "true"
-                when (val result = adminService.updateUser(userId, ctx.workspace.id, email, fullName)) {
+                when (val result = adminUserService.updateUser(userId, ctx.workspace.id, email, fullName)) {
                     is AdminResult.Success -> {
                         if (isHtmx) {
                             val updatedUser = result.value
@@ -376,7 +377,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (adminService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
+                when (accountService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
                     is AdminResult.Failure ->
@@ -393,7 +394,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (adminService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
+                when (accountService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
                     is AdminResult.Failure ->
@@ -410,7 +411,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (val result = adminService.setTemporaryPassword(userId, workspace.id)) {
+                when (val result = accountService.setTemporaryPassword(userId, workspace.id)) {
                     is AdminResult.Success -> {
                         val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
                         val flashToken = FlashStore.put(changeUrl)
@@ -433,7 +434,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (adminService.resendInvite(userId, workspace.id, baseUrl)) {
+                when (adminUserService.resendInvite(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=invite_resent")
                     is AdminResult.Failure ->
@@ -450,7 +451,7 @@ fun Route.adminUserRoutes(
                     call.parameters.typedId("userId", ::UserId)
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val user =
-                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
@@ -475,7 +476,7 @@ fun Route.adminUserRoutes(
                     call.parameters["attrKey"]
                         ?: return@get call.respond(HttpStatusCode.BadRequest)
                 val user =
-                    when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                    when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure -> return@get call.respond(HttpStatusCode.NotFound)
                     }
@@ -517,7 +518,7 @@ fun Route.adminUserRoutes(
                         )
                     else -> {
                         val user =
-                            when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                            when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                                 is AdminResult.Success -> r.value
                                 is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
                             }
@@ -556,7 +557,7 @@ fun Route.adminUserRoutes(
                         )
                     else -> {
                         val user =
-                            when (val r = adminService.getUser(userId, ctx.workspace.id)) {
+                            when (val r = adminUserService.getUser(userId, ctx.workspace.id)) {
                                 is AdminResult.Success -> r.value
                                 is AdminResult.Failure -> return@post call.respond(HttpStatusCode.NotFound)
                             }

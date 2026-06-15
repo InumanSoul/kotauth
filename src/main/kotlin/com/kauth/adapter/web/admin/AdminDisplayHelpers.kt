@@ -5,16 +5,16 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminUserService
 
 /** Resolves a list of user IDs to a display map of userId→username. */
 fun resolveUsernames(
     userIds: List<UserId>,
     tenantId: TenantId,
-    adminService: AdminService,
+    adminUserService: AdminUserService,
 ): Map<UserId, String> =
     userIds.associateWith { uid ->
-        (adminService.getUser(uid, tenantId) as? AdminResult.Success)
+        (adminUserService.getUser(uid, tenantId) as? AdminResult.Success)
             ?.value
             ?.username ?: uid.value.toString()
     }

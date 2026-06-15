@@ -12,8 +12,8 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
@@ -134,14 +134,29 @@ class ApiRoutesTest {
         )
 
     private val adminService =
-        AdminService(
+        AdminAccountService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+            selfServiceService = selfServiceService,
+        )
+
+    private val adminUserService =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
             selfServiceService = selfServiceService,
+        )
+
+    private val applicationManagementService =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private val roleGroupService =
@@ -920,7 +935,9 @@ class ApiRoutesTest {
                 sessionRepository = sessionRepo,
                 auditLogRepository = auditLogRepo,
                 roleGroupService = roleGroupService,
-                adminService = adminService,
+                accountService = adminService,
+                adminUserService = adminUserService,
+                applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 emailOtpService = stubEmailOtpService(),

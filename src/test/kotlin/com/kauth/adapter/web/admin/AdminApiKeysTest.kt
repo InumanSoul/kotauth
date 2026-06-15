@@ -7,7 +7,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
@@ -121,14 +121,29 @@ class AdminApiKeysTest {
         )
 
     private fun buildAdminService() =
-        AdminService(
+        AdminAccountService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
             selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAppMgmtService() =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private fun buildRoleGroupService() =
@@ -283,7 +298,12 @@ class AdminApiKeysTest {
                 call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
-                adminService = buildAdminService(),
+                accountService = buildAdminService(),
+                workspaceSettingsService =
+                    com.kauth.domain.service
+                        .WorkspaceSettingsService(tenantRepo, auditLogPort),
+                adminUserService = buildAdminUserService(),
+                applicationManagementService = buildAppMgmtService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

@@ -50,9 +50,11 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
@@ -68,6 +70,7 @@ import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.BundleTranslation
 import com.kauth.infrastructure.CachingClaimMapperService
@@ -101,7 +104,10 @@ import kotlinx.coroutines.SupervisorJob
 data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
-    val adminService: AdminService,
+    val accountService: AdminAccountService,
+    val workspaceSettingsService: WorkspaceSettingsService,
+    val adminUserService: AdminUserService,
+    val applicationManagementService: ApplicationManagementService,
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
@@ -317,20 +323,39 @@ data class ServiceGraph(
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
-            val adminService =
-                AdminService(
+            val accountService =
+                AdminAccountService(
                     tenantRepository = tenantRepository,
                     userRepository = userRepository,
+                    auditLog = auditLogAdapter,
+                    selfServiceService = selfServiceService,
+                )
+            val applicationManagementService =
+                ApplicationManagementService(
                     applicationRepository = applicationRepository,
+                    tenantRepository = tenantRepository,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
+                    corsPort = corsOriginCache,
+                )
+            val adminUserService =
+                AdminUserService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
                     sessionRepository = sessionRepository,
+                    passwordHasher = passwordHasher,
+                    auditLog = auditLogAdapter,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                    emailPort = emailAdapter,
+                )
+            val workspaceSettingsService =
+                WorkspaceSettingsService(
+                    tenantRepository = tenantRepository,
+                    auditLog = auditLogAdapter,
                     themeRepository = themeRepository,
                     portalConfigRepository = portalConfigRepository,
                     emailBrandingRepository = emailBrandingRepository,
-                    emailPort = emailAdapter,
                     corsPort = corsOriginCache,
                 )
             val roleGroupService =
@@ -508,7 +533,10 @@ data class ServiceGraph(
             return ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
-                adminService = adminService,
+                accountService = accountService,
+                workspaceSettingsService = workspaceSettingsService,
+                adminUserService = adminUserService,
+                applicationManagementService = applicationManagementService,
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
                 impersonationService = impersonationService,

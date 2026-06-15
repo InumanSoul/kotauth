@@ -5,7 +5,6 @@ import com.kauth.domain.model.SessionId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
-import com.kauth.domain.service.AdminService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -21,7 +20,7 @@ import java.time.Instant
 fun Route.adminSessionAuditRoutes(
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
-    adminService: AdminService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
     applicationRepository: ApplicationRepository,
 ) {
     // -------------------------------------------------------------------
@@ -35,7 +34,7 @@ fun Route.adminSessionAuditRoutes(
         val totalCount = sessionRepository.countActiveByTenant(workspace.id)
         val sessions = sessionRepository.findActiveByTenant(workspace.id, limit = sessionsLimit)
         val sessionUserIds = sessions.mapNotNull { it.userId }.distinct()
-        val sessionUserMap = resolveUsernames(sessionUserIds, workspace.id, adminService)
+        val sessionUserMap = resolveUsernames(sessionUserIds, workspace.id, adminUserService)
         val sessionClientIds = sessions.mapNotNull { it.clientId }.distinct()
         val sessionClientMap = resolveClientNames(sessionClientIds, applicationRepository)
         val wsPairs = call.attributes[WsPairsAttr]
@@ -67,7 +66,7 @@ fun Route.adminSessionAuditRoutes(
 
     post("/sessions/revoke-all") {
         val workspace = call.attributes[WorkspaceAttr]
-        adminService.revokeAllSessions(workspace.id)
+        adminUserService.revokeAllSessions(workspace.id)
         call.respondRedirect("/admin/workspaces/${workspace.slug}/sessions?saved=revoked_all")
     }
 
@@ -95,7 +94,7 @@ fun Route.adminSessionAuditRoutes(
             )
         val total = auditLogRepository.countByTenant(workspace.id, eventType)
         val auditUserIds = events.mapNotNull { it.userId }.distinct()
-        val auditUserMap = resolveUsernames(auditUserIds, workspace.id, adminService)
+        val auditUserMap = resolveUsernames(auditUserIds, workspace.id, adminUserService)
         val auditClientIds = events.mapNotNull { it.clientId }.distinct()
         val auditClientMap = resolveClientNames(auditClientIds, applicationRepository)
         val auditClientLinks = resolveClientLinks(auditClientIds, applicationRepository)
