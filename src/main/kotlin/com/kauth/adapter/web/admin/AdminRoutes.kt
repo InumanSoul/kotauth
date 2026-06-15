@@ -20,8 +20,8 @@ import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
@@ -52,7 +52,7 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 fun Route.adminRoutes(
-    adminService: AdminService,
+    credentialService: AdminCredentialService,
     workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
@@ -488,7 +488,7 @@ fun Route.adminRoutes(
                 }
 
                 adminSettingsRoutes(
-                    adminService = adminService,
+                    credentialService = credentialService,
                     workspaceSettingsService = workspaceSettingsService,
                     adminUserService = adminUserService,
                     userRepository = userRepository,
@@ -505,7 +505,7 @@ fun Route.adminRoutes(
                 )
 
                 adminUserRoutes(
-                    adminService = adminService,
+                    credentialService = credentialService,
                     adminUserService = adminUserService,
                     roleGroupService = roleGroupService,
                     sessionRepository = sessionRepository,
@@ -519,7 +519,6 @@ fun Route.adminRoutes(
                 adminSessionAuditRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
-                    adminService = adminService,
                     adminUserService = adminUserService,
                     applicationRepository = applicationRepository,
                 )

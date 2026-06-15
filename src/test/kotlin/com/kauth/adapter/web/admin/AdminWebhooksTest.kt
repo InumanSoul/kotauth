@@ -9,7 +9,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookEventType
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookResult
@@ -125,7 +125,7 @@ class AdminWebhooksTest {
         )
 
     private fun buildAdminService() =
-        AdminService(
+        AdminCredentialService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
@@ -301,7 +301,7 @@ class AdminWebhooksTest {
                 call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
-                adminService = buildAdminService(),
+                credentialService = buildAdminService(),
                 workspaceSettingsService =
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),

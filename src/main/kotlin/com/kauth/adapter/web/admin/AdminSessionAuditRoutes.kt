@@ -5,7 +5,6 @@ import com.kauth.domain.model.SessionId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
-import com.kauth.domain.service.AdminService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
@@ -21,7 +20,6 @@ import java.time.Instant
 fun Route.adminSessionAuditRoutes(
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
-    adminService: AdminService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     applicationRepository: ApplicationRepository,
 ) {

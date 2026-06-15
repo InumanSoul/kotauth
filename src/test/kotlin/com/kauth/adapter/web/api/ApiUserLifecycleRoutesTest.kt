@@ -8,7 +8,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
@@ -121,7 +121,7 @@ class ApiUserLifecycleRoutesTest {
         )
 
     private val adminService =
-        AdminService(
+        AdminCredentialService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
@@ -394,7 +394,7 @@ class ApiUserLifecycleRoutesTest {
                 sessionRepository = sessionRepo,
                 auditLogRepository = auditLogRepo,
                 roleGroupService = roleGroupService,
-                adminService = adminService,
+                credentialService = adminService,
                 adminUserService = adminUserService,
                 applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,

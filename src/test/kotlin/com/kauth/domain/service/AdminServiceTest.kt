@@ -66,12 +66,11 @@ class AdminServiceTest {
         )
 
     private val svc =
-        AdminService(
+        AdminCredentialService(
             tenantRepository = tenants,
             userRepository = users,
             auditLog = auditLog,
             selfServiceService = selfService,
-            passwordPolicy = passwordPolicy,
         )
 
     private val appSvc =

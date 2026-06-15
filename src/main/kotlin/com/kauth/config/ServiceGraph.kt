@@ -50,7 +50,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
@@ -104,7 +104,7 @@ import kotlinx.coroutines.SupervisorJob
 data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
-    val adminService: AdminService,
+    val credentialService: AdminCredentialService,
     val workspaceSettingsService: WorkspaceSettingsService,
     val adminUserService: AdminUserService,
     val applicationManagementService: ApplicationManagementService,
@@ -323,13 +323,12 @@ data class ServiceGraph(
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
-            val adminService =
-                AdminService(
+            val credentialService =
+                AdminCredentialService(
                     tenantRepository = tenantRepository,
                     userRepository = userRepository,
                     auditLog = auditLogAdapter,
                     selfServiceService = selfServiceService,
-                    passwordPolicy = passwordPolicyAdapter,
                 )
             val applicationManagementService =
                 ApplicationManagementService(
@@ -534,7 +533,7 @@ data class ServiceGraph(
             return ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
-                adminService = adminService,
+                credentialService = credentialService,
                 workspaceSettingsService = workspaceSettingsService,
                 adminUserService = adminUserService,
                 applicationManagementService = applicationManagementService,

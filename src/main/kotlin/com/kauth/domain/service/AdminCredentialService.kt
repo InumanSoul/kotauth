@@ -2,21 +2,18 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
-import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
-import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 
-class AdminService(
+class AdminCredentialService(
     private val tenantRepository: TenantRepository,
     private val userRepository: UserRepository,
     private val auditLog: AuditLogPort,
     private val selfServiceService: UserSelfServiceService,
-    private val passwordPolicy: PasswordPolicyPort? = null,
 ) {
     fun updateSmtpConfig(
         slug: String,
@@ -76,15 +73,6 @@ class AdminService(
         return AdminResult.Success(updated)
     }
 
-    // =========================================================================
-    // Admin-initiated password reset
-    // =========================================================================
-
-    /**
-     * Sends a password-reset email to the user, allowing them to set their
-     * own password via the standard self-service flow. Requires SMTP to be
-     * configured on the tenant.
-     */
     fun sendPasswordResetEmail(
         userId: UserId,
         tenantId: TenantId,
@@ -132,20 +120,6 @@ class AdminService(
         }
     }
 
-    /**
-     * Admin action: force a user to change their password on next login.
-     *
-     * Generates a one-time change-password token (24-hour expiry), stamps
-     * [RequiredAction.CHANGE_PASSWORD] on the account, and returns the raw
-     * token for one-time display in the admin console. The token is never
-     * stored or logged in plaintext.
-     *
-     * On next login, [AuthService] rejects the credentials with
-     * [AuthError.PasswordChangeRequired] and the web adapter redirects the
-     * user to `/t/{slug}/change-password?token={raw}`.
-     *
-     * The returned raw token must be shown to the admin exactly once.
-     */
     fun setTemporaryPassword(
         userId: UserId,
         tenantId: TenantId,
@@ -182,10 +156,6 @@ class AdminService(
         }
     }
 
-    /**
-     * Triggers a verification email to be resent for the given user.
-     * Delegates to [UserSelfServiceService] to keep the email flow in one place.
-     */
     fun resendVerificationEmail(
         userId: UserId,
         tenantId: TenantId,
@@ -196,10 +166,6 @@ class AdminService(
             is SelfServiceResult.Failure -> AdminResult.Failure(AdminError.Validation(result.error.message))
         }
 
-    /**
-     * Unlocks a user account that was locked due to excessive failed login attempts.
-     * Resets the failed attempt counter and clears the lock timestamp.
-     */
     fun unlockUser(
         userId: UserId,
         tenantId: TenantId,
@@ -219,34 +185,4 @@ class AdminService(
         )
         return AdminResult.Success(Unit)
     }
-}
-
-// =============================================================================
-// Result types
-// =============================================================================
-
-sealed class AdminResult<out T> {
-    data class Success<T>(
-        val value: T,
-    ) : AdminResult<T>()
-
-    data class Failure(
-        val error: AdminError,
-    ) : AdminResult<Nothing>()
-}
-
-sealed class AdminError(
-    val message: String,
-) {
-    class NotFound(
-        message: String,
-    ) : AdminError(message)
-
-    class Conflict(
-        message: String,
-    ) : AdminError(message)
-
-    class Validation(
-        message: String,
-    ) : AdminError(message)
 }

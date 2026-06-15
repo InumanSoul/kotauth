@@ -9,7 +9,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
@@ -107,7 +107,7 @@ class AdminRoutesTest {
         )
 
     private fun buildAdminService() =
-        AdminService(
+        AdminCredentialService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
@@ -621,7 +621,7 @@ class AdminRoutesTest {
         }
         routing {
             adminRoutes(
-                adminService = buildAdminService(),
+                credentialService = buildAdminService(),
                 workspaceSettingsService =
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),
@@ -707,7 +707,7 @@ class AdminRoutesTest {
         }
         routing {
             adminRoutes(
-                adminService = buildAdminService(),
+                credentialService = buildAdminService(),
                 workspaceSettingsService =
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),

@@ -6,7 +6,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WorkspaceSettingsService
@@ -118,7 +118,7 @@ class AdminSettingsTest {
         )
 
     private fun buildAdminService() =
-        AdminService(
+        AdminCredentialService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
@@ -437,7 +437,7 @@ class AdminSettingsTest {
                 call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
-                adminService = buildAdminService(),
+                credentialService = buildAdminService(),
                 workspaceSettingsService = buildWorkspaceSettingsService(),
                 adminUserService = buildAdminUserService(),
                 applicationManagementService = buildAppMgmtService(),

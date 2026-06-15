@@ -11,8 +11,8 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AdminCredentialService
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
@@ -26,7 +26,7 @@ import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 
 fun Route.adminSettingsRoutes(
-    adminService: AdminService,
+    credentialService: AdminCredentialService,
     workspaceSettingsService: WorkspaceSettingsService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     userRepository: UserRepository,
@@ -109,7 +109,7 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         when (
             val result =
-                adminService.updateSmtpConfig(
+                credentialService.updateSmtpConfig(
                     slug = slug,
                     smtpHost = params["smtpHost"]?.trim()?.takeIf { it.isNotBlank() },
                     smtpPort = params["smtpPort"]?.toIntOrNull() ?: 587,

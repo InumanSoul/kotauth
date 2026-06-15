@@ -358,8 +358,8 @@ class ApiUserAttributeRoutesTest {
                         applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                     ),
-                adminService =
-                    com.kauth.domain.service.AdminService(
+                credentialService =
+                    com.kauth.domain.service.AdminCredentialService(
                         tenantRepository = tenantRepo,
                         userRepository = userRepo,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
