@@ -340,6 +340,19 @@ class AdminUserAttributesAndClaimMappersTest {
     // Shared wiring
     // -------------------------------------------------------------------------
 
+    private fun buildSelfService() =
+        UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            evTokenRepo = FakeEmailVerificationTokenRepository(),
+            prTokenRepo = FakePasswordResetTokenRepository(),
+            emailPort = FakeEmailPort(),
+            emailScope = CoroutineScope(Dispatchers.Unconfined),
+        )
+
     private fun buildAdminService() =
         AdminService(
             tenantRepository = tenantRepo,
@@ -347,19 +360,17 @@ class AdminUserAttributesAndClaimMappersTest {
             applicationRepository = appRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
             sessionRepository = sessionRepo,
-            selfServiceService =
-                UserSelfServiceService(
-                    userRepository = userRepo,
-                    tenantRepository = tenantRepo,
-                    sessionRepository = sessionRepo,
-                    passwordHasher = hasher,
-                    auditLog = auditLogPort,
-                    evTokenRepo = FakeEmailVerificationTokenRepository(),
-                    prTokenRepo = FakePasswordResetTokenRepository(),
-                    emailPort = FakeEmailPort(),
-                    emailScope = CoroutineScope(Dispatchers.Unconfined),
-                ),
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
         )
 
     private fun buildRoleGroupService() =
@@ -405,6 +416,7 @@ class AdminUserAttributesAndClaimMappersTest {
                 workspaceSettingsService =
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),
+                adminUserService = buildAdminUserService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

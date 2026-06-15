@@ -18,6 +18,7 @@ import io.ktor.server.routing.route
 
 internal fun Route.apiUserRoutes(
     adminService: AdminService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
 ) {
     route("/users") {
@@ -28,7 +29,7 @@ internal fun Route.apiUserRoutes(
             // TODO: Add pagination support to the REST API (limit/offset or page/pageSize query params)
             //  to avoid returning unbounded result sets over the network. The port layer already
             //  supports limit/offset — this just needs wiring here + updating ApiMeta with pagination fields.
-            val users = adminService.listUsers(tenantId, search)
+            val users = adminUserService.listUsers(tenantId, search)
             call.respond(
                 HttpStatusCode.OK,
                 ApiResponse(
@@ -45,7 +46,7 @@ internal fun Route.apiUserRoutes(
 
             when (
                 val result =
-                    adminService.createUser(
+                    adminUserService.createUser(
                         tenantId = tenantId,
                         username = body.username,
                         email = body.email,
@@ -72,7 +73,7 @@ internal fun Route.apiUserRoutes(
 
             when (
                 val result =
-                    adminService.createUser(
+                    adminUserService.createUser(
                         tenantId = tenantId,
                         username = body.username,
                         email = body.email,
@@ -99,7 +100,7 @@ internal fun Route.apiUserRoutes(
                             "userId must be an integer.",
                         )
                 val user =
-                    when (val r = adminService.getUser(userId, tenantId)) {
+                    when (val r = adminUserService.getUser(userId, tenantId)) {
                         is AdminResult.Success -> r.value
                         is AdminResult.Failure ->
                             return@get call.respondProblem(
@@ -123,7 +124,7 @@ internal fun Route.apiUserRoutes(
                         )
                 val body = call.receive<UpdateUserRequest>()
 
-                when (val result = adminService.updateUser(userId, tenantId, body.email, body.fullName)) {
+                when (val result = adminUserService.updateUser(userId, tenantId, body.email, body.fullName)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.OK, result.value.toApiDto())
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }
@@ -140,7 +141,7 @@ internal fun Route.apiUserRoutes(
                             "userId must be an integer.",
                         )
 
-                when (val result = adminService.setUserEnabled(userId, tenantId, false)) {
+                when (val result = adminUserService.setUserEnabled(userId, tenantId, false)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }

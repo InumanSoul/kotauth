@@ -140,7 +140,16 @@ class ApiRoutesTest {
             applicationRepository = appRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
+            selfServiceService = selfServiceService,
+        )
+
+    private val adminUserService =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
             sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
             selfServiceService = selfServiceService,
         )
 
@@ -921,6 +930,7 @@ class ApiRoutesTest {
                 auditLogRepository = auditLogRepo,
                 roleGroupService = roleGroupService,
                 adminService = adminService,
+                adminUserService = adminUserService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 emailOtpService = stubEmailOtpService(),

@@ -127,7 +127,16 @@ class AdminApiKeysTest {
             applicationRepository = appRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
             sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
         )
 
@@ -287,6 +296,7 @@ class AdminApiKeysTest {
                 workspaceSettingsService =
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),
+                adminUserService = buildAdminUserService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

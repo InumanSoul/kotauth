@@ -124,7 +124,16 @@ class AdminSettingsTest {
             applicationRepository = appRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
+            selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
             sessionRepository = sessionRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
         )
 
@@ -424,6 +433,7 @@ class AdminSettingsTest {
             adminRoutes(
                 adminService = buildAdminService(),
                 workspaceSettingsService = buildWorkspaceSettingsService(),
+                adminUserService = buildAdminUserService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

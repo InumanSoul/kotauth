@@ -54,6 +54,7 @@ import io.ktor.server.sessions.set
 fun Route.adminRoutes(
     adminService: AdminService,
     workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
     appInfo: AppInfo,
     tenantRepository: TenantRepository,
@@ -488,6 +489,7 @@ fun Route.adminRoutes(
                 adminSettingsRoutes(
                     adminService = adminService,
                     workspaceSettingsService = workspaceSettingsService,
+                    adminUserService = adminUserService,
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
@@ -503,6 +505,7 @@ fun Route.adminRoutes(
 
                 adminUserRoutes(
                     adminService = adminService,
+                    adminUserService = adminUserService,
                     roleGroupService = roleGroupService,
                     sessionRepository = sessionRepository,
                     userAttributeService = userAttributeService,
@@ -516,6 +519,7 @@ fun Route.adminRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
                     adminService = adminService,
+                    adminUserService = adminUserService,
                     applicationRepository = applicationRepository,
                 )
 

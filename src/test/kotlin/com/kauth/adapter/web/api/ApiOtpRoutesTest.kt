@@ -302,6 +302,32 @@ class ApiOtpRoutesTest {
             assertTrue("""invalid_otp""" in verify.bodyAsText())
         }
 
+    private fun stubSelfService(audit: com.kauth.fakes.FakeAuditLogPort) =
+        com.kauth.domain.service.UserSelfServiceService(
+            userRepository = users,
+            tenantRepository = tenants,
+            sessionRepository = com.kauth.fakes.FakeSessionRepository(),
+            passwordHasher = com.kauth.fakes.FakePasswordHasher(),
+            auditLog = audit,
+            evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
+            prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
+            emailPort = com.kauth.fakes.FakeEmailPort(),
+            emailScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        )
+
+    private fun stubAdminUserService(
+        tenants: com.kauth.fakes.FakeTenantRepository,
+        users: com.kauth.fakes.FakeUserRepository,
+        audit: com.kauth.fakes.FakeAuditLogPort,
+    ) = com.kauth.domain.service.AdminUserService(
+        tenantRepository = tenants,
+        userRepository = users,
+        sessionRepository = com.kauth.fakes.FakeSessionRepository(),
+        passwordHasher = com.kauth.fakes.FakePasswordHasher(),
+        auditLog = audit,
+        selfServiceService = stubSelfService(audit),
+    )
+
     private fun io.ktor.server.application.Application.installApp(
         emailLimiter: RateLimiterPort,
         ipLimiter: RateLimiterPort,
@@ -340,21 +366,9 @@ class ApiOtpRoutesTest {
                         applicationRepository = apps,
                         passwordHasher = com.kauth.fakes.FakePasswordHasher(),
                         auditLog = audit,
-                        sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                        selfServiceService =
-                            com.kauth.domain.service.UserSelfServiceService(
-                                userRepository = users,
-                                tenantRepository = tenants,
-                                sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                                passwordHasher = com.kauth.fakes.FakePasswordHasher(),
-                                auditLog = audit,
-                                evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
-                                prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
-                                emailPort = email,
-                                emailScope =
-                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
-                            ),
+                        selfServiceService = stubSelfService(audit),
                     ),
+                adminUserService = stubAdminUserService(tenants, users, audit),
                 userAttributeService =
                     com.kauth.domain.service.UserAttributeService(
                         userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),

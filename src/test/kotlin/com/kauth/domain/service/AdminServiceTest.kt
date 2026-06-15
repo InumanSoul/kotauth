@@ -72,7 +72,6 @@ class AdminServiceTest {
             applicationRepository = apps,
             passwordHasher = hasher,
             auditLog = auditLog,
-            sessionRepository = sessions,
             selfServiceService = selfService,
             passwordPolicy = passwordPolicy,
         )
@@ -82,6 +81,18 @@ class AdminServiceTest {
             tenantRepository = tenants,
             auditLog = auditLog,
             emailBrandingRepository = emailBranding,
+        )
+
+    private val userSvc =
+        AdminUserService(
+            tenantRepository = tenants,
+            userRepository = users,
+            sessionRepository = sessions,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+            selfServiceService = selfService,
+            passwordPolicy = passwordPolicy,
+            emailPort = emailPort,
         )
 
     private val tenant =
@@ -198,7 +209,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - tenant not found`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(999),
                 username = "bob",
                 email = "bob@x.com",
@@ -212,7 +223,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - blank username`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "  ",
                 email = "bob@x.com",
@@ -226,7 +237,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - invalid username characters`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bad user!",
                 email = "bob@x.com",
@@ -240,7 +251,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - invalid email`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "not-email",
@@ -254,7 +265,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - duplicate username`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "alice",
                 email = "new@x.com",
@@ -268,7 +279,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - duplicate email`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "newuser",
                 email = "alice@example.com",
@@ -283,7 +294,7 @@ class AdminServiceTest {
     fun `createUser - password policy violation`() {
         passwordPolicy.validationError = "Too weak"
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@x.com",
@@ -297,7 +308,7 @@ class AdminServiceTest {
     @Test
     fun `createUser - success`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
@@ -317,7 +328,7 @@ class AdminServiceTest {
     @Test
     fun `createUser invite - stores sentinel hash and SET_PASSWORD action`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
@@ -334,7 +345,7 @@ class AdminServiceTest {
     @Test
     fun `createUser invite - sends invite email when SMTP ready`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
@@ -350,7 +361,7 @@ class AdminServiceTest {
 
     @Test
     fun `createUser invite - creates token with purpose INVITE`() {
-        svc.createUser(
+        userSvc.createUser(
             tenantId = TenantId(1),
             username = "bob",
             email = "bob@example.com",
@@ -368,7 +379,7 @@ class AdminServiceTest {
         val noSmtpTenant = tenant.copy(id = TenantId(2), slug = "no-smtp", smtpHost = null, smtpEnabled = false)
         tenants.add(noSmtpTenant)
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(2),
                 username = "bob",
                 email = "bob@example.com",
@@ -384,7 +395,7 @@ class AdminServiceTest {
     @Test
     fun `createUser password mode - requires password`() {
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
@@ -402,14 +413,14 @@ class AdminServiceTest {
 
     @Test
     fun `resendInvite - user not found`() {
-        val result = svc.resendInvite(UserId(999), TenantId(1), "http://localhost:8080")
+        val result = userSvc.resendInvite(UserId(999), TenantId(1), "http://localhost:8080")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
     fun `resendInvite - user has no pending invite`() {
-        val result = svc.resendInvite(alice.id!!, TenantId(1), "http://localhost:8080")
+        val result = userSvc.resendInvite(alice.id!!, TenantId(1), "http://localhost:8080")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
@@ -426,7 +437,7 @@ class AdminServiceTest {
                     requiredActions = setOf(RequiredAction.SET_PASSWORD),
                 ),
             )
-        val result = svc.resendInvite(invitedUser.id!!, TenantId(1), "http://localhost:8080")
+        val result = userSvc.resendInvite(invitedUser.id!!, TenantId(1), "http://localhost:8080")
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(1, emailPort.sent.size)
         assertEquals("invite", emailPort.sent[0].type)
@@ -439,14 +450,14 @@ class AdminServiceTest {
 
     @Test
     fun `updateUser - user not found`() {
-        val result = svc.updateUser(userId = UserId(999), tenantId = TenantId(1), email = "x@x.com", fullName = "X")
+        val result = userSvc.updateUser(userId = UserId(999), tenantId = TenantId(1), email = "x@x.com", fullName = "X")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
     fun `updateUser - tenant mismatch`() {
-        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(99), email = "x@x.com", fullName = "X")
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(99), email = "x@x.com", fullName = "X")
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -454,7 +465,7 @@ class AdminServiceTest {
     @Test
     fun `updateUser - success`() {
         val result =
-            svc.updateUser(
+            userSvc.updateUser(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 email = "newalice@example.com",
@@ -468,7 +479,7 @@ class AdminServiceTest {
 
     @Test
     fun `updateUser - partial update email only`() {
-        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "new@example.com")
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "new@example.com")
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("new@example.com", result.value.email)
         assertEquals("Alice Test", result.value.fullName)
@@ -476,7 +487,7 @@ class AdminServiceTest {
 
     @Test
     fun `updateUser - partial update fullName only`() {
-        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("alice@example.com", result.value.email)
         assertEquals("Alice Renamed", result.value.fullName)
@@ -484,7 +495,7 @@ class AdminServiceTest {
 
     @Test
     fun `updateUser - no fields keeps existing values`() {
-        val result = svc.updateUser(userId = UserId(10), tenantId = TenantId(1))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1))
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("alice@example.com", result.value.email)
         assertEquals("Alice Test", result.value.fullName)
@@ -496,13 +507,13 @@ class AdminServiceTest {
 
     @Test
     fun `setUserEnabled - user not found`() {
-        val result = svc.setUserEnabled(userId = UserId(999), tenantId = TenantId(1), enabled = false)
+        val result = userSvc.setUserEnabled(userId = UserId(999), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Failure>(result)
     }
 
     @Test
     fun `setUserEnabled - disables user`() {
-        val result = svc.setUserEnabled(userId = UserId(10), tenantId = TenantId(1), enabled = false)
+        val result = userSvc.setUserEnabled(userId = UserId(10), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(false, users.findById(UserId(10), TenantId(1))!!.enabled)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_DISABLED))
@@ -731,7 +742,6 @@ class AdminServiceTest {
             applicationRepository = apps,
             passwordHasher = hasher,
             auditLog = auditLog,
-            sessionRepository = sessions,
             selfServiceService = selfService,
             passwordPolicy = passwordPolicy,
             corsPort = corsPort,
@@ -961,14 +971,14 @@ class AdminServiceTest {
 
     @Test
     fun `getUser - returns Success when user exists in tenant`() {
-        val result = svc.getUser(userId = UserId(10), tenantId = TenantId(1))
+        val result = userSvc.getUser(userId = UserId(10), tenantId = TenantId(1))
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("alice", result.value.username)
     }
 
     @Test
     fun `getUser - returns NotFound when user does not exist`() {
-        val result = svc.getUser(userId = UserId(999), tenantId = TenantId(1))
+        val result = userSvc.getUser(userId = UserId(999), tenantId = TenantId(1))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -976,7 +986,7 @@ class AdminServiceTest {
     @Test
     fun `getUser - returns NotFound when user exists in different tenant`() {
         // Alice belongs to TenantId(1); querying from TenantId(2) must not expose her data.
-        val result = svc.getUser(userId = UserId(10), tenantId = TenantId(2))
+        val result = userSvc.getUser(userId = UserId(10), tenantId = TenantId(2))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -988,7 +998,7 @@ class AdminServiceTest {
     @Test
     fun `toggleUserEnabled - disables an enabled user`() {
         // Alice starts enabled = true
-        val result = svc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
+        val result = userSvc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(false, users.findById(UserId(10), TenantId(1))!!.enabled)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_DISABLED))
@@ -998,7 +1008,7 @@ class AdminServiceTest {
     fun `toggleUserEnabled - enables a disabled user`() {
         // Disable alice first so the toggle has something to flip
         users.update(alice.copy(enabled = false))
-        val result = svc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
+        val result = userSvc.toggleUserEnabled(userId = UserId(10), tenantId = TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(true, users.findById(UserId(10), TenantId(1))!!.enabled)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_ENABLED))
@@ -1006,7 +1016,7 @@ class AdminServiceTest {
 
     @Test
     fun `toggleUserEnabled - returns NotFound for non-existent user`() {
-        val result = svc.toggleUserEnabled(userId = UserId(999), tenantId = TenantId(1))
+        val result = userSvc.toggleUserEnabled(userId = UserId(999), tenantId = TenantId(1))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
@@ -1029,7 +1039,7 @@ class AdminServiceTest {
                 enabled = true,
             ),
         )
-        val result = svc.listUsers(tenantId = TenantId(1))
+        val result = userSvc.listUsers(tenantId = TenantId(1))
         assertEquals(1, result.size)
         assertEquals("alice", result.first().username)
     }
@@ -1047,14 +1057,14 @@ class AdminServiceTest {
                 enabled = true,
             ),
         )
-        val result = svc.listUsers(tenantId = TenantId(1), search = "charlie")
+        val result = userSvc.listUsers(tenantId = TenantId(1), search = "charlie")
         assertEquals(1, result.size)
         assertEquals("charlie", result.first().username)
     }
 
     @Test
     fun `listUsers - returns empty list for tenant with no users`() {
-        val result = svc.listUsers(tenantId = TenantId(99))
+        val result = userSvc.listUsers(tenantId = TenantId(99))
         assertTrue(result.isEmpty())
     }
 
@@ -1146,7 +1156,7 @@ class AdminServiceTest {
         tenants.clear()
         tenants.add(tenant.copy(securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = false)))
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "bob",
                 email = "bob@example.com",
@@ -1171,7 +1181,7 @@ class AdminServiceTest {
             ),
         )
         val result =
-            svc.createUser(
+            userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "carol",
                 email = "carol@example.com",

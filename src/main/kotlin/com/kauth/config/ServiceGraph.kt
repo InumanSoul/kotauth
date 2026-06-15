@@ -51,6 +51,7 @@ import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.AuthService
@@ -104,6 +105,7 @@ data class ServiceGraph(
     val oauthService: OAuthService,
     val adminService: AdminService,
     val workspaceSettingsService: WorkspaceSettingsService,
+    val adminUserService: AdminUserService,
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
@@ -326,11 +328,20 @@ data class ServiceGraph(
                     applicationRepository = applicationRepository,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
+                    selfServiceService = selfServiceService,
+                    passwordPolicy = passwordPolicyAdapter,
+                    corsPort = corsOriginCache,
+                )
+            val adminUserService =
+                AdminUserService(
+                    tenantRepository = tenantRepository,
+                    userRepository = userRepository,
                     sessionRepository = sessionRepository,
+                    passwordHasher = passwordHasher,
+                    auditLog = auditLogAdapter,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
-                    corsPort = corsOriginCache,
                 )
             val workspaceSettingsService =
                 WorkspaceSettingsService(
@@ -518,6 +529,7 @@ data class ServiceGraph(
                 oauthService = oauthService,
                 adminService = adminService,
                 workspaceSettingsService = workspaceSettingsService,
+                adminUserService = adminUserService,
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
                 impersonationService = impersonationService,

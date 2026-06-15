@@ -28,6 +28,7 @@ import io.ktor.server.sessions.sessions
 fun Route.adminSettingsRoutes(
     adminService: AdminService,
     workspaceSettingsService: WorkspaceSettingsService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
@@ -142,9 +143,14 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
         val adminUser =
-            (adminService.getUser(UserId(session.userId), TenantId(session.tenantId)) as? AdminResult.Success)?.value
+            (
+                adminUserService.getUser(
+                    UserId(session.userId),
+                    TenantId(session.tenantId),
+                ) as? AdminResult.Success
+            )?.value
         val recipientEmail = adminUser?.email ?: "${session.username}@localhost"
-        when (val result = adminService.sendTestEmail(workspace.id, recipientEmail)) {
+        when (val result = adminUserService.sendTestEmail(workspace.id, recipientEmail)) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/smtp?saved=test_sent")
             is AdminResult.Failure -> {

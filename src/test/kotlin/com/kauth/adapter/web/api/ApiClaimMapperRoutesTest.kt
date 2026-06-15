@@ -58,6 +58,19 @@ class ApiClaimMapperRoutesTest {
     private var readKey: String = ""
     private var writeKey: String = ""
 
+    private fun buildFakeSelfService() =
+        com.kauth.domain.service.UserSelfServiceService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = com.kauth.fakes.FakeSessionRepository(),
+            passwordHasher = hasher,
+            auditLog = com.kauth.fakes.FakeAuditLogPort(),
+            evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
+            prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
+            emailPort = com.kauth.fakes.FakeEmailPort(),
+            emailScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        )
+
     @BeforeTest
     fun setup() {
         tenantRepo.clear()
@@ -338,20 +351,16 @@ class ApiClaimMapperRoutesTest {
                         applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
+                        selfServiceService = buildFakeSelfService(),
+                    ),
+                adminUserService =
+                    com.kauth.domain.service.AdminUserService(
+                        tenantRepository = tenantRepo,
+                        userRepository = userRepo,
                         sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                        selfServiceService =
-                            com.kauth.domain.service.UserSelfServiceService(
-                                userRepository = userRepo,
-                                tenantRepository = tenantRepo,
-                                sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                                passwordHasher = hasher,
-                                auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                                evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
-                                prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
-                                emailPort = com.kauth.fakes.FakeEmailPort(),
-                                emailScope =
-                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
-                            ),
+                        passwordHasher = hasher,
+                        auditLog = com.kauth.fakes.FakeAuditLogPort(),
+                        selfServiceService = buildFakeSelfService(),
                     ),
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
