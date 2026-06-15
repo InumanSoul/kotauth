@@ -363,12 +363,17 @@ class ApiOtpRoutesTest {
                     com.kauth.domain.service.AdminService(
                         tenantRepository = tenants,
                         userRepository = users,
-                        applicationRepository = apps,
-                        passwordHasher = com.kauth.fakes.FakePasswordHasher(),
                         auditLog = audit,
                         selfServiceService = stubSelfService(audit),
                     ),
                 adminUserService = stubAdminUserService(tenants, users, audit),
+                applicationManagementService =
+                    com.kauth.domain.service.ApplicationManagementService(
+                        applicationRepository = apps,
+                        tenantRepository = tenants,
+                        passwordHasher = com.kauth.fakes.FakePasswordHasher(),
+                        auditLog = audit,
+                    ),
                 userAttributeService =
                     com.kauth.domain.service.UserAttributeService(
                         userAttributeRepository = com.kauth.fakes.FakeUserAttributeRepository(),

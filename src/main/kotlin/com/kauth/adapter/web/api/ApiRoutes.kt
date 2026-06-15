@@ -39,6 +39,7 @@ fun Route.apiRoutes(
     roleGroupService: RoleGroupService,
     adminService: AdminService,
     adminUserService: com.kauth.domain.service.AdminUserService,
+    applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     userAttributeService: UserAttributeService,
     claimMapperService: CachingClaimMapperService,
     emailOtpService: EmailOtpService,
@@ -115,7 +116,7 @@ fun Route.apiRoutes(
 
             apiUserRoutes(adminService, adminUserService, roleGroupService)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
-            apiApplicationRoutes(applicationRepository, adminService, roleGroupService)
+            apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)

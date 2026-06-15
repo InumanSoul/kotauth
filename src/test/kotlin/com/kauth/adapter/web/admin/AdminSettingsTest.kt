@@ -121,8 +121,6 @@ class AdminSettingsTest {
         AdminService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
-            passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
         )
@@ -135,6 +133,14 @@ class AdminSettingsTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAppMgmtService() =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private fun buildWorkspaceSettingsService() =
@@ -434,6 +440,7 @@ class AdminSettingsTest {
                 adminService = buildAdminService(),
                 workspaceSettingsService = buildWorkspaceSettingsService(),
                 adminUserService = buildAdminUserService(),
+                applicationManagementService = buildAppMgmtService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

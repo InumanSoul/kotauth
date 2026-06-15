@@ -69,11 +69,17 @@ class AdminServiceTest {
         AdminService(
             tenantRepository = tenants,
             userRepository = users,
-            applicationRepository = apps,
-            passwordHasher = hasher,
             auditLog = auditLog,
             selfServiceService = selfService,
             passwordPolicy = passwordPolicy,
+        )
+
+    private val appSvc =
+        ApplicationManagementService(
+            applicationRepository = apps,
+            tenantRepository = tenants,
+            passwordHasher = hasher,
+            auditLog = auditLog,
         )
 
     private val wsSvc =
@@ -526,7 +532,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - app not found`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(999),
                 tenantId = TenantId(1),
                 name = "X",
@@ -541,7 +547,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - tenant mismatch`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(99),
                 name = "X",
@@ -556,7 +562,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - blank name`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 name = "  ",
@@ -571,7 +577,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - success`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 name = "Renamed App",
@@ -586,7 +592,7 @@ class AdminServiceTest {
 
     @Test
     fun `updateApplication - partial update name only`() {
-        val result = svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), name = "New Name")
+        val result = appSvc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), name = "New Name")
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("New Name", result.value.name)
         assertEquals("Test app", result.value.description)
@@ -597,7 +603,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - partial update description only`() {
         val result =
-            svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), description = "New desc")
+            appSvc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1), description = "New desc")
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("My App", result.value.name)
         assertEquals("New desc", result.value.description)
@@ -605,7 +611,7 @@ class AdminServiceTest {
 
     @Test
     fun `updateApplication - no fields keeps existing values`() {
-        val result = svc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1))
+        val result = appSvc.updateApplication(appId = ApplicationId(100), tenantId = TenantId(1))
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("My App", result.value.name)
         assertEquals("Test app", result.value.description)
@@ -616,7 +622,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - launcherUrl matching redirect origin succeeds`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 launcherUrl = "http://localhost/home",
@@ -632,7 +638,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - launcherUrl mismatched origin rejected`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 launcherUrl = "https://attacker.example.com/home",
@@ -644,7 +650,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - launcherUrl with non-http scheme rejected`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 launcherUrl = "javascript:alert(1)",
@@ -656,7 +662,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - rejects when redirect URIs is empty`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 redirectUris = emptyList(),
@@ -669,7 +675,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - launcherUrl rejected when no redirect URIs registered`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 redirectUris = emptyList(),
@@ -685,7 +691,7 @@ class AdminServiceTest {
         apps.add(testApp.copy(launcherUrl = "http://localhost/home"))
 
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 launcherUrl = "   ",
@@ -697,7 +703,7 @@ class AdminServiceTest {
     @Test
     fun `updateApplication - iconUrl with non-http scheme rejected`() {
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 iconUrl = "javascript:alert(1)",
@@ -710,7 +716,7 @@ class AdminServiceTest {
     fun `updateApplication - iconUrl on a different origin is allowed`() {
         // Icons may be served from a CDN, unlike launcher URLs.
         val result =
-            svc.updateApplication(
+            appSvc.updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 iconUrl = "https://cdn.example.com/icon.svg",
@@ -725,7 +731,7 @@ class AdminServiceTest {
 
     @Test
     fun `setApplicationEnabled - disables app`() {
-        val result = svc.setApplicationEnabled(appId = ApplicationId(100), tenantId = TenantId(1), enabled = false)
+        val result = appSvc.setApplicationEnabled(appId = ApplicationId(100), tenantId = TenantId(1), enabled = false)
         assertIs<AdminResult.Success<Unit>>(result)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_DISABLED))
     }
@@ -735,15 +741,12 @@ class AdminServiceTest {
     // =========================================================================
 
     /** Builds a service variant with an observable [FakeCorsPort] wired in. */
-    private fun svcWithCors(corsPort: FakeCorsPort): AdminService =
-        AdminService(
-            tenantRepository = tenants,
-            userRepository = users,
+    private fun appSvcWithCors(corsPort: FakeCorsPort) =
+        ApplicationManagementService(
             applicationRepository = apps,
+            tenantRepository = tenants,
             passwordHasher = hasher,
             auditLog = auditLog,
-            selfServiceService = selfService,
-            passwordPolicy = passwordPolicy,
             corsPort = corsPort,
         )
 
@@ -765,7 +768,7 @@ class AdminServiceTest {
     fun `updateApplication invalidates CORS cache for tenant slug`() {
         val corsPort = FakeCorsPort()
         val result =
-            svcWithCors(corsPort).updateApplication(
+            appSvcWithCors(corsPort).updateApplication(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 name = "Renamed",
@@ -778,7 +781,7 @@ class AdminServiceTest {
     fun `setApplicationEnabled invalidates CORS cache for tenant slug`() {
         val corsPort = FakeCorsPort()
         val result =
-            svcWithCors(corsPort).setApplicationEnabled(
+            appSvcWithCors(corsPort).setApplicationEnabled(
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 enabled = false,
@@ -793,13 +796,13 @@ class AdminServiceTest {
 
     @Test
     fun `regenerateClientSecret - app not found`() {
-        val result = svc.regenerateClientSecret(appId = ApplicationId(999), tenantId = TenantId(1))
+        val result = appSvc.regenerateClientSecret(appId = ApplicationId(999), tenantId = TenantId(1))
         assertIs<AdminResult.Failure>(result)
     }
 
     @Test
     fun `regenerateClientSecret - success returns raw secret`() {
-        val result = svc.regenerateClientSecret(appId = ApplicationId(100), tenantId = TenantId(1))
+        val result = appSvc.regenerateClientSecret(appId = ApplicationId(100), tenantId = TenantId(1))
         assertIs<AdminResult.Success<String>>(result)
         assertTrue(result.value.isNotBlank())
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_CLIENT_SECRET_REGENERATED))

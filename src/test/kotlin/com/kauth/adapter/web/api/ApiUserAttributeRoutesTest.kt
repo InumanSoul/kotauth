@@ -362,8 +362,6 @@ class ApiUserAttributeRoutesTest {
                     com.kauth.domain.service.AdminService(
                         tenantRepository = tenantRepo,
                         userRepository = userRepo,
-                        applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
-                        passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                         selfServiceService = buildFakeSelfService(),
                     ),
@@ -375,6 +373,13 @@ class ApiUserAttributeRoutesTest {
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                         selfServiceService = buildFakeSelfService(),
+                    ),
+                applicationManagementService =
+                    com.kauth.domain.service.ApplicationManagementService(
+                        applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
+                        tenantRepository = tenantRepo,
+                        passwordHasher = hasher,
+                        auditLog = com.kauth.fakes.FakeAuditLogPort(),
                     ),
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,

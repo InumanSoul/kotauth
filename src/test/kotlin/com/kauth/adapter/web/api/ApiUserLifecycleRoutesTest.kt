@@ -124,8 +124,6 @@ class ApiUserLifecycleRoutesTest {
         AdminService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
-            passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = selfServiceService,
         )
@@ -138,6 +136,14 @@ class ApiUserLifecycleRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = selfServiceService,
+        )
+
+    private val applicationManagementService =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private val roleGroupService =
@@ -390,6 +396,7 @@ class ApiUserLifecycleRoutesTest {
                 roleGroupService = roleGroupService,
                 adminService = adminService,
                 adminUserService = adminUserService,
+                applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 emailOtpService = stubEmailOtpService(),

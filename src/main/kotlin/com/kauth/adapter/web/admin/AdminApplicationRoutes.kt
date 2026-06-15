@@ -6,7 +6,7 @@ import com.kauth.domain.model.RoleScope
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.CorsPort
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -22,7 +22,7 @@ import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 
 fun Route.adminApplicationRoutes(
-    adminService: AdminService,
+    applicationManagementService: ApplicationManagementService,
     applicationRepository: ApplicationRepository,
     roleGroupService: RoleGroupService,
     corsPort: CorsPort? = null,
@@ -179,7 +179,7 @@ fun Route.adminApplicationRoutes(
                 val audience = params["audience"]?.trim().orEmpty()
                 when (
                     val result =
-                        adminService.updateApplication(
+                        applicationManagementService.updateApplication(
                             appId = app.id,
                             tenantId = workspace.id,
                             name = name,
@@ -221,7 +221,7 @@ fun Route.adminApplicationRoutes(
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@post call.respond(HttpStatusCode.NotFound)
-                adminService.setApplicationEnabled(app.id, workspace.id, !app.enabled)
+                applicationManagementService.setApplicationEnabled(app.id, workspace.id, !app.enabled)
                 call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
             }
 
@@ -233,7 +233,7 @@ fun Route.adminApplicationRoutes(
                 val app =
                     applicationRepository.findByClientId(workspace.id, clientId)
                         ?: return@post call.respond(HttpStatusCode.NotFound)
-                when (val result = adminService.regenerateClientSecret(app.id, workspace.id)) {
+                when (val result = applicationManagementService.regenerateClientSecret(app.id, workspace.id)) {
                     is AdminResult.Success -> {
                         val flashToken = FlashStore.put(result.value)
                         call.respondRedirect(

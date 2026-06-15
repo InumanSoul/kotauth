@@ -5,7 +5,7 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -19,7 +19,7 @@ import io.ktor.server.routing.route
 
 internal fun Route.apiApplicationRoutes(
     applicationRepository: ApplicationRepository,
-    adminService: AdminService,
+    applicationManagementService: ApplicationManagementService,
     roleGroupService: RoleGroupService,
 ) {
     route("/applications") {
@@ -64,7 +64,7 @@ internal fun Route.apiApplicationRoutes(
             val body = call.receive<UpdateApplicationRequest>()
             when (
                 val result =
-                    adminService.updateApplication(
+                    applicationManagementService.updateApplication(
                         appId = appId,
                         tenantId = tenantId,
                         name = body.name,
@@ -89,7 +89,7 @@ internal fun Route.apiApplicationRoutes(
                         "Invalid application ID",
                         "",
                     )
-            when (val result = adminService.setApplicationEnabled(appId, tenantId, false)) {
+            when (val result = applicationManagementService.setApplicationEnabled(appId, tenantId, false)) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
                 is AdminResult.Failure -> call.respondAdminError(result.error)
             }

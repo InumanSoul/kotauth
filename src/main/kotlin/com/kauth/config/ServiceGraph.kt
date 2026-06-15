@@ -54,6 +54,7 @@ import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
@@ -106,6 +107,7 @@ data class ServiceGraph(
     val adminService: AdminService,
     val workspaceSettingsService: WorkspaceSettingsService,
     val adminUserService: AdminUserService,
+    val applicationManagementService: ApplicationManagementService,
     val roleGroupService: RoleGroupService,
     val launcherService: LauncherService,
     val impersonationService: ImpersonationService,
@@ -325,11 +327,16 @@ data class ServiceGraph(
                 AdminService(
                     tenantRepository = tenantRepository,
                     userRepository = userRepository,
-                    applicationRepository = applicationRepository,
-                    passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     selfServiceService = selfServiceService,
                     passwordPolicy = passwordPolicyAdapter,
+                )
+            val applicationManagementService =
+                ApplicationManagementService(
+                    applicationRepository = applicationRepository,
+                    tenantRepository = tenantRepository,
+                    passwordHasher = passwordHasher,
+                    auditLog = auditLogAdapter,
                     corsPort = corsOriginCache,
                 )
             val adminUserService =
@@ -530,6 +537,7 @@ data class ServiceGraph(
                 adminService = adminService,
                 workspaceSettingsService = workspaceSettingsService,
                 adminUserService = adminUserService,
+                applicationManagementService = applicationManagementService,
                 roleGroupService = roleGroupService,
                 launcherService = launcherService,
                 impersonationService = impersonationService,

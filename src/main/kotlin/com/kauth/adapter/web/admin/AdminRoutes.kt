@@ -55,6 +55,7 @@ fun Route.adminRoutes(
     adminService: AdminService,
     workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
     adminUserService: com.kauth.domain.service.AdminUserService,
+    applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     roleGroupService: RoleGroupService,
     appInfo: AppInfo,
     tenantRepository: TenantRepository,
@@ -497,7 +498,7 @@ fun Route.adminRoutes(
                 )
 
                 adminApplicationRoutes(
-                    adminService = adminService,
+                    applicationManagementService = applicationManagementService,
                     applicationRepository = applicationRepository,
                     roleGroupService = roleGroupService,
                     corsPort = corsPort,

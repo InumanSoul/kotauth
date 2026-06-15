@@ -128,8 +128,6 @@ class AdminWebhooksTest {
         AdminService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
-            passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
         )
@@ -142,6 +140,14 @@ class AdminWebhooksTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             selfServiceService = buildSelfService(),
+        )
+
+    private fun buildAppMgmtService() =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private fun buildRoleGroupService() =
@@ -300,6 +306,7 @@ class AdminWebhooksTest {
                     com.kauth.domain.service
                         .WorkspaceSettingsService(tenantRepo, auditLogPort),
                 adminUserService = buildAdminUserService(),
+                applicationManagementService = buildAppMgmtService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,
