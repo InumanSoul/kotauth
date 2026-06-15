@@ -359,8 +359,8 @@ class ApiOtpRoutesTest {
                         applicationRepository = apps,
                         auditLog = audit,
                     ),
-                credentialService =
-                    com.kauth.domain.service.AdminCredentialService(
+                accountService =
+                    com.kauth.domain.service.AdminAccountService(
                         tenantRepository = tenants,
                         userRepository = users,
                         auditLog = audit,

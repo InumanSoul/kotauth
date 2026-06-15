@@ -50,7 +50,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AdminCredentialService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
@@ -104,7 +104,7 @@ import kotlinx.coroutines.SupervisorJob
 data class ServiceGraph(
     val authService: AuthService,
     val oauthService: OAuthService,
-    val credentialService: AdminCredentialService,
+    val accountService: AdminAccountService,
     val workspaceSettingsService: WorkspaceSettingsService,
     val adminUserService: AdminUserService,
     val applicationManagementService: ApplicationManagementService,
@@ -323,8 +323,8 @@ data class ServiceGraph(
                 )
             val apiKeyBootstrapService =
                 ApiKeyBootstrapService(apiKeyRepository, tenantRepository)
-            val credentialService =
-                AdminCredentialService(
+            val accountService =
+                AdminAccountService(
                     tenantRepository = tenantRepository,
                     userRepository = userRepository,
                     auditLog = auditLogAdapter,
@@ -533,7 +533,7 @@ data class ServiceGraph(
             return ServiceGraph(
                 authService = authService,
                 oauthService = oauthService,
-                credentialService = credentialService,
+                accountService = accountService,
                 workspaceSettingsService = workspaceSettingsService,
                 adminUserService = adminUserService,
                 applicationManagementService = applicationManagementService,

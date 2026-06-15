@@ -3,7 +3,7 @@ package com.kauth.adapter.web.api
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminCredentialService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
@@ -17,7 +17,7 @@ import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
 internal fun Route.apiUserRoutes(
-    credentialService: AdminCredentialService,
+    accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
 ) {
@@ -163,7 +163,7 @@ internal fun Route.apiUserRoutes(
                             "userId must be an integer.",
                         )
                 val baseUrl = call.resolvedBaseUrl()
-                when (val result = credentialService.sendPasswordResetEmail(userId, tenantId, baseUrl)) {
+                when (val result = accountService.sendPasswordResetEmail(userId, tenantId, baseUrl)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }
@@ -190,7 +190,7 @@ internal fun Route.apiUserRoutes(
                             "Invalid user ID",
                             "userId must be an integer.",
                         )
-                when (val result = credentialService.setTemporaryPassword(userId, tenantId)) {
+                when (val result = accountService.setTemporaryPassword(userId, tenantId)) {
                     is AdminResult.Success -> {
                         val slug = call.parameters["tenantSlug"] ?: ""
                         val baseUrl = call.resolvedBaseUrl()

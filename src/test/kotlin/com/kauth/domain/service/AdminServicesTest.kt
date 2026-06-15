@@ -32,13 +32,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
-/**
- * Unit tests for [AdminService].
- *
- * Covers: workspace settings, user CRUD, application management,
- * client secret regeneration, SMTP config, admin-initiated password reset.
- */
-class AdminServiceTest {
+class AdminServicesTest {
     private val tenants = FakeTenantRepository()
     private val users = FakeUserRepository()
     private val apps = FakeApplicationRepository()
@@ -65,8 +59,8 @@ class AdminServiceTest {
             emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
-    private val svc =
-        AdminCredentialService(
+    private val accountSvc =
+        AdminAccountService(
             tenantRepository = tenants,
             userRepository = users,
             auditLog = auditLog,
@@ -739,7 +733,6 @@ class AdminServiceTest {
     // CORS cache invalidation hooks
     // =========================================================================
 
-    /** Builds a service variant with an observable [FakeCorsPort] wired in. */
     private fun appSvcWithCors(corsPort: FakeCorsPort) =
         ApplicationManagementService(
             applicationRepository = apps,
@@ -749,16 +742,18 @@ class AdminServiceTest {
             corsPort = corsPort,
         )
 
+    private fun wsSvcWithCors(corsPort: FakeCorsPort) =
+        WorkspaceSettingsService(
+            tenantRepository = tenants,
+            auditLog = auditLog,
+            emailBrandingRepository = emailBranding,
+            corsPort = corsPort,
+        )
+
     @Test
     fun `updateWorkspaceSettings invalidates CORS cache for tenant slug`() {
         val corsPort = FakeCorsPort()
-        val ws =
-            WorkspaceSettingsService(
-                tenantRepository = tenants,
-                auditLog = auditLog,
-                corsPort = corsPort,
-            )
-        val result = ws.updateWorkspaceSettings("acme", defaultSettingsUpdate())
+        val result = wsSvcWithCors(corsPort).updateWorkspaceSettings("acme", defaultSettingsUpdate())
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals(listOf("acme"), corsPort.invalidated)
     }
@@ -813,35 +808,46 @@ class AdminServiceTest {
 
     @Test
     fun `updateSmtpConfig - tenant not found`() {
-        val result = svc.updateSmtpConfig("unknown", "host", 587, null, null, "a@b.com", null, true, true)
+        val result = accountSvc.updateSmtpConfig("unknown", "host", 587, null, null, "a@b.com", null, true, true)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test
     fun `updateSmtpConfig - enabled but no host`() {
-        val result = svc.updateSmtpConfig("acme", "  ", 587, null, null, "a@b.com", null, true, true)
+        val result = accountSvc.updateSmtpConfig("acme", "  ", 587, null, null, "a@b.com", null, true, true)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `updateSmtpConfig - enabled but invalid from address`() {
-        val result = svc.updateSmtpConfig("acme", "smtp.host.com", 587, null, null, "bad-email", null, true, true)
+        val result =
+            accountSvc.updateSmtpConfig(
+                "acme",
+                "smtp.host.com",
+                587,
+                null,
+                null,
+                "bad-email",
+                null,
+                true,
+                true,
+            )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `updateSmtpConfig - enabled but invalid port`() {
-        val result = svc.updateSmtpConfig("acme", "smtp.host.com", 0, null, null, "a@b.com", null, true, true)
+        val result = accountSvc.updateSmtpConfig("acme", "smtp.host.com", 0, null, null, "a@b.com", null, true, true)
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }
 
     @Test
     fun `updateSmtpConfig - disabled skips validation`() {
-        val result = svc.updateSmtpConfig("acme", null, 587, null, null, null, null, false, false)
+        val result = accountSvc.updateSmtpConfig("acme", null, 587, null, null, null, null, false, false)
         assertIs<AdminResult.Success<Tenant>>(result)
         assertEquals(false, result.value.smtpEnabled)
     }
@@ -849,7 +855,7 @@ class AdminServiceTest {
     @Test
     fun `updateSmtpConfig - success`() {
         val result =
-            svc.updateSmtpConfig(
+            accountSvc.updateSmtpConfig(
                 "acme",
                 "smtp.new.com",
                 465,
@@ -873,7 +879,7 @@ class AdminServiceTest {
     @Test
     fun `sendPasswordResetEmail - user not found`() {
         val result =
-            svc.sendPasswordResetEmail(
+            accountSvc.sendPasswordResetEmail(
                 userId = UserId(999),
                 tenantId = TenantId(1),
                 baseUrl = "http://localhost",
@@ -885,7 +891,7 @@ class AdminServiceTest {
     @Test
     fun `sendPasswordResetEmail - success delegates to self-service`() {
         val result =
-            svc.sendPasswordResetEmail(
+            accountSvc.sendPasswordResetEmail(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 baseUrl = "http://localhost",
@@ -903,7 +909,7 @@ class AdminServiceTest {
     @Test
     fun `resendVerificationEmail - success`() {
         val result =
-            svc.resendVerificationEmail(
+            accountSvc.resendVerificationEmail(
                 userId = UserId(10),
                 tenantId = TenantId(1),
                 baseUrl = "http://localhost",
@@ -911,6 +917,27 @@ class AdminServiceTest {
         assertIs<AdminResult.Success<Unit>>(result)
         assertEquals(1, emailPort.sent.size)
         assertEquals("verification", emailPort.sent[0].type)
+    }
+
+    // =========================================================================
+    // unlockUser
+    // =========================================================================
+
+    @Test
+    fun `unlockUser - user not found returns NotFound`() {
+        val result = accountSvc.unlockUser(userId = UserId(999), tenantId = TenantId(1))
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `unlockUser - resets failed logins and emits ACCOUNT_UNLOCKED audit event`() {
+        users.recordFailedLogin(UserId(10), 5, lockedUntil = null)
+        val result = accountSvc.unlockUser(userId = UserId(10), tenantId = TenantId(1))
+        assertIs<AdminResult.Success<Unit>>(result)
+        val fresh = users.findById(UserId(10), TenantId(1))!!
+        assertEquals(0, fresh.failedLoginAttempts)
+        assertTrue(auditLog.hasEvent(AuditEventType.ACCOUNT_UNLOCKED))
     }
 
     // =========================================================================
@@ -1207,7 +1234,7 @@ class AdminServiceTest {
             ),
         )
         users.add(alice)
-        val result = svc.setTemporaryPassword(UserId(10), TenantId(1))
+        val result = accountSvc.setTemporaryPassword(UserId(10), TenantId(1))
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)
     }

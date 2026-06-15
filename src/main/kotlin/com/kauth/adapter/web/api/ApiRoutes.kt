@@ -8,7 +8,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
-import com.kauth.domain.service.AdminCredentialService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
@@ -37,7 +37,7 @@ fun Route.apiRoutes(
     sessionRepository: SessionRepository,
     auditLogRepository: AuditLogRepository,
     roleGroupService: RoleGroupService,
-    credentialService: AdminCredentialService,
+    accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     userAttributeService: UserAttributeService,
@@ -114,7 +114,7 @@ fun Route.apiRoutes(
                 }
             install(apiContextPlugin)
 
-            apiUserRoutes(credentialService, adminUserService, roleGroupService)
+            apiUserRoutes(accountService, adminUserService, roleGroupService)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)

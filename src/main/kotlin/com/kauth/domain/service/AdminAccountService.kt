@@ -9,7 +9,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 
-class AdminCredentialService(
+class AdminAccountService(
     private val tenantRepository: TenantRepository,
     private val userRepository: UserRepository,
     private val auditLog: AuditLogPort,

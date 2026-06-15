@@ -20,7 +20,7 @@ import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AdminCredentialService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.BackupExporterService
@@ -52,7 +52,7 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 fun Route.adminRoutes(
-    credentialService: AdminCredentialService,
+    accountService: AdminAccountService,
     workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
@@ -488,7 +488,7 @@ fun Route.adminRoutes(
                 }
 
                 adminSettingsRoutes(
-                    credentialService = credentialService,
+                    accountService = accountService,
                     workspaceSettingsService = workspaceSettingsService,
                     adminUserService = adminUserService,
                     userRepository = userRepository,
@@ -505,7 +505,7 @@ fun Route.adminRoutes(
                 )
 
                 adminUserRoutes(
-                    credentialService = credentialService,
+                    accountService = accountService,
                     adminUserService = adminUserService,
                     roleGroupService = roleGroupService,
                     sessionRepository = sessionRepository,

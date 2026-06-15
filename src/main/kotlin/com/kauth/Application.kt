@@ -444,7 +444,7 @@ fun Application.module(
             sessionRepository = s.sessionRepository,
             auditLogRepository = s.auditLogRepository,
             roleGroupService = s.roleGroupService,
-            credentialService = s.credentialService,
+            accountService = s.accountService,
             adminUserService = s.adminUserService,
             applicationManagementService = s.applicationManagementService,
             userAttributeService = s.userAttributeService,
@@ -467,7 +467,7 @@ fun Application.module(
         )
 
         adminRoutes(
-            credentialService = s.credentialService,
+            accountService = s.accountService,
             workspaceSettingsService = s.workspaceSettingsService,
             adminUserService = s.adminUserService,
             applicationManagementService = s.applicationManagementService,

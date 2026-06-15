@@ -6,7 +6,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.UserRepository
-import com.kauth.domain.service.AdminCredentialService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ImpersonationService
@@ -26,7 +26,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 
 fun Route.adminUserRoutes(
-    credentialService: AdminCredentialService,
+    accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
     sessionRepository: SessionRepository,
@@ -254,7 +254,7 @@ fun Route.adminUserRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                when (credentialService.unlockUser(userId, workspace.id)) {
+                when (accountService.unlockUser(userId, workspace.id)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=unlocked")
                     is AdminResult.Failure ->
@@ -377,7 +377,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (credentialService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
+                when (accountService.resendVerificationEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=verification_sent")
                     is AdminResult.Failure ->
@@ -394,7 +394,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (credentialService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
+                when (accountService.sendPasswordResetEmail(userId, workspace.id, baseUrl)) {
                     is AdminResult.Success ->
                         call.respondRedirect("/admin/workspaces/$slug/users/${userId.value}?saved=reset_email_sent")
                     is AdminResult.Failure ->
@@ -411,7 +411,7 @@ fun Route.adminUserRoutes(
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
                 val baseUrl = call.resolvedBaseUrl()
-                when (val result = credentialService.setTemporaryPassword(userId, workspace.id)) {
+                when (val result = accountService.setTemporaryPassword(userId, workspace.id)) {
                     is AdminResult.Success -> {
                         val changeUrl = "$baseUrl/t/$slug/change-password?token=${result.value}"
                         val flashToken = FlashStore.put(changeUrl)
