@@ -21,6 +21,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
+import com.kauth.domain.util.validatePasswordPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,13 @@ class CredentialFlowService(
     private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
     private val log = LoggerFactory.getLogger(CredentialFlowService::class.java)
+
+    private companion object {
+        const val EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600L
+        const val PASSWORD_RESET_TTL_SECONDS = 3600L
+        const val INVITE_TTL_SECONDS = 72 * 3600L
+        const val TEMP_PASSWORD_TTL_SECONDS = 24 * 3600L
+    }
 
     fun initiateEmailVerification(
         userId: UserId,
@@ -74,7 +82,7 @@ class CredentialFlowService(
                 userId = userId,
                 tenantId = tenantId,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(86400),
+                expiresAt = Instant.now().plusSeconds(EMAIL_VERIFICATION_TTL_SECONDS),
             ),
         )
 
@@ -170,7 +178,7 @@ class CredentialFlowService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(3600),
+                expiresAt = Instant.now().plusSeconds(PASSWORD_RESET_TTL_SECONDS),
                 ipAddress = ipAddress,
             ),
         )
@@ -241,8 +249,14 @@ class CredentialFlowService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
-                ?.let { return SelfServiceResult.Failure(it) }
+            validatePasswordPolicy(
+                newPassword,
+                tenant,
+                passwordPolicy,
+                token.userId,
+                token.tenantId,
+                checkHistory = true,
+            )?.let { return SelfServiceResult.Failure(it) }
         }
 
         val now = Instant.now()
@@ -307,7 +321,7 @@ class CredentialFlowService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(3600),
+                expiresAt = Instant.now().plusSeconds(PASSWORD_RESET_TTL_SECONDS),
                 ipAddress = null,
             ),
         )
@@ -355,7 +369,7 @@ class CredentialFlowService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(72 * 3600),
+                expiresAt = Instant.now().plusSeconds(INVITE_TTL_SECONDS),
                 purpose = TokenPurpose.INVITE,
             ),
         )
@@ -420,7 +434,7 @@ class CredentialFlowService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant)
+            validatePasswordPolicy(newPassword, tenant, passwordPolicy)
                 ?.let { return SelfServiceResult.Failure(it) }
         }
 
@@ -474,7 +488,7 @@ class CredentialFlowService(
                 userId = userId,
                 tenantId = user.tenantId,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(24 * 3600),
+                expiresAt = Instant.now().plusSeconds(TEMP_PASSWORD_TTL_SECONDS),
                 purpose = TokenPurpose.TEMP_PASSWORD,
             ),
         )
@@ -525,8 +539,14 @@ class CredentialFlowService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
-                ?.let { return SelfServiceResult.Failure(it) }
+            validatePasswordPolicy(
+                newPassword,
+                tenant,
+                passwordPolicy,
+                token.userId,
+                token.tenantId,
+                checkHistory = true,
+            )?.let { return SelfServiceResult.Failure(it) }
         }
 
         val now = Instant.now()
@@ -694,33 +714,4 @@ class CredentialFlowService(
             minutes % 60 == 0 -> "${minutes / 60} hour${if (minutes / 60 == 1) "" else "s"}"
             else -> "$minutes minutes"
         }
-
-    private fun validatePasswordPolicy(
-        newPassword: String,
-        tenant: Tenant,
-        userId: UserId? = null,
-        tenantId: TenantId? = null,
-        checkHistory: Boolean = false,
-    ): SelfServiceError.Validation? {
-        val policyError = passwordPolicy?.validate(newPassword, tenant)
-        if (policyError != null) return SelfServiceError.Validation(policyError)
-        if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-            return SelfServiceError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-            )
-        }
-        if (checkHistory &&
-            passwordPolicy != null &&
-            tenant.passwordPolicyHistoryCount > 0 &&
-            userId != null &&
-            tenantId != null
-        ) {
-            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
-                return SelfServiceError.Validation(
-                    "This password has been used recently. Please choose a different password.",
-                )
-            }
-        }
-        return null
-    }
 }

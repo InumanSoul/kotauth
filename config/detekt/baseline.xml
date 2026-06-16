@@ -2,9 +2,7 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>ComplexCondition:AccountSelfService.kt$AccountSelfService$checkHistory &amp;&amp; passwordPolicy != null &amp;&amp; tenant.passwordPolicyHistoryCount > 0 &amp;&amp; userId != null &amp;&amp; tenantId != null</ID>
     <ID>ComplexCondition:ApiKeyBootstrapService.kt$ApiKeyBootstrapService$hashUnchanged &amp;&amp; scopesUnchanged &amp;&amp; brandedAsBootstrap &amp;&amp; enabled</ID>
-    <ID>ComplexCondition:CredentialFlowService.kt$CredentialFlowService$checkHistory &amp;&amp; passwordPolicy != null &amp;&amp; tenant.passwordPolicyHistoryCount > 0 &amp;&amp; userId != null &amp;&amp; tenantId != null</ID>
     <ID>ComplexCondition:OAuthService.kt$OAuthService$stale != null &amp;&amp; stale.tenantId == tenant.id &amp;&amp; stale.revocationReason == Session.REVOCATION_REASON_ROTATED &amp;&amp; stale.userId != null</ID>
     <ID>ConstructorParameterNaming:TokenResponse.kt$TokenResponse$@SerialName("access_token") val access_token: String</ID>
     <ID>ConstructorParameterNaming:TokenResponse.kt$TokenResponse$@SerialName("expires_in") val expires_in: Long</ID>
@@ -44,7 +42,6 @@
     <ID>CyclomaticComplexMethod:UserViews.kt$internal fun userDetailPageImpl( workspace: Tenant, user: User, sessions: List&lt;Session>, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, successMessage: String? = null, editError: String? = null, roles: List&lt;Role> = emptyList(), groups: List&lt;Group> = emptyList(), userAttributes: Map&lt;String, String> = emptyMap(), /** attribute_key -> claim_name for keys that have a mapper configured. */ mappedKeys: Map&lt;String, String> = emptyMap(), attributeError: String? = null, /** * One-time reveal of a forced-change-password link. Shown once when the * admin has just clicked "Set temporary password"; on refresh the flash * slot is empty and the panel is gone. */ tempPasswordLink: String? = null, recentImpersonations: List&lt;ImpersonationRecord> = emptyList(), recentOtpActivity: List&lt;OtpActivityRecord> = emptyList(), ): HTML.() -> Unit</ID>
     <ID>CyclomaticComplexMethod:WebhookViews.kt$internal fun webhooksListPageImpl( workspace: Tenant, endpoints: List&lt;WebhookEndpoint>, deliveries: List&lt;WebhookDelivery>, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, newSecret: String? = null, error: String? = null, ): HTML.() -> Unit</ID>
     <ID>CyclomaticComplexMethod:WorkspaceViews.kt$internal fun securityPolicyPageImpl( workspace: Tenant, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, error: String? = null, saved: Boolean = false, ): HTML.() -> Unit</ID>
-    <ID>LargeClass:CredentialFlowService.kt$CredentialFlowService</ID>
     <ID>LongMethod:AdminApiKeyRoutes.kt$fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?)</ID>
     <ID>LongMethod:AdminApplicationRoutes.kt$fun Route.adminApplicationRoutes( applicationManagementService: ApplicationManagementService, applicationRepository: ApplicationRepository, roleGroupService: RoleGroupService, corsPort: CorsPort? = null, )</ID>
     <ID>LongMethod:AdminBackupRoutes.kt$fun Route.adminBackupRoutes( apiKeyService: ApiKeyService, tenantRepository: TenantRepository, backupExporterService: BackupExporterService, backupImporterService: BackupImporterService, backupEncryptionPort: BackupEncryptionPort, auditLogPort: AuditLogPort, currentSchemaVersion: Int, kotauthVersion: String, )</ID>
@@ -76,6 +73,7 @@
     <ID>LongMethod:BackupViews.kt$internal fun workspaceBackupPageImpl( workspace: Tenant, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, error: String? = null, ): HTML.() -> Unit</ID>
     <ID>LongMethod:ClaimMapperViews.kt$internal fun claimMapperFormPageImpl( workspace: Tenant, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, prefill: TenantClaimMapper? = null, error: String? = null, ): HTML.() -> Unit</ID>
     <ID>LongMethod:ClaimMapperViews.kt$internal fun claimMappersListPageImpl( workspace: Tenant, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, mappers: List&lt;TenantClaimMapper>, error: String? = null, toastMessage: String? = null, ): HTML.() -> Unit</ID>
+    <ID>LongMethod:CredentialFlowService.kt$CredentialFlowService$fun confirmPasswordReset( rawToken: String, newPassword: String, confirmPassword: String, ): SelfServiceResult&lt;Unit></ID>
     <ID>LongMethod:DashboardViews.kt$internal fun workspaceListPageImpl( workspaces: List&lt;Tenant>, allWorkspaces: List&lt;WorkspaceStub>, loggedInAs: String, ): HTML.() -> Unit</ID>
     <ID>LongMethod:DemoSeedService.kt$DemoSeedService$private fun seedAcmeWorkspace(passwordHash: String): SeedResult</ID>
     <ID>LongMethod:DemoSeedService.kt$DemoSeedService$private fun seedStartupLabsWorkspace(passwordHash: String): SeedResult</ID>

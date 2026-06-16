@@ -45,7 +45,7 @@ class AdminDisplayHelpersTest {
     private val prTokenRepo = FakePasswordResetTokenRepository()
     private val emailPort = FakeEmailPort()
 
-    private val selfService =
+    private val credentialFlowService =
         CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
@@ -66,7 +66,7 @@ class AdminDisplayHelpersTest {
             sessionRepository = sessions,
             passwordHasher = hasher,
             auditLog = auditLog,
-            credentialFlowService = selfService,
+            credentialFlowService = credentialFlowService,
             passwordPolicy = passwordPolicy,
         )
 

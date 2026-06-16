@@ -4,7 +4,6 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
-import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -15,6 +14,7 @@ import com.kauth.domain.port.PasswordPolicyPort
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.validatePasswordPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -118,7 +118,7 @@ class AccountSelfService(
             return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
         }
 
-        validatePasswordPolicy(newPassword, tenant, userId, tenantId, checkHistory = true)
+        validatePasswordPolicy(newPassword, tenant, passwordPolicy, userId, tenantId, checkHistory = true)
             ?.let { return SelfServiceResult.Failure(it) }
 
         val now = Instant.now()
@@ -250,75 +250,4 @@ class AccountSelfService(
 
         return SelfServiceResult.Success(Unit)
     }
-
-    private fun validatePasswordPolicy(
-        newPassword: String,
-        tenant: Tenant,
-        userId: UserId? = null,
-        tenantId: TenantId? = null,
-        checkHistory: Boolean = false,
-    ): SelfServiceError.Validation? {
-        val policyError = passwordPolicy?.validate(newPassword, tenant)
-        if (policyError != null) return SelfServiceError.Validation(policyError)
-        if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-            return SelfServiceError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-            )
-        }
-        if (checkHistory &&
-            passwordPolicy != null &&
-            tenant.passwordPolicyHistoryCount > 0 &&
-            userId != null &&
-            tenantId != null
-        ) {
-            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
-                return SelfServiceError.Validation(
-                    "This password has been used recently. Please choose a different password.",
-                )
-            }
-        }
-        return null
-    }
-}
-
-sealed class SelfServiceResult<out T> {
-    data class Success<T>(
-        val value: T,
-    ) : SelfServiceResult<T>()
-
-    data class Failure(
-        val error: SelfServiceError,
-    ) : SelfServiceResult<Nothing>()
-}
-
-sealed class SelfServiceError(
-    val message: String,
-) {
-    class NotFound(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class Validation(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class Unauthorized(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class TokenExpired(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class TokenInvalid(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class SmtpNotConfigured(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class PasswordLoginDisabled(
-        message: String = "Password sign-in is disabled for this workspace.",
-    ) : SelfServiceError(message)
 }
