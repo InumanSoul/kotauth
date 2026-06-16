@@ -400,7 +400,7 @@ fun Application.module(
             registerRateLimiter = s.registerRateLimiter,
             tokenRateLimiter = s.tokenRateLimiter,
             mfaRateLimiter = s.mfaRateLimiter,
-            selfServiceService = s.selfServiceService,
+            credentialFlowService = s.credentialFlowService,
             mfaService = s.mfaService,
             roleRepository = s.roleRepository,
             socialLoginService = s.socialLoginService,
@@ -416,7 +416,7 @@ fun Application.module(
         )
 
         portalRoutes(
-            selfServiceService = s.selfServiceService,
+            accountSelfService = s.accountSelfService,
             tenantRepository = s.tenantRepository,
             sessionRepository = s.sessionRepository,
             mfaService = s.mfaService,
@@ -486,7 +486,7 @@ fun Application.module(
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,
             oauthService = s.oauthService,
-            selfServiceService = s.selfServiceService,
+            accountSelfService = s.accountSelfService,
             roleRepository = s.roleRepository,
             keyRotationService = s.keyRotationService,
             tenantKeyRepository = s.tenantKeyRepository,

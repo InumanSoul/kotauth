@@ -303,7 +303,7 @@ class ApiOtpRoutesTest {
         }
 
     private fun stubSelfService(audit: com.kauth.fakes.FakeAuditLogPort) =
-        com.kauth.domain.service.UserSelfServiceService(
+        com.kauth.domain.service.CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = com.kauth.fakes.FakeSessionRepository(),
@@ -325,7 +325,7 @@ class ApiOtpRoutesTest {
         sessionRepository = com.kauth.fakes.FakeSessionRepository(),
         passwordHasher = com.kauth.fakes.FakePasswordHasher(),
         auditLog = audit,
-        selfServiceService = stubSelfService(audit),
+        credentialFlowService = stubSelfService(audit),
     )
 
     private fun io.ktor.server.application.Application.installApp(
@@ -364,7 +364,7 @@ class ApiOtpRoutesTest {
                         tenantRepository = tenants,
                         userRepository = users,
                         auditLog = audit,
-                        selfServiceService = stubSelfService(audit),
+                        credentialFlowService = stubSelfService(audit),
                     ),
                 adminUserService = stubAdminUserService(tenants, users, audit),
                 applicationManagementService =

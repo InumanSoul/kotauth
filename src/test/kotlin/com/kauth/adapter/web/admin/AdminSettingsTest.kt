@@ -7,8 +7,8 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -104,8 +104,8 @@ class AdminSettingsTest {
             enabled = true,
         )
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -122,7 +122,7 @@ class AdminSettingsTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAdminUserService() =
@@ -132,7 +132,7 @@ class AdminSettingsTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAppMgmtService() =

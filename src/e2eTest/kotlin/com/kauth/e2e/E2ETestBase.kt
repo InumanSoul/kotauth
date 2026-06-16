@@ -8,10 +8,10 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
@@ -107,7 +107,7 @@ abstract class E2ETestBase {
             )
 
         private fun buildSelfService() =
-            UserSelfServiceService(
+            AccountSelfService(
                 userRepository = userRepo,
                 tenantRepository = tenantRepo,
                 sessionRepository = sessionRepo,
@@ -126,7 +126,7 @@ abstract class E2ETestBase {
                 passwordHasher = hasher,
                 auditLog = auditLogPort,
                 sessionRepository = sessionRepo,
-                selfServiceService = buildSelfService(),
+                accountSelfService = buildSelfService(),
             )
 
         private fun buildRoleGroupService() =

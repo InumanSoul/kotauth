@@ -10,8 +10,8 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookResult
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApplicationRepository
@@ -111,8 +111,8 @@ class AdminWebhooksTest {
             enabled = true,
         )
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -129,7 +129,7 @@ class AdminWebhooksTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAdminUserService() =
@@ -139,7 +139,7 @@ class AdminWebhooksTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAppMgmtService() =

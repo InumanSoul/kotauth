@@ -59,7 +59,7 @@ class ApiClaimMapperRoutesTest {
     private var writeKey: String = ""
 
     private fun buildFakeSelfService() =
-        com.kauth.domain.service.UserSelfServiceService(
+        com.kauth.domain.service.CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = com.kauth.fakes.FakeSessionRepository(),
@@ -349,7 +349,7 @@ class ApiClaimMapperRoutesTest {
                         tenantRepository = tenantRepo,
                         userRepository = userRepo,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                        selfServiceService = buildFakeSelfService(),
+                        credentialFlowService = buildFakeSelfService(),
                     ),
                 adminUserService =
                     com.kauth.domain.service.AdminUserService(
@@ -358,7 +358,7 @@ class ApiClaimMapperRoutesTest {
                         sessionRepository = com.kauth.fakes.FakeSessionRepository(),
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                        selfServiceService = buildFakeSelfService(),
+                        credentialFlowService = buildFakeSelfService(),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

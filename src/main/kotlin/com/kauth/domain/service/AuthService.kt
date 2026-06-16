@@ -42,7 +42,7 @@ class AuthService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val sessionRepository: SessionRepository,
-    private val selfServiceService: UserSelfServiceService? = null,
+    private val credentialFlowService: CredentialFlowService? = null,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
@@ -169,7 +169,7 @@ class AuthService(
                             details = mapOf("attempts" to newCount.toString()),
                         ),
                     )
-                    selfServiceService?.sendAccountLockedNotification(user, tenant, baseUrl ?: "")
+                    credentialFlowService?.sendAccountLockedNotification(user, tenant, baseUrl ?: "")
                 }
             }
             auditLog.record(
@@ -399,9 +399,9 @@ class AuthService(
             ),
         )
 
-        if (tenant.emailVerificationRequired && tenant.isSmtpReady && selfServiceService != null) {
+        if (tenant.emailVerificationRequired && tenant.isSmtpReady && credentialFlowService != null) {
             try {
-                selfServiceService.initiateEmailVerification(savedUser.id, tenant.id, baseUrl)
+                credentialFlowService.initiateEmailVerification(savedUser.id, tenant.id, baseUrl)
             } catch (_: Exception) {
                 // non-fatal
             }

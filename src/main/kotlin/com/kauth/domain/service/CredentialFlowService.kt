@@ -5,8 +5,6 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.EmailVerificationToken
 import com.kauth.domain.model.PasswordResetToken
 import com.kauth.domain.model.RequiredAction
-import com.kauth.domain.model.Session
-import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenPurpose
@@ -23,6 +21,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.SecureTokens
 import com.kauth.domain.util.sha256Hex
+import com.kauth.domain.util.validatePasswordPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,26 +29,7 @@ import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
-/**
- * Domain service — user self-service use cases.
- *
- * Handles everything a logged-in user can do on their own account:
- *   - Email verification (initiate + confirm)
- *   - Forgot password (initiate + confirm)
- *   - Profile update (email, full name)
- *   - Password change (with current-password verification)
- *   - Session listing and self-revocation
- *
- * Security invariants:
- *   - Forgot-password flow always returns success — never reveals if an email exists.
- *   - Password change + reset always revoke all existing sessions.
- *   - Token lookups compare against SHA-256 hashes — raw tokens never touch this layer.
- *   - Session ownership is verified before revocation (a user cannot revoke another's session).
- *
- * Returns [SelfServiceResult] — same discriminated-union pattern as [AdminResult].
- * No exceptions cross layer boundaries.
- */
-class UserSelfServiceService(
+class CredentialFlowService(
     private val userRepository: UserRepository,
     private val tenantRepository: TenantRepository,
     private val sessionRepository: SessionRepository,
@@ -61,17 +41,15 @@ class UserSelfServiceService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
 ) {
-    private val log = LoggerFactory.getLogger(UserSelfServiceService::class.java)
+    private val log = LoggerFactory.getLogger(CredentialFlowService::class.java)
 
-    // =========================================================================
-    // Email verification
-    // =========================================================================
+    private companion object {
+        const val EMAIL_VERIFICATION_TTL_SECONDS = 24 * 3600L
+        const val PASSWORD_RESET_TTL_SECONDS = 3600L
+        const val INVITE_TTL_SECONDS = 72 * 3600L
+        const val TEMP_PASSWORD_TTL_SECONDS = 24 * 3600L
+    }
 
-    /**
-     * Generates a verification token and sends a verification email.
-     * Replaces any previously unused token for this user.
-     * Returns [SelfServiceError.SmtpNotConfigured] if the tenant has no SMTP.
-     */
     fun initiateEmailVerification(
         userId: UserId,
         tenantId: TenantId,
@@ -93,7 +71,7 @@ class UserSelfServiceService(
         }
 
         if (user.emailVerified) {
-            return SelfServiceResult.Success(Unit) // already verified — no-op
+            return SelfServiceResult.Success(Unit)
         }
 
         val (rawToken, tokenHash) = generateToken()
@@ -104,7 +82,7 @@ class UserSelfServiceService(
                 userId = userId,
                 tenantId = tenantId,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(86400), // 24 hours
+                expiresAt = Instant.now().plusSeconds(EMAIL_VERIFICATION_TTL_SECONDS),
             ),
         )
 
@@ -137,10 +115,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    /**
-     * Confirms an email address using a raw token from the verification link.
-     * Marks the token as used and flips [User.emailVerified].
-     */
     fun confirmEmailVerification(rawToken: String): SelfServiceResult<Unit> {
         val hash = sha256Hex(rawToken)
         val token =
@@ -178,17 +152,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    // =========================================================================
-    // Forgot password
-    // =========================================================================
-
-    /**
-     * Initiates a password reset for the email address if it exists in the tenant.
-     *
-     * SECURITY: always returns [SelfServiceResult.Success] — this prevents
-     * user enumeration even when the email is not found. The caller should
-     * display a generic "if an account exists, you'll receive an email" message.
-     */
     fun initiateForgotPassword(
         email: String,
         tenantSlug: String,
@@ -197,15 +160,15 @@ class UserSelfServiceService(
     ): SelfServiceResult<Unit> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
-                ?: return SelfServiceResult.Success(Unit) // fail silently — tenant slug visible in URL
+                ?: return SelfServiceResult.Success(Unit)
 
-        if (!tenant.isSmtpReady) return SelfServiceResult.Success(Unit) // silent — don't leak config state
+        if (!tenant.isSmtpReady) return SelfServiceResult.Success(Unit)
 
         val user =
             userRepository.findByEmail(tenant.id, email.trim().lowercase())
-                ?: return SelfServiceResult.Success(Unit) // user doesn't exist — don't reveal
+                ?: return SelfServiceResult.Success(Unit)
 
-        if (!user.enabled) return SelfServiceResult.Success(Unit) // disabled account — silent
+        if (!user.enabled) return SelfServiceResult.Success(Unit)
 
         val (rawToken, tokenHash) = generateToken()
 
@@ -215,7 +178,7 @@ class UserSelfServiceService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(3600), // 1 hour
+                expiresAt = Instant.now().plusSeconds(PASSWORD_RESET_TTL_SECONDS),
                 ipAddress = ipAddress,
             ),
         )
@@ -249,10 +212,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    /**
-     * Completes a password reset using a raw token from the reset link.
-     * On success: password updated, all sessions revoked, token marked used.
-     */
     fun confirmPasswordReset(
         rawToken: String,
         newPassword: String,
@@ -263,7 +222,6 @@ class UserSelfServiceService(
             prTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
 
-        // Purpose guard — invite tokens must not be usable on the reset endpoint
         if (token.purpose != TokenPurpose.PASSWORD_RESET) {
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Reset link is invalid."))
         }
@@ -291,14 +249,20 @@ class UserSelfServiceService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
-                ?.let { return SelfServiceResult.Failure(it) }
+            validatePasswordPolicy(
+                newPassword,
+                tenant,
+                passwordPolicy,
+                token.userId,
+                token.tenantId,
+                checkHistory = true,
+            )?.let { return SelfServiceResult.Failure(it) }
         }
 
         val now = Instant.now()
         val hashedPassword = passwordHasher.hash(newPassword)
         userRepository.updatePassword(token.userId, hashedPassword, now)
-        userRepository.resetFailedLogins(token.userId) // clear lockout on password reset
+        userRepository.resetFailedLogins(token.userId)
         sessionRepository.revokeAllForUser(token.tenantId, token.userId, now)
         prTokenRepo.markUsed(token.id!!, now)
 
@@ -325,7 +289,6 @@ class UserSelfServiceService(
             }
         }
 
-        // Record in password history
         if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
         }
@@ -344,151 +307,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    // =========================================================================
-    // Self-service profile management
-    // =========================================================================
-
-    fun getProfile(
-        userId: UserId,
-        tenantId: TenantId,
-    ): SelfServiceResult<User> {
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-        return SelfServiceResult.Success(user)
-    }
-
-    fun updateProfile(
-        userId: UserId,
-        tenantId: TenantId,
-        email: String,
-        fullName: String,
-    ): SelfServiceResult<User> {
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-
-        if (email.isBlank() || !email.contains('@')) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("A valid email address is required."))
-        }
-        if (fullName.isBlank()) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("Full name is required."))
-        }
-
-        val newEmail = email.trim().lowercase()
-        if (newEmail != user.email && userRepository.existsByEmail(tenantId, newEmail)) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("That email address is already in use."))
-        }
-
-        // If email changed, require re-verification
-        val emailChanged = newEmail != user.email
-        val updated =
-            userRepository.update(
-                user.copy(
-                    email = newEmail,
-                    fullName = fullName.trim(),
-                    emailVerified = if (emailChanged) false else user.emailVerified,
-                ),
-            )
-
-        auditLog.record(
-            AuditEvent(
-                tenantId = tenantId,
-                userId = userId,
-                clientId = null,
-                eventType = AuditEventType.USER_PROFILE_UPDATED,
-                ipAddress = null,
-                userAgent = null,
-            ),
-        )
-
-        return SelfServiceResult.Success(updated)
-    }
-
-    /**
-     * Changes the user's own password.
-     * Requires current password verification. Revokes all active sessions on success.
-     */
-    fun changePassword(
-        userId: UserId,
-        tenantId: TenantId,
-        currentPassword: String,
-        newPassword: String,
-        confirmPassword: String,
-    ): SelfServiceResult<Unit> {
-        val tenant =
-            tenantRepository.findById(tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("Workspace not found."))
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-
-        if (!tenant.securityConfig.passwordLoginEnabled) {
-            return SelfServiceResult.Failure(SelfServiceError.PasswordLoginDisabled())
-        }
-
-        if (!passwordHasher.verify(currentPassword, user.passwordHash)) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("Current password is incorrect."))
-        }
-        if (newPassword.isBlank()) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("New password cannot be empty."))
-        }
-        if (newPassword != confirmPassword) {
-            return SelfServiceResult.Failure(SelfServiceError.Validation("Passwords do not match."))
-        }
-
-        // Enforce password policy + history
-        validatePasswordPolicy(newPassword, tenant, userId, tenantId, checkHistory = true)
-            ?.let { return SelfServiceResult.Failure(it) }
-
-        val now = Instant.now()
-        val hashedPassword = passwordHasher.hash(newPassword)
-        userRepository.updatePassword(userId, hashedPassword, now)
-        sessionRepository.revokeAllForUser(tenantId, userId, now)
-
-        if (tenant.isSmtpReady) {
-            emailScope.launch {
-                try {
-                    emailPort.sendPasswordChangedEmail(user.email, user.fullName, tenant.displayName, tenant)
-                } catch (e: Exception) {
-                    log.warn(
-                        "Password changed email failed tenantId={} userId={}: {}",
-                        tenantId.value,
-                        userId.value,
-                        e.message,
-                    )
-                }
-            }
-        }
-
-        // Record in password history
-        if (passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
-            passwordPolicy.recordPasswordHistory(userId, tenantId, hashedPassword)
-        }
-
-        auditLog.record(
-            AuditEvent(
-                tenantId = tenantId,
-                userId = userId,
-                clientId = null,
-                eventType = AuditEventType.USER_PASSWORD_CHANGED,
-                ipAddress = null,
-                userAgent = null,
-            ),
-        )
-
-        return SelfServiceResult.Success(Unit)
-    }
-
-    // =========================================================================
-    // Security notifications
-    // =========================================================================
-
-    /**
-     * Sends an account-locked notification email with an embedded password reset link.
-     * Generates a fresh reset token so the user can bypass the lockout window immediately.
-     * Silent no-op if the tenant has no SMTP configured.
-     */
     fun sendAccountLockedNotification(
         user: User,
         tenant: Tenant,
@@ -503,7 +321,7 @@ class UserSelfServiceService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(3600),
+                expiresAt = Instant.now().plusSeconds(PASSWORD_RESET_TTL_SECONDS),
                 ipAddress = null,
             ),
         )
@@ -532,169 +350,6 @@ class UserSelfServiceService(
         }
     }
 
-    private fun formatLockoutDuration(minutes: Int): String =
-        when {
-            minutes < 60 -> "$minutes minute${if (minutes == 1) "" else "s"}"
-            minutes % 60 == 0 -> "${minutes / 60} hour${if (minutes / 60 == 1) "" else "s"}"
-            else -> "$minutes minutes"
-        }
-
-    // =========================================================================
-    // Session management
-    // =========================================================================
-
-    /** Returns all active sessions for the given user. */
-    fun getActiveSessions(
-        userId: UserId,
-        tenantId: TenantId,
-    ): List<Session> = sessionRepository.findActiveByUser(tenantId, userId)
-
-    /**
-     * Revokes a single session. Verifies ownership — a user cannot revoke
-     * another user's session through this path.
-     */
-    fun revokeSession(
-        userId: UserId,
-        tenantId: TenantId,
-        sessionId: SessionId,
-    ): SelfServiceResult<Unit> {
-        val session =
-            sessionRepository.findById(sessionId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("Session not found."))
-
-        if (session.userId != userId || session.tenantId != tenantId) {
-            return SelfServiceResult.Failure(SelfServiceError.Unauthorized("Cannot revoke this session."))
-        }
-
-        sessionRepository.revoke(sessionId)
-
-        auditLog.record(
-            AuditEvent(
-                tenantId = tenantId,
-                userId = userId,
-                clientId = null,
-                eventType = AuditEventType.USER_SESSION_REVOKED_SELF,
-                ipAddress = null,
-                userAgent = null,
-                details = mapOf("sessionId" to sessionId.value.toString()),
-            ),
-        )
-
-        return SelfServiceResult.Success(Unit)
-    }
-
-    fun revokeOtherSessions(
-        userId: UserId,
-        tenantId: TenantId,
-        keepSessionId: SessionId,
-    ): SelfServiceResult<Int> {
-        val active = sessionRepository.findActiveByUser(tenantId, userId)
-        var revoked = 0
-        for (s in active) {
-            if (s.id != null && s.id != keepSessionId) {
-                sessionRepository.revoke(s.id)
-                revoked++
-            }
-        }
-
-        if (revoked > 0) {
-            auditLog.record(
-                AuditEvent(
-                    tenantId = tenantId,
-                    userId = userId,
-                    clientId = null,
-                    eventType = AuditEventType.USER_SESSION_REVOKED_SELF,
-                    ipAddress = null,
-                    userAgent = null,
-                    details = mapOf("action" to "revoke_others", "count" to revoked.toString()),
-                ),
-            )
-        }
-
-        return SelfServiceResult.Success(revoked)
-    }
-
-    fun disableAccount(
-        userId: UserId,
-        tenantId: TenantId,
-    ): SelfServiceResult<Unit> {
-        val user =
-            userRepository.findById(userId, tenantId)
-                ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
-
-        userRepository.update(user.copy(enabled = false))
-        sessionRepository.revokeAllForUser(tenantId, userId)
-
-        auditLog.record(
-            AuditEvent(
-                tenantId = tenantId,
-                userId = userId,
-                clientId = null,
-                eventType = AuditEventType.USER_ACCOUNT_DISABLED_SELF,
-                ipAddress = null,
-                userAgent = null,
-                details = emptyMap(),
-            ),
-        )
-
-        return SelfServiceResult.Success(Unit)
-    }
-
-    // =========================================================================
-    // Helpers
-    // =========================================================================
-
-    /**
-     * Generates a cryptographically secure 32-byte token.
-     * Returns a pair of (rawToken, sha256Hash).
-     * Raw token is base64url-encoded (43 chars, URL-safe).
-     */
-    private fun generateToken(): Pair<String, String> {
-        val token = SecureTokens.randomBase64Url(32)
-        return token to sha256Hex(token)
-    }
-
-    /**
-     * Validates a new password against the tenant's policy and optionally against password history.
-     * Returns a [SelfServiceError.Validation] if the password fails, or null if it passes.
-     */
-    private fun validatePasswordPolicy(
-        newPassword: String,
-        tenant: Tenant,
-        userId: UserId? = null,
-        tenantId: TenantId? = null,
-        checkHistory: Boolean = false,
-    ): SelfServiceError.Validation? {
-        val policyError = passwordPolicy?.validate(newPassword, tenant)
-        if (policyError != null) return SelfServiceError.Validation(policyError)
-        if (passwordPolicy == null && newPassword.length < tenant.passwordPolicyMinLength) {
-            return SelfServiceError.Validation(
-                "Password must be at least ${tenant.passwordPolicyMinLength} characters.",
-            )
-        }
-        if (checkHistory &&
-            passwordPolicy != null &&
-            tenant.passwordPolicyHistoryCount > 0 &&
-            userId != null &&
-            tenantId != null
-        ) {
-            if (passwordPolicy.isInHistory(userId, tenantId, newPassword, tenant.passwordPolicyHistoryCount)) {
-                return SelfServiceError.Validation(
-                    "This password has been used recently. Please choose a different password.",
-                )
-            }
-        }
-        return null
-    }
-
-    // =========================================================================
-    // Invite flow
-    // =========================================================================
-
-    /**
-     * Creates an invite token and sends the invite email.
-     * Called by [AdminService.createUser] when sendInvite = true, and by resend-invite.
-     */
     fun initiateInvite(
         user: User,
         tenant: Tenant,
@@ -714,7 +369,7 @@ class UserSelfServiceService(
                 userId = user.id,
                 tenantId = tenant.id,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(72 * 3600), // 72 hours
+                expiresAt = Instant.now().plusSeconds(INVITE_TTL_SECONDS),
                 purpose = TokenPurpose.INVITE,
             ),
         )
@@ -742,11 +397,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    /**
-     * Processes the accept-invite form submission.
-     * On success: password set, email verified, SET_PASSWORD cleared, token consumed.
-     * Does NOT create a session — user goes through normal login.
-     */
     fun confirmAcceptInvite(
         rawToken: String,
         newPassword: String,
@@ -784,7 +434,7 @@ class UserSelfServiceService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant)
+            validatePasswordPolicy(newPassword, tenant, passwordPolicy)
                 ?.let { return SelfServiceResult.Failure(it) }
         }
 
@@ -796,7 +446,6 @@ class UserSelfServiceService(
 
         userRepository.updatePassword(token.userId, hashedPassword, now)
 
-        // Re-fetch after updatePassword to avoid stale snapshot
         val freshUser =
             userRepository.findById(token.userId, token.tenantId)
                 ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
@@ -809,7 +458,6 @@ class UserSelfServiceService(
 
         prTokenRepo.markUsed(token.id!!, now)
 
-        // Record first password in history
         if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
         }
@@ -830,21 +478,6 @@ class UserSelfServiceService(
         )
     }
 
-    // =========================================================================
-    // Forced password change (admin-initiated) — TEMP_PASSWORD token flow
-    // =========================================================================
-
-    /**
-     * Generates a 24-hour TEMP_PASSWORD token for [user] and stamps the
-     * [RequiredAction.CHANGE_PASSWORD] flag on their account. Any previous
-     * TEMP_PASSWORD tokens for this user are deleted first — only one
-     * active invitation to rotate at a time.
-     *
-     * Returns the raw token to the caller for one-time display. The raw
-     * value is never stored or logged; only the SHA-256 hash lives in
-     * [prTokenRepo]. The caller (admin route handler) is responsible for
-     * showing it exactly once to the admin.
-     */
     fun initiateForcedPasswordChange(user: User): SelfServiceResult<String> {
         val userId = user.id ?: return SelfServiceResult.Failure(SelfServiceError.NotFound("User not found."))
         val (rawToken, tokenHash) = generateToken()
@@ -855,7 +488,7 @@ class UserSelfServiceService(
                 userId = userId,
                 tenantId = user.tenantId,
                 tokenHash = tokenHash,
-                expiresAt = Instant.now().plusSeconds(24 * 3600), // 24 hours
+                expiresAt = Instant.now().plusSeconds(TEMP_PASSWORD_TTL_SECONDS),
                 purpose = TokenPurpose.TEMP_PASSWORD,
             ),
         )
@@ -869,14 +502,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(rawToken)
     }
 
-    /**
-     * Consumes a TEMP_PASSWORD token, sets the new password, clears the
-     * [RequiredAction.CHANGE_PASSWORD] flag, records in history, and
-     * revokes all active sessions.
-     *
-     * Same structural shape as [confirmPasswordReset] but with a purpose
-     * guard specific to TEMP_PASSWORD tokens.
-     */
     fun confirmForcedPasswordChange(
         rawToken: String,
         newPassword: String,
@@ -887,7 +512,6 @@ class UserSelfServiceService(
             prTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Change-password link is invalid."))
 
-        // Purpose guard — reject PASSWORD_RESET and INVITE tokens routed here by mistake
         if (token.purpose != TokenPurpose.TEMP_PASSWORD) {
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Change-password link is invalid."))
         }
@@ -915,8 +539,14 @@ class UserSelfServiceService(
         }
 
         if (tenant != null) {
-            validatePasswordPolicy(newPassword, tenant, token.userId, token.tenantId, checkHistory = true)
-                ?.let { return SelfServiceResult.Failure(it) }
+            validatePasswordPolicy(
+                newPassword,
+                tenant,
+                passwordPolicy,
+                token.userId,
+                token.tenantId,
+                checkHistory = true,
+            )?.let { return SelfServiceResult.Failure(it) }
         }
 
         val now = Instant.now()
@@ -933,7 +563,6 @@ class UserSelfServiceService(
             freshUser.copy(requiredActions = freshUser.requiredActions - RequiredAction.CHANGE_PASSWORD),
         )
 
-        // Record in password history
         if (tenant != null && passwordPolicy != null && tenant.passwordPolicyHistoryCount > 0) {
             passwordPolicy.recordPasswordHistory(token.userId, token.tenantId, hashedPassword)
         }
@@ -953,24 +582,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    // =========================================================================
-    // Magic link (passwordless sign-in)
-    // =========================================================================
-
-    /**
-     * Issues a one-time sign-in token, emails the link, and audits the request.
-     *
-     * Always returns [SelfServiceResult.Success] — user enumeration protection.
-     * Silent no-op when:
-     *   - tenant slug doesn't resolve
-     *   - tenant hasn't enabled `magicLinkEnabled` on its security config
-     *   - tenant SMTP isn't configured
-     *   - email doesn't match a user
-     *   - user is disabled
-     *
-     * 15-minute TTL. Any prior unused [TokenPurpose.MAGIC_LINK] for the user
-     * is deleted first — only one active link at a time.
-     */
     fun initiateMagicLink(
         email: String,
         tenantSlug: String,
@@ -1035,22 +646,6 @@ class UserSelfServiceService(
         return SelfServiceResult.Success(Unit)
     }
 
-    /**
-     * Consumes a magic-link token. On success returns the user for the caller
-     * to establish a session or resume an OAuth flow.
-     *
-     * Hard no-signs:
-     *   - token unknown, wrong purpose, expired, already used
-     *   - user not found
-     *   - user disabled
-     *   - user has `CHANGE_PASSWORD` required action — admin's rotation intent
-     *     must not be bypassable via a magic-link sign-in
-     *
-     * Clears `SET_PASSWORD` required action on success — the user proved email
-     * ownership, so the invite flow is satisfied. Sets `emailVerified = true`.
-     * Does NOT bypass MFA — the caller still routes the user through the
-     * MFA challenge if [MfaService.shouldChallengeMfa] returns true.
-     */
     fun consumeMagicLink(rawToken: String): SelfServiceResult<User> {
         val hash = sha256Hex(rawToken)
         val token =
@@ -1085,7 +680,6 @@ class UserSelfServiceService(
             )
         }
 
-        // Magic link proves inbox ownership — mark verified, clear any pending invite action
         userRepository.update(
             user.copy(
                 emailVerified = true,
@@ -1108,50 +702,16 @@ class UserSelfServiceService(
 
         return SelfServiceResult.Success(userRepository.findById(token.userId, token.tenantId)!!)
     }
-}
 
-// =============================================================================
-// Result types
-// =============================================================================
+    private fun generateToken(): Pair<String, String> {
+        val token = SecureTokens.randomBase64Url(32)
+        return token to sha256Hex(token)
+    }
 
-sealed class SelfServiceResult<out T> {
-    data class Success<T>(
-        val value: T,
-    ) : SelfServiceResult<T>()
-
-    data class Failure(
-        val error: SelfServiceError,
-    ) : SelfServiceResult<Nothing>()
-}
-
-sealed class SelfServiceError(
-    val message: String,
-) {
-    class NotFound(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class Validation(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class Unauthorized(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class TokenExpired(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class TokenInvalid(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class SmtpNotConfigured(
-        message: String,
-    ) : SelfServiceError(message)
-
-    class PasswordLoginDisabled(
-        message: String = "Password sign-in is disabled for this workspace.",
-    ) : SelfServiceError(message)
+    private fun formatLockoutDuration(minutes: Int): String =
+        when {
+            minutes < 60 -> "$minutes minute${if (minutes == 1) "" else "s"}"
+            minutes % 60 == 0 -> "${minutes / 60} hour${if (minutes / 60 == 1) "" else "s"}"
+            else -> "$minutes minutes"
+        }
 }

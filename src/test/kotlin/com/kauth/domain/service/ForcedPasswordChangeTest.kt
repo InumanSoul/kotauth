@@ -30,7 +30,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tests for admin-initiated forced password change — `initiateForcedPasswordChange`
- * and `confirmForcedPasswordChange` on [UserSelfServiceService].
+ * and `confirmForcedPasswordChange` on [CredentialFlowService].
  */
 class ForcedPasswordChangeTest {
     private val tenants = FakeTenantRepository()
@@ -44,7 +44,7 @@ class ForcedPasswordChangeTest {
     private val passwordPolicy = FakePasswordPolicyPort()
 
     private val svc =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,

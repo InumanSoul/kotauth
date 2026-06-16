@@ -5,7 +5,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
-import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -18,7 +18,7 @@ import io.ktor.server.routing.post
 
 internal fun Route.registerRoutes(
     authService: AuthService,
-    selfServiceService: UserSelfServiceService,
+    credentialFlowService: CredentialFlowService,
     registerRateLimiter: RateLimiterPort,
     identityProviderRepository: IdentityProviderRepository?,
     baseUrl: String,
@@ -101,7 +101,7 @@ internal fun Route.registerRoutes(
                 if (passwordlessTenant) {
                     // No password the user knows — issue a magic-link so they can complete
                     // first sign-in. Same enumeration-safe redirect as the normal flow.
-                    selfServiceService.initiateMagicLink(
+                    credentialFlowService.initiateMagicLink(
                         email = email,
                         tenantSlug = slug,
                         baseUrl = baseUrl,

@@ -50,7 +50,7 @@ class ApiUserAttributeRoutesTest {
     private val hasher = FakePasswordHasher()
 
     private fun buildFakeSelfService() =
-        com.kauth.domain.service.UserSelfServiceService(
+        com.kauth.domain.service.CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = com.kauth.fakes.FakeSessionRepository(),
@@ -363,7 +363,7 @@ class ApiUserAttributeRoutesTest {
                         tenantRepository = tenantRepo,
                         userRepository = userRepo,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                        selfServiceService = buildFakeSelfService(),
+                        credentialFlowService = buildFakeSelfService(),
                     ),
                 adminUserService =
                     com.kauth.domain.service.AdminUserService(
@@ -372,7 +372,7 @@ class ApiUserAttributeRoutesTest {
                         sessionRepository = com.kauth.fakes.FakeSessionRepository(),
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                        selfServiceService = buildFakeSelfService(),
+                        credentialFlowService = buildFakeSelfService(),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

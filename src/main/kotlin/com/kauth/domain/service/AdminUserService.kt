@@ -20,7 +20,7 @@ class AdminUserService(
     private val sessionRepository: SessionRepository,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val selfServiceService: UserSelfServiceService,
+    private val credentialFlowService: CredentialFlowService,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
@@ -118,7 +118,7 @@ class AdminUserService(
         )
 
         if (sendInvite && tenant.isSmtpReady) {
-            when (selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+            when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
                 is SelfServiceResult.Success ->
                     auditLog.record(
                         AuditEvent(
@@ -157,7 +157,7 @@ class AdminUserService(
             return AdminResult.Failure(AdminError.Validation("SMTP is not configured."))
         }
 
-        return when (val result = selfServiceService.initiateInvite(user, tenant, baseUrl)) {
+        return when (val result = credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
             is SelfServiceResult.Success -> {
                 auditLog.record(
                     AuditEvent(

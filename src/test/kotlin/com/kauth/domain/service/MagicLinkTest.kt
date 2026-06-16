@@ -32,7 +32,7 @@ import kotlin.test.assertTrue
 
 /**
  * Tests for magic-link (passwordless) sign-in — `initiateMagicLink` and
- * `consumeMagicLink` on [UserSelfServiceService].
+ * `consumeMagicLink` on [CredentialFlowService].
  */
 class MagicLinkTest {
     private val tenants = FakeTenantRepository()
@@ -46,7 +46,7 @@ class MagicLinkTest {
     private val passwordPolicy = FakePasswordPolicyPort()
 
     private val svc =
-        UserSelfServiceService(
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,

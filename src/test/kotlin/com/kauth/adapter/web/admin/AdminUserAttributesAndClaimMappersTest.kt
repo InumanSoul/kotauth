@@ -9,9 +9,9 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserAttribute
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuditLogRepository
@@ -340,8 +340,8 @@ class AdminUserAttributesAndClaimMappersTest {
     // Shared wiring
     // -------------------------------------------------------------------------
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -358,7 +358,7 @@ class AdminUserAttributesAndClaimMappersTest {
             tenantRepository = tenantRepo,
             userRepository = userRepo,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAdminUserService() =
@@ -368,7 +368,7 @@ class AdminUserAttributesAndClaimMappersTest {
             sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
         )
 
     private fun buildAppMgmtService() =
