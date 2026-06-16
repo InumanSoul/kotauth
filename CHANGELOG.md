@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.15.0] - 2026-06-15
+
+Internal refactor release. **No functional change.** The 2026-06-12
+god-file-refactor plan is fully landed, the largest service files are
+broken into focused services, and the detekt ratchet is tightened so
+new god files can't reappear silently.
+
+### Changed
+
+- **`AdminService` (1145 LOC) deleted** — split into four focused
+  services per the plan: `WorkspaceSettingsService`, `AdminUserService`,
+  `ApplicationManagementService`, `AdminAccountService` (previously
+  proposed as `AdminCredentialService`, renamed per clean-code review).
+  Shared `AdminResult` / `AdminError` sealed types live in
+  `AdminResult.kt`. Each new service depends only on the repos and ports
+  it actually uses
+- **`UserSelfServiceService` (1157 LOC) deleted** — split into
+  `CredentialFlowService` (token + email flows: email verification,
+  forgot password, invite, forced password change, magic link,
+  account-locked notification) and `AccountSelfService` (logged-in
+  profile + password change + session management). Shared
+  `SelfServiceResult` / `SelfServiceError` types live in
+  `SelfServiceResult.kt`
+- **`WorkspaceSettingsUpdate` parameter object** replaces the
+  25-positional-parameter signature on `updateWorkspaceSettings`. The
+  factory `WorkspaceSettingsUpdate.from(tenant)` also closed a latent
+  bug where the general-settings POST silently reset
+  `lockoutMaxAttempts`, `corsAllowCredentials`, magic-link, and OTP
+  fields to compile-time defaults when an admin saved the general tab
+- **`emailOtpLoginRoutes` cleanup** — `/email-otp/send` and
+  `/email-otp/verify` POST handlers extracted into private
+  `suspend handleSendOtp` and `handleVerifyOtp` helpers
+- **`validatePasswordPolicy` extracted to `domain/util/`** — the
+  duplicated private helper that lived in both
+  `CredentialFlowService` and `AccountSelfService` is now a single
+  top-level function, eliminating drift risk for password-policy
+  enforcement
+- **Named TTL constants** in `CredentialFlowService`
+  (`EMAIL_VERIFICATION_TTL_SECONDS`, `PASSWORD_RESET_TTL_SECONDS`,
+  `INVITE_TTL_SECONDS`, `TEMP_PASSWORD_TTL_SECONDS`) replacing bare
+  arithmetic like `72 * 3600`
+
+### Tooling
+
+- **Detekt thresholds tightened** — `LargeClass` 600→400,
+  `TooManyFunctions` 20 (classes) / 25 (files). The new baseline
+  records the surfaces that legitimately exceed the threshold
+  (`OAuthService` is deliberately deferred per the plan;
+  `ServiceGraph.Companion` is the composition root). New god files
+  cannot reappear silently
+
+### Notes
+
+- `OAuthService` is intentionally **not** split in this release — the
+  plan defers it until after OIDC certification testing, since protocol
+  code benefits from locality and it just absorbed three security fixes
+
+---
+
 ## [1.14.1] - 2026-06-12
 
 Closes the published-default admin credential window flagged in the

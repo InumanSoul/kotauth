@@ -12,7 +12,7 @@ complexity:
   active: true
   LargeClass:
     active: true
-    threshold: 600
+    threshold: 400
     excludes: ['**/*View.kt']
   LongMethod:
     active: true
@@ -28,8 +28,8 @@ complexity:
     threshold: 18
   TooManyFunctions:
     active: true
-    thresholdInClasses: 25
-    thresholdInFiles: 30
+    thresholdInClasses: 20
+    thresholdInFiles: 25
     ignorePrivate: true
     excludes: ['**/*View.kt']
   NestedBlockDepth:
