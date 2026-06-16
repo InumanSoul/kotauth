@@ -168,8 +168,7 @@ class BackupImporterService(
             )
         tenantRepository.update(fullTenant)
 
-        themeRepository.upsert(
-            createdTenant.id,
+        val importedTheme =
             with(tb.theme) {
                 TenantTheme(
                     accentColor = accentColor,
@@ -187,8 +186,11 @@ class BackupImporterService(
                     faviconUrl = faviconUrl,
                     defaultLocale = defaultLocale,
                 )
-            },
-        )
+            }
+        com.kauth.domain.util
+            .validateTenantTheme(importedTheme)
+            ?.let { error("theme: $it") }
+        themeRepository.upsert(createdTenant.id, importedTheme)
 
         portalConfigRepository.upsert(
             createdTenant.id,
