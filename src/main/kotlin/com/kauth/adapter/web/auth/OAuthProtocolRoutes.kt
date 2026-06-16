@@ -785,16 +785,10 @@ internal fun Route.oauthProtocolRoutes(
             call.clearSsoCookie(slug)
 
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
-            if (!postLogoutUri.isNullOrBlank()) {
-                // Only allow post-logout redirect to same origin to prevent open redirect
-                val origin = call.resolvedBaseUrl()
-                if (postLogoutUri.startsWith(origin) || postLogoutUri.startsWith("/")) {
-                    call.respondRedirect(postLogoutUri)
-                } else {
-                    call.respondRedirect("/t/$slug/authorize")
-                }
-            } else {
+            if (postLogoutUri.isNullOrBlank() || !isSafePostLogoutRedirect(postLogoutUri, call.resolvedBaseUrl())) {
                 call.respondRedirect("/t/$slug/authorize")
+            } else {
+                call.respondRedirect(postLogoutUri)
             }
         }
 
@@ -812,4 +806,13 @@ internal fun Route.oauthProtocolRoutes(
             call.respond(HttpStatusCode.OK)
         }
     }
+}
+
+private fun isSafePostLogoutRedirect(
+    uri: String,
+    origin: String,
+): Boolean {
+    // "//evil.com" and "/\evil.com" start with "/" but resolve to external origins.
+    if (uri.startsWith("//") || uri.startsWith("/\\") || uri.startsWith("\\")) return false
+    return uri.startsWith("/") || uri.startsWith(origin)
 }

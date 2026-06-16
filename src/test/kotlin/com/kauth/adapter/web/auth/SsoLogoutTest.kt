@@ -37,6 +37,7 @@ import io.mockk.mockk
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -179,5 +180,64 @@ class SsoLogoutTest {
 
             assertEquals(HttpStatusCode.OK, response.status)
             assertSsoCookieCleared(response.headers.getAll("Set-Cookie") ?: emptyList())
+        }
+
+    @Test
+    fun `GET end_session rejects protocol-relative double-slash redirect`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=//evil.com/x")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertFalse(location.contains("evil.com"), "Must not redirect to evil.com, got: $location")
+        }
+
+    @Test
+    fun `GET end_session rejects protocol-relative backslash redirect`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=%2F%5Cevil.com/x")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse((response.headers["Location"] ?: "").contains("evil.com"))
+        }
+
+    @Test
+    fun `GET end_session rejects double-backslash redirect`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=%5C%5Cevil.com/x")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse((response.headers["Location"] ?: "").contains("evil.com"))
+        }
+
+    @Test
+    fun `GET end_session rejects external absolute URI`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=https://evil.com/x")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse((response.headers["Location"] ?: "").contains("evil.com"))
+        }
+
+    @Test
+    fun `GET end_session accepts safe relative path`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response = noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=/dashboard")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/dashboard", response.headers["Location"])
         }
 }
