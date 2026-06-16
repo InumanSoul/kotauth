@@ -96,8 +96,13 @@ FROM eclipse-temurin:17-jre
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
+RUN groupadd -r -g 10001 kotauth \
+    && useradd -r -u 10001 -g kotauth -d /app -s /sbin/nologin kotauth
+
 EXPOSE 8080
 
-COPY --from=kotlin-build /app/build/libs/*.jar /app/kauth.jar
+COPY --from=kotlin-build --chown=kotauth:kotauth /app/build/libs/*.jar /app/kauth.jar
+
+USER kotauth
 
 ENTRYPOINT ["java", "-jar", "/app/kauth.jar"]

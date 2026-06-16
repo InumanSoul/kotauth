@@ -47,6 +47,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
     ports:
       - "8080:8080"
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       db:
         condition: service_healthy
