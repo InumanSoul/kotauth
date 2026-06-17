@@ -506,8 +506,8 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
             val redirect =
                 buildString {
                     append(redirectUri)
-                    append("?code=").append(code)
-                    if (!state.isNullOrBlank()) append("&state=").append(state)
+                    append("?code=").append(encodeParam(code))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
                 }
             respondRedirect(redirect)
         }
