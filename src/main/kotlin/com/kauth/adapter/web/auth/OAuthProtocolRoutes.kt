@@ -4,7 +4,6 @@ import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
@@ -451,24 +450,20 @@ internal fun Route.oauthProtocolRoutes(
 
         when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent, baseUrl)) {
             is AuthResult.Failure -> {
-                if (result.error is AuthError.PasswordExpired) {
-                    call.respondRedirect("/t/$slug/forgot-password?reason=expired")
-                } else {
-                    call.respondHtml(
-                        HttpStatusCode.Unauthorized,
-                        AuthView.loginPage(
-                            tenantSlug = slug,
-                            ctx = ctx.viewContext,
-                            error = result.error.toMessage(),
-                            oauthParams = oauthParams,
-                            enabledProviders = enabledProviders,
-                            registrationEnabled = tenant?.registrationEnabled ?: true,
-                            magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
-                            passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
-                            emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
-                        ),
-                    )
-                }
+                call.respondHtml(
+                    HttpStatusCode.Unauthorized,
+                    AuthView.loginPage(
+                        tenantSlug = slug,
+                        ctx = ctx.viewContext,
+                        error = result.error.toMessage(),
+                        oauthParams = oauthParams,
+                        enabledProviders = enabledProviders,
+                        registrationEnabled = tenant?.registrationEnabled ?: true,
+                        magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
+                        passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                        emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
+                    ),
+                )
             }
             is AuthResult.Success -> {
                 val user = result.value

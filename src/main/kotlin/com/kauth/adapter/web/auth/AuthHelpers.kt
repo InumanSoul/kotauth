@@ -315,16 +315,12 @@ internal fun AuthError.toMessage(): String =
         is AuthError.EmailAlreadyExists -> "An account with that email already exists."
         is AuthError.WeakPassword -> "Password must be at least $minLength characters."
         is AuthError.ValidationError -> this.message
-        is AuthError.PasswordExpired -> "Your password has expired. Please reset it."
-        is AuthError.AccountLocked ->
-            "Too many failed attempts. Your account is temporarily locked. " +
-                "Reset your password to regain access immediately."
-        is AuthError.PendingSetup ->
-            "This account has a pending invitation. Check your email for the invite link, " +
-                "or ask your administrator to resend it."
-        is AuthError.PasswordChangeRequired ->
-            "An administrator has required you to change your password. " +
-                "Follow the link provided to set a new one."
+        // Collapsed to the generic message — these states would otherwise let an attacker
+        // enumerate accounts (lockout, pending invite, expired/forced-change flags).
+        is AuthError.PasswordExpired -> "Invalid username or password."
+        is AuthError.AccountLocked -> "Invalid username or password."
+        is AuthError.PendingSetup -> "Invalid username or password."
+        is AuthError.PasswordChangeRequired -> "Invalid username or password."
         is AuthError.PasswordLoginDisabled ->
             "Password sign-in is disabled for this workspace. " +
                 "Use the email link option or sign in with a configured social provider."

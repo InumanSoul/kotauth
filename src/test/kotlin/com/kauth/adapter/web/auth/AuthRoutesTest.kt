@@ -47,6 +47,7 @@ import java.time.Instant
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -265,10 +266,9 @@ class AuthRoutesTest {
     // =========================================================================
 
     @Test
-    fun `POST authorize redirects to forgot-password with reason=expired for expired password`() =
+    fun `POST authorize renders the generic invalid-credentials message for expired password`() =
         testApplication {
             resetFixtures()
-            // Seed a user with an expired password
             userRepo.clear()
             userRepo.add(
                 user.copy(
@@ -317,10 +317,13 @@ class AuthRoutesTest {
                     header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
                 }
 
-            assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers["Location"] ?: ""
-            assertTrue(location.contains("forgot-password"), "Must redirect to forgot-password")
-            assertTrue(location.contains("reason=expired"), "Must include reason=expired query param")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("Invalid username or password"),
+                "Expired-password path must show the generic message, was: ${body.take(300)}",
+            )
+            assertFalse(body.contains("expired", ignoreCase = true), "Must not leak the expired state")
         }
 
     // =========================================================================
