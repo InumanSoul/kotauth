@@ -35,6 +35,7 @@ import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.port.UserAttributeRepository
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.util.validateTenantTheme
 import java.time.Instant
 
 /**
@@ -187,9 +188,7 @@ class BackupImporterService(
                     defaultLocale = defaultLocale,
                 )
             }
-        com.kauth.domain.util
-            .validateTenantTheme(importedTheme)
-            ?.let { error("theme: $it") }
+        validateTenantTheme(importedTheme)?.let { error("theme: $it") }
         themeRepository.upsert(createdTenant.id, importedTheme)
 
         portalConfigRepository.upsert(

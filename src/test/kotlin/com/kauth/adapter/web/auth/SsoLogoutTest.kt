@@ -231,6 +231,18 @@ class SsoLogoutTest {
         }
 
     @Test
+    fun `GET end_session rejects URL-encoded protocol-relative redirect`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=%2F%2Fevil.com/x")
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse((response.headers["Location"] ?: "").contains("evil.com"))
+        }
+
+    @Test
     fun `GET end_session accepts safe relative path`() =
         testApplication {
             application(appBlock())

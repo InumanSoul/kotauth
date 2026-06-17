@@ -535,6 +535,30 @@ class MfaServiceTest {
     }
 
     @Test
+    fun `verifyTotp rejects a prior-window code resubmitted in the next window`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+        val firstWindow = 1_700_000_000_000L
+        val priorCode = TotpUtil.generateCode(secret, firstWindow)
+
+        assertIs<MfaResult.Success<*>>(fixedClockSvc(firstWindow).verifyTotp(UserId(10), priorCode))
+
+        val laterWindow = firstWindow + 30_000L
+        val replay = fixedClockSvc(laterWindow).verifyTotp(UserId(10), priorCode)
+        assertIs<MfaResult.Failure>(replay)
+        assertIs<MfaError.ReplayRejected>(replay.error)
+    }
+
+    @Test
     fun `verifyTotp lockout is scoped per enrollment - one user lockout does not affect another`() {
         val aliceSecret = TotpUtil.generateSecret()
         val bobSecret = TotpUtil.generateSecret()

@@ -41,6 +41,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -522,6 +523,23 @@ class BackupExportImportTest {
         val export = exportSuccessful(ExportOptions())
         importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
         assertEquals(1, txRunner.invocations)
+    }
+
+    @Test
+    fun `import rejects a payload whose theme fails server-side validation`() {
+        val export = exportSuccessful(ExportOptions())
+        val tampered =
+            export.copy(
+                tenant = export.tenant.copy(theme = export.tenant.theme.copy(accentColor = "red; evil")),
+            )
+        val r = importer().import(tampered, newSlug = "acme-staging", currentSchemaVersion = 38)
+        assertIs<BackupResult.Failure>(r)
+        val error = r.error
+        assertIs<BackupError.InvalidPayload>(error)
+        assertTrue(
+            error.message.contains("theme", ignoreCase = true),
+            "Failure must surface a theme-validation error so misconfigured backups don't silently pass",
+        )
     }
 
     @Test

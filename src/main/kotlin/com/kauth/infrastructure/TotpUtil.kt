@@ -1,5 +1,6 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.TotpVerifyResult
 import com.kauth.domain.util.SecureTokens
 import java.nio.ByteBuffer
 import javax.crypto.Mac
@@ -151,14 +152,5 @@ object TotpUtil {
             }
         }
         return output.toByteArray()
-    }
-}
-
-data class TotpVerifyResult(
-    val valid: Boolean,
-    val matchedStep: Long? = null,
-) {
-    companion object {
-        val INVALID = TotpVerifyResult(valid = false, matchedStep = null)
     }
 }

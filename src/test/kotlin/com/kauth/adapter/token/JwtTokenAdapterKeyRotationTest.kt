@@ -255,6 +255,14 @@ class JwtTokenAdapterKeyRotationTest {
     }
 
     @Test
+    fun `decodeAccessToken accepts a token whose iss matches the expected issuer`() {
+        val response = adapter.issueUserTokens(user, tenant, null, listOf("openid"))
+        val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
+        assertNotNull(claims, "Legitimate same-issuer token must still decode after iss enforcement was added")
+        assertEquals(user.id!!.value.toString(), claims.sub)
+    }
+
+    @Test
     fun `invalidateSigningKeyCache for tenant A does not affect tenant B`() {
         // Setup tenant 2
         val keyPairC = KeyGenerator.generateRsaKeyPair("key-c")
