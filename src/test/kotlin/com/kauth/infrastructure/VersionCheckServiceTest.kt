@@ -351,6 +351,44 @@ class VersionCheckServiceTest {
     }
 
     @Test
+    fun `sanitizeReleaseUrl accepts https URLs`() {
+        val service = newServiceForSanitize()
+        assertEquals(
+            "https://github.com/anthropics/kotauth/releases/tag/v2.0.0",
+            service.sanitizeReleaseUrl("https://github.com/anthropics/kotauth/releases/tag/v2.0.0"),
+        )
+    }
+
+    @Test
+    fun `sanitizeReleaseUrl rejects http URLs`() {
+        val service = newServiceForSanitize()
+        assertNull(service.sanitizeReleaseUrl("http://attacker.example.com/release"))
+    }
+
+    @Test
+    fun `sanitizeReleaseUrl rejects javascript and data schemes`() {
+        val service = newServiceForSanitize()
+        assertNull(service.sanitizeReleaseUrl("javascript:alert(1)"))
+        assertNull(service.sanitizeReleaseUrl("data:text/html,<script>alert(1)</script>"))
+    }
+
+    @Test
+    fun `sanitizeReleaseUrl rejects null and blank inputs`() {
+        val service = newServiceForSanitize()
+        assertNull(service.sanitizeReleaseUrl(null))
+        assertNull(service.sanitizeReleaseUrl(""))
+        assertNull(service.sanitizeReleaseUrl("   "))
+    }
+
+    private fun newServiceForSanitize(): VersionCheckService =
+        VersionCheckService(
+            currentVersion = "1.0.0",
+            manifestUrl = "http://localhost/test",
+            enabled = false,
+            scope = CoroutineScope(SupervisorJob()),
+        )
+
+    @Test
     fun `service handles JSON array gracefully`() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val service =

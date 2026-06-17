@@ -99,9 +99,7 @@ data class EnvironmentConfig(
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
                 updateCheckEnabled = System.getenv("KAUTH_UPDATE_CHECK")?.lowercase() != "false",
-                updateCheckUrl =
-                    System.getenv("KAUTH_UPDATE_CHECK_URL")
-                        ?: "https://inumansoul.github.io/kotauth/latest.json",
+                updateCheckUrl = resolveUpdateCheckUrl(System.getenv("KAUTH_UPDATE_CHECK_URL")),
                 i18nBundleDir = System.getenv("KAUTH_I18N_BUNDLE_DIR")?.takeIf { it.isNotBlank() },
                 redisUrl = requireRedisUrl(System.getenv("KAUTH_REDIS_URL")),
                 redisUsername = System.getenv("KAUTH_REDIS_USERNAME")?.takeIf { it.isNotBlank() },
@@ -247,6 +245,29 @@ data class EnvironmentConfig(
                 exitProcess(1)
             }
             return dbPassword
+        }
+
+        private fun resolveUpdateCheckUrl(override: String?): String {
+            val raw = override?.trim().orEmpty()
+            if (raw.isEmpty()) return "https://inumansoul.github.io/kotauth/latest.json"
+            if (!raw.startsWith("https://")) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_UPDATE_CHECK_URL must use https://             │
+                    │                                                              │
+                    │  The update manifest controls the "update available" banner  │
+                    │  and the release-notes link in the admin UI. Plain HTTP can  │
+                    │  be MITM'd to point operators at an attacker-controlled URL. │
+                    │                                                              │
+                    │  Use https:// or unset KAUTH_UPDATE_CHECK_URL to use the     │
+                    │  default. Set KAUTH_UPDATE_CHECK=false for air-gapped runs.  │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+            return raw
         }
 
         private fun validateDemoMode(
