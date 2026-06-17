@@ -100,6 +100,19 @@ class MfaServiceTest {
     }
 
     @Test
+    fun `beginEnrollment recovery codes are 16 hex chars with at least 64-bit entropy`() {
+        val result = svc.beginEnrollment(userId = UserId(10), tenantId = TenantId(1), issuer = "Acme")
+        val codes = (result as MfaResult.Success<EnrollmentResponse>).value.recoveryCodes
+
+        val hex = Regex("^[0-9a-f]+$")
+        codes.forEach { code ->
+            assertEquals(MfaService.RECOVERY_CODE_LENGTH, code.length, "Code length must match RECOVERY_CODE_LENGTH")
+            assertTrue(code.matches(hex), "Code must be lowercase hex, got: $code")
+        }
+        assertEquals(codes.size, codes.toSet().size, "Recovery codes must be unique across the batch")
+    }
+
+    @Test
     fun `beginEnrollment returns AlreadyEnrolled for user with verified enrollment`() {
         // Seed a verified enrollment directly
         mfaRepo.saveEnrollment(
