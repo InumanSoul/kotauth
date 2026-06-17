@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.16.0] - 2026-06-17
+
+Security hardening release. Closes the seven Tier-2 findings from the
+2026-06-12 security review: container hardening, theme input validation,
+JWT issuer enforcement, social-link email-verification gate, TOTP replay
++ lockout, post-logout redirect SSRF, and login error normalisation.
+
+### Security
+
+- **Container drops privileges (H7).** Runtime image now runs as a
+  non-root user (`kotauth`, UID/GID 10001). All `docker-compose*.yml`
+  files set `security_opt: no-new-privileges`, `cap_drop: ALL`,
+  `read_only: true`, with `tmpfs: /tmp` for writable scratch space.
+- **TenantTheme inputs validated server-side (H5).** New
+  `validateTenantTheme` helper enforces strict patterns for colour hex,
+  font family, border-radius unit, locale (BCP-47), and logo URL
+  schemes. Backup imports go through the same validator.
+- **JWT introspection enforces `iss` (M4).**
+  `TokenPort.decodeAccessToken` now requires the caller to pass the
+  expected issuer; `JwtTokenAdapter` rebuilds the verifier with
+  `.withIssuer(...)` so a token minted for tenant A can no longer be
+  introspected against tenant B's verifier.
+- **Social-link email-verification gate (M1).** The auto-link-by-email
+  branch in `SocialLoginService` now rejects with
+  `LinkRequiresEmailVerification` when the provider has not verified
+  the address. The GitHub adapter only marks
+  `SocialUserProfile.emailVerified = true` when the address came from
+  `/user/emails` (which exposes `verified: true`), never from the
+  public `/user` payload alone.
+- **TOTP replay + per-enrollment lockout (M2 / M3).** `TotpUtil.verify`
+  now returns the matched time step. `MfaService` rejects any code
+  whose matched step is at or before the previously-consumed step
+  (replay) and locks the enrollment after
+  `MAX_FAILED_TOTP_ATTEMPTS` (5) consecutive failures for the tenant's
+  configured `lockoutDurationMinutes`. New audit event
+  `MFA_TOTP_LOCKOUT`. Schema: V50 adds `last_used_step`,
+  `failed_mfa_attempts`, `mfa_locked_until` to `mfa_enrollments`.
+- **Post-logout open-redirect closed (M5).** The OIDC end-session
+  endpoint now refuses `post_logout_redirect_uri` values like
+  `//evil.com`, `/\evil.com`, `\\evil.com`, and any non-origin
+  absolute URI. Only same-origin URIs or rooted relative paths are
+  accepted.
+- **Login error normalisation + timing equalisation (M6).**
+  `AccountLocked`, `PendingSetup`, `PasswordExpired`, and
+  `PasswordChangeRequired` all render the same generic
+  "Invalid username or password." message. `AuthService` runs a dummy
+  bcrypt verify on the user-not-found / disabled / locked /
+  pending-setup branches so all four states share the same response
+  latency as a wrong-password attempt. The OIDC route no longer
+  redirects expired passwords to `forgot-password?reason=expired` —
+  that branch was an enumeration vector.
+
+### Migrations
+
+- `V50__mfa_replay_lockout.sql` — adds three columns to
+  `mfa_enrollments`. Backwards-compatible: existing rows get
+  `last_used_step = NULL`, `failed_mfa_attempts = 0`,
+  `mfa_locked_until = NULL`.
+
+---
+
 ## [1.15.0] - 2026-06-15
 
 Internal refactor release. **No functional change.** The 2026-06-12
