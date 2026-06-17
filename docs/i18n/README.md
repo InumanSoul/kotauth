@@ -31,6 +31,15 @@ English browser hitting a Spanish-default workspace sees Spanish. When
 no tenant default is set, `Accept-Language` is honored as the user's
 signal.
 
+## Transactional emails
+
+Email subjects, headings, bodies, CTAs and footers all live in the same
+bundle files under `EMAIL_*` keys. The locale used for a given send is
+the tenant's `defaultLocale` — there is no per-user email preference yet.
+When the tenant has no default set, or the locale isn't loaded, English
+is used. Email keys follow the same key→string rules as the auth pages
+and fall back to English when a translation is missing.
+
 ## What's covered in v1.7.2
 
 The Spanish bundle (`es.json`) ships as a sample and covers the auth pages
