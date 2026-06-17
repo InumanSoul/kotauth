@@ -130,7 +130,7 @@ fun Route.portalRoutes(
                 value = cookieVal,
                 maxAge = 300L,
                 httpOnly = true,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
                 path = "/t/$slug/account",
             )
 
@@ -220,7 +220,7 @@ fun Route.portalRoutes(
                 name = "KOTAUTH_PORTAL_PKCE",
                 value = "",
                 maxAge = 0L,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
                 path = "/t/$slug/account",
                 httpOnly = true,
             )

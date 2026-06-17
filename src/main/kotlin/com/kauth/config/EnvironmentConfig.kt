@@ -247,8 +247,8 @@ data class EnvironmentConfig(
             return dbPassword
         }
 
-        private fun resolveUpdateCheckUrl(override: String?): String {
-            val raw = override?.trim().orEmpty()
+        private fun resolveUpdateCheckUrl(overrideUrl: String?): String {
+            val raw = overrideUrl?.trim().orEmpty()
             if (raw.isEmpty()) return "https://inumansoul.github.io/kotauth/latest.json"
             if (!raw.startsWith("https://")) {
                 System.err.println(

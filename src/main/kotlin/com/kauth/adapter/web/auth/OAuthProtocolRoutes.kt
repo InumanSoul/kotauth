@@ -382,7 +382,12 @@ internal fun Route.oauthProtocolRoutes(
             call.clearSsoCookie(slug)
         }
 
-        call.setAuthContextCookie(oauthParams, slug, encryptionService, baseUrl.startsWith("https"))
+        call.setAuthContextCookie(
+            oauthParams,
+            slug,
+            encryptionService,
+            baseUrl.startsWith("https://", ignoreCase = true),
+        )
 
         val enabledProviders =
             identityProviderRepository
@@ -514,7 +519,7 @@ internal fun Route.oauthProtocolRoutes(
                         value = encryptionService.signCookie(mfaPending),
                         maxAge = 300L,
                         httpOnly = true,
-                        secure = baseUrl.startsWith("https"),
+                        secure = baseUrl.startsWith("https://", ignoreCase = true),
                         path = "/t/$slug",
                     )
                     call.respondRedirect("/t/$slug/mfa-challenge")
@@ -530,7 +535,7 @@ internal fun Route.oauthProtocolRoutes(
                     authTime = java.time.Instant.now(),
                     mfaCompleted = false,
                     ssoTtlSeconds = ssoTtlSeconds,
-                    secure = baseUrl.startsWith("https"),
+                    secure = baseUrl.startsWith("https://", ignoreCase = true),
                     oauthService = oauthService,
                     encryptionService = encryptionService,
                     renderError = { message ->
