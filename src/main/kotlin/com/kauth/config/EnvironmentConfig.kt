@@ -69,6 +69,7 @@ data class EnvironmentConfig(
 
             val secretKey = requireSecretKey(System.getenv("KAUTH_SECRET_KEY"))
             validateQuickstartSecret(secretKey, env)
+            validateDemoMode(System.getenv("KAUTH_DEMO_MODE")?.lowercase() == "true", env)
 
             val adminBypass = System.getenv("KAUTH_ADMIN_BYPASS")?.lowercase() == "true"
             validateAdminBypass(adminBypass)
@@ -246,6 +247,27 @@ data class EnvironmentConfig(
                 exitProcess(1)
             }
             return dbPassword
+        }
+
+        private fun validateDemoMode(
+            isDemoMode: Boolean,
+            env: String,
+        ) {
+            if (isDemoMode && env == "production") {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: KAUTH_DEMO_MODE=true is incompatible with            │
+                    │  KAUTH_ENV=production.                                       │
+                    │                                                              │
+                    │  Demo mode seeds well-known credentials (Demo1234!) and      │
+                    │  fixed webhook secrets — never run it against a production   │
+                    │  database. Either unset KAUTH_DEMO_MODE or change KAUTH_ENV. │
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
         }
 
         private fun validateQuickstartSecret(
