@@ -16,6 +16,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.TotpUtil
+import java.time.Clock
 import java.time.Instant
 
 /**
@@ -38,13 +39,23 @@ class MfaService(
     private val tenantRepository: TenantRepository,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     companion object {
         /** Number of one-time recovery codes generated per enrollment. */
         const val RECOVERY_CODE_COUNT = 8
 
+        /** Random bytes per recovery code — 8 bytes = 64-bit entropy, rendered as 16 hex chars. */
+        const val RECOVERY_CODE_BYTES = 8
+
         /** Length of each plaintext recovery code (hex chars). */
-        const val RECOVERY_CODE_LENGTH = 8
+        const val RECOVERY_CODE_LENGTH = RECOVERY_CODE_BYTES * 2
+
+        /** Consecutive failed TOTP verifications before the enrollment is locked. */
+        const val MAX_FAILED_TOTP_ATTEMPTS = 5
+
+        /** Fallback lockout window when the tenant's SecurityConfig is unavailable. */
+        const val DEFAULT_LOCKOUT_MINUTES = 15
     }
 
     // -----------------------------------------------------------------------
@@ -155,16 +166,17 @@ class MfaService(
             return MfaResult.Failure(MfaError.AlreadyEnrolled)
         }
 
-        if (!TotpUtil.verify(enrollment.secret, code)) {
+        val totpResult = TotpUtil.verify(enrollment.secret, code, clock.millis())
+        if (!totpResult.valid) {
             return MfaResult.Failure(MfaError.InvalidCode)
         }
 
-        // Mark enrollment as verified
         val verified =
             mfaRepository.updateEnrollment(
                 enrollment.copy(
                     verified = true,
-                    verifiedAt = Instant.now(),
+                    verifiedAt = Instant.now(clock),
+                    lastUsedStep = totpResult.matchedStep,
                 ),
             )
 
@@ -193,7 +205,10 @@ class MfaService(
     // -----------------------------------------------------------------------
 
     /**
-     * Verifies a TOTP code during login. Returns true if valid.
+     * Verifies a TOTP code during login. Returns Success(true) on a valid, non-replayed code;
+     * Failure(TotpLocked) when the enrollment is in its lockout window; Failure(ReplayRejected)
+     * when the code is structurally valid but its time step has already been consumed by an
+     * earlier successful verification.
      */
     fun verifyTotp(
         userId: UserId,
@@ -209,29 +224,102 @@ class MfaService(
             return MfaResult.Failure(MfaError.NotEnrolled)
         }
 
-        val valid = TotpUtil.verify(enrollment.secret, code)
+        val now = Instant.now(clock)
+        if (enrollment.mfaLockedUntil != null && enrollment.mfaLockedUntil.isAfter(now)) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = enrollment.tenantId,
+                    userId = userId,
+                    clientId = null,
+                    eventType = AuditEventType.MFA_CHALLENGE_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "locked"),
+                ),
+            )
+            return MfaResult.Failure(MfaError.TotpLocked)
+        }
+
+        val totpResult = TotpUtil.verify(enrollment.secret, code, clock.millis())
+        val replay =
+            totpResult.valid &&
+                enrollment.lastUsedStep != null &&
+                totpResult.matchedStep!! <= enrollment.lastUsedStep
+
+        if (!totpResult.valid || replay) {
+            return recordFailedAttempt(enrollment, userId, ipAddress, userAgent, replay)
+        }
+
+        mfaRepository.updateEnrollment(
+            enrollment.copy(
+                lastUsedStep = totpResult.matchedStep,
+                failedMfaAttempts = 0,
+                mfaLockedUntil = null,
+            ),
+        )
 
         auditLog.record(
             AuditEvent(
                 tenantId = enrollment.tenantId,
                 userId = userId,
                 clientId = null,
-                eventType =
-                    if (valid) {
-                        AuditEventType.MFA_CHALLENGE_SUCCESS
-                    } else {
-                        AuditEventType.MFA_CHALLENGE_FAILED
-                    },
+                eventType = AuditEventType.MFA_CHALLENGE_SUCCESS,
                 ipAddress = ipAddress,
                 userAgent = userAgent,
             ),
         )
+        return MfaResult.Success(true)
+    }
 
-        return if (valid) {
-            MfaResult.Success(true)
-        } else {
-            MfaResult.Failure(MfaError.InvalidCode)
+    private fun recordFailedAttempt(
+        enrollment: MfaEnrollment,
+        userId: UserId,
+        ipAddress: String?,
+        userAgent: String?,
+        replay: Boolean,
+    ): MfaResult<Boolean> {
+        val nextCount = enrollment.failedMfaAttempts + 1
+        val shouldLock = nextCount >= MAX_FAILED_TOTP_ATTEMPTS
+        val tenant = tenantRepository.findById(enrollment.tenantId)
+        val lockMinutes =
+            (tenant?.securityConfig?.lockoutDurationMinutes ?: DEFAULT_LOCKOUT_MINUTES).coerceAtLeast(1)
+        val lockedUntil = if (shouldLock) Instant.now(clock).plusSeconds(lockMinutes * 60L) else null
+
+        mfaRepository.updateEnrollment(
+            enrollment.copy(
+                failedMfaAttempts = if (shouldLock) 0 else nextCount,
+                mfaLockedUntil = lockedUntil,
+            ),
+        )
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = enrollment.tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.MFA_CHALLENGE_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                details = mapOf("reason" to if (replay) "replay" else "invalid"),
+            ),
+        )
+
+        if (shouldLock) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = enrollment.tenantId,
+                    userId = userId,
+                    clientId = null,
+                    eventType = AuditEventType.MFA_TOTP_LOCKOUT,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("lockout_minutes" to lockMinutes.toString()),
+                ),
+            )
+            return MfaResult.Failure(MfaError.TotpLocked)
         }
+
+        return MfaResult.Failure(if (replay) MfaError.ReplayRejected else MfaError.InvalidCode)
     }
 
     /**
@@ -366,7 +454,7 @@ class MfaService(
     // -----------------------------------------------------------------------
 
     private fun generateRecoveryCodes(): List<String> =
-        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_LENGTH / 2) }
+        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_BYTES) }
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +495,10 @@ sealed class MfaError {
     object NotEnrolled : MfaError()
 
     object InvalidCode : MfaError()
+
+    object ReplayRejected : MfaError()
+
+    object TotpLocked : MfaError()
 
     object NoRecoveryCodesLeft : MfaError()
 }

@@ -204,5 +204,49 @@
   "LAUNCHER_PAGE_SUBTITLE": "Aplicaciones a las que tienes acceso en este espacio de trabajo",
   "LAUNCHER_OPEN_IN_NEW_TAB": "Abrir en una pestaña nueva",
   "LAUNCHER_EMPTY_TITLE": "No hay aplicaciones disponibles",
-  "LAUNCHER_EMPTY_BODY": "Pídele al administrador del espacio de trabajo que te dé acceso a una o más aplicaciones."
+  "LAUNCHER_EMPTY_BODY": "Pídele al administrador del espacio de trabajo que te dé acceso a una o más aplicaciones.",
+
+  "EMAIL_SUBJECT_VERIFY": "Verifica tu dirección de correo — {0}",
+  "EMAIL_SUBJECT_PASSWORD_RESET": "Restablece tu contraseña — {0}",
+  "EMAIL_SUBJECT_ACCOUNT_LOCKED": "Tu cuenta ha sido bloqueada — {0}",
+  "EMAIL_SUBJECT_PASSWORD_CHANGED": "Tu contraseña ha sido cambiada — {0}",
+  "EMAIL_SUBJECT_TEST": "Prueba de SMTP de KotAuth — {0}",
+  "EMAIL_SUBJECT_INVITE": "Has sido invitado a unirte a {0}",
+  "EMAIL_SUBJECT_MAGIC_LINK": "Tu enlace de inicio de sesión para {0}",
+  "EMAIL_SUBJECT_OTP": "Tu código de inicio de sesión para {0}",
+
+  "EMAIL_GREETING": "Hola {0},",
+
+  "EMAIL_HEADING_VERIFY": "Verifica tu dirección de correo",
+  "EMAIL_HEADING_PASSWORD_RESET": "Restablece tu contraseña",
+  "EMAIL_HEADING_ACCOUNT_LOCKED": "Tu cuenta ha sido bloqueada",
+  "EMAIL_HEADING_PASSWORD_CHANGED": "Tu contraseña ha sido cambiada",
+  "EMAIL_HEADING_TEST": "Prueba de configuración SMTP",
+  "EMAIL_HEADING_INVITE": "Has sido invitado",
+  "EMAIL_HEADING_MAGIC_LINK": "Inicia sesión en {0}",
+  "EMAIL_HEADING_OTP": "Tu código de inicio de sesión",
+
+  "EMAIL_BODY_VERIFY": "Pulsa el botón de abajo para verificar tu dirección de correo. Este enlace caduca en 24 horas.",
+  "EMAIL_BODY_PASSWORD_RESET": "Recibimos una solicitud para restablecer tu contraseña. Pulsa el botón de abajo para elegir una nueva. Este enlace caduca en 1 hora.",
+  "EMAIL_BODY_ACCOUNT_LOCKED": "Hemos bloqueado temporalmente tu cuenta de {0} tras varios intentos fallidos de inicio de sesión. Tu cuenta se desbloqueará automáticamente en {1}. Si quieres recuperar el acceso antes, o no reconoces esta actividad, puedes restablecer tu contraseña ahora.",
+  "EMAIL_BODY_PASSWORD_CHANGED": "La contraseña de tu cuenta de {0} se ha cambiado correctamente. Si fuiste tú, no necesitas hacer nada. Si no fuiste tú, restablece tu contraseña inmediatamente.",
+  "EMAIL_BODY_PASSWORD_CHANGED_LOGIN_HINT": "Inicia sesión en {0} y usa el enlace «¿Olvidaste tu contraseña?».",
+  "EMAIL_BODY_TEST": "Este correo confirma que SMTP está configurado correctamente para {0}. El envío de correos (verificación, restablecimiento de contraseña, notificaciones) está operativo.",
+  "EMAIL_BODY_INVITE": "Te hemos añadido a {0}. Pulsa el botón de abajo para establecer tu contraseña y activar tu cuenta. Este enlace caduca en 72 horas.",
+  "EMAIL_BODY_MAGIC_LINK": "Pulsa el botón de abajo para iniciar sesión. Este enlace caduca en 15 minutos y solo puede usarse una vez.",
+  "EMAIL_BODY_OTP": "Usa este código de {0} minutos para terminar de iniciar sesión. No lo compartas con nadie.",
+
+  "EMAIL_CTA_VERIFY": "Verificar dirección de correo",
+  "EMAIL_CTA_PASSWORD_RESET": "Restablecer contraseña",
+  "EMAIL_CTA_INVITE": "Establecer contraseña",
+  "EMAIL_CTA_MAGIC_LINK": "Iniciar sesión",
+
+  "EMAIL_FOOTER_VERIFY": "Si no creaste una cuenta, puedes ignorar este correo sin problema.",
+  "EMAIL_FOOTER_PASSWORD_RESET": "Si no solicitaste restablecer tu contraseña, puedes ignorar este correo sin problema.",
+  "EMAIL_FOOTER_PASSWORD_CHANGED": "Por seguridad, se cerraron todas las sesiones activas cuando se cambió tu contraseña.",
+  "EMAIL_FOOTER_ACCOUNT_LOCKED": "Si fuiste tú quien hizo esos intentos, puedes ignorar este correo sin problema — tu cuenta se desbloqueará automáticamente.",
+  "EMAIL_FOOTER_TEST": "Enviado por KotAuth para verificar la configuración SMTP.",
+  "EMAIL_FOOTER_INVITE": "Si no esperabas este correo, puedes ignorarlo sin problema. Ninguna cuenta se activará sin pulsar el enlace de arriba.",
+  "EMAIL_FOOTER_MAGIC_LINK": "Si no solicitaste este enlace, puedes ignorar este correo sin problema.",
+  "EMAIL_FOOTER_OTP": "Si no solicitaste un código, puedes ignorar este correo sin problema."
 }

@@ -152,14 +152,21 @@ class GitHubOAuthAdapter : SocialProviderPort {
                 ?: userObj["login"]?.jsonPrimitive?.content
         val avatarUrl = userObj["avatar_url"]?.jsonPrimitive?.content
 
-        // If public email is null, fetch the primary verified email from /user/emails
-        val email = publicEmail ?: fetchPrimaryEmail(accessToken)
+        // GitHub's /user payload does NOT tell us whether the public email is verified.
+        // Only /user/emails reports verification status — so we trust verification *only*
+        // when the address came from that endpoint after filtering on verified=true.
+        val (email, emailVerified) =
+            if (publicEmail != null) {
+                publicEmail to false
+            } else {
+                fetchPrimaryEmail(accessToken) to true
+            }
 
         return SocialUserProfile(
             providerUserId = id,
             email = email,
             name = name,
-            emailVerified = email != null, // GitHub emails are verified by definition
+            emailVerified = email != null && emailVerified,
             avatarUrl = avatarUrl,
         )
     }

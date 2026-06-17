@@ -7,6 +7,168 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.17.0] - 2026-06-17
+
+Email i18n + Tier-3 security polish. Closes the polish-tier findings from
+the 2026-06-12 audit and ships localized transactional emails. Heavier
+Tier-3 items (CSRF, SSRF, audit-integrity, secret rotation, supply-chain)
+land in follow-up releases.
+
+### Added
+
+- **Localized transactional emails.** All eight email types (verification,
+  password reset, account locked, password changed, SMTP test, invite,
+  magic link, OTP) now render in the tenant's `defaultLocale`. ~30 new
+  `EMAIL_*` keys live in `EnglishStrings` and ship in `docs/i18n/es.json`.
+  Per-key fallback to English for untranslated messages; no `EmailPort`
+  signature change.
+
+### Security
+
+- **L8.** Suppress the `Server` response header — Ktor 3.4's default
+  reveals the engine and version. Now overridden to empty across all
+  responses; `SecurityHeadersTest` locks the behavior.
+- **L4.** PKCE S256 challenge comparison uses `MessageDigest.isEqual`
+  instead of `==`, eliminating a timing oracle on the verifier check.
+- **L1.** `code` and `state` are URL-encoded on the authorization-code
+  redirect — closes a query-parameter injection vector when state
+  contains reserved characters. Matches the silent-auth path.
+- **L2.** `KOTAUTH_MFA_PENDING` cookie now carries `Secure` when the base
+  URL is HTTPS — applies to both the set and clear directives.
+- **L3.** MFA recovery codes raised from 8-char (32-bit) to 16-char hex
+  (64-bit) — the recommended minimum for one-shot fallback tokens.
+- **L5.** Admin error page no longer prints the raw exception message or
+  qualified class name. Details are logged server-side; the user sees a
+  generic apology.
+- **M11.** Refuse to start when `KAUTH_DEMO_MODE=true` and
+  `KAUTH_ENV=production` — mirrors the H6 quickstart-secret guard.
+- **M12.** Update-check hardened: `KAUTH_UPDATE_CHECK_URL` must use
+  `https://` (fatal otherwise), the HTTP client follows zero redirects,
+  and `releaseUrl` values from the manifest are restricted to `https://`
+  schemes (rejects `javascript:`, `data:`, plain `http://`).
+
+---
+
+## [1.16.0] - 2026-06-17
+
+Security hardening release. Closes the seven Tier-2 findings from the
+2026-06-12 security review: container hardening, theme input validation,
+JWT issuer enforcement, social-link email-verification gate, TOTP replay
++ lockout, post-logout redirect SSRF, and login error normalisation.
+
+### Security
+
+- **Container drops privileges (H7).** Runtime image now runs as a
+  non-root user (`kotauth`, UID/GID 10001). All `docker-compose*.yml`
+  files set `security_opt: no-new-privileges`, `cap_drop: ALL`,
+  `read_only: true`, with `tmpfs: /tmp` for writable scratch space.
+- **TenantTheme inputs validated server-side (H5).** New
+  `validateTenantTheme` helper enforces strict patterns for colour hex,
+  font family, border-radius unit, locale (BCP-47), and logo URL
+  schemes. Backup imports go through the same validator.
+- **JWT introspection enforces `iss` (M4).**
+  `TokenPort.decodeAccessToken` now requires the caller to pass the
+  expected issuer; `JwtTokenAdapter` rebuilds the verifier with
+  `.withIssuer(...)` so a token minted for tenant A can no longer be
+  introspected against tenant B's verifier.
+- **Social-link email-verification gate (M1).** The auto-link-by-email
+  branch in `SocialLoginService` now rejects with
+  `LinkRequiresEmailVerification` when the provider has not verified
+  the address. The GitHub adapter only marks
+  `SocialUserProfile.emailVerified = true` when the address came from
+  `/user/emails` (which exposes `verified: true`), never from the
+  public `/user` payload alone.
+- **TOTP replay + per-enrollment lockout (M2 / M3).** `TotpUtil.verify`
+  now returns the matched time step. `MfaService` rejects any code
+  whose matched step is at or before the previously-consumed step
+  (replay) and locks the enrollment after
+  `MAX_FAILED_TOTP_ATTEMPTS` (5) consecutive failures for the tenant's
+  configured `lockoutDurationMinutes`. New audit event
+  `MFA_TOTP_LOCKOUT`. Schema: V50 adds `last_used_step`,
+  `failed_mfa_attempts`, `mfa_locked_until` to `mfa_enrollments`.
+- **Post-logout open-redirect closed (M5).** The OIDC end-session
+  endpoint now refuses `post_logout_redirect_uri` values like
+  `//evil.com`, `/\evil.com`, `\\evil.com`, and any non-origin
+  absolute URI. Only same-origin URIs or rooted relative paths are
+  accepted.
+- **Login error normalisation + timing equalisation (M6).**
+  `AccountLocked`, `PendingSetup`, `PasswordExpired`, and
+  `PasswordChangeRequired` all render the same generic
+  "Invalid username or password." message. `AuthService` runs a dummy
+  bcrypt verify on the user-not-found / disabled / locked /
+  pending-setup branches so all four states share the same response
+  latency as a wrong-password attempt. The OIDC route no longer
+  redirects expired passwords to `forgot-password?reason=expired` —
+  that branch was an enumeration vector.
+
+### Migrations
+
+- `V50__mfa_replay_lockout.sql` — adds three columns to
+  `mfa_enrollments`. Backwards-compatible: existing rows get
+  `last_used_step = NULL`, `failed_mfa_attempts = 0`,
+  `mfa_locked_until = NULL`.
+
+---
+
+## [1.15.0] - 2026-06-15
+
+Internal refactor release. **No functional change.** The 2026-06-12
+god-file-refactor plan is fully landed, the largest service files are
+broken into focused services, and the detekt ratchet is tightened so
+new god files can't reappear silently.
+
+### Changed
+
+- **`AdminService` (1145 LOC) deleted** — split into four focused
+  services per the plan: `WorkspaceSettingsService`, `AdminUserService`,
+  `ApplicationManagementService`, `AdminAccountService` (previously
+  proposed as `AdminCredentialService`, renamed per clean-code review).
+  Shared `AdminResult` / `AdminError` sealed types live in
+  `AdminResult.kt`. Each new service depends only on the repos and ports
+  it actually uses
+- **`UserSelfServiceService` (1157 LOC) deleted** — split into
+  `CredentialFlowService` (token + email flows: email verification,
+  forgot password, invite, forced password change, magic link,
+  account-locked notification) and `AccountSelfService` (logged-in
+  profile + password change + session management). Shared
+  `SelfServiceResult` / `SelfServiceError` types live in
+  `SelfServiceResult.kt`
+- **`WorkspaceSettingsUpdate` parameter object** replaces the
+  25-positional-parameter signature on `updateWorkspaceSettings`. The
+  factory `WorkspaceSettingsUpdate.from(tenant)` also closed a latent
+  bug where the general-settings POST silently reset
+  `lockoutMaxAttempts`, `corsAllowCredentials`, magic-link, and OTP
+  fields to compile-time defaults when an admin saved the general tab
+- **`emailOtpLoginRoutes` cleanup** — `/email-otp/send` and
+  `/email-otp/verify` POST handlers extracted into private
+  `suspend handleSendOtp` and `handleVerifyOtp` helpers
+- **`validatePasswordPolicy` extracted to `domain/util/`** — the
+  duplicated private helper that lived in both
+  `CredentialFlowService` and `AccountSelfService` is now a single
+  top-level function, eliminating drift risk for password-policy
+  enforcement
+- **Named TTL constants** in `CredentialFlowService`
+  (`EMAIL_VERIFICATION_TTL_SECONDS`, `PASSWORD_RESET_TTL_SECONDS`,
+  `INVITE_TTL_SECONDS`, `TEMP_PASSWORD_TTL_SECONDS`) replacing bare
+  arithmetic like `72 * 3600`
+
+### Tooling
+
+- **Detekt thresholds tightened** — `LargeClass` 600→400,
+  `TooManyFunctions` 20 (classes) / 25 (files). The new baseline
+  records the surfaces that legitimately exceed the threshold
+  (`OAuthService` is deliberately deferred per the plan;
+  `ServiceGraph.Companion` is the composition root). New god files
+  cannot reappear silently
+
+### Notes
+
+- `OAuthService` is intentionally **not** split in this release — the
+  plan defers it until after OIDC certification testing, since protocol
+  code benefits from locality and it just absorbed three security fixes
+
+---
+
 ## [1.14.1] - 2026-06-12
 
 Closes the published-default admin credential window flagged in the

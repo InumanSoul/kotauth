@@ -16,7 +16,9 @@ import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.TotpUtil
+import java.time.Clock
 import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -95,6 +97,19 @@ class MfaServiceTest {
             "Must generate exactly ${MfaService.RECOVERY_CODE_COUNT} recovery codes",
         )
         assertTrue(auditLog.hasEvent(AuditEventType.MFA_ENROLLMENT_STARTED))
+    }
+
+    @Test
+    fun `beginEnrollment recovery codes are 16 hex chars with at least 64-bit entropy`() {
+        val result = svc.beginEnrollment(userId = UserId(10), tenantId = TenantId(1), issuer = "Acme")
+        val codes = (result as MfaResult.Success<EnrollmentResponse>).value.recoveryCodes
+
+        val hex = Regex("^[0-9a-f]+$")
+        codes.forEach { code ->
+            assertEquals(MfaService.RECOVERY_CODE_LENGTH, code.length, "Code length must match RECOVERY_CODE_LENGTH")
+            assertTrue(code.matches(hex), "Code must be lowercase hex, got: $code")
+        }
+        assertEquals(codes.size, codes.toSet().size, "Recovery codes must be unique across the batch")
     }
 
     @Test
@@ -398,5 +413,195 @@ class MfaServiceTest {
     @Test
     fun `isMfaRequired - unknown policy returns false (fail-open)`() {
         assertFalse(svc.isMfaRequired(testUser, tenantMfaPolicy = "unknown_policy"))
+    }
+
+    // =========================================================================
+    // M2: replay protection / M3: lockout
+    // =========================================================================
+
+    private fun fixedClockSvc(fixedMillis: Long) =
+        MfaService(
+            mfaRepository = mfaRepo,
+            userRepository = users,
+            tenantRepository = tenants,
+            passwordHasher = hasher,
+            auditLog = auditLog,
+            clock = Clock.fixed(Instant.ofEpochMilli(fixedMillis), ZoneOffset.UTC),
+        )
+
+    @Test
+    fun `verifyTotp rejects a replayed code within the same time step`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+        val fixed = 1_700_000_000_000L
+        val frozenSvc = fixedClockSvc(fixed)
+        val code = TotpUtil.generateCode(secret, fixed)
+
+        assertIs<MfaResult.Success<*>>(frozenSvc.verifyTotp(UserId(10), code))
+        val replay = frozenSvc.verifyTotp(UserId(10), code)
+        assertIs<MfaResult.Failure>(replay)
+        assertIs<MfaError.ReplayRejected>(replay.error)
+    }
+
+    @Test
+    fun `verifyTotp persists lastUsedStep on success`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+        val fixed = 1_700_000_000_000L
+        val frozenSvc = fixedClockSvc(fixed)
+        frozenSvc.verifyTotp(UserId(10), TotpUtil.generateCode(secret, fixed))
+
+        val expectedStep = fixed / 1000 / 30
+        val stored = mfaRepo.findEnrollmentByUserId(UserId(10))
+        assertEquals(expectedStep, stored?.lastUsedStep)
+    }
+
+    @Test
+    fun `verifyTotp locks the enrollment after MAX_FAILED_TOTP_ATTEMPTS bad codes`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+
+        repeat(MfaService.MAX_FAILED_TOTP_ATTEMPTS - 1) {
+            val r = svc.verifyTotp(UserId(10), "000000")
+            assertIs<MfaResult.Failure>(r)
+            assertIs<MfaError.InvalidCode>(r.error)
+        }
+
+        val locking = svc.verifyTotp(UserId(10), "000000")
+        assertIs<MfaResult.Failure>(locking)
+        assertIs<MfaError.TotpLocked>(locking.error)
+        assertTrue(auditLog.hasEvent(AuditEventType.MFA_TOTP_LOCKOUT))
+
+        val rejectedWhileLocked = svc.verifyTotp(UserId(10), TotpUtil.generateCode(secret))
+        assertIs<MfaResult.Failure>(rejectedWhileLocked)
+        assertIs<MfaError.TotpLocked>(rejectedWhileLocked.error)
+    }
+
+    @Test
+    fun `verifyTotp unlocks once mfaLockedUntil is in the past`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+                mfaLockedUntil = Instant.now().minusSeconds(60),
+            ),
+        )
+        val now = System.currentTimeMillis()
+        val frozenSvc = fixedClockSvc(now)
+        val result = frozenSvc.verifyTotp(UserId(10), TotpUtil.generateCode(secret, now))
+        assertIs<MfaResult.Success<*>>(result)
+    }
+
+    @Test
+    fun `verifyTotp success resets failedMfaAttempts and clears lock`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+                failedMfaAttempts = 2,
+            ),
+        )
+        val fixed = 1_700_000_000_000L
+        val frozenSvc = fixedClockSvc(fixed)
+        frozenSvc.verifyTotp(UserId(10), TotpUtil.generateCode(secret, fixed))
+
+        val stored = mfaRepo.findEnrollmentByUserId(UserId(10))
+        assertEquals(0, stored?.failedMfaAttempts)
+        assertEquals(null, stored?.mfaLockedUntil)
+    }
+
+    @Test
+    fun `verifyTotp rejects a prior-window code resubmitted in the next window`() {
+        val secret = TotpUtil.generateSecret()
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = secret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+        val firstWindow = 1_700_000_000_000L
+        val priorCode = TotpUtil.generateCode(secret, firstWindow)
+
+        assertIs<MfaResult.Success<*>>(fixedClockSvc(firstWindow).verifyTotp(UserId(10), priorCode))
+
+        val laterWindow = firstWindow + 30_000L
+        val replay = fixedClockSvc(laterWindow).verifyTotp(UserId(10), priorCode)
+        assertIs<MfaResult.Failure>(replay)
+        assertIs<MfaError.ReplayRejected>(replay.error)
+    }
+
+    @Test
+    fun `verifyTotp lockout is scoped per enrollment - one user lockout does not affect another`() {
+        val aliceSecret = TotpUtil.generateSecret()
+        val bobSecret = TotpUtil.generateSecret()
+        users.add(testUser.copy(id = UserId(20), username = "bob", email = "bob@example.com"))
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = aliceSecret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+        mfaRepo.saveEnrollment(
+            MfaEnrollment(
+                userId = UserId(20),
+                tenantId = TenantId(1),
+                method = MfaMethod.TOTP,
+                secret = bobSecret,
+                verified = true,
+                verifiedAt = Instant.now(),
+            ),
+        )
+
+        repeat(MfaService.MAX_FAILED_TOTP_ATTEMPTS) {
+            svc.verifyTotp(UserId(10), "000000")
+        }
+
+        val bob = svc.verifyTotp(UserId(20), TotpUtil.generateCode(bobSecret))
+        assertIs<MfaResult.Success<*>>(bob)
     }
 }

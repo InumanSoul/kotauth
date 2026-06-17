@@ -12,10 +12,10 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -47,6 +47,7 @@ import java.time.Instant
 import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -82,7 +83,7 @@ class AuthRoutesTest {
     private val tokenLimiter = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60)
 
     // MockK mocks for services that aren't the focus of these tests
-    private val selfService = mockk<UserSelfServiceService>(relaxed = true)
+    private val selfService = mockk<CredentialFlowService>(relaxed = true)
     private val mfaService = mockk<MfaService>(relaxed = true)
 
     private val encryptionService = EncryptionService("test-secret-key")
@@ -218,7 +219,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -260,15 +261,66 @@ class AuthRoutesTest {
             )
         }
 
+    @Test
+    fun `POST authorize sets Secure on KOTAUTH_MFA_PENDING when baseUrl is HTTPS`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                        baseUrl = "https://kotauth.example.com",
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            val mfaCookie = response.headers.getAll("Set-Cookie")?.firstOrNull { it.contains("KOTAUTH_MFA_PENDING") }
+            assertNotNull(mfaCookie, "KOTAUTH_MFA_PENDING must be set on MFA redirect")
+            assertTrue(
+                mfaCookie.contains("Secure", ignoreCase = true),
+                "KOTAUTH_MFA_PENDING must be Secure when baseUrl is HTTPS, got: $mfaCookie",
+            )
+        }
+
     // =========================================================================
     // POST /t/{slug}/authorize — password expired redirect
     // =========================================================================
 
     @Test
-    fun `POST authorize redirects to forgot-password with reason=expired for expired password`() =
+    fun `POST authorize renders the generic invalid-credentials message for expired password`() =
         testApplication {
             resetFixtures()
-            // Seed a user with an expired password
             userRepo.clear()
             userRepo.add(
                 user.copy(
@@ -290,7 +342,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -317,10 +369,13 @@ class AuthRoutesTest {
                     header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
                 }
 
-            assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers["Location"] ?: ""
-            assertTrue(location.contains("forgot-password"), "Must redirect to forgot-password")
-            assertTrue(location.contains("reason=expired"), "Must include reason=expired query param")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("Invalid username or password"),
+                "Expired-password path must show the generic message, was: ${body.take(300)}",
+            )
+            assertFalse(body.contains("expired", ignoreCase = true), "Must not leak the expired state")
         }
 
     // =========================================================================
@@ -343,7 +398,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -387,7 +442,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -446,7 +501,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -495,6 +550,67 @@ class AuthRoutesTest {
         }
 
     @Test
+    fun `POST authorize URL-encodes state containing reserved characters`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val rawState = "state with spaces & evil=1 # frag"
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scope = "openid",
+                    state = rawState,
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertFalse(
+                location.contains(rawState),
+                "Raw state must not be appended verbatim — would inject extra query params, got: $location",
+            )
+            val encoded = java.net.URLEncoder.encode(rawState, "UTF-8")
+            assertTrue(
+                location.contains("state=$encoded"),
+                "state must be URL-encoded on the redirect, got: $location",
+            )
+        }
+
+    @Test
     fun `POST authorize on success clears KOTAUTH_AUTH_CONTEXT cookie with maxAge=0`() =
         testApplication {
             resetFixtures()
@@ -510,7 +626,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -580,7 +696,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         mfaService = mfaService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -635,7 +751,7 @@ class AuthRoutesTest {
                         loginRateLimiter = tightLoginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -695,7 +811,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         // mfaService intentionally omitted
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
@@ -731,7 +847,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -770,7 +886,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -812,7 +928,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -850,7 +966,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -898,7 +1014,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -933,7 +1049,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -971,7 +1087,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1005,7 +1121,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1037,7 +1153,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1098,7 +1214,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1139,7 +1255,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1178,7 +1294,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1233,7 +1349,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1270,7 +1386,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1321,7 +1437,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1355,7 +1471,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1394,7 +1510,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1449,7 +1565,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1485,7 +1601,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1516,7 +1632,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1552,7 +1668,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1617,7 +1733,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1656,7 +1772,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1688,7 +1804,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1743,7 +1859,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1776,7 +1892,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1816,7 +1932,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1850,7 +1966,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1894,7 +2010,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1933,7 +2049,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -1972,7 +2088,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = tightRegisterLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -2028,7 +2144,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -2075,7 +2191,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -2124,7 +2240,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )
@@ -2189,7 +2305,7 @@ class AuthRoutesTest {
                         loginRateLimiter = loginLimiter,
                         registerRateLimiter = registerLimiter,
                         tokenRateLimiter = tokenLimiter,
-                        selfServiceService = selfService,
+                        credentialFlowService = selfService,
                         encryptionService = encryptionService,
                         translationPort = EnglishOnlyTranslation(),
                     )

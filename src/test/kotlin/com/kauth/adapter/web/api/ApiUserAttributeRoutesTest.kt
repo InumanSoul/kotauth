@@ -49,6 +49,19 @@ class ApiUserAttributeRoutesTest {
     private val userAttributeRepo = FakeUserAttributeRepository()
     private val hasher = FakePasswordHasher()
 
+    private fun buildFakeSelfService() =
+        com.kauth.domain.service.CredentialFlowService(
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            sessionRepository = com.kauth.fakes.FakeSessionRepository(),
+            passwordHasher = hasher,
+            auditLog = com.kauth.fakes.FakeAuditLogPort(),
+            evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
+            prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
+            emailPort = com.kauth.fakes.FakeEmailPort(),
+            emailScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
+        )
+
     private val apiKeyService =
         ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
     private val userAttributeService =
@@ -345,27 +358,28 @@ class ApiUserAttributeRoutesTest {
                         applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                     ),
-                adminService =
-                    com.kauth.domain.service.AdminService(
+                accountService =
+                    com.kauth.domain.service.AdminAccountService(
                         tenantRepository = tenantRepo,
                         userRepository = userRepo,
-                        applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
+                        auditLog = com.kauth.fakes.FakeAuditLogPort(),
+                        credentialFlowService = buildFakeSelfService(),
+                    ),
+                adminUserService =
+                    com.kauth.domain.service.AdminUserService(
+                        tenantRepository = tenantRepo,
+                        userRepository = userRepo,
+                        sessionRepository = com.kauth.fakes.FakeSessionRepository(),
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                        sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                        selfServiceService =
-                            com.kauth.domain.service.UserSelfServiceService(
-                                userRepository = userRepo,
-                                tenantRepository = tenantRepo,
-                                sessionRepository = com.kauth.fakes.FakeSessionRepository(),
-                                passwordHasher = hasher,
-                                auditLog = com.kauth.fakes.FakeAuditLogPort(),
-                                evTokenRepo = com.kauth.fakes.FakeEmailVerificationTokenRepository(),
-                                prTokenRepo = com.kauth.fakes.FakePasswordResetTokenRepository(),
-                                emailPort = com.kauth.fakes.FakeEmailPort(),
-                                emailScope =
-                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
-                            ),
+                        credentialFlowService = buildFakeSelfService(),
+                    ),
+                applicationManagementService =
+                    com.kauth.domain.service.ApplicationManagementService(
+                        applicationRepository = com.kauth.fakes.FakeApplicationRepository(),
+                        tenantRepository = tenantRepo,
+                        passwordHasher = hasher,
+                        auditLog = com.kauth.fakes.FakeAuditLogPort(),
                     ),
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,

@@ -122,7 +122,7 @@ class JwtTokenAdapterActClaimTest {
                 actingSubject = adminId,
             )
 
-        val claims = adapter.decodeAccessToken(response.access_token)
+        val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
         assertNotNull(claims)
         assertEquals(target.id!!.value.toString(), claims.sub)
         assertEquals(adminId.value.toString(), claims.actingSubject)
@@ -132,7 +132,7 @@ class JwtTokenAdapterActClaimTest {
     fun `decodeAccessToken returns null actingSubject for normal tokens`() {
         val response = adapter.issueUserTokens(target, tenant, null, listOf("openid"))
 
-        val claims = adapter.decodeAccessToken(response.access_token)
+        val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
         assertNotNull(claims)
         assertNull(claims.actingSubject)
     }

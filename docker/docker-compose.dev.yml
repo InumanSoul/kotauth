@@ -61,6 +61,13 @@ services:
       DB_PASSWORD: password
       KAUTH_I18N_BUNDLE_DIR: /etc/kotauth/i18n
       KAUTH_REDIS_URL: redis://redis:6379
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       db:
         condition: service_healthy

@@ -2,9 +2,9 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
@@ -34,7 +34,7 @@ import io.ktor.server.routing.post
  * Gated on `tenant.securityConfig.magicLinkEnabled` — off by default per tenant.
  */
 internal fun Route.magicLinkRoutes(
-    selfServiceService: UserSelfServiceService,
+    credentialFlowService: CredentialFlowService,
     rateLimiter: RateLimiterPort,
     encryptionService: EncryptionService,
     oauthService: OAuthService,
@@ -76,7 +76,7 @@ internal fun Route.magicLinkRoutes(
         val baseUrl = call.resolvedBaseUrl()
 
         // Service never fails externally — user enumeration is handled inside
-        selfServiceService.initiateMagicLink(
+        credentialFlowService.initiateMagicLink(
             email = email,
             tenantSlug = ctx.slug,
             baseUrl = baseUrl,
@@ -124,7 +124,7 @@ internal fun Route.magicLinkRoutes(
             return@get
         }
 
-        when (val result = selfServiceService.consumeMagicLink(token)) {
+        when (val result = credentialFlowService.consumeMagicLink(token)) {
             is SelfServiceResult.Failure -> {
                 call.respondHtml(
                     HttpStatusCode.Unauthorized,

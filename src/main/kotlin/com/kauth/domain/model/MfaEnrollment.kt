@@ -24,6 +24,11 @@ data class MfaEnrollment(
     val enabled: Boolean = true,
     val createdAt: Instant = Instant.now(),
     val verifiedAt: Instant? = null,
+    // RFC 6238 time step of the most recently accepted code. verifyTotp rejects any
+    // matched step <= this value, neutralising same-window code replay.
+    val lastUsedStep: Long? = null,
+    val failedMfaAttempts: Int = 0,
+    val mfaLockedUntil: Instant? = null,
 )
 
 /**

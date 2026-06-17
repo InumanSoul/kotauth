@@ -1,5 +1,6 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.TotpVerifyResult
 import com.kauth.domain.util.SecureTokens
 import java.nio.ByteBuffer
 import javax.crypto.Mac
@@ -52,7 +53,8 @@ object TotpUtil {
     }
 
     /**
-     * Verifies a TOTP code against the given secret.
+     * Verifies a TOTP code against the given secret. Returns which time step matched, if any —
+     * callers use [TotpVerifyResult.matchedStep] to detect replay (matched step <= last used).
      *
      * Allows a ±1 time step window to accommodate clock skew between
      * the server and the user's authenticator app.
@@ -61,18 +63,18 @@ object TotpUtil {
         secret: String,
         code: String,
         timeMillis: Long = System.currentTimeMillis(),
-    ): Boolean {
-        if (code.length != DIGITS || !code.all { it.isDigit() }) return false
+    ): TotpVerifyResult {
+        if (code.length != DIGITS || !code.all { it.isDigit() }) return TotpVerifyResult.INVALID
 
         val secretBytes = base32Decode(secret)
         val timeStep = timeMillis / 1000 / PERIOD
 
-        // Check current step and ±1 window
         for (offset in -1L..1L) {
-            val otp = generateOtp(secretBytes, timeStep + offset)
-            if (otp == code) return true
+            val candidateStep = timeStep + offset
+            val otp = generateOtp(secretBytes, candidateStep)
+            if (otp == code) return TotpVerifyResult(valid = true, matchedStep = candidateStep)
         }
-        return false
+        return TotpVerifyResult.INVALID
     }
 
     /**

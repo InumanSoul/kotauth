@@ -2,8 +2,8 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.SelfServiceResult
-import com.kauth.domain.service.UserSelfServiceService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
@@ -18,10 +18,10 @@ import io.ktor.server.routing.post
  * `/t/{slug}/…`.
  *
  * Mirrors the invite-accept flow: GET renders the form, POST consumes a
- * TEMP_PASSWORD token via [UserSelfServiceService.confirmForcedPasswordChange].
+ * TEMP_PASSWORD token via [CredentialFlowService.confirmForcedPasswordChange].
  */
 internal fun Route.forceChangePasswordRoutes(
-    selfServiceService: UserSelfServiceService,
+    credentialFlowService: CredentialFlowService,
     rateLimiter: RateLimiterPort,
 ) {
     get("/change-password") {
@@ -69,7 +69,7 @@ internal fun Route.forceChangePasswordRoutes(
 
         when (
             val result =
-                selfServiceService.confirmForcedPasswordChange(token, newPassword, confirmPassword)
+                credentialFlowService.confirmForcedPasswordChange(token, newPassword, confirmPassword)
         ) {
             is SelfServiceResult.Success ->
                 call.respondHtml(

@@ -613,7 +613,7 @@ class OAuthService(
         }
 
         val claims =
-            tokenPort.decodeAccessToken(token)
+            tokenPort.decodeAccessToken(token, tokenPort.issuerFor(tenant))
                 ?: return IntrospectionResult.Inactive
 
         return IntrospectionResult.Active(
@@ -772,9 +772,6 @@ class OAuthService(
 
     private fun generateSecureCode(): String = SecureTokens.randomBase64Url(32)
 
-    /**
-     * PKCE S256 verification: SHA-256(code_verifier) must equal code_challenge (base64url).
-     */
     private fun verifyPkce(
         codeVerifier: String,
         codeChallenge: String,
@@ -782,7 +779,10 @@ class OAuthService(
         val digest = MessageDigest.getInstance("SHA-256")
         val hash = digest.digest(codeVerifier.toByteArray(Charsets.US_ASCII))
         val computed = Base64.getUrlEncoder().withoutPadding().encodeToString(hash)
-        return computed == codeChallenge
+        return MessageDigest.isEqual(
+            computed.toByteArray(Charsets.US_ASCII),
+            codeChallenge.toByteArray(Charsets.US_ASCII),
+        )
     }
 
     companion object {

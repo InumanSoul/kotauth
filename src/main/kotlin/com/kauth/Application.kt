@@ -228,7 +228,7 @@ fun Application.module(
         header("X-Frame-Options", "DENY")
         header("Referrer-Policy", "strict-origin-when-cross-origin")
         header("Content-Security-Policy", buildCspPolicy())
-        header(HttpHeaders.Server, "KotAuth")
+        header(HttpHeaders.Server, "")
         if (config.isHttps) {
             header(
                 HttpHeaders.StrictTransportSecurity,
@@ -353,10 +353,6 @@ fun Application.module(
                 call.respondHtml(
                     HttpStatusCode.InternalServerError,
                     AdminView.adminErrorPage(
-                        message =
-                            cause.message
-                                ?: "An unexpected error occurred.",
-                        exceptionType = cause::class.qualifiedName,
                         allWorkspaces = workspaces,
                         loggedInAs = session?.username ?: "—",
                     ),
@@ -400,7 +396,7 @@ fun Application.module(
             registerRateLimiter = s.registerRateLimiter,
             tokenRateLimiter = s.tokenRateLimiter,
             mfaRateLimiter = s.mfaRateLimiter,
-            selfServiceService = s.selfServiceService,
+            credentialFlowService = s.credentialFlowService,
             mfaService = s.mfaService,
             roleRepository = s.roleRepository,
             socialLoginService = s.socialLoginService,
@@ -416,7 +412,7 @@ fun Application.module(
         )
 
         portalRoutes(
-            selfServiceService = s.selfServiceService,
+            accountSelfService = s.accountSelfService,
             tenantRepository = s.tenantRepository,
             sessionRepository = s.sessionRepository,
             mfaService = s.mfaService,
@@ -444,7 +440,9 @@ fun Application.module(
             sessionRepository = s.sessionRepository,
             auditLogRepository = s.auditLogRepository,
             roleGroupService = s.roleGroupService,
-            adminService = s.adminService,
+            accountService = s.accountService,
+            adminUserService = s.adminUserService,
+            applicationManagementService = s.applicationManagementService,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
             emailOtpService = s.emailOtpService,
@@ -465,7 +463,10 @@ fun Application.module(
         )
 
         adminRoutes(
-            adminService = s.adminService,
+            accountService = s.accountService,
+            workspaceSettingsService = s.workspaceSettingsService,
+            adminUserService = s.adminUserService,
+            applicationManagementService = s.applicationManagementService,
             roleGroupService = s.roleGroupService,
             appInfo = appInfo,
             tenantRepository = s.tenantRepository,
@@ -481,7 +482,7 @@ fun Application.module(
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,
             oauthService = s.oauthService,
-            selfServiceService = s.selfServiceService,
+            accountSelfService = s.accountSelfService,
             roleRepository = s.roleRepository,
             keyRotationService = s.keyRotationService,
             tenantKeyRepository = s.tenantKeyRepository,

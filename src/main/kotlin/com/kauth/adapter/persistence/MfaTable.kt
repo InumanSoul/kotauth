@@ -19,6 +19,9 @@ object MfaEnrollmentsTable : Table("mfa_enrollments") {
     val enabled = bool("enabled").default(true)
     val createdAt = timestampWithTimeZone("created_at")
     val verifiedAt = timestampWithTimeZone("verified_at").nullable()
+    val lastUsedStep = long("last_used_step").nullable()
+    val failedMfaAttempts = integer("failed_mfa_attempts").default(0)
+    val mfaLockedUntil = timestampWithTimeZone("mfa_locked_until").nullable()
 
     override val primaryKey = PrimaryKey(id)
 }

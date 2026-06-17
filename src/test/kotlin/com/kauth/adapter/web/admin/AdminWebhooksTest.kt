@@ -9,9 +9,9 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebhookEventType
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookResult
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApplicationRepository
@@ -111,8 +111,8 @@ class AdminWebhooksTest {
             enabled = true,
         )
 
-    private fun buildSelfService() =
-        UserSelfServiceService(
+    private fun buildCredentialFlowService() =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -125,14 +125,29 @@ class AdminWebhooksTest {
         )
 
     private fun buildAdminService() =
-        AdminService(
+        AdminAccountService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+            credentialFlowService = buildCredentialFlowService(),
+        )
+
+    private fun buildAdminUserService() =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
-            selfServiceService = buildSelfService(),
+            credentialFlowService = buildCredentialFlowService(),
+        )
+
+    private fun buildAppMgmtService() =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private fun buildRoleGroupService() =
@@ -286,7 +301,12 @@ class AdminWebhooksTest {
                 call.respond(HttpStatusCode.OK, "session set")
             }
             adminRoutes(
-                adminService = buildAdminService(),
+                accountService = buildAdminService(),
+                workspaceSettingsService =
+                    com.kauth.domain.service
+                        .WorkspaceSettingsService(tenantRepo, auditLogPort),
+                adminUserService = buildAdminUserService(),
+                applicationManagementService = buildAppMgmtService(),
                 roleGroupService = buildRoleGroupService(),
                 appInfo = AppInfo(),
                 tenantRepository = tenantRepo,

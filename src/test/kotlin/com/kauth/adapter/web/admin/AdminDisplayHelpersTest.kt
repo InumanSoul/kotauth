@@ -8,8 +8,8 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
-import com.kauth.domain.service.UserSelfServiceService
+import com.kauth.domain.service.AdminUserService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeEmailPort
@@ -45,8 +45,8 @@ class AdminDisplayHelpersTest {
     private val prTokenRepo = FakePasswordResetTokenRepository()
     private val emailPort = FakeEmailPort()
 
-    private val selfService =
-        UserSelfServiceService(
+    private val credentialFlowService =
+        CredentialFlowService(
             userRepository = users,
             tenantRepository = tenants,
             sessionRepository = sessions,
@@ -59,15 +59,14 @@ class AdminDisplayHelpersTest {
             emailScope = CoroutineScope(Dispatchers.Unconfined),
         )
 
-    private val adminService =
-        AdminService(
+    private val adminUserService =
+        com.kauth.domain.service.AdminUserService(
             tenantRepository = tenants,
             userRepository = users,
-            applicationRepository = apps,
+            sessionRepository = sessions,
             passwordHasher = hasher,
             auditLog = auditLog,
-            sessionRepository = sessions,
-            selfServiceService = selfService,
+            credentialFlowService = credentialFlowService,
             passwordPolicy = passwordPolicy,
         )
 
@@ -127,19 +126,19 @@ class AdminDisplayHelpersTest {
 
     @Test
     fun `resolveUsernames - returns username for known user`() {
-        val result = resolveUsernames(listOf(UserId(10)), tenantId, adminService)
+        val result = resolveUsernames(listOf(UserId(10)), tenantId, adminUserService)
         assertEquals("alice", result[UserId(10)])
     }
 
     @Test
     fun `resolveUsernames - falls back to ID string for unknown user`() {
-        val result = resolveUsernames(listOf(UserId(999)), tenantId, adminService)
+        val result = resolveUsernames(listOf(UserId(999)), tenantId, adminUserService)
         assertEquals("999", result[UserId(999)])
     }
 
     @Test
     fun `resolveUsernames - returns empty map for empty input`() {
-        val result = resolveUsernames(emptyList(), tenantId, adminService)
+        val result = resolveUsernames(emptyList(), tenantId, adminUserService)
         assertTrue(result.isEmpty())
     }
 

@@ -8,11 +8,11 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.TokenPurpose
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -107,8 +107,8 @@ class ApiUserLifecycleRoutesTest {
 
     private val apiKeyService = ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
 
-    private val selfServiceService =
-        UserSelfServiceService(
+    private val accountSelfService =
+        CredentialFlowService(
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             sessionRepository = sessionRepo,
@@ -121,15 +121,29 @@ class ApiUserLifecycleRoutesTest {
         )
 
     private val adminService =
-        AdminService(
+        AdminAccountService(
             tenantRepository = tenantRepo,
             userRepository = userRepo,
-            applicationRepository = appRepo,
+            auditLog = auditLogPort,
+            credentialFlowService = accountSelfService,
+        )
+
+    private val adminUserService =
+        com.kauth.domain.service.AdminUserService(
+            tenantRepository = tenantRepo,
+            userRepository = userRepo,
+            sessionRepository = sessionRepo,
             passwordHasher = hasher,
             auditLog = auditLogPort,
-            sessionRepository = sessionRepo,
-            selfServiceService = selfServiceService,
-            emailPort = emailPort,
+            credentialFlowService = accountSelfService,
+        )
+
+    private val applicationManagementService =
+        com.kauth.domain.service.ApplicationManagementService(
+            applicationRepository = appRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private val roleGroupService =
@@ -380,7 +394,9 @@ class ApiUserLifecycleRoutesTest {
                 sessionRepository = sessionRepo,
                 auditLogRepository = auditLogRepo,
                 roleGroupService = roleGroupService,
-                adminService = adminService,
+                accountService = adminService,
+                adminUserService = adminUserService,
+                applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 emailOtpService = stubEmailOtpService(),

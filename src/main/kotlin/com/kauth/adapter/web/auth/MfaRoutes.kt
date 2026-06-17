@@ -2,6 +2,7 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.service.MfaError
 import com.kauth.domain.service.MfaResult
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
@@ -99,13 +100,15 @@ internal fun Route.mfaRoutes(
 
         when (mfaResult) {
             is MfaResult.Failure -> {
+                val message =
+                    if (mfaResult.error is MfaError.TotpLocked) {
+                        "Too many failed attempts. MFA is temporarily locked — try again later or use a recovery code."
+                    } else {
+                        "Invalid code. Please try again."
+                    }
                 call.respondHtml(
                     HttpStatusCode.Unauthorized,
-                    AuthView.mfaChallengePage(
-                        slug,
-                        ctx.viewContext,
-                        error = "Invalid code. Please try again.",
-                    ),
+                    AuthView.mfaChallengePage(slug, ctx.viewContext, error = message),
                 )
             }
             is MfaResult.Success -> {
@@ -115,6 +118,7 @@ internal fun Route.mfaRoutes(
                     maxAge = 0L,
                     path = "/t/$slug",
                     httpOnly = true,
+                    secure = secure,
                 )
 
                 if (oauthParams.isOAuthFlow) {

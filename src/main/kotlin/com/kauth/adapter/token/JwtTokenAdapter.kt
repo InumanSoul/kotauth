@@ -222,13 +222,15 @@ class JwtTokenAdapter(
     // TokenPort — decode / verify
     // -------------------------------------------------------------------------
 
-    override fun decodeAccessToken(token: String): AccessTokenClaims? {
+    override fun decodeAccessToken(
+        token: String,
+        expectedIssuer: String,
+    ): AccessTokenClaims? {
         return try {
             val decoded = JWT.decode(token)
             val tenantIdRaw = decoded.getClaim("tenant_id").asInt() ?: return null
-            val kid = decoded.keyId // JWT "kid" header — null for tokens issued before key rotation
+            val kid = decoded.keyId
 
-            // Use kid-based lookup for rotated keys, fall back to active key for legacy tokens
             val algorithm =
                 if (kid != null) {
                     getAlgorithmForKid(tenantIdRaw, kid) ?: getOrCreateAlgorithm(tenantIdRaw).algorithm
@@ -236,7 +238,7 @@ class JwtTokenAdapter(
                     getOrCreateAlgorithm(tenantIdRaw).algorithm
                 }
 
-            val verifier = JWT.require(algorithm).build()
+            val verifier = JWT.require(algorithm).withIssuer(expectedIssuer).build()
             val verified = verifier.verify(token)
 
             val scopeStr = verified.getClaim("scope").asString() ?: ""
@@ -357,7 +359,7 @@ class JwtTokenAdapter(
         )
     }
 
-    private fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
+    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "$baseUrl/t/${tenant.slug}"
 
     private fun generateRefreshToken(): String = SecureTokens.randomBase64Url(32)
 

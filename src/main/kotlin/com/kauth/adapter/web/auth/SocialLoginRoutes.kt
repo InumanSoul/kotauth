@@ -216,7 +216,7 @@ internal fun Route.socialLoginRoutes(
                         authTime = java.time.Instant.now(),
                         mfaCompleted = false,
                         ssoTtlSeconds = ssoTtlSeconds,
-                        secure = baseUrl.startsWith("https"),
+                        secure = baseUrl.startsWith("https://", ignoreCase = true),
                         oauthService = oauthService,
                         encryptionService = encryptionService,
                         renderError = { message ->
@@ -368,7 +368,7 @@ internal fun Route.socialLoginRoutes(
                         authTime = java.time.Instant.now(),
                         mfaCompleted = false,
                         ssoTtlSeconds = ssoTtlSeconds,
-                        secure = baseUrl.startsWith("https"),
+                        secure = baseUrl.startsWith("https://", ignoreCase = true),
                         oauthService = oauthService,
                         encryptionService = encryptionService,
                         renderError = { message ->

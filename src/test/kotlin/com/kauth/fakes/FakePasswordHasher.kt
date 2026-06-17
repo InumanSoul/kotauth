@@ -14,10 +14,16 @@ import com.kauth.domain.port.PasswordHasher
  * Security note: NEVER use this outside of tests.
  */
 class FakePasswordHasher : PasswordHasher {
+    var verifyCallCount = 0
+        private set
+
     override fun hash(rawPassword: String): String = "hashed:$rawPassword"
 
     override fun verify(
         rawPassword: String,
         hashedPassword: String,
-    ): Boolean = hashedPassword == "hashed:$rawPassword"
+    ): Boolean {
+        verifyCallCount++
+        return hashedPassword == "hashed:$rawPassword"
+    }
 }

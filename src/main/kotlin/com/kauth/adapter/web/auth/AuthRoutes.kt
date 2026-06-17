@@ -12,10 +12,10 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CorsService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.HttpStatusCode
@@ -32,7 +32,7 @@ fun Route.authRoutes(
     registerRateLimiter: RateLimiterPort,
     tokenRateLimiter: RateLimiterPort,
     mfaRateLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 5, windowSeconds = 300),
-    selfServiceService: UserSelfServiceService,
+    credentialFlowService: CredentialFlowService,
     mfaService: MfaService? = null,
     roleRepository: RoleRepository? = null,
     socialLoginService: SocialLoginService? = null,
@@ -91,7 +91,7 @@ fun Route.authRoutes(
 
         registerRoutes(
             authService = authService,
-            selfServiceService = selfServiceService,
+            credentialFlowService = credentialFlowService,
             registerRateLimiter = registerRateLimiter,
             identityProviderRepository = identityProviderRepository,
             baseUrl = baseUrl,
@@ -99,27 +99,27 @@ fun Route.authRoutes(
         )
 
         selfServiceRoutes(
-            selfServiceService = selfServiceService,
+            credentialFlowService = credentialFlowService,
             registerRateLimiter = registerRateLimiter,
         )
 
         acceptInviteRoutes(
-            selfServiceService = selfServiceService,
+            credentialFlowService = credentialFlowService,
             rateLimiter = registerRateLimiter,
         )
 
         forceChangePasswordRoutes(
-            selfServiceService = selfServiceService,
+            credentialFlowService = credentialFlowService,
             rateLimiter = registerRateLimiter,
         )
 
         magicLinkRoutes(
-            selfServiceService = selfServiceService,
+            credentialFlowService = credentialFlowService,
             rateLimiter = registerRateLimiter,
             encryptionService = encryptionService,
             oauthService = oauthService,
             ssoTtlSeconds = ssoTtlSeconds,
-            secure = baseUrl.startsWith("https"),
+            secure = baseUrl.startsWith("https://", ignoreCase = true),
         )
 
         if (emailOtpService != null && otpIpRateLimiter != null) {
@@ -129,7 +129,7 @@ fun Route.authRoutes(
                 perIpLimiter = otpIpRateLimiter,
                 encryptionService = encryptionService,
                 ssoTtlSeconds = ssoTtlSeconds,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
             )
         }
 
@@ -139,7 +139,7 @@ fun Route.authRoutes(
             encryptionService = encryptionService,
             mfaRateLimiter = mfaRateLimiter,
             ssoTtlSeconds = ssoTtlSeconds,
-            secure = baseUrl.startsWith("https"),
+            secure = baseUrl.startsWith("https://", ignoreCase = true),
         )
 
         socialLoginRoutes(

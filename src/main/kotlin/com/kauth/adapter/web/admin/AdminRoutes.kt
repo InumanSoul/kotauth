@@ -20,8 +20,9 @@ import com.kauth.domain.port.TenantKeyRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.AccountSelfService
+import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
-import com.kauth.domain.service.AdminService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
@@ -29,7 +30,6 @@ import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
-import com.kauth.domain.service.UserSelfServiceService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.EncryptionService
@@ -52,7 +52,10 @@ import io.ktor.server.sessions.sessions
 import io.ktor.server.sessions.set
 
 fun Route.adminRoutes(
-    adminService: AdminService,
+    accountService: AdminAccountService,
+    workspaceSettingsService: com.kauth.domain.service.WorkspaceSettingsService,
+    adminUserService: com.kauth.domain.service.AdminUserService,
+    applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     roleGroupService: RoleGroupService,
     appInfo: AppInfo,
     tenantRepository: TenantRepository,
@@ -68,7 +71,7 @@ fun Route.adminRoutes(
     webhookService: WebhookService? = null,
     encryptionService: EncryptionService,
     oauthService: OAuthService? = null,
-    selfServiceService: UserSelfServiceService? = null,
+    accountSelfService: AccountSelfService? = null,
     roleRepository: RoleRepository? = null,
     keyRotationService: KeyRotationService? = null,
     tenantKeyRepository: TenantKeyRepository? = null,
@@ -105,7 +108,7 @@ fun Route.adminRoutes(
                 value = cookieVal,
                 maxAge = 300L,
                 httpOnly = true,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
                 path = "/admin",
             )
             val redirectUri = "$baseUrl/admin/callback"
@@ -261,7 +264,7 @@ fun Route.adminRoutes(
 
             // Find the session record created by the token exchange
             val latestSession =
-                selfServiceService
+                accountSelfService
                     ?.getActiveSessions(UserId(userId), masterTenant.id)
                     ?.maxByOrNull { it.createdAt }
 
@@ -285,7 +288,7 @@ fun Route.adminRoutes(
         post("/logout") {
             val session = call.sessions.get<AdminSession>()
             if (session?.adminSessionId != null) {
-                selfServiceService?.revokeSession(
+                accountSelfService?.revokeSession(
                     UserId(session.userId),
                     TenantId(session.tenantId),
                     com.kauth.domain.model
@@ -402,7 +405,7 @@ fun Route.adminRoutes(
                         registrationEnabled = params["registrationEnabled"] == "true",
                         emailVerificationRequired = params["emailVerificationRequired"] == "true",
                     )
-                when (val result = adminService.createWorkspace(slug, displayName, issuerUrl)) {
+                when (val result = workspaceSettingsService.createWorkspace(slug, displayName, issuerUrl)) {
                     is AdminResult.Failure -> {
                         val wsPairs =
                             tenantRepository.findAll().map {
@@ -485,7 +488,9 @@ fun Route.adminRoutes(
                 }
 
                 adminSettingsRoutes(
-                    adminService = adminService,
+                    accountService = accountService,
+                    workspaceSettingsService = workspaceSettingsService,
+                    adminUserService = adminUserService,
                     userRepository = userRepository,
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
@@ -493,14 +498,15 @@ fun Route.adminRoutes(
                 )
 
                 adminApplicationRoutes(
-                    adminService = adminService,
+                    applicationManagementService = applicationManagementService,
                     applicationRepository = applicationRepository,
                     roleGroupService = roleGroupService,
                     corsPort = corsPort,
                 )
 
                 adminUserRoutes(
-                    adminService = adminService,
+                    accountService = accountService,
+                    adminUserService = adminUserService,
                     roleGroupService = roleGroupService,
                     sessionRepository = sessionRepository,
                     userAttributeService = userAttributeService,
@@ -513,7 +519,7 @@ fun Route.adminRoutes(
                 adminSessionAuditRoutes(
                     sessionRepository = sessionRepository,
                     auditLogRepository = auditLogRepository,
-                    adminService = adminService,
+                    adminUserService = adminUserService,
                     applicationRepository = applicationRepository,
                 )
 

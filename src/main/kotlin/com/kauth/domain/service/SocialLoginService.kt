@@ -139,24 +139,22 @@ class SocialLoginService(
             return SocialLoginResult.Failure(SocialLoginError.EmailNotProvided)
         }
 
-        // Try to find an existing user — never create one here.
-        val existingUser = findExistingUser(tenant.id, provider, profile)
-
-        if (existingUser == null) {
-            // No account linked and no email match — hand off to the registration completion flow.
-            return SocialLoginResult.NeedsRegistration(
-                SocialLoginNeedsRegistration(
-                    provider = provider,
-                    providerUserId = profile.providerUserId,
-                    email = profile.email,
-                    name = profile.name,
-                    avatarUrl = profile.avatarUrl,
-                    emailVerified = profile.emailVerified,
-                ),
-            )
+        when (val match = resolveExistingUser(tenant.id, provider, profile)) {
+            is ExistingUserMatch.Linked -> return issueTokens(match.user, tenant, provider, false, ipAddress, userAgent)
+            is ExistingUserMatch.EmailCollisionUnverified ->
+                return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
+            ExistingUserMatch.None ->
+                return SocialLoginResult.NeedsRegistration(
+                    SocialLoginNeedsRegistration(
+                        provider = provider,
+                        providerUserId = profile.providerUserId,
+                        email = profile.email,
+                        name = profile.name,
+                        avatarUrl = profile.avatarUrl,
+                        emailVerified = profile.emailVerified,
+                    ),
+                )
         }
-
-        return issueTokens(existingUser, tenant, provider, isNewUser = false, ipAddress, userAgent)
     }
 
     /**
@@ -218,6 +216,9 @@ class SocialLoginService(
         val normalizedEmail = email.trim().lowercase()
         val existingByEmail = userRepository.findByEmail(tenant.id, normalizedEmail)
         if (existingByEmail != null) {
+            if (!emailVerified) {
+                return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
+            }
             socialAccountRepository.save(
                 SocialAccount(
                     userId = existingByEmail.id!!,
@@ -282,37 +283,42 @@ class SocialLoginService(
     // Private helpers
     // -------------------------------------------------------------------------
 
-    /**
-     * Looks up an existing KotAuth user by social account link or email match.
-     * NEVER creates a new user. NEVER modifies an existing user's profile.
-     *
-     *   (a) social_accounts row matches (tenantId, provider, providerUserId) -> return linked user.
-     *   (b) users row with matching email exists in this tenant -> auto-link + return user.
-     *   else -> return null (caller decides what to do — typically: show registration page).
-     */
-    private fun findExistingUser(
+    private sealed class ExistingUserMatch {
+        data class Linked(
+            val user: User,
+        ) : ExistingUserMatch()
+
+        object EmailCollisionUnverified : ExistingUserMatch()
+
+        object None : ExistingUserMatch()
+    }
+
+    // Account take-over guard: auto-linking by email REQUIRES the provider has verified
+    // the email. Otherwise an attacker who controls an unverified mailbox at the IdP
+    // could claim any KotAuth account that shares that address.
+    private fun resolveExistingUser(
         tenantId: TenantId,
         provider: SocialProvider,
         profile: SocialUserProfile,
-    ): User? {
-        // (a) Known social account link
-        val existing =
+    ): ExistingUserMatch {
+        val linked =
             socialAccountRepository.findByProviderIdentity(
                 tenantId = tenantId,
                 provider = provider,
                 providerUserId = profile.providerUserId,
             )
-        if (existing != null) {
-            return userRepository.findById(existing.userId, tenantId)
+        if (linked != null) {
+            val user = userRepository.findById(linked.userId, tenantId) ?: return ExistingUserMatch.None
+            return ExistingUserMatch.Linked(user)
         }
 
-        val email = profile.email?.trim()?.lowercase() ?: return null
+        val email = profile.email?.trim()?.lowercase() ?: return ExistingUserMatch.None
+        val existingByEmail = userRepository.findByEmail(tenantId, email) ?: return ExistingUserMatch.None
+        if (!profile.emailVerified) return ExistingUserMatch.EmailCollisionUnverified
 
-        // (b) Email match — auto-link without touching the user's profile
-        val existingUser = userRepository.findByEmail(tenantId, email) ?: return null
         socialAccountRepository.save(
             SocialAccount(
-                userId = existingUser.id!!,
+                userId = existingByEmail.id!!,
                 tenantId = tenantId,
                 provider = provider,
                 providerUserId = profile.providerUserId,
@@ -321,7 +327,7 @@ class SocialLoginService(
                 avatarUrl = profile.avatarUrl,
             ),
         )
-        return existingUser
+        return ExistingUserMatch.Linked(existingByEmail)
     }
 
     /**
@@ -454,6 +460,8 @@ sealed class SocialLoginError {
     object RegistrationDisabled : SocialLoginError()
 
     object UsernameConflict : SocialLoginError()
+
+    object LinkRequiresEmailVerification : SocialLoginError()
 
     data class InvalidUsername(
         val reason: String,
