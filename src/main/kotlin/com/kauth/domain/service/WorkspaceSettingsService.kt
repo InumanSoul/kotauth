@@ -14,6 +14,7 @@ import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
+import com.kauth.domain.util.validateTenantTheme
 
 class WorkspaceSettingsService(
     private val tenantRepository: TenantRepository,
@@ -90,7 +91,9 @@ class WorkspaceSettingsService(
             tenantRepository.findBySlug(slug)
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace '$slug' not found."))
 
-        val saved = repo.upsert(tenant.id, sanitizeTheme(theme))
+        val sanitized = sanitizeTheme(theme)
+        validateTenantTheme(sanitized)?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+        val saved = repo.upsert(tenant.id, sanitized)
 
         auditLog.record(
             AuditEvent(

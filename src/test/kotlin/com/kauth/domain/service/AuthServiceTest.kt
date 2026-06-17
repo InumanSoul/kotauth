@@ -522,4 +522,42 @@ class AuthServiceTest {
         assertIs<AuthResult.Failure>(result)
         assertIs<AuthError.PasswordLoginDisabled>(result.error)
     }
+
+    // -------------------------------------------------------------------------
+    // M6: timing-equalising dummy verify on enumeration-vector paths
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `authenticate runs a verify call on the unknown-username path so timing matches`() {
+        val before = hasher.verifyCallCount
+        svc.authenticate("acme", "no-such-user", "anything")
+        assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the username is unknown")
+    }
+
+    @Test
+    fun `authenticate runs a verify call on the disabled-user path`() {
+        users.clear()
+        users.add(activeUser.copy(enabled = false))
+        val before = hasher.verifyCallCount
+        svc.authenticate("acme", "alice", "correct-pass")
+        assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the account is disabled")
+    }
+
+    @Test
+    fun `authenticate runs a verify call on the locked-out path`() {
+        users.clear()
+        users.add(activeUser.copy(lockedUntil = Instant.now().plusSeconds(600)))
+        val before = hasher.verifyCallCount
+        svc.authenticate("acme", "alice", "correct-pass")
+        assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the account is locked")
+    }
+
+    @Test
+    fun `authenticate runs a verify call on the pending-setup path`() {
+        users.clear()
+        users.add(activeUser.copy(requiredActions = setOf(RequiredAction.SET_PASSWORD)))
+        val before = hasher.verifyCallCount
+        svc.authenticate("acme", "alice", "correct-pass")
+        assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the user has a pending invite")
+    }
 }

@@ -4,7 +4,6 @@ import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
-import com.kauth.domain.service.AuthError
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.IntrospectionResult
@@ -451,24 +450,20 @@ internal fun Route.oauthProtocolRoutes(
 
         when (val result = authService.authenticate(slug, username, password, ipAddress, userAgent, baseUrl)) {
             is AuthResult.Failure -> {
-                if (result.error is AuthError.PasswordExpired) {
-                    call.respondRedirect("/t/$slug/forgot-password?reason=expired")
-                } else {
-                    call.respondHtml(
-                        HttpStatusCode.Unauthorized,
-                        AuthView.loginPage(
-                            tenantSlug = slug,
-                            ctx = ctx.viewContext,
-                            error = result.error.toMessage(),
-                            oauthParams = oauthParams,
-                            enabledProviders = enabledProviders,
-                            registrationEnabled = tenant?.registrationEnabled ?: true,
-                            magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
-                            passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
-                            emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
-                        ),
-                    )
-                }
+                call.respondHtml(
+                    HttpStatusCode.Unauthorized,
+                    AuthView.loginPage(
+                        tenantSlug = slug,
+                        ctx = ctx.viewContext,
+                        error = result.error.toMessage(),
+                        oauthParams = oauthParams,
+                        enabledProviders = enabledProviders,
+                        registrationEnabled = tenant?.registrationEnabled ?: true,
+                        magicLinkEnabled = tenant?.securityConfig?.magicLinkEnabled == true,
+                        passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                        emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
+                    ),
+                )
             }
             is AuthResult.Success -> {
                 val user = result.value
@@ -785,16 +780,10 @@ internal fun Route.oauthProtocolRoutes(
             call.clearSsoCookie(slug)
 
             val postLogoutUri = call.request.queryParameters["post_logout_redirect_uri"]
-            if (!postLogoutUri.isNullOrBlank()) {
-                // Only allow post-logout redirect to same origin to prevent open redirect
-                val origin = call.resolvedBaseUrl()
-                if (postLogoutUri.startsWith(origin) || postLogoutUri.startsWith("/")) {
-                    call.respondRedirect(postLogoutUri)
-                } else {
-                    call.respondRedirect("/t/$slug/authorize")
-                }
-            } else {
+            if (postLogoutUri.isNullOrBlank() || !isSafePostLogoutRedirect(postLogoutUri, call.resolvedBaseUrl())) {
                 call.respondRedirect("/t/$slug/authorize")
+            } else {
+                call.respondRedirect(postLogoutUri)
             }
         }
 
@@ -813,3 +802,35 @@ internal fun Route.oauthProtocolRoutes(
         }
     }
 }
+
+private fun isSafePostLogoutRedirect(
+    uri: String,
+    origin: String,
+): Boolean {
+    val trimmed = uri.trim()
+    // "//evil.com" / "/\evil.com" / "\\evil.com" start with "/" but resolve to external origins.
+    if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.startsWith("\\")) return false
+    if (trimmed.startsWith("/")) return true
+    return try {
+        val target = java.net.URI(trimmed)
+        val base = java.net.URI(origin)
+        // Parse + compare scheme/host/port exactly. Prefix string match is bypassable by
+        // "https://legit.com.evil.com" against origin "https://legit.com".
+        target.userInfo == null &&
+            target.host != null &&
+            target.scheme.equals(base.scheme, ignoreCase = true) &&
+            target.host.equals(base.host, ignoreCase = true) &&
+            effectivePort(target) == effectivePort(base)
+    } catch (_: Exception) {
+        false
+    }
+}
+
+private fun effectivePort(u: java.net.URI): Int =
+    if (u.port != -1) {
+        u.port
+    } else if (u.scheme.equals("https", ignoreCase = true)) {
+        443
+    } else {
+        80
+    }

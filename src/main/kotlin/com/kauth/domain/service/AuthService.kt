@@ -47,6 +47,18 @@ class AuthService(
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
 ) {
+    // Equalises latency so wrong-password vs. user-not-found / disabled / locked / pending-setup
+    // are indistinguishable timing-wise — closes the bcrypt-skipped enumeration vector.
+    private val timingEqualizationHash: String by lazy { passwordHasher.hash(TIMING_EQUALIZATION_PROBE) }
+
+    private fun runDummyVerify(rawPassword: String) {
+        passwordHasher.verify(rawPassword, timingEqualizationHash)
+    }
+
+    private companion object {
+        const val TIMING_EQUALIZATION_PROBE = "__kauth_timing_equalization_probe__"
+    }
+
     /**
      * Authenticates a user and returns the User domain object.
      * Records LOGIN_SUCCESS or LOGIN_FAILED audit events.
@@ -86,6 +98,7 @@ class AuthService(
 
         val user = userRepository.findByUsername(tenant.id, username)
         if (user == null) {
+            runDummyVerify(rawPassword)
             auditLog.record(
                 AuditEvent(
                     tenantId = tenant.id,
@@ -100,6 +113,7 @@ class AuthService(
         }
 
         if (!user.enabled) {
+            runDummyVerify(rawPassword)
             auditLog.record(
                 AuditEvent(
                     tenantId = tenant.id,
@@ -113,9 +127,9 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        // Account lockout check — before password verification to avoid wasting bcrypt cycles
         val security = tenant.securityConfig
         if (security.isLockoutEnabled && user.isLocked) {
+            runDummyVerify(rawPassword)
             auditLog.record(
                 AuditEvent(
                     tenantId = tenant.id,
@@ -130,8 +144,8 @@ class AuthService(
             return AuthResult.Failure(AuthError.AccountLocked(user.lockedUntil!!))
         }
 
-        // Invite guard — user was created but has not yet accepted their invite
         if (RequiredAction.SET_PASSWORD in user.requiredActions) {
+            runDummyVerify(rawPassword)
             auditLog.record(
                 AuditEvent(
                     tenantId = tenant.id,

@@ -425,6 +425,52 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    fun `handleCallback - email matches existing user but provider says unverified rejects link`() {
+        googleAdapter.profileToReturn = googleProfile.copy(emailVerified = false, providerUserId = "imposter-uid")
+        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        assertIs<SocialLoginResult.Failure>(result)
+        assertEquals(SocialLoginError.LinkRequiresEmailVerification, result.error)
+        assertEquals(0, socialAccounts.all().size, "No link must be created when provider has not verified the email")
+        assertEquals(0, sessions.all().size, "No session must be issued for unverified email collisions")
+    }
+
+    @Test
+    fun `handleCallback - existing social link still works even if provider reports unverified`() {
+        socialAccounts.save(
+            com.kauth.domain.model.SocialAccount(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-uid-123",
+                providerEmail = "alice@example.com",
+                providerName = "Alice",
+            ),
+        )
+        googleAdapter.profileToReturn = googleProfile.copy(emailVerified = false)
+        val result = svc.handleCallback("acme", SocialProvider.GOOGLE, "code", "http://localhost")
+        assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
+        assertEquals("alice", result.value.user.username)
+    }
+
+    @Test
+    fun `completeSocialRegistration - email matches existing user but emailVerified is false rejects link`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "imposter-uid",
+                email = "alice@example.com",
+                providerName = "Imposter",
+                avatarUrl = null,
+                emailVerified = false,
+                chosenUsername = "imposter",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertEquals(SocialLoginError.LinkRequiresEmailVerification, result.error)
+        assertEquals(0, socialAccounts.all().size, "No link must be created for unverified email collisions")
+    }
+
+    @Test
     fun `completeSocialRegistration - unverified email propagated`() {
         val result =
             svc.completeSocialRegistration(

@@ -607,6 +607,8 @@ private fun MfaError.toCode(): String =
         is MfaError.AlreadyEnrolled -> "already_enrolled"
         is MfaError.NotEnrolled -> "not_enrolled"
         is MfaError.InvalidCode -> "invalid_code"
+        is MfaError.ReplayRejected -> "replay_rejected"
+        is MfaError.TotpLocked -> "totp_locked"
         is MfaError.NoRecoveryCodesLeft -> "no_recovery_codes"
     }
 

@@ -29,6 +29,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required — set it in .env}
     ports:
       - "8080:8080"
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
       interval: 10s

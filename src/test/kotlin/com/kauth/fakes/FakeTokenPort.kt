@@ -81,7 +81,12 @@ class FakeTokenPort : TokenPort {
         scopes: List<String>,
     ): String = "fake.m2m.${client.clientId}"
 
-    override fun decodeAccessToken(token: String): AccessTokenClaims? = claimsToReturn
+    override fun decodeAccessToken(
+        token: String,
+        expectedIssuer: String,
+    ): AccessTokenClaims? = claimsToReturn
+
+    override fun issuerFor(tenant: Tenant): String = tenant.issuerUrl ?: "https://fake-issuer/${tenant.slug}"
 
     override fun getTenantJwks(tenantId: TenantId): List<Map<String, Any>> = jwksToReturn
 
