@@ -2,6 +2,7 @@ package com.kauth.adapter.email
 
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.EmailPort
+import com.kauth.domain.port.TranslationPort
 import org.slf4j.LoggerFactory
 import java.util.Properties
 import javax.mail.Authenticator
@@ -14,25 +15,15 @@ import javax.mail.internet.MimeBodyPart
 import javax.mail.internet.MimeMessage
 import javax.mail.internet.MimeMultipart
 
-/**
- * Email adapter — delivers transactional emails via SMTP (JavaMail).
- *
- * Each send operation reads SMTP config from the [Tenant] domain object at call time,
- * so config changes take effect without restart.
- *
- * TLS connection modes:
- *   Port 465 → SMTPS (SSL-first):  mail.smtp.ssl.enable=true
- *   Port 587+ → STARTTLS:          mail.smtp.starttls.enable=true + starttls.required=true
- * These two modes are mutually exclusive. Conflating them is the most common JavaMail mistake.
- *
- * Emails use plain HTML with no template engine. Each email applies TenantTheme branding
- * (accent color, font family, border radius, logo) via a shared [buildEmailHtml] layout function.
- *
- * The caller (`AccountSelfService` in the domain layer) is responsible for
- * checking [Tenant.isSmtpReady] before calling this adapter. If SMTP is not
- * configured, this adapter will throw.
- */
-class SmtpEmailAdapter : EmailPort {
+internal data class RenderedEmail(
+    val subject: String,
+    val html: String,
+    val text: String,
+)
+
+class SmtpEmailAdapter(
+    private val translationPort: TranslationPort,
+) : EmailPort {
     private val log = LoggerFactory.getLogger(SmtpEmailAdapter::class.java)
 
     override fun sendVerificationEmail(
@@ -42,10 +33,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "Verify your email address — $workspaceName"
-        val html = buildVerificationHtml(toName, verifyUrl, tenant)
-        val text = buildVerificationText(toName, verifyUrl, workspaceName)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderVerification(toName, verifyUrl, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendPasswordResetEmail(
@@ -55,10 +44,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "Reset your password — $workspaceName"
-        val html = buildPasswordResetHtml(toName, resetUrl, tenant)
-        val text = buildPasswordResetText(toName, resetUrl, workspaceName)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderPasswordReset(toName, resetUrl, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendAccountLockedEmail(
@@ -69,10 +56,8 @@ class SmtpEmailAdapter : EmailPort {
         lockoutDuration: String,
         tenant: Tenant,
     ) {
-        val subject = "Your account has been locked — $workspaceName"
-        val html = buildAccountLockedHtml(toName, resetUrl, lockoutDuration, tenant)
-        val text = buildAccountLockedText(toName, resetUrl, workspaceName, lockoutDuration)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderAccountLocked(toName, resetUrl, workspaceName, lockoutDuration, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendPasswordChangedEmail(
@@ -81,10 +66,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "Your password has been changed — $workspaceName"
-        val html = buildPasswordChangedHtml(toName, workspaceName, tenant)
-        val text = buildPasswordChangedText(toName, workspaceName, tenant)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderPasswordChanged(toName, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendTestEmail(
@@ -92,19 +75,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "KotAuth SMTP Test — $workspaceName"
-        val html =
-            buildEmailHtml(
-                tenant = tenant,
-                heading = "SMTP Configuration Test",
-                bodyHtml =
-                    "This email confirms that SMTP is correctly configured for " +
-                        "<strong>${htmlEscape(workspaceName)}</strong>. " +
-                        "Email delivery (verification, password reset, notifications) is operational.",
-                footerHtml = "Sent by KotAuth to verify SMTP configuration.",
-            )
-        val text = "SMTP test email for $workspaceName. Email delivery is operational."
-        send(to, to, subject, html, text, tenant)
+        val r = renderTest(workspaceName, tenant)
+        send(to, to, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendInviteEmail(
@@ -114,10 +86,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "You've been invited to join $workspaceName"
-        val html = buildInviteHtml(toName, inviteUrl, tenant)
-        val text = buildInviteText(toName, inviteUrl, workspaceName)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderInvite(toName, inviteUrl, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendMagicLinkEmail(
@@ -127,10 +97,8 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "Your sign-in link for $workspaceName"
-        val html = buildMagicLinkHtml(toName, magicLinkUrl, tenant)
-        val text = buildMagicLinkText(toName, magicLinkUrl, workspaceName)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderMagicLink(toName, magicLinkUrl, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
 
     override fun sendEmailOtpEmail(
@@ -141,11 +109,312 @@ class SmtpEmailAdapter : EmailPort {
         workspaceName: String,
         tenant: Tenant,
     ) {
-        val subject = "Your sign-in code for $workspaceName"
-        val html = buildEmailOtpHtml(toName, code, expiresInMinutes, tenant)
-        val text = buildEmailOtpText(toName, code, expiresInMinutes, workspaceName)
-        send(to, toName, subject, html, text, tenant)
+        val r = renderEmailOtp(toName, code, expiresInMinutes, workspaceName, tenant)
+        send(to, toName, r.subject, r.html, r.text, tenant)
     }
+
+    // -------------------------------------------------------------------------
+    // Render functions — pure (no I/O) so they're directly testable.
+    // -------------------------------------------------------------------------
+
+    internal fun renderVerification(
+        toName: String,
+        verifyUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_VERIFY", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_VERIFY", locale),
+                    bodyHtml = greetingHtml(toName, locale) + t("EMAIL_BODY_VERIFY", locale),
+                    ctaLabel = t("EMAIL_CTA_VERIFY", locale),
+                    ctaUrl = verifyUrl,
+                    footerHtml = t("EMAIL_FOOTER_VERIFY", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_VERIFY", locale),
+                    body = greetingText(toName, locale) + t("EMAIL_BODY_VERIFY", locale),
+                    url = verifyUrl,
+                    footer = t("EMAIL_FOOTER_VERIFY", locale),
+                ),
+        )
+    }
+
+    internal fun renderPasswordReset(
+        toName: String,
+        resetUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_PASSWORD_RESET", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_PASSWORD_RESET", locale),
+                    bodyHtml = greetingHtml(toName, locale) + t("EMAIL_BODY_PASSWORD_RESET", locale),
+                    ctaLabel = t("EMAIL_CTA_PASSWORD_RESET", locale),
+                    ctaUrl = resetUrl,
+                    footerHtml = t("EMAIL_FOOTER_PASSWORD_RESET", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_PASSWORD_RESET", locale),
+                    body = greetingText(toName, locale) + t("EMAIL_BODY_PASSWORD_RESET", locale),
+                    url = resetUrl,
+                    footer = t("EMAIL_FOOTER_PASSWORD_RESET", locale),
+                ),
+        )
+    }
+
+    internal fun renderAccountLocked(
+        toName: String,
+        resetUrl: String,
+        workspaceName: String,
+        lockoutDuration: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_ACCOUNT_LOCKED", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_ACCOUNT_LOCKED", locale),
+                    bodyHtml =
+                        greetingHtml(toName, locale) +
+                            t(
+                                "EMAIL_BODY_ACCOUNT_LOCKED",
+                                locale,
+                                htmlEscape(workspaceName),
+                                htmlEscape(lockoutDuration),
+                            ),
+                    ctaLabel = t("EMAIL_CTA_PASSWORD_RESET", locale),
+                    ctaUrl = resetUrl,
+                    footerHtml = t("EMAIL_FOOTER_ACCOUNT_LOCKED", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_ACCOUNT_LOCKED", locale),
+                    body =
+                        greetingText(toName, locale) +
+                            t("EMAIL_BODY_ACCOUNT_LOCKED", locale, workspaceName, lockoutDuration),
+                    url = resetUrl,
+                    footer = t("EMAIL_FOOTER_ACCOUNT_LOCKED", locale),
+                ),
+        )
+    }
+
+    internal fun renderPasswordChanged(
+        toName: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
+
+        val baseBodyHtml =
+            greetingHtml(toName, locale) +
+                t("EMAIL_BODY_PASSWORD_CHANGED", locale, htmlEscape(workspaceName))
+        val loginHintHtml =
+            if (loginUrl.isNotBlank()) {
+                val anchor =
+                    """ <a href="${htmlEscape(loginUrl)}" style="color:#71717a;">${htmlEscape(loginUrl)}</a>"""
+                " " + t("EMAIL_BODY_PASSWORD_CHANGED_LOGIN_HINT", locale, anchor)
+            } else {
+                ""
+            }
+        val baseBodyText =
+            greetingText(toName, locale) + t("EMAIL_BODY_PASSWORD_CHANGED", locale, workspaceName)
+        val loginHintText =
+            if (loginUrl.isNotBlank()) "\n" + t("EMAIL_BODY_PASSWORD_CHANGED_LOGIN_HINT", locale, loginUrl) else ""
+
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_PASSWORD_CHANGED", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_PASSWORD_CHANGED", locale),
+                    bodyHtml = baseBodyHtml + loginHintHtml,
+                    footerHtml = t("EMAIL_FOOTER_PASSWORD_CHANGED", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_PASSWORD_CHANGED", locale),
+                    body = baseBodyText + loginHintText,
+                    url = null,
+                    footer = t("EMAIL_FOOTER_PASSWORD_CHANGED", locale),
+                ),
+        )
+    }
+
+    internal fun renderTest(
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_TEST", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_TEST", locale),
+                    bodyHtml = t("EMAIL_BODY_TEST", locale, "<strong>${htmlEscape(workspaceName)}</strong>"),
+                    footerHtml = t("EMAIL_FOOTER_TEST", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_TEST", locale),
+                    body = t("EMAIL_BODY_TEST", locale, workspaceName),
+                    url = null,
+                    footer = t("EMAIL_FOOTER_TEST", locale),
+                ),
+        )
+    }
+
+    internal fun renderInvite(
+        toName: String,
+        inviteUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_INVITE", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_INVITE", locale),
+                    bodyHtml =
+                        greetingHtml(toName, locale) +
+                            t("EMAIL_BODY_INVITE", locale, "<strong>${htmlEscape(workspaceName)}</strong>"),
+                    ctaLabel = t("EMAIL_CTA_INVITE", locale),
+                    ctaUrl = inviteUrl,
+                    footerHtml = t("EMAIL_FOOTER_INVITE", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_INVITE", locale),
+                    body = greetingText(toName, locale) + t("EMAIL_BODY_INVITE", locale, workspaceName),
+                    url = inviteUrl,
+                    footer = t("EMAIL_FOOTER_INVITE", locale),
+                ),
+        )
+    }
+
+    internal fun renderMagicLink(
+        toName: String,
+        magicLinkUrl: String,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_MAGIC_LINK", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_MAGIC_LINK", locale, htmlEscape(workspaceName)),
+                    bodyHtml = greetingHtml(toName, locale) + t("EMAIL_BODY_MAGIC_LINK", locale),
+                    ctaLabel = t("EMAIL_CTA_MAGIC_LINK", locale),
+                    ctaUrl = magicLinkUrl,
+                    footerHtml = t("EMAIL_FOOTER_MAGIC_LINK", locale),
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_MAGIC_LINK", locale, workspaceName),
+                    body = greetingText(toName, locale) + t("EMAIL_BODY_MAGIC_LINK", locale),
+                    url = magicLinkUrl,
+                    footer = t("EMAIL_FOOTER_MAGIC_LINK", locale),
+                ),
+        )
+    }
+
+    internal fun renderEmailOtp(
+        toName: String,
+        code: String,
+        expiresInMinutes: Long,
+        workspaceName: String,
+        tenant: Tenant,
+    ): RenderedEmail {
+        val locale = emailLocale(tenant)
+        val codeBlock =
+            """
+            <div style="font-family:monospace;font-size:32px;letter-spacing:6px;font-weight:600;padding:20px;border-radius:${htmlEscape(
+                tenant.theme.borderRadius,
+            )};background:#f4f4f5;color:#09090b;text-align:center;margin:0 0 24px 0;">
+              ${htmlEscape(code)}
+            </div>
+            """.trimIndent()
+        return RenderedEmail(
+            subject = t("EMAIL_SUBJECT_OTP", locale, workspaceName),
+            html =
+                buildEmailHtml(
+                    tenant = tenant,
+                    locale = locale,
+                    heading = t("EMAIL_HEADING_OTP", locale),
+                    bodyHtml = greetingHtml(toName, locale) + t("EMAIL_BODY_OTP", locale, expiresInMinutes),
+                    footerHtml = t("EMAIL_FOOTER_OTP", locale),
+                    embeddedHtml = codeBlock,
+                ),
+            text =
+                buildEmailText(
+                    workspace = workspaceName,
+                    heading = t("EMAIL_HEADING_OTP", locale),
+                    body =
+                        greetingText(toName, locale) +
+                            t("EMAIL_BODY_OTP", locale, expiresInMinutes) +
+                            "\n\n    $code",
+                    url = null,
+                    footer = t("EMAIL_FOOTER_OTP", locale),
+                ),
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // Locale + translation helpers
+    // -------------------------------------------------------------------------
+
+    private fun emailLocale(tenant: Tenant): String {
+        val configured = tenant.theme.defaultLocale?.lowercase() ?: return "en"
+        return if (configured in translationPort.availableLocales) configured else "en"
+    }
+
+    private fun t(
+        key: String,
+        locale: String,
+        vararg args: Any?,
+    ): String = translationPort.t(key, locale, *args)
+
+    private fun greetingHtml(
+        name: String,
+        locale: String,
+    ): String = t("EMAIL_GREETING", locale, htmlEscape(name)) + "<br><br>"
+
+    private fun greetingText(
+        name: String,
+        locale: String,
+    ): String = t("EMAIL_GREETING", locale, name) + "\n\n"
 
     private fun send(
         to: String,
@@ -157,10 +426,8 @@ class SmtpEmailAdapter : EmailPort {
     ) {
         val host = tenant.smtpHost ?: error("SMTP host not configured")
         val port = tenant.smtpPort
-        // Port 465 always uses SSL-first (SMTPS). Any other port uses STARTTLS when TLS is enabled.
         val useSsl = (port == 465)
 
-        // Auth requires BOTH username and password — if either is missing, skip auth entirely.
         val hasAuth = !tenant.smtpUsername.isNullOrBlank() && !tenant.smtpPassword.isNullOrBlank()
 
         val props =
@@ -171,14 +438,10 @@ class SmtpEmailAdapter : EmailPort {
 
                 when {
                     useSsl -> {
-                        // SSL-first connection (port 465 / SMTPS) — JavaMail wraps the socket in TLS
-                        // immediately on connect. Do NOT mix with starttls.enable.
                         put("mail.smtp.ssl.enable", "true")
                         put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
                     }
                     tenant.smtpTlsEnabled -> {
-                        // STARTTLS — connect plaintext then upgrade. `required=true` prevents silent
-                        // downgrade to unencrypted when the server is misconfigured.
                         put("mail.smtp.starttls.enable", "true")
                         put("mail.smtp.starttls.required", "true")
                         put("mail.smtp.ssl.protocols", "TLSv1.2 TLSv1.3")
@@ -229,11 +492,10 @@ class SmtpEmailAdapter : EmailPort {
                 val htmlPart = MimeBodyPart().apply { setContent(html, "text/html; charset=UTF-8") }
                 val textPart = MimeBodyPart().apply { setContent(text, "text/plain; charset=UTF-8") }
 
-                // multipart/alternative: mail clients pick the best format they support
                 val multipart =
                     MimeMultipart("alternative").apply {
-                        addBodyPart(textPart) // plain text first (fallback)
-                        addBodyPart(htmlPart) // HTML second (preferred)
+                        addBodyPart(textPart)
+                        addBodyPart(htmlPart)
                     }
                 setContent(multipart)
             }
@@ -257,22 +519,9 @@ class SmtpEmailAdapter : EmailPort {
 
     private fun workspaceDisplayName(tenant: Tenant) = tenant.emailBranding?.brandName ?: tenant.displayName
 
-    // -------------------------------------------------------------------------
-    // Shared layout builders
-    // -------------------------------------------------------------------------
-
-    /**
-     * Renders the full HTML email with the shared table-based shell and TenantTheme branding.
-     *
-     * Email backgrounds are always light (#f4f4f5 / #ffffff) regardless of the tenant's auth-page
-     * theme — dark-mode email rendering is inconsistent across clients and inbox providers.
-     *
-     * When [ctaLabel] and [ctaUrl] are both non-null the CTA button and URL-fallback footer are
-     * rendered. When [ctaLabel] is null the button section is omitted entirely (e.g. password-
-     * changed notification, which has no actionable link).
-     */
     private fun buildEmailHtml(
         tenant: Tenant,
+        locale: String,
         heading: String,
         bodyHtml: String,
         ctaLabel: String? = null,
@@ -327,7 +576,7 @@ class SmtpEmailAdapter : EmailPort {
 
         return """
             <!DOCTYPE html>
-            <html lang="en">
+            <html lang="$locale">
             <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
             <body style="margin:0;padding:0;font-family:$font;background:#f4f4f5;color:#18181b;">
               <table width="100%" cellpadding="0" cellspacing="0">
@@ -350,11 +599,6 @@ class SmtpEmailAdapter : EmailPort {
             """.trimIndent()
     }
 
-    /**
-     * Renders the plain-text fallback for all transactional emails.
-     *
-     * [url] is omitted when null — callers that have no CTA (e.g. password-changed) pass null.
-     */
     private fun buildEmailText(
         workspace: String,
         heading: String,
@@ -365,266 +609,6 @@ class SmtpEmailAdapter : EmailPort {
         val urlSection = if (url != null) "\n$url\n" else ""
         return "$workspace — $heading\n\n$body\n$urlSection\n$footer"
     }
-
-    // -------------------------------------------------------------------------
-    // Email templates — thin wrappers over the shared layout builders
-    // -------------------------------------------------------------------------
-
-    private fun buildVerificationHtml(
-        name: String,
-        url: String,
-        tenant: Tenant,
-    ) = buildEmailHtml(
-        tenant = tenant,
-        heading = "Verify your email address",
-        bodyHtml = "Hi ${htmlEscape(
-            name,
-        )},<br><br>Click the button below to verify your email address. This link expires in 24 hours.",
-        ctaLabel = "Verify email address",
-        ctaUrl = url,
-        footerHtml = "If you did not create an account, you can safely ignore this email.",
-    )
-
-    private fun buildVerificationText(
-        name: String,
-        url: String,
-        workspace: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "Verify your email address",
-        body = "Hi $name,\n\nClick the link below to verify your email address. This link expires in 24 hours.",
-        url = url,
-        footer = "If you did not create an account, you can safely ignore this email.",
-    )
-
-    private fun buildPasswordResetHtml(
-        name: String,
-        url: String,
-        tenant: Tenant,
-    ) = buildEmailHtml(
-        tenant = tenant,
-        heading = "Reset your password",
-        bodyHtml =
-            "Hi ${htmlEscape(name)},<br><br>" +
-                "We received a request to reset your password. " +
-                "Click the button below to choose a new one. This link expires in 1 hour.",
-        ctaLabel = "Reset password",
-        ctaUrl = url,
-        footerHtml = "If you did not request a password reset, you can safely ignore this email.",
-    )
-
-    private fun buildPasswordResetText(
-        name: String,
-        url: String,
-        workspace: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "Reset your password",
-        body =
-            "Hi $name,\n\nWe received a request to reset your password. " +
-                "Click the link below to choose a new one. This link expires in 1 hour.",
-        url = url,
-        footer = "If you did not request a password reset, you can safely ignore this email.",
-    )
-
-    private fun buildMagicLinkHtml(
-        name: String,
-        url: String,
-        tenant: Tenant,
-    ) = buildEmailHtml(
-        tenant = tenant,
-        heading = "Sign in to ${htmlEscape(tenant.displayName)}",
-        bodyHtml =
-            "Hi ${htmlEscape(name)},<br><br>" +
-                "Click the button below to sign in. This link expires in 15 minutes and can only be used once.",
-        ctaLabel = "Sign in",
-        ctaUrl = url,
-        footerHtml = "If you did not request this link, you can safely ignore this email.",
-    )
-
-    private fun buildMagicLinkText(
-        name: String,
-        url: String,
-        workspace: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "Sign in to $workspace",
-        body =
-            "Hi $name,\n\nClick the link below to sign in. " +
-                "This link expires in 15 minutes and can only be used once.",
-        url = url,
-        footer = "If you did not request this link, you can safely ignore this email.",
-    )
-
-    private fun buildAccountLockedHtml(
-        name: String,
-        url: String,
-        lockoutDuration: String,
-        tenant: Tenant,
-    ) = buildEmailHtml(
-        tenant = tenant,
-        heading = "Your account has been locked",
-        bodyHtml =
-            "Hi ${htmlEscape(name)},<br><br>" +
-                "We temporarily locked your ${htmlEscape(
-                    tenant.displayName,
-                )} account after several failed sign-in attempts. " +
-                "Your account will automatically unlock in $lockoutDuration. " +
-                "If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.",
-        ctaLabel = "Reset password",
-        ctaUrl = url,
-        footerHtml =
-            "If you made these sign-in attempts, you can safely ignore this email " +
-                "— your account will unlock automatically.",
-    )
-
-    private fun buildAccountLockedText(
-        name: String,
-        url: String,
-        workspace: String,
-        lockoutDuration: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "Your account has been locked",
-        body =
-            "Hi $name,\n\nWe temporarily locked your $workspace account after several failed sign-in attempts.\n" +
-                "Your account will automatically unlock in $lockoutDuration.\n" +
-                "If you'd like to regain access sooner, or if you don't recognize this activity, you can reset your password now.",
-        url = url,
-        footer =
-            "If you made these sign-in attempts, you can safely ignore this email " +
-                "— your account will unlock automatically.",
-    )
-
-    private fun buildPasswordChangedHtml(
-        name: String,
-        workspace: String,
-        tenant: Tenant,
-    ): String {
-        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
-        val loginLink =
-            if (loginUrl.isNotBlank()) {
-                " Sign in at <a href=\"${htmlEscape(loginUrl)}\" " +
-                    "style=\"color:#71717a;\">${htmlEscape(loginUrl)}</a>" +
-                    " and use the Forgot password link."
-            } else {
-                ""
-            }
-        return buildEmailHtml(
-            tenant = tenant,
-            heading = "Your password has been changed",
-            bodyHtml =
-                "Hi ${htmlEscape(name)},<br><br>" +
-                    "Your ${htmlEscape(workspace)} password was successfully changed. " +
-                    "If you made this change, no action is needed. " +
-                    "If you did not make this change, reset your password immediately." +
-                    loginLink,
-            ctaLabel = null,
-            ctaUrl = null,
-            footerHtml =
-                "For security, all active sessions were signed out " +
-                    "when your password was changed.",
-        )
-    }
-
-    private fun buildPasswordChangedText(
-        name: String,
-        workspace: String,
-        tenant: Tenant,
-    ): String {
-        val loginUrl = tenant.issuerUrl?.replace("/t/${tenant.slug}", "/t/${tenant.slug}/account/login") ?: ""
-        val loginHint = if (loginUrl.isNotBlank()) "\nSign in at $loginUrl and use the Forgot password link." else ""
-        return buildEmailText(
-            workspace = workspace,
-            heading = "Your password has been changed",
-            body =
-                "Hi $name,\n\nYour $workspace password was successfully changed.\n" +
-                    "If you made this change, no action is needed.\n" +
-                    "If you did not make this change, reset your password immediately." +
-                    loginHint,
-            url = null,
-            footer =
-                "For security, all active sessions were signed out " +
-                    "when your password was changed.",
-        )
-    }
-
-    private fun buildInviteHtml(
-        name: String,
-        url: String,
-        tenant: Tenant,
-    ) = buildEmailHtml(
-        tenant = tenant,
-        heading = "You\u2019ve been invited",
-        bodyHtml =
-            "Hi ${htmlEscape(name)},<br><br>" +
-                "You\u2019ve been added to <strong>${htmlEscape(tenant.displayName)}</strong>. " +
-                "Click the button below to set your password and activate your account. " +
-                "This link expires in 72 hours.",
-        ctaLabel = "Set your password",
-        ctaUrl = url,
-        footerHtml =
-            "If you weren\u2019t expecting this, you can safely ignore this email. " +
-                "No account will be activated without clicking the link above.",
-    )
-
-    private fun buildInviteText(
-        name: String,
-        url: String,
-        workspace: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "You've been invited",
-        body =
-            "Hi $name,\n\nYou've been added to $workspace. " +
-                "Click the link below to set your password and activate your account. " +
-                "This link expires in 72 hours.",
-        url = url,
-        footer =
-            "If you weren't expecting this, you can safely ignore this email. " +
-                "No account will be activated without clicking the link above.",
-    )
-
-    private fun buildEmailOtpHtml(
-        name: String,
-        code: String,
-        expiresInMinutes: Long,
-        tenant: Tenant,
-    ): String {
-        val codeBlock =
-            """
-            <div style="font-family:monospace;font-size:32px;letter-spacing:6px;font-weight:600;padding:20px;border-radius:${htmlEscape(
-                tenant.theme.borderRadius,
-            )};background:#f4f4f5;color:#09090b;text-align:center;margin:0 0 24px 0;">
-              ${htmlEscape(code)}
-            </div>
-            """.trimIndent()
-        return buildEmailHtml(
-            tenant = tenant,
-            heading = "Your sign-in code",
-            bodyHtml =
-                "Hi ${htmlEscape(name)},<br><br>" +
-                    "Use this $expiresInMinutes-minute code to finish signing in. " +
-                    "Don't share it with anyone.",
-            footerHtml = "If you didn't request a code, you can safely ignore this email.",
-            embeddedHtml = codeBlock,
-        )
-    }
-
-    private fun buildEmailOtpText(
-        name: String,
-        code: String,
-        expiresInMinutes: Long,
-        workspace: String,
-    ) = buildEmailText(
-        workspace = workspace,
-        heading = "Your sign-in code",
-        body =
-            "Hi $name,\n\nYour $expiresInMinutes-minute sign-in code is:\n\n" +
-                "    $code\n\nDon't share it with anyone.",
-        url = null,
-        footer = "If you didn't request a code, you can safely ignore this email.",
-    )
 
     private fun htmlEscape(s: String) =
         s

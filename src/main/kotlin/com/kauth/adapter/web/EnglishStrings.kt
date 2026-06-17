@@ -442,6 +442,91 @@ object EnglishStrings {
     const val MFA_CODE_PLACEHOLDER = "Enter 6-digit code or recovery code"
     const val MFA_VERIFY_BUTTON = "Verify"
 
+    // Transactional emails — see SmtpEmailAdapter. {0} is workspace name unless otherwise noted.
+    // Subjects
+    const val EMAIL_SUBJECT_VERIFY = "Verify your email address — {0}"
+    const val EMAIL_SUBJECT_PASSWORD_RESET = "Reset your password — {0}"
+    const val EMAIL_SUBJECT_ACCOUNT_LOCKED = "Your account has been locked — {0}"
+    const val EMAIL_SUBJECT_PASSWORD_CHANGED = "Your password has been changed — {0}"
+    const val EMAIL_SUBJECT_TEST = "KotAuth SMTP Test — {0}"
+    const val EMAIL_SUBJECT_INVITE = "You've been invited to join {0}"
+    const val EMAIL_SUBJECT_MAGIC_LINK = "Your sign-in link for {0}"
+    const val EMAIL_SUBJECT_OTP = "Your sign-in code for {0}"
+
+    // Greeting shared across emails. {0} = recipient name (HTML-escaped by builder).
+    const val EMAIL_GREETING = "Hi {0},"
+
+    // Headings — short titles rendered inside the email
+    const val EMAIL_HEADING_VERIFY = "Verify your email address"
+    const val EMAIL_HEADING_PASSWORD_RESET = "Reset your password"
+    const val EMAIL_HEADING_ACCOUNT_LOCKED = "Your account has been locked"
+    const val EMAIL_HEADING_PASSWORD_CHANGED = "Your password has been changed"
+    const val EMAIL_HEADING_TEST = "SMTP Configuration Test"
+    const val EMAIL_HEADING_INVITE = "You’ve been invited"
+    const val EMAIL_HEADING_MAGIC_LINK = "Sign in to {0}"
+    const val EMAIL_HEADING_OTP = "Your sign-in code"
+
+    // Bodies — sentence(s) shown below heading. Placeholders documented per key.
+    const val EMAIL_BODY_VERIFY = "Click the button below to verify your email address. This link expires in 24 hours."
+    const val EMAIL_BODY_PASSWORD_RESET =
+        "We received a request to reset your password. Click the button below to choose a new one. " +
+            "This link expires in 1 hour."
+
+    // {0} = workspace name, {1} = lockout duration ("15 minutes")
+    const val EMAIL_BODY_ACCOUNT_LOCKED =
+        "We temporarily locked your {0} account after several failed sign-in attempts. " +
+            "Your account will automatically unlock in {1}. " +
+            "If you'd like to regain access sooner, or if you don't recognize this activity, " +
+            "you can reset your password now."
+
+    // {0} = workspace name
+    const val EMAIL_BODY_PASSWORD_CHANGED =
+        "Your {0} password was successfully changed. " +
+            "If you made this change, no action is needed. " +
+            "If you did not make this change, reset your password immediately."
+
+    // {0} = login URL — substituted by builder so HTML / text variants can format the URL differently.
+    const val EMAIL_BODY_PASSWORD_CHANGED_LOGIN_HINT =
+        "Sign in at {0} and use the Forgot password link."
+
+    // {0} = workspace name
+    const val EMAIL_BODY_TEST =
+        "This email confirms that SMTP is correctly configured for {0}. " +
+            "Email delivery (verification, password reset, notifications) is operational."
+
+    // {0} = workspace name
+    const val EMAIL_BODY_INVITE =
+        "You’ve been added to {0}. " +
+            "Click the button below to set your password and activate your account. " +
+            "This link expires in 72 hours."
+
+    const val EMAIL_BODY_MAGIC_LINK =
+        "Click the button below to sign in. This link expires in 15 minutes and can only be used once."
+
+    // {0} = code expiry in minutes
+    const val EMAIL_BODY_OTP =
+        "Use this {0}-minute code to finish signing in. Don’t share it with anyone."
+
+    // CTAs — button labels
+    const val EMAIL_CTA_VERIFY = "Verify email address"
+    const val EMAIL_CTA_PASSWORD_RESET = "Reset password"
+    const val EMAIL_CTA_INVITE = "Set your password"
+    const val EMAIL_CTA_MAGIC_LINK = "Sign in"
+
+    // Footers
+    const val EMAIL_FOOTER_VERIFY = "If you did not create an account, you can safely ignore this email."
+    const val EMAIL_FOOTER_PASSWORD_RESET = "If you did not request a password reset, you can safely ignore this email."
+    const val EMAIL_FOOTER_PASSWORD_CHANGED =
+        "For security, all active sessions were signed out when your password was changed."
+    const val EMAIL_FOOTER_ACCOUNT_LOCKED =
+        "If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically."
+    const val EMAIL_FOOTER_TEST = "Sent by KotAuth to verify SMTP configuration."
+    const val EMAIL_FOOTER_INVITE =
+        "If you weren’t expecting this, you can safely ignore this email. " +
+            "No account will be activated without clicking the link above."
+    const val EMAIL_FOOTER_MAGIC_LINK = "If you did not request this link, you can safely ignore this email."
+    const val EMAIL_FOOTER_OTP = "If you didn’t request a code, you can safely ignore this email."
+
     /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for

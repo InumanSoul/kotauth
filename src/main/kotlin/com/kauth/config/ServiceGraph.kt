@@ -259,8 +259,17 @@ data class ServiceGraph(
             val auditLogAdapter =
                 PostgresAuditLogAdapter(webhookService = webhookService)
 
-            // -- Domain services ----------------------------------------------
-            val emailAdapter = SmtpEmailAdapter()
+            val translationPort: TranslationPort =
+                config.i18nBundleDir
+                    ?.let {
+                        BundleTranslation(
+                            java.nio.file.Paths
+                                .get(it),
+                        )
+                    }
+                    ?: EnglishOnlyTranslation()
+
+            val emailAdapter = SmtpEmailAdapter(translationPort)
             val credentialFlowService =
                 CredentialFlowService(
                     userRepository = userRepository,
@@ -528,20 +537,6 @@ data class ServiceGraph(
                     auditLogPort = auditLogAdapter,
                     transactionRunner = backupTransactionRunner,
                 )
-
-            // -- i18n translation port ---------------------------------------
-            // English is always-on (baked-in EnglishStrings). Non-English
-            // locales are opt-in via KAUTH_I18N_BUNDLE_DIR. When unset, the
-            // EnglishOnlyTranslation adapter handles every locale request.
-            val translationPort: TranslationPort =
-                config.i18nBundleDir
-                    ?.let {
-                        BundleTranslation(
-                            java.nio.file.Paths
-                                .get(it),
-                        )
-                    }
-                    ?: EnglishOnlyTranslation()
 
             return ServiceGraph(
                 authService = authService,
