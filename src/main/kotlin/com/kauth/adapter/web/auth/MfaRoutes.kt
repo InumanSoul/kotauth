@@ -118,6 +118,7 @@ internal fun Route.mfaRoutes(
                     maxAge = 0L,
                     path = "/t/$slug",
                     httpOnly = true,
+                    secure = secure,
                 )
 
                 if (oauthParams.isOAuthFlow) {

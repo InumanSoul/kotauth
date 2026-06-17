@@ -261,6 +261,58 @@ class AuthRoutesTest {
             )
         }
 
+    @Test
+    fun `POST authorize sets Secure on KOTAUTH_MFA_PENDING when baseUrl is HTTPS`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                        baseUrl = "https://kotauth.example.com",
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            val mfaCookie = response.headers.getAll("Set-Cookie")?.firstOrNull { it.contains("KOTAUTH_MFA_PENDING") }
+            assertNotNull(mfaCookie, "KOTAUTH_MFA_PENDING must be set on MFA redirect")
+            assertTrue(
+                mfaCookie.contains("Secure", ignoreCase = true),
+                "KOTAUTH_MFA_PENDING must be Secure when baseUrl is HTTPS, got: $mfaCookie",
+            )
+        }
+
     // =========================================================================
     // POST /t/{slug}/authorize — password expired redirect
     // =========================================================================

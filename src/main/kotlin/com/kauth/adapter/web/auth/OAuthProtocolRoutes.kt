@@ -514,6 +514,7 @@ internal fun Route.oauthProtocolRoutes(
                         value = encryptionService.signCookie(mfaPending),
                         maxAge = 300L,
                         httpOnly = true,
+                        secure = baseUrl.startsWith("https"),
                         path = "/t/$slug",
                     )
                     call.respondRedirect("/t/$slug/mfa-challenge")
