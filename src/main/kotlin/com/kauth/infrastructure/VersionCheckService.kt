@@ -55,7 +55,7 @@ class VersionCheckService(
         HttpClient
             .newBuilder()
             .connectTimeout(Duration.ofSeconds(HTTP_TIMEOUT_SECONDS))
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build()
 
     fun start() {
@@ -115,7 +115,7 @@ class VersionCheckService(
             val latest =
                 json["version"]?.jsonPrimitive?.content
                     ?: error("Manifest missing 'version' field")
-            val releaseUrl = json["releaseUrl"]?.jsonPrimitive?.content
+            val releaseUrl = sanitizeReleaseUrl(json["releaseUrl"]?.jsonPrimitive?.content)
             val urgency = json["urgency"]?.jsonPrimitive?.content ?: "info"
 
             VersionCheckResult(
@@ -128,6 +128,18 @@ class VersionCheckService(
                 enabled = true,
             )
         }
+
+    internal fun sanitizeReleaseUrl(raw: String?): String? {
+        val candidate = raw?.trim().orEmpty()
+        if (candidate.isEmpty()) return null
+        return try {
+            val uri = URI.create(candidate)
+            val scheme = uri.scheme?.lowercase()
+            if (scheme == "https" && uri.host != null) candidate else null
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 internal fun isNewer(

@@ -119,7 +119,7 @@ fun Route.authRoutes(
             encryptionService = encryptionService,
             oauthService = oauthService,
             ssoTtlSeconds = ssoTtlSeconds,
-            secure = baseUrl.startsWith("https"),
+            secure = baseUrl.startsWith("https://", ignoreCase = true),
         )
 
         if (emailOtpService != null && otpIpRateLimiter != null) {
@@ -129,7 +129,7 @@ fun Route.authRoutes(
                 perIpLimiter = otpIpRateLimiter,
                 encryptionService = encryptionService,
                 ssoTtlSeconds = ssoTtlSeconds,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
             )
         }
 
@@ -139,7 +139,7 @@ fun Route.authRoutes(
             encryptionService = encryptionService,
             mfaRateLimiter = mfaRateLimiter,
             ssoTtlSeconds = ssoTtlSeconds,
-            secure = baseUrl.startsWith("https"),
+            secure = baseUrl.startsWith("https://", ignoreCase = true),
         )
 
         socialLoginRoutes(

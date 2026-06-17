@@ -45,8 +45,11 @@ class MfaService(
         /** Number of one-time recovery codes generated per enrollment. */
         const val RECOVERY_CODE_COUNT = 8
 
+        /** Random bytes per recovery code — 8 bytes = 64-bit entropy, rendered as 16 hex chars. */
+        const val RECOVERY_CODE_BYTES = 8
+
         /** Length of each plaintext recovery code (hex chars). */
-        const val RECOVERY_CODE_LENGTH = 8
+        const val RECOVERY_CODE_LENGTH = RECOVERY_CODE_BYTES * 2
 
         /** Consecutive failed TOTP verifications before the enrollment is locked. */
         const val MAX_FAILED_TOTP_ATTEMPTS = 5
@@ -451,7 +454,7 @@ class MfaService(
     // -----------------------------------------------------------------------
 
     private fun generateRecoveryCodes(): List<String> =
-        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_LENGTH / 2) }
+        (1..RECOVERY_CODE_COUNT).map { SecureTokens.randomHex(RECOVERY_CODE_BYTES) }
 }
 
 // ---------------------------------------------------------------------------

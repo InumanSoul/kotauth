@@ -228,7 +228,7 @@ fun Application.module(
         header("X-Frame-Options", "DENY")
         header("Referrer-Policy", "strict-origin-when-cross-origin")
         header("Content-Security-Policy", buildCspPolicy())
-        header(HttpHeaders.Server, "KotAuth")
+        header(HttpHeaders.Server, "")
         if (config.isHttps) {
             header(
                 HttpHeaders.StrictTransportSecurity,
@@ -353,10 +353,6 @@ fun Application.module(
                 call.respondHtml(
                     HttpStatusCode.InternalServerError,
                     AdminView.adminErrorPage(
-                        message =
-                            cause.message
-                                ?: "An unexpected error occurred.",
-                        exceptionType = cause::class.qualifiedName,
                         allWorkspaces = workspaces,
                         loggedInAs = session?.username ?: "—",
                     ),

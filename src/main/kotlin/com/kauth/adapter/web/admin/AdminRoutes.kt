@@ -108,7 +108,7 @@ fun Route.adminRoutes(
                 value = cookieVal,
                 maxAge = 300L,
                 httpOnly = true,
-                secure = baseUrl.startsWith("https"),
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
                 path = "/admin",
             )
             val redirectUri = "$baseUrl/admin/callback"

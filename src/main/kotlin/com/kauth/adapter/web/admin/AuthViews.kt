@@ -27,10 +27,7 @@ internal fun adminOAuthErrorPageImpl(
         }
     }
 
-// Error page — rendered by the StatusPages error boundary.
 internal fun adminErrorPageImpl(
-    message: String,
-    exceptionType: String? = null,
     allWorkspaces: List<WorkspaceStub> = emptyList(),
     loggedInAs: String = "—",
 ): HTML.() -> Unit =
@@ -45,22 +42,9 @@ internal fun adminErrorPageImpl(
             div("content-inner content-inner--wide") {
                 pageHeader(
                     title = "Something went wrong",
-                    subtitle = "An unexpected error occurred processing your request.",
+                    subtitle = "An unexpected error occurred. The details have been logged for the operator.",
                 )
 
-                div("alert alert-error alert--constrained") {
-                    style = "margin-top:1.5rem;"
-                    if (exceptionType != null) {
-                        p {
-                            style = "font-size:0.75rem; opacity:0.65; margin-bottom:0.35rem;"
-                            +exceptionType
-                        }
-                    }
-                    p {
-                        style = "font-family:monospace; font-size:0.85rem; word-break:break-word;"
-                        +message
-                    }
-                }
                 div {
                     style = "margin-top:1.5rem;"
                     a("/admin", classes = "btn btn--ghost") { +"← Back to dashboard" }

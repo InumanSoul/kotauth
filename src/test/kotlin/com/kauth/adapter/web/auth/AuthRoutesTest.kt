@@ -261,6 +261,58 @@ class AuthRoutesTest {
             )
         }
 
+    @Test
+    fun `POST authorize sets Secure on KOTAUTH_MFA_PENDING when baseUrl is HTTPS`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(UserId(10)) } returns true
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                        baseUrl = "https://kotauth.example.com",
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            val mfaCookie = response.headers.getAll("Set-Cookie")?.firstOrNull { it.contains("KOTAUTH_MFA_PENDING") }
+            assertNotNull(mfaCookie, "KOTAUTH_MFA_PENDING must be set on MFA redirect")
+            assertTrue(
+                mfaCookie.contains("Secure", ignoreCase = true),
+                "KOTAUTH_MFA_PENDING must be Secure when baseUrl is HTTPS, got: $mfaCookie",
+            )
+        }
+
     // =========================================================================
     // POST /t/{slug}/authorize — password expired redirect
     // =========================================================================
@@ -494,6 +546,67 @@ class AuthRoutesTest {
             assertTrue(
                 location.contains("state=random-state-123"),
                 "Redirect must echo back the state param, got: $location",
+            )
+        }
+
+    @Test
+    fun `POST authorize URL-encodes state containing reserved characters`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val rawState = "state with spaces & evil=1 # frag"
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scope = "openid",
+                    state = rawState,
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertFalse(
+                location.contains(rawState),
+                "Raw state must not be appended verbatim — would inject extra query params, got: $location",
+            )
+            val encoded = java.net.URLEncoder.encode(rawState, "UTF-8")
+            assertTrue(
+                location.contains("state=$encoded"),
+                "state must be URL-encoded on the redirect, got: $location",
             )
         }
 

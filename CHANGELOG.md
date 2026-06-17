@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.17.0] - 2026-06-17
+
+Email i18n + Tier-3 security polish. Closes the polish-tier findings from
+the 2026-06-12 audit and ships localized transactional emails. Heavier
+Tier-3 items (CSRF, SSRF, audit-integrity, secret rotation, supply-chain)
+land in follow-up releases.
+
+### Added
+
+- **Localized transactional emails.** All eight email types (verification,
+  password reset, account locked, password changed, SMTP test, invite,
+  magic link, OTP) now render in the tenant's `defaultLocale`. ~30 new
+  `EMAIL_*` keys live in `EnglishStrings` and ship in `docs/i18n/es.json`.
+  Per-key fallback to English for untranslated messages; no `EmailPort`
+  signature change.
+
+### Security
+
+- **L8.** Suppress the `Server` response header — Ktor 3.4's default
+  reveals the engine and version. Now overridden to empty across all
+  responses; `SecurityHeadersTest` locks the behavior.
+- **L4.** PKCE S256 challenge comparison uses `MessageDigest.isEqual`
+  instead of `==`, eliminating a timing oracle on the verifier check.
+- **L1.** `code` and `state` are URL-encoded on the authorization-code
+  redirect — closes a query-parameter injection vector when state
+  contains reserved characters. Matches the silent-auth path.
+- **L2.** `KOTAUTH_MFA_PENDING` cookie now carries `Secure` when the base
+  URL is HTTPS — applies to both the set and clear directives.
+- **L3.** MFA recovery codes raised from 8-char (32-bit) to 16-char hex
+  (64-bit) — the recommended minimum for one-shot fallback tokens.
+- **L5.** Admin error page no longer prints the raw exception message or
+  qualified class name. Details are logged server-side; the user sees a
+  generic apology.
+- **M11.** Refuse to start when `KAUTH_DEMO_MODE=true` and
+  `KAUTH_ENV=production` — mirrors the H6 quickstart-secret guard.
+- **M12.** Update-check hardened: `KAUTH_UPDATE_CHECK_URL` must use
+  `https://` (fatal otherwise), the HTTP client follows zero redirects,
+  and `releaseUrl` values from the manifest are restricted to `https://`
+  schemes (rejects `javascript:`, `data:`, plain `http://`).
+
+---
+
 ## [1.16.0] - 2026-06-17
 
 Security hardening release. Closes the seven Tier-2 findings from the
