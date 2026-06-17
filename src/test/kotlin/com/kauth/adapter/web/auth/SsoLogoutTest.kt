@@ -231,6 +231,42 @@ class SsoLogoutTest {
         }
 
     @Test
+    fun `GET end_session rejects an absolute URI whose host prefix-matches the origin but resolves elsewhere`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=" +
+                        "http://localhost.evil.com:8080/x",
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse(
+                (response.headers["Location"] ?: "").contains("evil.com"),
+                "Prefix-match bypass via 'localhost.evil.com' must be rejected",
+            )
+        }
+
+    @Test
+    fun `GET end_session rejects an absolute URI carrying userinfo`() =
+        testApplication {
+            application(appBlock())
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/protocol/openid-connect/logout?post_logout_redirect_uri=" +
+                        "http://evil.com@localhost:8080/x",
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertFalse(
+                (response.headers["Location"] ?: "").contains("evil.com"),
+                "userinfo bypass (user@host) must be rejected",
+            )
+        }
+
+    @Test
     fun `GET end_session rejects URL-encoded protocol-relative redirect`() =
         testApplication {
             application(appBlock())

@@ -2,7 +2,7 @@ package com.kauth.domain.util
 
 import com.kauth.domain.model.TenantTheme
 
-private val COLOR_PATTERN = Regex("^#[0-9a-fA-F]{3,8}$")
+private val COLOR_PATTERN = Regex("^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
 private val FONT_FAMILY_PATTERN = Regex("^[A-Za-z0-9 .,'_-]+$")
 private val BORDER_RADIUS_PATTERN = Regex("^[0-9]+(\\.[0-9]+)?(px|rem|em|%)$")
 private val LOCALE_PATTERN = Regex("^[a-z]{2}(-[a-zA-Z]{2})?$")

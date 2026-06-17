@@ -38,8 +38,18 @@ class TenantThemeValidatorTest {
 
     @Test
     fun `color fields accept canonical hex values`() {
-        listOf("#fff", "#1FBCFF", "#0AaEe8", "#1FBCFFAA").forEach { ok ->
+        // CSS valid lengths: 3 (RGB), 4 (RGBA), 6 (RRGGBB), 8 (RRGGBBAA).
+        listOf("#fff", "#fffA", "#1FBCFF", "#0AaEe8", "#1FBCFFAA").forEach { ok ->
             assertNull(validateTenantTheme(TenantTheme.DEFAULT.copy(accentColor = ok)))
+        }
+    }
+
+    @Test
+    fun `color fields reject non-CSS hex lengths`() {
+        // 5 and 7 hex digits are NOT valid CSS — the validator must enforce {3,4,6,8} only.
+        listOf("#fffff", "#fffffff", "#ff", "#f").forEach { bad ->
+            val err = validateTenantTheme(TenantTheme.DEFAULT.copy(accentColor = bad))
+            assertTrue(err != null && "accentColor" in err, "Expected accentColor error for '$bad', got $err")
         }
     }
 

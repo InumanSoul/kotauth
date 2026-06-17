@@ -807,7 +807,30 @@ private fun isSafePostLogoutRedirect(
     uri: String,
     origin: String,
 ): Boolean {
-    // "//evil.com" and "/\evil.com" start with "/" but resolve to external origins.
-    if (uri.startsWith("//") || uri.startsWith("/\\") || uri.startsWith("\\")) return false
-    return uri.startsWith("/") || uri.startsWith(origin)
+    val trimmed = uri.trim()
+    // "//evil.com" / "/\evil.com" / "\\evil.com" start with "/" but resolve to external origins.
+    if (trimmed.startsWith("//") || trimmed.startsWith("/\\") || trimmed.startsWith("\\")) return false
+    if (trimmed.startsWith("/")) return true
+    return try {
+        val target = java.net.URI(trimmed)
+        val base = java.net.URI(origin)
+        // Parse + compare scheme/host/port exactly. Prefix string match is bypassable by
+        // "https://legit.com.evil.com" against origin "https://legit.com".
+        target.userInfo == null &&
+            target.host != null &&
+            target.scheme.equals(base.scheme, ignoreCase = true) &&
+            target.host.equals(base.host, ignoreCase = true) &&
+            effectivePort(target) == effectivePort(base)
+    } catch (_: Exception) {
+        false
+    }
 }
+
+private fun effectivePort(u: java.net.URI): Int =
+    if (u.port != -1) {
+        u.port
+    } else if (u.scheme.equals("https", ignoreCase = true)) {
+        443
+    } else {
+        80
+    }
