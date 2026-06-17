@@ -613,7 +613,7 @@ class OAuthService(
         }
 
         val claims =
-            tokenPort.decodeAccessToken(token)
+            tokenPort.decodeAccessToken(token, tokenPort.issuerFor(tenant))
                 ?: return IntrospectionResult.Inactive
 
         return IntrospectionResult.Active(

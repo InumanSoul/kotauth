@@ -133,7 +133,7 @@ class JwtTokenAdapterKeyRotationTest {
         adapter.invalidateSigningKeyCache(TenantId(1))
 
         // Token signed by old key A should still verify via kid-based lookup
-        val claims = adapter.decodeAccessToken(tokenSignedByA)
+        val claims = adapter.decodeAccessToken(tokenSignedByA, adapter.issuerFor(tenant))
         assertNotNull(claims, "Token signed by old key should verify when old key is still enabled")
         assertEquals("alice", claims.username)
     }
@@ -160,7 +160,7 @@ class JwtTokenAdapterKeyRotationTest {
         adapter.invalidateSigningKeyCache(TenantId(1))
 
         // Token signed by retired key A should be rejected
-        val claims = adapter.decodeAccessToken(tokenSignedByA)
+        val claims = adapter.decodeAccessToken(tokenSignedByA, adapter.issuerFor(tenant))
         assertNull(claims, "Token signed by retired key should be rejected")
     }
 
@@ -188,7 +188,7 @@ class JwtTokenAdapterKeyRotationTest {
         assertEquals(keyPairB.keyId, decoded.keyId, "New tokens should use the new active key")
 
         // And it should verify
-        val claims = adapter.decodeAccessToken(response.access_token)
+        val claims = adapter.decodeAccessToken(response.access_token, adapter.issuerFor(tenant))
         assertNotNull(claims)
     }
 
@@ -245,7 +245,13 @@ class JwtTokenAdapterKeyRotationTest {
 
     @Test
     fun `decodeAccessToken returns null for malformed token`() {
-        assertNull(adapter.decodeAccessToken("not-a-jwt"))
+        assertNull(adapter.decodeAccessToken("not-a-jwt", "http://localhost:8080/t/acme"))
+    }
+
+    @Test
+    fun `decodeAccessToken rejects a token whose iss does not match expectedIssuer`() {
+        val response = adapter.issueUserTokens(user, tenant, null, listOf("openid"))
+        assertNull(adapter.decodeAccessToken(response.access_token, "http://localhost:8080/t/someone-else"))
     }
 
     @Test
@@ -273,7 +279,7 @@ class JwtTokenAdapterKeyRotationTest {
         adapter.invalidateSigningKeyCache(TenantId(1))
 
         // Tenant 2 token should still verify (cache intact)
-        val claims = adapter.decodeAccessToken(t2Token.access_token)
+        val claims = adapter.decodeAccessToken(t2Token.access_token, adapter.issuerFor(tenant2))
         assertNotNull(claims, "Tenant 2 token should still verify after tenant 1 cache invalidation")
     }
 }
