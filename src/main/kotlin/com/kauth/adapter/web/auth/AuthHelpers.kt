@@ -342,6 +342,8 @@ internal fun SocialLoginError.toMessage(): String =
         is SocialLoginError.AccountCreationFailed -> "Failed to create an account. Please try again or contact support."
         is SocialLoginError.RegistrationDisabled -> "Account registration is not enabled for this workspace."
         is SocialLoginError.UsernameConflict -> "That username is already taken. Please choose a different one."
+        is SocialLoginError.LinkRequiresEmailVerification ->
+            "This email is already in use. Verify it with your social provider, then sign in again."
         is SocialLoginError.InvalidUsername -> this.reason
         is SocialLoginError.ProviderError ->
             "An error occurred communicating with the identity provider. Please try again."
