@@ -68,6 +68,12 @@ class PostgresMfaRepository(
                         enrollment.verifiedAt?.let { ts ->
                             OffsetDateTime.ofInstant(ts, ZoneOffset.UTC)
                         }
+                    it[lastUsedStep] = enrollment.lastUsedStep
+                    it[failedMfaAttempts] = enrollment.failedMfaAttempts
+                    it[mfaLockedUntil] =
+                        enrollment.mfaLockedUntil?.let { ts ->
+                            OffsetDateTime.ofInstant(ts, ZoneOffset.UTC)
+                        }
                 } get MfaEnrollmentsTable.id
 
             enrollment.copy(id = insertedId, createdAt = now.toInstant())
@@ -80,6 +86,12 @@ class PostgresMfaRepository(
                 it[enabled] = enrollment.enabled
                 it[verifiedAt] =
                     enrollment.verifiedAt?.let { ts ->
+                        OffsetDateTime.ofInstant(ts, ZoneOffset.UTC)
+                    }
+                it[lastUsedStep] = enrollment.lastUsedStep
+                it[failedMfaAttempts] = enrollment.failedMfaAttempts
+                it[mfaLockedUntil] =
+                    enrollment.mfaLockedUntil?.let { ts ->
                         OffsetDateTime.ofInstant(ts, ZoneOffset.UTC)
                     }
             }
@@ -152,6 +164,9 @@ class PostgresMfaRepository(
             enabled = this[MfaEnrollmentsTable.enabled],
             createdAt = this[MfaEnrollmentsTable.createdAt].toInstant(),
             verifiedAt = this[MfaEnrollmentsTable.verifiedAt]?.toInstant(),
+            lastUsedStep = this[MfaEnrollmentsTable.lastUsedStep],
+            failedMfaAttempts = this[MfaEnrollmentsTable.failedMfaAttempts],
+            mfaLockedUntil = this[MfaEnrollmentsTable.mfaLockedUntil]?.toInstant(),
         )
     }
 

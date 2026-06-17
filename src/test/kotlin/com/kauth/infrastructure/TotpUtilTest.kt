@@ -144,7 +144,7 @@ class TotpUtilTest {
         val secret = TotpUtil.generateSecret()
         val fixedTime = 1700000000000L
         val code = TotpUtil.generateCode(secret, fixedTime)
-        assertTrue(TotpUtil.verify(secret, code, fixedTime))
+        assertTrue(TotpUtil.verify(secret, code, fixedTime).valid)
     }
 
     @Test
@@ -154,8 +154,8 @@ class TotpUtilTest {
         val codePrevStep = TotpUtil.generateCode(secret, fixedTime - 30_000L) // previous step
         val codeNextStep = TotpUtil.generateCode(secret, fixedTime + 30_000L) // next step
 
-        assertTrue(TotpUtil.verify(secret, codePrevStep, fixedTime), "Should accept code from -1 time step")
-        assertTrue(TotpUtil.verify(secret, codeNextStep, fixedTime), "Should accept code from +1 time step")
+        assertTrue(TotpUtil.verify(secret, codePrevStep, fixedTime).valid, "Should accept code from -1 time step")
+        assertTrue(TotpUtil.verify(secret, codeNextStep, fixedTime).valid, "Should accept code from +1 time step")
     }
 
     @Test
@@ -163,25 +163,55 @@ class TotpUtilTest {
         val secret = TotpUtil.generateSecret()
         val fixedTime = 1700000000000L
         val codeFarFuture = TotpUtil.generateCode(secret, fixedTime + 90_000L) // +3 steps
-        assertFalse(TotpUtil.verify(secret, codeFarFuture, fixedTime), "Should reject code from distant time step")
+        assertFalse(TotpUtil.verify(secret, codeFarFuture, fixedTime).valid, "Should reject code from distant step")
     }
 
     @Test
     fun `verify - rejects non-numeric code`() {
         val secret = TotpUtil.generateSecret()
-        assertFalse(TotpUtil.verify(secret, "abcdef"))
+        assertFalse(TotpUtil.verify(secret, "abcdef").valid)
     }
 
     @Test
     fun `verify - rejects code with wrong length`() {
         val secret = TotpUtil.generateSecret()
-        assertFalse(TotpUtil.verify(secret, "12345"), "5-digit code should be rejected")
-        assertFalse(TotpUtil.verify(secret, "1234567"), "7-digit code should be rejected")
+        assertFalse(TotpUtil.verify(secret, "12345").valid, "5-digit code should be rejected")
+        assertFalse(TotpUtil.verify(secret, "1234567").valid, "7-digit code should be rejected")
     }
 
     @Test
     fun `verify - rejects empty code`() {
         val secret = TotpUtil.generateSecret()
-        assertFalse(TotpUtil.verify(secret, ""))
+        assertFalse(TotpUtil.verify(secret, "").valid)
+    }
+
+    @Test
+    fun `verify - returns matched step so caller can detect replay`() {
+        val secret = TotpUtil.generateSecret()
+        val fixedTime = 1700000000000L
+        val expectedStep = fixedTime / 1000 / 30
+        val code = TotpUtil.generateCode(secret, fixedTime)
+        val result = TotpUtil.verify(secret, code, fixedTime)
+        assertTrue(result.valid)
+        assertEquals(expectedStep, result.matchedStep)
+    }
+
+    @Test
+    fun `verify - matched step reflects the adjacent window that accepted the code`() {
+        val secret = TotpUtil.generateSecret()
+        val fixedTime = 1700000000000L
+        val baseStep = fixedTime / 1000 / 30
+        val priorCode = TotpUtil.generateCode(secret, fixedTime - 30_000L)
+        val result = TotpUtil.verify(secret, priorCode, fixedTime)
+        assertTrue(result.valid)
+        assertEquals(baseStep - 1, result.matchedStep, "matched step must point at the adjacent window")
+    }
+
+    @Test
+    fun `verify - invalid code has null matchedStep`() {
+        val secret = TotpUtil.generateSecret()
+        val result = TotpUtil.verify(secret, "000000", 1700000000000L)
+        assertFalse(result.valid)
+        assertEquals(null, result.matchedStep)
     }
 }
