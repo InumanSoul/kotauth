@@ -353,10 +353,6 @@ fun Application.module(
                 call.respondHtml(
                     HttpStatusCode.InternalServerError,
                     AdminView.adminErrorPage(
-                        message =
-                            cause.message
-                                ?: "An unexpected error occurred.",
-                        exceptionType = cause::class.qualifiedName,
                         allWorkspaces = workspaces,
                         loggedInAs = session?.username ?: "—",
                     ),

@@ -45,11 +45,9 @@ object AdminView {
         adminOAuthErrorPageImpl(message, retryUrl)
 
     fun adminErrorPage(
-        message: String,
-        exceptionType: String? = null,
         allWorkspaces: List<WorkspaceStub> = emptyList(),
         loggedInAs: String = "—",
-    ): HTML.() -> Unit = adminErrorPageImpl(message, exceptionType, allWorkspaces, loggedInAs)
+    ): HTML.() -> Unit = adminErrorPageImpl(allWorkspaces, loggedInAs)
 
     // ── Dashboard / redirect ────────────────────────────────────────────
 
