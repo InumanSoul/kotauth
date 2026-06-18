@@ -225,7 +225,12 @@ object EnglishStrings {
     const val API_AUTHORIZED_CLIENTS_HEADING = "Authorized APIs"
     const val API_AUTHORIZED_CLIENTS_HINT =
         "Tick each API this client is allowed to request as the audience of a client-credentials token."
-    const val API_AUTHORIZED_CLIENTS_EMPTY = "No APIs registered. Register one to authorize this client."
+    const val API_AUTHORIZED_CLIENTS_EMPTY_TITLE = "No APIs in this workspace yet"
+    const val API_AUTHORIZED_CLIENTS_EMPTY_BODY =
+        "Register an API under Settings → APIs, then return here to authorize it for this client."
+    const val API_AUTHORIZED_CLIENTS_EMPTY_CTA = "Register API"
+    const val API_AUTHORIZED_CLIENTS_ALL = "All"
+    const val API_AUTHORIZED_CLIENTS_NONE = "None"
     const val TOAST_API_CREATED = "API registered."
     const val TOAST_API_UPDATED = "API updated."
     const val TOAST_API_DISABLED = "API disabled."

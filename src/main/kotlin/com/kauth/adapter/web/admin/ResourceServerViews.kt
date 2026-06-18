@@ -109,6 +109,7 @@ internal fun clientAuthorizedApisPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     application: com.kauth.domain.model.Application,
+    allApps: List<com.kauth.domain.model.Application>,
     allResources: List<ResourceServer>,
     authorizedIds: Set<Int>,
     error: String? = null,
@@ -116,6 +117,7 @@ internal fun clientAuthorizedApisPageImpl(
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
+        val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
             pageTitle = "${EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING} — ${application.name}",
             activeRail = "apps",
@@ -123,6 +125,8 @@ internal fun clientAuthorizedApisPageImpl(
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
+            apps = appPairs,
+            activeAppSlug = application.clientId,
             loggedInAs = loggedInAs,
             activeAppSection = "applications",
             contentClass = "content-outer",
@@ -137,10 +141,7 @@ internal fun clientAuthorizedApisPageImpl(
                     EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING to null,
                 )
 
-                pageHeader(
-                    title = EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING,
-                    subtitle = EnglishStrings.API_AUTHORIZED_CLIENTS_HINT,
-                )
+                pageHeader(title = EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING)
 
                 if (error != null) {
                     div("notice notice--error") { +error }
@@ -150,11 +151,18 @@ internal fun clientAuthorizedApisPageImpl(
                     div("ov-card") {
                         emptyState(
                             iconName = "key",
-                            title = EnglishStrings.API_EMPTY_TITLE,
-                            description = EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY,
-                        )
+                            title = EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_TITLE,
+                            description = EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_BODY,
+                        ) {
+                            a(
+                                href = "/admin/workspaces/$slug/settings/apis/new",
+                                classes = "btn btn--primary",
+                            ) { +EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_CTA }
+                        }
                     }
                 } else {
+                    val gridId = "authorized-apis-grid"
+                    val totalSelectable = allResources.count { it.enabled }
                     form(
                         action =
                             "/admin/workspaces/$slug/applications/" +
@@ -163,25 +171,43 @@ internal fun clientAuthorizedApisPageImpl(
                         classes = "edit-form",
                     ) {
                         div("ov-card") {
-                            allResources.forEach { rs ->
-                                val rsId = rs.id?.value
-                                if (rsId != null) {
-                                    div("edit-row") {
-                                        label {
-                                            input(type = InputType.checkBox, name = "resource") {
-                                                value = rsId.toString()
-                                                if (rsId in authorizedIds) {
-                                                    attributes["checked"] = "checked"
-                                                }
-                                                if (!rs.enabled) {
-                                                    attributes["disabled"] = "disabled"
-                                                }
+                            div("chip-grid__header") {
+                                span("chip-grid__header-label") { +EnglishStrings.API_AUTHORIZED_CLIENTS_HINT }
+                                div("chip-grid__header-actions") {
+                                    span("chip-grid__count") {
+                                        id = "$gridId-count"
+                                        +"${authorizedIds.size} / $totalSelectable selected"
+                                    }
+                                    button(type = ButtonType.button) {
+                                        classes = setOf("chip-grid__toggle")
+                                        attributes["data-chips-all"] = gridId
+                                        +EnglishStrings.API_AUTHORIZED_CLIENTS_ALL
+                                    }
+                                    button(type = ButtonType.button) {
+                                        classes = setOf("chip-grid__toggle")
+                                        attributes["data-chips-none"] = gridId
+                                        +EnglishStrings.API_AUTHORIZED_CLIENTS_NONE
+                                    }
+                                }
+                            }
+                            div("chip-grid") {
+                                id = gridId
+                                allResources.forEach { rs ->
+                                    val rsId = rs.id?.value ?: return@forEach
+                                    label("scope-chip${if (!rs.enabled) " scope-chip--disabled" else ""}") {
+                                        input(type = InputType.checkBox, name = "resource") {
+                                            value = rsId.toString()
+                                            if (rsId in authorizedIds) {
+                                                attributes["checked"] = "checked"
                                             }
-                                            +" ${rs.name} "
-                                            span("badge badge--id") { +rs.identifier }
                                             if (!rs.enabled) {
-                                                span("badge badge--inactive") { +" Disabled" }
+                                                attributes["disabled"] = "disabled"
                                             }
+                                        }
+                                        span("scope-chip__label") { +rs.name }
+                                        span("badge badge--id") { +rs.identifier }
+                                        if (!rs.enabled) {
+                                            span("badge badge--inactive") { +"Disabled" }
                                         }
                                     }
                                 }

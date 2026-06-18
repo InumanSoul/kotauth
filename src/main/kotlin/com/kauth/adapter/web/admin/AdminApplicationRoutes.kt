@@ -291,6 +291,7 @@ fun Route.adminApplicationRoutes(
                     val app =
                         applicationRepository.findByClientId(workspace.id, clientId)
                             ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val allApps = applicationRepository.findByTenantId(workspace.id)
                     val all = resourceServerService.list(workspace.id)
                     val authorizedIds =
                         resourceServerService
@@ -310,6 +311,7 @@ fun Route.adminApplicationRoutes(
                             allWorkspaces = wsPairs,
                             loggedInAs = session.username,
                             application = app,
+                            allApps = allApps,
                             allResources = all,
                             authorizedIds = authorizedIds,
                             toastMessage = toast,
@@ -345,6 +347,7 @@ fun Route.adminApplicationRoutes(
                             )
                         is com.kauth.domain.service.ResourceServerResult.Failure -> {
                             val all = resourceServerService.list(workspace.id)
+                            val allApps = applicationRepository.findByTenantId(workspace.id)
                             val errorMessage =
                                 when (result.error) {
                                     com.kauth.domain.service.ResourceServerError.CrossTenant ->
@@ -360,6 +363,7 @@ fun Route.adminApplicationRoutes(
                                     allWorkspaces = wsPairs,
                                     loggedInAs = session.username,
                                     application = app,
+                                    allApps = allApps,
                                     allResources = all,
                                     authorizedIds = selectedIds.map { it.value }.toSet(),
                                     error = errorMessage,
