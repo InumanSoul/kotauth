@@ -15,6 +15,7 @@ import com.kauth.adapter.persistence.PostgresMfaRepository
 import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
 import com.kauth.adapter.persistence.PostgresPortalConfigRepository
+import com.kauth.adapter.persistence.PostgresResourceServerRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
@@ -43,6 +44,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
@@ -124,6 +126,7 @@ data class ServiceGraph(
     val corsOriginCache: CorsOriginCache,
     val tenantRepository: TenantRepository,
     val applicationRepository: ApplicationRepository,
+    val resourceServerRepository: ResourceServerRepository,
     val userRepository: UserRepository,
     val sessionRepository: SessionRepository,
     val auditLogRepository: AuditLogRepository,
@@ -186,6 +189,7 @@ data class ServiceGraph(
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
+            val resourceServerRepository = PostgresResourceServerRepository()
             val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
             val sessionRepository: SessionRepository =
                 redisClientHolder?.let { RedisSessionRepository(it.commands) }
@@ -560,6 +564,7 @@ data class ServiceGraph(
                 corsOriginCache = corsOriginCache,
                 tenantRepository = tenantRepository,
                 applicationRepository = applicationRepository,
+                resourceServerRepository = resourceServerRepository,
                 userRepository = userRepository,
                 sessionRepository = sessionRepository,
                 auditLogRepository = auditLogRepository,
