@@ -197,6 +197,42 @@ object EnglishStrings {
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
 
+    // APIs / RFC 8707 Resource Indicators (v1.18.0)
+    const val API_NAV_LABEL = "APIs"
+    const val API_PAGE_TITLE = "APIs"
+    const val API_PAGE_SUBTITLE =
+        "Register the APIs that your clients request audience-targeted tokens for. Each API has an " +
+            "identifier (the `aud` claim) that resource servers use to validate incoming tokens."
+    const val API_EMPTY_TITLE = "No APIs yet"
+    const val API_EMPTY_BODY =
+        "Register an API to start issuing audience-targeted M2M tokens. Authorize clients per API to " +
+            "control which audiences each caller can request."
+    const val API_LIST_COLUMN_NAME = "Name"
+    const val API_LIST_COLUMN_IDENTIFIER = "Audience"
+    const val API_LIST_COLUMN_STATUS = "Status"
+    const val API_ADD = "Register API"
+    const val API_FORM_NEW_TITLE = "Register API"
+    const val API_FORM_EDIT_TITLE = "Edit API"
+    const val API_FIELD_IDENTIFIER = "Audience identifier"
+    const val API_FIELD_IDENTIFIER_HINT_NEW =
+        "Used as the JWT `aud` claim. Use a URI like https://api.example.com or a stable slug like payment-api. " +
+            "Immutable after creation."
+    const val API_FIELD_IDENTIFIER_HINT_LOCKED = "Immutable after creation."
+    const val API_FIELD_NAME = "Name"
+    const val API_FIELD_NAME_HINT = "A human-readable name shown in the admin UI only."
+    const val API_FIELD_DESCRIPTION = "Description"
+    const val API_FIELD_DESCRIPTION_HINT = "Optional. Internal notes about what this API is for."
+    const val API_AUTHORIZED_CLIENTS_HEADING = "Authorized APIs"
+    const val API_AUTHORIZED_CLIENTS_HINT =
+        "Tick each API this client is allowed to request as the audience of a client-credentials token."
+    const val API_AUTHORIZED_CLIENTS_EMPTY = "No APIs registered. Register one to authorize this client."
+    const val TOAST_API_CREATED = "API registered."
+    const val TOAST_API_UPDATED = "API updated."
+    const val TOAST_API_DISABLED = "API disabled."
+    const val TOAST_API_ENABLED = "API enabled."
+    const val TOAST_API_DELETED = "API deleted."
+    const val TOAST_AUTHORIZED_APIS_UPDATED = "Authorized APIs updated."
+
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"
     const val BACKUP_PAGE_TITLE = "Backup workspace"

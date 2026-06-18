@@ -488,6 +488,7 @@ fun Application.module(
             tenantKeyRepository = s.tenantKeyRepository,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
+            resourceServerService = s.resourceServerService,
             impersonationService = s.impersonationService,
             backupExporterService = s.backupExporterService,
             backupImporterService = s.backupImporterService,

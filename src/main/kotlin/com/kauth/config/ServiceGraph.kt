@@ -69,6 +69,7 @@ import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
@@ -109,6 +110,7 @@ data class ServiceGraph(
     val oauthService: OAuthService,
     val accountService: AdminAccountService,
     val workspaceSettingsService: WorkspaceSettingsService,
+    val resourceServerService: ResourceServerService,
     val adminUserService: AdminUserService,
     val applicationManagementService: ApplicationManagementService,
     val roleGroupService: RoleGroupService,
@@ -385,6 +387,7 @@ data class ServiceGraph(
                     emailBrandingRepository = emailBrandingRepository,
                     corsPort = corsOriginCache,
                 )
+            val resourceServerService = ResourceServerService(resourceServerRepository)
             val roleGroupService =
                 RoleGroupService(
                     roleRepository = roleRepository,
@@ -548,6 +551,7 @@ data class ServiceGraph(
                 oauthService = oauthService,
                 accountService = accountService,
                 workspaceSettingsService = workspaceSettingsService,
+                resourceServerService = resourceServerService,
                 adminUserService = adminUserService,
                 applicationManagementService = applicationManagementService,
                 roleGroupService = roleGroupService,

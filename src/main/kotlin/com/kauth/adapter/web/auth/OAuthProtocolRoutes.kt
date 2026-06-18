@@ -141,6 +141,7 @@ internal fun Route.oauthProtocolRoutes(
                     },
                 )
                 put("code_challenge_methods_supported", buildJsonArray { add("S256") })
+                put("resource_indicators_supported", true)
                 put(
                     "prompt_values_supported",
                     buildJsonArray {

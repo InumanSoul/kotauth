@@ -444,4 +444,44 @@ object AdminView {
         error: String? = null,
     ): HTML.() -> Unit =
         claimMapperFormPageImpl(workspace, allWorkspaces, loggedInAs, prefill, error)
+
+    fun resourceServersListPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        resources: List<com.kauth.domain.model.ResourceServer>,
+        error: String? = null,
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        resourceServersListPageImpl(workspace, allWorkspaces, loggedInAs, resources, error, toastMessage)
+
+    fun resourceServerFormPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        prefill: com.kauth.domain.model.ResourceServer? = null,
+        error: String? = null,
+    ): HTML.() -> Unit =
+        resourceServerFormPageImpl(workspace, allWorkspaces, loggedInAs, prefill, error)
+
+    fun clientAuthorizedApisPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        application: com.kauth.domain.model.Application,
+        allResources: List<com.kauth.domain.model.ResourceServer>,
+        authorizedIds: Set<Int>,
+        error: String? = null,
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        clientAuthorizedApisPageImpl(
+            workspace,
+            allWorkspaces,
+            loggedInAs,
+            application,
+            allResources,
+            authorizedIds,
+            error,
+            toastMessage,
+        )
 }

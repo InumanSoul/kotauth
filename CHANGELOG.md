@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.18.0] - 2026-06-17
+
+Audience-targeted M2M tokens — RFC 8707 Resource Indicators. Tokens
+issued from the `client_credentials` grant can now carry the targeted
+API's identifier as the `aud` claim, instead of always the caller's
+`client_id`. Resource servers configure one stable audience (their own
+identifier) regardless of how many callers exist.
+
+### Added
+
+- **`resource` request parameter** on the token endpoint
+  (`client_credentials` grant). Repeatable. Each value is looked up in
+  the tenant-scoped API registry and validated against the calling
+  client's authorization. Unknown or unauthorized resources produce a
+  proper RFC 8707 `invalid_target` 400 — never a silently-broad token.
+- **APIs registry** (admin: `/settings/apis`). Workspace-scoped CRUD for
+  the audience identifiers M2M tokens can target. Identifier is
+  immutable after creation; disable is the primary destructive action;
+  hard delete requires typing the audience to confirm.
+- **Per-client "Authorized APIs"** screen
+  (`/applications/<client>/authorized-apis`) — a checkbox list of every
+  registered API in the workspace. Disabled APIs render as a
+  non-selectable badge.
+- **Discovery metadata** —
+  `/.well-known/openid-configuration` advertises
+  `"resource_indicators_supported": true` so RFC 8707-aware client
+  libraries and API gateways enable the `resource` parameter
+  automatically.
+- **Audit log** — `TOKEN_ISSUED` events for `client_credentials` now
+  include the resolved resources (comma-separated identifiers) in their
+  details map.
+
+### Changed
+
+- **`client_credentials` honors the per-client `audience` column when
+  no `resource` is sent.** The hierarchy is now
+  `resource → audience column → client_id` — same shape as user tokens.
+  Resource servers configured to accept the caller's `client_id` keep
+  working; deployments that set the `audience` column on an M2M client
+  start emitting that value automatically. Verify before upgrading.
+
+### Migrations
+
+- `V51__resource_servers.sql` — adds `resource_servers` and
+  `client_authorized_resources`. Empty tables; no backfill; absence of
+  rows is legacy behavior.
+
+### Deferred (planned for v1.19+)
+
+- `resource` parameter on the `authorization_code` / user-token path.
+- Per-resource scope narrowing (RFC 9068 §5) — issue only the subset of
+  scopes the targeted API defines.
+- Widening `AccessTokenClaims.aud` to `List<String>` so token
+  introspection surfaces every audience on a multi-resource token.
+  Issuance is already correct; introspection currently reads only the
+  first audience.
+
+---
+
 ## [1.17.0] - 2026-06-17
 
 Email i18n + Tier-3 security polish. Closes the polish-tier findings from

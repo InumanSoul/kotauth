@@ -423,6 +423,7 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
     div("sidebar__divider") {}
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
+    ctxLink("$base/apis", "apis", activeSection, "APIs")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
     ctxLink("$base/claim-mappers", "claim-mappers", activeSection, "Claim Mappers")
     div("sidebar__divider") {}

@@ -26,6 +26,7 @@ fun Route.adminApplicationRoutes(
     applicationRepository: ApplicationRepository,
     roleGroupService: RoleGroupService,
     corsPort: CorsPort? = null,
+    resourceServerService: com.kauth.domain.service.ResourceServerService? = null,
 ) {
     route("/applications") {
         get("/new") {
@@ -277,6 +278,69 @@ fun Route.adminApplicationRoutes(
                     current - roleId
                 }
                 call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+            }
+
+            if (resourceServerService != null) {
+                get("/authorized-apis") {
+                    val session = call.sessions.get<AdminSession>()!!
+                    val workspace = call.attributes[WorkspaceAttr]
+                    val wsPairs = call.attributes[WsPairsAttr]
+                    val clientId =
+                        call.parameters["clientId"]
+                            ?: return@get call.respond(HttpStatusCode.BadRequest)
+                    val app =
+                        applicationRepository.findByClientId(workspace.id, clientId)
+                            ?: return@get call.respond(HttpStatusCode.NotFound)
+                    val all = resourceServerService.list(workspace.id)
+                    val authorizedIds =
+                        resourceServerService
+                            .listAuthorized(app.id)
+                            .mapNotNull { it.id?.value }
+                            .toSet()
+                    val toast =
+                        if (call.request.queryParameters["saved"] == "ok") {
+                            com.kauth.adapter.web.EnglishStrings.TOAST_AUTHORIZED_APIS_UPDATED
+                        } else {
+                            null
+                        }
+                    call.respondHtml(
+                        HttpStatusCode.OK,
+                        AdminView.clientAuthorizedApisPage(
+                            workspace = workspace,
+                            allWorkspaces = wsPairs,
+                            loggedInAs = session.username,
+                            application = app,
+                            allResources = all,
+                            authorizedIds = authorizedIds,
+                            toastMessage = toast,
+                        ),
+                    )
+                }
+
+                post("/authorized-apis") {
+                    val workspace = call.attributes[WorkspaceAttr]
+                    val slug = workspace.slug
+                    val clientId =
+                        call.parameters["clientId"]
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val app =
+                        applicationRepository.findByClientId(workspace.id, clientId)
+                            ?: return@post call.respond(HttpStatusCode.NotFound)
+                    val params = call.receiveParameters()
+                    val selectedIds =
+                        params
+                            .getAll("resource")
+                            .orEmpty()
+                            .mapNotNull { it.toIntOrNull() }
+                            .map {
+                                com.kauth.domain.model
+                                    .ResourceServerId(it)
+                            }
+                    resourceServerService.setAuthorized(app.id, selectedIds)
+                    call.respondRedirect(
+                        "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=ok",
+                    )
+                }
             }
         }
     }
