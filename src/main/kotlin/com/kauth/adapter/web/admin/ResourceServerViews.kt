@@ -141,7 +141,22 @@ internal fun clientAuthorizedApisPageImpl(
                     EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING to null,
                 )
 
-                pageHeader(title = EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING)
+                val formId = "authorized-apis-form"
+                pageHeader(
+                    title = EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING,
+                    actions = {
+                        a(
+                            href = "/admin/workspaces/$slug/applications/${application.clientId}",
+                            classes = "btn btn--ghost",
+                        ) { +"Cancel" }
+                        if (allResources.isNotEmpty()) {
+                            button(type = ButtonType.submit, classes = "btn btn--primary") {
+                                attributes["form"] = formId
+                                +"Save"
+                            }
+                        }
+                    },
+                )
 
                 if (error != null) {
                     div("notice notice--error") { +error }
@@ -170,6 +185,7 @@ internal fun clientAuthorizedApisPageImpl(
                         method = FormMethod.post,
                         classes = "edit-form",
                     ) {
+                        id = formId
                         div("ov-card") {
                             div("chip-grid__header") {
                                 span("chip-grid__header-label") { +EnglishStrings.API_AUTHORIZED_CLIENTS_HINT }
@@ -211,17 +227,6 @@ internal fun clientAuthorizedApisPageImpl(
                                         }
                                     }
                                 }
-                            }
-                        }
-                        div("form-actions") {
-                            a(
-                                href =
-                                    "/admin/workspaces/$slug/applications/" +
-                                        application.clientId,
-                                classes = "btn btn--ghost",
-                            ) { +"Cancel" }
-                            button(type = ButtonType.submit, classes = "btn btn--primary") {
-                                +"Save"
                             }
                         }
                     }
@@ -269,13 +274,29 @@ internal fun resourceServerFormPageImpl(
                     title to null,
                 )
 
-                pageHeader(title = title)
+                val formId = "api-form"
+                val submitLabel = if (isEdit) "Save changes" else "Register API"
+
+                pageHeader(
+                    title = title,
+                    actions = {
+                        a(
+                            href = "/admin/workspaces/$slug/settings/apis",
+                            classes = "btn btn--ghost",
+                        ) { +"Cancel" }
+                        button(type = ButtonType.submit, classes = "btn btn--primary") {
+                            attributes["form"] = formId
+                            +submitLabel
+                        }
+                    },
+                )
 
                 if (error != null) {
                     div("notice notice--error") { +error }
                 }
 
                 form(action = submitUrl, method = FormMethod.post, classes = "edit-form") {
+                    id = formId
                     div("ov-card") {
                         div("edit-row") {
                             span("edit-row__label") { +EnglishStrings.API_FIELD_IDENTIFIER }
@@ -322,15 +343,6 @@ internal fun resourceServerFormPageImpl(
                                 }
                                 div("edit-row__hint") { +EnglishStrings.API_FIELD_DESCRIPTION_HINT }
                             }
-                        }
-                    }
-                    div("form-actions") {
-                        a(
-                            href = "/admin/workspaces/$slug/settings/apis",
-                            classes = "btn btn--ghost",
-                        ) { +"Cancel" }
-                        button(type = ButtonType.submit, classes = "btn btn--primary") {
-                            +if (isEdit) "Save changes" else "Register API"
                         }
                     }
                 }
