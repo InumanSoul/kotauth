@@ -318,7 +318,9 @@ fun Route.adminApplicationRoutes(
                 }
 
                 post("/authorized-apis") {
+                    val session = call.sessions.get<AdminSession>()!!
                     val workspace = call.attributes[WorkspaceAttr]
+                    val wsPairs = call.attributes[WsPairsAttr]
                     val slug = workspace.slug
                     val clientId =
                         call.parameters["clientId"]
@@ -336,10 +338,35 @@ fun Route.adminApplicationRoutes(
                                 com.kauth.domain.model
                                     .ResourceServerId(it)
                             }
-                    resourceServerService.setAuthorized(app.id, selectedIds)
-                    call.respondRedirect(
-                        "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=ok",
-                    )
+                    when (val result = resourceServerService.setAuthorized(app.id, selectedIds)) {
+                        is com.kauth.domain.service.ResourceServerResult.Success ->
+                            call.respondRedirect(
+                                "/admin/workspaces/$slug/applications/$clientId/authorized-apis?saved=ok",
+                            )
+                        is com.kauth.domain.service.ResourceServerResult.Failure -> {
+                            val all = resourceServerService.list(workspace.id)
+                            val errorMessage =
+                                when (result.error) {
+                                    com.kauth.domain.service.ResourceServerError.CrossTenant ->
+                                        "One of the selected APIs belongs to a different workspace."
+                                    com.kauth.domain.service.ResourceServerError.NotFound ->
+                                        "One of the selected APIs no longer exists. Reload and try again."
+                                    else -> "Could not save authorized APIs."
+                                }
+                            call.respondHtml(
+                                HttpStatusCode.UnprocessableEntity,
+                                AdminView.clientAuthorizedApisPage(
+                                    workspace = workspace,
+                                    allWorkspaces = wsPairs,
+                                    loggedInAs = session.username,
+                                    application = app,
+                                    allResources = all,
+                                    authorizedIds = selectedIds.map { it.value }.toSet(),
+                                    error = errorMessage,
+                                ),
+                            )
+                        }
+                    }
                 }
             }
         }

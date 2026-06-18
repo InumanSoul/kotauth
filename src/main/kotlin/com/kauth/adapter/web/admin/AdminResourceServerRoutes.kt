@@ -121,15 +121,23 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
     post("/settings/apis/{id}/enable") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        service.setEnabled(ctx.workspace.id, ResourceServerId(id), true)
-        call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=enabled")
+        when (service.setEnabled(ctx.workspace.id, ResourceServerId(id), true)) {
+            is ResourceServerResult.Success ->
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=enabled")
+            is ResourceServerResult.Failure ->
+                call.respond(HttpStatusCode.NotFound)
+        }
     }
 
     post("/settings/apis/{id}/disable") {
         val ctx = call.adminContext()
         val id = call.parameters["id"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
-        service.setEnabled(ctx.workspace.id, ResourceServerId(id), false)
-        call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=disabled")
+        when (service.setEnabled(ctx.workspace.id, ResourceServerId(id), false)) {
+            is ResourceServerResult.Success ->
+                call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=disabled")
+            is ResourceServerResult.Failure ->
+                call.respond(HttpStatusCode.NotFound)
+        }
     }
 
     post("/settings/apis/{id}/delete") {
