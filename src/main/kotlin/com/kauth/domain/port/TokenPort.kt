@@ -29,6 +29,7 @@ interface TokenPort {
         tenant: Tenant,
         client: Application,
         scopes: List<String>,
+        audiences: List<String>,
     ): String
 
     /** Verifies the token signature, expiry, and `iss` claim against [expectedIssuer]. */

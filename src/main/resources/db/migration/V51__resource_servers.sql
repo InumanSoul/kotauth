@@ -1,11 +1,4 @@
 -- V51: RFC 8707 Resource Indicators (v1.18.0).
--- A tenant-scoped registry of APIs that the client_credentials grant can target.
--- The `identifier` is what lands in the JWT `aud` claim; resource servers validate
--- against their own identifier instead of an N×M caller matrix.
---
--- client_authorized_resources gates which clients may request which audiences.
--- The join carries no tenant_id; same-tenant scoping is enforced by the adapter
--- in the write path (a tenant-A client cannot authorize against a tenant-B audience).
 
 CREATE TABLE resource_servers (
     id          SERIAL       PRIMARY KEY,

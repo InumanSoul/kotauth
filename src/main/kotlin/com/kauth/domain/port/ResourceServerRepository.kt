@@ -45,10 +45,6 @@ interface ResourceServerRepository {
 
     fun listAuthorizedFor(clientPk: ApplicationId): List<ResourceServer>
 
-    /**
-     * Returns null on success; otherwise a typed reason. The join table has no tenant_id, so
-     * cross-tenant authorization can only be caught at write time — see CrossTenant.
-     */
     fun setAuthorizedResources(
         clientPk: ApplicationId,
         resourceServerIds: List<ResourceServerId>,

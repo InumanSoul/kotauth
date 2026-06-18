@@ -617,6 +617,7 @@ internal fun Route.oauthProtocolRoutes(
 
             "client_credentials" -> {
                 val scopes = params["scope"] ?: ""
+                val resources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -636,6 +637,7 @@ internal fun Route.oauthProtocolRoutes(
                                 ),
                             scopes = scopes,
                             ipAddress = ipAddress,
+                            resources = resources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)

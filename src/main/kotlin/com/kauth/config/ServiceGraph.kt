@@ -332,6 +332,7 @@ data class ServiceGraph(
                     tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
+                    resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
                     userAttributeRepository = userAttributeRepository,
                     claimMappersFor = claimMapperService::list,

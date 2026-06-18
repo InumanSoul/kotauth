@@ -94,4 +94,34 @@ class JwtTokenAdapterAudienceTest {
 
         assertEquals("acme", audOf(response.access_token))
     }
+
+    @Test
+    fun `client credentials with a single audience emits a single-string aud`() {
+        val token =
+            adapter.issueClientCredentialsToken(
+                tenant,
+                app(audience = null),
+                listOf("openid"),
+                listOf("payment-api"),
+            )
+        val decoded =
+            com.auth0.jwt.JWT
+                .decode(token)
+        assertEquals(listOf("payment-api"), decoded.audience)
+    }
+
+    @Test
+    fun `client credentials with multiple audiences emits an aud array preserving order`() {
+        val token =
+            adapter.issueClientCredentialsToken(
+                tenant,
+                app(audience = null),
+                listOf("openid"),
+                listOf("payment-api", "ledger-api"),
+            )
+        val decoded =
+            com.auth0.jwt.JWT
+                .decode(token)
+        assertEquals(listOf("payment-api", "ledger-api"), decoded.audience)
+    }
 }
