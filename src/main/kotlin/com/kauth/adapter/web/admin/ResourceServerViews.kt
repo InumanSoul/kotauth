@@ -336,56 +336,57 @@ internal fun resourceServerFormPageImpl(
                 }
 
                 if (prefill != null && existingId != null) {
-                    dangerZoneCard(
-                        title = if (prefill.enabled) "Disable API" else "Enable API",
-                        description =
-                            if (prefill.enabled) {
-                                "Clients targeting this API will receive an invalid_target error on the next " +
-                                    "token request. Existing tokens remain valid until they expire."
-                            } else {
-                                "Re-enable token issuance for this API."
-                            },
-                        warning = false,
-                    ) {
-                        form(
-                            action =
-                                "/admin/workspaces/$slug/settings/apis/" +
-                                    "${existingId.value}/${if (prefill.enabled) "disable" else "enable"}",
-                            method = FormMethod.post,
-                        ) {
-                            button(type = ButtonType.submit, classes = "btn btn--secondary") {
-                                +if (prefill.enabled) "Disable" else "Enable"
+                    div("ov-card") {
+                        div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                        div("danger-zone") {
+                            dangerZoneCard(
+                                title = if (prefill.enabled) "Disable API" else "Enable API",
+                                description =
+                                    if (prefill.enabled) {
+                                        "Clients targeting this API will receive an invalid_target error on " +
+                                            "the next token request. Existing tokens remain valid until they expire."
+                                    } else {
+                                        "Re-enable token issuance for this API."
+                                    },
+                                warning = false,
+                            ) {
+                                postButton(
+                                    action =
+                                        "/admin/workspaces/$slug/settings/apis/" +
+                                            "${existingId.value}/${if (prefill.enabled) "disable" else "enable"}",
+                                    label = if (prefill.enabled) "Disable" else "Enable",
+                                    btnClass = "btn btn--danger btn--sm",
+                                )
                             }
-                        }
-                    }
 
-                    dangerZoneCard(
-                        title = "Delete API",
-                        description =
-                            "Removes this API and every client authorization that referenced it. " +
-                                "Tokens already issued remain valid until they expire. " +
-                                "Type the audience identifier to confirm.",
-                        warning = true,
-                    ) {
-                        form(
-                            action = "/admin/workspaces/$slug/settings/apis/${existingId.value}/delete",
-                            method = FormMethod.post,
-                        ) {
-                            div("edit-row") {
-                                input(type = InputType.text, name = "confirmIdentifier") {
-                                    classes = setOf("edit-row__field", "edit-row__field--mono")
-                                    attributes["pattern"] = java.util.regex.Pattern.quote(prefill.identifier)
-                                    attributes["required"] = "required"
-                                    attributes["autocomplete"] = "off"
-                                    attributes["data-confirm-slug"] = prefill.identifier
-                                    attributes["data-confirm-target"] = "#api-delete-button"
-                                    placeholder = prefill.identifier
+                            dangerZoneCard(
+                                title = "Delete API",
+                                description =
+                                    "Removes this API and every client authorization that referenced it. " +
+                                        "Tokens already issued remain valid until they expire. " +
+                                        "Type the audience identifier to confirm.",
+                                warning = true,
+                            ) {
+                                form(
+                                    action = "/admin/workspaces/$slug/settings/apis/${existingId.value}/delete",
+                                    method = FormMethod.post,
+                                    classes = "inline-form",
+                                ) {
+                                    input(type = InputType.text, name = "confirmIdentifier") {
+                                        classes = setOf("edit-row__field", "edit-row__field--mono")
+                                        attributes["pattern"] = java.util.regex.Pattern.quote(prefill.identifier)
+                                        attributes["required"] = "required"
+                                        attributes["autocomplete"] = "off"
+                                        attributes["data-confirm-slug"] = prefill.identifier
+                                        attributes["data-confirm-target"] = "#api-delete-button"
+                                        placeholder = prefill.identifier
+                                    }
+                                    button(type = ButtonType.submit, classes = "btn btn--danger btn--sm") {
+                                        id = "api-delete-button"
+                                        attributes["disabled"] = "disabled"
+                                        +"Delete API"
+                                    }
                                 }
-                            }
-                            button(type = ButtonType.submit, classes = "btn btn--danger") {
-                                id = "api-delete-button"
-                                attributes["disabled"] = "disabled"
-                                +"Delete API"
                             }
                         }
                     }
