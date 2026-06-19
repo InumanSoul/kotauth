@@ -5,11 +5,14 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.service.WebhookService
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.TreeMap
 
 /**
  * Persistence adapter — audit log (append-only).
@@ -40,9 +43,12 @@ class PostgresAuditLogAdapter(
                         if (event.details.isEmpty()) {
                             null
                         } else {
-                            event.details.entries.joinToString(",", "{", "}") { (k, v) ->
-                                "\"$k\":\"${v.replace("\"", "\\\"")}\""
-                            }
+                            Json.encodeToString(
+                                JsonObject.serializer(),
+                                buildJsonObject {
+                                    TreeMap(event.details).forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+                                },
+                            )
                         }
                     it[createdAt] = OffsetDateTime.ofInstant(event.createdAt, ZoneOffset.UTC)
                 }
