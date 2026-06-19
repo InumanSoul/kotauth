@@ -15,6 +15,7 @@ import com.kauth.adapter.persistence.PostgresMfaRepository
 import com.kauth.adapter.persistence.PostgresPasswordPolicyAdapter
 import com.kauth.adapter.persistence.PostgresPasswordResetTokenRepository
 import com.kauth.adapter.persistence.PostgresPortalConfigRepository
+import com.kauth.adapter.persistence.PostgresResourceServerRepository
 import com.kauth.adapter.persistence.PostgresRoleRepository
 import com.kauth.adapter.persistence.PostgresSessionRepository
 import com.kauth.adapter.persistence.PostgresSocialAccountRepository
@@ -43,6 +44,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
@@ -67,6 +69,7 @@ import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
@@ -107,6 +110,7 @@ data class ServiceGraph(
     val oauthService: OAuthService,
     val accountService: AdminAccountService,
     val workspaceSettingsService: WorkspaceSettingsService,
+    val resourceServerService: ResourceServerService,
     val adminUserService: AdminUserService,
     val applicationManagementService: ApplicationManagementService,
     val roleGroupService: RoleGroupService,
@@ -124,6 +128,7 @@ data class ServiceGraph(
     val corsOriginCache: CorsOriginCache,
     val tenantRepository: TenantRepository,
     val applicationRepository: ApplicationRepository,
+    val resourceServerRepository: ResourceServerRepository,
     val userRepository: UserRepository,
     val sessionRepository: SessionRepository,
     val auditLogRepository: AuditLogRepository,
@@ -186,6 +191,7 @@ data class ServiceGraph(
             val userRepository = PostgresUserRepository()
             val tenantRepository = PostgresTenantRepository(encryptionService)
             val applicationRepository = PostgresApplicationRepository()
+            val resourceServerRepository = PostgresResourceServerRepository()
             val tenantKeyRepository = PostgresTenantKeyRepository(encryptionService)
             val sessionRepository: SessionRepository =
                 redisClientHolder?.let { RedisSessionRepository(it.commands) }
@@ -328,6 +334,7 @@ data class ServiceGraph(
                     tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
+                    resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
                     userAttributeRepository = userAttributeRepository,
                     claimMappersFor = claimMapperService::list,
@@ -380,6 +387,7 @@ data class ServiceGraph(
                     emailBrandingRepository = emailBrandingRepository,
                     corsPort = corsOriginCache,
                 )
+            val resourceServerService = ResourceServerService(resourceServerRepository)
             val roleGroupService =
                 RoleGroupService(
                     roleRepository = roleRepository,
@@ -543,6 +551,7 @@ data class ServiceGraph(
                 oauthService = oauthService,
                 accountService = accountService,
                 workspaceSettingsService = workspaceSettingsService,
+                resourceServerService = resourceServerService,
                 adminUserService = adminUserService,
                 applicationManagementService = applicationManagementService,
                 roleGroupService = roleGroupService,
@@ -560,6 +569,7 @@ data class ServiceGraph(
                 corsOriginCache = corsOriginCache,
                 tenantRepository = tenantRepository,
                 applicationRepository = applicationRepository,
+                resourceServerRepository = resourceServerRepository,
                 userRepository = userRepository,
                 sessionRepository = sessionRepository,
                 auditLogRepository = auditLogRepository,

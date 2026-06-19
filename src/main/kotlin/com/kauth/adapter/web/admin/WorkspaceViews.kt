@@ -820,8 +820,13 @@ internal fun securityPolicyPageImpl(
                 }
 
                 // ── Authentication Methods ───────────────────────────
+                val anyEmailOtpEnabled =
+                    workspace.securityConfig.emailOtpLoginEnabled ||
+                        workspace.securityConfig.emailOtpSignupEnabled
                 div("ov-card") {
                     div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_CARD_TITLE }
+
+                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_SIGN_IN }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "magicLinkEnabled") {
                             attributes["value"] = "true"
@@ -830,18 +835,6 @@ internal fun securityPolicyPageImpl(
                         div("check-row__body") {
                             span("check-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_LABEL }
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_DESC }
-                        }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_LABEL }
-                        div {
-                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "1"
-                                attributes["max"] = "1440"
-                                value = workspace.securityConfig.magicLinkTokenTtlMinutes.toString()
-                            }
-                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_HINT }
                         }
                     }
                     label("check-row") {
@@ -864,27 +857,9 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
                         }
                     }
-                    val anyEmailOtpEnabled =
-                        workspace.securityConfig.emailOtpLoginEnabled ||
-                            workspace.securityConfig.emailOtpSignupEnabled
                     if (anyEmailOtpEnabled && !workspace.isSmtpReady) {
                         div("check-row__body") {
                             span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
-                        }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL }
-                        div {
-                            input(type = InputType.number, name = "emailOtpLockoutThreshold") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "0"
-                                attributes["max"] = "50"
-                                value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
-                                if (!anyEmailOtpEnabled) {
-                                    attributes["disabled"] = "disabled"
-                                }
-                            }
-                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
                         }
                     }
                     label("check-row") {
@@ -896,6 +871,34 @@ internal fun securityPolicyPageImpl(
                         div("check-row__body") {
                             span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
                             span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
+                        }
+                    }
+
+                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_LIMITS }
+                    div("edit-row") {
+                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_LABEL }
+                        div {
+                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "1"
+                                attributes["max"] = "1440"
+                                value = workspace.securityConfig.magicLinkTokenTtlMinutes.toString()
+                            }
+                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_HINT }
+                        }
+                    }
+                    if (anyEmailOtpEnabled) {
+                        div("edit-row") {
+                            span("edit-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL }
+                            div {
+                                input(type = InputType.number, name = "emailOtpLockoutThreshold") {
+                                    classes = setOf("edit-row__field", "edit-row__field--mono")
+                                    attributes["min"] = "0"
+                                    attributes["max"] = "50"
+                                    value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
+                                }
+                                div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
+                            }
                         }
                     }
                 }

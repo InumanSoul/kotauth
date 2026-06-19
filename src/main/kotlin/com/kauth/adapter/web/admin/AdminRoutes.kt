@@ -77,6 +77,7 @@ fun Route.adminRoutes(
     tenantKeyRepository: TenantKeyRepository? = null,
     userAttributeService: com.kauth.domain.service.UserAttributeService,
     claimMapperService: com.kauth.infrastructure.CachingClaimMapperService,
+    resourceServerService: com.kauth.domain.service.ResourceServerService? = null,
     impersonationService: com.kauth.domain.service.ImpersonationService? = null,
     backupExporterService: BackupExporterService? = null,
     backupImporterService: BackupImporterService? = null,
@@ -502,6 +503,7 @@ fun Route.adminRoutes(
                     applicationRepository = applicationRepository,
                     roleGroupService = roleGroupService,
                     corsPort = corsPort,
+                    resourceServerService = resourceServerService,
                 )
 
                 adminUserRoutes(
@@ -547,6 +549,10 @@ fun Route.adminRoutes(
                 adminClaimMapperRoutes(
                     claimMapperService = claimMapperService,
                 )
+
+                if (resourceServerService != null) {
+                    adminResourceServerRoutes(resourceServerService)
+                }
 
                 if (backupExporterService != null && backupEncryptionPort != null) {
                     adminBackupExportRoutes(

@@ -198,7 +198,9 @@ class JwtTokenAdapter(
         tenant: Tenant,
         client: Application,
         scopes: List<String>,
+        audiences: List<String>,
     ): String {
+        require(audiences.isNotEmpty()) { "audiences must contain at least one value" }
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
         val expiryMs = (client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
@@ -207,7 +209,7 @@ class JwtTokenAdapter(
             .create()
             .withKeyId(activeKey.keyId)
             .withIssuer(issuer)
-            .withAudience(client.clientId)
+            .withAudience(*audiences.toTypedArray())
             .withSubject(client.clientId) // sub = client_id for M2M
             .withClaim("tenant_id", tenant.id.value)
             .withClaim("client_id", client.clientId)

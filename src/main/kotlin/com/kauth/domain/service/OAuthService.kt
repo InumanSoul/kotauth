@@ -16,6 +16,7 @@ import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuthorizationCodeRepository
 import com.kauth.domain.port.PasswordHasher
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
@@ -54,6 +55,7 @@ class OAuthService(
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
+    private val resourceServerRepository: ResourceServerRepository? = null,
     private val roleRepository: RoleRepository? = null,
     private val userAttributeRepository: UserAttributeRepository? = null,
     /**
@@ -348,6 +350,7 @@ class OAuthService(
         clientSecret: String,
         scopes: String,
         ipAddress: String? = null,
+        resources: List<String> = emptyList(),
     ): OAuthResult<TokenResponse> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -374,12 +377,17 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidClient("Invalid client_secret"))
         }
 
+        val audiences =
+            when (val r = resolveAudiences(tenant.id, client, resources)) {
+                is AudienceResolution.Ok -> r.values
+                is AudienceResolution.Failed -> return OAuthResult.Failure(r.error)
+            }
+
         val requestedScopes = scopes.split(" ").filter { it.isNotBlank() }.ifEmpty { listOf("openid") }
-        val accessToken = tokenPort.issueClientCredentialsToken(tenant, client, requestedScopes)
+        val accessToken = tokenPort.issueClientCredentialsToken(tenant, client, requestedScopes, audiences)
 
         val expirySeconds = client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds
 
-        // Persist session (no user_id for M2M)
         sessionRepository.save(
             Session(
                 tenantId = tenant.id,
@@ -402,7 +410,11 @@ class OAuthService(
                 eventType = AuditEventType.TOKEN_ISSUED,
                 ipAddress = ipAddress,
                 userAgent = null,
-                details = mapOf("grant_type" to "client_credentials"),
+                details =
+                    mapOf(
+                        "grant_type" to "client_credentials",
+                        "resources" to audiences.joinToString(","),
+                    ),
             ),
         )
 
@@ -414,6 +426,50 @@ class OAuthService(
                 scope = requestedScopes.joinToString(" "),
             ),
         )
+    }
+
+    private sealed class AudienceResolution {
+        data class Ok(
+            val values: List<String>,
+        ) : AudienceResolution()
+
+        data class Failed(
+            val error: OAuthError.InvalidTarget,
+        ) : AudienceResolution()
+    }
+
+    private fun resolveAudiences(
+        tenantId: TenantId,
+        client: Application,
+        requested: List<String>,
+    ): AudienceResolution {
+        if (requested.isEmpty()) {
+            return AudienceResolution.Ok(listOf(client.audience ?: client.clientId))
+        }
+        if (resourceServerRepository == null) {
+            return AudienceResolution.Failed(
+                OAuthError.InvalidTarget("Resource indicators are not configured for this server."),
+            )
+        }
+        val authorized = resourceServerRepository.listAuthorizedFor(client.id).map { it.identifier }.toSet()
+        for (identifier in requested) {
+            val rs =
+                resourceServerRepository.findByIdentifier(tenantId, identifier)
+                    ?: return AudienceResolution.Failed(
+                        OAuthError.InvalidTarget("Unknown resource: $identifier"),
+                    )
+            if (!rs.enabled) {
+                return AudienceResolution.Failed(
+                    OAuthError.InvalidTarget("Resource is disabled: $identifier"),
+                )
+            }
+            if (identifier !in authorized) {
+                return AudienceResolution.Failed(
+                    OAuthError.InvalidTarget("Client is not authorized for resource: $identifier"),
+                )
+            }
+        }
+        return AudienceResolution.Ok(requested)
     }
 
     // -------------------------------------------------------------------------
@@ -826,6 +882,10 @@ sealed class OAuthError {
     ) : OAuthError()
 
     object UnsupportedGrantType : OAuthError()
+
+    data class InvalidTarget(
+        val reason: String,
+    ) : OAuthError()
 }
 
 sealed class IntrospectionResult {

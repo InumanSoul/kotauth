@@ -53,6 +53,10 @@ class OAuthServiceTest {
     private val hasher = FakePasswordHasher()
     private val tokens = FakeTokenPort()
     private val auditLog = FakeAuditLogPort()
+    private val resourceServers =
+        com.kauth.fakes.FakeResourceServerRepository(
+            clientTenantLookup = { id -> apps.findById(id)?.tenantId },
+        )
 
     private val svc =
         OAuthService(
@@ -64,6 +68,7 @@ class OAuthServiceTest {
             tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
+            resourceServerRepository = resourceServers,
         )
 
     // -------------------------------------------------------------------------
@@ -121,6 +126,7 @@ class OAuthServiceTest {
         sessions.clear()
         auditLog.clear()
         tokens.reset()
+        resourceServers.clear()
 
         tenants.add(testTenant)
         users.add(testUser)
@@ -432,6 +438,147 @@ class OAuthServiceTest {
         assertNotNull(tokenResponse.access_token)
         assertNull(tokenResponse.refresh_token, "M2M tokens must not include a refresh_token")
         assertTrue(auditLog.hasEvent(AuditEventType.TOKEN_ISSUED))
+    }
+
+    // =========================================================================
+    // clientCredentials — RFC 8707 Resource Indicators
+    // =========================================================================
+
+    @Test
+    fun `clientCredentials without resource falls back to client_id when audience column is unset`() {
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+            )
+        assertIs<OAuthResult.Success<*>>(result)
+        assertEquals(listOf("backend-app"), tokens.lastClientCredentialsAudiences)
+    }
+
+    @Test
+    fun `clientCredentials without resource honors the client audience column when set`() {
+        apps.clear()
+        apps.add(
+            confidentialClient.copy(audience = "static-audience"),
+            secretHash = hasher.hash("secret123"),
+        )
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+            )
+        assertIs<OAuthResult.Success<*>>(result)
+        assertEquals(listOf("static-audience"), tokens.lastClientCredentialsAudiences)
+    }
+
+    @Test
+    fun `clientCredentials with authorized resource sets aud to the resource identifier`() {
+        val payment = resourceServers.create(testTenant.id, "payment-api", "Payment API", null)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(payment.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+                resources = listOf("payment-api"),
+            )
+        assertIs<OAuthResult.Success<*>>(result)
+        assertEquals(listOf("payment-api"), tokens.lastClientCredentialsAudiences)
+    }
+
+    @Test
+    fun `clientCredentials with two authorized resources passes both as audiences`() {
+        val a = resourceServers.create(testTenant.id, "payment-api", "Payment API", null)
+        val b = resourceServers.create(testTenant.id, "ledger-api", "Ledger API", null)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(a.id!!, b.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+                resources = listOf("payment-api", "ledger-api"),
+            )
+        assertIs<OAuthResult.Success<*>>(result)
+        assertEquals(listOf("payment-api", "ledger-api"), tokens.lastClientCredentialsAudiences)
+    }
+
+    @Test
+    fun `clientCredentials with unknown resource returns InvalidTarget`() {
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+                resources = listOf("does-not-exist"),
+            )
+        assertIs<OAuthResult.Failure>(result)
+        val error = result.error
+        assertIs<OAuthError.InvalidTarget>(error)
+        assertTrue(error.reason.contains("does-not-exist"))
+    }
+
+    @Test
+    fun `clientCredentials with unauthorized resource returns InvalidTarget`() {
+        resourceServers.create(testTenant.id, "payment-api", "Payment API", null)
+        // intentionally not authorizing the client
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+                resources = listOf("payment-api"),
+            )
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidTarget>(result.error)
+    }
+
+    @Test
+    fun `clientCredentials with disabled resource returns InvalidTarget`() {
+        val payment = resourceServers.create(testTenant.id, "payment-api", "Payment API", null)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(payment.id!!))
+        resourceServers.setEnabled(testTenant.id, payment.id, false)
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "openid",
+                resources = listOf("payment-api"),
+            )
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidTarget>(result.error)
+    }
+
+    @Test
+    fun `TOKEN_ISSUED audit event records the resolved resource list`() {
+        val payment = resourceServers.create(testTenant.id, "payment-api", "Payment API", null)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(payment.id!!))
+
+        svc.clientCredentials(
+            tenantSlug = "acme",
+            clientId = "backend-app",
+            clientSecret = "secret123",
+            scopes = "openid",
+            resources = listOf("payment-api"),
+        )
+
+        val event =
+            auditLog.events.firstOrNull { it.eventType == AuditEventType.TOKEN_ISSUED }
+        assertNotNull(event)
+        assertEquals("payment-api", event.details["resources"])
+        assertEquals("client_credentials", event.details["grant_type"])
     }
 
     // =========================================================================

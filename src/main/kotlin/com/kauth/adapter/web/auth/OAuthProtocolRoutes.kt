@@ -141,6 +141,7 @@ internal fun Route.oauthProtocolRoutes(
                     },
                 )
                 put("code_challenge_methods_supported", buildJsonArray { add("S256") })
+                put("resource_indicators_supported", true)
                 put(
                     "prompt_values_supported",
                     buildJsonArray {
@@ -617,6 +618,7 @@ internal fun Route.oauthProtocolRoutes(
 
             "client_credentials" -> {
                 val scopes = params["scope"] ?: ""
+                val resources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -636,6 +638,7 @@ internal fun Route.oauthProtocolRoutes(
                                 ),
                             scopes = scopes,
                             ipAddress = ipAddress,
+                            resources = resources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)

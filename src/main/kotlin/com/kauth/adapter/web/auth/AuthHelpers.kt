@@ -293,6 +293,7 @@ internal fun OAuthError.toErrorCode(): String =
         is OAuthError.InvalidRedirectUri -> "invalid_request"
         is OAuthError.PkceRequired -> "invalid_request"
         is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
+        is OAuthError.InvalidTarget -> "invalid_target"
     }
 
 internal fun OAuthError.toDescription(): String =
@@ -304,6 +305,7 @@ internal fun OAuthError.toDescription(): String =
         is OAuthError.InvalidRedirectUri -> "Invalid redirect_uri: ${this.uri}"
         is OAuthError.PkceRequired -> "PKCE is required for public clients"
         is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
+        is OAuthError.InvalidTarget -> this.reason
     }
 
 internal fun AuthError.toMessage(): String =

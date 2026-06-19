@@ -75,11 +75,18 @@ class FakeTokenPort : TokenPort {
         )
     }
 
+    var lastClientCredentialsAudiences: List<String> = emptyList()
+        private set
+
     override fun issueClientCredentialsToken(
         tenant: Tenant,
         client: Application,
         scopes: List<String>,
-    ): String = "fake.m2m.${client.clientId}"
+        audiences: List<String>,
+    ): String {
+        lastClientCredentialsAudiences = audiences
+        return "fake.m2m.${client.clientId}.${audiences.joinToString("|")}"
+    }
 
     override fun decodeAccessToken(
         token: String,

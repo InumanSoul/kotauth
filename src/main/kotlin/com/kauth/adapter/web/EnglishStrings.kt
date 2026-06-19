@@ -197,6 +197,47 @@ object EnglishStrings {
         "Signing key rotated. The previous key remains active for token verification until retired."
     const val TOAST_KEY_RETIRED = "Key retired. Tokens signed with this key will no longer be accepted."
 
+    // APIs / RFC 8707 Resource Indicators (v1.18.0)
+    const val API_NAV_LABEL = "APIs"
+    const val API_PAGE_TITLE = "APIs"
+    const val API_PAGE_SUBTITLE =
+        "Register the APIs that your clients request audience-targeted tokens for. Each API has an " +
+            "identifier (the `aud` claim) that resource servers use to validate incoming tokens."
+    const val API_EMPTY_TITLE = "No APIs yet"
+    const val API_EMPTY_BODY =
+        "Register an API to start issuing audience-targeted M2M tokens. Authorize clients per API to " +
+            "control which audiences each caller can request."
+    const val API_LIST_COLUMN_NAME = "Name"
+    const val API_LIST_COLUMN_IDENTIFIER = "Audience"
+    const val API_LIST_COLUMN_STATUS = "Status"
+    const val API_ADD = "Register API"
+    const val API_FORM_NEW_TITLE = "Register API"
+    const val API_FORM_EDIT_TITLE = "Edit API"
+    const val API_FIELD_IDENTIFIER = "Audience identifier"
+    const val API_FIELD_IDENTIFIER_HINT_NEW =
+        "Used as the JWT `aud` claim. Use a URI like https://api.example.com or a stable slug like payment-api. " +
+            "Immutable after creation."
+    const val API_FIELD_IDENTIFIER_HINT_LOCKED = "Immutable after creation."
+    const val API_FIELD_NAME = "Name"
+    const val API_FIELD_NAME_HINT = "A human-readable name shown in the admin UI only."
+    const val API_FIELD_DESCRIPTION = "Description"
+    const val API_FIELD_DESCRIPTION_HINT = "Optional. Internal notes about what this API is for."
+    const val API_AUTHORIZED_CLIENTS_HEADING = "Authorized APIs"
+    const val API_AUTHORIZED_CLIENTS_HINT =
+        "Tick each API this client is allowed to request as the audience of a client-credentials token."
+    const val API_AUTHORIZED_CLIENTS_EMPTY_TITLE = "No APIs in this workspace yet"
+    const val API_AUTHORIZED_CLIENTS_EMPTY_BODY =
+        "Register an API under Settings → APIs, then return here to authorize it for this client."
+    const val API_AUTHORIZED_CLIENTS_EMPTY_CTA = "Register API"
+    const val API_AUTHORIZED_CLIENTS_ALL = "All"
+    const val API_AUTHORIZED_CLIENTS_NONE = "None"
+    const val TOAST_API_CREATED = "API registered."
+    const val TOAST_API_UPDATED = "API updated."
+    const val TOAST_API_DISABLED = "API disabled."
+    const val TOAST_API_ENABLED = "API enabled."
+    const val TOAST_API_DELETED = "API deleted."
+    const val TOAST_AUTHORIZED_APIS_UPDATED = "Authorized APIs updated."
+
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"
     const val BACKUP_PAGE_TITLE = "Backup workspace"
@@ -258,6 +299,8 @@ object EnglishStrings {
 
     // Authentication methods card (workspace security settings — v1.10)
     const val AUTH_METHODS_CARD_TITLE = "Authentication Methods"
+    const val AUTH_METHODS_GROUP_SIGN_IN = "Sign-in methods"
+    const val AUTH_METHODS_GROUP_LIMITS = "Limits"
     const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
     const val AUTH_METHODS_MAGIC_LINK_DESC =
         "Users can request a one-time sign-in link delivered to their email. " +
@@ -265,35 +308,33 @@ object EnglishStrings {
             "required when enrolled. Requires SMTP to be configured."
     const val AUTH_METHODS_MAGIC_LINK_TTL_LABEL = "Magic link expiry"
     const val AUTH_METHODS_MAGIC_LINK_TTL_HINT =
-        "Minutes before a magic link expires. 1–1440 (default 15). " +
+        "Minutes before a magic link expires. 1 to 1440 (default 15). " +
             "Raise it for slow corporate mail relays; lower it for high-assurance tenants."
     const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
     const val AUTH_METHODS_PASSWORDLESS_DESC =
         "Hides the password form and rejects password-based authentication. " +
             "Users can still sign in with magic links and any enabled social providers. " +
-            "Email becomes the only first factor — pair with MFA for higher-assurance environments."
+            "Email becomes the only first factor. Pair with MFA for higher-assurance environments."
 
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL =
         "Allow sign-in via Email OTP code"
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_DESC =
         "Adds a \"Sign in with email code\" option to the hosted login page. The user " +
             "enters their email, receives a 6-digit code, and types it in. Independent " +
-            "of the magic-link toggle above. Requires SMTP."
+            "of the magic link toggle above. Requires SMTP."
     const val AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL =
         "Allow sign-up via Email OTP admin API"
     const val AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC =
-        "When enabled, calls to the send-otp admin API create a passwordless user " +
-            "if the email doesn't already exist. Keep off unless an external onboarding " +
-            "flow (BFF, partner SPA) needs find-or-create semantics — opening this surface " +
-            "is a new account-creation channel."
+        "When enabled, the OTP admin API creates a passwordless account if the email " +
+            "does not exist yet. Leave off unless an external onboarding flow controls " +
+            "user creation. Enabling this opens a new account-creation channel."
     const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL =
-        "Cross-challenge OTP failure threshold"
+        "OTP lockout after failed attempts"
     const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT =
-        "After this many failed OTP challenges, the user is locked using the existing " +
-            "lockout window above. 0 disables the cross-challenge guard (per-challenge cap " +
-            "of 5 still applies)."
+        "Locks the account after this many failed OTP attempts across all active challenges. " +
+            "0 disables this guard. Each individual challenge still allows up to 5 attempts."
     const val AUTH_METHODS_EMAIL_OTP_SMTP_WARN =
-        "SMTP is not configured for this workspace — OTP emails will fail silently until " +
+        "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."

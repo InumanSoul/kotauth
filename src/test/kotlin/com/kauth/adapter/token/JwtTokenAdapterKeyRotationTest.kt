@@ -101,7 +101,7 @@ class JwtTokenAdapterKeyRotationTest {
                 redirectUris = listOf("http://localhost/cb"),
                 enabled = true,
             )
-        val token = adapter.issueClientCredentialsToken(tenant, app, listOf("openid"))
+        val token = adapter.issueClientCredentialsToken(tenant, app, listOf("openid"), listOf(app.clientId))
         val decoded =
             com.auth0.jwt.JWT
                 .decode(token)
