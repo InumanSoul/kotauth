@@ -766,6 +766,11 @@ internal fun Route.oauthProtocolRoutes(
                         put("scope", result.scopes.joinToString(" "))
                         put("exp", result.expiresAt)
                         put("client_id", result.clientId ?: "")
+                        when (result.aud.size) {
+                            0 -> Unit
+                            1 -> put("aud", result.aud.first())
+                            else -> put("aud", buildJsonArray { result.aud.forEach { add(it) } })
+                        }
                     },
                 )
         }

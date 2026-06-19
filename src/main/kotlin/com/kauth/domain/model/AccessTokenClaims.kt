@@ -12,7 +12,7 @@ package com.kauth.domain.model
 data class AccessTokenClaims(
     val sub: String,
     val iss: String,
-    val aud: String,
+    val aud: List<String>,
     val tenantId: TenantId,
     val username: String?,
     val email: String?,

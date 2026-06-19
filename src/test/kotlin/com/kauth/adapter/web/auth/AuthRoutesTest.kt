@@ -1713,7 +1713,7 @@ class AuthRoutesTest {
                 AccessTokenClaims(
                     sub = "10",
                     iss = "http://localhost/t/acme",
-                    aud = "spa-app",
+                    aud = listOf("spa-app"),
                     tenantId = TenantId(1),
                     username = "alice",
                     email = "alice@example.com",
@@ -2342,6 +2342,198 @@ class AuthRoutesTest {
         }
 
     // -------------------------------------------------------------------------
+
+    @Test
+    fun `POST introspect emits aud as string for single audience`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-single-aud"
+            sessionRepo.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
+                    accessTokenHash = sha256Hex(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+            tokenPort.claimsToReturn =
+                AccessTokenClaims(
+                    sub = "10",
+                    iss = "http://localhost/t/acme",
+                    aud = listOf("my-api"),
+                    tenantId = TenantId(1),
+                    username = "alice",
+                    email = "alice@example.com",
+                    scopes = listOf("openid"),
+                    issuedAt = Instant.now().epochSecond,
+                    expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+                )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters =
+                        Parameters.build {
+                            append("token", accessToken)
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"aud\":\"my-api\"") || body.contains("\"aud\": \"my-api\""))
+        }
+
+    @Test
+    fun `POST introspect emits aud as array for multiple audiences`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-multi-aud"
+            sessionRepo.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
+                    accessTokenHash = sha256Hex(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+            tokenPort.claimsToReturn =
+                AccessTokenClaims(
+                    sub = "10",
+                    iss = "http://localhost/t/acme",
+                    aud = listOf("api1", "api2"),
+                    tenantId = TenantId(1),
+                    username = "alice",
+                    email = "alice@example.com",
+                    scopes = listOf("openid"),
+                    issuedAt = Instant.now().epochSecond,
+                    expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+                )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters =
+                        Parameters.build {
+                            append("token", accessToken)
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(
+                body.contains("\"aud\":[") || body.contains("\"aud\": ["),
+                "Multi-aud must be a JSON array, got: $body",
+            )
+            assertTrue(body.contains("api1"))
+            assertTrue(body.contains("api2"))
+        }
+
+    @Test
+    fun `POST introspect omits aud field for empty audience list`() =
+        testApplication {
+            resetFixtures()
+            val accessToken = "test-access-token-empty-aud"
+            sessionRepo.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = ApplicationId(1),
+                    accessTokenHash = sha256Hex(accessToken),
+                    refreshTokenHash = null,
+                    scopes = "openid",
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+            tokenPort.claimsToReturn =
+                AccessTokenClaims(
+                    sub = "10",
+                    iss = "http://localhost/t/acme",
+                    aud = emptyList(),
+                    tenantId = TenantId(1),
+                    username = "alice",
+                    email = "alice@example.com",
+                    scopes = listOf("openid"),
+                    issuedAt = Instant.now().epochSecond,
+                    expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+                )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/introspect",
+                    formParameters =
+                        Parameters.build {
+                            append("token", accessToken)
+                            append("client_id", "backend-app")
+                            append("client_secret", "secret123")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertFalse(body.contains("\"aud\""), "Empty audience must not emit aud field, got: $body")
+        }
+
     // Utility
     // -------------------------------------------------------------------------
 
