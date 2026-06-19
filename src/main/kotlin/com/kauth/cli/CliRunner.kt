@@ -10,6 +10,7 @@ object CliRunner {
             "export-tenant" -> ExportTenantCommand.execute(args.drop(1))
             "import-tenant" -> ImportTenantCommand.execute(args.drop(1))
             "hash-api-key" -> HashApiKeyCommand.execute(args.drop(1))
+            "verify-audit-chain" -> VerifyAuditChainCommand.execute(args.drop(1))
             null, "--help", "-h" -> printUsage()
             else -> {
                 System.err.println("Unknown CLI command: ${args.first()}")
@@ -31,6 +32,8 @@ object CliRunner {
               import-tenant <file> ...           Import an encrypted backup as a new tenant
               hash-api-key [--key=<v>] [--tenant=<slug>]
                                                  Print SHA-256 for KAUTH_BOOTSTRAP_API_KEYS
+              verify-audit-chain [--tenant=<slug>] [--from-id=<n>] [--quiet]
+                                                 Verify HMAC integrity of the audit log chain
 
             Examples:
               java -jar kauth.jar cli generate-secret-key
@@ -39,6 +42,7 @@ object CliRunner {
                 --passphrase-env=KAUTH_BACKUP_PASS --out=acme.json.enc
               KAUTH_BACKUP_PASS=... java -jar kauth.jar cli import-tenant acme.json.enc \
                 --passphrase-env=KAUTH_BACKUP_PASS --new-slug=acme-staging
+              KAUTH_SECRET_KEY=... java -jar kauth.jar cli verify-audit-chain --tenant=acme
 
             Run any command with no arguments to see its detailed usage.
             """.trimIndent(),
