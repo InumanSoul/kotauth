@@ -18,6 +18,9 @@ object AuditLogTable : Table("audit_log") {
     val userAgent = text("user_agent").nullable()
     val details = jsonb("details").nullable()
     val createdAt = timestampWithTimeZone("created_at")
+    val prevHash = binary("prev_hash").nullable()
+    val rowHash = binary("row_hash").nullable()
+    val chainKeyId = varchar("chain_key_id", 32).nullable()
 
     override val primaryKey = PrimaryKey(id)
 }
