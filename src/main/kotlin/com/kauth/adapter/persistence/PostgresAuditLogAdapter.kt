@@ -16,19 +16,7 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.TreeMap
 
-/**
- * Persistence adapter — audit log (append-only).
- *
- * All exceptions are caught and logged locally.
- * Audit failures MUST NOT bubble up to callers (see [AuditLogPort] contract).
- *
- * Optionally accepts a [WebhookService] and fans out webhook events
- * after each successful audit write. The fan-out is fire-and-forget — webhook
- * failures never affect the audit write or the calling auth flow.
- *
- * When [auditChainHasher] is provided each row is signed with HMAC-SHA256 and
- * linked to the previous row's hash, forming a tamper-evident chain per tenant.
- */
+/** Append-only audit log adapter. Audit failures are swallowed per [AuditLogPort]. */
 class PostgresAuditLogAdapter(
     private val webhookService: WebhookService? = null,
     private val auditChainHasher: AuditChainHasher? = null,
@@ -75,7 +63,7 @@ class PostgresAuditLogAdapter(
             it[eventType] = event.eventType.name
             it[ipAddress] = event.ipAddress
             it[userAgent] = event.userAgent
-            it[details] = serializeDetails(event.details)
+            it[details] = serializeAuditDetails(event.details)
             it[createdAt] = OffsetDateTime.ofInstant(event.createdAt, ZoneOffset.UTC)
         }
     }
@@ -84,17 +72,14 @@ class PostgresAuditLogAdapter(
         event: AuditEvent,
         hasher: AuditChainHasher,
     ) {
-        // Serialize advisory lock token: per-tenant or sentinel 0 for system rows
-        val lockToken =
-            if (event.tenantId == null) {
-                "0"
-            } else {
-                "hashtext('kauth/audit/' || ${event.tenantId.value})"
-            }
+        val lockKey =
+            if (event.tenantId == null) 0L else "kauth/audit/${event.tenantId.value}".hashCode().toLong()
         val conn = TransactionManager.current().connection.connection as java.sql.Connection
-        conn.prepareStatement("SELECT pg_advisory_xact_lock($lockToken)").execute()
+        conn.prepareStatement("SELECT pg_advisory_xact_lock(?)").use { ps ->
+            ps.setLong(1, lockKey)
+            ps.execute()
+        }
 
-        // Read previous row hash for this tenant
         val prevRow =
             AuditLogTable
                 .select(AuditLogTable.id, AuditLogTable.rowHash, AuditLogTable.chainKeyId)
@@ -109,7 +94,7 @@ class PostgresAuditLogAdapter(
                 .firstOrNull()
 
         val prevHash = prevRow?.get(AuditLogTable.rowHash)
-        val detailsJson = serializeDetails(event.details)
+        val detailsJson = serializeAuditDetails(event.details)
         val createdAt = OffsetDateTime.ofInstant(event.createdAt, ZoneOffset.UTC)
 
         val inserted =
@@ -125,8 +110,8 @@ class PostgresAuditLogAdapter(
             }
 
         val insertedId = inserted[AuditLogTable.id]
-        val insertedCreatedAt = inserted[AuditLogTable.createdAt]
 
+        // Use the createdAt we just persisted, not the Exposed in-memory insert result.
         val canonical =
             hasher.canonicalize(
                 id = insertedId,
@@ -136,7 +121,7 @@ class PostgresAuditLogAdapter(
                 eventType = event.eventType.name,
                 ipAddress = event.ipAddress,
                 userAgent = event.userAgent,
-                createdAt = insertedCreatedAt,
+                createdAt = createdAt,
                 detailsJson = detailsJson,
                 prevHash = prevHash,
             )
@@ -148,22 +133,6 @@ class PostgresAuditLogAdapter(
             it[chainKeyId] = hasher.chainKeyId
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private fun serializeDetails(details: Map<String, String>): String? =
-        if (details.isEmpty()) {
-            null
-        } else {
-            Json.encodeToString(
-                JsonObject.serializer(),
-                buildJsonObject {
-                    TreeMap(details).forEach { (k, v) -> put(k, JsonPrimitive(v)) }
-                },
-            )
-        }
 
     // -------------------------------------------------------------------------
     // Webhook event mapping
@@ -210,3 +179,15 @@ class PostgresAuditLogAdapter(
             putAll(event.details)
         }
 }
+
+internal fun serializeAuditDetails(details: Map<String, String>): String? =
+    if (details.isEmpty()) {
+        null
+    } else {
+        Json.encodeToString(
+            JsonObject.serializer(),
+            buildJsonObject {
+                TreeMap(details).forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+            },
+        )
+    }

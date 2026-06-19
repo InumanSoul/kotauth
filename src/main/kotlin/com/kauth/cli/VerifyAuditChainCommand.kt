@@ -22,7 +22,7 @@ object VerifyAuditChainCommand {
         val secretKey = System.getenv("KAUTH_SECRET_KEY")
         if (secretKey == null) {
             System.err.println("KAUTH_SECRET_KEY is required")
-            exitProcess(1)
+            exitProcess(2)
         }
 
         val hasher = AuditChainHasher(secretKey)
@@ -37,13 +37,12 @@ object VerifyAuditChainCommand {
         exitProcess(exit)
     }
 
-    fun runVerification(
+    internal fun runVerification(
         hasher: AuditChainHasher,
         tenantSlug: String?,
         fromId: Int?,
         quiet: Boolean,
     ): Int {
-        // Resolve tenant filter
         val tenantIds: List<Int?> =
             if (tenantSlug != null) {
                 val id =
@@ -58,13 +57,10 @@ object VerifyAuditChainCommand {
                 }
                 listOf(id)
             } else {
-                // Gather all distinct tenant IDs + null (system rows)
-                val distinctTenantIds =
-                    AuditLogTable
-                        .select(AuditLogTable.tenantId)
-                        .groupBy(AuditLogTable.tenantId)
-                        .map { it[AuditLogTable.tenantId] }
-                distinctTenantIds
+                AuditLogTable
+                    .select(AuditLogTable.tenantId)
+                    .groupBy(AuditLogTable.tenantId)
+                    .map { it[AuditLogTable.tenantId] }
             }
 
         if (tenantIds.isEmpty()) {
@@ -83,7 +79,7 @@ object VerifyAuditChainCommand {
         return if (anyDivergence) 1 else 0
     }
 
-    fun verifyTenant(
+    internal fun verifyTenant(
         hasher: AuditChainHasher,
         tenantId: Int?,
         fromId: Int?,
@@ -112,21 +108,18 @@ object VerifyAuditChainCommand {
 
             if (storedRowHash == null) {
                 if (!quiet) println("tenant=$label id=$id: pre-chain (no row_hash, skipped)")
-                // Pre-chain rows don't break the chain; reset previous
                 previousHash = null
                 continue
             }
 
             val storedPrevHash = row[AuditLogTable.prevHash]
 
-            // Check linkage: stored prev_hash must match previous row's row_hash
             if (previousHash != null && !storedPrevHash.contentEquals(previousHash)) {
                 System.err.println("CHAIN BREAK at tenant=$label id=$id: prev_hash mismatch")
                 diverged = true
                 break
             }
 
-            // Recompute HMAC and compare
             val canonical =
                 hasher.canonicalize(
                     id = id,

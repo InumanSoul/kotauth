@@ -1,88 +1,100 @@
 package com.kauth.adapter.persistence
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import java.util.TreeMap
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class PostgresAuditLogAdapterDetailsTest {
-    private fun serializeDetails(details: Map<String, String>): String? =
-        if (details.isEmpty()) {
-            null
-        } else {
-            Json.encodeToString(
-                JsonObject.serializer(),
-                buildJsonObject {
-                    TreeMap(details).forEach { (k, v) -> put(k, JsonPrimitive(v)) }
-                },
-            )
-        }
+    private fun roundTrip(value: String): String {
+        val json = serializeAuditDetails(mapOf("k" to value))
+        assertNotNull(json)
+        val parsed = Json.decodeFromString(JsonObject.serializer(), json)
+        return (parsed["k"] as JsonPrimitive).content
+    }
 
     @Test
     fun `empty map produces null`() {
-        assertEquals(null, serializeDetails(emptyMap()))
+        assertEquals(null, serializeAuditDetails(emptyMap()))
     }
 
     @Test
-    fun `values containing double quotes are escaped`() {
-        val result = serializeDetails(mapOf("key" to "value with \"quotes\""))
-        assertNotNull(result)
-        // Must be valid JSON - should contain escaped quotes
-        assertTrue(result.contains("\\\"quotes\\\"") || result.contains("\\u0022"))
-        // Can be decoded back
-        val parsed = Json.decodeFromString(JsonObject.serializer(), result)
-        assertEquals("value with \"quotes\"", (parsed["key"] as JsonPrimitive).content)
+    fun `double quotes round-trip`() {
+        val v = "value with \"quotes\""
+        assertEquals(v, roundTrip(v))
     }
 
     @Test
-    fun `values containing backslashes are escaped`() {
-        val result = serializeDetails(mapOf("path" to "C:\\Windows\\System32"))
-        assertNotNull(result)
-        val parsed = Json.decodeFromString(JsonObject.serializer(), result)
-        assertEquals("C:\\Windows\\System32", (parsed["path"] as JsonPrimitive).content)
+    fun `backslashes round-trip`() {
+        val v = "C:\\Windows\\System32"
+        assertEquals(v, roundTrip(v))
     }
 
     @Test
-    fun `values containing newlines are escaped`() {
-        val result = serializeDetails(mapOf("line" to "first\nsecond"))
-        assertNotNull(result)
-        val parsed = Json.decodeFromString(JsonObject.serializer(), result)
-        assertEquals("first\nsecond", (parsed["line"] as JsonPrimitive).content)
+    fun `newline round-trips`() {
+        val v = "first\nsecond"
+        assertEquals(v, roundTrip(v))
     }
 
     @Test
-    fun `values containing control characters are escaped`() {
-        val result = serializeDetails(mapOf("ctrl" to "tab\there"))
-        assertNotNull(result)
-        // Must be parseable JSON
-        val parsed = Json.decodeFromString(JsonObject.serializer(), result)
-        assertEquals("tab\there", (parsed["ctrl"] as JsonPrimitive).content)
+    fun `tab round-trips`() {
+        val v = "a\tb"
+        assertEquals(v, roundTrip(v))
     }
 
     @Test
-    fun `keys are deterministically sorted`() {
-        val result1 = serializeDetails(mapOf("z" to "1", "a" to "2", "m" to "3"))
-        val result2 = serializeDetails(mapOf("m" to "3", "z" to "1", "a" to "2"))
-        assertEquals(result1, result2)
-        // And keys appear in alphabetical order
-        val aIdx = result1!!.indexOf("\"a\"")
-        val mIdx = result1.indexOf("\"m\"")
-        val zIdx = result1.indexOf("\"z\"")
+    fun `null byte round-trips`() {
+        val v = "a\u0000b"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `unicode line separator U_2028 round-trips`() {
+        val v = "first\u2028second"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `unicode paragraph separator U_2029 round-trips`() {
+        val v = "first\u2029second"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `bmp boundary U_FFFD round-trips`() {
+        val v = "rune \uFFFD ok"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `surrogate pair above BMP round-trips`() {
+        val v = "hi \uD83D\uDE00"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `empty string value round-trips`() {
+        assertEquals("", roundTrip(""))
+    }
+
+    @Test
+    fun `pipe character round-trips`() {
+        val v = "user|agent"
+        assertEquals(v, roundTrip(v))
+    }
+
+    @Test
+    fun `keys are deterministically sorted regardless of input order`() {
+        val a = serializeAuditDetails(mapOf("z" to "1", "a" to "2", "m" to "3"))
+        val b = serializeAuditDetails(mapOf("m" to "3", "z" to "1", "a" to "2"))
+        assertEquals(a, b)
+        assertNotNull(a)
+        val aIdx = a.indexOf("\"a\"")
+        val mIdx = a.indexOf("\"m\"")
+        val zIdx = a.indexOf("\"z\"")
         assertTrue(aIdx < mIdx && mIdx < zIdx)
-    }
-
-    @Test
-    fun `produces valid JSON string`() {
-        val result = serializeDetails(mapOf("event" to "login", "userId" to "42"))
-        assertNotNull(result)
-        // Should not throw
-        Json.decodeFromString(JsonObject.serializer(), result)
     }
 }

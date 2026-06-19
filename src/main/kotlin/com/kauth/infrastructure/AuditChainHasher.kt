@@ -7,17 +7,7 @@ import java.time.OffsetDateTime
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-/**
- * Computes the HMAC-SHA256 audit chain for append-only tamper detection.
- *
- * The MAC key is derived from KAUTH_SECRET_KEY via a domain-separated SHA-256:
- *   auditMacKey = sha256("$rawSecretKey|kauth/audit-log/v1")
- *
- * Each row carries:
- *   - prev_hash: row_hash of the immediately preceding row for this tenant (null for the first row)
- *   - row_hash: HMAC-SHA256 over the canonical row string
- *   - chain_key_id: first 8 hex chars of sha256(auditMacKey), identifies which key signed the chain
- */
+/** HMAC-SHA256 audit chain — key derived from KAUTH_SECRET_KEY with domain separation. */
 class AuditChainHasher(
     rawSecretKey: String,
 ) {
@@ -36,7 +26,9 @@ class AuditChainHasher(
         detailsJson: String?,
         prevHash: ByteArray?,
     ): ByteArray {
-        fun enc(v: String): String = URLEncoder.encode(v, "UTF-8")
+        // RFC 3986 percent-encoding (spaces → %20, not application/x-www-form +) so external
+        // verifiers built against the spec produce identical canonical bytes.
+        fun enc(v: String): String = URLEncoder.encode(v, "UTF-8").replace("+", "%20")
         val parts =
             listOf(
                 "v1",

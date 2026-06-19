@@ -42,6 +42,9 @@ import io.ktor.server.testing.testApplication
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
@@ -2464,12 +2467,14 @@ class AuthRoutesTest {
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
-            assertTrue(
-                body.contains("\"aud\":[") || body.contains("\"aud\": ["),
-                "Multi-aud must be a JSON array, got: $body",
-            )
-            assertTrue(body.contains("api1"))
-            assertTrue(body.contains("api2"))
+            val json =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(body)
+                    .jsonObject
+            val audElement = json["aud"]
+            assertNotNull(audElement, "Multi-aud token must emit aud, got: $body")
+            val audArray = audElement.jsonArray.map { it.jsonPrimitive.content }
+            assertEquals(listOf("api1", "api2"), audArray, "aud must be a JSON array with both values in order")
         }
 
     @Test

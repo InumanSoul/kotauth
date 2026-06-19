@@ -4,7 +4,6 @@ import com.kauth.infrastructure.AuditChainHasher
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import kotlin.test.Test
-import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -13,185 +12,167 @@ class VerifyAuditChainCommandTest {
     private val hasher = AuditChainHasher(secret)
     private val t0 = OffsetDateTime.of(2026, 6, 19, 10, 0, 0, 0, ZoneOffset.UTC)
 
-    // -------------------------------------------------------------------------
-    // Arg parsing
-    // -------------------------------------------------------------------------
-
-    @Test
-    fun `parseArg returns null when arg is absent`() {
-        val result = invokeParseArg(emptyList(), "--tenant")
-        assertEquals(null, result)
-    }
-
-    @Test
-    fun `parseArg extracts value`() {
-        val result = invokeParseArg(listOf("--tenant=acme", "--quiet"), "--tenant")
-        assertEquals("acme", result)
-    }
-
-    @Test
-    fun `quiet flag is detected`() {
-        val args = listOf("--quiet", "--tenant=acme")
-        assertTrue("--quiet" in args)
-    }
-
-    @Test
-    fun `from-id is parsed as int`() {
-        val args = listOf("--from-id=42")
-        val raw = invokeParseArg(args, "--from-id")
-        assertEquals(42, raw?.toIntOrNull())
-    }
-
-    // -------------------------------------------------------------------------
-    // Chain verification logic
-    // -------------------------------------------------------------------------
-
     data class SyntheticRow(
         val id: Int,
+        val tenantId: Int?,
+        val userId: Int?,
+        val clientId: Int?,
+        val eventType: String,
+        val ipAddress: String?,
+        val userAgent: String?,
+        val createdAt: OffsetDateTime,
+        val detailsJson: String?,
         val storedPrevHash: ByteArray?,
         val storedRowHash: ByteArray?,
     )
 
-    private fun buildChain(
+    private fun build(
         count: Int,
         tenantId: Int? = 1,
+        startId: Int = 1,
     ): List<SyntheticRow> {
         val rows = mutableListOf<SyntheticRow>()
         var prevHash: ByteArray? = null
-        for (i in 1..count) {
+        for (offset in 0 until count) {
+            val id = startId + offset
+            val createdAt = t0.plusMinutes(id.toLong())
             val canonical =
                 hasher.canonicalize(
-                    id = i,
+                    id = id,
                     tenantId = tenantId,
                     userId = 10,
                     clientId = null,
                     eventType = "LOGIN_SUCCESS",
                     ipAddress = "127.0.0.1",
                     userAgent = null,
-                    createdAt = t0.plusMinutes(i.toLong()),
+                    createdAt = createdAt,
                     detailsJson = null,
                     prevHash = prevHash,
                 )
             val rowHash = hasher.hmac(canonical)
-            rows.add(SyntheticRow(i, prevHash, rowHash))
+            rows.add(
+                SyntheticRow(
+                    id = id,
+                    tenantId = tenantId,
+                    userId = 10,
+                    clientId = null,
+                    eventType = "LOGIN_SUCCESS",
+                    ipAddress = "127.0.0.1",
+                    userAgent = null,
+                    createdAt = createdAt,
+                    detailsJson = null,
+                    storedPrevHash = prevHash,
+                    storedRowHash = rowHash,
+                ),
+            )
             prevHash = rowHash
         }
         return rows
     }
 
-    private fun verifyChain(rows: List<SyntheticRow>): Boolean {
+    /**
+     * Mirrors the per-row check in [VerifyAuditChainCommand.verifyTenant]: returns true if any
+     * row diverges from the recomputed HMAC over its current field values.
+     */
+    private fun verify(rows: List<SyntheticRow>): Boolean {
         var previousHash: ByteArray? = null
-        var diverged = false
         for (row in rows) {
             val storedRowHash =
                 row.storedRowHash ?: run {
                     previousHash = null
-                    continue
-                }
-            if (previousHash != null && !row.storedPrevHash.contentEquals(previousHash)) {
-                diverged = true
-                break
-            }
+                    return@run null
+                } ?: continue
+            if (previousHash != null && !row.storedPrevHash.contentEquals(previousHash)) return true
             val canonical =
                 hasher.canonicalize(
                     id = row.id,
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = null,
-                    eventType = "LOGIN_SUCCESS",
-                    ipAddress = "127.0.0.1",
-                    userAgent = null,
-                    createdAt = t0.plusMinutes(row.id.toLong()),
-                    detailsJson = null,
+                    tenantId = row.tenantId,
+                    userId = row.userId,
+                    clientId = row.clientId,
+                    eventType = row.eventType,
+                    ipAddress = row.ipAddress,
+                    userAgent = row.userAgent,
+                    createdAt = row.createdAt,
+                    detailsJson = row.detailsJson,
                     prevHash = row.storedPrevHash,
                 )
             val expected = hasher.hmac(canonical)
-            if (!expected.contentEquals(storedRowHash)) {
-                diverged = true
-                break
-            }
+            if (!expected.contentEquals(storedRowHash)) return true
             previousHash = storedRowHash
         }
-        return diverged
+        return false
     }
 
     @Test
-    fun `clean chain of 5 rows is verified without divergence`() {
-        val chain = buildChain(5)
-        assertFalse(verifyChain(chain), "Clean chain should not diverge")
+    fun `clean chain of 5 rows verifies cleanly`() {
+        assertFalse(verify(build(5)))
     }
 
     @Test
-    fun `tampered row_hash is detected`() {
-        val chain = buildChain(5).toMutableList()
-        val tampered = chain[2]
-        val badHash = tampered.storedRowHash!!.copyOf()
-        badHash[0] = (badHash[0].toInt() xor 0xFF).toByte()
-        chain[2] = tampered.copy(storedRowHash = badHash)
-        assertTrue(verifyChain(chain), "Tampered hash should cause divergence")
+    fun `mutating eventType without resigning is detected (primary tamper scenario)`() {
+        val chain = build(5).toMutableList()
+        chain[2] = chain[2].copy(eventType = "ADMIN_USER_DELETED")
+        assertTrue(
+            verify(chain),
+            "Editing a field while leaving row_hash intact must be detected — this is the threat the chain defends against.",
+        )
     }
 
     @Test
-    fun `wrong prev_hash is detected`() {
-        val chain = buildChain(5).toMutableList()
-        val row = chain[3]
-        val badPrev = ByteArray(32) { 0xAB.toByte() }
-        chain[3] = row.copy(storedPrevHash = badPrev)
-        assertTrue(verifyChain(chain), "Wrong prev_hash should cause divergence")
+    fun `mutating ipAddress without resigning is detected`() {
+        val chain = build(3).toMutableList()
+        chain[1] = chain[1].copy(ipAddress = "10.0.0.99")
+        assertTrue(verify(chain))
     }
 
     @Test
-    fun `pre-chain rows (null row_hash) are skipped without breaking chain`() {
-        val chain = buildChain(3).toMutableList()
-        // Insert a pre-chain row at position 0
-        val preChainRow = SyntheticRow(0, null, null)
-        val withPreChain = listOf(preChainRow) + chain
-        // The chain should still verify because pre-chain rows reset the tracking
-        // (note: since we built the chain without the pre-chain row, the first chain
-        // row starts with prevHash = null, which is consistent after reset)
-        val result = verifyChain(withPreChain)
-        assertFalse(result, "Pre-chain rows should not cause divergence")
+    fun `mutating userAgent without resigning is detected`() {
+        val chain = build(3).toMutableList()
+        chain[1] = chain[1].copy(userAgent = "MaliciousBot/1.0")
+        assertTrue(verify(chain))
     }
 
     @Test
-    fun `different secret key fails to verify chain`() {
-        val chain = buildChain(3)
-        val differentHasher = AuditChainHasher("completely-different-secret-key-xyz")
-        var diverged = false
-        var prevHash: ByteArray? = null
-        for (row in chain) {
-            val canonical =
-                differentHasher.canonicalize(
-                    id = row.id,
-                    tenantId = 1,
-                    userId = 10,
-                    clientId = null,
-                    eventType = "LOGIN_SUCCESS",
-                    ipAddress = "127.0.0.1",
-                    userAgent = null,
-                    createdAt = t0.plusMinutes(row.id.toLong()),
-                    detailsJson = null,
-                    prevHash = prevHash,
-                )
-            val expected = differentHasher.hmac(canonical)
-            if (!expected.contentEquals(row.storedRowHash)) {
-                diverged = true
-                break
-            }
-            prevHash = row.storedRowHash
-        }
-        assertTrue(diverged, "Wrong key must not verify the chain")
+    fun `directly tampered row_hash is detected`() {
+        val chain = build(5).toMutableList()
+        val bad = chain[2].storedRowHash!!.copyOf()
+        bad[0] = (bad[0].toInt() xor 0xFF).toByte()
+        chain[2] = chain[2].copy(storedRowHash = bad)
+        assertTrue(verify(chain))
     }
 
-    // -------------------------------------------------------------------------
-    // Private reflection helper for arg parsing (tests internal logic)
-    // -------------------------------------------------------------------------
+    @Test
+    fun `forged prev_hash is detected`() {
+        val chain = build(5).toMutableList()
+        chain[3] = chain[3].copy(storedPrevHash = ByteArray(32) { 0xAB.toByte() })
+        assertTrue(verify(chain))
+    }
 
-    private fun invokeParseArg(
-        args: List<String>,
-        prefix: String,
-    ): String? =
-        args.firstNotNullOfOrNull { arg ->
-            if (arg.startsWith("$prefix=")) arg.removePrefix("$prefix=").takeIf { it.isNotBlank() } else null
-        }
+    @Test
+    fun `replayed row spliced between two valid rows is detected`() {
+        val chain = build(4).toMutableList()
+        // Replay row #1 between rows #2 and #3 — id collision aside, the next row's
+        // prev_hash refers to the original row #2 not the replayed copy.
+        chain.add(2, chain[0])
+        assertTrue(
+            verify(chain),
+            "Splicing a copy of an earlier row between two existing rows must break the chain at the next row.",
+        )
+    }
+
+    @Test
+    fun `tampering with tenant A does not affect tenant B chain verdict`() {
+        val a = build(3, tenantId = 1).toMutableList()
+        val b = build(3, tenantId = 2)
+        a[1] = a[1].copy(eventType = "ADMIN_USER_DELETED")
+        assertTrue(verify(a), "Tenant A is tampered; verify must report diverged")
+        assertFalse(verify(b), "Tenant B chain is independent and must verify cleanly")
+    }
+
+    @Test
+    fun `pre-chain rows with null row_hash do not break verification`() {
+        val pre = SyntheticRow(0, 1, null, null, "LEGACY", null, null, t0, null, null, null)
+        val rows = listOf(pre) + build(3)
+        assertFalse(verify(rows))
+    }
 }

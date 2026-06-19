@@ -1,5 +1,3 @@
--- V52: HMAC audit chain (v1.19.0).
-
 ALTER TABLE audit_log
     ADD COLUMN prev_hash    BYTEA NULL,
     ADD COLUMN row_hash     BYTEA NULL,

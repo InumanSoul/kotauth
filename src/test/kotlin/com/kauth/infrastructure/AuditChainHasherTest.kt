@@ -123,4 +123,28 @@ class AuditChainHasherTest {
         val h = hasher.hmac(canonical())
         assertEquals(32, h.size, "HMAC-SHA256 must be 32 bytes")
     }
+
+    @Test
+    fun `pipe character in fields is URL-encoded so framing cannot be forged`() {
+        val withInjection = canonical(userAgent = "User|Agent|Injected").toString(Charsets.UTF_8)
+        assertFalse(
+            withInjection.contains("Agent|Injected"),
+            "Pipe in field value must be percent-encoded, not appear raw in canonical form",
+        )
+        assertTrue(
+            withInjection.contains("%7C"),
+            "Encoded pipe must appear as %7C: $withInjection",
+        )
+        val baseline = hasher.hmac(canonical(userAgent = "UserAgentInjected"))
+        val injected = hasher.hmac(canonical(userAgent = "User|Agent|Injected"))
+        assertFalse(baseline.contentEquals(injected), "Pipe injection must not produce a matching HMAC")
+    }
+
+    @Test
+    fun `URL encoder uses RFC 3986 percent encoding for spaces`() {
+        val bytes = canonical(userAgent = "Mozilla 5.0")
+        val s = bytes.toString(Charsets.UTF_8)
+        assertTrue(s.contains("Mozilla%205.0"), "Space must encode as %20 (RFC 3986), got: $s")
+        assertFalse(s.contains("Mozilla+5.0"), "Space must NOT encode as + (application/x-www-form): $s")
+    }
 }
