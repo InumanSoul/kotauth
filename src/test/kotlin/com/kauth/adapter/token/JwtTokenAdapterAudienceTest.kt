@@ -124,4 +124,34 @@ class JwtTokenAdapterAudienceTest {
                 .decode(token)
         assertEquals(listOf("payment-api", "ledger-api"), decoded.audience)
     }
+
+    @Test
+    fun `decodeAccessToken returns the full audience list for a multi-aud token`() {
+        val token =
+            adapter.issueClientCredentialsToken(
+                tenant,
+                app(audience = null),
+                listOf("openid"),
+                listOf("payment-api", "ledger-api"),
+            )
+        val claims = adapter.decodeAccessToken(token, adapter.issuerFor(tenant))
+        assertEquals(
+            listOf("payment-api", "ledger-api"),
+            claims?.aud,
+            "decode must surface every audience, not only the first",
+        )
+    }
+
+    @Test
+    fun `decodeAccessToken returns a single-element list for a single-aud token`() {
+        val token =
+            adapter.issueClientCredentialsToken(
+                tenant,
+                app(audience = null),
+                listOf("openid"),
+                listOf("payment-api"),
+            )
+        val claims = adapter.decodeAccessToken(token, adapter.issuerFor(tenant))
+        assertEquals(listOf("payment-api"), claims?.aud)
+    }
 }

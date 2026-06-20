@@ -76,6 +76,7 @@ import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
+import com.kauth.infrastructure.AuditChainHasher
 import com.kauth.infrastructure.BundleTranslation
 import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.DemoSeedService
@@ -262,8 +263,12 @@ data class ServiceGraph(
                     deliveryRepository = webhookDeliveryRepository,
                     scope = applicationScope,
                 )
+            val auditChainHasher = AuditChainHasher(config.secretKey)
             val auditLogAdapter =
-                PostgresAuditLogAdapter(webhookService = webhookService)
+                PostgresAuditLogAdapter(
+                    webhookService = webhookService,
+                    auditChainHasher = auditChainHasher,
+                )
 
             val translationPort: TranslationPort =
                 config.i18nBundleDir

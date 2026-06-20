@@ -880,7 +880,7 @@ class OAuthServiceTest {
             AccessTokenClaims(
                 sub = "10",
                 iss = "https://acme.example.com",
-                aud = "spa-app",
+                aud = listOf("spa-app"),
                 tenantId = TenantId(1),
                 username = "alice",
                 email = "alice@example.com",
@@ -896,6 +896,38 @@ class OAuthServiceTest {
         assertEquals("alice@example.com", result.email)
         assertEquals(listOf("openid", "profile"), result.scopes)
         assertEquals(expiresAt, result.expiresAt)
+    }
+
+    @Test
+    fun `introspectToken Active result carries aud from claims`() {
+        val accessToken = "valid-access-token-multi-aud"
+        sessions.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = publicClient.id,
+                accessTokenHash = sha256Hex(accessToken),
+                refreshTokenHash = null,
+                scopes = "openid profile",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+        tokens.claimsToReturn =
+            AccessTokenClaims(
+                sub = "10",
+                iss = "https://acme.example.com",
+                aud = listOf("res1", "res2"),
+                tenantId = TenantId(1),
+                username = "alice",
+                email = "alice@example.com",
+                scopes = listOf("openid", "profile"),
+                issuedAt = Instant.now().epochSecond,
+                expiresAt = Instant.now().plusSeconds(3600).epochSecond,
+            )
+
+        val result = introspectAsBackend(accessToken)
+        assertIs<IntrospectionResult.Active>(result)
+        assertEquals(listOf("res1", "res2"), result.aud)
     }
 
     // =========================================================================

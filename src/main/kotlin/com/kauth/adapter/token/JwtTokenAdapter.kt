@@ -279,7 +279,7 @@ class JwtTokenAdapter(
             AccessTokenClaims(
                 sub = verified.subject ?: "",
                 iss = verified.issuer ?: "",
-                aud = verified.audience?.firstOrNull() ?: "",
+                aud = verified.audience.orEmpty(),
                 tenantId = TenantId(tenantIdRaw),
                 username = verified.getClaim("username").asString(),
                 email = verified.getClaim("email").asString(),

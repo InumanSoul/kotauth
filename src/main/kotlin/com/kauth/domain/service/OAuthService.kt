@@ -682,6 +682,7 @@ class OAuthService(
                 session.clientId?.let {
                     applicationRepository.findById(it)?.clientId
                 },
+            aud = claims.aud,
         )
     }
 
@@ -901,5 +902,6 @@ sealed class IntrospectionResult {
         val scopes: List<String>,
         val expiresAt: Long,
         val clientId: String?,
+        val aud: List<String>,
     ) : IntrospectionResult()
 }

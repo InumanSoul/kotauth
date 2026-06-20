@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.19.0] - 2026-06-19
+
+Audit integrity + multi-audience introspection. Closes the M9 finding from the
+2026-06-12 security audit and the documented v1.18.0 limitation around
+multi-resource token introspection.
+
+### Security
+
+- **Audit log details are now built with kotlinx.serialization.** Hand-concatenated
+  JSON in `PostgresAuditLogAdapter` was silently corruptible when any detail value
+  contained quotes, backslashes, or control characters. Switched to
+  `buildJsonObject`; values are escaped correctly and the resulting JSONB always
+  round-trips.
+- **HMAC chain over the audit log.** Each row carries a `prev_hash` and `row_hash`
+  derived from an HMAC-SHA256 keyed by `KAUTH_SECRET_KEY`. Tampering with a row or
+  reordering rows breaks the chain and is detected by a new `verify-audit-chain` CLI
+  command. Per-tenant chains; first row in a tenant has `prev_hash = NULL`.
+- **Recommended Postgres role separation** for `audit_log` documented in
+  `docs/operations/audit-log.md` — the app user gets `INSERT, SELECT`; a separate
+  maintenance role keeps `UPDATE/DELETE` for legitimate backups and migrations.
+
+### Changed
+
+- **`AccessTokenClaims.aud` widened from `String` to `List<String>`.** Multi-aud tokens
+  now decode correctly throughout introspection and any future internal `aud`
+  checks. The introspection response (RFC 7662 §2.2) now emits `aud` — a JSON
+  string for one audience, a JSON array for two or more.
+
+### Migrations
+
+- `V52__audit_log_chain.sql` adds `prev_hash`, `row_hash`, `chain_key_id` columns to
+  `audit_log`. Existing rows keep these `NULL`; new rows always populate them.
+
+---
+
 ## [1.18.0] - 2026-06-17
 
 Audience-targeted M2M tokens — RFC 8707 Resource Indicators. Tokens
