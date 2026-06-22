@@ -1,6 +1,19 @@
 package com.kauth.config
 
+import java.io.File
 import kotlin.system.exitProcess
+
+// `<NAME>_FILE` wins over `<NAME>`; contents trimmed for the trailing newline Docker secrets carry.
+internal fun envOrFile(
+    name: String,
+    getenv: (String) -> String? = System::getenv,
+): String? {
+    val filePath = getenv("${name}_FILE")
+    if (!filePath.isNullOrBlank()) {
+        return File(filePath).readText().trim()
+    }
+    return getenv(name)
+}
 
 /** Database connection config — loadable independently for CLI commands that don't need the full server config. */
 data class DbConfig(
@@ -15,7 +28,7 @@ data class DbConfig(
             DbConfig(
                 dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/kauth_db",
                 dbUser = System.getenv("DB_USER") ?: "postgres",
-                dbPassword = EnvironmentConfig.requireDbPassword(System.getenv("DB_PASSWORD")),
+                dbPassword = EnvironmentConfig.requireDbPassword(envOrFile("DB_PASSWORD")),
                 dbPoolMaxSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
                 dbPoolMinIdle = System.getenv("DB_POOL_MIN_IDLE")?.toIntOrNull() ?: 2,
             )
@@ -67,7 +80,7 @@ data class EnvironmentConfig(
             validateHttps(baseUrl, env)
             validateLegacySecret(env)
 
-            val secretKey = requireSecretKey(System.getenv("KAUTH_SECRET_KEY"))
+            val secretKey = requireSecretKey(envOrFile("KAUTH_SECRET_KEY"))
             validateQuickstartSecret(secretKey, env)
             validateDemoMode(System.getenv("KAUTH_DEMO_MODE")?.lowercase() == "true", env)
 
@@ -79,7 +92,7 @@ data class EnvironmentConfig(
             validateSsoTtls(ssoTtl, ssoMaxTtl)
 
             val bootstrapAdminPassword =
-                System.getenv("KAUTH_BOOTSTRAP_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
+                envOrFile("KAUTH_BOOTSTRAP_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
             bootstrapAdminPassword?.let(::validateBootstrapAdminPassword)
 
             return EnvironmentConfig(
@@ -91,7 +104,7 @@ data class EnvironmentConfig(
                     System.getenv("DB_URL")
                         ?: "jdbc:postgresql://localhost:5432/kauth_db",
                 dbUser = System.getenv("DB_USER") ?: "postgres",
-                dbPassword = requireDbPassword(System.getenv("DB_PASSWORD")),
+                dbPassword = requireDbPassword(envOrFile("DB_PASSWORD")),
                 isDemoMode =
                     System
                         .getenv("KAUTH_DEMO_MODE")
@@ -103,14 +116,14 @@ data class EnvironmentConfig(
                 i18nBundleDir = System.getenv("KAUTH_I18N_BUNDLE_DIR")?.takeIf { it.isNotBlank() },
                 redisUrl = requireRedisUrl(System.getenv("KAUTH_REDIS_URL")),
                 redisUsername = System.getenv("KAUTH_REDIS_USERNAME")?.takeIf { it.isNotBlank() },
-                redisPassword = System.getenv("KAUTH_REDIS_PASSWORD")?.takeIf { it.isNotBlank() },
+                redisPassword = envOrFile("KAUTH_REDIS_PASSWORD")?.takeIf { it.isNotBlank() },
                 redisTimeoutMs = System.getenv("KAUTH_REDIS_TIMEOUT_MS")?.toLongOrNull() ?: 250L,
                 redisStartupProbeTimeoutMs =
                     System.getenv("KAUTH_REDIS_STARTUP_PROBE_TIMEOUT_MS")?.toLongOrNull() ?: 2000L,
                 redisCommandTimeoutMs = System.getenv("KAUTH_REDIS_COMMAND_TIMEOUT_MS")?.toLongOrNull() ?: 100L,
                 ssoSessionTtlSeconds = ssoTtl,
                 ssoSessionMaxTtlSeconds = ssoMaxTtl,
-                bootstrapApiKeysJson = System.getenv("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
+                bootstrapApiKeysJson = envOrFile("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
                 bootstrapAdminPassword = bootstrapAdminPassword,
                 trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
             )
