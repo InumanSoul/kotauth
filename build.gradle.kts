@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.19.0"
+version = "1.19.1"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -29,6 +29,11 @@ application {
 
 repositories {
     mavenCentral()
+}
+
+// Pins the resolved dependency graph to `gradle.lockfile`. Regenerate with `make update-locks`.
+dependencyLocking {
+    lockAllConfigurations()
 }
 
 dependencies {

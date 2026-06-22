@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.19.1] - 2026-06-22
+
+Supply-chain hygiene patch. Closes L6 and L7 from the 2026-06-12 security audit.
+
+### Security
+
+- **File-based secret injection (`*_FILE` convention).** `KAUTH_SECRET_KEY`,
+  `DB_PASSWORD`, `KAUTH_REDIS_PASSWORD`, `KAUTH_BOOTSTRAP_ADMIN_PASSWORD`, and
+  `KAUTH_BOOTSTRAP_API_KEYS` now accept a sibling `<NAME>_FILE` env var pointing
+  at a filesystem path. The contents are read and trimmed at startup. Compatible
+  with Docker Swarm secrets, Kubernetes mounted secrets, and systemd
+  `LoadCredential=`. `<NAME>_FILE` takes precedence when both are set. Working
+  example in `docker/docker-compose.prod.yml`.
+
+### Added
+
+- **Gradle dependency locking.** `gradle.lockfile` pins the resolved dependency
+  graph across all configurations. CI verifies resolution against the lockfile on
+  every PR. Run `make update-locks` after any dependency change to regenerate.
+- **Dependabot.** Weekly alerts for Gradle dependencies (Ktor, Exposed, and Kotlin
+  grouped to reduce noise), GitHub Actions, and Docker base images.
+
+---
+
 ## [1.19.0] - 2026-06-19
 
 Audit integrity + multi-audience introspection. Closes the M9 finding from the

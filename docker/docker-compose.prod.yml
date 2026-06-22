@@ -52,3 +52,29 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+# ── Docker Secrets example ───────────────────────────────────────────────────
+# Uncomment the blocks below to source KAUTH_SECRET_KEY and DB_PASSWORD from
+# Docker / Swarm secrets instead of .env. The app reads `*_FILE` env vars and
+# loads the secret value from the referenced path. See docs/ENV_REFERENCE.md
+# for the full list of supported variables.
+#
+# Create the secrets first:
+#   printf %s "$(openssl rand -hex 32)" | docker secret create kauth_secret_key -
+#   printf %s "your-db-password"        | docker secret create db_password       -
+#
+# secrets:
+#   kauth_secret_key:
+#     external: true
+#   db_password:
+#     external: true
+#
+# services:
+#   app:
+#     secrets:
+#       - kauth_secret_key
+#       - db_password
+#     environment:
+#       KAUTH_SECRET_KEY_FILE: /run/secrets/kauth_secret_key
+#       DB_PASSWORD_FILE:      /run/secrets/db_password
+#     # Remove KAUTH_SECRET_KEY / DB_PASSWORD from .env when using this.
