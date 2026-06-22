@@ -69,7 +69,7 @@ jobs:
       # Always upload the HTML test report so failures are investigatable
       # without needing to reproduce locally.
       - name: Upload test report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: test-report-jdk${{ matrix.java }}
@@ -102,7 +102,7 @@ jobs:
         run: ./gradlew buildFatJar --no-daemon
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kotauth-jar
           path: build/libs/kotauth-all.jar
