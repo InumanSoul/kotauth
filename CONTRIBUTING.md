@@ -31,7 +31,7 @@ make up              # start the full stack once
 make down            # stop everything
 make version         # generate version.properties (required before IDE run)
 make css             # compile CSS bundles (required before IDE run)
-docker compose -f docker/docker-compose.dev.yml up db -d   # start only PostgreSQL
+docker compose up db -d                                    # start only PostgreSQL (use `make infra-up` to also include Redis)
 ```
 
 The application starts on `http://localhost:8080`. Database migrations run automatically on startup via Flyway.

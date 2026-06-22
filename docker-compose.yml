@@ -47,6 +47,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-kotauth_db}
       POSTGRES_USER: ${DB_USER:-kotauth}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-localonly}
+    ports:
+      - "127.0.0.1:5432:5432"
     volumes:
       - kotauth_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -61,6 +63,8 @@ services:
     container_name: kotauth-redis
     command: ["redis-server", "--appendonly", "no", "--save", ""]
     profiles: ["redis"]
+    ports:
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

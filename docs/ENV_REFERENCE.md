@@ -32,7 +32,7 @@ services:
       KAUTH_SECRET_KEY_FILE: /run/secrets/kauth_secret_key
 ```
 
-A commented working example lives in `docker/docker-compose.prod.yml`.
+See [`docs/deploy/production.md#7-file-based-secrets`](deploy/production.md#7-file-based-secrets) for a working Docker Secrets example.
 
 ---
 
@@ -410,7 +410,7 @@ DB_NAME=kotauth_db
 DB_USER=kotauth
 DB_PASSWORD=             # use a strong, unique password
 
-# Required when using docker/docker-compose.prod.yml (Caddy TLS)
+# Required when using docker-compose.prod.yml (Caddy TLS)
 DOMAIN=auth.yourdomain.com
 ACME_EMAIL=you@yourdomain.com
 ```
@@ -444,16 +444,16 @@ DOMAIN=demo.kotauth.com
 ACME_EMAIL=you@yourdomain.com
 ```
 
-Start with the demo overlay:
+Start:
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Hourly reset cron (wipes the database volume and re-seeds on restart):
 
 ```bash
-0 * * * * cd /opt/kotauth && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml down -v && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+0 * * * * cd /opt/kotauth && docker compose -f docker-compose.prod.yml down -v && docker compose -f docker-compose.prod.yml up -d
 ```
 
-See [docs/guides/production-deployment.md](guides/production-deployment.md) for the full deployment walkthrough.
+See [docs/deploy/production.md](deploy/production.md) for the full deployment walkthrough.
