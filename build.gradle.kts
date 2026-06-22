@@ -31,6 +31,11 @@ repositories {
     mavenCentral()
 }
 
+// Pins the resolved dependency graph to `gradle.lockfile`. Regenerate with `make update-locks`.
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencies {
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-forwarded-header:$ktorVersion")

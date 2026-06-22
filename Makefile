@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix detekt detekt-baseline test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up
+.PHONY: help css css-admin css-auth js lint lint-fix detekt detekt-baseline test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up update-locks
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -63,6 +63,10 @@ build: ## Full build — CSS + lint + tests + fat JAR (CI-equivalent)
 
 jar: ## Build fat JAR only, skipping tests (faster iteration)
 	./gradlew buildFatJar -x test
+
+update-locks: ## Regenerate gradle.lockfile (run after bumping any dependency)
+	./gradlew dependencies --write-locks
+	@echo "gradle.lockfile updated — commit it with your dependency change."
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 # --project-directory . ensures Docker Compose reads .env and resolves env_file

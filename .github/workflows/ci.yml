@@ -31,6 +31,9 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
+      - name: Verify dependency lockfile
+        run: ./gradlew dependencies --configuration runtimeClasspath --no-daemon --quiet
+
       - name: ktlint check
         run: ./gradlew ktlintCheck --no-daemon
 
