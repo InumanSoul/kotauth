@@ -4,6 +4,38 @@ All environment variables Kotauth reads at startup. Variables marked **Required*
 
 ---
 
+## File-based secret injection (`*_FILE`)
+
+For every secret listed below, Kotauth also accepts a sibling `<NAME>_FILE` variable containing a filesystem path. At startup, the file's contents are read, trimmed (Docker secrets usually carry a trailing newline), and used as the secret value. `<NAME>_FILE` takes precedence over `<NAME>` when both are set.
+
+This is compatible with Docker Swarm secrets, Kubernetes mounted secrets, and systemd `LoadCredential=` — none of which expose secret values through process environment.
+
+Supported variables:
+- `KAUTH_SECRET_KEY_FILE`
+- `DB_PASSWORD_FILE`
+- `KAUTH_REDIS_PASSWORD_FILE`
+- `KAUTH_BOOTSTRAP_ADMIN_PASSWORD_FILE`
+- `KAUTH_BOOTSTRAP_API_KEYS_FILE`
+
+Example (Docker Swarm / Compose):
+
+```yaml
+secrets:
+  kauth_secret_key:
+    external: true
+
+services:
+  app:
+    secrets:
+      - kauth_secret_key
+    environment:
+      KAUTH_SECRET_KEY_FILE: /run/secrets/kauth_secret_key
+```
+
+A commented working example lives in `docker/docker-compose.prod.yml`.
+
+---
+
 ## Core
 
 ### `KAUTH_BASE_URL`
@@ -53,6 +85,8 @@ Generate one:
 ```bash
 openssl rand -hex 32
 ```
+
+Also accepts `KAUTH_SECRET_KEY_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ---
 
@@ -134,6 +168,8 @@ default fallback.
 DB_PASSWORD=changeme
 ```
 
+Also accepts `DB_PASSWORD_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
+
 ---
 
 ### `KAUTH_TRUSTED_PROXY`
@@ -205,6 +241,8 @@ Redis 6+ ACL username. Omit if your Redis only requires a password.
 **Optional.** Default: _unset_
 
 Redis password. When `KAUTH_REDIS_USERNAME` is unset, this is sent as the `default`-user credential — works for both Redis 5 (legacy `requirepass`) and Redis 6+ (default ACL user).
+
+Also accepts `KAUTH_REDIS_PASSWORD_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ---
 
@@ -303,6 +341,8 @@ KAUTH_BOOTSTRAP_ADMIN_PASSWORD=<a strong operator-chosen password>
 ```
 
 The legacy default `changeme123!` is removed. Operators who scripted around it must either set this variable or read the random password from the first-boot log.
+
+Also accepts `KAUTH_BOOTSTRAP_ADMIN_PASSWORD_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ---
 
