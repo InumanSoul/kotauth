@@ -18,69 +18,13 @@ Kotauth is an open-source authentication and identity platform that bridges the 
 You need Docker and Docker Compose. Nothing else.
 
 ```bash
-curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker-compose.quickstart.yml
-docker compose -f docker-compose.quickstart.yml up -d
+curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker-compose.yml
+docker compose up -d
 ```
 
 Open **http://localhost:8080/admin** — demo data is pre-loaded with two workspaces, users, roles, and applications. Credentials are shown in the banner.
 
-That's it. When you're ready to customize, see the next section.
-
----
-
-## Quickstart — configure your own instance
-
-For running Kotauth with your own settings. No repo clone required.
-
-**1. Grab the compose file and env template**
-
-```bash
-mkdir kotauth && cd kotauth
-curl --create-dirs -o docker/docker-compose.yml \
-  https://raw.githubusercontent.com/inumansoul/kotauth/main/docker/docker-compose.yml
-curl -o .env.example \
-  https://raw.githubusercontent.com/inumansoul/kotauth/main/.env.example
-cp .env.example .env
-```
-
-**2. Set your secret key**
-
-Open `.env` and generate a secret key:
-
-```bash
-# In .env:
-KAUTH_SECRET_KEY=$(openssl rand -hex 32)
-```
-
-`KAUTH_BASE_URL` defaults to `http://localhost:8080`. Change it if deploying remotely.
-
-**3. Start**
-
-```bash
-docker compose -f docker/docker-compose.yml up -d
-```
-
-Kotauth starts on port `8080`. PostgreSQL is bundled — no separate database setup. Flyway migrations run automatically on first boot.
-
-**4. Open the admin console**
-
-```
-http://localhost:8080/admin
-```
-
-Master workspace admin credentials are printed in the startup log on first run. Change them immediately:
-
-```bash
-docker compose -f docker/docker-compose.yml logs kotauth | grep "Admin credentials"
-```
-
-**5. Create a workspace**
-
-In the admin console, create a new workspace (e.g. `my-app`). This is your tenant — it gets its own users, OAuth clients, and signing keys. Your OIDC discovery document is then live at:
-
-```
-http://localhost:8080/t/my-app/.well-known/openid-configuration
-```
+For configuration knobs (set your own `KAUTH_SECRET_KEY`, point at an external DB, enable Redis), see the [quickstart guide](docs/deploy/quickstart.md).
 
 ---
 
@@ -91,12 +35,10 @@ For contributors or anyone who wants to run from the cloned repo.
 ```bash
 git clone https://github.com/inumansoul/kotauth.git
 cd kotauth
-cp .env.example .env
-# Edit .env: set KAUTH_SECRET_KEY
 make up
 ```
 
-`make up` builds the image from the local Dockerfile via `docker-compose.dev.yml`. Run `make help` to see all available targets (test, lint, logs, nuke, etc.). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
+`make up` builds the image from the local Dockerfile and starts the full stack. Run `make help` for the rest (test, lint, logs, nuke, …). For the fast inner loop — host JVM against Docker-hosted Postgres + Redis — use `make run`. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
 ---
 
@@ -151,71 +93,33 @@ For the full reference including per-tenant SMTP and security policy configurati
 
 ---
 
-## Bring your own database
-
-Already have PostgreSQL (or using a managed provider like RDS, Supabase, Neon)? Skip the bundled database entirely:
-
-```bash
-docker compose -f docker/docker-compose.external-db.yml up -d
-```
-
-Set these in `.env`:
-
-```bash
-DB_URL=jdbc:postgresql://your-host:5432/kotauth_db?sslmode=require
-DB_USER=kotauth
-DB_PASSWORD=your-password
-KAUTH_BASE_URL=https://auth.yourdomain.com
-KAUTH_SECRET_KEY=$(openssl rand -hex 32)
-```
-
-Flyway runs all migrations automatically — just point it at an empty database.
-
-For production with TLS, layer the Caddy overlay on top:
-
-```bash
-docker compose -f docker/docker-compose.external-db.yml -f docker/docker-compose.prod.yml up -d
-```
-
----
-
 ## Production deployment
 
-See the full guide: [docs/guides/production-deployment.md](docs/guides/production-deployment.md).
+The full walkthrough — TLS via Caddy, external database, Redis sidecar, file-based secrets, backups, upgrades, security checklist — is in [`docs/deploy/production.md`](docs/deploy/production.md).
 
-The short version: TLS is required. Use `docker/docker-compose.prod.yml` which adds a Caddy sidecar for automatic Let's Encrypt certificates.
-
-```bash
-# Bundled database + Caddy TLS
-# Requires: DOMAIN and ACME_EMAIL set in .env, ports 80/443 open
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml up -d
-```
-
-Minimum requirements: 512 MB RAM, 1 vCPU, PostgreSQL 14+.
-
----
-
-## Demo deployment
-
-Deploy a public showcase instance with pre-populated workspaces, users, roles, and applications. Ideal for `demo.yourdomain.com`.
+The shape of it:
 
 ```bash
-# Set KAUTH_DEMO_MODE=true in .env (or use the demo overlay)
-docker compose \
-  -f docker/docker-compose.yml \
-  -f docker/docker-compose.prod.yml \
-  -f docker/docker-compose.demo.yml \
-  up -d
+mkdir kotauth && cd kotauth
+curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker-compose.prod.yml
+curl --create-dirs -o docker/Caddyfile \
+  https://raw.githubusercontent.com/inumansoul/kotauth/main/docker/Caddyfile
+
+# fill in .env: KAUTH_BASE_URL, KAUTH_SECRET_KEY, DB_PASSWORD, DOMAIN, ACME_EMAIL
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-The demo overlay sets `KAUTH_DEMO_MODE=true`, which seeds two workspaces ("Acme Corp" and "Startup Labs") with realistic data on startup and shows a credentials banner on every page. An hourly cron with `docker compose down -v && up -d` resets the data. See [docs/ENV_REFERENCE.md](docs/ENV_REFERENCE.md#demo-mode) for details.
+Minimum requirements: 512 MB RAM, 1 vCPU, PostgreSQL 14+. Already have a managed Postgres? Set `DB_URL` in `.env` — Kotauth uses it directly. To enable the Redis sidecar, add `--profile redis`.
+
+For a public demo deployment (seeded workspaces + reset cron), set `KAUTH_DEMO_MODE=true` — see [`docs/deploy/production.md#11-demo-deployment`](docs/deploy/production.md#11-demo-deployment).
 
 ---
 
 ## Integration guides
 
+- [Quickstart](docs/deploy/quickstart.md) — local evaluation
+- [Production deployment](docs/deploy/production.md) — TLS, backups, upgrades
 - [React SPA with TanStack Router](docs/guides/react-spa-tanstack-router.md)
-- [Production deployment](docs/guides/production-deployment.md)
 - Generic OIDC *(coming soon)*
 
 ---
