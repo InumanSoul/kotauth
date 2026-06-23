@@ -1,184 +1,32 @@
 # Integrating Kotauth with a React SPA and TanStack Router
 
-This guide walks through adding Kotauth authentication to a React single-page application using [TanStack Router](https://tanstack.com/router). The result is a complete auth flow: login redirect, callback handling, protected routes, token refresh, and logout.
+TanStack-specific layer on top of the [browser-direct SPA guide](react-spa-direct.md). Read that first — it covers the Kotauth application registration, OIDC client config, `<AuthProvider>` wrapper, and the token-bearing fetch wrapper. This guide adds what TanStack Router needs: an `/auth/callback` route, a `beforeLoad` guard, and the router wiring.
 
-**What you'll build:**
-- OIDC Authorization Code + PKCE flow (the correct flow for SPAs — no client secret needed)
-- Auth context that holds the user session and exposes `login`, `logout`, and `getAccessToken`
-- Route-level protection using TanStack Router's `beforeLoad` hook
-- Silent token refresh before expiry
+**Stack:** React 18+, TanStack Router v1, [`oidc-client-ts`](https://github.com/authts/oidc-client-ts).
 
-**Stack:** React 18, TanStack Router v1, [`oidc-client-ts`](https://github.com/authts/oidc-client-ts)
-
----
-
-## Prerequisites
-
-- Kotauth running locally (`docker compose up`) or on a server
-- A workspace created in the admin console (e.g. slug `my-app`)
-- Node.js 18+
-
----
-
-## 1. Create an Application in Kotauth
-
-In the Kotauth admin console:
-
-1. Navigate to your workspace → **Applications** → **New Application**
-2. Set the name (e.g. `react-frontend`)
-3. Under **Redirect URIs**, add:
-   ```
-   http://localhost:5173/auth/callback
-   ```
-4. Under **Post-Logout Redirect URIs**, add:
-   ```
-   http://localhost:5173
-   ```
-5. Set **Access Type** to `public` (no client secret — correct for SPAs)
-6. Save. Copy the **Client ID** shown on the application detail page.
-
----
-
-## 2. Install Dependencies
-
-```bash
-npm install oidc-client-ts
-```
-
-TanStack Router should already be in your project. If not:
-
-```bash
-npm install @tanstack/react-router
-```
-
----
-
-## 3. Configure the OIDC Client
-
-Create `src/auth/oidcConfig.ts`:
+TanStack's `beforeLoad` runs outside React, so it can't call `react-oidc-context`'s `useAuth()` hook. The cleanest workaround is to construct the `UserManager` yourself and pass it to both `<AuthProvider>` and your `beforeLoad` helper. Replace the inline `oidcConfig` from the foundation guide with an exported `userManager`:
 
 ```ts
-import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
-
-const KOTAUTH_BASE_URL = import.meta.env.VITE_KOTAUTH_URL ?? 'http://localhost:8080'
-const WORKSPACE_SLUG   = import.meta.env.VITE_KOTAUTH_WORKSPACE ?? 'my-app'
-const CLIENT_ID        = import.meta.env.VITE_KOTAUTH_CLIENT_ID ?? 'react-frontend'
+// src/auth/oidcConfig.ts
+import { UserManager, WebStorageStateStore } from "oidc-client-ts";
 
 export const userManager = new UserManager({
-  // The authority is your workspace's OIDC issuer URL.
-  // oidc-client-ts fetches /.well-known/openid-configuration from this URL
-  // to auto-discover all endpoints (token, userinfo, logout, etc.).
-  authority: `${KOTAUTH_BASE_URL}/t/${WORKSPACE_SLUG}`,
-
-  client_id:     CLIENT_ID,
-  redirect_uri:  `${window.location.origin}/auth/callback`,
+  authority: import.meta.env.VITE_KOTAUTH_AUTHORITY,
+  client_id: import.meta.env.VITE_KOTAUTH_CLIENT_ID,
+  redirect_uri: `${window.location.origin}/auth/callback`,
   post_logout_redirect_uri: window.location.origin,
-
-  // Scopes: 'openid' is required. 'profile' and 'email' add standard claims.
-  // Add any custom scopes you defined on the application.
-  scope: 'openid profile email',
-
-  // Authorization Code + PKCE — the only correct flow for SPAs.
-  // oidc-client-ts handles code_verifier/code_challenge generation automatically.
-  response_type: 'code',
-
-  // Store the user session in sessionStorage so it's cleared on tab close.
-  // Use localStorage if you need persistence across tabs — understand the
-  // XSS risk trade-off before choosing.
-  userStore: new WebStorageStateStore({ store: window.sessionStorage }),
-
-  // Trigger a silent token refresh 60 seconds before the access token expires.
+  response_type: "code",
+  scope: "openid profile email",
+  userStore: new WebStorageStateStore({ store: window.localStorage }),
   automaticSilentRenew: true,
-  accessTokenExpiringNotificationTimeInSeconds: 60,
-})
+});
 ```
 
-Add the environment variables to your `.env.local`:
-
-```
-VITE_KOTAUTH_URL=http://localhost:8080
-VITE_KOTAUTH_WORKSPACE=my-app
-VITE_KOTAUTH_CLIENT_ID=react-frontend
-```
+Pass it to `<AuthProvider userManager={userManager}>` in `main.tsx` and register `${origin}/auth/callback` on the Kotauth application.
 
 ---
 
-## 4. Build the Auth Context
-
-Create `src/auth/AuthContext.tsx`:
-
-```tsx
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import type { User } from 'oidc-client-ts'
-import { userManager } from './oidcConfig'
-
-interface AuthContextValue {
-  user:           User | null
-  isLoading:      boolean
-  login:          () => Promise<void>
-  logout:         () => Promise<void>
-  getAccessToken: () => string | null
-}
-
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser]         = useState<User | null>(null)
-  const [isLoading, setLoading] = useState(true)
-
-  useEffect(() => {
-    // Load any existing session from storage on mount
-    userManager.getUser().then(u => {
-      setUser(u)
-      setLoading(false)
-    })
-
-    // Keep local state in sync when oidc-client-ts silently renews tokens
-    const onUserLoaded   = (u: User) => setUser(u)
-    const onUserUnloaded = ()        => setUser(null)
-
-    userManager.events.addUserLoaded(onUserLoaded)
-    userManager.events.addUserUnloaded(onUserUnloaded)
-
-    return () => {
-      userManager.events.removeUserLoaded(onUserLoaded)
-      userManager.events.removeUserUnloaded(onUserUnloaded)
-    }
-  }, [])
-
-  const login = useCallback(() =>
-    // Redirects to Kotauth login page. After login, Kotauth redirects back
-    // to /auth/callback with the authorization code.
-    userManager.signinRedirect(),
-  [])
-
-  const logout = useCallback(() =>
-    // Redirects to Kotauth's end_session endpoint, which clears the server-side
-    // session and redirects back to post_logout_redirect_uri.
-    userManager.signoutRedirect(),
-  [])
-
-  const getAccessToken = useCallback(() =>
-    user?.access_token ?? null,
-  [user])
-
-  return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, getAccessToken }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
-  return ctx
-}
-```
-
----
-
-## 5. Handle the Auth Callback
+## 1. Handle the auth callback
 
 Create `src/routes/auth.callback.tsx` (or wherever your file-based routing places it):
 
@@ -207,13 +55,13 @@ export default function AuthCallbackPage() {
 }
 ```
 
-Register this route at `/auth/callback` in your router (see step 7).
+Register this route at `/auth/callback` in your router (see section 3).
 
 ---
 
-## 6. Create an Auth Guard Utility
+## 2. Build the `beforeLoad` guard
 
-TanStack Router's `beforeLoad` is the cleanest place to enforce authentication. Create a reusable helper:
+`beforeLoad` is the cleanest place to enforce authentication — it runs before the route component mounts and can redirect synchronously.
 
 ```ts
 // src/auth/requireAuth.ts
@@ -241,9 +89,9 @@ export async function requireAuth() {
 
 ---
 
-## 7. Wire Up the Router
+## 3. Wire up the router
 
-Here's a minimal but complete router setup:
+A minimal but complete router setup:
 
 ```tsx
 // src/router.tsx
@@ -262,7 +110,7 @@ import AuthCallbackPage  from './routes/auth.callback'
 import DashboardPage     from './routes/dashboard'
 import ProfilePage       from './routes/profile'
 
-// Root route — wraps everything with the AuthProvider (see step 8)
+// Root route — wraps everything with the AuthProvider
 const rootRoute = createRootRoute({ component: RootLayout })
 
 // Public routes
@@ -323,81 +171,57 @@ declare module '@tanstack/react-router' {
 
 ---
 
-## 8. Set Up the Root Layout
+## 4. Root layout
 
-The `AuthProvider` goes in your root layout so every route can access auth state:
+Wrap the root in `<AuthProvider>` (sharing the same `userManager`):
 
 ```tsx
 // src/layouts/RootLayout.tsx
-import { Outlet } from '@tanstack/react-router'
-import { AuthProvider } from '../auth/AuthContext'
+import { Outlet } from "@tanstack/react-router";
+import { AuthProvider } from "react-oidc-context";
+import { userManager } from "../auth/oidcConfig";
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
+    <AuthProvider userManager={userManager}>
       <Outlet />
     </AuthProvider>
-  )
+  );
 }
 ```
 
 ---
 
-## 9. Use Auth State in Components
+## 5. Reading claims and roles
 
-```tsx
-// src/routes/dashboard.tsx
-import { useAuth } from '../auth/AuthContext'
-
-export default function DashboardPage() {
-  const { user, logout, getAccessToken } = useAuth()
-
-  async function fetchProtectedData() {
-    const token = getAccessToken()
-    const res = await fetch('/api/whatever', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    return res.json()
-  }
-
-  return (
-    <div>
-      <h1>Welcome, {user?.profile.name}</h1>
-      <p>Email: {user?.profile.email}</p>
-      <button onClick={logout}>Sign out</button>
-    </div>
-  )
-}
-```
-
-**Getting token claims:** The `user.profile` object contains the OIDC claims from Kotauth's userinfo endpoint — `sub`, `email`, `email_verified`, `name`, `preferred_username`. The `user.access_token` is a JWT you can send to your backend APIs.
-
-**Role-based UI:** Roles and groups from Kotauth appear in the JWT under `realm_access.roles`. You can read them from the decoded token, but for UI decisions it's cleaner to get them from the userinfo profile:
+Inside route components, prefer `useAuth()` from `react-oidc-context` (the foundation guide covers this). For role-based UI:
 
 ```ts
-// oidc-client-ts includes all claims Kotauth returns in user.profile
-const roles: string[] = (user?.profile as any)?.realm_access?.roles ?? []
-const isAdmin = roles.includes('admin')
+const auth = useAuth();
+const roles: string[] = (auth.user?.profile as any)?.realm_access?.roles ?? [];
+const isAdmin = roles.includes("admin");
 ```
+
+The `realm_access.roles` claim is populated automatically when the user has any role assignments in the workspace. Custom claim mappers can add tenant- or app-scoped role arrays.
 
 ---
 
-## 10. Calling Kotauth's API from Your Backend
+## 6. Validating tokens on your backend
 
-Your backend (or BFF) can validate access tokens using Kotauth's JWKS endpoint or introspection endpoint.
+Backends validate access tokens with Kotauth's JWKS or introspection endpoint:
 
-**JWKS (recommended for stateless validation):**
-
-```
-GET http://localhost:8080/t/my-app/protocol/openid-connect/certs
-```
-
-Use any JWT library that supports JWKS to verify the `RS256` signature. The `iss` claim will be `http://localhost:8080/t/my-app`.
-
-**Introspection (for opaque token checking or forced revocation awareness):**
+**JWKS** — recommended for stateless validation:
 
 ```
-POST http://localhost:8080/t/my-app/protocol/openid-connect/introspect
+GET http://localhost:8080/t/<workspace>/protocol/openid-connect/certs
+```
+
+Any JWT library with JWKS support verifies the RS256 signature. The `iss` claim equals `${KAUTH_BASE_URL}/t/<workspace>`.
+
+**Introspection** — for revocation awareness:
+
+```
+POST http://localhost:8080/t/<workspace>/protocol/openid-connect/introspect
 Content-Type: application/x-www-form-urlencoded
 
 token=<access_token>&client_id=<backend_client_id>&client_secret=<backend_secret>
@@ -437,8 +261,8 @@ Kotauth's OIDC endpoints include CORS headers. If you're seeing CORS errors, che
 
 ---
 
-## What's Next
+## Where next
 
-- [Environment Variable Reference](../ENV_REFERENCE.md)
-- [REST API Reference](http://localhost:8080/t/my-app/api/v1/docs) — Swagger UI
-- Webhook setup — receive real-time events (`user.created`, `login.success`, etc.) in your backend
+- [Browser-direct SPA foundation](react-spa-direct.md) — the OIDC config and `<AuthProvider>` this guide builds on
+- [BFF pattern](react-bff-pattern.md) — production-grade alternative where tokens never reach the browser
+- [Environment variable reference](../ENV_REFERENCE.md)

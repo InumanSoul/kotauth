@@ -8,17 +8,9 @@ The patterns work with React Router, TanStack Router, or no router. For TanStack
 
 ## When to use this pattern
 
-Pick browser-direct OIDC when:
+Use browser-direct when you have no backend and want a static SPA + Kotauth deployment. Accept the trade-off that access tokens are reachable from JavaScript (see [security trade-offs](#security-trade-offs)).
 
-- The SPA is the only client talking to Kotauth — there is no separate backend doing user-facing work
-- You want the simplest possible deployment: a static-hosted SPA + Kotauth, nothing in between
-- You're comfortable with access tokens being reachable from JavaScript (the XSS trade-off)
-
-Pick the [BFF pattern](react-bff-pattern.md) instead when:
-
-- Tokens must never be reachable from JavaScript (high-value targets, regulated industries)
-- You already have a backend that needs to authenticate calls (avoid double-handling identity)
-- You want centrally-managed token refresh, not per-tab refresh in the browser
+For production-grade or regulated apps where tokens must not reach JavaScript, use the [BFF pattern](react-bff-pattern.md) instead.
 
 ## Prerequisites
 

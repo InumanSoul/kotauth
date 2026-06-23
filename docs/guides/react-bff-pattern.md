@@ -8,17 +8,14 @@ This is the **recommended pattern for production deployments**. If an XSS lands,
 
 ## When to use this pattern
 
-Pick BFF when **any** of these are true:
+Use BFF when any of these are true:
 
-- You're shipping a customer-facing or regulated app where XSS-driven token theft is unacceptable
-- You already run a backend that needs to call internal APIs on the user's behalf
+- The app is customer-facing or regulated; XSS-driven token theft is unacceptable
+- You already run a backend that calls internal APIs on the user's behalf
 - You want centrally-managed token refresh (one server-side flow, not N tabs)
-- You need to apply additional authorization, rate limiting, or audit logging at the gateway
+- You need extra authorization, rate limiting, or audit logging at the gateway
 
-Pick the [browser-direct SPA pattern](react-spa-direct.md) instead when:
-
-- The app is a small internal tool with no separate backend
-- You want the simplest possible deployment (static SPA + Kotauth, nothing else)
+For small internal tools with no backend, the [browser-direct SPA pattern](react-spa-direct.md) is simpler.
 
 ## The architecture
 

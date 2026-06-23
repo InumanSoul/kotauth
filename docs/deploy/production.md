@@ -207,21 +207,15 @@ services:
 
 ## 11. Demo deployment
 
-Run a public showcase instance (e.g. `demo.yourdomain.com`) with pre-seeded workspaces:
+For a public showcase (e.g. `demo.yourdomain.com`), set `KAUTH_DEMO_MODE=true` in `.env`. The seed and credentials are documented in [quickstart](quickstart.md#demo-credentials).
 
-```env
-KAUTH_DEMO_MODE=true
-```
-
-Restart and the demo seed runs on startup, creating two workspaces with users, applications, roles, and audit log entries. A sticky banner exposes the demo credentials on every page.
-
-Hourly reset (the only sensible cadence for a public demo):
+For periodic reset (hourly is typical for public demos):
 
 ```cron
 0 * * * * cd /opt/kotauth && docker compose -f docker-compose.prod.yml down -v && docker compose -f docker-compose.prod.yml up -d
 ```
 
-`-v` wipes `kotauth_db_data`. Flyway re-migrates from scratch and `DemoSeedService` re-creates the demo data.
+`-v` wipes `kotauth_db_data`; Flyway re-migrates and the demo seed runs again.
 
 ## 12. Security checklist
 
