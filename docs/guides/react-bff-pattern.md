@@ -1,8 +1,8 @@
 # Integrating Kotauth with a React SPA (BFF Pattern)
 
-This guide walks through adding Kotauth authentication to a React SPA using the **Backend-For-Frontend (BFF) pattern**. The browser never touches OIDC; instead, a thin backend handles the token exchange, stores access/refresh tokens server-side, and exposes session-cookie-authenticated endpoints to the SPA.
+Add Kotauth authentication to a React SPA using the **Backend-For-Frontend (BFF) pattern**: a thin backend handles the OIDC token exchange, stores access and refresh tokens server-side, and exposes session-cookie-authenticated endpoints to the SPA. The browser never sees a bearer token.
 
-This is the **recommended pattern for production deployments** of any non-trivial size, because the access token never reaches JavaScript. If an XSS lands, the attacker still cannot exfiltrate the bearer token — they only see an opaque `HTTP-only` session cookie that the browser will not surface to script.
+This is the **recommended pattern for production deployments**. If an XSS lands, the attacker cannot exfiltrate tokens — only an opaque `HTTP-only` session cookie that the browser will not surface to script.
 
 **Stack:** React 18+, Vite (dev proxy), any backend that can speak OIDC. The backend example below is Kotlin/Ktor (Kotauth's native stack), but the pattern translates to Express, FastAPI, ASP.NET Core, Spring Boot, anything that can do an Authorization Code + PKCE exchange and set a cookie.
 
@@ -141,11 +141,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 }
 ```
 
-Three things to notice:
-
-1. **`credentials: "include"`** — the browser sends the session cookie on every request to the same origin.
-2. **No `Authorization` header** — the SPA never sees the access token. The cookie is the only credential.
-3. **401 handler is centralized** — when the session expires, the browser hard-navigates to `/api/auth/login`, which the BFF turns into a Kotauth authorize redirect.
+`credentials: 'include'` sends the session cookie on every same-origin request. The SPA never sets `Authorization` because it has no token. 401s route through one handler that hard-navigates to `/api/auth/login`.
 
 ### Session query
 
@@ -191,8 +187,6 @@ export function useSession() {
   });
 }
 ```
-
-The query returns the user identity or `null`. No tokens, no expiry timestamps, no PKCE state — just "who is this person?"
 
 ### Route protection
 
@@ -245,13 +239,11 @@ export async function logout(): Promise<void> {
 }
 ```
 
-`POST /api/auth/logout` clears the server-side session and the cookie. The follow-up navigation forces a fresh login (`prompt=login` tells Kotauth to re-prompt even if the SSO cookie is still valid).
-
-That's everything the SPA needs. No OIDC library, no token storage, no refresh logic. The whole frontend auth surface is `useSession()`, `apiFetch()`, and a logout button.
+`POST /api/auth/logout` clears the server-side session and the cookie; `prompt=login` forces re-auth on the next navigation even if the Kotauth SSO cookie is still valid.
 
 ## 3. The BFF side
 
-The BFF needs four endpoints. The Kotlin/Ktor sketch below is the shape Kotauth itself encourages — production-grade Kotlin code, deployable as a sidecar to the SPA.
+Four endpoints. The Kotlin/Ktor sketch below mirrors what Kotauth itself runs.
 
 ### Configuration
 
@@ -292,8 +284,6 @@ get("/auth/login") {
     call.respondRedirect(authorizeUrl, permanent = false)
 }
 ```
-
-The PKCE verifier stays in Redis keyed by `state`. The browser only sees the redirect.
 
 ### `GET /auth/callback` — exchange code for tokens
 
@@ -342,7 +332,7 @@ fun ApplicationCall.setSessionCookie(sessionId: String, secure: Boolean) {
 }
 ```
 
-The cookie is **`httpOnly`** (unreachable from JavaScript), **`SameSite=Lax`** (mitigates CSRF on cross-site GETs), and **`secure`** in production (HTTPS only).
+`httpOnly` keeps the cookie unreachable from JavaScript; `SameSite=Lax` blocks cross-site CSRF on state-changing requests; `secure` is required in production.
 
 ### `GET /auth/me` — return the current identity
 
@@ -369,7 +359,7 @@ get("/auth/me") {
 }
 ```
 
-The refresh happens on the BFF, transparently. The SPA never sees an expired-token error during normal use.
+Refresh happens on the BFF; the SPA never sees an expired token during normal use.
 
 ### `POST /auth/logout` — clear session
 

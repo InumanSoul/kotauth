@@ -1,7 +1,5 @@
 # Production deployment
 
-This guide takes you from a fresh Linux server to a running Kotauth instance behind HTTPS, with backups, secrets management, and an upgrade path.
-
 ## Prerequisites
 
 - Docker and Docker Compose on a Linux host
@@ -11,7 +9,7 @@ This guide takes you from a fresh Linux server to a running Kotauth instance beh
 
 ## 1. Pull the files
 
-You don't need to clone the repo. Fetch the production compose file, the Caddy config, and the env template:
+No repo clone required:
 
 ```bash
 mkdir kotauth && cd kotauth
@@ -24,7 +22,7 @@ curl -o .env https://raw.githubusercontent.com/inumansoul/kotauth/main/.env.exam
 
 ## 2. Configure `.env`
 
-Open `.env` and fill in every value. Nothing should be left blank in production.
+Fill every value:
 
 ```env
 KAUTH_BASE_URL=https://auth.yourdomain.com
@@ -39,7 +37,7 @@ DOMAIN=auth.yourdomain.com
 ACME_EMAIL=you@yourdomain.com
 ```
 
-`KAUTH_SECRET_KEY` is the most important value — it encrypts every secret at rest (SMTP credentials, TOTP enrolments, RSA private keys) and signs session cookies. Generate it with `openssl rand -hex 32` or `docker run --rm ghcr.io/inumansoul/kotauth:latest cli generate-secret-key`. Lose it and you lose every encrypted value in the database.
+`KAUTH_SECRET_KEY` encrypts every secret at rest (SMTP credentials, TOTP enrolments, RSA private keys) and signs session cookies. Generate it with `openssl rand -hex 32`. Never reuse it across environments.
 
 ## 3. Start
 
@@ -47,7 +45,7 @@ ACME_EMAIL=you@yourdomain.com
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Three services come up: `app` (Kotauth), `db` (PostgreSQL 15), and `caddy` (Let's Encrypt TLS). Caddy obtains a certificate on first boot via the ACME HTTP-01 challenge, which is why port `80` has to be reachable.
+Three services: `app`, `db` (PostgreSQL 15), `caddy` (Let's Encrypt TLS via ACME HTTP-01).
 
 ## 4. Verify
 
@@ -79,7 +77,7 @@ In `.env`:
 KAUTH_REDIS_URL=redis://redis:6379
 ```
 
-Kotauth's Redis path fails closed — if Redis becomes unreachable, auth requests are rejected rather than falling back to per-replica state.
+The Redis path fails closed: if Redis becomes unreachable, auth requests are rejected rather than falling back to per-replica state.
 
 ## 6. Use a managed database
 
@@ -91,13 +89,11 @@ DB_USER=kotauth
 DB_PASSWORD=<the managed-db password>
 ```
 
-The bundled `db` service still starts but receives no traffic — Flyway runs against the external database. If you want to remove the idle container entirely, comment out the `db` service block and the `depends_on: db` line in `docker-compose.prod.yml`.
-
-Flyway runs all migrations automatically. Point it at an empty database.
+Flyway runs against the external database. The bundled `db` service still starts but receives no traffic — to remove the idle container, comment out the `db` service block and its `depends_on: db` line in `docker-compose.prod.yml`.
 
 ## 7. File-based secrets
 
-For Docker Swarm, Kubernetes mounted secrets, or systemd `LoadCredential=`, every sensitive variable accepts a `<NAME>_FILE` form. The file's contents are read and trimmed at startup. `<NAME>_FILE` wins over `<NAME>` when both are set.
+For Docker Swarm, Kubernetes mounted secrets, or systemd `LoadCredential=`, every sensitive variable accepts a `<NAME>_FILE` form (contents read and trimmed at startup; `<NAME>_FILE` takes precedence over `<NAME>`).
 
 Supported variables:
 
@@ -140,10 +136,8 @@ Named volumes:
 | Volume | Contents |
 |---|---|
 | `kotauth_db_data` | PostgreSQL data — every tenant, user, session, audit row |
-| `caddy_data` | TLS certificates and ACME state |
-| `caddy_config` | Caddy runtime config |
-
-Only `kotauth_db_data` matters for backups. Caddy state is regenerable.
+| `caddy_data` | TLS certificates and ACME state (regenerable) |
+| `caddy_config` | Caddy runtime config (regenerable) |
 
 ```bash
 docker exec kotauth-db pg_dump -U kotauth kotauth_db > backup_$(date +%Y%m%d).sql
@@ -162,7 +156,7 @@ docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-Flyway runs new migrations before the server accepts traffic. If a migration fails, the container exits and the previous version remains in place. Take a database backup before crossing a major version.
+Flyway auto-migrates before accepting traffic; a failed migration halts the container and leaves the previous version running. Take a backup before major version bumps.
 
 Pin a specific image tag instead of tracking `latest`:
 
@@ -174,7 +168,7 @@ services:
 
 ## 10. Reverse proxy alternatives
 
-The bundled `caddy` service handles TLS for a single-domain single-host deployment. If you already run your own reverse proxy (nginx, Traefik, an L7 load balancer), remove the `caddy` service from `docker-compose.prod.yml` and proxy your existing edge to port `8080`.
+If you already run your own reverse proxy (nginx, Traefik, an L7 load balancer), remove the `caddy` service from `docker-compose.prod.yml` and proxy your existing edge to port `8080`.
 
 ### nginx
 

@@ -1,8 +1,8 @@
 # Integrating Kotauth with a React SPA (Browser-Direct OIDC)
 
-This guide walks through adding Kotauth authentication to a React SPA where **the browser talks to Kotauth directly** — Authorization Code + PKCE, tokens stored in the browser, `Authorization: Bearer` on every API request.
+Add Kotauth authentication to a React SPA where **the browser talks to Kotauth directly** — Authorization Code + PKCE, tokens stored in the browser, `Authorization: Bearer` on every API request.
 
-It is router-agnostic. The patterns work with React Router, TanStack Router, or no router at all. If you specifically want TanStack's `beforeLoad` integration, see the [TanStack Router guide](react-spa-tanstack-router.md) after reading this one.
+The patterns work with React Router, TanStack Router, or no router. For TanStack's `beforeLoad` integration, see the [TanStack Router guide](react-spa-tanstack-router.md) after reading this one.
 
 **Stack:** React 18+, [`react-oidc-context`](https://github.com/authts/react-oidc-context) (wraps [`oidc-client-ts`](https://github.com/authts/oidc-client-ts)), Vite. Both libraries are framework-neutral OIDC implementations.
 
@@ -157,9 +157,7 @@ export function Login() {
 }
 ```
 
-`auth.signinRedirect()` navigates the browser to Kotauth's `/oauth2/authorize` with the PKCE challenge. After the user authenticates, Kotauth redirects back to `redirect_uri` with `?code=...&state=...`. `react-oidc-context` detects the callback on mount, exchanges the code for tokens (using the PKCE verifier it stored in `sessionStorage` before redirecting), and updates `auth.isAuthenticated` to `true`.
-
-You do not need a separate `/callback` route — the provider handles the callback in-place because `redirect_uri` points at the app root.
+`auth.signinRedirect()` navigates to Kotauth's `/oauth2/authorize` with PKCE. On the return, `react-oidc-context` exchanges the code for tokens using the stored PKCE verifier and sets `auth.isAuthenticated = true` — no separate `/callback` route needed because `redirect_uri` points at the app root.
 
 ## 6. Attach the access token to API requests
 
@@ -214,7 +212,7 @@ function Profile() {
 }
 ```
 
-A new client instance is built whenever the token changes (after silent refresh or sign-in). This keeps every request bound to the current token without subscribing to mutation events.
+The `useMemo` rebuilds the client when the token changes, keeping every request bound to the current token.
 
 ## 7. Logout
 
@@ -229,13 +227,11 @@ function Logout() {
 }
 ```
 
-`auth.signoutRedirect()` navigates to Kotauth's `/oauth2/logout`, which clears the SSO cookie on Kotauth's side, then redirects back to the post-logout URI. The library also clears local OIDC state.
-
-If you want a local-only logout (clear tokens but keep the Kotauth SSO session), use `auth.removeUser()` instead.
+`auth.signoutRedirect()` navigates to Kotauth's `/oauth2/logout` (clears the SSO cookie), then redirects to the post-logout URI; the library clears local OIDC state. For local-only logout (clear tokens but keep the Kotauth SSO session), use `auth.removeUser()`.
 
 ## 8. Token refresh
 
-For a longer-lived session without forcing the user back through the login page when the access token expires, enable silent refresh in `oidcConfig`:
+To refresh expired tokens transparently, enable silent renew in `oidcConfig`:
 
 ```ts
 export const oidcConfig: AuthProviderProps = {
