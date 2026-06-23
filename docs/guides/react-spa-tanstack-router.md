@@ -405,7 +405,7 @@ token=<access_token>&client_id=<backend_client_id>&client_secret=<backend_secret
 
 ---
 
-## Silent SSO across apps (v1.8.1+)
+## Silent SSO across apps
 
 Kotauth honors the OIDC `prompt`, `max_age`, and `id_token_hint` parameters on `/authorize`. After the user signs into one client on your tenant, every subsequent `/authorize` against the same `/t/{slug}` path silent-auths via a server-side witness cookie — **no UI shown, no extra round-trip visible to the user**.
 
@@ -414,10 +414,10 @@ Kotauth honors the OIDC `prompt`, `max_age`, and `id_token_hint` parameters on `
 For SPA-side use cases:
 
 - **`prompt=login`** — pass `prompt: "login"` to `signinRedirect({ extraQueryParams: { prompt: "login" } })` to force re-auth even if the user has a valid SSO cookie. Useful for "switch account" or "re-authenticate before sensitive action" flows.
-- **`max_age`** — pass `max_age: "300"` to require a credential proof within the last 5 minutes. RPs that gate sensitive operations (admin pages, payment authorization, etc.) typically pair this with the `auth_time` claim verification on the issued ID token (Kotauth populates `auth_time` since v1.8.1; for MFA logins it is the moment the second factor was verified).
+- **`max_age`** — pass `max_age: "300"` to require a credential proof within the last 5 minutes. RPs gating sensitive operations (admin pages, payment authorization, etc.) typically pair this with the `auth_time` claim on the issued ID token. For MFA logins, `auth_time` is the moment the second factor was verified.
 - **`prompt=select_account`** — same effect as `prompt=login` today. Will diverge once Kotauth ships an account picker.
 
-**Logout that actually logs out.** After v1.8.1, hitting `/protocol/openid-connect/logout` clears the silent-SSO cookie too. Your `userManager.signoutRedirect()` call will fully sign the user out — they will see the login form on their next visit, not silent-auth back into the session.
+**Logout that actually logs out.** Hitting `/protocol/openid-connect/logout` clears the silent-SSO cookie. Your `userManager.signoutRedirect()` call will fully sign the user out — they will see the login form on their next visit, not silent-auth back into the session.
 
 ---
 

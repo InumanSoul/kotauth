@@ -90,7 +90,7 @@ src/main/kotlin/com/kauth/
 
 src/test/kotlin/          — Unit tests and fakes (no database required)
 src/main/resources/
-  db/migration/           — Flyway SQL migrations (V1–V21)
+  db/migration/           — Flyway SQL migrations (V1–V52)
   openapi/v1.yaml         — OpenAPI 3.1 specification
 ```
 
@@ -238,12 +238,15 @@ Good areas to contribute:
 - **Documentation improvements** — typos, clarity, new deployment guides
 - **Bug fixes** — always welcome
 
-Out of scope for V1 (don't start these without discussion first):
+Larger items already on the roadmap — start with a discussion issue before opening a PR:
 
 - LDAP / SAML federation
 - WebAuthn / Passkeys
+- Magic links / SMS OTP
 - Multi-region / distributed PostgreSQL
 - Prometheus metrics
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the planned phases.
 
 ---
 
