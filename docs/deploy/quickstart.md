@@ -1,24 +1,22 @@
 # Quickstart
 
-Run Kotauth locally in one command. Bundled PostgreSQL, demo data pre-loaded, no `.env` file required.
-
-You need Docker and Docker Compose. Nothing else.
+Requires Docker and Docker Compose.
 
 ```bash
 curl -O https://raw.githubusercontent.com/inumansoul/kotauth/main/docker-compose.yml
 docker compose up -d
 ```
 
-Open **http://localhost:8080/admin** and sign in with the credentials shown in the demo banner.
+Open **http://localhost:8080/admin**, sign in with the credentials shown in the demo banner.
 
 ## What you get
 
 - Kotauth on port `8080` (HTTP)
 - PostgreSQL 15 (named volume `kotauth_db_data`)
 - Demo mode on — two seeded workspaces (Acme Corp, Startup Labs) with users, roles, applications, and audit log entries
-- `KAUTH_UPDATE_CHECK=false` so the demo banner doesn't network out
+- `KAUTH_UPDATE_CHECK=false` so the banner doesn't network out
 
-The defaults are unsafe (well-known secret key, hardcoded password). They're fine for local evaluation. When you're ready to run a real instance, see [`production.md`](production.md).
+The defaults are unsafe for anything beyond local evaluation. See [`production.md`](production.md) when you're ready to deploy.
 
 ## Demo credentials
 
@@ -30,30 +28,24 @@ The defaults are unsafe (well-known secret key, hardcoded password). They're fin
 
 ## Customizing the defaults
 
-Every value in `docker-compose.yml` uses the `${VAR:-default}` pattern. To override, either:
+Every value in `docker-compose.yml` uses `${VAR:-default}` substitution. Override by dropping a `.env` file next to `docker-compose.yml` or exporting the var in your shell:
 
-- Drop a `.env` file in the same directory as `docker-compose.yml`:
+```env
+KAUTH_BASE_URL=http://my-host:8080
+KAUTH_SECRET_KEY=<openssl rand -hex 32>
+KAUTH_DEMO_MODE=false
+DB_PASSWORD=<your password>
+```
 
-  ```env
-  KAUTH_BASE_URL=http://my-host:8080
-  KAUTH_SECRET_KEY=<openssl rand -hex 32>
-  KAUTH_DEMO_MODE=false
-  DB_PASSWORD=<your password>
-  ```
+Full variable list: [`../ENV_REFERENCE.md`](../ENV_REFERENCE.md).
 
-- Or export the var in your shell before `docker compose up`.
-
-The full list of supported variables is in [`../ENV_REFERENCE.md`](../ENV_REFERENCE.md).
-
-## Enabling Redis (optional)
-
-Redis is opt-in. Activate the `redis` profile:
+## Redis (optional)
 
 ```bash
 docker compose --profile redis up -d
 ```
 
-The Redis sidecar moves rate-limit state and short-lived auth cookies off Postgres. Useful when running more than one Kotauth replica or sustaining high login traffic. Not needed for a single-instance evaluation.
+Moves rate-limit state and session cookies off Postgres. Enable for multi-replica setups or high login traffic.
 
 ## Stopping
 
