@@ -118,8 +118,10 @@ For a public demo deployment (seeded workspaces + reset cron), set `KAUTH_DEMO_M
 ## Integration guides
 
 - [Quickstart](docs/deploy/quickstart.md) — local evaluation
+- [React SPA — browser-direct OIDC](docs/guides/react-spa-direct.md) — simplest path; tokens in the browser
+- [React SPA — BFF pattern](docs/guides/react-bff-pattern.md) — recommended for production; tokens stay server-side
+- [React SPA with TanStack Router](docs/guides/react-spa-tanstack-router.md) — `beforeLoad` route guards on top of either pattern
 - [Production deployment](docs/deploy/production.md) — TLS, backups, upgrades
-- [React SPA with TanStack Router](docs/guides/react-spa-tanstack-router.md)
 - Generic OIDC *(coming soon)*
 
 ---
