@@ -30,7 +30,7 @@ RUN node frontend/scripts/build-js.js
 RUN node frontend/scripts/generate-sri.js
 
 
-FROM eclipse-temurin:17-jdk AS kotlin-build
+FROM eclipse-temurin:25-jdk AS kotlin-build
 
 WORKDIR /app
 COPY . .
@@ -57,7 +57,7 @@ RUN ./gradlew buildFatJar \
       --no-daemon
 
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:25-jre
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
