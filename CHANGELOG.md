@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.19.2] - 2026-06-22
+
+Docker stack consolidation. No runtime changes — image and JAR are unchanged from `1.19.1`. Six compose files become two.
+
+### Changed
+
+- **Two root compose files replace the six in `docker/`.**
+  - `docker-compose.yml` (root) — local + eval + `make up` (build via `--build`). Bundled Postgres always, Redis behind `--profile redis`.
+  - `docker-compose.prod.yml` (root) — production with Caddy TLS. `KAUTH_TRUSTED_PROXY=true` baked in, same `--profile redis`. Operators wanting a managed database set `DB_URL`; the bundled `db` service can be removed by hand for that case.
+- **Comments stripped** from `Dockerfile`, `docker/Caddyfile`, and both compose files. All deployment guidance lives in `docs/deploy/`.
+- **`docs/deploy/quickstart.md`** — new, canonical local-evaluation guide.
+- **`docs/deploy/production.md`** — new, replaces `docs/guides/production-deployment.md`. Adds a profiles reference, external-database section, file-based-secrets recipe (moved out of the compose file), and a Caddy-vs-own-proxy decision tree.
+- **`make up` rebuilds via the root compose file with `--build`.** `make run` now sets `KAUTH_I18N_BUNDLE_DIR=docs/i18n` so contributors editing translations see them after a restart — replaces the bind-mount the deleted `docker-compose.dev.yml` carried.
+
+### Removed
+
+- `docker-compose.quickstart.yml`
+- `docker/docker-compose.yml`
+- `docker/docker-compose.dev.yml`
+- `docker/docker-compose.external-db.yml`
+- `docker/docker-compose.prod.yml`
+- `docker/docker-compose.demo.yml`
+- `docs/guides/production-deployment.md` — superseded by `docs/deploy/production.md`
+
+### Migration
+
+Operators pointing automation at the old paths must update:
+
+- `docker-compose.quickstart.yml` → `docker-compose.yml`
+- `docker/docker-compose.yml` → `docker-compose.yml`
+- `docker/docker-compose.prod.yml` → `docker-compose.prod.yml`
+- External-DB overlay (`docker/docker-compose.external-db.yml`) → set `DB_URL` in `.env`; the bundled `db` service runs idle or can be removed by hand
+- Demo overlay (`docker/docker-compose.demo.yml`) → set `KAUTH_DEMO_MODE=true` in `.env`
+
+---
+
 ## [1.19.1] - 2026-06-22
 
 Supply-chain hygiene patch. Closes L6 and L7 from the 2026-06-12 security audit.
