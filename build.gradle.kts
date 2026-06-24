@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.19.1"
+version = "1.19.2"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -60,7 +60,7 @@ dependencies {
     implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.flywaydb:flyway-core:$flywayVersion")
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
-    implementation("com.auth0:java-jwt:4.5.1")
+    implementation("com.auth0:java-jwt:4.5.2")
     implementation("at.favre.lib:bcrypt:0.10.2")
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")

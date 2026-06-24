@@ -92,3 +92,17 @@ current status.
    runtime values like the workspace name or the configured password
    minimum length.
 4. Restart KotAuth.
+
+## Developing translations locally
+
+Edit `docs/i18n/*.json` directly and use `make run`, which boots Kotauth on
+the host JVM against Docker-hosted Postgres and Redis. The Makefile target
+sets `KAUTH_I18N_BUNDLE_DIR=docs/i18n` so the bundles you edit are loaded
+on restart — no Docker rebuild, no volume mount.
+
+```bash
+make run
+# edit docs/i18n/es.json, Ctrl+C, make run again to see the change
+```
+
+Bundles are loaded once at startup; changes apply on the next restart.

@@ -1,0 +1,87 @@
+name: kotauth
+
+services:
+  app:
+    image: ghcr.io/inumansoul/kotauth:latest
+    container_name: kotauth
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      KAUTH_BASE_URL: ${KAUTH_BASE_URL:?KAUTH_BASE_URL is required (e.g. https://auth.yourdomain.com)}
+      KAUTH_ENV: ${KAUTH_ENV:-production}
+      KAUTH_SECRET_KEY: ${KAUTH_SECRET_KEY:?KAUTH_SECRET_KEY is required (openssl rand -hex 32)}
+      KAUTH_DEMO_MODE: ${KAUTH_DEMO_MODE:-false}
+      KAUTH_TRUSTED_PROXY: "true"
+      DB_URL: ${DB_URL:-jdbc:postgresql://db:5432/${DB_NAME:-kotauth_db}}
+      DB_USER: ${DB_USER:-kotauth}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      KAUTH_REDIS_URL: ${KAUTH_REDIS_URL:-}
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ready || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    restart: unless-stopped
+
+  db:
+    image: postgres:15
+    container_name: kotauth-db
+    environment:
+      POSTGRES_DB: ${DB_NAME:-kotauth_db}
+      POSTGRES_USER: ${DB_USER:-kotauth}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - kotauth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-kotauth} -d ${DB_NAME:-kotauth_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: kotauth-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required (e.g. auth.yourdomain.com)}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required (for Let's Encrypt notifications)}
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: kotauth-redis
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    profiles: ["redis"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  kotauth_db_data:
+  caddy_data:
+  caddy_config:

@@ -77,12 +77,11 @@ Each port interface has a corresponding `Fake` implementation in `src/test/kotli
 - Wildcard imports are allowed in Exposed/Ktor adapter files.
 - Logging: use `call.application.log` in routes. Never log tokens, passwords, or secrets.
 
-## Docker Compose Variants
+## Docker Compose Files
 
-- `docker-compose.quickstart.yml` — one-command demo (pre-built image + bundled DB)
-- `docker/docker-compose.dev.yml` — build from source
-- `docker/docker-compose.external-db.yml` — external database
-- `docker/docker-compose.prod.yml` — Caddy TLS overlay
+- `docker-compose.yml` (root) — local + eval + `make up` (build from source via `--build`). Bundled Postgres always; Redis behind `--profile redis`. Db/Redis ports bound to `127.0.0.1` for the `make run` host-JVM workflow.
+- `docker-compose.prod.yml` (root) — production with Caddy TLS. `KAUTH_TRUSTED_PROXY=true` hardcoded; same `redis` profile. Operators use a managed database by setting `DB_URL`.
+- `docker/Caddyfile` — Caddy reverse-proxy config consumed by `docker-compose.prod.yml`.
 
 ## Environment Variables
 

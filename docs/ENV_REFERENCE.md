@@ -32,7 +32,7 @@ services:
       KAUTH_SECRET_KEY_FILE: /run/secrets/kauth_secret_key
 ```
 
-A commented working example lives in `docker/docker-compose.prod.yml`.
+See [`docs/deploy/production.md#7-file-based-secrets`](deploy/production.md#7-file-based-secrets) for a working Docker Secrets example.
 
 ---
 
@@ -41,16 +41,11 @@ A commented working example lives in `docker/docker-compose.prod.yml`.
 ### `KAUTH_BASE_URL`
 **Required.**
 
-The public base URL of the Kotauth instance. Used as the OIDC issuer (`iss` claim), in OIDC discovery documents, OAuth2 redirect URI validation, and email links.
+Public base URL. Used as the OIDC issuer (`iss` claim), in discovery documents, redirect-URI validation, and email links. Must be `https://` in production; `http://localhost` is allowed in development. No trailing slash.
 
 ```
 KAUTH_BASE_URL=https://auth.yourdomain.com
 ```
-
-Rules:
-- Must start with `https://` when `KAUTH_ENV=production`. The server refuses to start otherwise.
-- HTTP is allowed for `localhost` in development mode.
-- No trailing slash.
 
 ---
 
@@ -61,8 +56,8 @@ Controls startup validation strictness.
 
 | Value | Behavior |
 |---|---|
-| `development` | HTTP allowed, default secrets tolerated, startup warnings printed, welcome page shows live health details |
-| `production` | HTTPS required, default JWT secret rejected, strict cookie flags enforced, welcome page hides health details |
+| `development` | Lax: HTTP allowed, default secrets tolerated, warnings printed |
+| `production` | Strict: HTTPS required, quickstart secret rejected, strict cookie flags |
 
 ```
 KAUTH_ENV=production
@@ -71,22 +66,13 @@ KAUTH_ENV=production
 ---
 
 ### `KAUTH_SECRET_KEY`
-**Required.** The server refuses to start without it.
+**Required.**
 
-A 32+ character string used for:
-- AES-256-GCM encryption of secrets at rest (SMTP passwords, TOTP secrets, RSA private keys)
-- HMAC-SHA256 signing of session cookies and short-lived auth state cookies
+32+ character secret used for AES-256-GCM encryption of secrets at rest (SMTP credentials, TOTP secrets, RSA private keys) and HMAC-SHA256 signing of session cookies. Generate: `openssl rand -hex 32`. Also accepts `KAUTH_SECRET_KEY_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ```
-KAUTH_SECRET_KEY=<output of: openssl rand -hex 32>
+KAUTH_SECRET_KEY=<openssl rand -hex 32 output>
 ```
-
-Generate one:
-```bash
-openssl rand -hex 32
-```
-
-Also accepts `KAUTH_SECRET_KEY_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ---
 
@@ -161,26 +147,18 @@ DB_USER=kotauth
 ### `DB_PASSWORD`
 **Required.**
 
-PostgreSQL password. The server refuses to start when unset — there is no
-default fallback.
+PostgreSQL password. Also accepts `DB_PASSWORD_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ```
 DB_PASSWORD=changeme
 ```
-
-Also accepts `DB_PASSWORD_FILE` (see [File-based secret injection](#file-based-secret-injection-_file)).
 
 ---
 
 ### `KAUTH_TRUSTED_PROXY`
 **Optional.** Default: `false`
 
-When `true`, Kotauth honors `X-Forwarded-For` / `X-Forwarded-Proto` headers
-to resolve client IPs. **Only enable this behind a reverse proxy that
-overwrites these headers** (the bundled Caddy production overlay sets it
-automatically). On a directly-exposed instance, leaving this off is what
-prevents clients from spoofing their IP to bypass per-IP rate limits on
-login, token, MFA, and OTP endpoints.
+When `true`, Kotauth trusts `X-Forwarded-For` / `X-Forwarded-Proto` headers for client-IP resolution. **Only enable behind a reverse proxy that overwrites these headers** — on a directly-exposed instance, this lets clients spoof their IP to bypass per-IP rate limits on login, token, MFA, and OTP endpoints. The bundled Caddy production setup sets it automatically.
 
 ```
 KAUTH_TRUSTED_PROXY=true
@@ -191,9 +169,7 @@ KAUTH_TRUSTED_PROXY=true
 ### `DB_POOL_MAX_SIZE`
 **Optional.** Default: `10`
 
-Maximum number of connections in the HikariCP connection pool. For coroutine-based apps, size to actual DB concurrency needs rather than thread count. A value of `CPU cores × 2` is a good starting point.
-
-When running multiple Kotauth instances, ensure the total across all instances stays within PostgreSQL's `max_connections` (default 100). For example, 4 instances × 10 = 40 connections.
+Maximum HikariCP pool size. When running multiple Kotauth instances, ensure the total stays within PostgreSQL's `max_connections` (default 100).
 
 ```
 DB_POOL_MAX_SIZE=10
@@ -204,7 +180,7 @@ DB_POOL_MAX_SIZE=10
 ### `DB_POOL_MIN_IDLE`
 **Optional.** Default: `2`
 
-Minimum number of idle connections maintained in the pool. Keeps a small number of connections warm to avoid cold-start latency on the first requests after an idle period.
+Minimum idle connections kept warm.
 
 ```
 DB_POOL_MIN_IDLE=2
@@ -214,7 +190,7 @@ DB_POOL_MIN_IDLE=2
 
 ## Redis
 
-Optional sidecar for distributed rate limiting and sessions. Single-instance deployments can leave all of these unset. See [REDIS.md](REDIS.md) for the full operator guide.
+Optional sidecar for distributed rate limiting and sessions. Single-instance deployments can leave these unset. See [REDIS.md](REDIS.md) for the operator guide.
 
 ### `KAUTH_REDIS_URL`
 **Optional.** Default: _unset_ (Redis disabled — in-memory limiter, Postgres sessions)
@@ -287,31 +263,24 @@ The cookie carries its own `expiresAt` timestamp in the signed payload, so this 
 ### `KAUTH_SSO_SESSION_MAX_TTL_SECONDS`
 **Optional.** Default: `2592000` (30 days)
 
-Operator-side ceiling. `KAUTH_SSO_SESSION_TTL_SECONDS` must be `≤` this value or the server refuses to start (fail-fast at `EnvironmentConfig.load`). Use it to enforce a policy "no SSO session may live longer than X" without trusting individual deployments to keep the per-instance TTL under control.
+Operator ceiling on `KAUTH_SSO_SESSION_TTL_SECONDS`. The server refuses to start unless `TTL ≤ MAX_TTL` and both are `≥ 60`.
 
 ```
 KAUTH_SSO_SESSION_MAX_TTL_SECONDS=2592000
 ```
-
-Validation: both values must be `≥ 60` and `ttl ≤ maxTtl`. Misconfiguration prints a `FATAL` banner and exits.
 
 ---
 
 ## Demo Mode
 
 ### `KAUTH_DEMO_MODE`
-**Optional.** Default: `false` (disabled)
+**Optional.** Default: `false`
 
-When set to `true`, activates demo mode for public showcase deployments:
-
-1. **Seed data** — On startup, `DemoSeedService` creates two pre-populated workspaces ("Acme Corp" and "Startup Labs") with users, applications, roles, groups, webhooks, and audit log entries. Idempotent — skipped if the data already exists.
-2. **Demo banner** — A sticky amber banner is rendered on every page showing demo credentials and a reset notice.
+When `true`, seeds two demo workspaces (`Acme Corp`, `Startup Labs`) with users, applications, roles, groups, webhooks, and audit log entries, and shows a sticky credential banner. Seed is idempotent. Intended for public showcase deployments paired with an hourly reset (see [Demo deployment](#example-env--demo-deployment)).
 
 ```
 KAUTH_DEMO_MODE=true
 ```
-
-Intended for deployments like `demo.kotauth.com` where visitors should see a populated instance. Not intended for production. Pair with an hourly database reset (see [Demo deployment](#example-env--demo-deployment) below).
 
 **Seeded credentials:**
 
@@ -410,7 +379,7 @@ DB_NAME=kotauth_db
 DB_USER=kotauth
 DB_PASSWORD=             # use a strong, unique password
 
-# Required when using docker/docker-compose.prod.yml (Caddy TLS)
+# Required when using docker-compose.prod.yml (Caddy TLS)
 DOMAIN=auth.yourdomain.com
 ACME_EMAIL=you@yourdomain.com
 ```
@@ -444,16 +413,16 @@ DOMAIN=demo.kotauth.com
 ACME_EMAIL=you@yourdomain.com
 ```
 
-Start with the demo overlay:
+Start:
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 Hourly reset cron (wipes the database volume and re-seeds on restart):
 
 ```bash
-0 * * * * cd /opt/kotauth && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml down -v && docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml -f docker/docker-compose.demo.yml up -d
+0 * * * * cd /opt/kotauth && docker compose -f docker-compose.prod.yml down -v && docker compose -f docker-compose.prod.yml up -d
 ```
 
-See [docs/guides/production-deployment.md](guides/production-deployment.md) for the full deployment walkthrough.
+See [docs/deploy/production.md](deploy/production.md) for the full deployment walkthrough.

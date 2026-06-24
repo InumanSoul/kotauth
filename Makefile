@@ -69,47 +69,40 @@ update-locks: ## Regenerate gradle.lockfile (run after bumping any dependency)
 	@echo "gradle.lockfile updated — commit it with your dependency change."
 
 # ── Docker ────────────────────────────────────────────────────────────────────
-# --project-directory . ensures Docker Compose reads .env and resolves env_file
-# paths from the repo root, not from the docker/ subdirectory.
-# Makefile targets use docker/docker-compose.dev.yml (build from source).
-# To run the pre-built image instead:
-#   docker compose --project-directory . -f docker/docker-compose.yml up -d
 
-COMPOSE_DEV = docker compose --project-directory . -f docker/docker-compose.dev.yml
+COMPOSE = docker compose
 
-up: ## Build images from source and start all services (dev)
-	$(COMPOSE_DEV) up -d --build
+up: ## Build the image from local source and start the stack
+	$(COMPOSE) up -d --build
 
-up-fresh: ## Rebuild dev images from scratch (no layer cache)
-	$(COMPOSE_DEV) build --no-cache && $(COMPOSE_DEV) up -d
+up-fresh: ## Rebuild from scratch (no Docker layer cache)
+	$(COMPOSE) build --no-cache && $(COMPOSE) up -d
 
 down: ## Stop and remove containers
-	$(COMPOSE_DEV) down
+	$(COMPOSE) down
 
 nuke: ## Stop containers and wipe volumes (destroys the database)
-	$(COMPOSE_DEV) down -v
+	$(COMPOSE) down -v
 
-# Fast inner loop — start only the infrastructure (db + redis) in Docker and
-# run the JAR directly on the host. Avoids the multi-minute Docker rebuild on
-# every Kotlin change. Use this for IDE-driven work.
-infra-up: ## Start only db + redis in Docker, wait for healthchecks
-	$(COMPOSE_DEV) up -d --wait db redis
+infra-up: ## Start only db + redis in Docker (for `make run`)
+	$(COMPOSE) --profile redis up -d --wait db redis
 
-run: infra-up ## Run Kotauth locally against Docker-hosted db + redis (fast inner loop)
+run: infra-up ## Run Kotauth on the host JVM against Docker-hosted db + redis
 	@env \
 	  KAUTH_BASE_URL=http://localhost:8080 \
 	  KAUTH_ENV=development \
 	  KAUTH_SECRET_KEY=dev-only-not-for-production-replace-this-secret-key \
 	  DB_HOST=localhost \
 	  DB_PORT=5432 \
-	  DB_USER=postgres \
-	  DB_PASSWORD=password \
+	  DB_USER=kotauth \
+	  DB_PASSWORD=localonly \
 	  DB_NAME=kotauth_db \
 	  KAUTH_REDIS_URL=redis://localhost:6379 \
+	  KAUTH_I18N_BUNDLE_DIR=docs/i18n \
 	  ./gradlew run
 
 logs: ## Follow app container logs
-	$(COMPOSE_DEV) logs -f app
+	$(COMPOSE) logs -f app
 
 health: ## Probe the local health endpoint
 	@curl -sf http://localhost:8080/health/ready && echo " OK" || echo " FAILED"
