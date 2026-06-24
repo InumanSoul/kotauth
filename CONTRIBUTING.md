@@ -31,86 +31,28 @@ make up              # start the full stack once
 make down            # stop everything
 make version         # generate version.properties (required before IDE run)
 make css             # compile CSS bundles (required before IDE run)
-docker compose -f docker/docker-compose.dev.yml up db -d   # start only PostgreSQL
+docker compose up db -d                                    # start only PostgreSQL (use `make infra-up` to also include Redis)
 ```
 
 The application starts on `http://localhost:8080`. Database migrations run automatically on startup via Flyway.
 
 ### Makefile targets
 
-All developer workflows are available via `make`. Run `make help` to see the full list.
-
-| Target | What it does |
-| --- | --- |
-| `make up` | Build from source and start all services (dev) |
-| `make up-fresh` | Rebuild from scratch, no layer cache |
-| `make down` | Stop and remove containers |
-| `make nuke` | Stop containers and wipe volumes (destroys the database) |
-| `make logs` | Follow app container logs |
-| `make health` | Probe the local health endpoint |
-| `make test` | Run the unit/integration test suite |
-| `make e2e` | Run E2E browser smoke tests (Playwright, headless) |
-| `make e2e-headed` | Run E2E tests with a visible browser (debugging) |
-| `make lint` | Run ktlint check |
-| `make lint-fix` | Auto-fix lint issues |
-| `make css` | Compile all four CSS bundles (admin, auth, portal-sidenav, portal-tabnav) |
-| `make build` | Full CI-equivalent build — CSS + lint + tests + fat JAR |
-| `make jar` | Build fat JAR only, skipping tests (faster iteration) |
-| `make version` | Generate `version.properties` (required before running from IDE) |
-
-### Typical dev loop
-
-```bash
-make up              # start the stack
-# make changes...
-make test            # run tests
-make lint            # check formatting
-make logs            # tail the app logs
-make nuke && make up # reset everything from scratch
-```
-
----
-
-## Project Structure
-
-```bash
-src/main/kotlin/com/kauth/
-  Application.kt          — Entry point and composition root
-  domain/
-    model/                — Pure data classes (no framework imports)
-    port/                 — Interface contracts (Repository, EmailPort, etc.)
-    service/              — Business logic (AuthService, OAuthService, etc.)
-  adapter/
-    web/                  — Ktor HTTP route handlers
-    persistence/          — PostgreSQL adapters (Exposed ORM)
-    token/                — JWT adapter, password hasher
-    email/                — SMTP adapter
-    social/               — Google / GitHub OAuth adapters
-  infrastructure/         — Cross-cutting: encryption, rate limiting, TOTP, key generation
-
-src/test/kotlin/          — Unit tests and fakes (no database required)
-src/main/resources/
-  db/migration/           — Flyway SQL migrations (V1–V21)
-  openapi/v1.yaml         — OpenAPI 3.1 specification
-```
+Run `make help` for the full list. Common loop: `make up` → edit → `make test` → `make lint` → `make logs`. To reset state: `make nuke && make up`.
 
 ---
 
 ## Architecture
 
-Kotauth follows [hexagonal architecture](https://alistair.cockburn.us/hexagonal-architecture/). The key rule is:
+Hexagonal (Ports & Adapters). The domain layer (`domain/model`, `domain/port`, `domain/service`) has zero framework dependencies — tests run in-memory without Docker, a database, or HTTP. See [CLAUDE.md](CLAUDE.md) for the full directory layout, and [docs/adr/](docs/adr/) for decision records.
 
-**The domain layer has zero dependencies on any framework, database, or HTTP library.**
+When adding a feature:
 
-Domain services (`AuthService`, `OAuthService`, etc.) depend only on port interfaces — never on Ktor, Exposed, or any other adapter. This makes them testable in complete isolation.
-
-When adding a new feature:
-
-1. Model the domain entity in `domain/model/`
+1. Model the entity in `domain/model/`
 2. Define the port interface in `domain/port/`
 3. Write the business logic in `domain/service/`
-4. Implement the adapter in `adapter/persistence/` (database), `adapter/web/` (HTTP), etc.
-5. Wire everything together in `Application.kt`
+4. Implement the adapter in `adapter/persistence/`, `adapter/web/`, etc.
+5. Wire it up in `Application.kt`
 
 ---
 
@@ -238,12 +180,15 @@ Good areas to contribute:
 - **Documentation improvements** — typos, clarity, new deployment guides
 - **Bug fixes** — always welcome
 
-Out of scope for V1 (don't start these without discussion first):
+Larger items already on the roadmap — start with a discussion issue before opening a PR:
 
 - LDAP / SAML federation
 - WebAuthn / Passkeys
+- Magic links / SMS OTP
 - Multi-region / distributed PostgreSQL
 - Prometheus metrics
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the planned phases.
 
 ---
 

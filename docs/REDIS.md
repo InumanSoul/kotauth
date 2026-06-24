@@ -95,15 +95,17 @@ deliberately.
 
 ### Bundled compose (development)
 
-The repo's `docker/docker-compose.dev.yml` ships a `redis:7-alpine`
-service:
+The root `docker-compose.yml` ships a `redis:7-alpine` service behind the
+`redis` profile — opt-in via `docker compose --profile redis up -d` or
+`make infra-up` (which activates the profile for the host-JVM workflow):
 
 ```yaml
 redis:
   image: redis:7-alpine
   command: ["redis-server", "--appendonly", "no", "--save", ""]
+  profiles: ["redis"]
   ports:
-    - "6379:6379"
+    - "127.0.0.1:6379:6379"
   healthcheck:
     test: ["CMD", "redis-cli", "ping"]
 ```
