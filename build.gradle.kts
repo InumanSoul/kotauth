@@ -1,4 +1,4 @@
-val ktorVersion = "3.4.2"
+val ktorVersion = "3.5.0"
 val exposedVersion = "0.61.0"
 val logbackVersion = "1.5.32"
 val flywayVersion = "12.4.0"
