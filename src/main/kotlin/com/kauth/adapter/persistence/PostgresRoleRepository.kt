@@ -8,9 +8,8 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.RoleRepository
 import org.jetbrains.exposed.v1.core.*
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.v1.core.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -283,7 +282,7 @@ class PostgresRoleRepository : RoleRepository {
         val stmt = conn.prepareStatement(sql, false)
         val rs = stmt.executeQuery()
         while (rs.next()) {
-            result.add(rs.getInt(1))
+            result.add(rs.result.getInt(1))
         }
         return result
     }
@@ -310,7 +309,7 @@ class PostgresRoleRepository : RoleRepository {
         val stmt = conn.prepareStatement(sql, false)
         val rs = stmt.executeQuery()
         while (rs.next()) {
-            result.add(rs.getInt(1))
+            result.add(rs.result.getInt(1))
         }
         return result
     }

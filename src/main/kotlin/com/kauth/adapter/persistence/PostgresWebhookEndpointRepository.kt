@@ -5,10 +5,9 @@ import com.kauth.domain.model.WebhookEndpoint
 import com.kauth.domain.model.WebhookEventType
 import com.kauth.domain.port.WebhookEndpointRepository
 import org.jetbrains.exposed.v1.core.*
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 

@@ -2,9 +2,9 @@ package com.kauth.infrastructure
 
 import com.kauth.adapter.persistence.TenantKeysTable
 import com.kauth.domain.port.EncryptionPort
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 
 /**

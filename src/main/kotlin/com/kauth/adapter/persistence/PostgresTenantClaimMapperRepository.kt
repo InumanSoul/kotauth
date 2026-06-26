@@ -3,9 +3,7 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.TenantClaimMapperRepository
-import org.jetbrains.exposed.v1.core.ResultRow
-import org.jetbrains.exposed.v1.core.SortOrder
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 

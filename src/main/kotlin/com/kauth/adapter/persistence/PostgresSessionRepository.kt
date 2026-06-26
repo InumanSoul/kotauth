@@ -274,7 +274,7 @@ class PostgresSessionRepository : SessionRepository {
                     }.map { it[SessionsTable.id] }
             if (expiredIds.isEmpty()) return@transaction 0
             expiredIds.chunked(500).sumOf { batch ->
-                SessionsTable.deleteWhere { Op.build { SessionsTable.id inList batch } }
+                SessionsTable.deleteWhere { SessionsTable.id inList batch }
             }
         }
 

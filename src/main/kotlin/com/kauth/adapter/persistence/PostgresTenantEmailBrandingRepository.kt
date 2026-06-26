@@ -3,12 +3,10 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.TenantEmailBranding
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.TenantEmailBrandingRepository
-import org.jetbrains.exposed.v1.core.ResultRow
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset

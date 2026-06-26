@@ -1,9 +1,8 @@
 package com.kauth.adapter.persistence
 
 import org.jetbrains.exposed.v1.core.Table
-import org.jetbrains.exposed.v1.jdbc.*
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.*
 
 /**
  * Exposed ORM mapping for the 'mfa_enrollments' table (V14 migration).

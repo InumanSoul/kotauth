@@ -5,11 +5,9 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.EmailOtpChallengeRepository
 import org.jetbrains.exposed.v1.core.*
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.less
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
-import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -61,9 +59,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
     override fun incrementAttempts(id: Int): Int =
         transaction {
             EmailOtpChallengesTable.update({ EmailOtpChallengesTable.id eq id }) {
-                with(org.jetbrains.exposed.sql.SqlExpressionBuilder) {
-                    it.update(attemptCount, attemptCount + 1)
-                }
+                it.update(attemptCount, attemptCount + 1)
             }
             EmailOtpChallengesTable
                 .selectAll()
@@ -84,10 +80,8 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
     override fun deleteActiveByUser(userId: UserId): Int =
         transaction {
             EmailOtpChallengesTable.deleteWhere {
-                Op.build {
-                    (EmailOtpChallengesTable.userId eq userId.value) and
-                        EmailOtpChallengesTable.consumedAt.isNull()
-                }
+                (EmailOtpChallengesTable.userId eq userId.value) and
+                    EmailOtpChallengesTable.consumedAt.isNull()
             }
         }
 

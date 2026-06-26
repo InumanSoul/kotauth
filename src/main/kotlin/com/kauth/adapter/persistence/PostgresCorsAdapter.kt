@@ -2,6 +2,7 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.port.CorsPolicy
 import com.kauth.domain.port.CorsPort
+import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.net.URI

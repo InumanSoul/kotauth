@@ -3,7 +3,6 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.AccessType
 import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.jdbc.*
-import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.postgresql.util.PGobject
 
 /**
