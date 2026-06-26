@@ -2,10 +2,8 @@ package com.kauth.adapter.persistence
 
 import com.kauth.domain.port.CorsPolicy
 import com.kauth.domain.port.CorsPort
-import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.net.URI
 
 class PostgresCorsAdapter : CorsPort {

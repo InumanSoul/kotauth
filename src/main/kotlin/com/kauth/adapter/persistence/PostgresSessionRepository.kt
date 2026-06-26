@@ -6,8 +6,9 @@ import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset

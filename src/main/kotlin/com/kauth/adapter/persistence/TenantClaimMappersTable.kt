@@ -1,6 +1,8 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 /**
  * Exposed mapping for 'tenant_claim_mappers' (V34 migration).
