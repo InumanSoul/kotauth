@@ -6,6 +6,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
@@ -428,7 +429,7 @@ class OAuthService(
         )
     }
 
-    private sealed class AudienceResolution {
+    sealed class AudienceResolution {
         data class Ok(
             val values: List<String>,
         ) : AudienceResolution()
@@ -438,7 +439,36 @@ class OAuthService(
         ) : AudienceResolution()
     }
 
-    private fun resolveAudiences(
+    sealed class ScopeNarrowing {
+        data class Ok(
+            val narrowed: List<String>,
+        ) : ScopeNarrowing()
+
+        data class InvalidScope(
+            val rejected: List<String>,
+        ) : ScopeNarrowing()
+    }
+
+    fun narrowScopes(
+        requested: List<String>,
+        resolvedResources: List<ResourceServer>,
+    ): ScopeNarrowing {
+        if (requested.isEmpty()) return ScopeNarrowing.Ok(emptyList())
+
+        val anyDeclares = resolvedResources.any { it.scopes.isNotEmpty() }
+        if (!anyDeclares) return ScopeNarrowing.Ok(requested)
+
+        val allowed = resolvedResources.flatMap { it.scopes }.toSet()
+        val rejected = requested.filterNot { it in allowed }
+        return if (rejected.isEmpty()) {
+            ScopeNarrowing.Ok(requested)
+        } else {
+            ScopeNarrowing.InvalidScope(rejected)
+        }
+    }
+
+    /** Callable from OAuthProtocolRoutes for authorize-time validation. */
+    fun resolveAudiences(
         tenantId: TenantId,
         client: Application,
         requested: List<String>,

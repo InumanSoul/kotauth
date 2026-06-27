@@ -6,6 +6,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -1180,6 +1181,51 @@ class OAuthServiceTest {
         assertEquals("key-1", jwks[0]["kid"])
     }
 
+    // =========================================================================
+    // narrowScopes
+    // =========================================================================
+
+    @Test
+    fun `narrowScopes accepts all requested when API declares them`() {
+        val api = resourceServerOf(scopes = listOf("read:invoices", "write:invoices"))
+        val result = svc.narrowScopes(listOf("read:invoices"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("read:invoices")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes rejects requested scope not declared by any targeted API (strict mode)`() {
+        val api = resourceServerOf(scopes = listOf("read:invoices"))
+        val result = svc.narrowScopes(listOf("read:invoices", "delete:invoices"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("delete:invoices")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes treats empty API scopes as no narrowing — returns requested as-is`() {
+        val api = resourceServerOf(scopes = emptyList())
+        val result = svc.narrowScopes(listOf("anything:goes"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("anything:goes")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes unions scopes across multiple targeted APIs`() {
+        val a = resourceServerOf(identifier = "https://a", scopes = listOf("read:a"))
+        val b = resourceServerOf(identifier = "https://b", scopes = listOf("read:b"))
+        val result = svc.narrowScopes(listOf("read:a", "read:b"), listOf(a, b))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("read:a", "read:b")),
+            result,
+        )
+    }
+
     // -------------------------------------------------------------------------
     // PKCE helper — mirrors OAuthService.verifyPkce
     // -------------------------------------------------------------------------
@@ -1188,4 +1234,24 @@ class OAuthServiceTest {
         val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
     }
+
+    // -------------------------------------------------------------------------
+    // Resource server fixture builder
+    // -------------------------------------------------------------------------
+
+    private fun resourceServerOf(
+        identifier: String = "https://api",
+        name: String = "Test API",
+        description: String? = null,
+        enabled: Boolean = true,
+        scopes: List<String> = emptyList(),
+    ): ResourceServer =
+        ResourceServer(
+            tenantId = TenantId(1),
+            identifier = identifier,
+            name = name,
+            description = description,
+            enabled = enabled,
+            scopes = scopes,
+        )
 }
