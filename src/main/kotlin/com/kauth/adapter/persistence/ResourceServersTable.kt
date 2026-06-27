@@ -11,6 +11,7 @@ object ResourceServersTable : Table("resource_servers") {
     val name = varchar("name", 100)
     val description = text("description").nullable()
     val enabled = bool("enabled").default(true)
+    val scopes = jsonb("scopes").default("[]")
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

@@ -6,6 +6,8 @@ import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.SessionRepository
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -36,6 +38,7 @@ class PostgresSessionRepository : SessionRepository {
                     it[revokedAt] = session.revokedAt?.toOffsetDateTime()
                     it[revocationReason] = session.revocationReason
                     it[impersonatorSessionId] = session.impersonatorSessionId?.value
+                    it[resources] = Json.encodeToString(session.resources)
                 } get SessionsTable.id
 
             session.copy(id = SessionId(insertedId))
@@ -300,6 +303,7 @@ class PostgresSessionRepository : SessionRepository {
             revokedAt = this[SessionsTable.revokedAt]?.toInstant(),
             revocationReason = this[SessionsTable.revocationReason],
             impersonatorSessionId = this[SessionsTable.impersonatorSessionId]?.let { SessionId(it) },
+            resources = Json.decodeFromString(this[SessionsTable.resources].ifBlank { "[]" }),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)

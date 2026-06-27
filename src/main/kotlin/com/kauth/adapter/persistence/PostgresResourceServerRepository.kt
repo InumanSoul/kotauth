@@ -6,6 +6,7 @@ import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ResourceAuthorizationError
 import com.kauth.domain.port.ResourceServerRepository
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.jdbc.*
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -172,6 +173,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             name = this[ResourceServersTable.name],
             description = this[ResourceServersTable.description],
             enabled = this[ResourceServersTable.enabled],
+            scopes = Json.decodeFromString(this[ResourceServersTable.scopes].ifBlank { "[]" }),
             createdAt = this[ResourceServersTable.createdAt].toInstant(),
         )
 }

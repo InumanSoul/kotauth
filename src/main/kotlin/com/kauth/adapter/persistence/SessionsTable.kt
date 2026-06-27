@@ -24,6 +24,7 @@ object SessionsTable : Table("sessions") {
     val revokedAt = timestampWithTimeZone("revoked_at").nullable()
     val revocationReason = varchar("revocation_reason", 32).nullable()
     val impersonatorSessionId = integer("impersonator_session_id").references(id).nullable()
+    val resources = jsonb("resources").default("[]")
 
     override val primaryKey = PrimaryKey(id)
 }

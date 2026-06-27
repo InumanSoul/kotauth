@@ -34,6 +34,7 @@ data class Session(
     val revokedAt: Instant? = null,
     val revocationReason: String? = null,
     val impersonatorSessionId: SessionId? = null,
+    val resources: List<String> = emptyList(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isRevoked: Boolean get() = revokedAt != null
