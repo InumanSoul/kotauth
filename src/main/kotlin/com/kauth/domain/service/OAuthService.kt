@@ -136,6 +136,7 @@ class OAuthService(
         state: String?,
         ipAddress: String? = null,
         authTime: Instant = Instant.now(),
+        resources: List<String> = emptyList(),
     ): OAuthResult<AuthorizationCode> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -178,6 +179,7 @@ class OAuthService(
                 state = state,
                 expiresAt = Instant.now().plusSeconds(CODE_EXPIRY_SECONDS),
                 authTime = authTime,
+                resources = resources,
             )
 
         val saved = authCodeRepository.save(code)
@@ -500,6 +502,21 @@ class OAuthService(
             }
         }
         return AudienceResolution.Ok(requested)
+    }
+
+    fun resolveAudiencesForClient(
+        tenantSlug: String,
+        clientId: String,
+        requested: List<String>,
+    ): AudienceResolution {
+        if (requested.isEmpty()) return AudienceResolution.Ok(emptyList())
+        val tenant =
+            tenantRepository.findBySlug(tenantSlug)
+                ?: return AudienceResolution.Failed(OAuthError.InvalidTarget("Unknown tenant: $tenantSlug"))
+        val client =
+            applicationRepository.findByClientId(tenant.id, clientId)
+                ?: return AudienceResolution.Failed(OAuthError.InvalidTarget("Unknown client: $clientId"))
+        return resolveAudiences(tenant.id, client, requested)
     }
 
     // -------------------------------------------------------------------------

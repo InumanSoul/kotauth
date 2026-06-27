@@ -146,6 +146,7 @@ class AuthRoutesTest {
         codeChallenge: String? = null,
         codeChallengeMethod: String? = null,
         nonce: String? = null,
+        resources: List<String> = emptyList(),
     ): String {
         val payload =
             listOf(
@@ -158,6 +159,9 @@ class AuthRoutesTest {
                 codeChallengeMethod ?: "",
                 nonce ?: "",
                 System.currentTimeMillis().toString(),
+                "", // otpChallengeId
+                "", // otpEmail
+                resources.joinToString(","),
             ).joinToString("|")
         return encryptionService.signCookie(payload)
     }
@@ -2537,6 +2541,112 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertFalse(body.contains("\"aud\""), "Empty audience must not emit aud field, got: $body")
+        }
+
+    @Test
+    fun `GET authorize with unknown resource redirects with invalid_target and preserves state`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val encodedRedirect = java.net.URLEncoder.encode("https://app.example.com/callback", "UTF-8")
+            val encodedResource = java.net.URLEncoder.encode("https://unknown-api.example.com", "UTF-8")
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=$encodedRedirect" +
+                        "&scope=openid" +
+                        "&code_challenge=$pkceChallenge&code_challenge_method=S256" +
+                        "&state=csrf-state-abc" +
+                        "&resource=$encodedResource",
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            assertTrue(
+                location.contains("error=invalid_target"),
+                "Must redirect with error=invalid_target, got: $location",
+            )
+            assertTrue(
+                location.contains("state=csrf-state-abc"),
+                "Must preserve state on error redirect, got: $location",
+            )
+        }
+
+    @Test
+    fun `POST authorize with resource in cookie binds resource identifiers on issued code`() =
+        testApplication {
+            resetFixtures()
+            every { mfaService.shouldChallengeMfa(any()) } returns false
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        mfaService = mfaService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                    scope = "openid",
+                    codeChallenge = pkceChallenge,
+                    codeChallengeMethod = "S256",
+                    resources = listOf("https://api.example.com"),
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "correct-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val location = response.headers["Location"] ?: ""
+            val code = location.substringAfter("code=").substringBefore("&").substringBefore("#")
+            assertNotNull(code.ifBlank { null }, "Redirect must include an authorization code, got: $location")
+
+            val stored = authCodeRepo.findByCode(code)
+            assertNotNull(stored, "Issued code must be persisted in the repository")
+            assertEquals(listOf("https://api.example.com"), stored.resources)
         }
 
     // Utility

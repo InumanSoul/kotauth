@@ -94,6 +94,7 @@ object AuthView {
         val codeChallenge: String? = null,
         val codeChallengeMethod: String? = null,
         val nonce: String? = null,
+        val resources: List<String> = emptyList(),
     ) {
         val isOAuthFlow: Boolean get() = !responseType.isNullOrBlank()
 

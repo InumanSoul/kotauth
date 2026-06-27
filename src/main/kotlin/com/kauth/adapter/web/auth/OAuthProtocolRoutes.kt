@@ -295,6 +295,31 @@ internal fun Route.oauthProtocolRoutes(
             return@get
         }
 
+        val requestedResources =
+            call.parameters
+                .getAll("resource")
+                .orEmpty()
+                .filter { it.isNotBlank() }
+                .map { it.trim() }
+        val audienceResolution =
+            if (requestedResources.isNotEmpty()) {
+                oauthService.resolveAudiencesForClient(slug, clientId, requestedResources)
+            } else {
+                OAuthService.AudienceResolution.Ok(emptyList())
+            }
+        if (audienceResolution is OAuthService.AudienceResolution.Failed) {
+            call.respondRedirect(
+                buildString {
+                    append(redirectUri)
+                    append("?error=invalid_target")
+                    append("&error_description=").append(encodeParam(audienceResolution.error.reason))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                },
+            )
+            return@get
+        }
+        val resolvedResources = (audienceResolution as OAuthService.AudienceResolution.Ok).values
+
         val oauthParams =
             AuthView.OAuthParams(
                 responseType = responseType,
@@ -305,6 +330,7 @@ internal fun Route.oauthProtocolRoutes(
                 codeChallenge = codeChallenge,
                 codeChallengeMethod = codeChallengeMethod,
                 nonce = nonce,
+                resources = resolvedResources,
             )
 
         // ---- Silent auth attempt -------------------------------------------
@@ -348,6 +374,7 @@ internal fun Route.oauthProtocolRoutes(
                             state = state,
                             ipAddress = call.request.local.remoteAddress,
                             authTime = sso.authTime,
+                            resources = resolvedResources,
                         )
                     if (codeResult is OAuthResult.Success) {
                         val redirect =
