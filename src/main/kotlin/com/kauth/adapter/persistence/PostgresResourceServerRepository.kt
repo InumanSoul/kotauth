@@ -54,6 +54,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         identifier: String,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer =
         transaction {
             val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -63,6 +64,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                     it[ResourceServersTable.identifier] = identifier
                     it[ResourceServersTable.name] = name
                     it[ResourceServersTable.description] = description
+                    it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
                     it[ResourceServersTable.enabled] = true
                     it[ResourceServersTable.createdAt] = now
                 } get ResourceServersTable.id
@@ -73,6 +75,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 identifier = identifier,
                 name = name,
                 description = description,
+                scopes = scopes,
                 enabled = true,
                 createdAt = now.toInstant(),
             )
@@ -83,6 +86,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         id: ResourceServerId,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer =
         transaction {
             ResourceServersTable.update(
@@ -90,6 +94,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             ) {
                 it[ResourceServersTable.name] = name
                 it[ResourceServersTable.description] = description
+                it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
             }
             findById(tenantId, id) ?: error("ResourceServer $id not found after update")
         }

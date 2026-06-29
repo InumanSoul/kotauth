@@ -49,8 +49,15 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         val identifier = params["identifier"].orEmpty()
         val name = params["name"].orEmpty()
         val description = params["description"]?.takeIf { it.isNotBlank() }
+        val scopes =
+            params["scopes"]
+                ?.lines()
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                ?.distinct()
+                .orEmpty()
 
-        when (val result = service.create(ctx.workspace.id, identifier, name, description)) {
+        when (val result = service.create(ctx.workspace.id, identifier, name, description, scopes)) {
             is ResourceServerResult.Success ->
                 call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=created")
             is ResourceServerResult.Failure -> {
@@ -60,6 +67,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
                         identifier = identifier,
                         name = name,
                         description = description,
+                        scopes = scopes,
                     )
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
@@ -98,8 +106,15 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
         val params = call.receiveParameters()
         val name = params["name"].orEmpty()
         val description = params["description"]?.takeIf { it.isNotBlank() }
+        val scopes =
+            params["scopes"]
+                ?.lines()
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                ?.distinct()
+                .orEmpty()
 
-        when (val result = service.update(ctx.workspace.id, ResourceServerId(id), name, description)) {
+        when (val result = service.update(ctx.workspace.id, ResourceServerId(id), name, description, scopes)) {
             is ResourceServerResult.Success ->
                 call.respondRedirect("/admin/workspaces/${ctx.slug}/settings/apis?saved=updated")
             is ResourceServerResult.Failure -> {
@@ -110,7 +125,7 @@ fun Route.adminResourceServerRoutes(service: ResourceServerService) {
                         workspace = ctx.workspace,
                         allWorkspaces = ctx.wsPairs,
                         loggedInAs = ctx.session.username,
-                        prefill = current?.copy(name = name, description = description),
+                        prefill = current?.copy(name = name, description = description, scopes = scopes),
                         error = errorMessage(result.error),
                     ),
                 )

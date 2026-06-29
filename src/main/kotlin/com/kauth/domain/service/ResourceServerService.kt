@@ -23,6 +23,7 @@ class ResourceServerService(
         identifier: String,
         name: String,
         description: String?,
+        scopes: List<String> = emptyList(),
     ): ResourceServerResult<ResourceServer> {
         val trimmedIdentifier = identifier.trim()
         val trimmedName = name.trim()
@@ -34,7 +35,7 @@ class ResourceServerService(
             return ResourceServerResult.Failure(ResourceServerError.IdentifierAlreadyExists)
         }
         return ResourceServerResult.Success(
-            repo.create(tenantId, trimmedIdentifier, trimmedName, description?.trim()?.ifBlank { null }),
+            repo.create(tenantId, trimmedIdentifier, trimmedName, description?.trim()?.ifBlank { null }, scopes),
         )
     }
 
@@ -43,6 +44,7 @@ class ResourceServerService(
         id: ResourceServerId,
         name: String,
         description: String?,
+        scopes: List<String> = emptyList(),
     ): ResourceServerResult<ResourceServer> {
         val trimmedName = name.trim()
         if (trimmedName.isBlank()) return ResourceServerResult.Failure(ResourceServerError.InvalidName)
@@ -50,7 +52,7 @@ class ResourceServerService(
             return ResourceServerResult.Failure(ResourceServerError.NotFound)
         }
         return ResourceServerResult.Success(
-            repo.update(tenantId, id, trimmedName, description?.trim()?.ifBlank { null }),
+            repo.update(tenantId, id, trimmedName, description?.trim()?.ifBlank { null }, scopes),
         )
     }
 
