@@ -332,7 +332,7 @@ class OAuthService(
                 clientId = client.id,
                 accessTokenHash = sha256Hex(tokenResponse.access_token),
                 refreshTokenHash = tokenResponse.refresh_token?.let { sha256Hex(it) },
-                scopes = authCode.scopes,
+                scopes = finalScopes.joinToString(" "),
                 ipAddress = ipAddress,
                 userAgent = userAgent,
                 expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),

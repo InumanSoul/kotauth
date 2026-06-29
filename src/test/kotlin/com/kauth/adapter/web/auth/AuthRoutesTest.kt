@@ -1567,6 +1567,76 @@ class AuthRoutesTest {
             assertEquals(listOf("https://api.example.com"), sessions.first().resources)
         }
 
+    @Test
+    fun `token auth-code with narrowed scope persists narrowed scopes on session`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api.example.com",
+                    name = "API",
+                    scopes = listOf("read:invoices"),
+                ),
+            )
+            val oauthSvc = buildOAuthServiceWithResources(rsRepo)
+
+            val code =
+                (
+                    oauthSvc.issueAuthorizationCode(
+                        tenantSlug = "acme",
+                        userId = UserId(10),
+                        clientId = "spa-app",
+                        redirectUri = "https://app.example.com/callback",
+                        scopes = "read:invoices",
+                        codeChallenge = pkceChallenge,
+                        codeChallengeMethod = "S256",
+                        nonce = null,
+                        state = null,
+                        resources = listOf("https://api.example.com"),
+                    ) as OAuthResult.Success
+                ).value.code
+
+            // Patch the stored code with a trailing-space scope string.
+            // finalScopes.joinToString(" ") normalises this to "read:invoices";
+            // authCode.scopes would leave the trailing space intact.
+            val raw = authCodeRepo.findByCode(code)!!
+            authCodeRepo.save(raw.copy(scopes = "read:invoices "))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = oauthSvc,
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            client.submitForm(
+                url = "/t/acme/protocol/openid-connect/token",
+                formParameters =
+                    Parameters.build {
+                        append("grant_type", "authorization_code")
+                        append("code", code)
+                        append("client_id", "spa-app")
+                        append("redirect_uri", "https://app.example.com/callback")
+                        append("code_verifier", pkceVerifier)
+                    },
+            )
+
+            val session = sessionRepo.findByUserId(UserId(10)).first()
+            assertEquals("read:invoices", session.scopes)
+        }
+
     // =========================================================================
     // GET /t/{slug}/protocol/openid-connect/auth — legacy redirect (Gap 10)
     // =========================================================================
