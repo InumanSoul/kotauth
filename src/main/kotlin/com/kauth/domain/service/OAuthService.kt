@@ -292,6 +292,9 @@ class OAuthService(
                 else -> return OAuthResult.Failure(OAuthError.InvalidTarget("requested resource not bound to code"))
             }
 
+        if (resourceServerRepository == null && resolvedResources.isNotEmpty()) {
+            return OAuthResult.Failure(OAuthError.InvalidTarget("resource indicators not configured"))
+        }
         val resolvedResourceServers =
             if (resourceServerRepository != null) {
                 resolvedResources.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
@@ -410,18 +413,22 @@ class OAuthService(
             }
 
         val requestedScopes = scopes.split(" ").filter { it.isNotBlank() }.ifEmpty { listOf("openid") }
-        val resolvedServers =
-            if (resourceServerRepository != null) {
-                audiences.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
-            } else {
-                emptyList()
-            }
         val finalScopes =
-            when (val narrowing = narrowScopes(requestedScopes, resolvedServers)) {
-                is ScopeNarrowing.Ok -> narrowing.narrowed
-                is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
-                    OAuthError.InvalidScope(narrowing.rejected),
-                )
+            if (resources.isNotEmpty()) {
+                val resolvedServers =
+                    if (resourceServerRepository != null) {
+                        audiences.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
+                    } else {
+                        emptyList()
+                    }
+                when (val narrowing = narrowScopes(requestedScopes, resolvedServers)) {
+                    is ScopeNarrowing.Ok -> narrowing.narrowed
+                    is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
+                        OAuthError.InvalidScope(narrowing.rejected),
+                    )
+                }
+            } else {
+                requestedScopes
             }
         val accessToken = tokenPort.issueClientCredentialsToken(tenant, client, finalScopes, audiences)
 
@@ -438,6 +445,7 @@ class OAuthService(
                 ipAddress = ipAddress,
                 userAgent = null,
                 expiresAt = Instant.now().plusSeconds(expirySeconds),
+                resources = audiences,
             ),
         )
 
@@ -545,7 +553,6 @@ class OAuthService(
         clientId: String,
         requested: List<String>,
     ): AudienceResolution {
-        if (requested.isEmpty()) return AudienceResolution.Ok(emptyList())
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
                 ?: return AudienceResolution.Failed(OAuthError.InvalidTarget("Unknown tenant: $tenantSlug"))
@@ -630,6 +637,9 @@ class OAuthService(
                 else -> return OAuthResult.Failure(OAuthError.InvalidTarget("requested resource not bound to session"))
             }
 
+        if (resourceServerRepository == null && resolvedResources.isNotEmpty()) {
+            return OAuthResult.Failure(OAuthError.InvalidTarget("resource indicators not configured"))
+        }
         val resolvedResourceServers =
             if (resourceServerRepository != null) {
                 resolvedResources.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
@@ -637,16 +647,28 @@ class OAuthService(
                 emptyList()
             }
 
-        val requestedScopes = session.scopes.split(" ").filter { it.isNotBlank() }
+        val resourcesNarrowed = requestedResources.isNotEmpty() && resolvedResources.toSet() != sessionResources.toSet()
+        val sessionScopes = session.scopes.split(" ").filter { it.isNotBlank() }
+        val effectiveScopes =
+            if (resourcesNarrowed) {
+                val anyDeclares = resolvedResourceServers.any { it.scopes.isNotEmpty() }
+                if (anyDeclares) {
+                    val allowed = resolvedResourceServers.flatMap { it.scopes }.toSet()
+                    sessionScopes.filter { it in allowed }
+                } else {
+                    sessionScopes
+                }
+            } else {
+                sessionScopes
+            }
         val finalScopes =
-            when (val narrowing = narrowScopes(requestedScopes, resolvedResourceServers)) {
+            when (val narrowing = narrowScopes(effectiveScopes, resolvedResourceServers)) {
                 is ScopeNarrowing.Ok -> narrowing.narrowed
                 is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
                     OAuthError.InvalidScope(narrowing.rejected),
                 )
             }
 
-        // Resolve effective roles for refresh
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
         val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
@@ -662,7 +684,6 @@ class OAuthService(
                 audiences = resolvedResources,
             )
 
-        // Revoke old session, create new (rotation); carry forward narrowed resources + scopes
         sessionRepository.revoke(session.id!!, reason = Session.REVOCATION_REASON_ROTATED)
         sessionRepository.save(
             Session(

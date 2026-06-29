@@ -1092,6 +1092,50 @@ class AuthRoutesTest {
             assertTrue(body.contains("invalid_request"), "Body must contain error code, got: $body")
         }
 
+    @Test
+    fun `GET authorize with untrusted redirect_uri and invalid resource returns 400 not redirect`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            val oauthSvc = buildOAuthServiceWithResources(rsRepo)
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = oauthSvc,
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                        resourceServerRepository = rsRepo,
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code" +
+                        "&client_id=spa-app" +
+                        "&redirect_uri=https://evil.attacker.com/steal" +
+                        "&scope=openid" +
+                        "&resource=https://unknown-api.example.com",
+                )
+
+            assertEquals(
+                HttpStatusCode.BadRequest,
+                response.status,
+                "Untrusted redirect_uri with invalid resource must return 400, not a redirect",
+            )
+            assertEquals(null, response.headers["Location"], "Must not redirect to untrusted redirect_uri")
+        }
+
     // =========================================================================
     // GET /t/{slug}/protocol/openid-connect/auth — legacy endpoint parameter validation
     // =========================================================================

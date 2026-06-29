@@ -315,6 +315,16 @@ internal fun Route.oauthProtocolRoutes(
                 OAuthService.AudienceResolution.Ok(emptyList())
             }
         if (audienceResolution is OAuthService.AudienceResolution.Failed) {
+            if (!redirectUriTrusted) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "Invalid redirect_uri for client",
+                    ),
+                )
+                return@get
+            }
             call.respondRedirect(
                 buildString {
                     append(redirectUri)
