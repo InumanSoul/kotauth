@@ -410,7 +410,20 @@ class OAuthService(
             }
 
         val requestedScopes = scopes.split(" ").filter { it.isNotBlank() }.ifEmpty { listOf("openid") }
-        val accessToken = tokenPort.issueClientCredentialsToken(tenant, client, requestedScopes, audiences)
+        val resolvedServers =
+            if (resourceServerRepository != null) {
+                audiences.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
+            } else {
+                emptyList()
+            }
+        val finalScopes =
+            when (val narrowing = narrowScopes(requestedScopes, resolvedServers)) {
+                is ScopeNarrowing.Ok -> narrowing.narrowed
+                is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
+                    OAuthError.InvalidScope(narrowing.rejected),
+                )
+            }
+        val accessToken = tokenPort.issueClientCredentialsToken(tenant, client, finalScopes, audiences)
 
         val expirySeconds = client.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds
 
@@ -421,7 +434,7 @@ class OAuthService(
                 clientId = client.id,
                 accessTokenHash = sha256Hex(accessToken),
                 refreshTokenHash = null,
-                scopes = requestedScopes.joinToString(" "),
+                scopes = finalScopes.joinToString(" "),
                 ipAddress = ipAddress,
                 userAgent = null,
                 expiresAt = Instant.now().plusSeconds(expirySeconds),
@@ -449,7 +462,7 @@ class OAuthService(
                 access_token = accessToken,
                 token_type = "Bearer",
                 expires_in = expirySeconds,
-                scope = requestedScopes.joinToString(" "),
+                scope = finalScopes.joinToString(" "),
             ),
         )
     }

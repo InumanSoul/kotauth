@@ -582,6 +582,53 @@ class OAuthServiceTest {
         assertEquals("client_credentials", event.details["grant_type"])
     }
 
+    @Test
+    fun `clientCredentials rejects out-of-API scope with InvalidScope (strict)`() {
+        val api =
+            resourceServerOf(
+                identifier = "https://api.example.com",
+                scopes = listOf("read:invoices"),
+            )
+        val seeded = resourceServers.seed(api)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(seeded.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "read:invoices delete:invoices",
+                resources = listOf("https://api.example.com"),
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidScope>(result.error)
+    }
+
+    @Test
+    fun `clientCredentials narrows scope per targeted API`() {
+        val api =
+            resourceServerOf(
+                identifier = "https://api.example.com",
+                scopes = listOf("read:invoices"),
+            )
+        val seeded = resourceServers.seed(api)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(seeded.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "read:invoices",
+                resources = listOf("https://api.example.com"),
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        val tokenResponse = (result as OAuthResult.Success<*>).value as com.kauth.domain.model.TokenResponse
+        assertEquals("read:invoices", tokenResponse.scope)
+    }
+
     // =========================================================================
     // refreshTokens
     // =========================================================================
