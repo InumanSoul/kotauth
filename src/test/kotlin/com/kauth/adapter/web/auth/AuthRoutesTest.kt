@@ -1638,6 +1638,262 @@ class AuthRoutesTest {
         }
 
     // =========================================================================
+    // POST /t/{slug}/protocol/openid-connect/token — refresh-token resource binding
+    // =========================================================================
+
+    @Test
+    fun `refresh-token grant reissues with session's resources by default`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api.example.com",
+                    name = "API",
+                    scopes = listOf("read:invoices"),
+                ),
+            )
+            val oauthSvc = buildOAuthServiceWithResources(rsRepo)
+
+            val code =
+                (
+                    oauthSvc.issueAuthorizationCode(
+                        tenantSlug = "acme",
+                        userId = UserId(10),
+                        clientId = "spa-app",
+                        redirectUri = "https://app.example.com/callback",
+                        scopes = "read:invoices",
+                        codeChallenge = pkceChallenge,
+                        codeChallengeMethod = "S256",
+                        nonce = null,
+                        state = null,
+                        resources = listOf("https://api.example.com"),
+                    ) as OAuthResult.Success
+                ).value.code
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = oauthSvc,
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val exchangeResponse =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/token",
+                    formParameters =
+                        Parameters.build {
+                            append("grant_type", "authorization_code")
+                            append("code", code)
+                            append("client_id", "spa-app")
+                            append("redirect_uri", "https://app.example.com/callback")
+                            append("code_verifier", pkceVerifier)
+                        },
+                )
+            val refreshToken =
+                Json
+                    .parseToJsonElement(exchangeResponse.bodyAsText())
+                    .jsonObject["refresh_token"]!!
+                    .jsonPrimitive.content
+
+            client.submitForm(
+                url = "/t/acme/protocol/openid-connect/token",
+                formParameters =
+                    Parameters.build {
+                        append("grant_type", "refresh_token")
+                        append("refresh_token", refreshToken)
+                        append("client_id", "spa-app")
+                    },
+            )
+
+            assertEquals(listOf("https://api.example.com"), tokenPort.lastUserTokenAudiences)
+        }
+
+    @Test
+    fun `refresh-token grant accepts narrowing resource param`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api-a.example.com",
+                    name = "A",
+                    scopes = listOf("read:a"),
+                ),
+            )
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api-b.example.com",
+                    name = "B",
+                    scopes = listOf("read:b"),
+                ),
+            )
+            val oauthSvc = buildOAuthServiceWithResources(rsRepo)
+
+            val code =
+                (
+                    oauthSvc.issueAuthorizationCode(
+                        tenantSlug = "acme",
+                        userId = UserId(10),
+                        clientId = "spa-app",
+                        redirectUri = "https://app.example.com/callback",
+                        scopes = "read:a",
+                        codeChallenge = pkceChallenge,
+                        codeChallengeMethod = "S256",
+                        nonce = null,
+                        state = null,
+                        resources = listOf("https://api-a.example.com", "https://api-b.example.com"),
+                    ) as OAuthResult.Success
+                ).value.code
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = oauthSvc,
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val exchangeResponse =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/token",
+                    formParameters =
+                        Parameters.build {
+                            append("grant_type", "authorization_code")
+                            append("code", code)
+                            append("client_id", "spa-app")
+                            append("redirect_uri", "https://app.example.com/callback")
+                            append("code_verifier", pkceVerifier)
+                        },
+                )
+            val refreshToken =
+                Json
+                    .parseToJsonElement(exchangeResponse.bodyAsText())
+                    .jsonObject["refresh_token"]!!
+                    .jsonPrimitive.content
+
+            client.submitForm(
+                url = "/t/acme/protocol/openid-connect/token",
+                formParameters =
+                    Parameters.build {
+                        append("grant_type", "refresh_token")
+                        append("refresh_token", refreshToken)
+                        append("client_id", "spa-app")
+                        append("resource", "https://api-a.example.com")
+                    },
+            )
+
+            assertEquals(listOf("https://api-a.example.com"), tokenPort.lastUserTokenAudiences)
+            val session = sessionRepo.findActiveByUser(TenantId(1), UserId(10)).first()
+            assertEquals(listOf("https://api-a.example.com"), session.resources)
+        }
+
+    @Test
+    fun `refresh-token grant rejects superset resource with invalid_target`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api-a.example.com",
+                    name = "A",
+                    scopes = listOf("read:a"),
+                ),
+            )
+            val oauthSvc = buildOAuthServiceWithResources(rsRepo)
+
+            val code =
+                (
+                    oauthSvc.issueAuthorizationCode(
+                        tenantSlug = "acme",
+                        userId = UserId(10),
+                        clientId = "spa-app",
+                        redirectUri = "https://app.example.com/callback",
+                        scopes = "read:a",
+                        codeChallenge = pkceChallenge,
+                        codeChallengeMethod = "S256",
+                        nonce = null,
+                        state = null,
+                        resources = listOf("https://api-a.example.com"),
+                    ) as OAuthResult.Success
+                ).value.code
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = oauthSvc,
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val exchangeResponse =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/token",
+                    formParameters =
+                        Parameters.build {
+                            append("grant_type", "authorization_code")
+                            append("code", code)
+                            append("client_id", "spa-app")
+                            append("redirect_uri", "https://app.example.com/callback")
+                            append("code_verifier", pkceVerifier)
+                        },
+                )
+            val refreshToken =
+                Json
+                    .parseToJsonElement(exchangeResponse.bodyAsText())
+                    .jsonObject["refresh_token"]!!
+                    .jsonPrimitive.content
+
+            val response =
+                client.submitForm(
+                    url = "/t/acme/protocol/openid-connect/token",
+                    formParameters =
+                        Parameters.build {
+                            append("grant_type", "refresh_token")
+                            append("refresh_token", refreshToken)
+                            append("client_id", "spa-app")
+                            append("resource", "https://api-b.example.com")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalid_target", json["error"]!!.jsonPrimitive.content)
+        }
+
+    // =========================================================================
     // GET /t/{slug}/protocol/openid-connect/auth — legacy redirect (Gap 10)
     // =========================================================================
 

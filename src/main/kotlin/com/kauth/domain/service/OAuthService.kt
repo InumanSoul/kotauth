@@ -563,6 +563,7 @@ class OAuthService(
         clientSecret: String? = null,
         ipAddress: String? = null,
         userAgent: String? = null,
+        requestedResources: List<String> = emptyList(),
     ): OAuthResult<TokenResponse> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -607,7 +608,30 @@ class OAuthService(
             }
         }
 
-        val scopes = session.scopes.split(" ").filter { it.isNotBlank() }
+        // RFC 8707 §3: validate requested resources are a subset of the session's bound resources
+        val sessionResources = session.resources
+        val resolvedResources =
+            when {
+                requestedResources.isEmpty() -> sessionResources
+                requestedResources.toSet().all { it in sessionResources.toSet() } -> requestedResources
+                else -> return OAuthResult.Failure(OAuthError.InvalidTarget("requested resource not bound to session"))
+            }
+
+        val resolvedResourceServers =
+            if (resourceServerRepository != null) {
+                resolvedResources.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
+            } else {
+                emptyList()
+            }
+
+        val requestedScopes = session.scopes.split(" ").filter { it.isNotBlank() }
+        val finalScopes =
+            when (val narrowing = narrowScopes(requestedScopes, resolvedResourceServers)) {
+                is ScopeNarrowing.Ok -> narrowing.narrowed
+                is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
+                    OAuthError.InvalidScope(narrowing.rejected),
+                )
+            }
 
         // Resolve effective roles for refresh
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
@@ -618,13 +642,14 @@ class OAuthService(
                 user = user,
                 tenant = tenant,
                 client = client,
-                scopes = scopes,
+                scopes = finalScopes,
                 roles = effectiveRoles,
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
+                audiences = resolvedResources,
             )
 
-        // Revoke old session, create new (rotation)
+        // Revoke old session, create new (rotation); carry forward narrowed resources + scopes
         sessionRepository.revoke(session.id!!, reason = Session.REVOCATION_REASON_ROTATED)
         sessionRepository.save(
             Session(
@@ -633,7 +658,7 @@ class OAuthService(
                 clientId = session.clientId,
                 accessTokenHash = sha256Hex(newTokens.access_token),
                 refreshTokenHash = newTokens.refresh_token?.let { sha256Hex(it) },
-                scopes = session.scopes,
+                scopes = finalScopes.joinToString(" "),
                 ipAddress = ipAddress,
                 userAgent = userAgent,
                 expiresAt = Instant.now().plusSeconds(tenant.tokenExpirySeconds),
@@ -641,6 +666,7 @@ class OAuthService(
                     newTokens.refresh_token?.let {
                         Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
                     },
+                resources = resolvedResources,
             ),
         )
 

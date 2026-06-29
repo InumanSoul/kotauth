@@ -684,6 +684,7 @@ internal fun Route.oauthProtocolRoutes(
                 val refreshToken =
                     params["refresh_token"]
                         ?: return@post oauthError(call, "invalid_request", "refresh_token is required")
+                val requestedResources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -699,6 +700,7 @@ internal fun Route.oauthProtocolRoutes(
                             clientSecret = formClientSecret,
                             ipAddress = ipAddress,
                             userAgent = userAgent,
+                            requestedResources = requestedResources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)
