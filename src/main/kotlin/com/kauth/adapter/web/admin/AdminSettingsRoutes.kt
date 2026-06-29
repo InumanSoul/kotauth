@@ -388,13 +388,11 @@ fun Route.adminSettingsRoutes(
                 val emailBrandingResult =
                     workspaceSettingsService.updateEmailBranding(
                         slug,
-                        com.kauth.domain.model.TenantEmailBranding(
+                        existingBranding?.copy(
+                            supportEmail = params["emailSupportEmail"]?.trim()?.takeIf { it.isNotBlank() },
+                        ) ?: com.kauth.domain.model.TenantEmailBranding(
                             tenantId = workspace.id,
-                            brandName = existingBranding?.brandName,
-                            brandColorHex = existingBranding?.brandColorHex,
-                            brandLogoUrl = existingBranding?.brandLogoUrl,
-                            supportEmail = params["emailSupportEmail"],
-                            fromDisplayName = params["emailFromDisplayName"],
+                            supportEmail = params["emailSupportEmail"]?.trim()?.takeIf { it.isNotBlank() },
                         ),
                     )
                 if (emailBrandingResult is AdminResult.Failure) {

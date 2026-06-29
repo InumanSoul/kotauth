@@ -572,6 +572,9 @@ object EnglishStrings {
     const val EMAIL_FOOTER_MAGIC_LINK = "If you did not request this link, you can safely ignore this email."
     const val EMAIL_FOOTER_OTP = "If you didn’t request a code, you can safely ignore this email."
 
+    const val BRAND_IDENTITY_HEADING = "Brand Identity"
+    const val VISUAL_THEME_HEADING = "Visual Theme"
+
     /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for
