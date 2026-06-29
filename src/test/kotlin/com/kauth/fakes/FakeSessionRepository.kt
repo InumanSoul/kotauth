@@ -22,6 +22,8 @@ class FakeSessionRepository : SessionRepository {
 
     fun all(): List<Session> = store.values.toList()
 
+    fun findByUserId(userId: UserId): List<Session> = store.values.filter { it.userId == userId }
+
     override fun save(session: Session): Session {
         val s = session.copy(id = SessionId(nextId++))
         store[s.id!!.value] = s

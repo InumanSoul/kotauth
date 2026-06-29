@@ -319,6 +319,7 @@ internal fun OAuthError.toErrorCode(): String =
         is OAuthError.PkceRequired -> "invalid_request"
         is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
         is OAuthError.InvalidTarget -> "invalid_target"
+        is OAuthError.InvalidScope -> "invalid_scope"
     }
 
 internal fun OAuthError.toDescription(): String =
@@ -331,6 +332,7 @@ internal fun OAuthError.toDescription(): String =
         is OAuthError.PkceRequired -> "PKCE is required for public clients"
         is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
         is OAuthError.InvalidTarget -> this.reason
+        is OAuthError.InvalidScope -> "scopes ${this.rejected} are not declared by the targeted APIs"
     }
 
 internal fun AuthError.toMessage(): String =

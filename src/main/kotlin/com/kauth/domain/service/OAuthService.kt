@@ -216,6 +216,7 @@ class OAuthService(
         clientSecret: String?,
         ipAddress: String? = null,
         userAgent: String? = null,
+        requestedResources: List<String> = emptyList(),
     ): OAuthResult<TokenResponse> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -283,9 +284,30 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidGrant("User is disabled"))
         }
 
-        val scopes = authCode.scopes.split(" ").filter { it.isNotBlank() }
+        val codeResources = authCode.resources
+        val resolvedResources =
+            when {
+                requestedResources.isEmpty() -> codeResources
+                requestedResources.toSet().all { it in codeResources.toSet() } -> requestedResources
+                else -> return OAuthResult.Failure(OAuthError.InvalidTarget("requested resource not bound to code"))
+            }
 
-        // Resolve effective roles for the user
+        val resolvedResourceServers =
+            if (resourceServerRepository != null) {
+                resolvedResources.mapNotNull { resourceServerRepository.findByIdentifier(tenant.id, it) }
+            } else {
+                emptyList()
+            }
+
+        val requestedScopes = authCode.scopes.split(" ").filter { it.isNotBlank() }
+        val finalScopes =
+            when (val narrowing = narrowScopes(requestedScopes, resolvedResourceServers)) {
+                is ScopeNarrowing.Ok -> narrowing.narrowed
+                is ScopeNarrowing.InvalidScope -> return OAuthResult.Failure(
+                    OAuthError.InvalidScope(narrowing.rejected),
+                )
+            }
+
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
         val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
@@ -294,15 +316,15 @@ class OAuthService(
                 user = user,
                 tenant = tenant,
                 client = client,
-                scopes = scopes,
+                scopes = finalScopes,
                 nonce = authCode.nonce,
                 roles = effectiveRoles,
                 customAccessClaims = customAccessClaims,
                 customIdClaims = customIdClaims,
                 authTime = authCode.authTime,
+                audiences = resolvedResources,
             )
 
-        // Persist session
         sessionRepository.save(
             Session(
                 tenantId = tenant.id,
@@ -318,6 +340,7 @@ class OAuthService(
                     tokenResponse.refresh_token?.let {
                         Instant.now().plusSeconds(tenant.refreshTokenExpirySeconds)
                     },
+                resources = resolvedResources,
             ),
         )
 
@@ -933,6 +956,10 @@ sealed class OAuthError {
 
     data class InvalidTarget(
         val reason: String,
+    ) : OAuthError()
+
+    data class InvalidScope(
+        val rejected: List<String>,
     ) : OAuthError()
 }
 

@@ -614,6 +614,7 @@ internal fun Route.oauthProtocolRoutes(
                     params["redirect_uri"]
                         ?: return@post oauthError(call, "invalid_request", "redirect_uri is required")
                 val codeVerifier = params["code_verifier"]
+                val requestedResources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -631,6 +632,7 @@ internal fun Route.oauthProtocolRoutes(
                             clientSecret = formClientSecret,
                             ipAddress = ipAddress,
                             userAgent = userAgent,
+                            requestedResources = requestedResources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)
