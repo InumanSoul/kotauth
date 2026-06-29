@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
@@ -76,6 +77,7 @@ internal fun Route.oauthProtocolRoutes(
     roleRepository: RoleRepository?,
     encryptionService: EncryptionService,
     loginRateLimiter: RateLimiterPort,
+    resourceServerRepository: ResourceServerRepository? = null,
     baseUrl: String = "",
     ssoTtlSeconds: Long,
 ) {
@@ -117,13 +119,18 @@ internal fun Route.oauthProtocolRoutes(
                         add("client_secret_basic")
                     },
                 )
+                val baselineScopes = listOf("openid", "profile", "email")
+                val apiScopes =
+                    resourceServerRepository
+                        ?.findByTenantId(tenant.id)
+                        ?.filter { it.enabled }
+                        ?.flatMap { it.scopes }
+                        ?.distinct()
+                        ?: emptyList()
+                val allScopes = (baselineScopes + apiScopes).distinct()
                 put(
                     "scopes_supported",
-                    buildJsonArray {
-                        add("openid")
-                        add("profile")
-                        add("email")
-                    },
+                    buildJsonArray { allScopes.forEach { add(it) } },
                 )
                 put(
                     "claims_supported",

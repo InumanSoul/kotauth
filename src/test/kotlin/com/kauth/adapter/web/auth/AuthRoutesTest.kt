@@ -52,6 +52,7 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Base64
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -2149,6 +2150,51 @@ class AuthRoutesTest {
                 body.contains("/t/acme/protocol/openid-connect/token"),
                 "token_endpoint must be derived from the fallback issuer",
             )
+        }
+
+    @Test
+    fun `discovery emits scopes_supported as union of OIDC baseline and enabled API scopes`() =
+        testApplication {
+            resetFixtures()
+            val rsRepo = FakeResourceServerRepository()
+            rsRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api.example.com",
+                    name = "Invoices API",
+                    enabled = true,
+                    scopes = listOf("read:invoices", "write:invoices"),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                        resourceServerRepository = rsRepo,
+                    )
+                }
+            }
+
+            val response = client.get("/t/acme/.well-known/openid-configuration")
+            assertEquals(HttpStatusCode.OK, response.status)
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val scopes = json["scopes_supported"]!!.jsonArray.map { it.jsonPrimitive.content }
+
+            assertContains(scopes, "openid")
+            assertContains(scopes, "profile")
+            assertContains(scopes, "email")
+            assertContains(scopes, "read:invoices")
+            assertContains(scopes, "write:invoices")
         }
 
     // =========================================================================

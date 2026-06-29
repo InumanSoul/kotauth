@@ -7,6 +7,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
@@ -37,6 +38,7 @@ fun Route.authRoutes(
     roleRepository: RoleRepository? = null,
     socialLoginService: SocialLoginService? = null,
     identityProviderRepository: IdentityProviderRepository? = null,
+    resourceServerRepository: ResourceServerRepository? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
     corsService: CorsService? = null,
@@ -160,6 +162,7 @@ fun Route.authRoutes(
             roleRepository = roleRepository,
             encryptionService = encryptionService,
             loginRateLimiter = loginRateLimiter,
+            resourceServerRepository = resourceServerRepository,
             baseUrl = baseUrl,
             ssoTtlSeconds = ssoTtlSeconds,
         )
