@@ -237,6 +237,10 @@ object EnglishStrings {
     const val TOAST_API_ENABLED = "API enabled."
     const val TOAST_API_DELETED = "API deleted."
     const val TOAST_AUTHORIZED_APIS_UPDATED = "Authorized APIs updated."
+    const val RESOURCE_SERVER_SCOPES_LABEL = "Scopes (one per line)"
+    const val RESOURCE_SERVER_SCOPES_HINT =
+        "Tokens issued for this API will be narrowed to scopes in this list. " +
+            "Leave empty to disable narrowing."
 
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"
@@ -567,6 +571,9 @@ object EnglishStrings {
             "No account will be activated without clicking the link above."
     const val EMAIL_FOOTER_MAGIC_LINK = "If you did not request this link, you can safely ignore this email."
     const val EMAIL_FOOTER_OTP = "If you didn’t request a code, you can safely ignore this email."
+
+    const val BRAND_IDENTITY_HEADING = "Brand Identity"
+    const val VISUAL_THEME_HEADING = "Visual Theme"
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

@@ -1,5 +1,5 @@
 val ktorVersion = "3.5.0"
-val exposedVersion = "0.61.0"
+val exposedVersion = "1.3.0"
 val logbackVersion = "1.5.32"
 val flywayVersion = "12.4.0"
 val logstashEncoderVersion = "8.1"
@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.19.2"
+version = "1.19.3"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -77,7 +77,7 @@ dependencies {
     // MockK — Kotlin-native mocking (HTTP integration tests only)
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.5")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
     // Testcontainers — Redis integration tests (tagged @Tag("redis"); excluded from `make test`)
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")

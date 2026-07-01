@@ -6,11 +6,9 @@ import com.kauth.config.DbConfig
 import com.kauth.infrastructure.AuditChainHasher
 import com.kauth.infrastructure.DatabaseFactory
 import com.kauth.infrastructure.toHex
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.andWhere
-import org.jetbrains.exposed.sql.select
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.system.exitProcess
 
 object VerifyAuditChainCommand {

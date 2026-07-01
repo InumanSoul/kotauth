@@ -78,7 +78,19 @@ internal fun resourceServersListPageImpl(
                                                 +rs.name
                                             }
                                         }
-                                        td { span("data-table__id") { +rs.identifier } }
+                                        td {
+                            span("data-table__id") { +rs.identifier }
+                            if (rs.scopes.isNotEmpty()) {
+                                div("badge-row") {
+                                    rs.scopes.take(5).forEach {
+                                        span("badge badge--muted") { +it }
+                                    }
+                                    if (rs.scopes.size > 5) {
+                                        span("badge badge--muted") { +"+${rs.scopes.size - 5}" }
+                                    }
+                                }
+                            }
+                        }
                                         td {
                                             if (rs.enabled) {
                                                 span("badge badge--active") { +"Enabled" }
@@ -342,6 +354,20 @@ internal fun resourceServerFormPageImpl(
                                     +(prefill?.description ?: "")
                                 }
                                 div("edit-row__hint") { +EnglishStrings.API_FIELD_DESCRIPTION_HINT }
+                            }
+                        }
+                        div("edit-row") {
+                            span("edit-row__label") { +EnglishStrings.RESOURCE_SERVER_SCOPES_LABEL }
+                            div {
+                                textArea {
+                                    classes = setOf("edit-row__field")
+                                    id = "scopes"
+                                    attributes["name"] = "scopes"
+                                    attributes["rows"] = "6"
+                                    placeholder = "read:invoices\nwrite:invoices"
+                                    +(prefill?.scopes?.joinToString("\n").orEmpty())
+                                }
+                                div("edit-row__hint") { +EnglishStrings.RESOURCE_SERVER_SCOPES_HINT }
                             }
                         }
                     }

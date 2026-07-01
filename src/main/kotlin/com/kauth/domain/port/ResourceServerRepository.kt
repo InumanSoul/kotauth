@@ -23,6 +23,7 @@ interface ResourceServerRepository {
         identifier: String,
         name: String,
         description: String?,
+        scopes: List<String> = emptyList(),
     ): ResourceServer
 
     fun update(
@@ -30,6 +31,7 @@ interface ResourceServerRepository {
         id: ResourceServerId,
         name: String,
         description: String?,
+        scopes: List<String> = emptyList(),
     ): ResourceServer
 
     fun setEnabled(

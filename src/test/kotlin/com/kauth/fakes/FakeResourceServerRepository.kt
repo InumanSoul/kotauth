@@ -47,6 +47,7 @@ class FakeResourceServerRepository(
         identifier: String,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer {
         val pk = nextId++
         val rs =
@@ -56,6 +57,7 @@ class FakeResourceServerRepository(
                 identifier = identifier,
                 name = name,
                 description = description,
+                scopes = scopes,
                 enabled = true,
                 createdAt = Instant.now(),
             )
@@ -68,9 +70,10 @@ class FakeResourceServerRepository(
         id: ResourceServerId,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer {
         val current = byId[id.value]?.takeIf { it.tenantId == tenantId } ?: error("not found")
-        val updated = current.copy(name = name, description = description)
+        val updated = current.copy(name = name, description = description, scopes = scopes)
         byId[id.value] = updated
         return updated
     }

@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.service.AuthResult
 import com.kauth.domain.service.AuthService
@@ -76,6 +77,7 @@ internal fun Route.oauthProtocolRoutes(
     roleRepository: RoleRepository?,
     encryptionService: EncryptionService,
     loginRateLimiter: RateLimiterPort,
+    resourceServerRepository: ResourceServerRepository? = null,
     baseUrl: String = "",
     ssoTtlSeconds: Long,
 ) {
@@ -117,13 +119,18 @@ internal fun Route.oauthProtocolRoutes(
                         add("client_secret_basic")
                     },
                 )
+                val baselineScopes = listOf("openid", "profile", "email")
+                val apiScopes =
+                    resourceServerRepository
+                        ?.findByTenantId(tenant.id)
+                        ?.filter { it.enabled }
+                        ?.flatMap { it.scopes }
+                        ?.distinct()
+                        ?: emptyList()
+                val allScopes = (baselineScopes + apiScopes).distinct()
                 put(
                     "scopes_supported",
-                    buildJsonArray {
-                        add("openid")
-                        add("profile")
-                        add("email")
-                    },
+                    buildJsonArray { allScopes.forEach { add(it) } },
                 )
                 put(
                     "claims_supported",
@@ -295,6 +302,41 @@ internal fun Route.oauthProtocolRoutes(
             return@get
         }
 
+        val requestedResources =
+            call.parameters
+                .getAll("resource")
+                .orEmpty()
+                .filter { it.isNotBlank() }
+                .map { it.trim() }
+        val audienceResolution =
+            if (requestedResources.isNotEmpty()) {
+                oauthService.resolveAudiencesForClient(slug, clientId, requestedResources)
+            } else {
+                OAuthService.AudienceResolution.Ok(emptyList())
+            }
+        if (audienceResolution is OAuthService.AudienceResolution.Failed) {
+            if (!redirectUriTrusted) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "Invalid redirect_uri for client",
+                    ),
+                )
+                return@get
+            }
+            call.respondRedirect(
+                buildString {
+                    append(redirectUri)
+                    append("?error=invalid_target")
+                    append("&error_description=").append(encodeParam(audienceResolution.error.reason))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                },
+            )
+            return@get
+        }
+        val resolvedResources = (audienceResolution as OAuthService.AudienceResolution.Ok).values
+
         val oauthParams =
             AuthView.OAuthParams(
                 responseType = responseType,
@@ -305,6 +347,7 @@ internal fun Route.oauthProtocolRoutes(
                 codeChallenge = codeChallenge,
                 codeChallengeMethod = codeChallengeMethod,
                 nonce = nonce,
+                resources = resolvedResources,
             )
 
         // ---- Silent auth attempt -------------------------------------------
@@ -348,6 +391,7 @@ internal fun Route.oauthProtocolRoutes(
                             state = state,
                             ipAddress = call.request.local.remoteAddress,
                             authTime = sso.authTime,
+                            resources = resolvedResources,
                         )
                     if (codeResult is OAuthResult.Success) {
                         val redirect =
@@ -587,6 +631,7 @@ internal fun Route.oauthProtocolRoutes(
                     params["redirect_uri"]
                         ?: return@post oauthError(call, "invalid_request", "redirect_uri is required")
                 val codeVerifier = params["code_verifier"]
+                val requestedResources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -604,6 +649,7 @@ internal fun Route.oauthProtocolRoutes(
                             clientSecret = formClientSecret,
                             ipAddress = ipAddress,
                             userAgent = userAgent,
+                            requestedResources = requestedResources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)
@@ -655,6 +701,7 @@ internal fun Route.oauthProtocolRoutes(
                 val refreshToken =
                     params["refresh_token"]
                         ?: return@post oauthError(call, "invalid_request", "refresh_token is required")
+                val requestedResources = params.getAll("resource").orEmpty().filter { it.isNotBlank() }
 
                 when (
                     val result =
@@ -670,6 +717,7 @@ internal fun Route.oauthProtocolRoutes(
                             clientSecret = formClientSecret,
                             ipAddress = ipAddress,
                             userAgent = userAgent,
+                            requestedResources = requestedResources,
                         )
                 ) {
                     is OAuthResult.Success -> call.respond(result.value)

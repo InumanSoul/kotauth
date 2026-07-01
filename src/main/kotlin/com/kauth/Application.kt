@@ -401,6 +401,7 @@ fun Application.module(
             roleRepository = s.roleRepository,
             socialLoginService = s.socialLoginService,
             identityProviderRepository = s.identityProviderRepository,
+            resourceServerRepository = s.resourceServerRepository,
             baseUrl = config.baseUrl,
             encryptionService = s.encryptionService,
             corsService = s.corsService,

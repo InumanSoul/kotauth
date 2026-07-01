@@ -1,7 +1,8 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.*
 
 object ResourceServersTable : Table("resource_servers") {
     val id = integer("id").autoIncrement()
@@ -10,6 +11,7 @@ object ResourceServersTable : Table("resource_servers") {
     val name = varchar("name", 100)
     val description = text("description").nullable()
     val enabled = bool("enabled").default(true)
+    val scopes = jsonb("scopes").default("[]")
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)

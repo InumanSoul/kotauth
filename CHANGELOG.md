@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.19.3] - 2026-06-29
+
+Polish release — dependency hygiene, OIDC closure of the v1.18.0 deferred items, and a Brand Identity admin-page restructure.
+
+### Added
+
+- **RFC 8707 resource indicator on the `authorization_code` grant.** `/authorize` now accepts repeatable `resource` parameters; validated identifiers are bound to the issued code and propagated through to the access token's `aud` claim and the resulting session. Refresh-token grant honours the session-bound resources by default and accepts optional narrowing per RFC 8707 §3. Closes the v1.18.0 "Deferred" item.
+- **RFC 9068 §5 scope narrowing on token issuance (strict mode).** Token requests targeting one or more APIs (via `resource`) are narrowed to the intersection of the requested `scope` and the union of the targeted APIs' declared scopes. Requested scopes outside that set are rejected with `invalid_scope`. Applies to all three grants: `authorization_code`, `refresh_token`, and `client_credentials`.
+- **Admin UI — Scopes editor on the API settings page.** Each API in the workspace registry can declare its accepted scopes via a newline-separated textarea. Declared scopes render as inline badges on the API list. Empty scopes column = no narrowing (backwards-compatible for v1.18.0 deployments).
+- **`scopes_supported` discovery metadata.** `/.well-known/openid-configuration` now emits the union of the OIDC baseline (`openid profile email`) and every enabled API's declared scopes for the tenant.
+
+### Changed
+
+- **Brand Identity admin page restructured into two cards.** The `/settings/branding` page now renders a top-level **Brand Identity** card (logo, favicon, accent color, support email) above a **Visual Theme** card (theme preset, remaining colors, font, border radius, default locale). The `fromDisplayName` input is removed from the branding form — the SMTP card's existing `smtpFromName` is the operator-managed display name; `emailBranding.fromDisplayName` remains as an API-only override (matches the existing `brandName`/`brandColorHex`/`brandLogoUrl` pattern).
+- **Dependencies bumped:** `org.junit.jupiter:junit-jupiter-engine` 5.10.5 → 6.1.0; `org.jetbrains.exposed` group 0.61.0 → 1.3.0 (major package restructuring to `org.jetbrains.exposed.v1.*`); runtime container base `eclipse-temurin:17-jre` → `eclipse-temurin:25-jre`.
+
+### Migrations
+
+- `V53__resource_indicators_auth_code.sql` — adds `scopes JSONB NOT NULL DEFAULT '[]'` to `resource_servers`, and `resources JSONB NOT NULL DEFAULT '[]'` to `authorization_codes` and `sessions`. All defaults preserve v1.19.2 behaviour for existing rows.
+
+---
+
 ## [1.19.2] - 2026-06-22
 
 Docker stack consolidation. No runtime changes — image and JAR are unchanged from `1.19.1`. Six compose files become two.

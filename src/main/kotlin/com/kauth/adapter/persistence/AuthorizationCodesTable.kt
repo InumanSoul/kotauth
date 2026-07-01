@@ -1,7 +1,8 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.*
 
 /**
  * Exposed mapping for 'authorization_codes' (V7 migration).
@@ -22,6 +23,7 @@ object AuthorizationCodesTable : Table("authorization_codes") {
     val usedAt = timestampWithTimeZone("used_at").nullable()
     val createdAt = timestampWithTimeZone("created_at")
     val authTime = timestampWithTimeZone("auth_time").nullable()
+    val resources = jsonb("resources").default("[]")
 
     override val primaryKey = PrimaryKey(id)
 }

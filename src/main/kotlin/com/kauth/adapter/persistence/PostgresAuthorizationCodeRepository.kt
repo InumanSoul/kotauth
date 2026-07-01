@@ -5,8 +5,11 @@ import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuthorizationCodeRepository
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -33,6 +36,7 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
                     it[usedAt] = code.usedAt?.toOffsetDateTime()
                     it[createdAt] = code.createdAt.toOffsetDateTime()
                     it[authTime] = code.authTime?.toOffsetDateTime()
+                    it[resources] = Json.encodeToString(code.resources)
                 } get AuthorizationCodesTable.id
 
             code.copy(id = insertedId)
@@ -78,6 +82,7 @@ class PostgresAuthorizationCodeRepository : AuthorizationCodeRepository {
             usedAt = this[AuthorizationCodesTable.usedAt]?.toInstant(),
             createdAt = this[AuthorizationCodesTable.createdAt].toInstant(),
             authTime = this[AuthorizationCodesTable.authTime]?.toInstant(),
+            resources = Json.decodeFromString(this[AuthorizationCodesTable.resources].ifBlank { "[]" }),
         )
 
     private fun Instant.toOffsetDateTime(): OffsetDateTime = OffsetDateTime.ofInstant(this, ZoneOffset.UTC)
