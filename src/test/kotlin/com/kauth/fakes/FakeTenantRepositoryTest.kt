@@ -18,4 +18,13 @@ class FakeTenantRepositoryTest {
         repo.update(tenant.copy(passkeysEnabled = false))
         assertEquals(false, repo.findBySlug("acme")?.passkeysEnabled)
     }
+
+    @Test
+    fun `passwordLoginDisabled defaults to false and round-trips on update`() {
+        val tenant = repo.create(slug = "acme", displayName = "Acme", issuerUrl = null)
+        assertEquals(false, tenant.passwordLoginDisabled)
+
+        repo.update(tenant.copy(passwordLoginDisabled = true))
+        assertEquals(true, repo.findBySlug("acme")?.passwordLoginDisabled)
+    }
 }

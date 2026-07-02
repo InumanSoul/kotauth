@@ -109,6 +109,7 @@ class PostgresTenantRepository(
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
                 it[passkeysEnabled] = tenant.passkeysEnabled
+                it[passwordLoginDisabled] = tenant.passwordLoginDisabled
             }
             // Upsert: update if exists, insert if the row was never created
             val updatedRows =
@@ -216,6 +217,7 @@ class PostgresTenantRepository(
             portalConfig = toPortalConfig(),
             emailBranding = toEmailBranding(),
             passkeysEnabled = this[TenantsTable.passkeysEnabled],
+            passwordLoginDisabled = this[TenantsTable.passwordLoginDisabled],
         )
     }
 
