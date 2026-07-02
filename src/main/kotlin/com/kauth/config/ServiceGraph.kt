@@ -26,6 +26,7 @@ import com.kauth.adapter.persistence.PostgresTenantRepository
 import com.kauth.adapter.persistence.PostgresThemeRepository
 import com.kauth.adapter.persistence.PostgresUserAttributeRepository
 import com.kauth.adapter.persistence.PostgresUserRepository
+import com.kauth.adapter.persistence.PostgresWebAuthnCredentialRepository
 import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
 import com.kauth.adapter.social.GitHubOAuthAdapter
@@ -33,6 +34,8 @@ import com.kauth.adapter.social.GoogleOAuthAdapter
 import com.kauth.adapter.token.BcryptPasswordHasher
 import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
+import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
+import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -44,6 +47,7 @@ import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.PortalConfigRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.RelyingPartyAdapter
 import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
@@ -52,6 +56,7 @@ import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminUserService
@@ -73,6 +78,7 @@ import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.infrastructure.AdminClientProvisioning
@@ -93,6 +99,8 @@ import com.kauth.infrastructure.redis.RedisClientFactory
 import com.kauth.infrastructure.redis.RedisClientHolder
 import com.kauth.infrastructure.redis.RedisRateLimiter
 import com.kauth.infrastructure.redis.RedisSessionRepository
+import com.yubico.webauthn.RelyingParty
+import com.yubico.webauthn.data.RelyingPartyIdentity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -165,6 +173,7 @@ data class ServiceGraph(
     val backupImporterService: BackupImporterService,
     val backupEncryptionPort: BackupEncryptionPort,
     val auditLogPort: AuditLogPort,
+    val webAuthnService: WebAuthnService,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
 ) {
@@ -447,6 +456,33 @@ data class ServiceGraph(
                     roleRepository = roleRepository,
                 )
 
+            // -- WebAuthn (passkeys) ------------------------------------------
+            val webAuthnCredentialRepository: WebAuthnCredentialRepository = PostgresWebAuthnCredentialRepository()
+            val rpHost = java.net.URI(config.baseUrl).host
+            val yubicoRelyingParty: RelyingParty =
+                RelyingParty
+                    .builder()
+                    .identity(
+                        RelyingPartyIdentity
+                            .builder()
+                            .id(rpHost)
+                            .name("Kotauth")
+                            .build(),
+                    ).credentialRepository(YubicoCredentialRepositoryBridge(webAuthnCredentialRepository))
+                    .origins(setOf(config.baseUrl))
+                    .allowOriginPort(false)
+                    .allowOriginSubdomain(false)
+                    .build()
+            val relyingPartyAdapter: RelyingPartyAdapter = YubicoRelyingPartyAdapter(yubicoRelyingParty)
+            val webAuthnService =
+                WebAuthnService(
+                    credentialRepository = webAuthnCredentialRepository,
+                    userRepository = userRepository,
+                    relyingParty = relyingPartyAdapter,
+                    secretKey = config.secretKey,
+                    auditLog = auditLogAdapter,
+                )
+
             // -- Key rotation -------------------------------------------------
             val keyRotationService =
                 KeyRotationService(
@@ -610,6 +646,7 @@ data class ServiceGraph(
                 backupImporterService = backupImporterService,
                 backupEncryptionPort = backupEncryptionPort,
                 auditLogPort = auditLogAdapter,
+                webAuthnService = webAuthnService,
                 flywaySchemaVersion = flywaySchemaVersion,
             )
         }
