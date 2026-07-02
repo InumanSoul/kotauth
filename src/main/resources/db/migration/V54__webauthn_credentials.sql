@@ -2,8 +2,8 @@ ALTER TABLE tenants ADD COLUMN password_login_disabled BOOLEAN NOT NULL DEFAULT 
 
 CREATE TABLE webauthn_credentials (
     id                BIGSERIAL PRIMARY KEY,
-    user_id           BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    tenant_id         BIGINT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id           INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    tenant_id         INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     credential_id     TEXT NOT NULL UNIQUE,
     public_key_cose   BYTEA NOT NULL,
     sign_counter      BIGINT NOT NULL DEFAULT 0,
