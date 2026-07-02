@@ -62,6 +62,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("com.auth0:java-jwt:4.5.2")
     implementation("at.favre.lib:bcrypt:0.10.2")
+    implementation("com.yubico:webauthn-server-core:2.6.0")
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
