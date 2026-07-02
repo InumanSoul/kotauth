@@ -32,6 +32,7 @@ object TenantsTable : Table("tenants") {
     val smtpTlsEnabled = bool("smtp_tls_enabled").default(true)
     val smtpEnabled = bool("smtp_enabled").default(false)
     val maxConcurrentSessions = integer("max_concurrent_sessions").nullable()
+    val passkeysEnabled = bool("passkeys_enabled").default(true)
 
     override val primaryKey = PrimaryKey(id)
 }
