@@ -1,10 +1,11 @@
-package com.kauth.adapter.webauthn
+package com.kauth.domain.port
 
 import java.util.UUID
 
 /**
- * Isolates Yubico webauthn-server-core types from the domain layer.
- * Concrete implementation ([YubicoRelyingPartyAdapter]) wraps [com.yubico.webauthn.RelyingParty].
+ * Port (outbound) — isolates Yubico webauthn-server-core types from the domain layer.
+ * Concrete implementation ([com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter]) wraps
+ * [com.yubico.webauthn.RelyingParty].
  */
 interface RelyingPartyAdapter {
     /**

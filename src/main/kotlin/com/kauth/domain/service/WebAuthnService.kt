@@ -1,6 +1,5 @@
 package com.kauth.domain.service
 
-import com.kauth.adapter.webauthn.RelyingPartyAdapter
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
@@ -9,6 +8,8 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebAuthnCredential
 import com.kauth.domain.port.AuditLogPort
+import com.kauth.domain.port.RelyingPartyAdapter
+import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
 import java.security.MessageDigest
 import java.time.Clock
@@ -19,6 +20,7 @@ class WebAuthnService(
     private val relyingParty: RelyingPartyAdapter,
     private val secretKey: String,
     private val auditLog: AuditLogPort,
+    private val userRepository: UserRepository,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -30,7 +32,7 @@ class WebAuthnService(
         userId: UserId,
     ): ByteArray {
         val input = "${tenantId.value}:${userId.value}:$secretKey".toByteArray(Charsets.UTF_8)
-        return MessageDigest.getInstance("SHA-256").digest(input).copyOf(32)
+        return MessageDigest.getInstance("SHA-256").digest(input)
     }
 
     fun startRegistration(
@@ -38,9 +40,10 @@ class WebAuthnService(
         tenant: Tenant,
     ): WebAuthnResult<RegistrationOptions> {
         if (!tenant.passkeysEnabled) return WebAuthnResult.Failure(WebAuthnError.PasskeysDisabledForTenant)
-        val existing = credentialRepository.findByUserId(user.id!!, tenant.id)
+        val userId = requireNotNull(user.id) { "user must be persisted before passkey operations" }
+        val existing = credentialRepository.findByUserId(userId, tenant.id)
         val excludeIds = existing.map { it.credentialId }
-        val userHandle = deriveUserHandle(tenant.id, user.id)
+        val userHandle = deriveUserHandle(tenant.id, userId)
         val (optionsJson, challenge) =
             relyingParty.startRegistration(
                 userHandle = userHandle,
@@ -58,6 +61,7 @@ class WebAuthnService(
         request: RegistrationFinishRequest,
     ): WebAuthnResult<WebAuthnCredential> {
         if (!tenant.passkeysEnabled) return WebAuthnResult.Failure(WebAuthnError.PasskeysDisabledForTenant)
+        val userId = requireNotNull(user.id) { "user must be persisted before passkey operations" }
         val parsed =
             try {
                 relyingParty.finishRegistration(creationOptionsJson, request.credentialJson)
@@ -66,7 +70,7 @@ class WebAuthnService(
             }
         val credential =
             WebAuthnCredential(
-                userId = user.id!!,
+                userId = userId,
                 tenantId = tenant.id,
                 credentialId = parsed.credentialId,
                 publicKeyCose = parsed.publicKeyCose,
@@ -83,7 +87,7 @@ class WebAuthnService(
         auditLog.record(
             AuditEvent(
                 tenantId = tenant.id,
-                userId = user.id,
+                userId = userId,
                 clientId = null,
                 eventType = AuditEventType.PASSKEY_ENROLLED,
                 ipAddress = null,
@@ -118,6 +122,17 @@ class WebAuthnService(
             try {
                 relyingParty.finishAssertion(assertionRequestJson, request.credentialJson)
             } catch (e: IllegalStateException) {
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = null,
+                        clientId = null,
+                        eventType = AuditEventType.PASSKEY_AUTH_FAILED,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("reason" to (e.message ?: "verification failed")),
+                    ),
+                )
                 return WebAuthnResult.Failure(WebAuthnError.VerificationFailed(e.message ?: "verification failed"))
             }
 
@@ -143,7 +158,11 @@ class WebAuthnService(
             return WebAuthnResult.Failure(WebAuthnError.CounterReplayDetected)
         }
 
-        if (!stored.userId.let { true }) return WebAuthnResult.Failure(WebAuthnError.CredentialNotFound)
+        val user =
+            userRepository.findById(stored.userId, tenant.id)
+                ?: return WebAuthnResult.Failure(WebAuthnError.CredentialNotFound)
+
+        if (!user.enabled) return WebAuthnResult.Failure(WebAuthnError.UserDisabled)
 
         credentialRepository.updateCounter(stored.id!!, assertion.newSignCounter, Instant.now(clock))
         auditLog.record(

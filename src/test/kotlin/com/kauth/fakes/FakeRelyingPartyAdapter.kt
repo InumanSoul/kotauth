@@ -1,8 +1,8 @@
 package com.kauth.fakes
 
-import com.kauth.adapter.webauthn.AssertionResultData
-import com.kauth.adapter.webauthn.RegisteredCredentialData
-import com.kauth.adapter.webauthn.RelyingPartyAdapter
+import com.kauth.domain.port.AssertionResultData
+import com.kauth.domain.port.RegisteredCredentialData
+import com.kauth.domain.port.RelyingPartyAdapter
 import java.util.UUID
 
 /**

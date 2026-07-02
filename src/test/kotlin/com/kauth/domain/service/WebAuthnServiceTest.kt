@@ -1,14 +1,15 @@
 package com.kauth.domain.service
 
-import com.kauth.adapter.webauthn.AssertionResultData
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebAuthnCredential
+import com.kauth.domain.port.AssertionResultData
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeRelyingPartyAdapter
+import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import java.time.Clock
 import java.time.Instant
@@ -47,6 +48,7 @@ class WebAuthnServiceTest {
         )
 
     private lateinit var credRepo: FakeWebAuthnCredentialRepository
+    private lateinit var userRepo: FakeUserRepository
     private lateinit var relyingParty: FakeRelyingPartyAdapter
     private lateinit var auditLog: FakeAuditLogPort
     private lateinit var service: WebAuthnService
@@ -56,6 +58,8 @@ class WebAuthnServiceTest {
     @BeforeTest
     fun setup() {
         credRepo = FakeWebAuthnCredentialRepository()
+        userRepo = FakeUserRepository()
+        userRepo.add(user)
         relyingParty = FakeRelyingPartyAdapter()
         auditLog = FakeAuditLogPort()
         service =
@@ -64,6 +68,7 @@ class WebAuthnServiceTest {
                 relyingParty = relyingParty,
                 secretKey = "test-secret-key-32-chars-minimum!!",
                 auditLog = auditLog,
+                userRepository = userRepo,
                 clock = fixedClock,
             )
     }
@@ -193,6 +198,7 @@ class WebAuthnServiceTest {
         val result = service.startAuthentication(tenant)
         assertIs<WebAuthnResult.Success<AuthenticationOptions>>(result)
         assertTrue(result.value.challenge.isNotBlank())
+        assertTrue(result.value.publicKeyOptionsJson.isNotBlank())
     }
 
     @Test
@@ -254,6 +260,46 @@ class WebAuthnServiceTest {
         val updated = credRepo.findByCredentialId(FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID)
         assertNotNull(updated)
         assertEquals(1L, updated.signCounter)
+    }
+
+    @Test
+    fun `finishAuthentication rejects disabled user`() {
+        seedCredential(signCounter = 0L)
+        val disabledUser = user.copy(enabled = false)
+        userRepo.clear()
+        userRepo.add(disabledUser)
+
+        relyingParty.queueAssertion(
+            AssertionResultData(
+                credentialId = FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID,
+                userHandle = ByteArray(32) { 0x42 },
+                newSignCounter = 1L,
+                userVerified = true,
+            ),
+        )
+
+        val result =
+            service.finishAuthentication(
+                tenant = tenant,
+                assertionRequestJson = FakeRelyingPartyAdapter.CANNED_ASSERTION_REQUEST_JSON,
+                request = AuthenticationFinishRequest(credentialJson = "{}"),
+            )
+        assertIs<WebAuthnResult.Failure>(result)
+        assertEquals(WebAuthnError.UserDisabled, result.error)
+    }
+
+    @Test
+    fun `finishAuthentication records PASSKEY_AUTH_FAILED audit event when adapter throws`() {
+        relyingParty.throwOnFinishAssertion = "crypto error"
+        val result =
+            service.finishAuthentication(
+                tenant = tenant,
+                assertionRequestJson = FakeRelyingPartyAdapter.CANNED_ASSERTION_REQUEST_JSON,
+                request = AuthenticationFinishRequest(credentialJson = "{}"),
+            )
+        assertIs<WebAuthnResult.Failure>(result)
+        assertIs<WebAuthnError.VerificationFailed>(result.error)
+        assertTrue(auditLog.hasEvent(AuditEventType.PASSKEY_AUTH_FAILED))
     }
 
     @Test
