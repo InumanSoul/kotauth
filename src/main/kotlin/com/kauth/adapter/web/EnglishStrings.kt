@@ -383,6 +383,8 @@ object EnglishStrings {
     const val LOGIN_CONTINUE_GITHUB = "Continue with GitHub"
     const val LOGIN_PROVIDER_GOOGLE = "Google"
     const val LOGIN_PROVIDER_GITHUB = "GitHub"
+    const val AUTH_LOGIN_PASSKEY_BUTTON = "Sign in with a passkey"
+    const val AUTH_LOGIN_MAGIC_LINK_BUTTON = "Sign in with a magic link"
 
     // Login page — passwordless mode (when tenant disables password sign-in)
     const val LOGIN_PASSWORDLESS_SUBTITLE = "Sign in with an email link"

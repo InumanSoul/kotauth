@@ -124,6 +124,8 @@ object AuthView {
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
         emailOtpLoginEnabled: Boolean = false,
+        passkeysEnabled: Boolean = false,
+        passwordLoginDisabled: Boolean = false,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
@@ -169,38 +171,63 @@ object AuthView {
                                     input(type = InputType.text, name = "username") {
                                         id = "username"
                                         placeholder = ctx.t("LOGIN_USERNAME_PLACEHOLDER")
-                                        attributes["autocomplete"] = "username"
+                                        attributes["autocomplete"] =
+                                            if (passkeysEnabled) "username webauthn" else "username"
                                         required = true
                                         attributes["autofocus"] = "true"
                                     }
                                 }
-                                div("field") {
-                                    label {
-                                        htmlFor = "password"
-                                        +ctx.t("PASSWORD")
-                                    }
-                                    div("field__input-wrap") {
-                                        input(type = InputType.password, name = "password") {
-                                            id = "password"
-                                            placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
-                                            attributes["autocomplete"] = "current-password"
-                                            required = true
+                                if (!passwordLoginDisabled) {
+                                    div("field") {
+                                        label {
+                                            htmlFor = "password"
+                                            +ctx.t("PASSWORD")
                                         }
-                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
-                                            attributes["data-toggle-password"] = "password"
-                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
-                                            attributes["aria-pressed"] = "false"
-                                            attributes["data-visible"] = "false"
-                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
-                                            inlineSvgIcon("eye-off", ctx.t("AUTH_ICON_HIDE"), cssClass = "icon-eye-off")
+                                        div("field__input-wrap") {
+                                            input(type = InputType.password, name = "password") {
+                                                id = "password"
+                                                placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
+                                                attributes["autocomplete"] = "current-password"
+                                                required = true
+                                            }
+                                            button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                                attributes["data-toggle-password"] = "password"
+                                                attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
+                                                attributes["aria-pressed"] = "false"
+                                                attributes["data-visible"] = "false"
+                                                inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                                inlineSvgIcon(
+                                                    "eye-off",
+                                                    ctx.t("AUTH_ICON_HIDE"),
+                                                    cssClass = "icon-eye-off",
+                                                )
+                                            }
                                         }
                                     }
                                 }
-                                button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
+                                if (!passwordLoginDisabled) {
+                                    button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
+                                }
                             }
 
-                            div("footer-link") {
-                                a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
+                            if (passkeysEnabled) {
+                                button(classes = "btn btn--secondary") {
+                                    id = "passkey-signin-btn"
+                                    +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
+                                }
+                            }
+                            if (passwordLoginDisabled) {
+                                div("footer-link") {
+                                    a(href = "/t/$tenantSlug/magic-link", classes = "link") {
+                                        +ctx.t("AUTH_LOGIN_MAGIC_LINK_BUTTON")
+                                    }
+                                }
+                            }
+
+                            if (!passwordLoginDisabled) {
+                                div("footer-link") {
+                                    a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
+                                }
                             }
                             if (magicLinkEnabled || emailOtpLoginEnabled) {
                                 div("passwordless-options") {
@@ -237,6 +264,12 @@ object AuthView {
                                 }
                                 button(type = ButtonType.submit, classes = "btn") {
                                     +ctx.t("LOGIN_PASSWORDLESS_SUBMIT")
+                                }
+                            }
+                            if (passkeysEnabled) {
+                                button(classes = "btn btn--secondary") {
+                                    id = "passkey-signin-btn"
+                                    +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
                             if (emailOtpLoginEnabled) {
@@ -301,6 +334,28 @@ object AuthView {
                             ctx.workspaceName,
                         )
                         a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+
+                if (passkeysEnabled) {
+                    script(src = "/static/js/kotauth-passkeys.min.js?v=${AppInfo.assetVersion}") {
+                        JsIntegrity.passkeys?.let { attributes["integrity"] = it }
+                        attributes["crossorigin"] = "anonymous"
+                    }
+                    script {
+                        unsafe {
+                            +"""
+                            document.addEventListener('DOMContentLoaded', function () {
+                              var base = '/t/$tenantSlug/passkeys';
+                              var btn = document.getElementById('passkey-signin-btn');
+                              if (btn) btn.addEventListener('click', function (e) {
+                                e.preventDefault();
+                                Kotauth.passkeys.signInWithPasskey(base);
+                              });
+                              Kotauth.passkeys.startConditionalMediation(base);
+                            });
+                            """.trimIndent()
+                        }
                     }
                 }
             }
