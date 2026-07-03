@@ -512,6 +512,9 @@ fun Application.module(
             baseUrl = config.baseUrl,
             translationPort = s.translationPort,
             webAuthnCredentialRepository = s.webAuthnCredentialRepository,
+            webAuthnService = s.webAuthnService,
+            mfaService = s.mfaService,
+            auditLogPort = s.auditLogPort,
         )
     }
 }

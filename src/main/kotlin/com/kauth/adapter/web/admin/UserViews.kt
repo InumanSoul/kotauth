@@ -2,12 +2,14 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.adapter.webauthn.AaguidLookup
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
+import com.kauth.domain.model.WebAuthnCredential
 import kotlinx.html.*
 import java.time.Instant
 import java.time.ZoneOffset
@@ -48,6 +50,7 @@ internal fun userDetailPageImpl(
     tempPasswordLink: String? = null,
     recentImpersonations: List<ImpersonationRecord> = emptyList(),
     recentOtpActivity: List<OtpActivityRecord> = emptyList(),
+    passkeys: List<WebAuthnCredential> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -340,6 +343,61 @@ internal fun userDetailPageImpl(
                 }
             }
 
+            // ── Passkeys ─────────────────────────────────────────────
+            div("ov-card") {
+                div("ov-card__section-label") {
+                    span { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
+                }
+                if (passkeys.isEmpty()) {
+                    emptyState(
+                        iconName = "key",
+                        title = "No passkeys enrolled",
+                        description = "This user has not registered any passkeys.",
+                    )
+                } else {
+                    table("data-table") {
+                        thead {
+                            tr {
+                                th { +"Name" }
+                                th { +"Device" }
+                                th { +"Registered" }
+                                th { style = "width:80px;" }
+                            }
+                        }
+                        tbody {
+                            passkeys.forEach { cred ->
+                                tr {
+                                    td { span("data-table__name") { +cred.name } }
+                                    td { +(AaguidLookup.displayName(cred.aaguid)) }
+                                    td { +cred.createdAt.toDisplayString() }
+                                    td {
+                                        div("data-table__actions") {
+                                            postButton(
+                                                action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/passkeys/${cred.id}/revoke",
+                                                label = EnglishStrings.PORTAL_PASSKEYS_REVOKE,
+                                                btnClass = "btn btn--ghost btn--sm",
+                                                confirmMessage = "Revoke this passkey? The user will need to re-register it.",
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if (passkeys.isNotEmpty()) {
+                    div {
+                        style = "margin-top:var(--space-3);"
+                        postButton(
+                            action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/passkeys/reset-all",
+                            label = EnglishStrings.ADMIN_PASSKEYS_RESET_ALL_BUTTON,
+                            btnClass = "btn btn--danger btn--sm",
+                            confirmMessage = "Remove all passkeys for this user? They will need to re-register.",
+                        )
+                    }
+                }
+            }
+
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
                 div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
@@ -374,6 +432,19 @@ internal fun userDetailPageImpl(
                                 null
                             },
                         )
+                    }
+                    if (user.mfaEnabled) {
+                        dangerZoneCard(
+                            title = "Reset MFA",
+                            description = "Removes all MFA enrollments and recovery codes for this user. They will need to re-enroll.",
+                        ) {
+                            postButton(
+                                action = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/mfa/reset",
+                                label = EnglishStrings.ADMIN_MFA_RESET_BUTTON,
+                                btnClass = "btn btn--danger btn--sm",
+                                confirmMessage = "Reset MFA for this user? All enrollments and recovery codes will be removed.",
+                            )
+                        }
                     }
                 }
             }

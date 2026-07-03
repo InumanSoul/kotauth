@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.UserRepository
@@ -10,12 +12,16 @@ import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ImpersonationService
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebAuthnResult
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
@@ -35,6 +41,9 @@ fun Route.adminUserRoutes(
     impersonationService: ImpersonationService? = null,
     userRepository: UserRepository? = null,
     auditLogRepository: AuditLogRepository? = null,
+    webAuthnService: WebAuthnService? = null,
+    mfaService: MfaService? = null,
+    auditLogPort: AuditLogPort? = null,
 ) {
     route("/users") {
         get {
@@ -190,6 +199,8 @@ fun Route.adminUserRoutes(
                                 )
                             }
                     } ?: emptyList()
+                val passkeys =
+                    webAuthnService?.listForUser(userId, ctx.workspace.id) ?: emptyList()
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
@@ -206,6 +217,7 @@ fun Route.adminUserRoutes(
                         mappedKeys = mappedKeys,
                         tempPasswordLink = tempPasswordLink,
                         recentImpersonations = recentImpersonations,
+                        passkeys = passkeys,
                     ),
                 )
             }
@@ -591,6 +603,93 @@ fun Route.adminUserRoutes(
                 call.respondRedirect(
                     "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=attribute_deleted",
                 )
+            }
+
+            // ── Passkeys: revoke single credential ──────────────────────
+            if (webAuthnService != null && auditLogPort != null) {
+                post("/passkeys/{credId}/revoke") {
+                    val ctx = call.adminContext()
+                    val userId =
+                        call.parameters.typedId("userId", ::UserId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val credId =
+                        call.parameters["credId"]?.toLongOrNull()
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val actorId = UserId(ctx.session.userId)
+                    when (webAuthnService.revoke(userId, credId, ctx.workspace.id)) {
+                        is WebAuthnResult.Success -> {
+                            auditLogPort.record(
+                                AuditEvent(
+                                    tenantId = ctx.workspace.id,
+                                    userId = actorId,
+                                    clientId = null,
+                                    eventType = AuditEventType.PASSKEY_ADMIN_REVOKED,
+                                    ipAddress = call.request.origin.remoteHost,
+                                    userAgent = null,
+                                    details =
+                                        mapOf(
+                                            "targetUser" to userId.value.toString(),
+                                            "credentialId" to credId.toString(),
+                                        ),
+                                ),
+                            )
+                            call.respondRedirect(
+                                "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=passkey_revoked",
+                            )
+                        }
+                        is WebAuthnResult.Failure ->
+                            call.respond(HttpStatusCode.NotFound)
+                    }
+                }
+
+                // ── Passkeys: reset all ──────────────────────────────────
+                post("/passkeys/reset-all") {
+                    val ctx = call.adminContext()
+                    val userId =
+                        call.parameters.typedId("userId", ::UserId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val actorId = UserId(ctx.session.userId)
+                    if (ctx.workspace.passwordLoginDisabled && !ctx.workspace.isSmtpReady) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "OperatorLockoutBlocked"),
+                        )
+                    }
+                    webAuthnService.adminResetAll(ctx.workspace.id, userId, actorId)
+                    call.respondRedirect(
+                        "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=passkeys_reset",
+                    )
+                }
+            }
+
+            // ── MFA: admin reset ─────────────────────────────────────────
+            if (mfaService != null && auditLogPort != null) {
+                post("/mfa/reset") {
+                    val ctx = call.adminContext()
+                    val userId =
+                        call.parameters.typedId("userId", ::UserId)
+                            ?: return@post call.respond(HttpStatusCode.BadRequest)
+                    val actorId = UserId(ctx.session.userId)
+                    mfaService.disableMfa(
+                        userId = userId,
+                        tenantId = ctx.workspace.id,
+                        ipAddress = call.request.origin.remoteHost,
+                    )
+                    auditLogPort.record(
+                        AuditEvent(
+                            tenantId = ctx.workspace.id,
+                            userId = actorId,
+                            clientId = null,
+                            eventType = AuditEventType.MFA_ADMIN_RESET,
+                            ipAddress = call.request.origin.remoteHost,
+                            userAgent = null,
+                            details = mapOf("targetUser" to userId.value.toString()),
+                        ),
+                    )
+                    call.respondRedirect(
+                        "/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=mfa_reset",
+                    )
+                }
             }
         }
     }

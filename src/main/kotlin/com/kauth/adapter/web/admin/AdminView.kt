@@ -180,6 +180,7 @@ object AdminView {
         tempPasswordLink: String? = null,
         recentImpersonations: List<ImpersonationRecord> = emptyList(),
         recentOtpActivity: List<OtpActivityRecord> = emptyList(),
+        passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -197,6 +198,7 @@ object AdminView {
             tempPasswordLink,
             recentImpersonations,
             recentOtpActivity,
+            passkeys,
         )
 
     fun userAttributeFormPage(

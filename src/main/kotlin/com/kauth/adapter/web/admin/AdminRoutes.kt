@@ -9,6 +9,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.ApplicationRepository
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.BackupEncryptionPort
 import com.kauth.domain.port.CorsPort
@@ -27,9 +28,11 @@ import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.BackupExporterService
 import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.KeyRotationService
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AdminClientProvisioning
 import com.kauth.infrastructure.EncryptionService
@@ -87,6 +90,9 @@ fun Route.adminRoutes(
     baseUrl: String = "",
     translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
+    webAuthnService: WebAuthnService? = null,
+    mfaService: MfaService? = null,
+    auditLogPort: AuditLogPort? = null,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
@@ -518,6 +524,9 @@ fun Route.adminRoutes(
                     impersonationService = impersonationService,
                     userRepository = userRepository,
                     auditLogRepository = auditLogRepository,
+                    webAuthnService = webAuthnService,
+                    mfaService = mfaService,
+                    auditLogPort = auditLogPort,
                 )
 
                 adminSessionAuditRoutes(
