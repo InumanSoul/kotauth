@@ -75,4 +75,11 @@ class FakeWebAuthnCredentialRepository : WebAuthnCredentialRepository {
         toRemove.forEach { store.remove(it) }
         return toRemove.size
     }
+
+    override fun countEnrolledUsersByTenantId(tenantId: TenantId): Int =
+        store.values
+            .filter { it.tenantId == tenantId }
+            .map { it.userId }
+            .distinct()
+            .size
 }

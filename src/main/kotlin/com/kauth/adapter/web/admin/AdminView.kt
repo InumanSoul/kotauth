@@ -87,7 +87,10 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved)
+        enrolledPasskeyUsers: Int = 0,
+        totalUsers: Int = 0,
+    ): HTML.() -> Unit =
+        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved, enrolledPasskeyUsers, totalUsers)
 
     fun brandingPage(
         workspace: Tenant,

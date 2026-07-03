@@ -38,4 +38,6 @@ interface WebAuthnCredentialRepository {
         userId: UserId,
         tenantId: TenantId,
     ): Int
+
+    fun countEnrolledUsersByTenantId(tenantId: TenantId): Int
 }

@@ -579,6 +579,8 @@ internal fun securityPolicyPageImpl(
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
+    enrolledPasskeyUsers: Int = 0,
+    totalUsers: Int = 0,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -899,6 +901,47 @@ internal fun securityPolicyPageImpl(
                                 }
                                 div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
                             }
+                        }
+                    }
+                }
+
+                // ── Passkeys ─────────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "passkeysEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.passkeysEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_ENABLED_LABEL }
+                        }
+                    }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "passwordLoginDisabled") {
+                            attributes["value"] = "true"
+                            if (workspace.passwordLoginDisabled) checked = true
+                            if (!workspace.isSmtpReady) disabled = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_PASSWORDLESS_LABEL }
+                            if (!workspace.isSmtpReady) {
+                                span("check-row__warn") { +EnglishStrings.ADMIN_PASSKEYS_SMTP_GATE_HINT }
+                            }
+                        }
+                    }
+                    if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
+                        div("insight-item insight-item--static") {
+                            span("insight-item__label") { +"Passkey enrollment" }
+                            span("insight-item__value insight-item__value--mono") {
+                                +"$enrolledPasskeyUsers"
+                                span {
+                                    attributes["style"] =
+                                        "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
+                                    +" / $totalUsers"
+                                }
+                            }
+                            span("insight-item__hint") { +"users have enrolled at least one passkey" }
                         }
                     }
                 }

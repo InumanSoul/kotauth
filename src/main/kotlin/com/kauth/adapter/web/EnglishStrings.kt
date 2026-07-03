@@ -353,6 +353,15 @@ object EnglishStrings {
         "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
+    // Passkeys card (workspace security settings — v1.20)
+    const val ADMIN_PASSKEYS_HEADING = "Passkeys"
+    const val ADMIN_PASSKEYS_ENABLED_LABEL = "Passkey sign-in enabled"
+    const val ADMIN_PASSKEYS_PASSWORDLESS_LABEL = "Disable password sign-in (passkey + magic link only)"
+    const val ADMIN_PASSKEYS_SMTP_GATE_HINT =
+        "SMTP is required to disable password sign-in — magic-link is the recovery path."
+    const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
+    const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 

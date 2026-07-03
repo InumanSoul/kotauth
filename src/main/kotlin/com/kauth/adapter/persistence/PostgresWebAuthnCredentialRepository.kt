@@ -131,6 +131,16 @@ class PostgresWebAuthnCredentialRepository(
             }
         }
 
+    override fun countEnrolledUsersByTenantId(tenantId: TenantId): Int =
+        transaction {
+            WebAuthnCredentialsTable
+                .select(WebAuthnCredentialsTable.userId)
+                .where { WebAuthnCredentialsTable.tenantId eq tenantId.value }
+                .withDistinct()
+                .count()
+                .toInt()
+        }
+
     private fun ResultRow.toCredential(): WebAuthnCredential {
         val transportsJson = this[WebAuthnCredentialsTable.transports]
         val transportsList =
