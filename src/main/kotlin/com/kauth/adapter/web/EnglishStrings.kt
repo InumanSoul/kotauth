@@ -134,6 +134,18 @@ object EnglishStrings {
     const val PORTAL_MFA_VERIFICATION_CODE = "Verification code"
     const val PORTAL_MFA_CONFIRM_SETUP = "Confirm setup"
 
+    // Portal — passkeys page
+    const val PORTAL_NAV_PASSKEYS = "Passkeys"
+    const val PORTAL_PASSKEYS_TITLE = "Passkeys"
+    const val PORTAL_PASSKEYS_INTRO = "Sign in without a password using your device's biometrics or a hardware key."
+    const val PORTAL_PASSKEYS_ADD_BUTTON = "Add a passkey"
+    const val PORTAL_PASSKEYS_EMPTY_STATE = "You have no passkeys enrolled yet."
+    const val PORTAL_PASSKEYS_ADDED_ON = "Added"
+    const val PORTAL_PASSKEYS_LAST_USED = "Last used"
+    const val PORTAL_PASSKEYS_RENAME = "Rename"
+    const val PORTAL_PASSKEYS_REVOKE = "Remove"
+    const val PORTAL_PASSKEYS_ADD_PROMPT_NAME = "What do you want to call this passkey?"
+
     // Portal — confirm dialog
     const val PORTAL_CONFIRM_TITLE = "Confirm"
     const val PORTAL_CONFIRM_CANCEL = "Cancel"

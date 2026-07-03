@@ -12,6 +12,7 @@ import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.model.WebAuthnCredential
 import kotlinx.html.*
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -798,6 +799,128 @@ object PortalView {
     }
 
     // =========================================================================
+    // Passkeys management page
+    // =========================================================================
+
+    fun passkeysPage(
+        slug: String,
+        session: PortalSession,
+        ctx: ViewContext,
+        layout: PortalLayout = PortalLayout.SIDEBAR,
+        credentials: List<WebAuthnCredential>,
+    ): HTML.() -> Unit = {
+        head {
+            portalPageHead("${ctx.t("PORTAL_NAV_PASSKEYS")} — ${ctx.workspaceName}", ctx.theme, layout)
+        }
+        body {
+            attributes["data-tenant-slug"] = slug
+            portalShell(slug, ctx, session.username, "passkeys", layout) {
+                div(classes = "page-header") {
+                    h1(classes = "page-header__title") { +ctx.t("PORTAL_PASSKEYS_TITLE") }
+                    p(classes = "page-header__subtitle") { +ctx.t("PORTAL_PASSKEYS_INTRO") }
+                }
+
+                div(classes = "portal-section") {
+                    div(classes = "portal-section__header") {
+                        div(classes = "portal-section__title") { +ctx.t("PORTAL_PASSKEYS_TITLE") }
+                        button(classes = "btn btn--primary btn--sm") {
+                            id = "add-passkey-btn"
+                            +ctx.t("PORTAL_PASSKEYS_ADD_BUTTON")
+                        }
+                    }
+                    div(classes = "portal-section__body") {
+                        if (credentials.isEmpty()) {
+                            p(classes = "form-hint") { +ctx.t("PORTAL_PASSKEYS_EMPTY_STATE") }
+                        } else {
+                            div(classes = "passkey-list") {
+                                credentials.forEach { cred ->
+                                    div(classes = "passkey-row") {
+                                        attributes["data-passkey-id"] = (cred.id ?: 0).toString()
+                                        div(classes = "passkey-row__info") {
+                                            div(classes = "passkey-row__name") { +cred.name }
+                                            div(classes = "passkey-row__meta") {
+                                                span {
+                                                    +"${ctx.t("PORTAL_PASSKEYS_ADDED_ON")}: "
+                                                    +cred.createdAt.toString().substring(0, 10)
+                                                }
+                                                if (cred.lastUsedAt != null) {
+                                                    span { +" · " }
+                                                    span {
+                                                        +"${ctx.t("PORTAL_PASSKEYS_LAST_USED")}: "
+                                                        +cred.lastUsedAt.toString().substring(0, 10)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        div(classes = "passkey-row__actions") {
+                                            button(classes = "btn btn--ghost btn--sm passkey-rename-btn") {
+                                                +ctx.t("PORTAL_PASSKEYS_RENAME")
+                                            }
+                                            button(classes = "btn btn--danger btn--sm passkey-revoke-btn") {
+                                                +ctx.t("PORTAL_PASSKEYS_REVOKE")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                script(src = "/static/js/kotauth-passkeys.min.js?v=${AppInfo.assetVersion}") {
+                    attributes["defer"] = "true"
+                    JsIntegrity.passkeys?.let { attributes["integrity"] = it }
+                    attributes["crossorigin"] = "anonymous"
+                }
+                script {
+                    unsafe {
+                        +"""
+document.addEventListener('DOMContentLoaded', function () {
+  var base = '/t/$slug/passkeys';
+  var addBtn = document.getElementById('add-passkey-btn');
+  if (addBtn) {
+    addBtn.addEventListener('click', async function () {
+      var name = prompt('${ctx.t("PORTAL_PASSKEYS_ADD_PROMPT_NAME")}') || 'Passkey';
+      try {
+        await Kotauth.passkeys.enrollPasskey(base, name);
+        window.location.reload();
+      } catch (e) {
+        alert('Failed to add passkey: ' + e.message);
+      }
+    });
+  }
+  document.querySelectorAll('.passkey-rename-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      var row = btn.closest('.passkey-row');
+      var id = row.getAttribute('data-passkey-id');
+      var newName = prompt('New name for this passkey:');
+      if (!newName) return;
+      await fetch(base + '/' + id + '/rename', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName }),
+      });
+      window.location.reload();
+    });
+  });
+  document.querySelectorAll('.passkey-revoke-btn').forEach(function (btn) {
+    btn.addEventListener('click', async function () {
+      var row = btn.closest('.passkey-row');
+      var id = row.getAttribute('data-passkey-id');
+      await fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' });
+      window.location.reload();
+    });
+  });
+});
+                        """.trimIndent()
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
     // Shared <head> — login page (centered card, same as auth pages)
     // =========================================================================
 
@@ -1017,6 +1140,10 @@ object PortalView {
             href = "/t/$slug/account/mfa",
             classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
         ) { +ctx.t("PORTAL_NAV_MFA") }
+        a(
+            href = "/t/$slug/account/passkeys",
+            classes = "$linkClass${if (activePage == "passkeys") " is-active" else ""}",
+        ) { +ctx.t("PORTAL_NAV_PASSKEYS") }
     }
 
     // ─── Shared helpers ────────────────────────────────────────────────────

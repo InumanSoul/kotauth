@@ -23,6 +23,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
@@ -77,6 +78,7 @@ fun Route.portalRoutes(
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
     impersonationService: com.kauth.domain.service.ImpersonationService? = null,
+    webAuthnService: WebAuthnService? = null,
 ) {
     fun ApplicationCall.portalViewContext(tenant: Tenant?): ViewContext {
         val theme = tenant?.theme ?: TenantTheme.DEFAULT
@@ -596,6 +598,32 @@ fun Route.portalRoutes(
 
             mfaService.disableMfa(UserId(session.userId), TenantId(session.tenantId))
             call.respond(mapOf("status" to "disabled"))
+        }
+
+        // ------------------------------------------------------------------
+        // Passkeys management page
+        // ------------------------------------------------------------------
+
+        get("/passkeys") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val credentials =
+                if (webAuthnService != null) {
+                    webAuthnService.listForUser(UserId(session.userId), TenantId(session.tenantId))
+                } else {
+                    emptyList()
+                }
+            call.respondHtml(
+                HttpStatusCode.OK,
+                PortalView.passkeysPage(
+                    slug = slug,
+                    session = session,
+                    ctx = call.portalViewContext(tenant),
+                    layout = tenant.portalConfig.layout,
+                    credentials = credentials,
+                ),
+            )
         }
     }
 }
