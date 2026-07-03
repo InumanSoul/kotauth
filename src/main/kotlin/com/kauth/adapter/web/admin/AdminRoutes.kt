@@ -86,6 +86,7 @@ fun Route.adminRoutes(
     corsPort: CorsPort? = null,
     baseUrl: String = "",
     translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
+    webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
@@ -496,6 +497,7 @@ fun Route.adminRoutes(
                     identityProviderRepository = identityProviderRepository,
                     mfaRepository = mfaRepository,
                     translationPort = translationPort,
+                    webAuthnCredentialRepository = webAuthnCredentialRepository,
                 )
 
                 adminApplicationRoutes(

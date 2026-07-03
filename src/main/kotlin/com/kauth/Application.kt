@@ -511,6 +511,7 @@ fun Application.module(
             corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
             translationPort = s.translationPort,
+            webAuthnCredentialRepository = s.webAuthnCredentialRepository,
         )
     }
 }

@@ -174,6 +174,7 @@ data class ServiceGraph(
     val backupEncryptionPort: BackupEncryptionPort,
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
+    val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
@@ -649,6 +650,7 @@ data class ServiceGraph(
                 backupEncryptionPort = backupEncryptionPort,
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
+                webAuthnCredentialRepository = webAuthnCredentialRepository,
                 passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
             )
