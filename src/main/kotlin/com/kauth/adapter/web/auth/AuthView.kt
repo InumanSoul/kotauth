@@ -211,8 +211,7 @@ object AuthView {
                             }
 
                             if (passkeysEnabled) {
-                                button(classes = "btn btn--secondary") {
-                                    id = "passkey-signin-btn"
+                                button(classes = "btn btn--secondary passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
@@ -267,8 +266,7 @@ object AuthView {
                                 }
                             }
                             if (passkeysEnabled) {
-                                button(classes = "btn btn--secondary") {
-                                    id = "passkey-signin-btn"
+                                button(classes = "btn btn--secondary passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
@@ -347,10 +345,11 @@ object AuthView {
                             +"""
                             document.addEventListener('DOMContentLoaded', function () {
                               var base = '/t/$tenantSlug/passkeys';
-                              var btn = document.getElementById('passkey-signin-btn');
-                              if (btn) btn.addEventListener('click', function (e) {
-                                e.preventDefault();
-                                Kotauth.passkeys.signInWithPasskey(base);
+                              document.querySelectorAll('.passkey-signin-btn').forEach(function (btn) {
+                                btn.addEventListener('click', function (e) {
+                                  e.preventDefault();
+                                  Kotauth.passkeys.signInWithPasskey(base);
+                                });
                               });
                               Kotauth.passkeys.startConditionalMediation(base);
                             });
