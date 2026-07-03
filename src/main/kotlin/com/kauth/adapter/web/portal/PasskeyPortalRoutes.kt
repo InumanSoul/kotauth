@@ -164,6 +164,51 @@ fun Route.passkeyPortalRoutes(
                 },
             )
         }
+
+        post("/{id}/rename") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session =
+                call.resolvePortalSession(slug, sessionRepository)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+
+            val id =
+                call.parameters["id"]?.toLongOrNull()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "InvalidId"))
+            val body = call.receive<JsonObject>()
+            val newName =
+                body["name"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "MissingName"))
+
+            val result = webAuthnService.rename(UserId(session.userId), id, newName)
+            when (result) {
+                is WebAuthnResult.Success -> call.respond(HttpStatusCode.OK)
+                is WebAuthnResult.Failure ->
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        mapOf("error" to "CredentialNotFound"),
+                    )
+            }
+        }
+
+        post("/{id}/revoke") {
+            val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+            val session =
+                call.resolvePortalSession(slug, sessionRepository)
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "not_authenticated"))
+
+            val id =
+                call.parameters["id"]?.toLongOrNull()
+                    ?: return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "InvalidId"))
+            val result = webAuthnService.revoke(UserId(session.userId), id, TenantId(session.tenantId))
+            when (result) {
+                is WebAuthnResult.Success -> call.respond(HttpStatusCode.NoContent)
+                is WebAuthnResult.Failure ->
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        mapOf("error" to "CredentialNotFound"),
+                    )
+            }
+        }
     }
 }
 

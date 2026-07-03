@@ -261,6 +261,143 @@ class PasskeyPortalRoutesTest {
         }
 
     // =========================================================================
+    // POST /passkeys/{id}/rename
+    // =========================================================================
+
+    @Test
+    fun `POST passkey rename updates the name`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            loginAs(authed)
+
+            // Seed a credential
+            relyingParty.queueRegistration()
+            authed.post("/t/acme/passkeys/register/start")
+            val finishResponse =
+                authed.post("/t/acme/passkeys/register/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"credential":{"type":"public-key","id":"cred-001"},"name":"Old Name"}""")
+                }
+            val credId =
+                Json
+                    .parseToJsonElement(finishResponse.bodyAsText())
+                    .jsonObject["id"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?: throw AssertionError("No id in response")
+
+            // Rename it
+            val renameResponse =
+                authed.post("/t/acme/passkeys/$credId/rename") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"New Name"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, renameResponse.status)
+
+            // Verify new name appears in list
+            val listResponse = authed.get("/t/acme/passkeys")
+            assertEquals(HttpStatusCode.OK, listResponse.status)
+            val list = Json.parseToJsonElement(listResponse.bodyAsText()).jsonArray
+            assertEquals(1, list.size)
+            assertEquals("New Name", list[0].jsonObject["name"]?.jsonPrimitive?.content)
+        }
+
+    // =========================================================================
+    // POST /passkeys/{id}/revoke
+    // =========================================================================
+
+    @Test
+    fun `POST passkey revoke deletes the credential`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            loginAs(authed)
+
+            // Seed a credential
+            relyingParty.queueRegistration()
+            authed.post("/t/acme/passkeys/register/start")
+            val finishResponse =
+                authed.post("/t/acme/passkeys/register/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"credential":{"type":"public-key","id":"cred-002"},"name":"To Revoke"}""")
+                }
+            val credId =
+                Json
+                    .parseToJsonElement(finishResponse.bodyAsText())
+                    .jsonObject["id"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?: throw AssertionError("No id in response")
+
+            // Revoke it
+            val revokeResponse = authed.post("/t/acme/passkeys/$credId/revoke")
+
+            assertEquals(HttpStatusCode.NoContent, revokeResponse.status)
+
+            // Verify list is empty
+            val listResponse = authed.get("/t/acme/passkeys")
+            assertEquals(HttpStatusCode.OK, listResponse.status)
+            val list = Json.parseToJsonElement(listResponse.bodyAsText()).jsonArray
+            assertEquals(0, list.size)
+        }
+
+    @Test
+    fun `POST passkey revoke of another user's credential returns 404`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            loginAs(authed)
+
+            // Seed a credential for userId=10 (alice)
+            relyingParty.queueRegistration()
+            authed.post("/t/acme/passkeys/register/start")
+            val finishResponse =
+                authed.post("/t/acme/passkeys/register/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"credential":{"type":"public-key","id":"cred-003"},"name":"Alice's Key"}""")
+                }
+            val credId =
+                Json
+                    .parseToJsonElement(finishResponse.bodyAsText())
+                    .jsonObject["id"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?: throw AssertionError("No id in response")
+
+            // Switch to a different user (userId=99)
+            val otherAuthed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            otherAuthed.post("/test-portal-login-user-99")
+
+            // Attempt to revoke alice's credential as user 99
+            val revokeResponse = otherAuthed.post("/t/acme/passkeys/$credId/revoke")
+
+            assertEquals(HttpStatusCode.NotFound, revokeResponse.status)
+
+            // Verify credential still exists for alice
+            val aliceListResponse = authed.get("/t/acme/passkeys")
+            val list = Json.parseToJsonElement(aliceListResponse.bodyAsText()).jsonArray
+            assertEquals(1, list.size)
+        }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
@@ -283,6 +420,17 @@ class PasskeyPortalRoutesTest {
                         tenantId = 1,
                         tenantSlug = "acme",
                         username = "alice",
+                    ),
+                )
+                call.respond(HttpStatusCode.OK, "session set")
+            }
+            post("/test-portal-login-user-99") {
+                call.sessions.set(
+                    PortalSession(
+                        userId = 99,
+                        tenantId = 1,
+                        tenantSlug = "acme",
+                        username = "bob",
                     ),
                 )
                 call.respond(HttpStatusCode.OK, "session set")
