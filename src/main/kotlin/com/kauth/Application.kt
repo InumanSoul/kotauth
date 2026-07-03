@@ -426,6 +426,7 @@ fun Application.module(
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,
             impersonationService = s.impersonationService,
+            webAuthnService = s.webAuthnService,
         )
 
         passkeyPortalRoutes(
