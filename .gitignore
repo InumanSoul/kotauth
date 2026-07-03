@@ -52,6 +52,7 @@ src/main/resources/static/js/kotauth-admin.min.js
 src/main/resources/static/js/kotauth-auth.min.js
 src/main/resources/static/js/kotauth-portal.min.js
 src/main/resources/static/js/branding.min.js
+src/main/resources/static/js/kotauth-passkeys.min.js
 
 # JS SRI hash metadata — generated at build time by generateJsSri Gradle task
 src/main/resources/js-integrity.properties

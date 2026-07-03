@@ -261,6 +261,7 @@ val compileJs =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
     }
 
@@ -277,6 +278,7 @@ val generateJsSri =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
         outputs.file("src/main/resources/js-integrity.properties")
     }
