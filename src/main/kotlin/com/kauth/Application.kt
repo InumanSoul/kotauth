@@ -411,6 +411,8 @@ fun Application.module(
             ssoTtlSeconds = config.ssoSessionTtlSeconds,
             emailOtpService = s.emailOtpService,
             otpIpRateLimiter = s.otpIpRateLimiter,
+            webAuthnService = s.webAuthnService,
+            passkeyRateLimiter = s.passkeyRateLimiter,
         )
 
         portalRoutes(

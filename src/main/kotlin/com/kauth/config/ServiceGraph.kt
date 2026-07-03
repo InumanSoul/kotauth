@@ -174,6 +174,7 @@ data class ServiceGraph(
     val backupEncryptionPort: BackupEncryptionPort,
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
+    val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
 ) {
@@ -531,6 +532,7 @@ data class ServiceGraph(
             val mfaLimiter = buildRateLimiter(max = 5, windowSecs = 300, prefix = "mfa")
             val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
+            val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -647,6 +649,7 @@ data class ServiceGraph(
                 backupEncryptionPort = backupEncryptionPort,
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
+                passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
             )
         }
