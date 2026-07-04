@@ -598,6 +598,12 @@ object EnglishStrings {
     const val BRAND_IDENTITY_HEADING = "Brand Identity"
     const val VISUAL_THEME_HEADING = "Visual Theme"
 
+    const val POST_MAGIC_LINK_TITLE = "Sign in complete"
+    const val POST_MAGIC_LINK_INTRO =
+        "Adding a passkey lets you sign in faster next time without a magic link."
+    const val POST_MAGIC_LINK_ENROLL_CTA = "Enroll a passkey on this device"
+    const val POST_MAGIC_LINK_SKIP_CTA = "Continue without a passkey"
+
     /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for

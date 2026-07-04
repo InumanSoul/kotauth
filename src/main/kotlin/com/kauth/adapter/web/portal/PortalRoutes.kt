@@ -3,6 +3,7 @@ package com.kauth.adapter.web.portal
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.admin.portalImpersonationStopRoute
 import com.kauth.adapter.web.auth.clearSsoCookie
+import com.kauth.adapter.web.auth.postMagicLinkPage
 import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
@@ -294,6 +295,8 @@ fun Route.portalRoutes(
                             "Please set up an authenticator app below to keep your account secure.",
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
+            } else if (tenantObj.passwordLoginDisabled) {
+                call.respondRedirect("/t/$slug/account/enroll-passkey")
             } else {
                 call.respondRedirect("/t/$slug/launcher")
             }
@@ -330,6 +333,17 @@ fun Route.portalRoutes(
                 }
             }
             return session
+        }
+
+        // ------------------------------------------------------------------
+        // Post-magic-link passkey enrollment landing
+        // ------------------------------------------------------------------
+
+        get("/enroll-passkey") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.respondHtml(HttpStatusCode.OK, postMagicLinkPage(slug, call.portalViewContext(tenant)))
         }
 
         // ------------------------------------------------------------------
