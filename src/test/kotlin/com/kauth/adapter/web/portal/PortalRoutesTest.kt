@@ -11,17 +11,21 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.model.WebAuthnCredential
 import com.kauth.domain.service.AccountSelfService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakePasswordHasher
+import com.kauth.fakes.FakeRelyingPartyAdapter
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import io.ktor.client.request.forms.submitForm
@@ -443,6 +447,125 @@ class PortalRoutesTest {
                 "/t/acme/account/enroll-passkey",
                 response.headers["Location"],
                 "passwordLoginDisabled callback must redirect to enroll-passkey",
+            )
+        }
+
+    @Test
+    fun `callback with passwordLoginDisabled=true skips enroll-passkey redirect when user has passkeys`() =
+        testApplication {
+            val passwordlessRepo = FakeTenantRepository()
+            val passwordlessTenant = tenant.copy(passwordLoginDisabled = true)
+            passwordlessRepo.add(passwordlessTenant)
+            userRepo.add(user)
+
+            val credRepo = FakeWebAuthnCredentialRepository()
+            credRepo.save(
+                WebAuthnCredential(
+                    userId = user.id!!,
+                    tenantId = TenantId(1),
+                    credentialId = "existing-passkey",
+                    publicKeyCose = ByteArray(77),
+                    signCounter = 0L,
+                    aaguid = null,
+                    transports = listOf("internal"),
+                    name = "My Device",
+                    backupEligible = false,
+                    backupState = false,
+                    createdAt = Instant.now(),
+                    lastUsedAt = null,
+                ),
+            )
+            val webAuthnSvc =
+                WebAuthnService(
+                    credentialRepository = credRepo,
+                    relyingParty = FakeRelyingPartyAdapter(),
+                    secretKey = "test-secret-key-32-chars-minimum!!",
+                    auditLog = auditLogPort,
+                    userRepository = userRepo,
+                    tenantRepository = passwordlessRepo,
+                )
+
+            val authCodes = FakeAuthorizationCodeRepository()
+            val jwtTokenPort = JwtFakeTokenPort(userId = user.id!!.value, username = user.username)
+            val apps = FakeApplicationRepository()
+            apps.add(
+                Application(
+                    id = ApplicationId(1),
+                    tenantId = TenantId(1),
+                    clientId = "kotauth-portal",
+                    name = "Portal",
+                    description = null,
+                    accessType = com.kauth.domain.model.AccessType.PUBLIC,
+                    enabled = true,
+                    redirectUris = listOf("http://localhost/t/acme/account/callback"),
+                ),
+            )
+
+            val oauthService =
+                OAuthService(
+                    tenantRepository = passwordlessRepo,
+                    userRepository = userRepo,
+                    applicationRepository = apps,
+                    sessionRepository = sessionRepo,
+                    authCodeRepository = authCodes,
+                    tokenPort = jwtTokenPort,
+                    passwordHasher = hasher,
+                    auditLog = auditLogPort,
+                )
+
+            val rawCode = "test-code-has-passkeys"
+            authCodes.save(
+                AuthorizationCode(
+                    code = rawCode,
+                    tenantId = TenantId(1),
+                    clientId = ApplicationId(1),
+                    userId = user.id!!,
+                    redirectUri = "http://localhost/t/acme/account/callback",
+                    scopes = "openid profile email",
+                    expiresAt = Instant.now().plusSeconds(300),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                install(Sessions) { cookie<PortalSession>("KOTAUTH_PORTAL") }
+                routing {
+                    portalRoutes(
+                        accountSelfService =
+                            AccountSelfService(
+                                userRepository = userRepo,
+                                tenantRepository = passwordlessRepo,
+                                sessionRepository = sessionRepo,
+                                passwordHasher = hasher,
+                                auditLog = auditLogPort,
+                                emailPort = FakeEmailPort(),
+                                emailScope = CoroutineScope(Dispatchers.Unconfined),
+                            ),
+                        tenantRepository = passwordlessRepo,
+                        encryptionService = encryptionService,
+                        oauthService = oauthService,
+                        webAuthnService = webAuthnSvc,
+                        baseUrl = "http://localhost",
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val pkcePayload =
+                encryptionService.signCookie(
+                    "verifier|acme|${System.currentTimeMillis()}|state789",
+                )
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get("/t/acme/account/callback?code=$rawCode&state=state789") {
+                    header("Cookie", "KOTAUTH_PORTAL_PKCE=$pkcePayload")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                "/t/acme/launcher",
+                response.headers["Location"],
+                "User with passkeys on passwordless tenant must skip enroll-passkey and go to launcher",
             )
         }
 

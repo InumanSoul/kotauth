@@ -15,6 +15,7 @@ import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebAuthnError
 import com.kauth.domain.service.WebAuthnResult
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.CachingClaimMapperService
@@ -163,6 +164,9 @@ fun Route.adminUserRoutes(
                         "attribute_saved" -> "Attribute saved."
                         "attribute_deleted" -> "Attribute deleted."
                         "impersonation_ended" -> "Impersonation session ended."
+                        "passkey_revoked" -> EnglishStrings.TOAST_PASSKEY_REVOKED
+                        "passkeys_reset" -> EnglishStrings.TOAST_PASSKEYS_RESET
+                        "mfa_reset" -> EnglishStrings.TOAST_MFA_RESET
                         else -> null
                     }
                 val errorParam =
@@ -616,7 +620,7 @@ fun Route.adminUserRoutes(
                         call.parameters["credId"]?.toLongOrNull()
                             ?: return@post call.respond(HttpStatusCode.BadRequest)
                     val actorId = UserId(ctx.session.userId)
-                    when (webAuthnService.revoke(userId, credId, ctx.workspace.id)) {
+                    when (val revokeResult = webAuthnService.revoke(userId, credId, ctx.workspace.id)) {
                         is WebAuthnResult.Success -> {
                             auditLogPort.record(
                                 AuditEvent(
@@ -638,7 +642,18 @@ fun Route.adminUserRoutes(
                             )
                         }
                         is WebAuthnResult.Failure ->
-                            call.respond(HttpStatusCode.NotFound)
+                            if (revokeResult.error is WebAuthnError.CannotRevokeLast) {
+                                call.respond(
+                                    HttpStatusCode.BadRequest,
+                                    mapOf(
+                                        "error" to
+                                            "Cannot revoke your last passkey on a passwordless tenant. " +
+                                            "Enable password sign-in first, or add another passkey.",
+                                    ),
+                                )
+                            } else {
+                                call.respond(HttpStatusCode.NotFound)
+                            }
                     }
                 }
 

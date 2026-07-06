@@ -34,6 +34,9 @@ object EnglishStrings {
     const val TOAST_USER_ENABLED = "User enabled."
     const val TOAST_USER_SESSIONS_REVOKED = "All sessions revoked."
     const val TOAST_VERIFICATION_SENT = "Verification email sent."
+    const val TOAST_PASSKEY_REVOKED = "Passkey revoked."
+    const val TOAST_PASSKEYS_RESET = "All passkeys reset for this user."
+    const val TOAST_MFA_RESET = "MFA reset for this user."
 
     // Portal — navigation and shell
     const val PORTAL_SIGN_OUT = "Sign out"

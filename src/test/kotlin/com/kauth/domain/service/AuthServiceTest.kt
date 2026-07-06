@@ -523,6 +523,17 @@ class AuthServiceTest {
         assertIs<AuthError.PasswordLoginDisabled>(result.error)
     }
 
+    @Test
+    fun `authenticate returns PasswordLoginDisabled when tenant has passwordLoginDisabled=true`() {
+        tenants.clear()
+        tenants.add(testTenant.copy(passwordLoginDisabled = true))
+
+        val result = svc.authenticate("acme", "alice", "correct-pass")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.PasswordLoginDisabled>(result.error)
+        assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_REJECTED_POLICY))
+    }
+
     // -------------------------------------------------------------------------
     // M6: timing-equalising dummy verify on enumeration-vector paths
     // -------------------------------------------------------------------------

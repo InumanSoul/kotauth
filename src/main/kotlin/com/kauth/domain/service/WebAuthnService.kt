@@ -9,6 +9,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WebAuthnCredential
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.RelyingPartyAdapter
+import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
 import java.security.MessageDigest
@@ -21,6 +22,7 @@ class WebAuthnService(
     private val secretKey: String,
     private val auditLog: AuditLogPort,
     private val userRepository: UserRepository,
+    private val tenantRepository: TenantRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
     /**
@@ -173,7 +175,11 @@ class WebAuthnService(
                 eventType = AuditEventType.PASSKEY_AUTH_SUCCESS,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("credentialId" to stored.id.toString()),
+                details =
+                    mapOf(
+                        "credentialId" to stored.id.toString(),
+                        "userVerified" to assertion.userVerified.toString(),
+                    ),
             ),
         )
 
@@ -203,8 +209,15 @@ class WebAuthnService(
         userId: UserId,
         credentialPk: Long,
         tenantId: TenantId,
-    ): WebAuthnResult<Unit> =
-        if (credentialRepository.delete(credentialPk, userId)) {
+    ): WebAuthnResult<Unit> {
+        val tenant = tenantRepository?.findById(tenantId)
+        if (tenant?.passwordLoginDisabled == true) {
+            val remaining = credentialRepository.findByUserId(userId, tenantId)
+            if (remaining.size == 1 && remaining.first().id == credentialPk) {
+                return WebAuthnResult.Failure(WebAuthnError.CannotRevokeLast)
+            }
+        }
+        return if (credentialRepository.delete(credentialPk, userId)) {
             auditLog.record(
                 AuditEvent(
                     tenantId = tenantId,
@@ -220,6 +233,7 @@ class WebAuthnService(
         } else {
             WebAuthnResult.Failure(WebAuthnError.CredentialNotFound)
         }
+    }
 
     fun adminResetAll(
         tenantId: TenantId,
@@ -278,6 +292,8 @@ sealed class WebAuthnError {
     data class RateLimited(
         val retryAfter: java.time.Duration,
     ) : WebAuthnError()
+
+    data object CannotRevokeLast : WebAuthnError()
 }
 
 /**

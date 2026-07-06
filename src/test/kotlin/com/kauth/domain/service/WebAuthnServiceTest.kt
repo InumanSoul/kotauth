@@ -9,6 +9,7 @@ import com.kauth.domain.model.WebAuthnCredential
 import com.kauth.domain.port.AssertionResultData
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeRelyingPartyAdapter
+import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import java.time.Clock
@@ -49,6 +50,7 @@ class WebAuthnServiceTest {
 
     private lateinit var credRepo: FakeWebAuthnCredentialRepository
     private lateinit var userRepo: FakeUserRepository
+    private lateinit var tenantRepo: FakeTenantRepository
     private lateinit var relyingParty: FakeRelyingPartyAdapter
     private lateinit var auditLog: FakeAuditLogPort
     private lateinit var service: WebAuthnService
@@ -60,6 +62,7 @@ class WebAuthnServiceTest {
         credRepo = FakeWebAuthnCredentialRepository()
         userRepo = FakeUserRepository()
         userRepo.add(user)
+        tenantRepo = FakeTenantRepository()
         relyingParty = FakeRelyingPartyAdapter()
         auditLog = FakeAuditLogPort()
         service =
@@ -69,6 +72,7 @@ class WebAuthnServiceTest {
                 secretKey = "test-secret-key-32-chars-minimum!!",
                 auditLog = auditLog,
                 userRepository = userRepo,
+                tenantRepository = tenantRepo,
                 clock = fixedClock,
             )
     }
@@ -451,6 +455,32 @@ class WebAuthnServiceTest {
         assertIs<WebAuthnError.VerificationFailed>(result.error)
     }
 
+    @Test
+    fun `finishAuthentication returns userVerified=false in outcome when authenticator did not verify user`() {
+        seedCredential(signCounter = 0L)
+        relyingParty.queueAssertion(
+            AssertionResultData(
+                credentialId = FakeRelyingPartyAdapter.CANNED_CREDENTIAL_ID,
+                userHandle = ByteArray(32) { 0x42 },
+                newSignCounter = 1L,
+                userVerified = false,
+            ),
+        )
+
+        val result =
+            service.finishAuthentication(
+                tenant = tenant,
+                assertionRequestJson = FakeRelyingPartyAdapter.CANNED_ASSERTION_REQUEST_JSON,
+                request = AuthenticationFinishRequest(credentialJson = "{}"),
+            )
+        assertIs<WebAuthnResult.Success<AuthenticationOutcome>>(result)
+        assertEquals(false, result.value.userVerified)
+
+        val successEvent = auditLog.events.find { it.eventType == AuditEventType.PASSKEY_AUTH_SUCCESS }
+        assertNotNull(successEvent)
+        assertEquals("false", successEvent.details["userVerified"])
+    }
+
     // -------------------------------------------------------------------------
     // revoke
     // -------------------------------------------------------------------------
@@ -470,6 +500,23 @@ class WebAuthnServiceTest {
         val result = service.revoke(UserId(99), saved.id!!, tenantId)
         assertIs<WebAuthnResult.Failure>(result)
         assertEquals(WebAuthnError.CredentialNotFound, result.error)
+    }
+
+    @Test
+    fun `revoke rejects with CannotRevokeLast when tenant is passwordless-only and user has 1 credential`() {
+        tenantRepo.add(tenant.copy(passwordLoginDisabled = true))
+        val saved = seedCredential()
+        val result = service.revoke(userId, saved.id!!, tenantId)
+        assertIs<WebAuthnResult.Failure>(result)
+        assertEquals(WebAuthnError.CannotRevokeLast, result.error)
+    }
+
+    @Test
+    fun `revoke succeeds when tenant is NOT passwordless-only even if user has 1 credential`() {
+        tenantRepo.add(tenant.copy(passwordLoginDisabled = false))
+        val saved = seedCredential()
+        val result = service.revoke(userId, saved.id!!, tenantId)
+        assertIs<WebAuthnResult.Success<Unit>>(result)
     }
 
     // -------------------------------------------------------------------------

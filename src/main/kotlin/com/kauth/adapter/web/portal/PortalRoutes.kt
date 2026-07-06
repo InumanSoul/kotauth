@@ -296,7 +296,12 @@ fun Route.portalRoutes(
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
             } else if (tenantObj.passwordLoginDisabled) {
-                call.respondRedirect("/t/$slug/account/enroll-passkey")
+                val hasPasskeys = webAuthnService?.listForUser(UserId(userId), tenantObj.id)?.isNotEmpty() ?: false
+                if (!hasPasskeys) {
+                    call.respondRedirect("/t/$slug/account/enroll-passkey")
+                } else {
+                    call.respondRedirect("/t/$slug/launcher")
+                }
             } else {
                 call.respondRedirect("/t/$slug/launcher")
             }

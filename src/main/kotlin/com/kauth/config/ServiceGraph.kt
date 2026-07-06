@@ -480,6 +480,7 @@ data class ServiceGraph(
                 WebAuthnService(
                     credentialRepository = webAuthnCredentialRepository,
                     userRepository = userRepository,
+                    tenantRepository = tenantRepository,
                     relyingParty = relyingPartyAdapter,
                     secretKey = config.secretKey,
                     auditLog = auditLogAdapter,

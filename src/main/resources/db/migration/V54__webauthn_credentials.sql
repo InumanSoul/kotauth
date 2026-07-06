@@ -7,7 +7,7 @@ CREATE TABLE webauthn_credentials (
     credential_id     TEXT NOT NULL UNIQUE,
     public_key_cose   BYTEA NOT NULL,
     sign_counter      BIGINT NOT NULL DEFAULT 0,
-    aaguid            UUID,
+    aaguid            VARCHAR(36),
     transports        JSONB NOT NULL DEFAULT '[]',
     name              VARCHAR(64) NOT NULL,
     backup_eligible   BOOLEAN NOT NULL DEFAULT FALSE,

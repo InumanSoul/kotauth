@@ -39,3 +39,4 @@ Per-tenant `mfa_policy=required` semantics stay honored: a passkey sign-in issue
 - New table `webauthn_credentials` (V54) with N-per-user credentials, no unique constraint on `(user_id, method)`.
 - Recovery for passkey-only tenants uses the existing magic-link flow (see [ADR-17](ADR-17-smtp-hard-gate-passwordless-tenants.md)).
 - CLI reset commands are per-mechanism: `reset-admin-mfa` and `reset-admin-passkeys` are separate.
+- Legacy U2F-only hardware keys (no PIN/biometric) provide only single-factor possession and will NOT set `mfaCompleted=true` on the SSO cookie — those users must enroll TOTP as a second factor if `mfa_policy=required`. Modern platform authenticators (Face ID, Touch ID, Windows Hello, Android biometric) always perform user verification and continue to satisfy MFA.

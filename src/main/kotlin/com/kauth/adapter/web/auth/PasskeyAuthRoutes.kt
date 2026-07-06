@@ -119,7 +119,7 @@ internal fun Route.passkeyAuthRoutes(
                         oauthParams = oauthParams,
                         ipAddress = ipAddress,
                         authTime = Instant.now(),
-                        mfaCompleted = true,
+                        mfaCompleted = result.value.userVerified,
                         ssoTtlSeconds = ssoTtlSeconds,
                         secure = secure,
                         oauthService = oauthService,

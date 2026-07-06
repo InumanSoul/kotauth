@@ -7,6 +7,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.RegistrationFinishRequest
+import com.kauth.domain.service.WebAuthnError
 import com.kauth.domain.service.WebAuthnResult
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
@@ -203,10 +204,21 @@ fun Route.passkeyPortalRoutes(
             when (result) {
                 is WebAuthnResult.Success -> call.respond(HttpStatusCode.NoContent)
                 is WebAuthnResult.Failure ->
-                    call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "CredentialNotFound"),
-                    )
+                    if (result.error is WebAuthnError.CannotRevokeLast) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf(
+                                "error" to
+                                    "Cannot revoke your last passkey on a passwordless tenant. " +
+                                    "Enable password sign-in first, or add another passkey.",
+                            ),
+                        )
+                    } else {
+                        call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "CredentialNotFound"),
+                        )
+                    }
             }
         }
     }
