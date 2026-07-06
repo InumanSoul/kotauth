@@ -140,4 +140,82 @@
   }
 
   Kotauth.passkeys = { enrollPasskey, signInWithPasskey, startConditionalMediation };
+
+  var scriptEl = document.currentScript;
+  if (scriptEl) {
+    var mode = scriptEl.getAttribute('data-passkey-mode');
+    var base = scriptEl.getAttribute('data-passkey-base');
+
+    if (mode === 'login' && base) {
+      document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.passkey-signin-btn').forEach(function (btn) {
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            Kotauth.passkeys.signInWithPasskey(base);
+          });
+        });
+        Kotauth.passkeys.startConditionalMediation(base);
+      });
+    }
+
+    if (mode === 'manage' && base) {
+      var addPrompt = scriptEl.getAttribute('data-passkey-add-prompt') || 'Passkey name';
+      var renamePrompt = scriptEl.getAttribute('data-passkey-rename-prompt') || 'New name:';
+      document.addEventListener('DOMContentLoaded', function () {
+        var addBtn = document.getElementById('add-passkey-btn');
+        if (addBtn) {
+          addBtn.addEventListener('click', async function () {
+            var name = prompt(addPrompt) || 'Passkey';
+            try {
+              await Kotauth.passkeys.enrollPasskey(base, name);
+              window.location.reload();
+            } catch (e) {
+              alert('Failed to add passkey: ' + e.message);
+            }
+          });
+        }
+        document.querySelectorAll('.passkey-rename-btn').forEach(function (btn) {
+          btn.addEventListener('click', async function () {
+            var row = btn.closest('.passkey-row');
+            var id = row.getAttribute('data-passkey-id');
+            var newName = prompt(renamePrompt);
+            if (!newName) return;
+            await fetch(base + '/' + id + '/rename', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: newName }),
+            });
+            window.location.reload();
+          });
+        });
+        document.querySelectorAll('.passkey-revoke-btn').forEach(function (btn) {
+          btn.addEventListener('click', async function () {
+            var row = btn.closest('.passkey-row');
+            var id = row.getAttribute('data-passkey-id');
+            await fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' });
+            window.location.reload();
+          });
+        });
+      });
+    }
+
+    if (mode === 'enroll' && base) {
+      var redirect = scriptEl.getAttribute('data-passkey-redirect') || '/';
+      var defaultName = scriptEl.getAttribute('data-passkey-default-name') || 'This device';
+      document.addEventListener('DOMContentLoaded', function () {
+        var enrollBtn = document.getElementById('enroll-passkey-btn');
+        if (enrollBtn) {
+          enrollBtn.addEventListener('click', async function () {
+            try {
+              await Kotauth.passkeys.enrollPasskey(base, defaultName);
+              window.location.assign(redirect);
+            } catch (e) {
+              alert('Failed to add passkey: ' + e.message);
+            }
+          });
+        }
+      });
+    }
+  }
 })();

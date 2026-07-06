@@ -148,6 +148,7 @@ object EnglishStrings {
     const val PORTAL_PASSKEYS_RENAME = "Rename"
     const val PORTAL_PASSKEYS_REVOKE = "Remove"
     const val PORTAL_PASSKEYS_ADD_PROMPT_NAME = "What do you want to call this passkey?"
+    const val PORTAL_PASSKEYS_RENAME_PROMPT_NAME = "New name for this passkey:"
 
     // Portal — confirm dialog
     const val PORTAL_CONFIRM_TITLE = "Confirm"
@@ -606,6 +607,7 @@ object EnglishStrings {
         "Adding a passkey lets you sign in faster next time without a magic link."
     const val POST_MAGIC_LINK_ENROLL_CTA = "Enroll a passkey on this device"
     const val POST_MAGIC_LINK_SKIP_CTA = "Continue without a passkey"
+    const val POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME = "This device"
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

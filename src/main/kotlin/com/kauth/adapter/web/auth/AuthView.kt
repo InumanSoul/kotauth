@@ -339,22 +339,8 @@ object AuthView {
                     script(src = "/static/js/kotauth-passkeys.min.js?v=${AppInfo.assetVersion}") {
                         JsIntegrity.passkeys?.let { attributes["integrity"] = it }
                         attributes["crossorigin"] = "anonymous"
-                    }
-                    script {
-                        unsafe {
-                            +"""
-                            document.addEventListener('DOMContentLoaded', function () {
-                              var base = '/t/$tenantSlug/passkeys';
-                              document.querySelectorAll('.passkey-signin-btn').forEach(function (btn) {
-                                btn.addEventListener('click', function (e) {
-                                  e.preventDefault();
-                                  Kotauth.passkeys.signInWithPasskey(base);
-                                });
-                              });
-                              Kotauth.passkeys.startConditionalMediation(base);
-                            });
-                            """.trimIndent()
-                        }
+                        attributes["data-passkey-base"] = "/t/$tenantSlug/passkeys"
+                        attributes["data-passkey-mode"] = "login"
                     }
                 }
             }

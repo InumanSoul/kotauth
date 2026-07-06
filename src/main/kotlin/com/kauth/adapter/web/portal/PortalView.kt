@@ -871,50 +871,10 @@ object PortalView {
                     attributes["defer"] = "true"
                     JsIntegrity.passkeys?.let { attributes["integrity"] = it }
                     attributes["crossorigin"] = "anonymous"
-                }
-                script {
-                    unsafe {
-                        +"""
-document.addEventListener('DOMContentLoaded', function () {
-  var base = '/t/$slug/passkeys';
-  var addBtn = document.getElementById('add-passkey-btn');
-  if (addBtn) {
-    addBtn.addEventListener('click', async function () {
-      var name = prompt('${ctx.t("PORTAL_PASSKEYS_ADD_PROMPT_NAME")}') || 'Passkey';
-      try {
-        await Kotauth.passkeys.enrollPasskey(base, name);
-        window.location.reload();
-      } catch (e) {
-        alert('Failed to add passkey: ' + e.message);
-      }
-    });
-  }
-  document.querySelectorAll('.passkey-rename-btn').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      var row = btn.closest('.passkey-row');
-      var id = row.getAttribute('data-passkey-id');
-      var newName = prompt('New name for this passkey:');
-      if (!newName) return;
-      await fetch(base + '/' + id + '/rename', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName }),
-      });
-      window.location.reload();
-    });
-  });
-  document.querySelectorAll('.passkey-revoke-btn').forEach(function (btn) {
-    btn.addEventListener('click', async function () {
-      var row = btn.closest('.passkey-row');
-      var id = row.getAttribute('data-passkey-id');
-      await fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' });
-      window.location.reload();
-    });
-  });
-});
-                        """.trimIndent()
-                    }
+                    attributes["data-passkey-base"] = "/t/$slug/passkeys"
+                    attributes["data-passkey-mode"] = "manage"
+                    attributes["data-passkey-add-prompt"] = ctx.t("PORTAL_PASSKEYS_ADD_PROMPT_NAME")
+                    attributes["data-passkey-rename-prompt"] = ctx.t("PORTAL_PASSKEYS_RENAME_PROMPT_NAME")
                 }
             }
         }

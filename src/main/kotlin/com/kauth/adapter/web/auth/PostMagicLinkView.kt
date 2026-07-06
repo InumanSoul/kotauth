@@ -43,22 +43,10 @@ fun postMagicLinkPage(
                 attributes["defer"] = "true"
                 JsIntegrity.passkeys?.let { attributes["integrity"] = it }
                 attributes["crossorigin"] = "anonymous"
-            }
-            script {
-                unsafe {
-                    +"""
-document.addEventListener('DOMContentLoaded', function () {
-  document.getElementById('enroll-passkey-btn').addEventListener('click', async function () {
-    try {
-      await Kotauth.passkeys.enrollPasskey('/t/$tenantSlug/passkeys', 'This device');
-      window.location.assign('/t/$tenantSlug/launcher');
-    } catch (e) {
-      alert('Failed to add passkey: ' + e.message);
-    }
-  });
-});
-""".trimIndent()
-                }
+                attributes["data-passkey-base"] = "/t/$tenantSlug/passkeys"
+                attributes["data-passkey-mode"] = "enroll"
+                attributes["data-passkey-redirect"] = "/t/$tenantSlug/launcher"
+                attributes["data-passkey-default-name"] = ctx.t("POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME")
             }
         }
     }
