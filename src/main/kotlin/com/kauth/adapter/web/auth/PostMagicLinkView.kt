@@ -1,7 +1,6 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.AppInfo
-import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
@@ -13,7 +12,7 @@ fun postMagicLinkPage(
 ): HTML.() -> Unit =
     {
         head {
-            title { +EnglishStrings.POST_MAGIC_LINK_TITLE }
+            title { +ctx.t("POST_MAGIC_LINK_TITLE") }
             meta(charset = "UTF-8")
             meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
             style { unsafe { +ctx.theme.toCssVars() } }
@@ -23,18 +22,18 @@ fun postMagicLinkPage(
             demoBanner()
             div("shell") {
                 div("card") {
-                    h1("card-title") { +EnglishStrings.POST_MAGIC_LINK_TITLE }
-                    p("card-subtitle") { +EnglishStrings.POST_MAGIC_LINK_INTRO }
+                    h1("card-title") { +ctx.t("POST_MAGIC_LINK_TITLE") }
+                    p("card-subtitle") { +ctx.t("POST_MAGIC_LINK_INTRO") }
 
                     button(classes = "btn") {
                         id = "enroll-passkey-btn"
                         type = ButtonType.button
-                        +EnglishStrings.POST_MAGIC_LINK_ENROLL_CTA
+                        +ctx.t("POST_MAGIC_LINK_ENROLL_CTA")
                     }
 
                     div("footer-link") {
                         a(href = "/t/$tenantSlug/launcher", classes = "link") {
-                            +EnglishStrings.POST_MAGIC_LINK_SKIP_CTA
+                            +ctx.t("POST_MAGIC_LINK_SKIP_CTA")
                         }
                     }
                 }

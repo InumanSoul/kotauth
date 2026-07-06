@@ -109,6 +109,7 @@ fun Route.passkeyPortalRoutes(
                     ?.jsonPrimitive
                     ?.contentOrNull
                     ?.trim()
+                    ?.ifBlank { null }
                     ?.take(64) ?: "Passkey"
 
             when (
@@ -184,10 +185,20 @@ fun Route.passkeyPortalRoutes(
             when (result) {
                 is WebAuthnResult.Success -> call.respond(HttpStatusCode.OK)
                 is WebAuthnResult.Failure ->
-                    call.respond(
-                        HttpStatusCode.NotFound,
-                        mapOf("error" to "CredentialNotFound"),
-                    )
+                    when (result.error) {
+                        is WebAuthnError.CredentialNotFound ->
+                            call.respond(HttpStatusCode.NotFound, mapOf("error" to "CredentialNotFound"))
+                        is WebAuthnError.VerificationFailed ->
+                            call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to "InvalidName", "message" to result.error.reason),
+                            )
+                        else ->
+                            call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to result.error::class.simpleName),
+                            )
+                    }
             }
         }
 

@@ -112,22 +112,24 @@ internal fun Route.passkeyAuthRoutes(
                 )
                 val oauthParams = call.getAuthContext(encryptionService) ?: AuthView.OAuthParams()
                 if (oauthParams.isOAuthFlow) {
-                    call.completeAuthorizationCodeFlow(
-                        slug = slug,
-                        userId = result.value.userId,
-                        tenantId = tenant.id,
-                        oauthParams = oauthParams,
-                        ipAddress = ipAddress,
-                        authTime = Instant.now(),
-                        mfaCompleted = result.value.userVerified,
-                        ssoTtlSeconds = ssoTtlSeconds,
-                        secure = secure,
-                        oauthService = oauthService,
-                        encryptionService = encryptionService,
-                        renderError = { message ->
-                            call.respond(HttpStatusCode.BadRequest, mapOf("error" to message))
-                        },
-                    )
+                    val redirectUrl =
+                        call.buildAuthorizationCodeRedirectUrl(
+                            slug = slug,
+                            userId = result.value.userId,
+                            tenantId = tenant.id,
+                            oauthParams = oauthParams,
+                            ipAddress = ipAddress,
+                            authTime = Instant.now(),
+                            mfaCompleted = result.value.userVerified,
+                            ssoTtlSeconds = ssoTtlSeconds,
+                            secure = secure,
+                            oauthService = oauthService,
+                            encryptionService = encryptionService,
+                            renderError = { message ->
+                                call.respond(HttpStatusCode.BadRequest, mapOf("error" to message))
+                            },
+                        ) ?: return@post
+                    call.respond(HttpStatusCode.OK, mapOf("redirect_url" to redirectUrl))
                 } else {
                     call.respond(
                         mapOf(

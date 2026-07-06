@@ -71,6 +71,9 @@
     const optionsJson = await startResp.json();
     const options = decodeCreateOptions(optionsJson);
     const credential = await navigator.credentials.create({ publicKey: options });
+    if (!credential) {
+      throw new Error('Passkey enrollment cancelled');
+    }
     const finishBody = { credential: serializeAttestation(credential), name };
     const finishResp = await fetch(basePath + '/register/finish', {
       method: 'POST',
@@ -88,6 +91,9 @@
     const optionsJson = await startResp.json();
     const options = decodeGetOptions(optionsJson);
     const credential = await navigator.credentials.get({ publicKey: options });
+    if (!credential) {
+      throw new Error('Passkey sign-in cancelled');
+    }
     const finishBody = { credential: serializeAssertion(credential) };
     if (oauthContext) finishBody.oauth_context = oauthContext;
     const finishResp = await fetch(basePath + '/authenticate/finish', {
@@ -97,8 +103,14 @@
       body: JSON.stringify(finishBody),
     });
     if (!finishResp.ok) throw new Error('finish failed');
-    if (finishResp.redirected) window.location.assign(finishResp.url);
-    else window.location.assign('/');
+    const result = await finishResp.json();
+    if (result.redirect_url) {
+      window.location.assign(result.redirect_url);
+    } else if (result.user_id) {
+      window.location.assign('/');
+    } else {
+      throw new Error('Unexpected finish response');
+    }
   }
 
   async function startConditionalMediation(basePath) {
@@ -111,15 +123,19 @@
       const optionsJson = await startResp.json();
       const options = decodeGetOptions(optionsJson);
       const credential = await navigator.credentials.get({ publicKey: options, mediation: 'conditional' });
+      if (!credential) return; // user dismissed autofill, no-op
       const finishResp = await fetch(basePath + '/authenticate/finish', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: serializeAssertion(credential) }),
       });
-      if (finishResp.ok) window.location.assign(finishResp.redirected ? finishResp.url : '/');
+      if (finishResp.ok) {
+        const finishBody = await finishResp.json();
+        window.location.assign(finishBody.redirect_url || '/');
+      }
     } catch (e) {
-      // Silent — autofill failure is a UX no-op.
+      // autofill failure is silent
     }
   }
 

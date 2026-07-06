@@ -17,6 +17,5 @@ CREATE TABLE webauthn_credentials (
 );
 
 CREATE INDEX idx_webauthn_credentials_user ON webauthn_credentials(user_id, tenant_id);
-CREATE INDEX idx_webauthn_credentials_credential_id ON webauthn_credentials(credential_id);
 
 ALTER TABLE tenants ADD COLUMN passkeys_enabled BOOLEAN NOT NULL DEFAULT TRUE;

@@ -392,12 +392,13 @@ class PasskeyAuthRoutesTest {
                         "KOTAUTH_PASSKEY_AUTH=$challengeCookieValue; KOTAUTH_AUTH_CONTEXT=$oauthCookieValue",
                     )
                 }
-            // Should redirect to the callback URI with an authorization code
-            assertEquals(HttpStatusCode.Found, response.status)
-            val location = response.headers[HttpHeaders.Location].orEmpty()
+            // Should respond with JSON redirect_url pointing to the callback URI
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            val redirectUrl = body["redirect_url"]?.jsonPrimitive?.content.orEmpty()
             assertTrue(
-                location.startsWith("https://app.example.com/callback?code="),
-                "Expected redirect to callback with code, got: $location",
+                redirectUrl.startsWith("https://app.example.com/callback?code="),
+                "Expected redirect_url to callback with code, got: $redirectUrl",
             )
         }
 

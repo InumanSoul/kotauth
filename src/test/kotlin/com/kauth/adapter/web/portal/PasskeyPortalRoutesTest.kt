@@ -308,6 +308,66 @@ class PasskeyPortalRoutesTest {
             assertEquals("New Name", list[0].jsonObject["name"]?.jsonPrimitive?.content)
         }
 
+    @Test
+    fun `POST passkeys register finish coerces blank name to default`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            loginAs(authed)
+
+            authed.post("/t/acme/passkeys/register/start")
+            val finishResponse =
+                authed.post("/t/acme/passkeys/register/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"credential":{"type":"public-key","id":"cred-blank"},"name":"   "}""")
+                }
+
+            assertEquals(HttpStatusCode.Created, finishResponse.status)
+            val body = Json.parseToJsonElement(finishResponse.bodyAsText()).jsonObject
+            assertEquals("Passkey", body["name"]?.jsonPrimitive?.content)
+        }
+
+    @Test
+    fun `POST passkey rename with blank name returns 400`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            loginAs(authed)
+
+            relyingParty.queueRegistration()
+            authed.post("/t/acme/passkeys/register/start")
+            val finishResponse =
+                authed.post("/t/acme/passkeys/register/finish") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"credential":{"type":"public-key","id":"cred-rename"},"name":"Original"}""")
+                }
+            val credId =
+                Json
+                    .parseToJsonElement(finishResponse.bodyAsText())
+                    .jsonObject["id"]
+                    ?.jsonPrimitive
+                    ?.content
+                    ?: throw AssertionError("No id in response")
+
+            val renameResponse =
+                authed.post("/t/acme/passkeys/$credId/rename") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"   "}""")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, renameResponse.status)
+            val body = Json.parseToJsonElement(renameResponse.bodyAsText()).jsonObject
+            assertEquals("InvalidName", body["error"]?.jsonPrimitive?.content)
+        }
+
     // =========================================================================
     // POST /passkeys/{id}/revoke
     // =========================================================================
