@@ -30,7 +30,7 @@ RUN node frontend/scripts/build-js.js
 RUN node frontend/scripts/generate-sri.js
 
 
-FROM eclipse-temurin:17-jdk AS kotlin-build
+FROM eclipse-temurin:25-jdk AS kotlin-build
 
 WORKDIR /app
 COPY . .
