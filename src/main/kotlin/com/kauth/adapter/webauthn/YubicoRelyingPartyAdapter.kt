@@ -64,7 +64,7 @@ class YubicoRelyingPartyAdapter(
                 ).build()
 
         val creationOptions = relyingParty.startRegistration(options)
-        val json = creationOptions.toCredentialsCreateJson()
+        val json = creationOptions.toJson()
         val challenge = creationOptions.challenge.base64Url
         return json to challenge
     }
@@ -113,7 +113,7 @@ class YubicoRelyingPartyAdapter(
 
     override fun startAssertion(): Pair<String, String> {
         val assertionRequest = relyingParty.startAssertion(StartAssertionOptions.builder().build())
-        val json = assertionRequest.toCredentialsGetJson()
+        val json = assertionRequest.toJson()
         val challenge = assertionRequest.publicKeyCredentialRequestOptions.challenge.base64Url
         return json to challenge
     }

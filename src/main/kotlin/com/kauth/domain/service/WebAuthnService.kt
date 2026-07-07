@@ -67,7 +67,7 @@ class WebAuthnService(
         val parsed =
             try {
                 relyingParty.finishRegistration(creationOptionsJson, request.credentialJson)
-            } catch (e: IllegalStateException) {
+            } catch (e: Exception) {
                 return WebAuthnResult.Failure(WebAuthnError.VerificationFailed(e.message ?: "verification failed"))
             }
         val credential =
@@ -123,7 +123,7 @@ class WebAuthnService(
         val assertion =
             try {
                 relyingParty.finishAssertion(assertionRequestJson, request.credentialJson)
-            } catch (e: IllegalStateException) {
+            } catch (e: Exception) {
                 auditLog.record(
                     AuditEvent(
                         tenantId = tenant.id,
