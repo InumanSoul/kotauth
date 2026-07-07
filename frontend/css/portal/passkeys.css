@@ -1,0 +1,108 @@
+/* Passkey management page — add panel, rename forms, name display */
+
+.passkey-add-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.passkey-add-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.passkey-add-form label {
+  font-size: 0.8125rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.passkey-add-form input[type="text"] {
+  height: 32px;
+  padding: 0 10px;
+  font-size: 0.875rem;
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  min-width: 160px;
+}
+
+.passkey-add-form input[type="text"]:focus {
+  outline: none;
+  border-color: var(--color-accent-border);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
+}
+
+.passkey-name-display {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.passkey-rename-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.passkey-rename-input {
+  height: 30px;
+  padding: 0 8px;
+  font-size: 0.875rem;
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  min-width: 140px;
+}
+
+.passkey-rename-input:focus {
+  outline: none;
+  border-color: var(--color-accent-border);
+  box-shadow: 0 0 0 3px var(--color-accent-bg);
+}
+
+.passkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.passkey-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.passkey-row:last-child {
+  border-bottom: none;
+}
+
+.passkey-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.passkey-row__meta {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.passkey-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}

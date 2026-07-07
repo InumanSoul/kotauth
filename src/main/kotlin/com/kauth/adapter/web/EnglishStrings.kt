@@ -150,6 +150,17 @@ object EnglishStrings {
     const val PORTAL_PASSKEYS_ADD_PROMPT_NAME = "What do you want to call this passkey?"
     const val PORTAL_PASSKEYS_RENAME_PROMPT_NAME = "New name for this passkey:"
 
+    // Passkey inline components — error messages and form labels
+    const val PASSKEY_CANCEL_BUTTON = "Cancel"
+    const val PASSKEY_ERROR_ALREADY_ENROLLED = "That passkey is already registered on this account."
+    const val PASSKEY_ERROR_CANCELLED = "Passkey action was cancelled."
+    const val PASSKEY_ERROR_GENERIC = "We couldn't complete that. Please try again."
+    const val PASSKEY_ERROR_UNSUPPORTED = "This browser doesn't support passkeys."
+    const val PASSKEY_ERROR_VERIFICATION = "Your device could not be verified. Try a different passkey."
+    const val PASSKEY_NAME_LABEL = "Passkey name"
+    const val PASSKEY_NAME_PLACEHOLDER = "e.g. My phone"
+    const val PASSKEY_SAVE_BUTTON = "Save"
+
     // Portal — confirm dialog
     const val PORTAL_CONFIRM_TITLE = "Confirm"
     const val PORTAL_CONFIRM_CANCEL = "Cancel"

@@ -139,19 +139,69 @@
     }
   }
 
-  Kotauth.passkeys = { enrollPasskey, signInWithPasskey, startConditionalMediation };
+  function resolveErrorMessage(serverErrorType, strings) {
+    var map = {
+      'AlreadyEnrolled': strings.errorAlreadyEnrolled,
+      'VerificationFailed': strings.errorVerification,
+    };
+    return map[serverErrorType] || strings.errorGeneric;
+  }
+
+  function classifyException(err, strings) {
+    if (!window.PublicKeyCredential) return strings.errorUnsupported;
+    var msg = (err && err.message) ? err.message.toLowerCase() : '';
+    if (msg.indexOf('cancel') !== -1 || msg.indexOf('abort') !== -1 || msg.indexOf('not allowed') !== -1) {
+      return strings.errorCancelled;
+    }
+    return strings.errorGeneric;
+  }
+
+  function showError(message) {
+    var el = document.getElementById('passkey-error');
+    if (!el) return;
+    el.textContent = message;
+    el.hidden = false;
+  }
+
+  function clearError() {
+    var el = document.getElementById('passkey-error');
+    if (!el) return;
+    el.textContent = '';
+    el.hidden = true;
+  }
+
+  Kotauth.passkeys = {
+    enrollPasskey,
+    signInWithPasskey,
+    startConditionalMediation,
+    showError,
+    clearError,
+  };
 
   var scriptEl = document.currentScript;
   if (scriptEl) {
     var mode = scriptEl.getAttribute('data-passkey-mode');
     var base = scriptEl.getAttribute('data-passkey-base');
 
+    var strings = {
+      errorGeneric:        scriptEl.getAttribute('data-passkey-error-generic')          || 'We couldn’t complete that. Please try again.',
+      errorCancelled:      scriptEl.getAttribute('data-passkey-error-cancelled')         || 'Passkey action was cancelled.',
+      errorVerification:   scriptEl.getAttribute('data-passkey-error-verification')      || 'Your device could not be verified. Try a different passkey.',
+      errorAlreadyEnrolled: scriptEl.getAttribute('data-passkey-error-already-enrolled') || 'That passkey is already registered on this account.',
+      errorUnsupported:    scriptEl.getAttribute('data-passkey-error-unsupported')       || 'This browser doesn’t support passkeys.',
+    };
+
     if (mode === 'login' && base) {
       document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.passkey-signin-btn').forEach(function (btn) {
-          btn.addEventListener('click', function (e) {
+          btn.addEventListener('click', async function (e) {
             e.preventDefault();
-            Kotauth.passkeys.signInWithPasskey(base);
+            clearError();
+            try {
+              await Kotauth.passkeys.signInWithPasskey(base);
+            } catch (err) {
+              showError(classifyException(err, strings));
+            }
           });
         });
         Kotauth.passkeys.startConditionalMediation(base);
@@ -159,26 +209,66 @@
     }
 
     if (mode === 'manage' && base) {
-      var addPrompt = scriptEl.getAttribute('data-passkey-add-prompt') || 'Passkey name';
-      var renamePrompt = scriptEl.getAttribute('data-passkey-rename-prompt') || 'New name:';
       document.addEventListener('DOMContentLoaded', function () {
-        var addBtn = document.getElementById('add-passkey-btn');
-        if (addBtn) {
-          addBtn.addEventListener('click', async function () {
-            var name = prompt(addPrompt) || 'Passkey';
+        var addBtn  = document.getElementById('add-passkey-btn');
+        var addForm = document.getElementById('add-passkey-form');
+
+        if (addBtn && addForm) {
+          addBtn.addEventListener('click', function () {
+            addBtn.disabled = true;
+            addForm.hidden = false;
+            var nameInput = document.getElementById('add-passkey-name');
+            if (nameInput) nameInput.focus();
+          });
+
+          addForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            clearError();
+            var nameInput = document.getElementById('add-passkey-name');
+            var name = (nameInput && nameInput.value.trim()) || 'Passkey';
             try {
               await Kotauth.passkeys.enrollPasskey(base, name);
               window.location.reload();
-            } catch (e) {
-              alert('Failed to add passkey: ' + e.message);
+            } catch (err) {
+              showError(classifyException(err, strings));
+              addBtn.disabled = false;
+              addForm.hidden = true;
             }
           });
+
+          addForm.querySelector('.passkey-cancel-btn').addEventListener('click', function () {
+            addForm.hidden = true;
+            addBtn.disabled = false;
+            clearError();
+          });
         }
+
         document.querySelectorAll('.passkey-rename-btn').forEach(function (btn) {
-          btn.addEventListener('click', async function () {
-            var row = btn.closest('.passkey-row');
-            var id = row.getAttribute('data-passkey-id');
-            var newName = prompt(renamePrompt);
+          btn.addEventListener('click', function () {
+            var row        = btn.closest('.passkey-row');
+            var nameDisplay = row.querySelector('.passkey-name-display');
+            var renameForm  = row.querySelector('.passkey-rename-form');
+            if (!renameForm) return;
+            btn.disabled    = true;
+            renameForm.hidden = false;
+            var input = renameForm.querySelector('.passkey-rename-input');
+            if (input) {
+              input.value = nameDisplay ? nameDisplay.textContent : '';
+              input.focus();
+              input.select();
+            }
+          });
+
+          var row       = btn.closest('.passkey-row');
+          var renameForm = row && row.querySelector('.passkey-rename-form');
+          if (!renameForm) return;
+
+          renameForm.addEventListener('submit', async function (e) {
+            e.preventDefault();
+            clearError();
+            var id    = row.getAttribute('data-passkey-id');
+            var input = renameForm.querySelector('.passkey-rename-input');
+            var newName = input && input.value.trim();
             if (!newName) return;
             await fetch(base + '/' + id + '/rename', {
               method: 'POST',
@@ -188,11 +278,17 @@
             });
             window.location.reload();
           });
+
+          renameForm.querySelector('.passkey-cancel-btn').addEventListener('click', function () {
+            renameForm.hidden = true;
+            btn.disabled = false;
+          });
         });
+
         document.querySelectorAll('.passkey-revoke-btn').forEach(function (btn) {
           btn.addEventListener('click', async function () {
             var row = btn.closest('.passkey-row');
-            var id = row.getAttribute('data-passkey-id');
+            var id  = row.getAttribute('data-passkey-id');
             await fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' });
             window.location.reload();
           });
@@ -201,17 +297,18 @@
     }
 
     if (mode === 'enroll' && base) {
-      var redirect = scriptEl.getAttribute('data-passkey-redirect') || '/';
+      var redirect    = scriptEl.getAttribute('data-passkey-redirect') || '/';
       var defaultName = scriptEl.getAttribute('data-passkey-default-name') || 'This device';
       document.addEventListener('DOMContentLoaded', function () {
         var enrollBtn = document.getElementById('enroll-passkey-btn');
         if (enrollBtn) {
           enrollBtn.addEventListener('click', async function () {
+            clearError();
             try {
               await Kotauth.passkeys.enrollPasskey(base, defaultName);
               window.location.assign(redirect);
-            } catch (e) {
-              alert('Failed to add passkey: ' + e.message);
+            } catch (err) {
+              showError(classifyException(err, strings));
             }
           });
         }

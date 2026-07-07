@@ -823,12 +823,39 @@ object PortalView {
                 div(classes = "portal-section") {
                     div(classes = "portal-section__header") {
                         div(classes = "portal-section__title") { +ctx.t("PORTAL_PASSKEYS_TITLE") }
-                        button(classes = "btn btn--primary btn--sm") {
-                            id = "add-passkey-btn"
-                            +ctx.t("PORTAL_PASSKEYS_ADD_BUTTON")
+                        div(classes = "passkey-add-panel") {
+                            button(classes = "btn btn--primary btn--sm") {
+                                id = "add-passkey-btn"
+                                +ctx.t("PORTAL_PASSKEYS_ADD_BUTTON")
+                            }
+                            form(classes = "passkey-add-form") {
+                                id = "add-passkey-form"
+                                attributes["hidden"] = "hidden"
+                                label {
+                                    htmlFor = "add-passkey-name"
+                                    +ctx.t("PASSKEY_NAME_LABEL")
+                                }
+                                input(type = InputType.text, name = "passkey-name") {
+                                    id = "add-passkey-name"
+                                    placeholder = ctx.t("PASSKEY_NAME_PLACEHOLDER")
+                                    maxLength = "64"
+                                    required = true
+                                }
+                                button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
+                                    +ctx.t("PASSKEY_SAVE_BUTTON")
+                                }
+                                button(type = ButtonType.button, classes = "btn btn--ghost btn--sm passkey-cancel-btn") {
+                                    +ctx.t("PASSKEY_CANCEL_BUTTON")
+                                }
+                            }
                         }
                     }
                     div(classes = "portal-section__body") {
+                        div(classes = "alert alert-error") {
+                            id = "passkey-error"
+                            attributes["hidden"] = "hidden"
+                            attributes["role"] = "alert"
+                        }
                         if (credentials.isEmpty()) {
                             p(classes = "form-hint") { +ctx.t("PORTAL_PASSKEYS_EMPTY_STATE") }
                         } else {
@@ -837,7 +864,21 @@ object PortalView {
                                     div(classes = "passkey-row") {
                                         attributes["data-passkey-id"] = (cred.id ?: 0).toString()
                                         div(classes = "passkey-row__info") {
-                                            div(classes = "passkey-row__name") { +cred.name }
+                                            span(classes = "passkey-name-display") { +cred.name }
+                                            form(classes = "passkey-rename-form") {
+                                                attributes["hidden"] = "hidden"
+                                                input(type = InputType.text, classes = "passkey-rename-input") {
+                                                    placeholder = cred.name
+                                                    maxLength = "64"
+                                                    required = true
+                                                }
+                                                button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
+                                                    +ctx.t("PASSKEY_SAVE_BUTTON")
+                                                }
+                                                button(type = ButtonType.button, classes = "btn btn--ghost btn--sm passkey-cancel-btn") {
+                                                    +ctx.t("PASSKEY_CANCEL_BUTTON")
+                                                }
+                                            }
                                             div(classes = "passkey-row__meta") {
                                                 span {
                                                     +"${ctx.t("PORTAL_PASSKEYS_ADDED_ON")}: "
@@ -873,8 +914,15 @@ object PortalView {
                     attributes["crossorigin"] = "anonymous"
                     attributes["data-passkey-base"] = "/t/$slug/passkeys"
                     attributes["data-passkey-mode"] = "manage"
-                    attributes["data-passkey-add-prompt"] = ctx.t("PORTAL_PASSKEYS_ADD_PROMPT_NAME")
-                    attributes["data-passkey-rename-prompt"] = ctx.t("PORTAL_PASSKEYS_RENAME_PROMPT_NAME")
+                    attributes["data-passkey-name-label"] = ctx.t("PASSKEY_NAME_LABEL")
+                    attributes["data-passkey-name-placeholder"] = ctx.t("PASSKEY_NAME_PLACEHOLDER")
+                    attributes["data-passkey-save-button"] = ctx.t("PASSKEY_SAVE_BUTTON")
+                    attributes["data-passkey-cancel-button"] = ctx.t("PASSKEY_CANCEL_BUTTON")
+                    attributes["data-passkey-error-generic"] = ctx.t("PASSKEY_ERROR_GENERIC")
+                    attributes["data-passkey-error-cancelled"] = ctx.t("PASSKEY_ERROR_CANCELLED")
+                    attributes["data-passkey-error-verification"] = ctx.t("PASSKEY_ERROR_VERIFICATION")
+                    attributes["data-passkey-error-already-enrolled"] = ctx.t("PASSKEY_ERROR_ALREADY_ENROLLED")
+                    attributes["data-passkey-error-unsupported"] = ctx.t("PASSKEY_ERROR_UNSUPPORTED")
                 }
             }
         }

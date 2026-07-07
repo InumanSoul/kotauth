@@ -211,6 +211,11 @@ object AuthView {
                             }
 
                             if (passkeysEnabled) {
+                                div("alert alert-error") {
+                                    id = "passkey-error"
+                                    attributes["hidden"] = "hidden"
+                                    attributes["role"] = "alert"
+                                }
                                 button(classes = "btn btn--secondary passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
@@ -266,6 +271,11 @@ object AuthView {
                                 }
                             }
                             if (passkeysEnabled) {
+                                div("alert alert-error") {
+                                    id = "passkey-error"
+                                    attributes["hidden"] = "hidden"
+                                    attributes["role"] = "alert"
+                                }
                                 button(classes = "btn btn--secondary passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
@@ -341,6 +351,11 @@ object AuthView {
                         attributes["crossorigin"] = "anonymous"
                         attributes["data-passkey-base"] = "/t/$tenantSlug/passkeys"
                         attributes["data-passkey-mode"] = "login"
+                        attributes["data-passkey-error-generic"] = ctx.t("PASSKEY_ERROR_GENERIC")
+                        attributes["data-passkey-error-cancelled"] = ctx.t("PASSKEY_ERROR_CANCELLED")
+                        attributes["data-passkey-error-verification"] = ctx.t("PASSKEY_ERROR_VERIFICATION")
+                        attributes["data-passkey-error-already-enrolled"] = ctx.t("PASSKEY_ERROR_ALREADY_ENROLLED")
+                        attributes["data-passkey-error-unsupported"] = ctx.t("PASSKEY_ERROR_UNSUPPORTED")
                     }
                 }
             }

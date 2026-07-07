@@ -25,6 +25,12 @@ fun postMagicLinkPage(
                     h1("card-title") { +ctx.t("POST_MAGIC_LINK_TITLE") }
                     p("card-subtitle") { +ctx.t("POST_MAGIC_LINK_INTRO") }
 
+                    div(classes = "alert alert-error") {
+                        id = "passkey-error"
+                        attributes["hidden"] = "hidden"
+                        attributes["role"] = "alert"
+                    }
+
                     button(classes = "btn") {
                         id = "enroll-passkey-btn"
                         type = ButtonType.button
@@ -47,6 +53,11 @@ fun postMagicLinkPage(
                 attributes["data-passkey-mode"] = "enroll"
                 attributes["data-passkey-redirect"] = "/t/$tenantSlug/launcher"
                 attributes["data-passkey-default-name"] = ctx.t("POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME")
+                attributes["data-passkey-error-generic"] = ctx.t("PASSKEY_ERROR_GENERIC")
+                attributes["data-passkey-error-cancelled"] = ctx.t("PASSKEY_ERROR_CANCELLED")
+                attributes["data-passkey-error-verification"] = ctx.t("PASSKEY_ERROR_VERIFICATION")
+                attributes["data-passkey-error-already-enrolled"] = ctx.t("PASSKEY_ERROR_ALREADY_ENROLLED")
+                attributes["data-passkey-error-unsupported"] = ctx.t("PASSKEY_ERROR_UNSUPPORTED")
             }
         }
     }
