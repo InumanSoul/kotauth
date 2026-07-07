@@ -470,8 +470,9 @@ data class ServiceGraph(
                             .id(rpHost)
                             .name("Kotauth")
                             .build(),
-                    ).credentialRepository(YubicoCredentialRepositoryBridge(webAuthnCredentialRepository))
-                    .origins(setOf(config.baseUrl))
+                    ).credentialRepository(
+                        YubicoCredentialRepositoryBridge(webAuthnCredentialRepository, config.secretKey),
+                    ).origins(setOf(config.baseUrl))
                     .allowOriginPort(false)
                     .allowOriginSubdomain(false)
                     .build()
