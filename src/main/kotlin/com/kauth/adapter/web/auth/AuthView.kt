@@ -176,44 +176,38 @@ object AuthView {
                                         attributes["autofocus"] = "true"
                                     }
                                 }
-                                if (passwordLoginEnabled) {
-                                    div("field") {
-                                        label {
-                                            htmlFor = "password"
-                                            +ctx.t("PASSWORD")
+                                div("field") {
+                                    label {
+                                        htmlFor = "password"
+                                        +ctx.t("PASSWORD")
+                                    }
+                                    div("field__input-wrap") {
+                                        input(type = InputType.password, name = "password") {
+                                            id = "password"
+                                            placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
+                                            attributes["autocomplete"] = "current-password"
+                                            required = true
                                         }
-                                        div("field__input-wrap") {
-                                            input(type = InputType.password, name = "password") {
-                                                id = "password"
-                                                placeholder = ctx.t("LOGIN_PASSWORD_PLACEHOLDER")
-                                                attributes["autocomplete"] = "current-password"
-                                                required = true
-                                            }
-                                            button(type = ButtonType.button, classes = "field__toggle-pw") {
-                                                attributes["data-toggle-password"] = "password"
-                                                attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
-                                                attributes["aria-pressed"] = "false"
-                                                attributes["data-visible"] = "false"
-                                                inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
-                                                inlineSvgIcon(
-                                                    "eye-off",
-                                                    ctx.t("AUTH_ICON_HIDE"),
-                                                    cssClass = "icon-eye-off",
-                                                )
-                                            }
+                                        button(type = ButtonType.button, classes = "field__toggle-pw") {
+                                            attributes["data-toggle-password"] = "password"
+                                            attributes["aria-label"] = ctx.t("AUTH_SHOW_PASSWORD")
+                                            attributes["aria-pressed"] = "false"
+                                            attributes["data-visible"] = "false"
+                                            inlineSvgIcon("eye", ctx.t("AUTH_ICON_SHOW"), cssClass = "icon-eye")
+                                            inlineSvgIcon(
+                                                "eye-off",
+                                                ctx.t("AUTH_ICON_HIDE"),
+                                                cssClass = "icon-eye-off",
+                                            )
                                         }
                                     }
                                 }
-                                if (passwordLoginEnabled) {
-                                    button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
-                                }
+                                button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
                             }
 
                             if (passkeysEnabled) {
-                                if (passwordLoginEnabled) {
-                                    div("social-divider") {
-                                        span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
-                                    }
+                                div("social-divider") {
+                                    span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
                                 }
                                 div("alert alert-error") {
                                     id = "passkey-error"
@@ -224,10 +218,8 @@ object AuthView {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
-                            if (passwordLoginEnabled) {
-                                div("footer-link") {
-                                    a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
-                                }
+                            div("footer-link") {
+                                a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
                             }
                             if (magicLinkEnabled || emailOtpLoginEnabled) {
                                 div("passwordless-options") {
