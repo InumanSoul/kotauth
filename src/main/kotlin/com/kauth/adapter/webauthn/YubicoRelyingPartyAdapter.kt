@@ -1,5 +1,7 @@
 package com.kauth.adapter.webauthn
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.kauth.domain.port.AssertionResultData
 import com.kauth.domain.port.RegisteredCredentialData
 import com.kauth.domain.port.RelyingPartyAdapter
@@ -36,6 +38,8 @@ import com.yubico.webauthn.data.ByteArray as YubiByteArray
 class YubicoRelyingPartyAdapter(
     private val relyingParty: RelyingParty,
 ) : RelyingPartyAdapter {
+    private val jsonMapper = ObjectMapper()
+
     @Suppress("UnusedParameter")
     override fun startRegistration(
         userHandle: ByteArray,
@@ -113,7 +117,7 @@ class YubicoRelyingPartyAdapter(
 
     override fun startAssertion(): Pair<String, String> {
         val assertionRequest = relyingParty.startAssertion(StartAssertionOptions.builder().build())
-        val json = assertionRequest.toJson()
+        val json = assertionRequest.toCredentialsGetJson()
         val challenge = assertionRequest.publicKeyCredentialRequestOptions.challenge.base64Url
         return json to challenge
     }
@@ -122,7 +126,11 @@ class YubicoRelyingPartyAdapter(
         assertionRequestJson: String,
         credentialResponseJson: String,
     ): AssertionResultData {
-        val request = AssertionRequest.fromJson(assertionRequestJson)
+        val browserTree = jsonMapper.readTree(assertionRequestJson)
+        val innerNode = browserTree.get("publicKey") ?: browserTree
+        val wrappedTree = jsonMapper.createObjectNode()
+        wrappedTree.set<JsonNode>("publicKeyCredentialRequestOptions", innerNode)
+        val request = AssertionRequest.fromJson(jsonMapper.writeValueAsString(wrappedTree))
         val credential = PublicKeyCredential.parseAssertionResponseJson(credentialResponseJson)
 
         val result =

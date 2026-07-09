@@ -1,6 +1,6 @@
 package com.kauth.adapter.webauthn
 
-import com.yubico.webauthn.AssertionRequest
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.yubico.webauthn.CredentialRepository
 import com.yubico.webauthn.RegisteredCredential
 import com.yubico.webauthn.RelyingParty
@@ -14,15 +14,13 @@ import kotlin.test.assertNotNull
 import com.yubico.webauthn.data.ByteArray as YubiByteArray
 
 /**
- * Verifies that [YubicoRelyingPartyAdapter] serialises registration and assertion
- * options in the unwrapped JSON shape expected by the Yubico fromJson factories.
- *
- * Background: [PublicKeyCredentialCreationOptions.toCredentialsCreateJson] (and the
- * assertion equivalent) produce the browser-navigator envelope {"publicKey": {...}},
- * while fromJson expects the inner object {"rp": ..., "user": ...} directly. Using the
- * wrong serialiser causes "rp is marked non-null but is null" at finish time (500).
- * [PublicKeyCredentialCreationOptions.toJson] and [AssertionRequest.toJson] produce
- * the correct unwrapped shape — these tests lock that invariant in.
+ * Verifies that [YubicoRelyingPartyAdapter] serialises options in a shape the
+ * browser's navigator.credentials API can decode. Registration returns the
+ * unwrapped creation options ({rp, user, challenge, ...}). Assertion returns
+ * Yubico's toCredentialsGetJson envelope ({publicKey: {challenge, rpId, ...}})
+ * because AssertionRequest.toJson wraps fields under publicKeyCredentialRequestOptions
+ * which the browser cannot consume. The bundle's decode helper handles both the
+ * unwrapped and publicKey-envelope shapes.
  */
 class YubicoRelyingPartyAdapterTest {
     private val rpIdentity =
@@ -79,14 +77,12 @@ class YubicoRelyingPartyAdapterTest {
     }
 
     @Test
-    fun `startAssertion produces JSON that round-trips through AssertionRequest fromJson`() {
+    fun `startAssertion produces JSON in the publicKey envelope shape the browser can decode`() {
         val (json, _) = adapter.startAssertion()
 
-        // If toCredentialsGetJson() were used, fromJson would throw because the
-        // assertion request fields would be wrapped under "publicKey".
-        val parsed = AssertionRequest.fromJson(json)
-
-        assertNotNull(parsed)
-        assertNotNull(parsed.publicKeyCredentialRequestOptions.challenge)
+        val tree = ObjectMapper().readTree(json)
+        val inner = tree.get("publicKey") ?: tree
+        assertNotNull(inner.get("challenge"))
+        assertEquals("localhost", inner.get("rpId").asText())
     }
 }
