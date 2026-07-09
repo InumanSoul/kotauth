@@ -1020,7 +1020,7 @@ object PortalView {
                     p("confirm-dialog__title") {
                         id = "passkey-name-dialog-title"
                     }
-                    input(type = InputType.text) {
+                    input(type = InputType.text, classes = "edit-field__input") {
                         id = "passkey-name-dialog-input"
                         maxLength = "64"
                         required = true
