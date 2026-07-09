@@ -930,7 +930,7 @@ and one developer-experience improvement.
 
 ### Documentation
 
-- **Per-tenant magic-link token TTL** — captured in `docs/internal/FEATURE_BACKLOG.md` as item #9. Started as a free-rider in V39, then reverted because adding the column without wiring it into the magic-link service would leave dead state. Tracked for a future ~0.5-day follow-up
+- **Per-tenant magic-link token TTL** — tracked as a future follow-up. Started as a free-rider in V39, then reverted because adding the column without wiring it into the magic-link service would leave dead state
 
 ---
 
@@ -1256,7 +1256,7 @@ and one developer-experience improvement.
 ### Changed
 
 - **Kotlin upgraded to 2.3.20** — from 1.9.24. Source-compatible, no breaking changes. Enables K2 compiler, aligns with latest JetBrains toolchain. Gradle deprecation warnings persist (source: Ktor 2.3.12 plugin, resolved when migrating to Ktor 3.x in v2.0)
-- **Dependency upgrade plan rewritten** — `docs/internal/GRADLE_UPGRADE_PLAN.md` now contains a deep migration impact analysis for the v2.0 framework upgrade: Ktor 3.x (2.5 days, 4 intercept→plugin conversions + 30 mechanical changes), Exposed 1.0 (1.5 days, limit/offset + TransactionManager accessor), Flyway 11 (30 min). Total: ~4.25 days. Migrations are independent and ordered: Flyway → Exposed → Ktor
+- **Dependency upgrade plan rewritten** — deep migration impact analysis captured for the v2.0 framework upgrade: Ktor 3.x (2.5 days, 4 intercept→plugin conversions + 30 mechanical changes), Exposed 1.0 (1.5 days, limit/offset + TransactionManager accessor), Flyway 11 (30 min). Total: ~4.25 days. Migrations are independent and ordered: Flyway → Exposed → Ktor
 
 ---
 

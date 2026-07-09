@@ -64,6 +64,8 @@ src/main/resources/version.properties
 ai-tools/
 .claude/
 .cursor/
+.superpowers/
 
 # Internal development tracking — not for public consumption
 docs/internal/
+docs/superpowers/
