@@ -72,6 +72,10 @@
   padding: 12px 24px 20px;
 }
 
+.confirm-dialog__body .edit-field__input {
+  margin-top: 0.75rem;
+}
+
 /* ── Animations ──────────────────────────────────────────── */
 
 @keyframes backdrop-fade-in {

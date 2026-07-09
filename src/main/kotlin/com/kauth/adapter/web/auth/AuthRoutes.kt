@@ -17,6 +17,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.HttpStatusCode
@@ -47,6 +48,8 @@ fun Route.authRoutes(
     ssoTtlSeconds: Long = 86_400L,
     emailOtpService: com.kauth.domain.service.EmailOtpService? = null,
     otpIpRateLimiter: RateLimiterPort? = null,
+    webAuthnService: WebAuthnService? = null,
+    passkeyRateLimiter: RateLimiterPort? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -130,6 +133,17 @@ fun Route.authRoutes(
                 oauthService = oauthService,
                 perIpLimiter = otpIpRateLimiter,
                 encryptionService = encryptionService,
+                ssoTtlSeconds = ssoTtlSeconds,
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
+            )
+        }
+
+        if (webAuthnService != null && passkeyRateLimiter != null) {
+            passkeyAuthRoutes(
+                webAuthnService = webAuthnService,
+                oauthService = oauthService,
+                encryptionService = encryptionService,
+                rateLimiter = passkeyRateLimiter,
                 ssoTtlSeconds = ssoTtlSeconds,
                 secure = baseUrl.startsWith("https://", ignoreCase = true),
             )

@@ -92,6 +92,21 @@ class AuthService(
             return AuthResult.Failure(AuthError.PasswordLoginDisabled)
         }
 
+        if (tenant.passwordLoginDisabled) {
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_REJECTED_POLICY,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "password_login_disabled_by_tenant"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.PasswordLoginDisabled)
+        }
+
         if (username.isBlank() || rawPassword.isBlank()) {
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }

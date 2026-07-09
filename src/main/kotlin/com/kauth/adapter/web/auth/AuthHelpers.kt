@@ -460,25 +460,13 @@ internal fun parseSocialPendingCookie(
 // -- Authorization-code flow completion ----------------------------------------
 
 /**
- * Shared "issue authorization code and redirect" finalization step.
+ * Issues an authorization code and returns the fully-built redirect URL, or
+ * null on failure (in which case [renderError] has already been invoked).
  *
- * Called from any authentication-success point in an OAuth flow:
- *   - Password login (see [oauthProtocolRoutes])
- *   - MFA challenge success (see [mfaRoutes])
- *   - Magic-link consumption (see [magicLinkRoutes])
- *
- * Flow:
- *   1. Validates that [oauthParams] carries a `clientId` + `redirectUri` (400 otherwise).
- *   2. Requests an authorization code from [oauthService] for [userId].
- *   3. On success: clears the auth-context cookie, redirects to
- *      `redirectUri?code=…&state=…`.
- *   4. On failure: invokes [renderError] with a human-readable message so the
- *      caller can render its context-appropriate error page (login, mfa, etc.)
- *
- * [renderError] is a `suspend` callback because error rendering typically
- * involves `call.respondHtml(...)`.
+ * Does NOT emit any HTTP response. Callers decide whether to redirect or
+ * return JSON (e.g. passkey finish, which uses a fetch and needs JSON).
  */
-internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
+internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
     slug: String,
     userId: UserId,
     tenantId: TenantId,
@@ -491,13 +479,19 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     oauthService: OAuthService,
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
-) {
+): String? {
     val clientId =
         oauthParams.clientId
-            ?: return respond(HttpStatusCode.BadRequest, "Missing client_id")
+            ?: run {
+                respond(HttpStatusCode.BadRequest, "Missing client_id")
+                return null
+            }
     val redirectUri =
         oauthParams.redirectUri
-            ?: return respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+            ?: run {
+                respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+                return null
+            }
 
     setSsoCookie(
         SsoCookieData(
@@ -512,7 +506,7 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
         secure = secure,
     )
 
-    when (
+    return when (
         val codeResult =
             oauthService.issueAuthorizationCode(
                 tenantSlug = slug,
@@ -533,16 +527,52 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
             clearAuthContextCookie(slug)
             val code = codeResult.value.code
             val state = oauthParams.state
-            val redirect =
-                buildString {
-                    append(redirectUri)
-                    append("?code=").append(encodeParam(code))
-                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
-                }
-            respondRedirect(redirect)
+            buildString {
+                append(redirectUri)
+                append("?code=").append(encodeParam(code))
+                if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+            }
         }
         is OAuthResult.Failure -> {
             renderError(codeResult.error.toDescription())
+            null
         }
     }
+}
+
+/**
+ * Issues an authorization code and performs the redirect directly.
+ * Thin wrapper around [buildAuthorizationCodeRedirectUrl] for callers
+ * that always want an HTTP redirect (password login, MFA, magic-link).
+ */
+internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
+    slug: String,
+    userId: UserId,
+    tenantId: TenantId,
+    oauthParams: AuthView.OAuthParams,
+    ipAddress: String?,
+    authTime: Instant,
+    mfaCompleted: Boolean,
+    ssoTtlSeconds: Long,
+    secure: Boolean,
+    oauthService: OAuthService,
+    encryptionService: EncryptionService,
+    renderError: suspend (message: String) -> Unit,
+) {
+    val url =
+        buildAuthorizationCodeRedirectUrl(
+            slug = slug,
+            userId = userId,
+            tenantId = tenantId,
+            oauthParams = oauthParams,
+            ipAddress = ipAddress,
+            authTime = authTime,
+            mfaCompleted = mfaCompleted,
+            ssoTtlSeconds = ssoTtlSeconds,
+            secure = secure,
+            oauthService = oauthService,
+            encryptionService = encryptionService,
+            renderError = renderError,
+        ) ?: return
+    respondRedirect(url)
 }

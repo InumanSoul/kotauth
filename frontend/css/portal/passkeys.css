@@ -1,0 +1,38 @@
+.passkey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.passkey-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--color-border);
+}
+
+.passkey-row:last-child {
+  border-bottom: none;
+}
+
+.passkey-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.passkey-row__meta {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.passkey-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}

@@ -323,6 +323,94 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
+    // Passkeys / SMTP hard-gate
+    // =========================================================================
+
+    @Test
+    fun `POST security passwordLoginDisabled=true is rejected when tenant SMTP not ready`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // workspace has no SMTP configured (smtpEnabled=false by default)
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passwordLoginDisabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertContains(response.bodyAsText(), "SmtpRequired")
+        }
+
+    @Test
+    fun `POST security passwordLoginDisabled=true is accepted when SMTP is ready`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // configure acme workspace with valid SMTP
+            val smtpReadyWorkspace =
+                workspace.copy(
+                    smtpEnabled = true,
+                    smtpHost = "smtp.example.com",
+                    smtpFromAddress = "no-reply@acme.dev",
+                )
+            tenantRepo.add(smtpReadyWorkspace)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passwordLoginDisabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
+        }
+
+    @Test
+    fun `POST security passkeysEnabled=false persists without SMTP requirement`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // workspace has no SMTP — should still allow toggling passkeysEnabled alone
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passkeysEnabled", "false")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val saved = tenantRepo.findBySlug("acme")
+            assertFalse(saved?.passkeysEnabled ?: true, "passkeysEnabled should be persisted as false")
+        }
+
+    // =========================================================================
     // Branding settings
     // =========================================================================
 

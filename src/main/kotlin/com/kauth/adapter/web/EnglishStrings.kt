@@ -34,6 +34,9 @@ object EnglishStrings {
     const val TOAST_USER_ENABLED = "User enabled."
     const val TOAST_USER_SESSIONS_REVOKED = "All sessions revoked."
     const val TOAST_VERIFICATION_SENT = "Verification email sent."
+    const val TOAST_PASSKEY_REVOKED = "Passkey revoked."
+    const val TOAST_PASSKEYS_RESET = "All passkeys reset for this user."
+    const val TOAST_MFA_RESET = "MFA reset for this user."
 
     // Portal — navigation and shell
     const val PORTAL_SIGN_OUT = "Sign out"
@@ -133,6 +136,31 @@ object EnglishStrings {
         "Enter the 6-digit code shown in your authenticator app to confirm everything is working."
     const val PORTAL_MFA_VERIFICATION_CODE = "Verification code"
     const val PORTAL_MFA_CONFIRM_SETUP = "Confirm setup"
+
+    // Portal — passkeys page
+    const val PORTAL_NAV_PASSKEYS = "Passkeys"
+    const val PORTAL_PASSKEYS_TITLE = "Passkeys"
+    const val PORTAL_PASSKEYS_INTRO = "Sign in without a password using your device's biometrics or a hardware key."
+    const val PORTAL_PASSKEYS_ADD_BUTTON = "Add a passkey"
+    const val PORTAL_PASSKEYS_EMPTY_STATE = "You have no passkeys enrolled yet."
+    const val PORTAL_PASSKEYS_ADDED_ON = "Added"
+    const val PORTAL_PASSKEYS_LAST_USED = "Last used"
+    const val PORTAL_PASSKEYS_RENAME = "Rename"
+    const val PORTAL_PASSKEYS_REVOKE = "Remove"
+    const val PASSKEY_ADD_DIALOG_TITLE = "Add a passkey"
+    const val PASSKEY_RENAME_DIALOG_TITLE = "Rename passkey"
+    const val PASSKEY_REMOVE_CONFIRM = "Remove passkey \"{name}\"?"
+
+    // Passkey inline components — error messages and form labels
+    const val PASSKEY_CANCEL_BUTTON = "Cancel"
+    const val PASSKEY_ERROR_ALREADY_ENROLLED = "That passkey is already registered on this account."
+    const val PASSKEY_ERROR_CANCELLED = "Passkey action was cancelled."
+    const val PASSKEY_ERROR_GENERIC = "We couldn't complete that. Please try again."
+    const val PASSKEY_ERROR_UNSUPPORTED = "This browser doesn't support passkeys."
+    const val PASSKEY_ERROR_VERIFICATION = "Your device could not be verified. Try a different passkey."
+    const val PASSKEY_NAME_LABEL = "Passkey name"
+    const val PASSKEY_NAME_PLACEHOLDER = "e.g. My phone"
+    const val PASSKEY_SAVE_BUTTON = "Save"
 
     // Portal — confirm dialog
     const val PORTAL_CONFIRM_TITLE = "Confirm"
@@ -341,6 +369,15 @@ object EnglishStrings {
         "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
+    // Passkeys card (workspace security settings — v1.20)
+    const val ADMIN_PASSKEYS_HEADING = "Passkeys"
+    const val ADMIN_PASSKEYS_ENABLED_LABEL = "Passkey sign-in enabled"
+    const val ADMIN_PASSKEYS_PASSWORDLESS_LABEL = "Disable password sign-in (passkey + magic link only)"
+    const val ADMIN_PASSKEYS_SMTP_GATE_HINT =
+        "SMTP is required to disable password sign-in — magic-link is the recovery path."
+    const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
+    const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 
@@ -383,6 +420,8 @@ object EnglishStrings {
     const val LOGIN_CONTINUE_GITHUB = "Continue with GitHub"
     const val LOGIN_PROVIDER_GOOGLE = "Google"
     const val LOGIN_PROVIDER_GITHUB = "GitHub"
+    const val AUTH_LOGIN_PASSKEY_BUTTON = "Sign in with a passkey"
+    const val AUTH_LOGIN_MAGIC_LINK_BUTTON = "Sign in with a magic link"
 
     // Login page — passwordless mode (when tenant disables password sign-in)
     const val LOGIN_PASSWORDLESS_SUBTITLE = "Sign in with an email link"
@@ -574,6 +613,13 @@ object EnglishStrings {
 
     const val BRAND_IDENTITY_HEADING = "Brand Identity"
     const val VISUAL_THEME_HEADING = "Visual Theme"
+
+    const val POST_MAGIC_LINK_TITLE = "Sign in complete"
+    const val POST_MAGIC_LINK_INTRO =
+        "Adding a passkey lets you sign in faster next time without a magic link."
+    const val POST_MAGIC_LINK_ENROLL_CTA = "Enroll a passkey on this device"
+    const val POST_MAGIC_LINK_SKIP_CTA = "Continue without a passkey"
+    const val POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME = "This device"
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

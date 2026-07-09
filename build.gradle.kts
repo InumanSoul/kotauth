@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.19.3"
+version = "1.20.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -62,6 +62,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("com.auth0:java-jwt:4.5.2")
     implementation("at.favre.lib:bcrypt:0.10.2")
+    implementation("com.yubico:webauthn-server-core:2.6.0")
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
@@ -260,6 +261,7 @@ val compileJs =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
     }
 
@@ -276,6 +278,7 @@ val generateJsSri =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
         outputs.file("src/main/resources/js-integrity.properties")
     }
