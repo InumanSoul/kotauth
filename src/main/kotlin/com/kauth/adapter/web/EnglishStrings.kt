@@ -20,6 +20,7 @@ object EnglishStrings {
     // Toast messages — success feedback after form saves
     const val TOAST_SETTINGS_SAVED = "Settings saved."
     const val TOAST_SECURITY_POLICY_SAVED = "Security policy saved."
+    const val TOAST_SIGN_IN_METHODS_SAVED = "Sign-in methods updated."
     const val TOAST_BRANDING_SAVED = "Branding saved."
     const val TOAST_SMTP_SAVED = "SMTP settings saved."
     const val TOAST_IDP_SAVED = "Identity provider settings saved."

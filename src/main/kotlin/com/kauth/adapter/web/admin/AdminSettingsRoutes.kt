@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantId
@@ -12,6 +13,7 @@ import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
@@ -283,7 +285,7 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
-        val saved = call.request.queryParameters["saved"] == "true"
+        val savedParam = call.request.queryParameters["saved"]
         val allUsers = userRepository.findByTenantId(workspace.id, null)
         val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
         val methodRows = securityMethodsService?.list(workspace) ?: emptyList()
@@ -293,7 +295,7 @@ fun Route.adminSettingsRoutes(
                 workspace,
                 wsPairs,
                 session.username,
-                saved = saved,
+                savedParam = savedParam,
                 enrolledPasskeyUsers = enrolledPasskeyUsers,
                 totalUsers = allUsers.size,
                 rows = methodRows,
@@ -305,19 +307,12 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
+        val wsPairs = call.attributes[WsPairsAttr]
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
-        val requestedPasswordLoginEnabled = params["passwordLoginDisabled"] != "true"
-        val requestedPasskeysEnabled = params["passkeysEnabled"] == "true"
-
-        if (!requestedPasswordLoginEnabled && !workspace.isSmtpReady) {
-            return@post call.respond(
-                HttpStatusCode.BadRequest,
-                mapOf("error" to "SmtpRequired", "message" to "SMTP must be configured to disable password sign-in."),
-            )
-        }
-
+        // Policy settings (password rules, MFA, lockout, CORS, HIBP).
+        // Auth-method toggles are owned by securityMethodsService below.
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
                 passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
@@ -332,32 +327,53 @@ fun Route.adminSettingsRoutes(
                 lockoutDurationMinutes = params["lockoutDurationMinutes"]?.toIntOrNull() ?: s.lockoutDurationMinutes,
                 corsAllowCredentials = params["corsAllowCredentials"] == "true",
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
-                magicLinkEnabled = params["magicLinkEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
-                passwordLoginEnabled = requestedPasswordLoginEnabled,
-                emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
-                emailOtpLockoutThreshold =
-                    params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
-                emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
-                passkeysEnabled = requestedPasskeysEnabled,
             )
-        when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
-            is AdminResult.Success ->
-                call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
-            is AdminResult.Failure -> {
-                val wsPairs = call.attributes[WsPairsAttr]
-                call.respondHtml(
-                    HttpStatusCode.UnprocessableEntity,
-                    AdminView.securityPolicyPage(
-                        workspace,
-                        wsPairs,
-                        session.username,
-                        error = result.error.message,
-                    ),
-                )
+
+        val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)
+        if (policyResult is AdminResult.Failure) {
+            val rows = securityMethodsService?.list(workspace) ?: emptyList()
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.securityPolicyPage(
+                    workspace,
+                    wsPairs,
+                    session.username,
+                    error = policyResult.error.message,
+                    rows = rows,
+                ),
+            )
+        }
+
+        if (securityMethodsService != null) {
+            // Only include keys the current row set allows toggling; drop any that the
+            // browser shouldn't have submitted (e.g. unconfigured social providers).
+            val toggleableKeys =
+                securityMethodsService
+                    .list(workspace)
+                    .filter { it.toggleable }
+                    .map { it.key }
+                    .toSet()
+            val requested =
+                MethodKey.entries
+                    .filter { it in toggleableKeys }
+                    .associateWith { key -> params["enabled_${key.name.lowercase()}"] == "on" }
+            when (val methodResult = securityMethodsService.updateSecurityMethods(workspace.id, requested)) {
+                is AdminResult.Success -> Unit
+                is AdminResult.Failure -> {
+                    val errorCode =
+                        when (methodResult.error) {
+                            AdminError.NoMethodsEnabled -> "NoMethodsEnabled"
+                            AdminError.SmtpRequired -> "SmtpRequired"
+                            else -> "UnknownError"
+                        }
+                    return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to errorCode))
+                }
             }
         }
+
+        call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=methods")
     }
 
     // -------------------------------------------------------------------

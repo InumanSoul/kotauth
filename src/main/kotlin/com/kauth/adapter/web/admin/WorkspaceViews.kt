@@ -578,7 +578,7 @@ internal fun securityPolicyPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
-    saved: Boolean = false,
+    savedParam: String? = null,
     enrolledPasskeyUsers: Int = 0,
     totalUsers: Int = 0,
     rows: List<com.kauth.domain.model.AuthMethodRow> = emptyList(),
@@ -596,7 +596,11 @@ internal fun securityPolicyPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
-            toastMessage = if (saved) EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
+            toastMessage = when (savedParam) {
+                "methods" -> EnglishStrings.TOAST_SIGN_IN_METHODS_SAVED
+                "true" -> EnglishStrings.TOAST_SECURITY_POLICY_SAVED
+                else -> null
+            },
 ) {
             div("content-inner") {
             breadcrumb(

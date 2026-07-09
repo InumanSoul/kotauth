@@ -86,12 +86,12 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         error: String? = null,
-        saved: Boolean = false,
+        savedParam: String? = null,
         enrolledPasskeyUsers: Int = 0,
         totalUsers: Int = 0,
         rows: List<com.kauth.domain.model.AuthMethodRow> = emptyList(),
     ): HTML.() -> Unit =
-        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved, enrolledPasskeyUsers, totalUsers, rows)
+        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam, enrolledPasskeyUsers, totalUsers, rows)
 
     fun brandingPage(
         workspace: Tenant,
