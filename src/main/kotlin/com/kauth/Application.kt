@@ -14,6 +14,7 @@ import com.kauth.adapter.web.loadAppInfo
 import com.kauth.adapter.web.plugin.buildCspPolicy
 import com.kauth.adapter.web.portal.PortalSession
 import com.kauth.adapter.web.portal.launcherRoutes
+import com.kauth.adapter.web.portal.passkeyPortalRoutes
 import com.kauth.adapter.web.portal.portalRoutes
 import com.kauth.adapter.web.versionCheckRoutes
 import com.kauth.adapter.web.welcomeRoutes
@@ -410,6 +411,8 @@ fun Application.module(
             ssoTtlSeconds = config.ssoSessionTtlSeconds,
             emailOtpService = s.emailOtpService,
             otpIpRateLimiter = s.otpIpRateLimiter,
+            webAuthnService = s.webAuthnService,
+            passkeyRateLimiter = s.passkeyRateLimiter,
         )
 
         portalRoutes(
@@ -423,6 +426,16 @@ fun Application.module(
             encryptionService = s.encryptionService,
             translationPort = s.translationPort,
             impersonationService = s.impersonationService,
+            webAuthnService = s.webAuthnService,
+        )
+
+        passkeyPortalRoutes(
+            webAuthnService = s.webAuthnService,
+            encryptionService = s.encryptionService,
+            tenantRepository = s.tenantRepository,
+            userRepository = s.userRepository,
+            sessionRepository = s.sessionRepository,
+            secure = config.baseUrl.startsWith("https://", ignoreCase = true),
         )
 
         launcherRoutes(
@@ -498,6 +511,10 @@ fun Application.module(
             corsPort = s.corsOriginCache,
             baseUrl = config.baseUrl,
             translationPort = s.translationPort,
+            webAuthnCredentialRepository = s.webAuthnCredentialRepository,
+            webAuthnService = s.webAuthnService,
+            mfaService = s.mfaService,
+            auditLogPort = s.auditLogPort,
         )
     }
 }

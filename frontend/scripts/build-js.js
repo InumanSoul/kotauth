@@ -52,6 +52,12 @@ const bundles = [
       src('branding/branding.js'),
     ],
   },
+  {
+    name: 'kotauth-passkeys.min.js',
+    files: [
+      src('passkeys.js'),
+    ],
+  },
 ];
 
 let failed = false;

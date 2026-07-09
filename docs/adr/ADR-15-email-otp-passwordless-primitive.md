@@ -206,9 +206,8 @@ re-plumbing.
 - v1.12.0 ships ~2k LOC across three coherent primitives (Email OTP,
   bootstrap keys, tenant email branding). All three serve future Kotauth
   consumers, not just the Zion BFF that triggered the work.
-- The find-or-create flag default-off means new tenants must opt in.
-  Documented in `docs/internal/V1_12_0_PLAN.md` and the admin UI security
-  settings.
+- The find-or-create flag default-off means new tenants must opt in via
+  the admin UI security settings.
 - The originating-client redirect-URI requirement is a real operator
   footgun — a misconfigured BFF client (no redirect URI) makes the verify
   endpoint return 422 `invalid_client`. Documented in this ADR and in the

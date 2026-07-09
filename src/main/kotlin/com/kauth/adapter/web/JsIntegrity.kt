@@ -22,4 +22,5 @@ object JsIntegrity {
     val auth: String? = props.getProperty("js.auth.integrity")
     val portal: String? = props.getProperty("js.portal.integrity")
     val branding: String? = props.getProperty("js.branding.integrity")
+    val passkeys: String? = props.getProperty("js.passkeys.integrity")
 }
