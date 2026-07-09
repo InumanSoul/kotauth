@@ -339,7 +339,7 @@ class AdminSettingsTest {
     @Test
     fun `POST security saves method grid and redirects with saved=methods`() =
         testApplication {
-            application { installTestApp() }
+            application { installTestAppWithSecurityMethods() }
             val authed =
                 createClient {
                     install(HttpCookies)
@@ -354,7 +354,37 @@ class AdminSettingsTest {
                         Parameters.build {
                             append("enabled_password", "on")
                             append("enabled_passkey", "on")
-                            append("enabled_magic_link", "on")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertContains(response.headers["Location"] ?: "", "saved=methods")
+
+            val persisted = tenantRepo.findBySlug("acme")!!
+            assertTrue(persisted.securityConfig.passwordLoginEnabled)
+            assertTrue(persisted.passkeysEnabled)
+        }
+
+    @Test
+    fun `POST security silently drops toggles on non-toggleable rows`() =
+        testApplication {
+            application { installTestAppWithSecurityMethods() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // enabled_social_google is submitted but the workspace has no Google IDP credentials,
+            // so its row is non-toggleable — the handler must silently drop it, not error out.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("enabled_password", "on")
+                            append("enabled_social_google", "on")
                         },
                 )
 

@@ -313,6 +313,7 @@ fun Route.adminSettingsRoutes(
 
         // Policy settings (password rules, MFA, lockout, CORS, HIBP).
         // Auth-method toggles are owned by securityMethodsService below.
+        // emailOtpSignupEnabled has no UI toggle in v1.20.1 — editable via backup import or admin API only.
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
                 passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
@@ -362,13 +363,14 @@ fun Route.adminSettingsRoutes(
             when (val methodResult = securityMethodsService.updateSecurityMethods(workspace.id, requested)) {
                 is AdminResult.Success -> Unit
                 is AdminResult.Failure -> {
-                    val errorCode =
+                    val (status, errorCode) =
                         when (methodResult.error) {
-                            AdminError.NoMethodsEnabled -> "NoMethodsEnabled"
-                            AdminError.SmtpRequired -> "SmtpRequired"
-                            else -> "UnknownError"
+                            AdminError.NoMethodsEnabled -> HttpStatusCode.BadRequest to "NoMethodsEnabled"
+                            AdminError.SmtpRequired -> HttpStatusCode.BadRequest to "SmtpRequired"
+                            is AdminError.NotFound -> HttpStatusCode.NotFound to "NotFound"
+                            else -> HttpStatusCode.BadRequest to "UnknownError"
                         }
-                    return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to errorCode))
+                    return@post call.respond(status, mapOf("error" to errorCode))
                 }
             }
         }
