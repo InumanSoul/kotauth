@@ -12,6 +12,23 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
     private val store = mutableMapOf<Int, IdentityProvider>()
     private var nextId = 1
 
+    fun seed(
+        tenantId: TenantId,
+        provider: String,
+        enabled: Boolean = true,
+    ) {
+        val socialProvider = SocialProvider.fromValue(provider)
+        add(
+            IdentityProvider(
+                tenantId = tenantId,
+                provider = socialProvider,
+                clientId = "client-$provider",
+                clientSecret = "secret-$provider",
+                enabled = enabled,
+            ),
+        )
+    }
+
     fun add(provider: IdentityProvider): IdentityProvider {
         val p = if (provider.id == null) provider.copy(id = nextId++) else provider
         store[p.id!!] = p

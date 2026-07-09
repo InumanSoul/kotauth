@@ -65,6 +65,8 @@ internal suspend fun ApplicationCall.respondAdminError(error: AdminError): Unit 
                 "Validation Error",
                 error.message,
             )
+        AdminError.SmtpRequired, AdminError.NoMethodsEnabled ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", error.message)
     }
 
 /** Maps the terminal [AttributeResult] failure variants to Problem+JSON responses. */

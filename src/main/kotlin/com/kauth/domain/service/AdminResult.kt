@@ -24,4 +24,8 @@ sealed class AdminError(
     class Validation(
         message: String,
     ) : AdminError(message)
+
+    data object SmtpRequired : AdminError("SMTP must be configured and enabled before disabling password sign-in.")
+
+    data object NoMethodsEnabled : AdminError("At least one sign-in method must remain enabled.")
 }
