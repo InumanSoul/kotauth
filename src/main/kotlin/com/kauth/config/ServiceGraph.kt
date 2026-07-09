@@ -366,6 +366,7 @@ data class ServiceGraph(
                     authorizationCodeRepository = authCodeRepository,
                     emailPort = emailAdapter,
                     auditLog = auditLogAdapter,
+                    resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
                 )
             val apiKeyBootstrapService =
