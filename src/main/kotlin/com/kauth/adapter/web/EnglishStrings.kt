@@ -369,6 +369,18 @@ object EnglishStrings {
         "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
+    // Sign-in Methods grid rows (v1.20.1 — SecurityMethodsService)
+    const val AUTH_METHOD_PASSWORD_LABEL = "Password"
+    const val AUTH_METHOD_PASSKEY_LABEL = "Passkey"
+    const val AUTH_METHOD_MAGIC_LINK_LABEL = "Magic link"
+    const val AUTH_METHOD_MAGIC_LINK_DESC =
+        "One-time sign-in link delivered by email. Single-use, expires after the configured window."
+    const val AUTH_METHOD_EMAIL_OTP_LABEL = "Email code"
+    const val AUTH_METHOD_EMAIL_OTP_DESC =
+        "6-digit code delivered by email. The user enters it after their email address."
+    const val AUTH_METHOD_SOCIAL_GOOGLE_LABEL = "Google"
+    const val AUTH_METHOD_SOCIAL_GITHUB_LABEL = "GitHub"
+
     // Passkeys card (workspace security settings — v1.20)
     const val ADMIN_PASSKEYS_HEADING = "Passkeys"
     const val ADMIN_PASSKEYS_ENABLED_LABEL = "Passkey sign-in enabled"

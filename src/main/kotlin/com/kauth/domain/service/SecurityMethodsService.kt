@@ -9,6 +9,9 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.TenantRepository
 
+// WorkspaceSettingsService is intentionally NOT injected: updateSecurityMethods writes via
+// tenantRepository directly to avoid duplicating audit-log and CORS-invalidation side effects
+// that WorkspaceSettingsService.applyWorkspaceSettings owns for the general settings flow.
 class SecurityMethodsService(
     private val tenantRepository: TenantRepository,
     private val identityProviderRepository: IdentityProviderRepository,

@@ -3,6 +3,9 @@ package com.kauth.domain.model
 sealed class Requirement {
     data object SmtpRequired : Requirement()
 
+    // Attached to rows for unconfigured social providers so the grid renders them
+    // greyed out with a tooltip. Emitted when SecurityMethodsService lists disabled
+    // providers alongside enabled ones.
     data class OAuthCredentialsRequired(
         val provider: String,
     ) : Requirement()
