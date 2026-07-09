@@ -43,7 +43,7 @@ class LoginPagePasskeyRenderTest {
     }
 
     @Test
-    fun `login page hides password field and shows magic-link button when passwordLoginDisabled is true`() {
+    fun `login page routes to passwordless form when passwordLoginDisabled is true`() {
         val html =
             render(
                 AuthView.loginPage(
@@ -58,7 +58,7 @@ class LoginPagePasskeyRenderTest {
             html.contains("name=\"password\""),
             "password field must not be rendered when passwordLoginDisabled",
         )
-        assertContains(html, "Sign in with a magic link")
+        assertContains(html, "action=\"/t/acme/magic-link/send\"")
         assertContains(html, "Sign in with a passkey")
     }
 

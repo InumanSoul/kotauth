@@ -22,10 +22,10 @@
 .btn:not(.btn--compact).btn--ghost {
   background: transparent;
   color: var(--color-text);
-  border: 2px solid var(--color-text);
+  border: 2px solid var(--color-accent);
 }
 
 .btn:not(.btn--compact).btn--ghost:hover {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
 }

@@ -157,7 +157,7 @@ object AuthView {
                             div("alert alert-error") { +error }
                         }
 
-                        if (passwordLoginEnabled) {
+                        if (passwordLoginEnabled && !passwordLoginDisabled) {
                             form(
                                 action = "/t/$tenantSlug/authorize",
                                 encType = FormEncType.applicationXWwwFormUrlEncoded,
