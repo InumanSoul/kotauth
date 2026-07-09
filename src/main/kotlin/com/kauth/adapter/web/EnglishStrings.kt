@@ -330,8 +330,10 @@ object EnglishStrings {
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
     // Authentication methods card (workspace security settings — v1.10)
-    const val AUTH_METHODS_CARD_TITLE = "Authentication Methods"
     const val AUTH_METHODS_GROUP_SIGN_IN = "Sign-in methods"
+    const val AUTH_METHODS_TABLE_COL_METHOD = "Method"
+    const val AUTH_METHODS_TABLE_COL_ENABLED = "Enabled"
+    const val AUTH_METHODS_TABLE_COL_NOTES = "Notes"
     const val AUTH_METHODS_GROUP_LIMITS = "Limits"
     const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
     const val AUTH_METHODS_MAGIC_LINK_DESC =

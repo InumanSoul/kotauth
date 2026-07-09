@@ -99,6 +99,21 @@ class SecurityMethodsServiceTest {
         val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
         assertTrue(googleRow.enabled)
         assertFalse(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
+        assertTrue(googleRow.toggleable)
+    }
+
+    @Test
+    fun `list makes social row toggleable when credentials present but disabled`() {
+        val tenant = tenantOf()
+        tenantRepo.save(tenant)
+        idpRepo.seed(tenantId, provider = "google", enabled = false)
+
+        val rows = service.list(tenant)
+
+        val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
+        assertFalse(googleRow.enabled)
+        assertTrue(googleRow.toggleable)
+        assertFalse(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
     }
 
     @Test

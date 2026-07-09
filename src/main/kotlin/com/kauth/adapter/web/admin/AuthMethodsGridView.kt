@@ -17,9 +17,9 @@ object AuthMethodsGridView {
             table("method-table") {
                 thead {
                     tr {
-                        th { +"Method" }
-                        th { +"Enabled" }
-                        th { +"Notes" }
+                        th { +EnglishStrings.AUTH_METHODS_TABLE_COL_METHOD }
+                        th { +EnglishStrings.AUTH_METHODS_TABLE_COL_ENABLED }
+                        th { +EnglishStrings.AUTH_METHODS_TABLE_COL_NOTES }
                     }
                 }
                 tbody {

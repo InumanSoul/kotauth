@@ -85,7 +85,7 @@ class SecurityMethodsService(
                         } else {
                             emptyList()
                         },
-                    toggleable = configured,
+                    toggleable = hasCredentials,
                 )
         }
 
