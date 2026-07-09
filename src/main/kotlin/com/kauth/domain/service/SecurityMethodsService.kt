@@ -60,20 +60,32 @@ class SecurityMethodsService(
                 toggleable = tenant.securityConfig.emailOtpLoginEnabled || !smtpBlocking,
             )
 
-        identityProviderRepository.findEnabledByTenant(tenant.id).forEach { idp ->
+        val allIdps = identityProviderRepository.findAllByTenant(tenant.id)
+        val enabledProviders = allIdps.filter { it.enabled }.map { it.provider }.toSet()
+
+        SocialProvider.entries.forEach { socialProvider ->
             val key =
-                when (idp.provider) {
+                when (socialProvider) {
                     SocialProvider.GOOGLE -> MethodKey.SOCIAL_GOOGLE
                     SocialProvider.GITHUB -> MethodKey.SOCIAL_GITHUB
                 }
+            val configured = socialProvider in enabledProviders
+            val hasCredentials = allIdps.any { it.provider == socialProvider }
             rows +=
                 AuthMethodRow(
                     key = key,
                     labelKey = "AUTH_METHOD_${key.name}_LABEL",
                     descriptionKey = null,
-                    enabled = true,
-                    requirements = emptyList(),
-                    toggleable = true,
+                    enabled = configured,
+                    requirements =
+                        if (!hasCredentials) {
+                            listOf(
+                                Requirement.OAuthCredentialsRequired(socialProvider.value),
+                            )
+                        } else {
+                            emptyList()
+                        },
+                    toggleable = configured,
                 )
         }
 

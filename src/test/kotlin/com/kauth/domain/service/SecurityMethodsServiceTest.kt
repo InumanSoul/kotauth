@@ -75,14 +75,17 @@ class SecurityMethodsServiceTest {
     }
 
     @Test
-    fun `list does not include social providers when none configured`() {
+    fun `list includes social rows for unconfigured providers with OAuthCredentialsRequired`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
 
         val rows = service.list(tenant)
 
-        assertFalse(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
-        assertFalse(rows.any { it.key == MethodKey.SOCIAL_GITHUB })
+        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
+        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GITHUB })
+        val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
+        assertTrue(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
+        assertFalse(googleRow.toggleable)
     }
 
     @Test
@@ -93,7 +96,9 @@ class SecurityMethodsServiceTest {
 
         val rows = service.list(tenant)
 
-        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
+        val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
+        assertTrue(googleRow.enabled)
+        assertFalse(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
     }
 
     @Test

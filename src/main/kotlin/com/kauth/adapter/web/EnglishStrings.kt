@@ -342,12 +342,6 @@ object EnglishStrings {
     const val AUTH_METHODS_MAGIC_LINK_TTL_HINT =
         "Minutes before a magic link expires. 1 to 1440 (default 15). " +
             "Raise it for slow corporate mail relays; lower it for high-assurance tenants."
-    const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
-    const val AUTH_METHODS_PASSWORDLESS_DESC =
-        "Hides the password form and rejects password-based authentication. " +
-            "Users can still sign in with magic links and any enabled social providers. " +
-            "Email becomes the only first factor. Pair with MFA for higher-assurance environments."
-
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL =
         "Allow sign-in via Email OTP code"
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_DESC =
@@ -381,12 +375,17 @@ object EnglishStrings {
     const val AUTH_METHOD_SOCIAL_GOOGLE_LABEL = "Google"
     const val AUTH_METHOD_SOCIAL_GITHUB_LABEL = "GitHub"
 
+    // Auth Methods grid (v1.20.1)
+    const val AUTH_METHODS_TABLE_HEADING = "Sign-in methods"
+    const val REQUIREMENT_SMTP_REQUIRED = "SMTP required"
+    const val REQUIREMENT_SMTP_LINK = "Set up SMTP"
+    const val REQUIREMENT_OAUTH_CREDENTIALS_REQUIRED = "OAuth credentials required"
+    const val AUTH_METHODS_PASSWORD_OFF_WARNING =
+        "Disabling passwords requires ≥1 other method and configured SMTP for magic-link recovery."
+
     // Passkeys card (workspace security settings — v1.20)
     const val ADMIN_PASSKEYS_HEADING = "Passkeys"
     const val ADMIN_PASSKEYS_ENABLED_LABEL = "Passkey sign-in enabled"
-    const val ADMIN_PASSKEYS_PASSWORDLESS_LABEL = "Disable password sign-in (passkey + magic link only)"
-    const val ADMIN_PASSKEYS_SMTP_GATE_HINT =
-        "SMTP is required to disable password sign-in — magic-link is the recovery path."
     const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
     const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
 

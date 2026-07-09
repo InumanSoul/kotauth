@@ -152,3 +152,13 @@
   font-family: var(--font-mono);
   font-size: 11px;
 }
+
+/* ── Auth Methods grid (v1.20.1) ── */
+.method-table { width: 100%; border-collapse: collapse; }
+.method-table th,
+.method-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--color-border); }
+.method-table__label { font-weight: var(--weight-medium); }
+.method-table__desc { font-size: var(--text-sm); color: var(--color-muted); margin-top: 2px; }
+.row-locked { display: inline-flex; gap: 4px; align-items: center; color: var(--color-amber); }
+.row-locked a { text-decoration: underline; }
+.notice--warn { padding: 10px; margin-top: 12px; background: var(--color-amber-bg); border-left: 3px solid var(--color-amber); }

@@ -581,6 +581,7 @@ internal fun securityPolicyPageImpl(
     saved: Boolean = false,
     enrolledPasskeyUsers: Int = 0,
     totalUsers: Int = 0,
+    rows: List<com.kauth.domain.model.AuthMethodRow> = emptyList(),
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -624,6 +625,24 @@ internal fun securityPolicyPageImpl(
             }
             if (error != null) {
                 div("notice notice--error") { +error }
+            }
+
+            // ── Insight bar ──────────────────────────────────────────
+            if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
+                div("insight-bar insight-bar--cols-1") {
+                    div("insight-item insight-item--static") {
+                        span("insight-item__label") { +"Passkey enrollment" }
+                        span("insight-item__value insight-item__value--mono") {
+                            +"$enrolledPasskeyUsers"
+                            span {
+                                attributes["style"] =
+                                    "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
+                                +" / $totalUsers"
+                            }
+                        }
+                        span("insight-item__hint") { +"users have enrolled at least one passkey" }
+                    }
+                }
             }
 
             // ── Form (wraps both cards) ──────────────────────────────
@@ -821,129 +840,9 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
-                // ── Authentication Methods ───────────────────────────
-                val anyEmailOtpEnabled =
-                    workspace.securityConfig.emailOtpLoginEnabled ||
-                        workspace.securityConfig.emailOtpSignupEnabled
-                div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_CARD_TITLE }
-
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_SIGN_IN }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "magicLinkEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.magicLinkEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_DESC }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "emailOtpLoginEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.emailOtpLoginEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_DESC }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
-                        }
-                    }
-                    if (anyEmailOtpEnabled && !workspace.isSmtpReady) {
-                        div("check-row__body") {
-                            span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "requirePasswordless") {
-                            attributes["value"] = "true"
-                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
-                            if (workspace.isMaster) attributes["disabled"] = "disabled"
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
-                        }
-                    }
-
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_LIMITS }
-                    div("edit-row") {
-                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_LABEL }
-                        div {
-                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "1"
-                                attributes["max"] = "1440"
-                                value = workspace.securityConfig.magicLinkTokenTtlMinutes.toString()
-                            }
-                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_HINT }
-                        }
-                    }
-                    if (anyEmailOtpEnabled) {
-                        div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL }
-                            div {
-                                input(type = InputType.number, name = "emailOtpLockoutThreshold") {
-                                    classes = setOf("edit-row__field", "edit-row__field--mono")
-                                    attributes["min"] = "0"
-                                    attributes["max"] = "50"
-                                    value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
-                                }
-                                div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
-                            }
-                        }
-                    }
-                }
-
-                // ── Passkeys ─────────────────────────────────────────
-                div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "passkeysEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.passkeysEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_ENABLED_LABEL }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "passwordLoginDisabled") {
-                            attributes["value"] = "true"
-                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
-                            if (!workspace.isSmtpReady) disabled = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_PASSWORDLESS_LABEL }
-                            if (!workspace.isSmtpReady) {
-                                span("check-row__warn") { +EnglishStrings.ADMIN_PASSKEYS_SMTP_GATE_HINT }
-                            }
-                        }
-                    }
-                    if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
-                        div("insight-item insight-item--static") {
-                            span("insight-item__label") { +"Passkey enrollment" }
-                            span("insight-item__value insight-item__value--mono") {
-                                +"$enrolledPasskeyUsers"
-                                span {
-                                    attributes["style"] =
-                                        "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
-                                    +" / $totalUsers"
-                                }
-                            }
-                            span("insight-item__hint") { +"users have enrolled at least one passkey" }
-                        }
-                    }
+                // ── Auth Methods grid ────────────────────────────────
+                div {
+                    with(AuthMethodsGridView) { render(rows, workspace) }
                 }
             }
                     }

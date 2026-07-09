@@ -34,6 +34,7 @@ fun Route.adminSettingsRoutes(
     mfaRepository: MfaRepository?,
     translationPort: TranslationPort,
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
+    securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -285,6 +286,7 @@ fun Route.adminSettingsRoutes(
         val saved = call.request.queryParameters["saved"] == "true"
         val allUsers = userRepository.findByTenantId(workspace.id, null)
         val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
+        val methodRows = securityMethodsService?.list(workspace) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.securityPolicyPage(
@@ -294,6 +296,7 @@ fun Route.adminSettingsRoutes(
                 saved = saved,
                 enrolledPasskeyUsers = enrolledPasskeyUsers,
                 totalUsers = allUsers.size,
+                rows = methodRows,
             ),
         )
     }
