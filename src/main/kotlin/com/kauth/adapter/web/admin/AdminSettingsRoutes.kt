@@ -305,9 +305,8 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
-        val requestedPasswordLoginDisabled =
-            params["passwordLoginDisabled"]?.toBoolean() ?: workspace.passwordLoginDisabled
-        val requestedPasskeysEnabled = params["passkeysEnabled"]?.toBoolean() ?: workspace.passkeysEnabled
+        val requestedPasswordLoginDisabled = params["passwordLoginDisabled"] == "true"
+        val requestedPasskeysEnabled = params["passkeysEnabled"] == "true"
 
         if (requestedPasswordLoginDisabled && !workspace.isSmtpReady) {
             return@post call.respond(
