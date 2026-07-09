@@ -288,6 +288,11 @@ class BackupExporterService(
                 "tenant.smtpPassword",
                 "users.totpSeed",
                 "users.recoveryCodes",
+                // Passkeys / WebAuthn credentials: excluded from backups. Credentials are
+                // device-bound to the original RP ID + origin; restoring on a different host
+                // would break credentialId lookups. Users must re-enroll after a restore.
+                // (Consistent with TOTP secret + recovery-code exclusion above.)
+                "webauthn_credentials",
                 "sessions",
                 "authorizationCodes",
                 "magicLinkTokens",

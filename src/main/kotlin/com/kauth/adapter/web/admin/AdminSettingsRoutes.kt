@@ -33,6 +33,7 @@ fun Route.adminSettingsRoutes(
     identityProviderRepository: IdentityProviderRepository?,
     mfaRepository: MfaRepository?,
     translationPort: TranslationPort,
+    webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -282,9 +283,18 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
         val saved = call.request.queryParameters["saved"] == "true"
+        val allUsers = userRepository.findByTenantId(workspace.id, null)
+        val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.securityPolicyPage(workspace, wsPairs, session.username, saved = saved),
+            AdminView.securityPolicyPage(
+                workspace,
+                wsPairs,
+                session.username,
+                saved = saved,
+                enrolledPasskeyUsers = enrolledPasskeyUsers,
+                totalUsers = allUsers.size,
+            ),
         )
     }
 
@@ -294,6 +304,17 @@ fun Route.adminSettingsRoutes(
         val slug = workspace.slug
         val params = call.receiveParameters()
         val s = workspace.securityConfig
+
+        val requestedPasswordLoginDisabled = params["passwordLoginDisabled"] == "true"
+        val requestedPasskeysEnabled = params["passkeysEnabled"] == "true"
+
+        if (requestedPasswordLoginDisabled && !workspace.isSmtpReady) {
+            return@post call.respond(
+                HttpStatusCode.BadRequest,
+                mapOf("error" to "SmtpRequired", "message" to "SMTP must be configured to disable password sign-in."),
+            )
+        }
+
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
                 passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
@@ -316,6 +337,8 @@ fun Route.adminSettingsRoutes(
                 emailOtpLockoutThreshold =
                     params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
+                passkeysEnabled = requestedPasskeysEnabled,
+                passwordLoginDisabled = requestedPasswordLoginDisabled,
             )
         when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success ->
@@ -388,13 +411,11 @@ fun Route.adminSettingsRoutes(
                 val emailBrandingResult =
                     workspaceSettingsService.updateEmailBranding(
                         slug,
-                        com.kauth.domain.model.TenantEmailBranding(
+                        existingBranding?.copy(
+                            supportEmail = params["emailSupportEmail"]?.trim()?.takeIf { it.isNotBlank() },
+                        ) ?: com.kauth.domain.model.TenantEmailBranding(
                             tenantId = workspace.id,
-                            brandName = existingBranding?.brandName,
-                            brandColorHex = existingBranding?.brandColorHex,
-                            brandLogoUrl = existingBranding?.brandLogoUrl,
-                            supportEmail = params["emailSupportEmail"],
-                            fromDisplayName = params["emailFromDisplayName"],
+                            supportEmail = params["emailSupportEmail"]?.trim()?.takeIf { it.isNotBlank() },
                         ),
                     )
                 if (emailBrandingResult is AdminResult.Failure) {

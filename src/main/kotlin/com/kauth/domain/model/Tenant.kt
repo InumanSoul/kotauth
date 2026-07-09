@@ -38,6 +38,8 @@ data class Tenant(
     val portalConfig: PortalConfig = PortalConfig(),
     // Per-tenant transactional email branding; null means inherit defaults.
     val emailBranding: TenantEmailBranding? = null,
+    val passkeysEnabled: Boolean = true,
+    val passwordLoginDisabled: Boolean = false,
 ) {
     /** True for the built-in platform-admin tenant. */
     val isMaster: Boolean get() = slug == MASTER_SLUG

@@ -36,6 +36,9 @@
 /* ── MFA management page ─────────────────────────────────────────────── */
 @import "./portal/mfa.css";
 
+/* ── Passkeys management page ─────────────────────────────────────────── */
+@import "./portal/passkeys.css";
+
 /* ── App launcher page ────────────────────────────────────────────────── */
 @import "./portal/launcher.css";
 

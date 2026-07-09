@@ -1,7 +1,8 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.*
 
 /**
  * Exposed ORM mapping for the 'password_reset_tokens' table (V11 migration).

@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.20.0] - 2026-07-09
+
+Passkeys / WebAuthn — passwordless sign-in via device biometrics or hardware keys.
+
+### Added
+
+- **Passkeys as a passwordless-primary sign-in method.** Users can enroll one or more WebAuthn credentials (platform authenticators like Face ID / Windows Hello, roaming authenticators like YubiKey) via the portal at `/t/<slug>/account/passkeys` and sign in with an explicit "Sign in with a passkey" button or conditional-mediation autofill on the username field.
+- **Per-tenant `passkeys_enabled` toggle** on the workspace security page (default: on).
+- **Per-tenant passwordless-only mode** via the new `password_login_disabled` column. When enabled, the login page hides the password field and shows "Sign in with a passkey" + "Get a magic link" only. Recovery reuses the existing magic-link password-reset flow, ending on a "Enroll a passkey on this device" landing (see [ADR-16](docs/adr/ADR-16-passkeys-sibling-to-password.md) and the [operator guide](docs/guides/passkeys.md)).
+- **Hard SMTP gate on passwordless-only tenants.** Admin UI and backend both reject enabling `password_login_disabled` without configured SMTP — prevents operator-created lockout (see [ADR-17](docs/adr/ADR-17-smtp-hard-gate-passwordless-tenants.md)). The same gate blocks per-user "Reset all passkeys" when it would strand a user.
+- **Admin per-user passkey management** at `/admin/workspaces/<slug>/users/<id>` — list credentials (with device name from bundled AAGUID lookup), revoke individually, "Reset all passkeys". Simultaneously adds the previously-missing admin "Reset MFA" action.
+- **CLI `reset-admin-passkeys`** — master-tenant emergency reset, sibling of `reset-admin-mfa`.
+- **Passkey authentication satisfies MFA** — passkey with user verification is inherently multi-factor per FIDO2. Users with `mfa_policy=required` skip the TOTP challenge when signing in with a passkey.
+- **AAGUID → device-name lookup** bundled at `webauthn/aaguid-names.json` (11 baseline entries: Apple, Windows Hello, YubiKey 5 series, iCloud Keychain, 1Password, Bitwarden, Google Password Manager). Unknown authenticators render as "Unknown authenticator".
+
+### Migrations
+
+- `V54__webauthn_credentials.sql` — new `webauthn_credentials` table (13 columns, one row per credential); new `tenants.passkeys_enabled BOOLEAN NOT NULL DEFAULT TRUE` and `tenants.password_login_disabled BOOLEAN NOT NULL DEFAULT FALSE` columns. All defaults preserve v1.19.3 behaviour for existing rows.
+
+### Security
+
+- **Per-credential replay defense** via the WebAuthn sign counter. Cloned authenticators are detected on counter mismatch; the credential is auto-revoked and `PASSKEY_REPLAY_REJECTED` audit event is emitted.
+- **Attestation policy: none** (accept all authenticators) in v1.20.0. Enterprise attestation via FIDO MDS is deferred to a v1.20.1 candidate.
+- **User verification: `preferred`** — modern platform passkeys always supply UV; older U2F-only keys still work. Per-tenant `required` override deferred to v1.20.1.
+- **Rate limiting** on `/passkeys/authenticate/finish` — 10 attempts per 60 seconds per IP, fail-closed on Redis outage.
+- **Backup exclusion** — passkey credentials are not included in `BackupExport` (device-bound, would break RP ID on restore to a different origin).
+- **New audit events**: `PASSKEY_ENROLLED`, `PASSKEY_AUTH_SUCCESS`, `PASSKEY_AUTH_FAILED`, `PASSKEY_REPLAY_REJECTED`, `PASSKEY_REVOKED`, `PASSKEY_ADMIN_REVOKED`, `PASSKEY_ADMIN_RESET_ALL`, `MFA_ADMIN_RESET`.
+
+### Dependencies
+
+- Added: `com.yubico:webauthn-server-core:2.6.0` + transitive `org.bouncycastle:bcprov-jdk18on` (EdDSA support). ~7 MB JAR growth.
+
+### ADRs
+
+- [ADR-16 — Passkeys as sibling to password, not MFA method](docs/adr/ADR-16-passkeys-sibling-to-password.md).
+- [ADR-17 — SMTP hard-gate for `password_login_disabled`](docs/adr/ADR-17-smtp-hard-gate-passwordless-tenants.md).
+
+---
+
+## [1.19.3] - 2026-06-29
+
+Polish release — dependency hygiene, OIDC closure of the v1.18.0 deferred items, and a Brand Identity admin-page restructure.
+
+### Added
+
+- **RFC 8707 resource indicator on the `authorization_code` grant.** `/authorize` now accepts repeatable `resource` parameters; validated identifiers are bound to the issued code and propagated through to the access token's `aud` claim and the resulting session. Refresh-token grant honours the session-bound resources by default and accepts optional narrowing per RFC 8707 §3. Closes the v1.18.0 "Deferred" item.
+- **RFC 9068 §5 scope narrowing on token issuance (strict mode).** Token requests targeting one or more APIs (via `resource`) are narrowed to the intersection of the requested `scope` and the union of the targeted APIs' declared scopes. Requested scopes outside that set are rejected with `invalid_scope`. Applies to all three grants: `authorization_code`, `refresh_token`, and `client_credentials`.
+- **Admin UI — Scopes editor on the API settings page.** Each API in the workspace registry can declare its accepted scopes via a newline-separated textarea. Declared scopes render as inline badges on the API list. Empty scopes column = no narrowing (backwards-compatible for v1.18.0 deployments).
+- **`scopes_supported` discovery metadata.** `/.well-known/openid-configuration` now emits the union of the OIDC baseline (`openid profile email`) and every enabled API's declared scopes for the tenant.
+
+### Changed
+
+- **Brand Identity admin page restructured into two cards.** The `/settings/branding` page now renders a top-level **Brand Identity** card (logo, favicon, accent color, support email) above a **Visual Theme** card (theme preset, remaining colors, font, border radius, default locale). The `fromDisplayName` input is removed from the branding form — the SMTP card's existing `smtpFromName` is the operator-managed display name; `emailBranding.fromDisplayName` remains as an API-only override (matches the existing `brandName`/`brandColorHex`/`brandLogoUrl` pattern).
+- **Dependencies bumped:** `org.junit.jupiter:junit-jupiter-engine` 5.10.5 → 6.1.0; `org.jetbrains.exposed` group 0.61.0 → 1.3.0 (major package restructuring to `org.jetbrains.exposed.v1.*`); runtime container base `eclipse-temurin:17-jre` → `eclipse-temurin:25-jre`.
+
+### Migrations
+
+- `V53__resource_indicators_auth_code.sql` — adds `scopes JSONB NOT NULL DEFAULT '[]'` to `resource_servers`, and `resources JSONB NOT NULL DEFAULT '[]'` to `authorization_codes` and `sessions`. All defaults preserve v1.19.2 behaviour for existing rows.
+
+---
+
 ## [1.19.2] - 2026-06-22
 
 Docker stack consolidation. No runtime changes — image and JAR are unchanged from `1.19.1`. Six compose files become two.
@@ -869,7 +930,7 @@ and one developer-experience improvement.
 
 ### Documentation
 
-- **Per-tenant magic-link token TTL** — captured in `docs/internal/FEATURE_BACKLOG.md` as item #9. Started as a free-rider in V39, then reverted because adding the column without wiring it into the magic-link service would leave dead state. Tracked for a future ~0.5-day follow-up
+- **Per-tenant magic-link token TTL** — tracked as a future follow-up. Started as a free-rider in V39, then reverted because adding the column without wiring it into the magic-link service would leave dead state
 
 ---
 
@@ -1195,7 +1256,7 @@ and one developer-experience improvement.
 ### Changed
 
 - **Kotlin upgraded to 2.3.20** — from 1.9.24. Source-compatible, no breaking changes. Enables K2 compiler, aligns with latest JetBrains toolchain. Gradle deprecation warnings persist (source: Ktor 2.3.12 plugin, resolved when migrating to Ktor 3.x in v2.0)
-- **Dependency upgrade plan rewritten** — `docs/internal/GRADLE_UPGRADE_PLAN.md` now contains a deep migration impact analysis for the v2.0 framework upgrade: Ktor 3.x (2.5 days, 4 intercept→plugin conversions + 30 mechanical changes), Exposed 1.0 (1.5 days, limit/offset + TransactionManager accessor), Flyway 11 (30 min). Total: ~4.25 days. Migrations are independent and ordered: Flyway → Exposed → Ktor
+- **Dependency upgrade plan rewritten** — deep migration impact analysis captured for the v2.0 framework upgrade: Ktor 3.x (2.5 days, 4 intercept→plugin conversions + 30 mechanical changes), Exposed 1.0 (1.5 days, limit/offset + TransactionManager accessor), Flyway 11 (30 min). Total: ~4.25 days. Migrations are independent and ordered: Flyway → Exposed → Ktor
 
 ---
 

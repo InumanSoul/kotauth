@@ -7,6 +7,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TranslationPort
@@ -16,6 +17,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.http.HttpStatusCode
@@ -37,6 +39,7 @@ fun Route.authRoutes(
     roleRepository: RoleRepository? = null,
     socialLoginService: SocialLoginService? = null,
     identityProviderRepository: IdentityProviderRepository? = null,
+    resourceServerRepository: ResourceServerRepository? = null,
     baseUrl: String = "",
     encryptionService: EncryptionService,
     corsService: CorsService? = null,
@@ -45,6 +48,8 @@ fun Route.authRoutes(
     ssoTtlSeconds: Long = 86_400L,
     emailOtpService: com.kauth.domain.service.EmailOtpService? = null,
     otpIpRateLimiter: RateLimiterPort? = null,
+    webAuthnService: WebAuthnService? = null,
+    passkeyRateLimiter: RateLimiterPort? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -133,6 +138,17 @@ fun Route.authRoutes(
             )
         }
 
+        if (webAuthnService != null && passkeyRateLimiter != null) {
+            passkeyAuthRoutes(
+                webAuthnService = webAuthnService,
+                oauthService = oauthService,
+                encryptionService = encryptionService,
+                rateLimiter = passkeyRateLimiter,
+                ssoTtlSeconds = ssoTtlSeconds,
+                secure = baseUrl.startsWith("https://", ignoreCase = true),
+            )
+        }
+
         mfaRoutes(
             oauthService = oauthService,
             mfaService = mfaService,
@@ -160,6 +176,7 @@ fun Route.authRoutes(
             roleRepository = roleRepository,
             encryptionService = encryptionService,
             loginRateLimiter = loginRateLimiter,
+            resourceServerRepository = resourceServerRepository,
             baseUrl = baseUrl,
             ssoTtlSeconds = ssoTtlSeconds,
         )

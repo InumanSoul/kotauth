@@ -86,6 +86,23 @@ internal fun Parameters.toOAuthParams() =
 
 private const val AUTH_CONTEXT_COOKIE = "KOTAUTH_AUTH_CONTEXT"
 
+// Auth-context cookie field indices — must stay in sync with setAuthContextCookie.
+private const val AUTH_CTX_RESPONSE_TYPE = 0
+private const val AUTH_CTX_CLIENT_ID = 1
+private const val AUTH_CTX_REDIRECT_URI = 2
+private const val AUTH_CTX_SCOPE = 3
+private const val AUTH_CTX_STATE = 4
+private const val AUTH_CTX_CODE_CHALLENGE = 5
+private const val AUTH_CTX_CODE_CHALLENGE_METHOD = 6
+private const val AUTH_CTX_NONCE = 7
+private const val AUTH_CTX_TIMESTAMP = 8
+private const val AUTH_CTX_OTP_CHALLENGE_ID = 9
+private const val AUTH_CTX_OTP_EMAIL = 10
+private const val AUTH_CTX_RESOURCES = 11
+
+private const val AUTH_CTX_MIN_FIELDS = AUTH_CTX_TIMESTAMP + 1 // base OAuth params
+private const val AUTH_CTX_MIN_OTP_FIELDS = AUTH_CTX_OTP_EMAIL + 1 // OTP context required
+
 /**
  * Stores OAuth params in a signed cookie scoped to `/t/{slug}`.
  * Replaces hidden form fields — survives page refreshes, URL changes, and incognito mode.
@@ -111,6 +128,7 @@ internal fun ApplicationCall.setAuthContextCookie(
             System.currentTimeMillis().toString(),
             otpChallengeId ?: "",
             otpEmail ?: "",
+            params.resources.joinToString(","),
         ).joinToString("|")
     response.cookies.append(
         name = AUTH_CONTEXT_COOKIE,
@@ -127,19 +145,26 @@ internal fun ApplicationCall.getAuthContext(encryptionService: EncryptionService
     val raw = request.cookies[AUTH_CONTEXT_COOKIE] ?: return null
     val payload = encryptionService.verifyCookie(raw) ?: return null
     val parts = payload.split("|")
-    if (parts.size < 9) return null
-    val timestamp = parts[8].toLongOrNull() ?: return null
+    if (parts.size < AUTH_CTX_MIN_FIELDS) return null
+    val timestamp = parts[AUTH_CTX_TIMESTAMP].toLongOrNull() ?: return null
     if (System.currentTimeMillis() - timestamp > 300_000) return null
+    val resources =
+        if (parts.size > AUTH_CTX_RESOURCES && parts[AUTH_CTX_RESOURCES].isNotBlank()) {
+            parts[AUTH_CTX_RESOURCES].split(",").filter { it.isNotBlank() }
+        } else {
+            emptyList()
+        }
     val params =
         AuthView.OAuthParams(
-            responseType = parts[0].ifBlank { null },
-            clientId = parts[1].ifBlank { null },
-            redirectUri = parts[2].ifBlank { null },
-            scope = parts[3].ifBlank { null },
-            state = parts[4].ifBlank { null },
-            codeChallenge = parts[5].ifBlank { null },
-            codeChallengeMethod = parts[6].ifBlank { null },
-            nonce = parts[7].ifBlank { null },
+            responseType = parts[AUTH_CTX_RESPONSE_TYPE].ifBlank { null },
+            clientId = parts[AUTH_CTX_CLIENT_ID].ifBlank { null },
+            redirectUri = parts[AUTH_CTX_REDIRECT_URI].ifBlank { null },
+            scope = parts[AUTH_CTX_SCOPE].ifBlank { null },
+            state = parts[AUTH_CTX_STATE].ifBlank { null },
+            codeChallenge = parts[AUTH_CTX_CODE_CHALLENGE].ifBlank { null },
+            codeChallengeMethod = parts[AUTH_CTX_CODE_CHALLENGE_METHOD].ifBlank { null },
+            nonce = parts[AUTH_CTX_NONCE].ifBlank { null },
+            resources = resources,
         )
     return if (params.isOAuthFlow) params else null
 }
@@ -154,11 +179,11 @@ internal fun ApplicationCall.getOtpFlowContext(encryptionService: EncryptionServ
     val raw = request.cookies[AUTH_CONTEXT_COOKIE] ?: return null
     val payload = encryptionService.verifyCookie(raw) ?: return null
     val parts = payload.split("|")
-    if (parts.size < 11) return null
-    val timestamp = parts[8].toLongOrNull() ?: return null
+    if (parts.size < AUTH_CTX_MIN_OTP_FIELDS) return null
+    val timestamp = parts[AUTH_CTX_TIMESTAMP].toLongOrNull() ?: return null
     if (System.currentTimeMillis() - timestamp > 300_000) return null
-    val challengeId = parts[9].ifBlank { null } ?: return null
-    val email = parts[10].ifBlank { null } ?: return null
+    val challengeId = parts[AUTH_CTX_OTP_CHALLENGE_ID].ifBlank { null } ?: return null
+    val email = parts[AUTH_CTX_OTP_EMAIL].ifBlank { null } ?: return null
     return OtpFlowContext(challengeId, email)
 }
 
@@ -294,6 +319,7 @@ internal fun OAuthError.toErrorCode(): String =
         is OAuthError.PkceRequired -> "invalid_request"
         is OAuthError.UnsupportedGrantType -> "unsupported_grant_type"
         is OAuthError.InvalidTarget -> "invalid_target"
+        is OAuthError.InvalidScope -> "invalid_scope"
     }
 
 internal fun OAuthError.toDescription(): String =
@@ -306,6 +332,7 @@ internal fun OAuthError.toDescription(): String =
         is OAuthError.PkceRequired -> "PKCE is required for public clients"
         is OAuthError.UnsupportedGrantType -> "Unsupported grant type"
         is OAuthError.InvalidTarget -> this.reason
+        is OAuthError.InvalidScope -> "scopes ${this.rejected} are not declared by the targeted APIs"
     }
 
 internal fun AuthError.toMessage(): String =
@@ -433,23 +460,90 @@ internal fun parseSocialPendingCookie(
 // -- Authorization-code flow completion ----------------------------------------
 
 /**
- * Shared "issue authorization code and redirect" finalization step.
+ * Issues an authorization code and returns the fully-built redirect URL, or
+ * null on failure (in which case [renderError] has already been invoked).
  *
- * Called from any authentication-success point in an OAuth flow:
- *   - Password login (see [oauthProtocolRoutes])
- *   - MFA challenge success (see [mfaRoutes])
- *   - Magic-link consumption (see [magicLinkRoutes])
- *
- * Flow:
- *   1. Validates that [oauthParams] carries a `clientId` + `redirectUri` (400 otherwise).
- *   2. Requests an authorization code from [oauthService] for [userId].
- *   3. On success: clears the auth-context cookie, redirects to
- *      `redirectUri?code=…&state=…`.
- *   4. On failure: invokes [renderError] with a human-readable message so the
- *      caller can render its context-appropriate error page (login, mfa, etc.)
- *
- * [renderError] is a `suspend` callback because error rendering typically
- * involves `call.respondHtml(...)`.
+ * Does NOT emit any HTTP response. Callers decide whether to redirect or
+ * return JSON (e.g. passkey finish, which uses a fetch and needs JSON).
+ */
+internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
+    slug: String,
+    userId: UserId,
+    tenantId: TenantId,
+    oauthParams: AuthView.OAuthParams,
+    ipAddress: String?,
+    authTime: Instant,
+    mfaCompleted: Boolean,
+    ssoTtlSeconds: Long,
+    secure: Boolean,
+    oauthService: OAuthService,
+    encryptionService: EncryptionService,
+    renderError: suspend (message: String) -> Unit,
+): String? {
+    val clientId =
+        oauthParams.clientId
+            ?: run {
+                respond(HttpStatusCode.BadRequest, "Missing client_id")
+                return null
+            }
+    val redirectUri =
+        oauthParams.redirectUri
+            ?: run {
+                respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
+                return null
+            }
+
+    setSsoCookie(
+        SsoCookieData(
+            userId = userId.value,
+            tenantId = tenantId.value,
+            authTime = authTime,
+            mfaCompleted = mfaCompleted,
+            expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
+        ),
+        slug = slug,
+        encryptionService = encryptionService,
+        secure = secure,
+    )
+
+    return when (
+        val codeResult =
+            oauthService.issueAuthorizationCode(
+                tenantSlug = slug,
+                userId = userId,
+                clientId = clientId,
+                redirectUri = redirectUri,
+                scopes = oauthParams.scope ?: "openid",
+                codeChallenge = oauthParams.codeChallenge,
+                codeChallengeMethod = oauthParams.codeChallengeMethod,
+                nonce = oauthParams.nonce,
+                state = oauthParams.state,
+                ipAddress = ipAddress,
+                authTime = authTime,
+                resources = oauthParams.resources,
+            )
+    ) {
+        is OAuthResult.Success -> {
+            clearAuthContextCookie(slug)
+            val code = codeResult.value.code
+            val state = oauthParams.state
+            buildString {
+                append(redirectUri)
+                append("?code=").append(encodeParam(code))
+                if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+            }
+        }
+        is OAuthResult.Failure -> {
+            renderError(codeResult.error.toDescription())
+            null
+        }
+    }
+}
+
+/**
+ * Issues an authorization code and performs the redirect directly.
+ * Thin wrapper around [buildAuthorizationCodeRedirectUrl] for callers
+ * that always want an HTTP redirect (password login, MFA, magic-link).
  */
 internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     slug: String,
@@ -465,56 +559,20 @@ internal suspend fun ApplicationCall.completeAuthorizationCodeFlow(
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
 ) {
-    val clientId =
-        oauthParams.clientId
-            ?: return respond(HttpStatusCode.BadRequest, "Missing client_id")
-    val redirectUri =
-        oauthParams.redirectUri
-            ?: return respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
-
-    setSsoCookie(
-        SsoCookieData(
-            userId = userId.value,
-            tenantId = tenantId.value,
+    val url =
+        buildAuthorizationCodeRedirectUrl(
+            slug = slug,
+            userId = userId,
+            tenantId = tenantId,
+            oauthParams = oauthParams,
+            ipAddress = ipAddress,
             authTime = authTime,
             mfaCompleted = mfaCompleted,
-            expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
-        ),
-        slug = slug,
-        encryptionService = encryptionService,
-        secure = secure,
-    )
-
-    when (
-        val codeResult =
-            oauthService.issueAuthorizationCode(
-                tenantSlug = slug,
-                userId = userId,
-                clientId = clientId,
-                redirectUri = redirectUri,
-                scopes = oauthParams.scope ?: "openid",
-                codeChallenge = oauthParams.codeChallenge,
-                codeChallengeMethod = oauthParams.codeChallengeMethod,
-                nonce = oauthParams.nonce,
-                state = oauthParams.state,
-                ipAddress = ipAddress,
-                authTime = authTime,
-            )
-    ) {
-        is OAuthResult.Success -> {
-            clearAuthContextCookie(slug)
-            val code = codeResult.value.code
-            val state = oauthParams.state
-            val redirect =
-                buildString {
-                    append(redirectUri)
-                    append("?code=").append(encodeParam(code))
-                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
-                }
-            respondRedirect(redirect)
-        }
-        is OAuthResult.Failure -> {
-            renderError(codeResult.error.toDescription())
-        }
-    }
+            ssoTtlSeconds = ssoTtlSeconds,
+            secure = secure,
+            oauthService = oauthService,
+            encryptionService = encryptionService,
+            renderError = renderError,
+        ) ?: return
+    respondRedirect(url)
 }

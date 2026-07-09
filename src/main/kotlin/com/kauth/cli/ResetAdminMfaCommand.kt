@@ -6,9 +6,9 @@ import com.kauth.adapter.persistence.TenantsTable
 import com.kauth.adapter.persistence.UsersTable
 import com.kauth.config.DbConfig
 import com.kauth.infrastructure.DatabaseFactory
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.system.exitProcess
 
 object ResetAdminMfaCommand {

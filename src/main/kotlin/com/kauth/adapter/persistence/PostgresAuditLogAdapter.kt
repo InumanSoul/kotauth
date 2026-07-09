@@ -8,9 +8,10 @@ import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.AuditChainHasher
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.TransactionManager
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.time.OffsetDateTime
 import java.time.ZoneOffset

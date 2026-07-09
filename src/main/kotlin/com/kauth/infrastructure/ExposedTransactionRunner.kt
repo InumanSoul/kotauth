@@ -1,7 +1,7 @@
 package com.kauth.infrastructure
 
 import com.kauth.domain.port.TransactionRunner
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 /**
  * Production [TransactionRunner] — wraps Exposed's `transaction { }`.

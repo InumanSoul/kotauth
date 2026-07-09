@@ -1,6 +1,7 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.jdbc.*
 
 /**
  * Exposed ORM mapping for the 'tenants' table.
@@ -31,6 +32,8 @@ object TenantsTable : Table("tenants") {
     val smtpTlsEnabled = bool("smtp_tls_enabled").default(true)
     val smtpEnabled = bool("smtp_enabled").default(false)
     val maxConcurrentSessions = integer("max_concurrent_sessions").nullable()
+    val passkeysEnabled = bool("passkeys_enabled").default(true)
+    val passwordLoginDisabled = bool("password_login_disabled").default(false)
 
     override val primaryKey = PrimaryKey(id)
 }

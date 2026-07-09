@@ -18,6 +18,7 @@ class AdminApplicationE2ETest : E2ETestBase() {
         navigateSafe("$baseUrl/admin/workspaces/master/applications/new")
         page.fill("input[name=clientId]", "test-app")
         page.fill("input[name=name]", "Test Application")
+        page.fill("textarea[name=redirectUris]", "http://localhost:3000/callback")
         page.locator("button[type=submit][form=create-app-form]").click()
 
         page.waitForURL(
@@ -109,7 +110,7 @@ class AdminApplicationE2ETest : E2ETestBase() {
         loginAsAdmin()
         navigateSafe("$baseUrl/admin/workspaces/master/applications/toggle-app")
 
-        val toggleForm = page.querySelector("form[action*='/toggle']")
+        val toggleForm = page.querySelector("form[action$='/toggle']")
         if (toggleForm != null) {
             val action = toggleForm.getAttribute("action")
             assertTrue(

@@ -1,7 +1,7 @@
 val ktorVersion = "3.5.0"
-val exposedVersion = "0.61.0"
+val exposedVersion = "1.3.1"
 val logbackVersion = "1.5.32"
-val flywayVersion = "12.4.0"
+val flywayVersion = "12.11.0"
 val logstashEncoderVersion = "8.1"
 val lettuceVersion = "6.5.5.RELEASE"
 val testcontainersVersion = "1.21.0"
@@ -9,7 +9,7 @@ val testcontainersVersion = "1.21.0"
 plugins {
     kotlin("jvm") version "2.3.20"
     kotlin("plugin.serialization") version "2.3.20"
-    id("io.ktor.plugin") version "3.5.0"
+    id("io.ktor.plugin") version "3.5.1"
     id("com.gradleup.shadow") version "9.1.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.19.2"
+version = "1.20.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -62,6 +62,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
     implementation("com.auth0:java-jwt:4.5.2")
     implementation("at.favre.lib:bcrypt:0.10.2")
+    implementation("com.yubico:webauthn-server-core:2.6.0")
 
     implementation("ch.qos.logback:logback-classic:$logbackVersion")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
@@ -77,7 +78,7 @@ dependencies {
     // MockK — Kotlin-native mocking (HTTP integration tests only)
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.5")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
     // Testcontainers — Redis integration tests (tagged @Tag("redis"); excluded from `make test`)
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
@@ -260,6 +261,7 @@ val compileJs =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
     }
 
@@ -276,6 +278,7 @@ val generateJsSri =
             "src/main/resources/static/js/kotauth-auth.min.js",
             "src/main/resources/static/js/kotauth-portal.min.js",
             "src/main/resources/static/js/branding.min.js",
+            "src/main/resources/static/js/kotauth-passkeys.min.js",
         )
         outputs.file("src/main/resources/js-integrity.properties")
     }

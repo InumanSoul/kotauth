@@ -7,6 +7,7 @@ object CliRunner {
         when (args.firstOrNull()) {
             "generate-secret-key" -> GenerateSecretKeyCommand.execute()
             "reset-admin-mfa" -> ResetAdminMfaCommand.execute(args.drop(1))
+            "reset-admin-passkeys" -> ResetAdminPasskeysCommand.execute(args.drop(1))
             "export-tenant" -> ExportTenantCommand.execute(args.drop(1))
             "import-tenant" -> ImportTenantCommand.execute(args.drop(1))
             "hash-api-key" -> HashApiKeyCommand.execute(args.drop(1))
@@ -28,6 +29,8 @@ object CliRunner {
             Commands:
               generate-secret-key                Generate a KAUTH_SECRET_KEY value
               reset-admin-mfa --username=<name>  Reset MFA for an admin user
+              reset-admin-passkeys --username=<name>
+                                                 Reset passkeys for an admin user
               export-tenant <slug> ...           Export a tenant to an encrypted backup file
               import-tenant <file> ...           Import an encrypted backup as a new tenant
               hash-api-key [--key=<v>] [--tenant=<slug>]
@@ -38,6 +41,7 @@ object CliRunner {
             Examples:
               java -jar kauth.jar cli generate-secret-key
               java -jar kauth.jar cli reset-admin-mfa --username=admin
+              java -jar kauth.jar cli reset-admin-passkeys --username=admin
               KAUTH_BACKUP_PASS=... java -jar kauth.jar cli export-tenant acme \
                 --passphrase-env=KAUTH_BACKUP_PASS --out=acme.json.enc
               KAUTH_BACKUP_PASS=... java -jar kauth.jar cli import-tenant acme.json.enc \

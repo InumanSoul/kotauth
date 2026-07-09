@@ -35,6 +35,8 @@ class FakeTokenPort : TokenPort {
         private set
     var lastActingSubject: UserId? = null
         private set
+    var lastUserTokenAudiences: List<String> = emptyList()
+        private set
 
     fun reset() {
         callCount = 0
@@ -44,6 +46,7 @@ class FakeTokenPort : TokenPort {
         lastCustomIdClaims = emptyMap()
         lastAuthTime = null
         lastActingSubject = null
+        lastUserTokenAudiences = emptyList()
     }
 
     override fun issueUserTokens(
@@ -57,12 +60,14 @@ class FakeTokenPort : TokenPort {
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
         actingSubject: UserId?,
+        audiences: List<String>,
     ): TokenResponse {
         val n = ++callCount
         lastCustomAccessClaims = customAccessClaims
         lastCustomIdClaims = customIdClaims
         lastAuthTime = authTime
         lastActingSubject = actingSubject
+        lastUserTokenAudiences = audiences
         val subjectMarker = if (actingSubject != null) "imp.${actingSubject.value}." else ""
         return TokenResponse(
             access_token = "fake.access.$subjectMarker${user.username}.$n",

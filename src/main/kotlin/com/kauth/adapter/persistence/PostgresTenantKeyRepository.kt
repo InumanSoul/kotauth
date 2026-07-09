@@ -4,8 +4,9 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantKey
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantKeyRepository
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.OffsetDateTime
 
 /** Persistence adapter for tenant RSA signing keys. Private keys are AES-256-GCM encrypted at rest. */
