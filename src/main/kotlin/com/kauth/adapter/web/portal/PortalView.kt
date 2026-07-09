@@ -17,6 +17,20 @@ import kotlinx.html.*
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+sealed class PortalNavItem {
+    data class Leaf(
+        val activeKey: String,
+        val labelKey: String,
+        val href: (slug: String) -> String,
+    ) : PortalNavItem()
+
+    data class Group(
+        val activeKeyPrefix: String,
+        val labelKey: String,
+        val children: List<Leaf>,
+    ) : PortalNavItem()
+}
+
 /**
  * Self-service portal HTML views.
  *
@@ -31,6 +45,45 @@ import java.time.format.DateTimeFormatter
  */
 object PortalView {
     private val dtf = DateTimeFormatter.ofPattern("MMM d, yyyy HH:mm").withZone(ZoneOffset.UTC)
+
+    private val portalNavItems: List<PortalNavItem> = listOf(
+        PortalNavItem.Leaf(
+            activeKey = "launcher",
+            labelKey = "LAUNCHER_NAV",
+            href = { slug -> "/t/$slug/launcher" },
+        ),
+        PortalNavItem.Leaf(
+            activeKey = "profile",
+            labelKey = "PORTAL_NAV_PROFILE",
+            href = { slug -> "/t/$slug/account/profile" },
+        ),
+        PortalNavItem.Group(
+            activeKeyPrefix = "security",
+            labelKey = "PORTAL_NAV_SECURITY",
+            children = listOf(
+                PortalNavItem.Leaf(
+                    activeKey = "security/overview",
+                    labelKey = "PORTAL_NAV_SECURITY_OVERVIEW",
+                    href = { slug -> "/t/$slug/account/security" },
+                ),
+                PortalNavItem.Leaf(
+                    activeKey = "security/mfa",
+                    labelKey = "PORTAL_NAV_MFA",
+                    href = { slug -> "/t/$slug/account/mfa" },
+                ),
+                PortalNavItem.Leaf(
+                    activeKey = "security/passkeys",
+                    labelKey = "PORTAL_NAV_PASSKEYS",
+                    href = { slug -> "/t/$slug/account/passkeys" },
+                ),
+                PortalNavItem.Leaf(
+                    activeKey = "security/sessions",
+                    labelKey = "PORTAL_NAV_SESSIONS",
+                    href = { slug -> "/t/$slug/account/sessions" },
+                ),
+            ),
+        ),
+    )
 
     // =========================================================================
     // Portal login — matches AuthView card layout exactly
@@ -329,7 +382,7 @@ object PortalView {
                 if (successMsg != null) {
                     attributes["data-toast-msg"] = EnglishStrings.TOAST_PASSWORD_CHANGED
                 }
-                portalShell(slug, ctx, session.username, "security", layout) {
+                portalShell(slug, ctx, session.username, "security/overview", layout) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +ctx.t("PORTAL_SECURITY_TITLE") }
                         p(classes = "page-header__subtitle") { +ctx.t("PORTAL_SECURITY_SUBTITLE") }
@@ -606,7 +659,7 @@ object PortalView {
             if (successMsg != null) {
                 attributes["data-toast-msg"] = EnglishStrings.TOAST_MFA_SETUP
             }
-            portalShell(slug, ctx, session.username, "mfa", layout) {
+            portalShell(slug, ctx, session.username, "security/mfa", layout) {
                 div(classes = "page-header") {
                     h1(classes = "page-header__title") { +ctx.t("PORTAL_MFA_TITLE") }
                     p(classes = "page-header__subtitle") { +ctx.t("PORTAL_MFA_SUBTITLE") }
@@ -814,7 +867,7 @@ object PortalView {
         }
         body {
             attributes["data-tenant-slug"] = slug
-            portalShell(slug, ctx, session.username, "passkeys", layout) {
+            portalShell(slug, ctx, session.username, "security/passkeys", layout) {
                 div(classes = "page-header") {
                     h1(classes = "page-header__title") { +ctx.t("PORTAL_PASSKEYS_TITLE") }
                     p(classes = "page-header__subtitle") { +ctx.t("PORTAL_PASSKEYS_INTRO") }
@@ -1069,7 +1122,7 @@ object PortalView {
                 attributes["role"] = "navigation"
                 attributes["aria-label"] = ctx.t("PORTAL_TOPBAR_TITLE")
                 span(classes = "portal-nav__label") { +ctx.t("PORTAL_ACCOUNT") }
-                portalNavItems(slug, ctx, activePage, "portal-nav__item")
+                portalNavTree(slug, ctx, activePage, "portal-nav__item")
             }
             div(classes = "portal-sidebar__footer") {
                 portalUserMenu(slug, ctx, username, openUpward = true)
@@ -1111,38 +1164,47 @@ object PortalView {
             attributes["role"] = "navigation"
             attributes["aria-label"] = ctx.t("PORTAL_TOPBAR_TITLE")
             div(classes = "portal-tabnav__inner") {
-                portalNavItems(slug, ctx, activePage, "portal-tabnav__item")
+                portalNavTree(slug, ctx, activePage, "portal-tabnav__item")
             }
         }
         div(classes = "portal-content") { content() }
     }
 
-    private fun FlowContent.portalNavItems(
+    private fun FlowContent.portalNavTree(
         slug: String,
         ctx: ViewContext,
         activePage: String,
         linkClass: String,
     ) {
-        a(
-            href = "/t/$slug/launcher",
-            classes = "$linkClass${if (activePage == "launcher") " is-active" else ""}",
-        ) { +ctx.t("LAUNCHER_NAV") }
-        a(
-            href = "/t/$slug/account/profile",
-            classes = "$linkClass${if (activePage == "profile") " is-active" else ""}",
-        ) { +ctx.t("PORTAL_NAV_PROFILE") }
-        a(
-            href = "/t/$slug/account/security",
-            classes = "$linkClass${if (activePage == "security") " is-active" else ""}",
-        ) { +ctx.t("PORTAL_NAV_SECURITY") }
-        a(
-            href = "/t/$slug/account/mfa",
-            classes = "$linkClass${if (activePage == "mfa") " is-active" else ""}",
-        ) { +ctx.t("PORTAL_NAV_MFA") }
-        a(
-            href = "/t/$slug/account/passkeys",
-            classes = "$linkClass${if (activePage == "passkeys") " is-active" else ""}",
-        ) { +ctx.t("PORTAL_NAV_PASSKEYS") }
+        for (item in portalNavItems) {
+            when (item) {
+                is PortalNavItem.Leaf -> {
+                    a(
+                        href = item.href(slug),
+                        classes = "$linkClass${if (activePage == item.activeKey) " is-active" else ""}",
+                    ) { +ctx.t(item.labelKey) }
+                }
+                is PortalNavItem.Group -> {
+                    val groupActive = activePage.startsWith(item.activeKeyPrefix)
+                    val groupClass = buildString {
+                        append("portal-nav__group")
+                        if (groupActive) append(" portal-nav__group--active")
+                    }
+                    div(classes = groupClass) {
+                        span(classes = "$linkClass portal-nav__group-label") { +ctx.t(item.labelKey) }
+                        div(classes = "portal-nav__children") {
+                            for (child in item.children) {
+                                a(
+                                    href = child.href(slug),
+                                    classes = "$linkClass portal-nav__child" +
+                                        if (activePage == child.activeKey) " is-active" else "",
+                                ) { +ctx.t(child.labelKey) }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // ─── Shared helpers ────────────────────────────────────────────────────

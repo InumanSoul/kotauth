@@ -66,7 +66,9 @@ object EnglishStrings {
     // Portal — navigation labels
     const val PORTAL_NAV_PROFILE = "Profile"
     const val PORTAL_NAV_SECURITY = "Security"
+    const val PORTAL_NAV_SECURITY_OVERVIEW = "Overview"
     const val PORTAL_NAV_MFA = "Two-Factor Auth"
+    const val PORTAL_NAV_SESSIONS = "Sessions"
     const val PORTAL_TOPBAR_TITLE = "Account settings"
 
     // Portal — profile page
