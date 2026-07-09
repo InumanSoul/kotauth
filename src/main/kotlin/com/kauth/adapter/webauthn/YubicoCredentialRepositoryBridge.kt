@@ -21,12 +21,15 @@ class YubicoCredentialRepositoryBridge(
     private val repo: WebAuthnCredentialRepository,
     private val secretKey: String,
 ) : CredentialRepository {
-    // Discoverable-only flow: no username lookup needed.
     override fun getCredentialIdsForUsername(username: String) = emptySet<PublicKeyCredentialDescriptor>()
 
-    override fun getUserHandleForUsername(username: String): Optional<YubiByteArray> = Optional.empty()
+    override fun getUserHandleForUsername(username: String): Optional<YubiByteArray> =
+        runCatching { YubiByteArray.fromBase64Url(username) }
+            .map { Optional.of(it) }
+            .getOrDefault(Optional.empty())
 
-    override fun getUsernameForUserHandle(userHandle: YubiByteArray): Optional<String> = Optional.empty()
+    override fun getUsernameForUserHandle(userHandle: YubiByteArray): Optional<String> =
+        Optional.of(userHandle.base64Url)
 
     override fun lookup(
         credentialId: YubiByteArray,
