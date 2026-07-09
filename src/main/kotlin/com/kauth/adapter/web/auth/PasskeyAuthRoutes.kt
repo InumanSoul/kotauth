@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.AuthenticationFinishRequest
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.WebAuthnError
 import com.kauth.domain.service.WebAuthnResult
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
@@ -144,7 +145,12 @@ internal fun Route.passkeyAuthRoutes(
             is WebAuthnResult.Failure ->
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    mapOf("error" to result.error::class.simpleName),
+                    buildMap {
+                        put("error", result.error::class.simpleName ?: "Unknown")
+                        (result.error as? WebAuthnError.VerificationFailed)?.reason?.let {
+                            put("reason", it)
+                        }
+                    },
                 )
         }
     }
