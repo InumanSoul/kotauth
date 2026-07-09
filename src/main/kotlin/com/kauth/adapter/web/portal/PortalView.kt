@@ -76,11 +76,7 @@ object PortalView {
                     labelKey = "PORTAL_NAV_PASSKEYS",
                     href = { slug -> "/t/$slug/account/passkeys" },
                 ),
-                PortalNavItem.Leaf(
-                    activeKey = "security/sessions",
-                    labelKey = "PORTAL_NAV_SESSIONS",
-                    href = { slug -> "/t/$slug/account/sessions" },
-                ),
+                // Sessions leaf is added by Task 6 when the /account/sessions route lands.
             ),
         ),
     )

@@ -144,7 +144,6 @@ class PortalNavTest {
             assertContains(html, "portal-nav__group--active")
             assertContains(html, "Two-Factor Auth")
             assertContains(html, "Passkeys")
-            assertContains(html, "Sessions")
         }
 
     @Test
