@@ -211,12 +211,17 @@ object AuthView {
                             }
 
                             if (passkeysEnabled) {
+                                if (!passwordLoginDisabled) {
+                                    div("social-divider") {
+                                        span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
+                                    }
+                                }
                                 div("alert alert-error") {
                                     id = "passkey-error"
                                     attributes["hidden"] = "hidden"
                                     attributes["role"] = "alert"
                                 }
-                                button(classes = "btn btn--secondary passkey-signin-btn") {
+                                button(classes = "btn btn--ghost passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
@@ -276,7 +281,7 @@ object AuthView {
                                     attributes["hidden"] = "hidden"
                                     attributes["role"] = "alert"
                                 }
-                                button(classes = "btn btn--secondary passkey-signin-btn") {
+                                button(classes = "btn btn--ghost passkey-signin-btn") {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }

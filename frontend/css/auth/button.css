@@ -18,3 +18,14 @@
 
 .btn:not(.btn--compact):hover { background: var(--color-accent-hover); }
 .btn:not(.btn--compact):active { transform: scale(0.98); }
+
+.btn:not(.btn--compact).btn--ghost {
+  background: transparent;
+  color: var(--color-text);
+  border: 2px solid var(--color-text);
+}
+
+.btn:not(.btn--compact).btn--ghost:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
