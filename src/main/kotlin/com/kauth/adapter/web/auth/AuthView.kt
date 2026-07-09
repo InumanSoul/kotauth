@@ -125,7 +125,6 @@ object AuthView {
         passwordLoginEnabled: Boolean = true,
         emailOtpLoginEnabled: Boolean = false,
         passkeysEnabled: Boolean = false,
-        passwordLoginDisabled: Boolean = false,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
@@ -157,7 +156,7 @@ object AuthView {
                             div("alert alert-error") { +error }
                         }
 
-                        if (passwordLoginEnabled && !passwordLoginDisabled) {
+                        if (passwordLoginEnabled) {
                             form(
                                 action = "/t/$tenantSlug/authorize",
                                 encType = FormEncType.applicationXWwwFormUrlEncoded,
@@ -177,7 +176,7 @@ object AuthView {
                                         attributes["autofocus"] = "true"
                                     }
                                 }
-                                if (!passwordLoginDisabled) {
+                                if (passwordLoginEnabled) {
                                     div("field") {
                                         label {
                                             htmlFor = "password"
@@ -205,13 +204,13 @@ object AuthView {
                                         }
                                     }
                                 }
-                                if (!passwordLoginDisabled) {
+                                if (passwordLoginEnabled) {
                                     button(type = ButtonType.submit, classes = "btn") { +ctx.t("LOGIN_SUBMIT") }
                                 }
                             }
 
                             if (passkeysEnabled) {
-                                if (!passwordLoginDisabled) {
+                                if (passwordLoginEnabled) {
                                     div("social-divider") {
                                         span { +ctx.t("LOGIN_OR_CONTINUE_WITH") }
                                     }
@@ -225,15 +224,7 @@ object AuthView {
                                     +ctx.t("AUTH_LOGIN_PASSKEY_BUTTON")
                                 }
                             }
-                            if (passwordLoginDisabled) {
-                                div("footer-link") {
-                                    a(href = "/t/$tenantSlug/magic-link", classes = "link") {
-                                        +ctx.t("AUTH_LOGIN_MAGIC_LINK_BUTTON")
-                                    }
-                                }
-                            }
-
-                            if (!passwordLoginDisabled) {
+                            if (passwordLoginEnabled) {
                                 div("footer-link") {
                                     a(href = "/t/$tenantSlug/forgot-password") { +ctx.t("LOGIN_FORGOT_PASSWORD") }
                                 }

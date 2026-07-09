@@ -14,7 +14,7 @@ import kotlin.test.assertFalse
  * Pure view-layer tests for the login page passkey UI additions.
  *
  * Tests: passkey button visibility, autocomplete hint, JS bundle include,
- * passwordLoginDisabled hides the password field and shows the magic-link button.
+ * passwordLoginEnabled=false hides the password field and shows the magic-link button.
  */
 class LoginPagePasskeyRenderTest {
     private fun render(page: HTML.() -> Unit): String = createHTML().html { page() }
@@ -43,20 +43,20 @@ class LoginPagePasskeyRenderTest {
     }
 
     @Test
-    fun `login page routes to passwordless form when passwordLoginDisabled is true`() {
+    fun `login page routes to passwordless form when passwordLoginEnabled is false`() {
         val html =
             render(
                 AuthView.loginPage(
                     tenantSlug = "acme",
                     ctx = viewContext,
                     passkeysEnabled = true,
-                    passwordLoginDisabled = true,
+                    passwordLoginEnabled = false,
                 ),
             )
 
         assertFalse(
             html.contains("name=\"password\""),
-            "password field must not be rendered when passwordLoginDisabled",
+            "password field must not be rendered when passwordLoginEnabled is false",
         )
         assertContains(html, "action=\"/t/acme/magic-link/send\"")
         assertContains(html, "Sign in with a passkey")

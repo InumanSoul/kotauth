@@ -920,7 +920,7 @@ internal fun securityPolicyPageImpl(
                     label("check-row") {
                         input(type = InputType.checkBox, name = "passwordLoginDisabled") {
                             attributes["value"] = "true"
-                            if (workspace.passwordLoginDisabled) checked = true
+                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
                             if (!workspace.isSmtpReady) disabled = true
                         }
                         div("check-row__body") {

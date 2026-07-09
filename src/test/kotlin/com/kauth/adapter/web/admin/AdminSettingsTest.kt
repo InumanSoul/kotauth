@@ -377,6 +377,7 @@ class AdminSettingsTest {
                     formParameters =
                         Parameters.build {
                             append("passwordLoginDisabled", "true")
+                            append("magicLinkEnabled", "true")
                         },
                 )
 

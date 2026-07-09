@@ -305,10 +305,10 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
-        val requestedPasswordLoginDisabled = params["passwordLoginDisabled"] == "true"
+        val requestedPasswordLoginEnabled = params["passwordLoginDisabled"] != "true"
         val requestedPasskeysEnabled = params["passkeysEnabled"] == "true"
 
-        if (requestedPasswordLoginDisabled && !workspace.isSmtpReady) {
+        if (!requestedPasswordLoginEnabled && !workspace.isSmtpReady) {
             return@post call.respond(
                 HttpStatusCode.BadRequest,
                 mapOf("error" to "SmtpRequired", "message" to "SMTP must be configured to disable password sign-in."),
@@ -332,13 +332,12 @@ fun Route.adminSettingsRoutes(
                 magicLinkEnabled = params["magicLinkEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
-                passwordLoginEnabled = params["requirePasswordless"] != "true",
+                passwordLoginEnabled = requestedPasswordLoginEnabled,
                 emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
                 emailOtpLockoutThreshold =
                     params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
                 emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
                 passkeysEnabled = requestedPasskeysEnabled,
-                passwordLoginDisabled = requestedPasswordLoginDisabled,
             )
         when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success ->

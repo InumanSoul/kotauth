@@ -245,7 +245,6 @@ class WorkspaceSettingsService(
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
                 ),
             passkeysEnabled = update.passkeysEnabled,
-            passwordLoginDisabled = update.passwordLoginDisabled,
         )
 
     private fun recordWorkspaceSettingsAudit(

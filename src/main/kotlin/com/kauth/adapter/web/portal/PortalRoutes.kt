@@ -295,7 +295,7 @@ fun Route.portalRoutes(
                             "Please set up an authenticator app below to keep your account secure.",
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
-            } else if (tenantObj.passwordLoginDisabled) {
+            } else if (!tenantObj.securityConfig.passwordLoginEnabled) {
                 val hasPasskeys = webAuthnService?.listForUser(UserId(userId), tenantObj.id)?.isNotEmpty() ?: false
                 if (!hasPasskeys) {
                     call.respondRedirect("/t/$slug/account/enroll-passkey")

@@ -361,7 +361,10 @@ class PortalRoutesTest {
     fun `portal callback redirects to enroll-passkey for passwordLoginDisabled tenant`() =
         testApplication {
             val passwordlessRepo = FakeTenantRepository()
-            val passwordlessTenant = tenant.copy(passwordLoginDisabled = true)
+            val passwordlessTenant =
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = false),
+                )
             passwordlessRepo.add(passwordlessTenant)
             userRepo.add(user)
 
@@ -454,7 +457,10 @@ class PortalRoutesTest {
     fun `callback with passwordLoginDisabled=true skips enroll-passkey redirect when user has passkeys`() =
         testApplication {
             val passwordlessRepo = FakeTenantRepository()
-            val passwordlessTenant = tenant.copy(passwordLoginDisabled = true)
+            val passwordlessTenant =
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = false),
+                )
             passwordlessRepo.add(passwordlessTenant)
             userRepo.add(user)
 

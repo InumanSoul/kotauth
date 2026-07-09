@@ -68,7 +68,6 @@ internal fun Route.socialLoginRoutes(
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
-                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
             }
@@ -111,7 +110,6 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
-                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -133,7 +131,6 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
-                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -150,7 +147,6 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
-                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -193,7 +189,6 @@ internal fun Route.socialLoginRoutes(
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
-                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
             }
@@ -239,7 +234,6 @@ internal fun Route.socialLoginRoutes(
                                     enabledProviders = enabledProviders,
                                     passwordLoginEnabled = activeTenant.securityConfig.passwordLoginEnabled,
                                     passkeysEnabled = activeTenant.passkeysEnabled,
-                                    passwordLoginDisabled = activeTenant.passwordLoginDisabled,
                                 ),
                             )
                         },
