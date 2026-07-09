@@ -6,6 +6,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -393,6 +394,50 @@ class OAuthServiceTest {
         assertTrue(auditLog.hasEvent(AuditEventType.SESSION_REVOKED))
     }
 
+    @Test
+    fun `exchangeAuthorizationCode fails closed when repo is null but code has bound resources`() {
+        val svcNoRepo =
+            OAuthService(
+                tenantRepository = tenants,
+                userRepository = users,
+                applicationRepository = apps,
+                sessionRepository = sessions,
+                authCodeRepository = authCodes,
+                tokenPort = tokens,
+                passwordHasher = hasher,
+                auditLog = auditLog,
+                resourceServerRepository = null,
+            )
+
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+                resources = listOf("https://api.example.com"),
+            )
+        val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
+
+        val result =
+            svcNoRepo.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidTarget>(result.error)
+    }
+
     // =========================================================================
     // clientCredentials
     // =========================================================================
@@ -581,6 +626,130 @@ class OAuthServiceTest {
         assertEquals("client_credentials", event.details["grant_type"])
     }
 
+    @Test
+    fun `clientCredentials rejects out-of-API scope with InvalidScope (strict)`() {
+        val api =
+            resourceServerOf(
+                identifier = "https://api.example.com",
+                scopes = listOf("read:invoices"),
+            )
+        val seeded = resourceServers.seed(api)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(seeded.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "read:invoices delete:invoices",
+                resources = listOf("https://api.example.com"),
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidScope>(result.error)
+    }
+
+    @Test
+    fun `clientCredentials narrows scope per targeted API`() {
+        val api =
+            resourceServerOf(
+                identifier = "https://api.example.com",
+                scopes = listOf("read:invoices"),
+            )
+        val seeded = resourceServers.seed(api)
+        resourceServers.setAuthorizedResources(confidentialClient.id, listOf(seeded.id!!))
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "backend-app",
+                clientSecret = "secret123",
+                scopes = "read:invoices",
+                resources = listOf("https://api.example.com"),
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        val tokenResponse = (result as OAuthResult.Success<*>).value as com.kauth.domain.model.TokenResponse
+        assertEquals("read:invoices", tokenResponse.scope)
+    }
+
+    @Test
+    fun `clientCredentials without resource param bypasses narrowing even when audience matches a ResourceServer`() {
+        val clientWithAudience =
+            Application(
+                id = ApplicationId(3),
+                tenantId = TenantId(1),
+                clientId = "m2m-app",
+                name = "M2M",
+                description = null,
+                accessType = AccessType.CONFIDENTIAL,
+                enabled = true,
+                redirectUris = emptyList(),
+                audience = "https://api.example.com",
+            )
+        apps.add(clientWithAudience, secretHash = hasher.hash("m2m-secret"))
+
+        val api =
+            resourceServerOf(
+                identifier = "https://api.example.com",
+                scopes = listOf("read:invoices"),
+            )
+        resourceServers.seed(api)
+
+        val result =
+            svc.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "m2m-app",
+                clientSecret = "m2m-secret",
+                scopes = "openid",
+                resources = emptyList(),
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        val tokenResponse = (result as OAuthResult.Success<*>).value as com.kauth.domain.model.TokenResponse
+        assertEquals("openid", tokenResponse.scope)
+    }
+
+    @Test
+    fun `refreshTokens returns InvalidTarget when resourceServerRepository is null but session has bound resources`() {
+        val svcNoRepo =
+            OAuthService(
+                tenantRepository = tenants,
+                userRepository = users,
+                applicationRepository = apps,
+                sessionRepository = sessions,
+                authCodeRepository = authCodes,
+                tokenPort = tokens,
+                passwordHasher = hasher,
+                auditLog = auditLog,
+                resourceServerRepository = null,
+            )
+
+        sessions.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = publicClient.id,
+                accessTokenHash = sha256Hex("access-token"),
+                refreshTokenHash = sha256Hex("refresh-token-value"),
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(3600),
+                refreshExpiresAt = Instant.now().plusSeconds(86400),
+                resources = listOf("https://api.example.com"),
+            ),
+        )
+
+        val result =
+            svcNoRepo.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = "refresh-token-value",
+                clientId = "spa-app",
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidTarget>(result.error)
+    }
+
     // =========================================================================
     // refreshTokens
     // =========================================================================
@@ -749,6 +918,49 @@ class OAuthServiceTest {
                 clientSecret = "secret123",
             )
         assertIs<OAuthResult.Success<*>>(ok)
+    }
+
+    @Test
+    fun `refreshTokens auto-drops cross-API scopes when refresh narrows to a resource subset`() {
+        val apiA =
+            resourceServerOf(
+                identifier = "https://api-a.example.com",
+                scopes = listOf("read:a"),
+            )
+        val apiB =
+            resourceServerOf(
+                identifier = "https://api-b.example.com",
+                scopes = listOf("read:b"),
+            )
+        val seededA = resourceServers.seed(apiA)
+        resourceServers.seed(apiB)
+        resourceServers.setAuthorizedResources(publicClient.id, listOf(seededA.id!!))
+
+        sessions.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = UserId(10),
+                clientId = publicClient.id,
+                accessTokenHash = sha256Hex("at-two-apis"),
+                refreshTokenHash = sha256Hex("rt-two-apis"),
+                scopes = "read:a read:b",
+                expiresAt = Instant.now().plusSeconds(3600),
+                refreshExpiresAt = Instant.now().plusSeconds(86400),
+                resources = listOf("https://api-a.example.com", "https://api-b.example.com"),
+            ),
+        )
+
+        val result =
+            svc.refreshTokens(
+                tenantSlug = "acme",
+                refreshToken = "rt-two-apis",
+                clientId = "spa-app",
+                requestedResources = listOf("https://api-a.example.com"),
+            )
+
+        assertIs<OAuthResult.Success<*>>(result)
+        val tokenResponse = (result as OAuthResult.Success<*>).value as com.kauth.domain.model.TokenResponse
+        assertEquals("read:a", tokenResponse.scope, "Narrowed refresh must drop scopes from the excluded API")
     }
 
     /** Runs the full code flow for [client] and returns the issued refresh token. */
@@ -1180,6 +1392,51 @@ class OAuthServiceTest {
         assertEquals("key-1", jwks[0]["kid"])
     }
 
+    // =========================================================================
+    // narrowScopes
+    // =========================================================================
+
+    @Test
+    fun `narrowScopes accepts all requested when API declares them`() {
+        val api = resourceServerOf(scopes = listOf("read:invoices", "write:invoices"))
+        val result = svc.narrowScopes(listOf("read:invoices"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("read:invoices")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes rejects requested scope not declared by any targeted API (strict mode)`() {
+        val api = resourceServerOf(scopes = listOf("read:invoices"))
+        val result = svc.narrowScopes(listOf("read:invoices", "delete:invoices"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.InvalidScope(listOf("delete:invoices")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes treats empty API scopes as no narrowing — returns requested as-is`() {
+        val api = resourceServerOf(scopes = emptyList())
+        val result = svc.narrowScopes(listOf("anything:goes"), listOf(api))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("anything:goes")),
+            result,
+        )
+    }
+
+    @Test
+    fun `narrowScopes unions scopes across multiple targeted APIs`() {
+        val a = resourceServerOf(identifier = "https://a", scopes = listOf("read:a"))
+        val b = resourceServerOf(identifier = "https://b", scopes = listOf("read:b"))
+        val result = svc.narrowScopes(listOf("read:a", "read:b"), listOf(a, b))
+        assertEquals(
+            OAuthService.ScopeNarrowing.Ok(listOf("read:a", "read:b")),
+            result,
+        )
+    }
+
     // -------------------------------------------------------------------------
     // PKCE helper — mirrors OAuthService.verifyPkce
     // -------------------------------------------------------------------------
@@ -1188,4 +1445,24 @@ class OAuthServiceTest {
         val digest = MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
         return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
     }
+
+    // -------------------------------------------------------------------------
+    // Resource server fixture builder
+    // -------------------------------------------------------------------------
+
+    private fun resourceServerOf(
+        identifier: String = "https://api",
+        name: String = "Test API",
+        description: String? = null,
+        enabled: Boolean = true,
+        scopes: List<String> = emptyList(),
+    ): ResourceServer =
+        ResourceServer(
+            tenantId = TenantId(1),
+            identifier = identifier,
+            name = name,
+            description = description,
+            enabled = enabled,
+            scopes = scopes,
+        )
 }

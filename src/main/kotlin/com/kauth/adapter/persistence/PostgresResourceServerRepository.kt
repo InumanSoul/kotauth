@@ -6,9 +6,10 @@ import com.kauth.domain.model.ResourceServerId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ResourceAuthorizationError
 import com.kauth.domain.port.ResourceServerRepository
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.transactions.transaction
+import kotlinx.serialization.json.Json
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 
@@ -53,6 +54,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         identifier: String,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer =
         transaction {
             val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -62,6 +64,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                     it[ResourceServersTable.identifier] = identifier
                     it[ResourceServersTable.name] = name
                     it[ResourceServersTable.description] = description
+                    it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
                     it[ResourceServersTable.enabled] = true
                     it[ResourceServersTable.createdAt] = now
                 } get ResourceServersTable.id
@@ -72,6 +75,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 identifier = identifier,
                 name = name,
                 description = description,
+                scopes = scopes,
                 enabled = true,
                 createdAt = now.toInstant(),
             )
@@ -82,6 +86,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
         id: ResourceServerId,
         name: String,
         description: String?,
+        scopes: List<String>,
     ): ResourceServer =
         transaction {
             ResourceServersTable.update(
@@ -89,6 +94,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             ) {
                 it[ResourceServersTable.name] = name
                 it[ResourceServersTable.description] = description
+                it[ResourceServersTable.scopes] = Json.encodeToString(scopes)
             }
             findById(tenantId, id) ?: error("ResourceServer $id not found after update")
         }
@@ -172,6 +178,7 @@ class PostgresResourceServerRepository : ResourceServerRepository {
             name = this[ResourceServersTable.name],
             description = this[ResourceServersTable.description],
             enabled = this[ResourceServersTable.enabled],
+            scopes = Json.decodeFromString(this[ResourceServersTable.scopes].ifBlank { "[]" }),
             createdAt = this[ResourceServersTable.createdAt].toInstant(),
         )
 }

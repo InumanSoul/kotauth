@@ -3,6 +3,7 @@ package com.kauth.adapter.web.portal
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.admin.portalImpersonationStopRoute
 import com.kauth.adapter.web.auth.clearSsoCookie
+import com.kauth.adapter.web.auth.postMagicLinkPage
 import com.kauth.adapter.web.auth.resolveLocale
 import com.kauth.adapter.web.decodeJwtPayload
 import com.kauth.adapter.web.generatePkceChallenge
@@ -23,6 +24,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthResult
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SelfServiceResult
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
@@ -77,6 +79,7 @@ fun Route.portalRoutes(
     encryptionService: EncryptionService,
     translationPort: TranslationPort,
     impersonationService: com.kauth.domain.service.ImpersonationService? = null,
+    webAuthnService: WebAuthnService? = null,
 ) {
     fun ApplicationCall.portalViewContext(tenant: Tenant?): ViewContext {
         val theme = tenant?.theme ?: TenantTheme.DEFAULT
@@ -292,6 +295,13 @@ fun Route.portalRoutes(
                             "Please set up an authenticator app below to keep your account secure.",
                     )
                 call.respondRedirect("/t/$slug/account/mfa?notice=$notice")
+            } else if (tenantObj.passwordLoginDisabled) {
+                val hasPasskeys = webAuthnService?.listForUser(UserId(userId), tenantObj.id)?.isNotEmpty() ?: false
+                if (!hasPasskeys) {
+                    call.respondRedirect("/t/$slug/account/enroll-passkey")
+                } else {
+                    call.respondRedirect("/t/$slug/launcher")
+                }
             } else {
                 call.respondRedirect("/t/$slug/launcher")
             }
@@ -328,6 +338,17 @@ fun Route.portalRoutes(
                 }
             }
             return session
+        }
+
+        // ------------------------------------------------------------------
+        // Post-magic-link passkey enrollment landing
+        // ------------------------------------------------------------------
+
+        get("/enroll-passkey") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            call.respondHtml(HttpStatusCode.OK, postMagicLinkPage(slug, call.portalViewContext(tenant)))
         }
 
         // ------------------------------------------------------------------
@@ -596,6 +617,32 @@ fun Route.portalRoutes(
 
             mfaService.disableMfa(UserId(session.userId), TenantId(session.tenantId))
             call.respond(mapOf("status" to "disabled"))
+        }
+
+        // ------------------------------------------------------------------
+        // Passkeys management page
+        // ------------------------------------------------------------------
+
+        get("/passkeys") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val credentials =
+                if (webAuthnService != null) {
+                    webAuthnService.listForUser(UserId(session.userId), TenantId(session.tenantId))
+                } else {
+                    emptyList()
+                }
+            call.respondHtml(
+                HttpStatusCode.OK,
+                PortalView.passkeysPage(
+                    slug = slug,
+                    session = session,
+                    ctx = call.portalViewContext(tenant),
+                    layout = tenant.portalConfig.layout,
+                    credentials = credentials,
+                ),
+            )
         }
     }
 }

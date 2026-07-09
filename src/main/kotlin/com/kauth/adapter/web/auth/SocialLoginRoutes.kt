@@ -67,6 +67,8 @@ internal fun Route.socialLoginRoutes(
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                        passkeysEnabled = tenant?.passkeysEnabled == true,
+                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
             }
@@ -108,6 +110,8 @@ internal fun Route.socialLoginRoutes(
                     error = "Login with ${provider.displayName} was cancelled or failed.",
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                    passkeysEnabled = tenant?.passkeysEnabled == true,
+                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -128,6 +132,8 @@ internal fun Route.socialLoginRoutes(
                     error = "Invalid or expired state parameter. Please try signing in again.",
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                    passkeysEnabled = tenant?.passkeysEnabled == true,
+                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -143,6 +149,8 @@ internal fun Route.socialLoginRoutes(
                     error = "State mismatch. Please try signing in again.",
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                    passkeysEnabled = tenant?.passkeysEnabled == true,
+                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
             return@get
@@ -184,6 +192,8 @@ internal fun Route.socialLoginRoutes(
                         error = result.error.toMessage(),
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                        passkeysEnabled = tenant?.passkeysEnabled == true,
+                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
             }
@@ -228,6 +238,8 @@ internal fun Route.socialLoginRoutes(
                                     error = message,
                                     enabledProviders = enabledProviders,
                                     passwordLoginEnabled = activeTenant.securityConfig.passwordLoginEnabled,
+                                    passkeysEnabled = activeTenant.passkeysEnabled,
+                                    passwordLoginDisabled = activeTenant.passwordLoginDisabled,
                                 ),
                             )
                         },

@@ -70,11 +70,12 @@ class JwtTokenAdapter(
         customIdClaims: Map<String, String>,
         authTime: java.time.Instant?,
         actingSubject: UserId?,
+        audiences: List<String>,
     ): TokenResponse {
         val activeKey = getOrCreateAlgorithm(tenant.id.value)
         val issuer = issuerFor(tenant)
-        // Per-client custom audience falls back to the client_id, then the tenant slug.
-        val audience = client?.audience ?: client?.clientId ?: tenant.slug
+        val clientAudience = client?.audience ?: client?.clientId ?: tenant.slug
+        val accessTokenAudiences = audiences.ifEmpty { listOf(clientAudience) }
         val subject = user.id!!.value.toString()
         val expiryMs = (client?.tokenExpiryOverride?.toLong() ?: tenant.tokenExpirySeconds) * 1_000L
         val expiresAt = Date(System.currentTimeMillis() + expiryMs)
@@ -90,7 +91,7 @@ class JwtTokenAdapter(
                 .create()
                 .withKeyId(activeKey.keyId)
                 .withIssuer(issuer)
-                .withAudience(audience)
+                .withAudience(*accessTokenAudiences.toTypedArray())
                 .withSubject(subject)
                 .withClaim("tenant_id", tenant.id.value)
                 .withClaim("username", user.username)
@@ -153,7 +154,7 @@ class JwtTokenAdapter(
                     .create()
                     .withKeyId(activeKey.keyId)
                     .withIssuer(issuer)
-                    .withAudience(audience)
+                    .withAudience(clientAudience)
                     .withSubject(subject)
                     .withClaim("email", user.email)
                     .withClaim("email_verified", user.emailVerified)

@@ -20,6 +20,7 @@ import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
+import com.kauth.fakes.FakeTenantEmailBrandingRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTokenPort
@@ -49,7 +50,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -71,6 +74,7 @@ class AdminSettingsTest {
     private val hasher = FakePasswordHasher()
     private val tokenPort = FakeTokenPort()
     private val themeRepo = FakeThemeRepository()
+    private val emailBrandingRepo = FakeTenantEmailBrandingRepository()
 
     private val keyProvisioningService = mockk<KeyProvisioningService>(relaxed = true)
     private val encryptionService = EncryptionService("test-secret-key")
@@ -148,6 +152,7 @@ class AdminSettingsTest {
             tenantRepository = tenantRepo,
             auditLog = auditLogPort,
             themeRepository = themeRepo,
+            emailBrandingRepository = emailBrandingRepo,
         )
 
     private fun buildRoleGroupService() =
@@ -167,6 +172,7 @@ class AdminSettingsTest {
         roleRepo.clear()
         auditLogPort.clear()
         themeRepo.clear()
+        emailBrandingRepo.clear()
         tokenPort.reset()
         tenantRepo.add(masterTenant)
         tenantRepo.add(workspace)
@@ -317,6 +323,94 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
+    // Passkeys / SMTP hard-gate
+    // =========================================================================
+
+    @Test
+    fun `POST security passwordLoginDisabled=true is rejected when tenant SMTP not ready`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // workspace has no SMTP configured (smtpEnabled=false by default)
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passwordLoginDisabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertContains(response.bodyAsText(), "SmtpRequired")
+        }
+
+    @Test
+    fun `POST security passwordLoginDisabled=true is accepted when SMTP is ready`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // configure acme workspace with valid SMTP
+            val smtpReadyWorkspace =
+                workspace.copy(
+                    smtpEnabled = true,
+                    smtpHost = "smtp.example.com",
+                    smtpFromAddress = "no-reply@acme.dev",
+                )
+            tenantRepo.add(smtpReadyWorkspace)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passwordLoginDisabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
+        }
+
+    @Test
+    fun `POST security passkeysEnabled=false persists without SMTP requirement`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // workspace has no SMTP — should still allow toggling passkeysEnabled alone
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("passkeysEnabled", "false")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val saved = tenantRepo.findBySlug("acme")
+            assertFalse(saved?.passkeysEnabled ?: true, "passkeysEnabled should be persisted as false")
+        }
+
+    // =========================================================================
     // Branding settings
     // =========================================================================
 
@@ -341,7 +435,6 @@ class AdminSettingsTest {
 
             val body = authed.get("/admin/workspaces/acme/settings/branding").bodyAsText()
 
-            assertTrue(body.contains("Default Locale"), "Locale section header missing")
             assertTrue(body.contains("themeDefaultLocale"), "Locale select input missing")
             assertTrue(body.contains("Auto-detect"), "Auto-detect option missing")
         }
@@ -392,6 +485,53 @@ class AdminSettingsTest {
 
             val saved = themeRepo.findByTenantId(workspace.id)?.defaultLocale
             assertEquals("en", saved)
+        }
+
+    @Test
+    fun `branding POST does not consume fromDisplayName (UI-dropped, API-only)`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val before = emailBrandingRepo.findByTenantId(TenantId(2))?.fromDisplayName
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/branding",
+                formParameters =
+                    Parameters.build {
+                        append("emailSupportEmail", "support@example.com")
+                        append("emailFromDisplayName", "Should Not Be Persisted")
+                    },
+            )
+
+            val after = emailBrandingRepo.findByTenantId(TenantId(2))
+            assertEquals(before, after?.fromDisplayName, "fromDisplayName must NOT be writable via branding form")
+            assertEquals("support@example.com", after?.supportEmail)
+        }
+
+    @Test
+    fun `branding page renders two top-level cards Brand Identity and Visual Theme`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val html = authed.get("/admin/workspaces/acme/settings/branding").bodyAsText()
+
+            assertContains(html, "Brand Identity")
+            assertContains(html, "Visual Theme")
+            assertContains(html, "name=\"themeLogoUrl\"")
+            assertContains(html, "name=\"themeAccentColor\"")
+            assertContains(html, "name=\"emailSupportEmail\"")
+            assertFalse(
+                html.contains("name=\"emailFromDisplayName\""),
+                "fromDisplayName input must not appear in the branding form",
+            )
         }
 
     @Test

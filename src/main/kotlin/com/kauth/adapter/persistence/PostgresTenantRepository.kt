@@ -9,12 +9,9 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.TenantRepository
-import org.jetbrains.exposed.sql.JoinType
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 /**
  * Persistence adapter — implements TenantRepository using PostgreSQL + Exposed.
@@ -111,6 +108,8 @@ class PostgresTenantRepository(
                 it[smtpTlsEnabled] = tenant.smtpTlsEnabled
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
+                it[passkeysEnabled] = tenant.passkeysEnabled
+                it[passwordLoginDisabled] = tenant.passwordLoginDisabled
             }
             // Upsert: update if exists, insert if the row was never created
             val updatedRows =
@@ -217,6 +216,8 @@ class PostgresTenantRepository(
             maxConcurrentSessions = this[TenantsTable.maxConcurrentSessions],
             portalConfig = toPortalConfig(),
             emailBranding = toEmailBranding(),
+            passkeysEnabled = this[TenantsTable.passkeysEnabled],
+            passwordLoginDisabled = this[TenantsTable.passwordLoginDisabled],
         )
     }
 

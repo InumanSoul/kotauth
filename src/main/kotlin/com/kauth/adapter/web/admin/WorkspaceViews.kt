@@ -579,6 +579,8 @@ internal fun securityPolicyPageImpl(
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
+    enrolledPasskeyUsers: Int = 0,
+    totalUsers: Int = 0,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -902,6 +904,47 @@ internal fun securityPolicyPageImpl(
                         }
                     }
                 }
+
+                // ── Passkeys ─────────────────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "passkeysEnabled") {
+                            attributes["value"] = "true"
+                            if (workspace.passkeysEnabled) checked = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_ENABLED_LABEL }
+                        }
+                    }
+                    label("check-row") {
+                        input(type = InputType.checkBox, name = "passwordLoginDisabled") {
+                            attributes["value"] = "true"
+                            if (workspace.passwordLoginDisabled) checked = true
+                            if (!workspace.isSmtpReady) disabled = true
+                        }
+                        div("check-row__body") {
+                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_PASSWORDLESS_LABEL }
+                            if (!workspace.isSmtpReady) {
+                                span("check-row__warn") { +EnglishStrings.ADMIN_PASSKEYS_SMTP_GATE_HINT }
+                            }
+                        }
+                    }
+                    if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
+                        div("insight-item insight-item--static") {
+                            span("insight-item__label") { +"Passkey enrollment" }
+                            span("insight-item__value insight-item__value--mono") {
+                                +"$enrolledPasskeyUsers"
+                                span {
+                                    attributes["style"] =
+                                        "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
+                                    +" / $totalUsers"
+                                }
+                            }
+                            span("insight-item__hint") { +"users have enrolled at least one passkey" }
+                        }
+                    }
+                }
             }
                     }
 }
@@ -976,9 +1019,8 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-form") {
 
-                        // ── Assets ─────────────────────────────────
                         div("ov-card") {
-                            div("ov-card__section-label") { +"Assets" }
+                            div("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
                             div("edit-row") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
@@ -1008,99 +1050,13 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                        }
-
-                        // ── Theme Presets ──────────────────────────
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Theme Preset" }
-                            div("preset-group") {
-                                button(type = ButtonType.button) {
-                                    classes = setOf("preset-btn", "preset-btn--active")
-                                    attributes["data-preset"] = "dark"
-                                    +"Dark"
-                                }
-                                button(type = ButtonType.button) {
-                                    classes = setOf("preset-btn")
-                                    attributes["data-preset"] = "light"
-                                    +"Light"
-                                }
-                                button(type = ButtonType.button) {
-                                    classes = setOf("preset-btn")
-                                    attributes["data-preset"] = "simple"
-                                    +"Simple"
+                            div("edit-row") {
+                                span("edit-row__label") { +"Accent Color" }
+                                div {
+                                    colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 }
                             }
-                        }
-
-                        // ── Colors ─────────────────────────────────
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Colors" }
-                            div("color-grid") {
-                                colorField("Accent", "accent", "themeAccentColor", t.accentColor)
-                                colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
-                                colorField("Accent Text", "accent-fg", "themeAccentForeground", t.accentForeground)
-                                colorField("Page Background", "page-bg", "themeBgDeep", t.bgDeep)
-                                colorField("Surface", "surface", "themeSurface", t.surface)
-                                colorField("Input Background", "input-bg", "themeBgInput", t.bgInput)
-                                colorField("Border", "border", "themeBorderColor", t.borderColor)
-                                colorField("Text Primary", "text", "themeTextPrimary", t.textPrimary)
-                                colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
-                            }
-                        }
-
-                        // ── Border Radius ──────────────────────────
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Border Radius" }
-                            div("preset-group") {
-                                val radiusPresets = listOf("0px" to "Sharp", "8px" to "Rounded", "40px" to "Pill")
-                                for ((rv, label) in radiusPresets) {
-                                    button(type = ButtonType.button) {
-                                        classes = if (t.borderRadius == rv) {
-                                            setOf("preset-btn", "preset-btn--active")
-                                        } else {
-                                            setOf("preset-btn")
-                                        }
-                                        attributes["data-radius"] = rv
-                                        +label
-                                    }
-                                }
-                            }
-                            input(type = InputType.text, name = "themeBorderRadius") {
-                                classes = setOf("edit-row__field")
-                                id = "field-radius"
-                                value = t.borderRadius
-                                placeholder = "e.g. 0px, 6px, 12px"
-                                attributes["data-radius-input"] = ""
-                            }
-                        }
-
-                        // ── Font Family ───────────────────────────
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Font Family" }
-                            val fontOptions = listOf(
-                                "Inter",
-                                "Montserrat",
-                                "IBM Plex Sans",
-                                "DM Sans",
-                                "Source Sans 3",
-                            )
-                            select {
-                                name = "themeFontFamily"
-                                classes = setOf("edit-row__field")
-                                for (f in fontOptions) {
-                                    option {
-                                        value = f
-                                        if (t.fontFamily == f) selected = true
-                                        +f
-                                    }
-                                }
-                            }
-                        }
-
-                        // ── Email Identity ──────────────────────────
-                        val eb = workspace.emailBranding
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Email Identity" }
+                            val eb = workspace.emailBranding
                             div("edit-row") {
                                 span("edit-row__label") { +"Support email" }
                                 div {
@@ -1114,26 +1070,90 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
+                        }
+
+                        div("ov-card") {
+                            div("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
                             div("edit-row") {
-                                span("edit-row__label") { +"From display name" }
-                                div {
-                                    input(type = InputType.text, name = "emailFromDisplayName") {
-                                        classes = setOf("edit-row__field")
-                                        value = eb?.fromDisplayName ?: ""
-                                        attributes["placeholder"] = workspace.smtpFromName ?: workspace.displayName
+                                span("edit-row__label") { +"Theme Preset" }
+                                div("preset-group") {
+                                    button(type = ButtonType.button) {
+                                        classes = setOf("preset-btn", "preset-btn--active")
+                                        attributes["data-preset"] = "dark"
+                                        +"Dark"
                                     }
-                                    div("edit-row__hint") {
-                                        +"Display name only. The sender address is set in SMTP "
-                                        +"configuration and cannot be changed per workspace. "
-                                        +"Brand name, color, and logo are inherited from the theme above."
+                                    button(type = ButtonType.button) {
+                                        classes = setOf("preset-btn")
+                                        attributes["data-preset"] = "light"
+                                        +"Light"
+                                    }
+                                    button(type = ButtonType.button) {
+                                        classes = setOf("preset-btn")
+                                        attributes["data-preset"] = "simple"
+                                        +"Simple"
                                     }
                                 }
                             }
-                        }
-
-                        // ── Default Locale ─────────────────────────
-                        div("ov-card") {
-                            div("ov-card__section-label") { +"Default Locale" }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Colors" }
+                                div("color-grid") {
+                                    colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
+                                    colorField("Accent Text", "accent-fg", "themeAccentForeground", t.accentForeground)
+                                    colorField("Page Background", "page-bg", "themeBgDeep", t.bgDeep)
+                                    colorField("Surface", "surface", "themeSurface", t.surface)
+                                    colorField("Input Background", "input-bg", "themeBgInput", t.bgInput)
+                                    colorField("Border", "border", "themeBorderColor", t.borderColor)
+                                    colorField("Text Primary", "text", "themeTextPrimary", t.textPrimary)
+                                    colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Font Family" }
+                                val fontOptions = listOf(
+                                    "Inter",
+                                    "Montserrat",
+                                    "IBM Plex Sans",
+                                    "DM Sans",
+                                    "Source Sans 3",
+                                )
+                                select {
+                                    name = "themeFontFamily"
+                                    classes = setOf("edit-row__field")
+                                    for (f in fontOptions) {
+                                        option {
+                                            value = f
+                                            if (t.fontFamily == f) selected = true
+                                            +f
+                                        }
+                                    }
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +"Border Radius" }
+                                div {
+                                    div("preset-group") {
+                                        val radiusPresets = listOf("0px" to "Sharp", "8px" to "Rounded", "40px" to "Pill")
+                                        for ((rv, label) in radiusPresets) {
+                                            button(type = ButtonType.button) {
+                                                classes = if (t.borderRadius == rv) {
+                                                    setOf("preset-btn", "preset-btn--active")
+                                                } else {
+                                                    setOf("preset-btn")
+                                                }
+                                                attributes["data-radius"] = rv
+                                                +label
+                                            }
+                                        }
+                                    }
+                                    input(type = InputType.text, name = "themeBorderRadius") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-radius"
+                                        value = t.borderRadius
+                                        placeholder = "e.g. 0px, 6px, 12px"
+                                        attributes["data-radius-input"] = ""
+                                    }
+                                }
+                            }
                             div("edit-row") {
                                 span("edit-row__label") { +"Language" }
                                 div {

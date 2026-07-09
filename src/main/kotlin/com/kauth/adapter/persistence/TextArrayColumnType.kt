@@ -1,9 +1,10 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Column
-import org.jetbrains.exposed.sql.ColumnType
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.transactions.TransactionManager
+import org.jetbrains.exposed.v1.core.Column
+import org.jetbrains.exposed.v1.core.ColumnType
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.TransactionManager
 
 /**
  * Exposed column type for PostgreSQL `text[]` array columns.

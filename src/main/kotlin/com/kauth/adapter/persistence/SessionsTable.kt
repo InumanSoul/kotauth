@@ -1,7 +1,8 @@
 package com.kauth.adapter.persistence
 
-import org.jetbrains.exposed.sql.Table
-import org.jetbrains.exposed.sql.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.core.Table
+import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
+import org.jetbrains.exposed.v1.jdbc.*
 
 /**
  * Exposed mapping for 'sessions' (V6 migration).
@@ -23,6 +24,7 @@ object SessionsTable : Table("sessions") {
     val revokedAt = timestampWithTimeZone("revoked_at").nullable()
     val revocationReason = varchar("revocation_reason", 32).nullable()
     val impersonatorSessionId = integer("impersonator_session_id").references(id).nullable()
+    val resources = jsonb("resources").default("[]")
 
     override val primaryKey = PrimaryKey(id)
 }

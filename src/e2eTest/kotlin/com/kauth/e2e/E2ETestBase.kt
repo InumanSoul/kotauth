@@ -9,10 +9,14 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AccountSelfService
-import com.kauth.domain.service.AdminService
+import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.AdminUserService
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.ApplicationManagementService
+import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.WebhookService
+import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -106,8 +110,8 @@ abstract class E2ETestBase {
                 enabled = true,
             )
 
-        private fun buildSelfService() =
-            AccountSelfService(
+        private fun buildCredentialFlowService() =
+            CredentialFlowService(
                 userRepository = userRepo,
                 tenantRepository = tenantRepo,
                 sessionRepository = sessionRepo,
@@ -118,15 +122,46 @@ abstract class E2ETestBase {
                 emailPort = FakeEmailPort(),
             )
 
-        private fun buildAdminService() =
-            AdminService(
-                tenantRepository = tenantRepo,
+        private fun buildSelfService() =
+            AccountSelfService(
                 userRepository = userRepo,
-                applicationRepository = appRepo,
+                tenantRepository = tenantRepo,
+                sessionRepository = sessionRepo,
                 passwordHasher = hasher,
                 auditLog = auditLogPort,
+                emailPort = FakeEmailPort(),
+            )
+
+        private fun buildAccountService() =
+            AdminAccountService(
+                tenantRepository = tenantRepo,
+                userRepository = userRepo,
+                auditLog = auditLogPort,
+                credentialFlowService = buildCredentialFlowService(),
+            )
+
+        private fun buildAdminUserService() =
+            AdminUserService(
+                tenantRepository = tenantRepo,
+                userRepository = userRepo,
                 sessionRepository = sessionRepo,
-                accountSelfService = buildSelfService(),
+                passwordHasher = hasher,
+                auditLog = auditLogPort,
+                credentialFlowService = buildCredentialFlowService(),
+            )
+
+        private fun buildWorkspaceSettingsService() =
+            WorkspaceSettingsService(
+                tenantRepository = tenantRepo,
+                auditLog = auditLogPort,
+            )
+
+        private fun buildApplicationManagementService() =
+            ApplicationManagementService(
+                applicationRepository = appRepo,
+                tenantRepository = tenantRepo,
+                passwordHasher = hasher,
+                auditLog = auditLogPort,
             )
 
         private fun buildRoleGroupService() =
@@ -192,7 +227,10 @@ abstract class E2ETestBase {
                             call.respondRedirect("/admin")
                         }
                         adminRoutes(
-                            adminService = buildAdminService(),
+                            accountService = buildAccountService(),
+                            workspaceSettingsService = buildWorkspaceSettingsService(),
+                            adminUserService = buildAdminUserService(),
+                            applicationManagementService = buildApplicationManagementService(),
                             roleGroupService = buildRoleGroupService(),
                             appInfo = AppInfo(),
                             tenantRepository = tenantRepo,

@@ -3,15 +3,9 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.TenantClaimMapperRepository
-import org.jetbrains.exposed.sql.ResultRow
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.jdbc.*
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 
 class PostgresTenantClaimMapperRepository : TenantClaimMapperRepository {
     override fun findAll(tenantId: TenantId): List<TenantClaimMapper> =

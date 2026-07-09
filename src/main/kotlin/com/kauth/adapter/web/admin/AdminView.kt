@@ -87,7 +87,10 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved)
+        enrolledPasskeyUsers: Int = 0,
+        totalUsers: Int = 0,
+    ): HTML.() -> Unit =
+        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved, enrolledPasskeyUsers, totalUsers)
 
     fun brandingPage(
         workspace: Tenant,
@@ -177,6 +180,7 @@ object AdminView {
         tempPasswordLink: String? = null,
         recentImpersonations: List<ImpersonationRecord> = emptyList(),
         recentOtpActivity: List<OtpActivityRecord> = emptyList(),
+        passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -194,6 +198,7 @@ object AdminView {
             tempPasswordLink,
             recentImpersonations,
             recentOtpActivity,
+            passkeys,
         )
 
     fun userAttributeFormPage(

@@ -244,6 +244,8 @@ class WorkspaceSettingsService(
                     emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
                 ),
+            passkeysEnabled = update.passkeysEnabled,
+            passwordLoginDisabled = update.passwordLoginDisabled,
         )
 
     private fun recordWorkspaceSettingsAudit(

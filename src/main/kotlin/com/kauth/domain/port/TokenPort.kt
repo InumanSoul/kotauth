@@ -23,6 +23,7 @@ interface TokenPort {
         authTime: Instant? = null,
         // Sets the RFC 8693 §4.1 nested `act` claim on access + id tokens; `sub` stays the impersonated user.
         actingSubject: UserId? = null,
+        audiences: List<String> = emptyList(),
     ): TokenResponse
 
     fun issueClientCredentialsToken(

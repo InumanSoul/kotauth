@@ -14,5 +14,6 @@ data class ResourceServer(
     val name: String,
     val description: String? = null,
     val enabled: Boolean = true,
+    val scopes: List<String> = emptyList(),
     val createdAt: Instant = Instant.now(),
 )

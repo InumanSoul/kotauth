@@ -39,6 +39,7 @@ data class AuthorizationCode(
      * field existed; new issuance paths always populate it.
      */
     val authTime: Instant? = null,
+    val resources: List<String> = emptyList(),
 ) {
     val isExpired: Boolean get() = Instant.now().isAfter(expiresAt)
     val isUsed: Boolean get() = usedAt != null

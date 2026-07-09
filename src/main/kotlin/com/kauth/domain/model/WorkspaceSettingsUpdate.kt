@@ -25,6 +25,8 @@ data class WorkspaceSettingsUpdate(
     val emailOtpSignupEnabled: Boolean,
     val emailOtpLockoutThreshold: Int,
     val emailOtpLoginEnabled: Boolean,
+    val passkeysEnabled: Boolean,
+    val passwordLoginDisabled: Boolean,
 ) {
     companion object {
         fun from(tenant: Tenant): WorkspaceSettingsUpdate {
@@ -54,6 +56,8 @@ data class WorkspaceSettingsUpdate(
                 emailOtpSignupEnabled = s.emailOtpSignupEnabled,
                 emailOtpLockoutThreshold = s.emailOtpLockoutThreshold,
                 emailOtpLoginEnabled = s.emailOtpLoginEnabled,
+                passkeysEnabled = tenant.passkeysEnabled,
+                passwordLoginDisabled = tenant.passwordLoginDisabled,
             )
         }
     }
