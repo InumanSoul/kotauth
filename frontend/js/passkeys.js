@@ -209,88 +209,93 @@
     }
 
     if (mode === 'manage' && base) {
+      var addTitle    = scriptEl.getAttribute('data-passkey-add-title')    || 'Add a passkey';
+      var renameTitle = scriptEl.getAttribute('data-passkey-rename-title') || 'Rename passkey';
+
+      function openNameDialog(title, initialValue) {
+        return new Promise(function (resolve) {
+          var dlg       = document.getElementById('passkey-name-dialog');
+          var titleEl   = document.getElementById('passkey-name-dialog-title');
+          var input     = document.getElementById('passkey-name-dialog-input');
+          var saveBtn   = document.getElementById('passkey-name-dialog-save');
+          var cancelBtn = document.getElementById('passkey-name-dialog-cancel');
+          if (!dlg) { resolve(null); return; }
+
+          titleEl.textContent = title;
+          input.value = initialValue || '';
+
+          function onSave() {
+            var value = input.value.trim();
+            cleanup();
+            dlg.close();
+            resolve(value || null);
+          }
+          function onCancel() {
+            cleanup();
+            dlg.close();
+            resolve(null);
+          }
+          function onClose() {
+            cleanup();
+            resolve(null);
+          }
+          function cleanup() {
+            saveBtn.removeEventListener('click', onSave);
+            cancelBtn.removeEventListener('click', onCancel);
+            dlg.removeEventListener('close', onClose);
+          }
+
+          saveBtn.addEventListener('click', onSave);
+          cancelBtn.addEventListener('click', onCancel);
+          dlg.addEventListener('close', onClose, { once: true });
+          dlg.showModal();
+          setTimeout(function () { input.focus(); }, 0);
+        });
+      }
+
       document.addEventListener('DOMContentLoaded', function () {
-        var addBtn  = document.getElementById('add-passkey-btn');
-        var addForm = document.getElementById('add-passkey-form');
-
-        if (addBtn && addForm) {
+        var addBtn = document.getElementById('add-passkey-btn');
+        if (addBtn) {
           addBtn.addEventListener('click', function () {
-            addBtn.disabled = true;
-            addForm.hidden = false;
-            var nameInput = document.getElementById('add-passkey-name');
-            if (nameInput) nameInput.focus();
-          });
-
-          addForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            clearError();
-            var nameInput = document.getElementById('add-passkey-name');
-            var name = (nameInput && nameInput.value.trim()) || 'Passkey';
-            try {
-              await Kotauth.passkeys.enrollPasskey(base, name);
-              window.location.reload();
-            } catch (err) {
-              showError(classifyException(err, strings));
-              addBtn.disabled = false;
-              addForm.hidden = true;
-            }
-          });
-
-          addForm.querySelector('.passkey-cancel-btn').addEventListener('click', function () {
-            addForm.hidden = true;
-            addBtn.disabled = false;
-            clearError();
+            openNameDialog(addTitle, '').then(function (name) {
+              if (!name) return;
+              clearError();
+              Kotauth.passkeys.enrollPasskey(base, name).then(function () {
+                window.location.reload();
+              }).catch(function (err) {
+                showError(classifyException(err, strings));
+              });
+            });
           });
         }
 
         document.querySelectorAll('.passkey-rename-btn').forEach(function (btn) {
           btn.addEventListener('click', function () {
-            var row        = btn.closest('.passkey-row');
-            var nameDisplay = row.querySelector('.passkey-name-display');
-            var renameForm  = row.querySelector('.passkey-rename-form');
-            if (!renameForm) return;
-            btn.disabled    = true;
-            renameForm.hidden = false;
-            var input = renameForm.querySelector('.passkey-rename-input');
-            if (input) {
-              input.value = nameDisplay ? nameDisplay.textContent : '';
-              input.focus();
-              input.select();
-            }
-          });
-
-          var row       = btn.closest('.passkey-row');
-          var renameForm = row && row.querySelector('.passkey-rename-form');
-          if (!renameForm) return;
-
-          renameForm.addEventListener('submit', async function (e) {
-            e.preventDefault();
-            clearError();
-            var id    = row.getAttribute('data-passkey-id');
-            var input = renameForm.querySelector('.passkey-rename-input');
-            var newName = input && input.value.trim();
-            if (!newName) return;
-            await fetch(base + '/' + id + '/rename', {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: newName }),
+            var currentName = btn.getAttribute('data-passkey-name') || '';
+            var id          = btn.getAttribute('data-passkey-id');
+            openNameDialog(renameTitle, currentName).then(function (newName) {
+              if (!newName || newName === currentName) return;
+              clearError();
+              fetch(base + '/' + id + '/rename', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName }),
+              }).then(function () {
+                window.location.reload();
+              }).catch(function (err) {
+                showError(classifyException(err, strings));
+              });
             });
-            window.location.reload();
-          });
-
-          renameForm.querySelector('.passkey-cancel-btn').addEventListener('click', function () {
-            renameForm.hidden = true;
-            btn.disabled = false;
           });
         });
 
         document.querySelectorAll('.passkey-revoke-btn').forEach(function (btn) {
-          btn.addEventListener('click', async function () {
-            var row = btn.closest('.passkey-row');
-            var id  = row.getAttribute('data-passkey-id');
-            await fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' });
-            window.location.reload();
+          btn.addEventListener('click', function () {
+            var id = btn.getAttribute('data-passkey-id');
+            fetch(base + '/' + id + '/revoke', { method: 'POST', credentials: 'include' })
+              .then(function () { window.location.reload(); })
+              .catch(function (err) { showError(classifyException(err, strings)); });
           });
         });
       });

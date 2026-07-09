@@ -147,8 +147,9 @@ object EnglishStrings {
     const val PORTAL_PASSKEYS_LAST_USED = "Last used"
     const val PORTAL_PASSKEYS_RENAME = "Rename"
     const val PORTAL_PASSKEYS_REVOKE = "Remove"
-    const val PORTAL_PASSKEYS_ADD_PROMPT_NAME = "What do you want to call this passkey?"
-    const val PORTAL_PASSKEYS_RENAME_PROMPT_NAME = "New name for this passkey:"
+    const val PASSKEY_ADD_DIALOG_TITLE = "Add a passkey"
+    const val PASSKEY_RENAME_DIALOG_TITLE = "Rename passkey"
+    const val PASSKEY_REMOVE_CONFIRM = "Remove passkey \"{name}\"?"
 
     // Passkey inline components — error messages and form labels
     const val PASSKEY_CANCEL_BUTTON = "Cancel"

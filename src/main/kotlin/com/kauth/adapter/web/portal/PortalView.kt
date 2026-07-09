@@ -823,31 +823,9 @@ object PortalView {
                 div(classes = "portal-section") {
                     div(classes = "portal-section__header") {
                         div(classes = "portal-section__title") { +ctx.t("PORTAL_PASSKEYS_TITLE") }
-                        div(classes = "passkey-add-panel") {
-                            button(classes = "btn btn--primary btn--sm") {
-                                id = "add-passkey-btn"
-                                +ctx.t("PORTAL_PASSKEYS_ADD_BUTTON")
-                            }
-                            form(classes = "passkey-add-form") {
-                                id = "add-passkey-form"
-                                attributes["hidden"] = "hidden"
-                                label {
-                                    htmlFor = "add-passkey-name"
-                                    +ctx.t("PASSKEY_NAME_LABEL")
-                                }
-                                input(type = InputType.text, name = "passkey-name") {
-                                    id = "add-passkey-name"
-                                    placeholder = ctx.t("PASSKEY_NAME_PLACEHOLDER")
-                                    maxLength = "64"
-                                    required = true
-                                }
-                                button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
-                                    +ctx.t("PASSKEY_SAVE_BUTTON")
-                                }
-                                button(type = ButtonType.button, classes = "btn btn--ghost btn--sm passkey-cancel-btn") {
-                                    +ctx.t("PASSKEY_CANCEL_BUTTON")
-                                }
-                            }
+                        button(classes = "btn btn--sm") {
+                            id = "add-passkey-btn"
+                            +ctx.t("PORTAL_PASSKEYS_ADD_BUTTON")
                         }
                     }
                     div(classes = "portal-section__body") {
@@ -864,21 +842,7 @@ object PortalView {
                                     div(classes = "passkey-row") {
                                         attributes["data-passkey-id"] = (cred.id ?: 0).toString()
                                         div(classes = "passkey-row__info") {
-                                            span(classes = "passkey-name-display") { +cred.name }
-                                            form(classes = "passkey-rename-form") {
-                                                attributes["hidden"] = "hidden"
-                                                input(type = InputType.text, classes = "passkey-rename-input") {
-                                                    placeholder = cred.name
-                                                    maxLength = "64"
-                                                    required = true
-                                                }
-                                                button(type = ButtonType.submit, classes = "btn btn--primary btn--sm") {
-                                                    +ctx.t("PASSKEY_SAVE_BUTTON")
-                                                }
-                                                button(type = ButtonType.button, classes = "btn btn--ghost btn--sm passkey-cancel-btn") {
-                                                    +ctx.t("PASSKEY_CANCEL_BUTTON")
-                                                }
-                                            }
+                                            span { +cred.name }
                                             div(classes = "passkey-row__meta") {
                                                 span {
                                                     +"${ctx.t("PORTAL_PASSKEYS_ADDED_ON")}: "
@@ -895,9 +859,14 @@ object PortalView {
                                         }
                                         div(classes = "passkey-row__actions") {
                                             button(classes = "btn btn--ghost btn--sm passkey-rename-btn") {
+                                                attributes["data-passkey-name"] = cred.name
+                                                attributes["data-passkey-id"] = (cred.id ?: 0).toString()
                                                 +ctx.t("PORTAL_PASSKEYS_RENAME")
                                             }
                                             button(classes = "btn btn--danger btn--sm passkey-revoke-btn") {
+                                                attributes["data-confirm"] =
+                                                    ctx.t("PASSKEY_REMOVE_CONFIRM").replace("{name}", cred.name)
+                                                attributes["data-passkey-id"] = (cred.id ?: 0).toString()
                                                 +ctx.t("PORTAL_PASSKEYS_REVOKE")
                                             }
                                         }
@@ -914,10 +883,8 @@ object PortalView {
                     attributes["crossorigin"] = "anonymous"
                     attributes["data-passkey-base"] = "/t/$slug/passkeys"
                     attributes["data-passkey-mode"] = "manage"
-                    attributes["data-passkey-name-label"] = ctx.t("PASSKEY_NAME_LABEL")
-                    attributes["data-passkey-name-placeholder"] = ctx.t("PASSKEY_NAME_PLACEHOLDER")
-                    attributes["data-passkey-save-button"] = ctx.t("PASSKEY_SAVE_BUTTON")
-                    attributes["data-passkey-cancel-button"] = ctx.t("PASSKEY_CANCEL_BUTTON")
+                    attributes["data-passkey-add-title"] = ctx.t("PASSKEY_ADD_DIALOG_TITLE")
+                    attributes["data-passkey-rename-title"] = ctx.t("PASSKEY_RENAME_DIALOG_TITLE")
                     attributes["data-passkey-error-generic"] = ctx.t("PASSKEY_ERROR_GENERIC")
                     attributes["data-passkey-error-cancelled"] = ctx.t("PASSKEY_ERROR_CANCELLED")
                     attributes["data-passkey-error-verification"] = ctx.t("PASSKEY_ERROR_VERIFICATION")
@@ -1022,7 +989,6 @@ object PortalView {
             PortalLayout.CENTERED -> portalShellTabnav(slug, ctx, username, activePage, content)
         }
 
-        // Shared confirmation dialog — same pattern as admin shell
         dialog("confirm-dialog") {
             id = "confirm-dialog"
             div("confirm-dialog__card") {
@@ -1043,6 +1009,31 @@ object PortalView {
                     button(classes = "btn btn--danger") {
                         id = "confirm-dialog-ok"
                         +ctx.t("PORTAL_CONFIRM_OK")
+                    }
+                }
+            }
+        }
+        dialog(classes = "confirm-dialog") {
+            id = "passkey-name-dialog"
+            div("confirm-dialog__card") {
+                div("confirm-dialog__body") {
+                    p("confirm-dialog__title") {
+                        id = "passkey-name-dialog-title"
+                    }
+                    input(type = InputType.text) {
+                        id = "passkey-name-dialog-input"
+                        maxLength = "64"
+                        required = true
+                    }
+                }
+                div("confirm-dialog__actions") {
+                    button(classes = "btn btn--ghost") {
+                        id = "passkey-name-dialog-cancel"
+                        +ctx.t("PASSKEY_CANCEL_BUTTON")
+                    }
+                    button(classes = "btn") {
+                        id = "passkey-name-dialog-save"
+                        +ctx.t("PASSKEY_SAVE_BUTTON")
                     }
                 }
             }

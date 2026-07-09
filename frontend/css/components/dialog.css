@@ -72,6 +72,17 @@
   padding: 12px 24px 20px;
 }
 
+.confirm-dialog__body input[type="text"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-md);
+  border-radius: calc(var(--radius) - 4px);
+  font-size: 0.95rem;
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  margin-top: 0.5rem;
+}
+
 /* ── Animations ──────────────────────────────────────────── */
 
 @keyframes backdrop-fade-in {
