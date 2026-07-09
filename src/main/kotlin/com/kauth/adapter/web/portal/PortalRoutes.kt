@@ -48,8 +48,10 @@ import kotlinx.serialization.json.putJsonArray
  *   POST /logout           — clears portal session and end-session at auth server
  *   GET  /profile          — view & edit profile (email, full name)
  *   POST /profile          — submit profile changes
- *   GET  /security         — change password + active sessions
+ *   GET  /security         — security overview (links to MFA, passkeys, sessions)
+ *   GET  /change-password  — change password form
  *   POST /change-password  — submit new password
+ *   GET  /sessions         — active sessions list
  *   POST /sessions/{id}/revoke — revoke one session
  *   GET  /mfa              — MFA management (enroll, disable)
  *   POST /mfa/enroll|verify|disable — MFA operations
@@ -436,14 +438,27 @@ fun Route.portalRoutes(
         }
 
         // ------------------------------------------------------------------
-        // Security (change password + sessions)
+        // Security overview
         // ------------------------------------------------------------------
 
         get("/security") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
-            val sessions = accountSelfService.getActiveSessions(UserId(session.userId), TenantId(session.tenantId))
+
+            call.respondHtml(HttpStatusCode.OK) {
+                portalSecurityOverviewPage(tenant, session, call.portalViewContext(tenant), tenant.portalConfig.layout)
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Change password (moved off the overview — keeps its own URL)
+        // ------------------------------------------------------------------
+
+        get("/change-password") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]
 
@@ -454,13 +469,35 @@ fun Route.portalRoutes(
                     session = session,
                     ctx = call.portalViewContext(tenant),
                     layout = tenant.portalConfig.layout,
-                    sessions = sessions,
-                    currentSessionId = session.portalSessionId,
                     successMsg = successMsg,
                     errorMsg = errorMsg,
                     passwordPolicy = tenant.securityConfig,
                 ),
             )
+        }
+
+        // ------------------------------------------------------------------
+        // Sessions
+        // ------------------------------------------------------------------
+
+        get("/sessions") {
+            val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+            val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
+            val sessions = accountSelfService.getActiveSessions(UserId(session.userId), TenantId(session.tenantId))
+            val successMsg = call.request.queryParameters["saved"]
+
+            call.respondHtml(HttpStatusCode.OK) {
+                portalSessionsPage(
+                    tenant,
+                    session,
+                    sessions,
+                    call.portalViewContext(tenant),
+                    tenant.portalConfig.layout,
+                    session.portalSessionId,
+                    successMsg,
+                )
+            }
         }
 
         post("/change-password") {
@@ -492,7 +529,7 @@ fun Route.portalRoutes(
                     )
                 }
                 is SelfServiceResult.Failure ->
-                    call.respondRedirect("/t/$slug/account/security?error=${encodeParam(result.error.message)}")
+                    call.respondRedirect("/t/$slug/account/change-password?error=${encodeParam(result.error.message)}")
             }
         }
 
@@ -504,7 +541,7 @@ fun Route.portalRoutes(
                     ?: return@post call.respond(HttpStatusCode.BadRequest)
 
             accountSelfService.revokeSession(UserId(session.userId), TenantId(session.tenantId), sessionId)
-            call.respondRedirect("/t/$slug/account/security?saved=true")
+            call.respondRedirect("/t/$slug/account/sessions?saved=true")
         }
 
         post("/sessions/revoke-others") {
@@ -513,11 +550,11 @@ fun Route.portalRoutes(
             val keepId = session.portalSessionId?.let { SessionId(it) }
             if (keepId == null) {
                 return@post call.respondRedirect(
-                    "/t/$slug/account/security?error=${encodeParam("Could not identify current session.")}",
+                    "/t/$slug/account/sessions?error=${encodeParam("Could not identify current session.")}",
                 )
             }
             accountSelfService.revokeOtherSessions(UserId(session.userId), TenantId(session.tenantId), keepId)
-            call.respondRedirect("/t/$slug/account/security?saved=true")
+            call.respondRedirect("/t/$slug/account/sessions?saved=true")
         }
 
         // ------------------------------------------------------------------

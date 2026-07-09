@@ -140,10 +140,19 @@ object EnglishStrings {
     const val PORTAL_MFA_VERIFICATION_CODE = "Verification code"
     const val PORTAL_MFA_CONFIRM_SETUP = "Confirm setup"
 
+    // Portal — MFA page intro (used on the Security overview card)
+    const val PORTAL_MFA_INTRO = "Protect your account with a time-based one-time code from an authenticator app."
+
+    // Portal — Security overview card shared action label
+    const val PORTAL_SECURITY_MANAGE = "Manage"
+
     // Portal — passkeys page
     const val PORTAL_NAV_PASSKEYS = "Passkeys"
     const val PORTAL_PASSKEYS_TITLE = "Passkeys"
     const val PORTAL_PASSKEYS_INTRO = "Sign in without a password using your device's biometrics or a hardware key."
+
+    // Portal — sessions page intro (used on the Security overview card)
+    const val PORTAL_SESSIONS_INTRO = "See where you're signed in and revoke sessions."
     const val PORTAL_PASSKEYS_ADD_BUTTON = "Add a passkey"
     const val PORTAL_PASSKEYS_EMPTY_STATE = "You have no passkeys enrolled yet."
     const val PORTAL_PASSKEYS_ADDED_ON = "Added"

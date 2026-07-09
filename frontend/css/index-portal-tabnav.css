@@ -42,6 +42,9 @@
 /* ── App launcher page ────────────────────────────────────────────────── */
 @import "./portal/launcher.css";
 
+/* ── Security overview page ─────────────────────────────────────────────── */
+@import "./portal/overview.css";
+
 /* ── Impersonation banner (admin-acting-as-user) ────────────────────────── */
 @import "./portal/impersonation.css";
 

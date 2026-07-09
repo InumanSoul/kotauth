@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.portal
 
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -33,9 +34,11 @@ import io.ktor.server.sessions.set
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 /**
@@ -180,5 +183,45 @@ class PortalNavTest {
             val html = resp.bodyAsText()
 
             assertFalse(html.contains("portal-nav__group--active"), "Profile page must not activate Security group")
+        }
+
+    @Test
+    fun `GET account sessions renders session list`() =
+        testApplication {
+            sessionRepo.save(
+                Session(
+                    tenantId = TenantId(1),
+                    userId = UserId(10),
+                    clientId = null,
+                    accessTokenHash = "hash-abc",
+                    refreshTokenHash = null,
+                    expiresAt = Instant.now().plusSeconds(3600),
+                ),
+            )
+            application { installWithSession() }
+            val cookie = sessionCookie()
+
+            val resp = client.get("/t/acme/account/sessions") { header("Cookie", cookie) }
+            val html = resp.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, resp.status)
+            assertContains(html, "Sessions")
+            assertContains(html, "portal-session-row")
+        }
+
+    @Test
+    fun `GET account security renders overview cards with links to children`() =
+        testApplication {
+            application { installWithSession() }
+            val cookie = sessionCookie()
+
+            val resp = client.get("/t/acme/account/security") { header("Cookie", cookie) }
+            val html = resp.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, resp.status)
+            assertContains(html, "Two-Factor Auth")
+            assertContains(html, "Passkeys")
+            assertContains(html, "Sessions")
+            assertFalse(html.contains("portal-session-row"), "Overview must not inline the session list")
         }
 }

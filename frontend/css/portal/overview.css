@@ -1,0 +1,39 @@
+/* frontend/css/portal/overview.css
+ *
+ * Security overview page — three summary cards linking to MFA, passkeys, sessions.
+ */
+
+.portal-security-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.ov-card {
+  border: 0.5px solid var(--color-border-md);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ov-card h2 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.ov-card p {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  line-height: var(--leading-relaxed);
+  flex: 1;
+}
+
+.ov-card .btn--outline {
+  align-self: flex-start;
+  margin-top: 4px;
+}
