@@ -4,6 +4,8 @@ import com.kauth.domain.model.EmailOtpChallenge
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.EmailOtpChallengeRepository
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.v1.core.*
 import org.jetbrains.exposed.v1.javatime.timestampWithTimeZone
 import org.jetbrains.exposed.v1.jdbc.*
@@ -19,6 +21,7 @@ object EmailOtpChallengesTable : Table("email_otp_challenges") {
     val challengeId = varchar("challenge_id", 64)
     val codeHash = varchar("code_hash", 64)
     val originatingClientId = varchar("originating_client_id", 255).nullable()
+    val resources = jsonb("resources").default("[]")
     val attemptCount = integer("attempt_count").default(0)
     val resendCount = integer("resend_count").default(0)
     val expiresAt = timestampWithTimeZone("expires_at")
@@ -38,6 +41,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
                     it[challengeId] = challenge.challengeId
                     it[codeHash] = challenge.codeHash
                     it[originatingClientId] = challenge.originatingClientId
+                    it[resources] = Json.encodeToString(challenge.resources)
                     it[attemptCount] = challenge.attemptCount
                     it[resendCount] = challenge.resendCount
                     it[expiresAt] = challenge.expiresAt.toOffsetDateTime()
@@ -100,6 +104,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
             challengeId = this[EmailOtpChallengesTable.challengeId],
             codeHash = this[EmailOtpChallengesTable.codeHash],
             originatingClientId = this[EmailOtpChallengesTable.originatingClientId],
+            resources = Json.decodeFromString(this[EmailOtpChallengesTable.resources].ifBlank { "[]" }),
             attemptCount = this[EmailOtpChallengesTable.attemptCount],
             resendCount = this[EmailOtpChallengesTable.resendCount],
             expiresAt = this[EmailOtpChallengesTable.expiresAt].toInstant(),

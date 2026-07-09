@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -15,6 +16,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
@@ -36,6 +38,10 @@ class EmailOtpServiceTest {
     private val challenges = FakeEmailOtpChallengeRepository()
     private val apps = FakeApplicationRepository()
     private val authCodes = FakeAuthorizationCodeRepository()
+    private val resources =
+        FakeResourceServerRepository { appId ->
+            apps.findById(appId)?.tenantId
+        }
     private val roles = FakeRoleRepository()
     private val email = FakeEmailPort()
     private val audit = FakeAuditLogPort()
@@ -54,6 +60,7 @@ class EmailOtpServiceTest {
             authorizationCodeRepository = authCodes,
             emailPort = email,
             auditLog = audit,
+            resourceServerRepository = resources,
             roleRepository = roles,
             clock = fixedClock,
         )
@@ -65,6 +72,7 @@ class EmailOtpServiceTest {
         challenges.clear()
         apps.clear()
         authCodes.clear()
+        resources.clear()
         roles.clear()
         email.clear()
         audit.clear()
@@ -116,6 +124,31 @@ class EmailOtpServiceTest {
         assertEquals(sha256Hex(sentCode), saved.codeHash)
         assertEquals(clientApp.clientId, saved.originatingClientId)
         assertEquals(AuditEventType.EMAIL_OTP_SENT, audit.events.single().eventType)
+    }
+
+    @Test
+    fun `sendOtp stores normalized requested resources`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "alice",
+                email = "alice@acme.test",
+                fullName = "Alice",
+                passwordHash = "x",
+            ),
+        )
+
+        val result =
+            newService().sendOtp(
+                tenant.slug,
+                "alice@acme.test",
+                clientApp.clientId,
+                resources = listOf(" orders-api ", "", "orders-api"),
+            )
+
+        assertTrue(result is OtpSendResult.Success)
+        val saved = challenges.findByChallengeId(result.challengeId)!!
+        assertEquals(listOf("orders-api"), saved.resources)
     }
 
     @Test
@@ -215,6 +248,7 @@ class EmailOtpServiceTest {
     private fun seedChallenge(
         codeRaw: String = "123456",
         clientId: String? = null,
+        resources: List<String> = emptyList(),
     ): Pair<User, com.kauth.domain.model.EmailOtpChallenge> {
         val user =
             users.add(
@@ -234,6 +268,7 @@ class EmailOtpServiceTest {
                     challengeId = "handle-1",
                     codeHash = sha256Hex(codeRaw),
                     originatingClientId = clientId,
+                    resources = resources,
                     expiresAt = fixedClock.instant().plusSeconds(600),
                 ),
             )
@@ -253,6 +288,39 @@ class EmailOtpServiceTest {
         assertNotNull(consumed.consumedAt)
         assertTrue(users.findByEmail(tenant.id, "alice@acme.test")!!.emailVerified)
         assertEquals(AuditEventType.EMAIL_OTP_VERIFIED, audit.events.last().eventType)
+    }
+
+    @Test
+    fun `verifyOtp copies authorized OTP resources to the issued auth code`() {
+        val resource =
+            resources.seed(
+                ResourceServer(
+                    id = null,
+                    tenantId = tenant.id,
+                    identifier = "orders-api",
+                    name = "Orders API",
+                    description = null,
+                ),
+            )
+        resources.setAuthorizedResources(clientApp.id, listOf(resource.id!!))
+        seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+
+        val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
+
+        assertTrue(result is OtpVerifyResult.Success)
+        val stored = authCodes.findByCode(result.authorizationCode)!!
+        assertEquals(listOf("orders-api"), stored.resources)
+    }
+
+    @Test
+    fun `verifyOtp rejects unauthorized OTP resources`() {
+        seedChallenge(clientId = clientApp.clientId, resources = listOf("orders-api"))
+
+        val result = newService().verifyOtp(tenant.slug, "handle-1", "123456")
+
+        assertTrue(result is OtpVerifyResult.Failure)
+        assertEquals(OtpError.InvalidClient, result.error)
+        assertTrue(authCodes.all().isEmpty())
     }
 
     @Test

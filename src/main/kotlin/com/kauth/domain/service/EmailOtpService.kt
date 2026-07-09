@@ -1,5 +1,6 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
@@ -14,6 +15,7 @@ import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuthorizationCodeRepository
 import com.kauth.domain.port.EmailOtpChallengeRepository
 import com.kauth.domain.port.EmailPort
+import com.kauth.domain.port.ResourceServerRepository
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
@@ -47,6 +49,7 @@ class EmailOtpService(
     private val authorizationCodeRepository: AuthorizationCodeRepository,
     private val emailPort: EmailPort,
     private val auditLog: AuditLogPort,
+    private val resourceServerRepository: ResourceServerRepository? = null,
     private val roleRepository: RoleRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -63,6 +66,7 @@ class EmailOtpService(
         tenantSlug: String,
         email: String,
         originatingClientId: String? = null,
+        resources: List<String> = emptyList(),
         ipAddress: String? = null,
     ): OtpSendResult {
         val tenant =
@@ -106,6 +110,7 @@ class EmailOtpService(
                     challengeId = generateChallengeHandle(),
                     codeHash = sha256Hex(rawCode),
                     originatingClientId = originatingClientId,
+                    resources = resources.normalizedResources(),
                     resendCount = if (invalidated > 0) 1 else 0,
                     expiresAt = expiresAt,
                     createdAt = now,
@@ -144,6 +149,7 @@ class EmailOtpService(
                     mapOf(
                         "resend_count" to challenge.resendCount.toString(),
                         "originating_client_id" to (originatingClientId ?: ""),
+                        "resources" to challenge.resources.joinToString(","),
                     ),
             ),
         )
@@ -212,7 +218,7 @@ class EmailOtpService(
         )
 
         val authCode =
-            issueAuthorizationCodeFor(tenant, user.id, challenge.originatingClientId)
+            issueAuthorizationCodeFor(tenant, user.id, challenge)
                 ?: return reject(tenant.id, user.id, null, OtpError.InvalidClient, ipAddress)
 
         auditLog.record(
@@ -282,12 +288,14 @@ class EmailOtpService(
     private fun issueAuthorizationCodeFor(
         tenant: Tenant,
         userId: UserId,
-        clientIdString: String?,
+        challenge: EmailOtpChallenge,
     ): AuthorizationCode? {
+        val clientIdString = challenge.originatingClientId
         if (clientIdString.isNullOrBlank()) return null
         val client = applicationRepository.findByClientId(tenant.id, clientIdString) ?: return null
         if (!client.enabled) return null
         val redirectUri = client.redirectUris.firstOrNull() ?: return null
+        val resources = challengeResourcesFor(tenant, client.id, challenge.resources) ?: return null
 
         val now = clock.instant()
         return authorizationCodeRepository.save(
@@ -301,9 +309,30 @@ class EmailOtpService(
                 expiresAt = now.plusSeconds(AUTH_CODE_TTL_SECONDS),
                 createdAt = now,
                 authTime = now,
+                resources = resources,
             ),
         )
     }
+
+    private fun challengeResourcesFor(
+        tenant: Tenant,
+        clientPk: ApplicationId,
+        requestedResources: List<String>,
+    ): List<String>? {
+        val challengeResources = requestedResources.normalizedResources()
+        if (challengeResources.isEmpty()) return emptyList()
+        val repo = resourceServerRepository ?: return null
+        val authorized = repo.listAuthorizedFor(clientPk).map { it.identifier }.toSet()
+        return challengeResources.takeIf {
+            it.all { identifier ->
+                val resource = repo.findByIdentifier(tenant.id, identifier)
+                resource != null && resource.enabled && identifier in authorized
+            }
+        }
+    }
+
+    private fun List<String>.normalizedResources(): List<String> =
+        map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
     private fun reject(
         tenantId: TenantId,
