@@ -56,7 +56,7 @@ jobs:
       # Metadata is generated here for labels only — tags are applied during manifest merge.
       - name: Extract image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image.outputs.name }}
           labels: |
@@ -74,7 +74,7 @@ jobs:
       # Build and push a single-platform image by digest (no tag yet).
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -156,7 +156,7 @@ jobs:
       #   v1.2.3-rc1 →  1.2.3-rc1  (pre-release: no latest tag)
       - name: Extract image metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ steps.image-list.outputs.images }}
           tags: |
