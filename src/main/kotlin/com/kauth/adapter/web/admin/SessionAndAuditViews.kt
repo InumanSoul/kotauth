@@ -40,7 +40,7 @@ internal fun activeSessionsPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
-                    "Security" to "/admin/workspaces/${workspace.slug}/sessions",
+                    "Security" to "/admin/workspaces/${workspace.slug}/settings/security",
                     "Sessions" to null,
                 )
 

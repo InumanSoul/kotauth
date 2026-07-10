@@ -27,8 +27,10 @@ internal fun mfaSettingsPageImpl(
                 "required_admins" -> "Required (admins)"
                 else -> "Optional"
             }
+        val isRequired = workspace.mfaPolicy == "required" || workspace.mfaPolicy == "required_admins"
         val enrollmentRate = if (totalUsers > 0) "${enrolledUsers * 100 / totalUsers}%" else "—"
         val enrollUrl = "/t/${workspace.slug}/account/mfa/enroll"
+        val securityPolicyUrl = "/admin/workspaces/${workspace.slug}/settings/security"
 
         adminShell(
             pageTitle = "MFA — ${workspace.displayName}",
@@ -46,82 +48,68 @@ internal fun mfaSettingsPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     workspace.slug to "/admin/workspaces/${workspace.slug}",
-                    "Security" to "/admin/workspaces/${workspace.slug}/sessions",
+                    "Security" to "/admin/workspaces/${workspace.slug}/settings/security",
                     "MFA" to null,
                 )
 
-                // Page header
                 pageHeader(
                     title = "Multi-Factor Authentication",
-                    subtitle = "TOTP-based MFA enrollment status for ${workspace.displayName}.",
+                    subtitleContent = {
+                        +"TOTP-based MFA enrollment status for ${workspace.displayName}. Policy: "
+                        val badgeMod =
+                            when (workspace.mfaPolicy) {
+                                "required" -> "badge--active"
+                                "required_admins" -> "badge--info"
+                                else -> "badge--inactive"
+                            }
+                        span("badge $badgeMod") { +policyLabel }
+                    },
                     actions = {
-                        a(
-                            "/admin/workspaces/${workspace.slug}/settings/security",
-                            classes = "btn btn--ghost",
-                        ) {
+                        a(securityPolicyUrl, classes = "btn btn--ghost") {
                             inlineSvgIcon("lock", "Security")
                             +"Security Policy"
                         }
                     },
                 )
 
-                // Notice: conditional — shown when no users enrolled and policy is optional
-                if (enrolledUsers == 0 && workspace.mfaPolicy == "optional") {
-                    notice(
-                        title = "No users have enrolled in MFA",
-                        description = "Policy is set to Optional. Share the enrollment URL below to encourage users to enable MFA.",
-                        linkHref = "/admin/workspaces/${workspace.slug}/settings/security",
-                        linkText = "Change policy",
+                // 4-state conditional alert — suppressed when at least one user is enrolled
+                when {
+                    isRequired && enrolledUsers == 0 -> notice(
+                        title = EnglishStrings.ADMIN_MFA_ALERT_NO_ENROLLED_TITLE,
+                        description = "${EnglishStrings.ADMIN_MFA_ALERT_REQUIRED_DESC_PREFIX} \"$policyLabel\"" +
+                            EnglishStrings.ADMIN_MFA_ALERT_REQUIRED_DESC_SUFFIX,
+                        linkHref = securityPolicyUrl,
+                        linkText = EnglishStrings.ADMIN_MFA_ALERT_REQUIRED_LINK,
+                    )
+                    !isRequired && enrolledUsers == 0 -> notice(
+                        title = EnglishStrings.ADMIN_MFA_ALERT_NO_ENROLLED_TITLE,
+                        description = EnglishStrings.ADMIN_MFA_ALERT_OPTIONAL_DESC,
+                        modifier = "notice--info",
+                        iconName = "info",
+                        linkHref = securityPolicyUrl,
+                        linkText = EnglishStrings.ADMIN_MFA_ALERT_OPTIONAL_LINK,
                     )
                 }
 
-                // Stat strip — 3-column insight bar
-                div("insight-bar insight-bar--cols-3") {
-                    // Current Policy
-                    a(
-                        href = "/admin/workspaces/${workspace.slug}/settings/security",
-                        classes = "insight-item",
-                    ) {
-                        span("insight-item__label") { +"Current Policy" }
-                        span("insight-item__value") {
-                            val badgeMod =
-                                when (workspace.mfaPolicy) {
-                                    "required" -> "badge--active"
-                                    "required_admins" -> "badge--info"
-                                    else -> "badge--inactive"
-                                }
-                            span("badge $badgeMod") { +policyLabel }
-                        }
-                        span("insight-item__arrow") {
-                            +"Change in Security Policy"
-                            inlineSvgIcon("arrow-small", "arrow")
-                        }
-                    }
-
-                    // Enrolled Users
+                // 2-column insight bar — policy cell moved to page subtitle
+                div("insight-bar insight-bar--cols-2") {
                     div("insight-item insight-item--static") {
                         span("insight-item__label") { +"Enrolled Users" }
                         span("insight-item__value insight-item__value--mono") {
                             +"$enrolledUsers"
-                            span {
-                                attributes["style"] =
-                                    "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
-                                +" / $totalUsers"
-                            }
+                            span("insight-item__denominator") { +" / $totalUsers" }
                         }
                         span("insight-item__hint") { +"$enrollmentRate enrollment rate" }
                     }
 
-                    // Not Enrolled
                     div("insight-item insight-item--static") {
                         span("insight-item__label") { +"Not Enrolled" }
-                        val valueClass =
-                            if (notEnrolled > 0) {
-                                "insight-item__value insight-item__value--warn"
-                            } else {
-                                "insight-item__value insight-item__value--ok"
-                            }
-                        span(valueClass) { +"$notEnrolled" }
+                        val notEnrolledValueClass = when {
+                            notEnrolled == 0 -> "insight-item__value insight-item__value--ok"
+                            isRequired -> "insight-item__value insight-item__value--warn"
+                            else -> "insight-item__value"
+                        }
+                        span(notEnrolledValueClass) { +"$notEnrolled" }
                         span("insight-item__hint") {
                             +if (notEnrolled == 1) "user without MFA" else "users without MFA"
                         }
@@ -148,69 +136,29 @@ internal fun mfaSettingsPageImpl(
                     }
                 }
 
-                // Enrolled users table
+                // Merged user table — enrolled first (secondary: username alphabetical)
                 ovCard {
-                    ovSectionLabel("Enrolled Users")
-                    if (enrolledUserList.isEmpty()) {
-                        emptyState(
-                            iconName = "rail-security",
-                            title = "No users enrolled yet",
-                            description = "Users who enable MFA will appear here with their enrollment date.",
-                        )
-                    } else {
-                        table("data-table") {
-                            thead {
-                                tr {
-                                    th { +"Username" }
-                                    th { +"Full Name" }
-                                    th { +"Email" }
-                                }
-                            }
-                            tbody {
-                                enrolledUserList.forEach { u ->
-                                    tr {
-                                        td {
-                                            a(
-                                                "/admin/workspaces/${workspace.slug}/users/${u.id?.value}",
-                                                classes = "data-table__id",
-                                            ) { +u.username }
-                                        }
-                                        td { span("data-table__name") { +u.fullName } }
-                                        td { span("data-table__email") { +u.email } }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Not enrolled table
-                ovCard {
-                    ovSectionLabel("Not Enrolled")
-                    if (notEnrolledUserList.isEmpty() && notEnrolled == 0) {
-                        emptyState(
-                            iconName = "check-circle",
-                            title = "All users enrolled",
-                            description = "Every user in this workspace has MFA enabled.",
-                        )
-                    } else if (notEnrolledUserList.isEmpty()) {
-                        // User lists not yet wired from backend — show count-based placeholder
+                    ovSectionLabel("Users")
+                    val allUsers = (enrolledUserList + notEnrolledUserList)
+                        .sortedWith(compareBy({ !it.mfaEnabled }, { it.username }))
+                    if (allUsers.isEmpty()) {
                         emptyState(
                             iconName = "user",
-                            title = "$notEnrolled user${if (notEnrolled != 1) "s" else ""} without MFA",
-                            description = "Connect the user data to see individual enrollment status.",
+                            title = EnglishStrings.ADMIN_MFA_EMPTY_USERS_TITLE,
+                            description = EnglishStrings.ADMIN_MFA_EMPTY_USERS_DESC,
                         )
                     } else {
                         table("data-table") {
                             thead {
                                 tr {
-                                    th { +"Username" }
-                                    th { +"Full Name" }
-                                    th { +"Email" }
+                                    th { +EnglishStrings.ADMIN_MFA_TABLE_COL_USERNAME }
+                                    th { +EnglishStrings.ADMIN_MFA_TABLE_COL_FULL_NAME }
+                                    th { +EnglishStrings.ADMIN_MFA_TABLE_COL_EMAIL }
+                                    th { +EnglishStrings.ADMIN_MFA_TABLE_COL_STATUS }
                                 }
                             }
                             tbody {
-                                notEnrolledUserList.forEach { u ->
+                                allUsers.forEach { u ->
                                     tr {
                                         td {
                                             a(
@@ -220,6 +168,17 @@ internal fun mfaSettingsPageImpl(
                                         }
                                         td { span("data-table__name") { +u.fullName } }
                                         td { span("data-table__email") { +u.email } }
+                                        td {
+                                            if (u.mfaEnabled) {
+                                                span("badge badge--active") {
+                                                    +EnglishStrings.ADMIN_MFA_TABLE_BADGE_ENROLLED
+                                                }
+                                            } else {
+                                                span("badge badge--inactive") {
+                                                    +EnglishStrings.ADMIN_MFA_TABLE_BADGE_NOT_ENROLLED
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }

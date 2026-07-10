@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.20.1] - 2026-07-10
+
+Polish release for v1.20.0 Passkeys — consolidates the two overlapping "disable password sign-in" flags into one canonical column, replaces the split "Authentication Methods" and "Passkeys" cards with a single Sign-in Methods grid, restructures the admin Security rail to actually hold security pages, and nests MFA, Passkeys, and Sessions under a Security parent group in the portal nav.
+
+### Changed
+
+- **Sign-in Methods grid** replaces the two-card auth methods panel on the Security Policy page. One row per method (Password, Passkey, Email magic link, Email OTP, Google, GitHub). Locked rows show an inline "SMTP required — Set up SMTP" prompt when SMTP is not configured.
+- **`tenant.password_login_disabled` column removed.** The v1.20.0 flag is consolidated into `security_config.passwordLoginEnabled`. V55 migration back-fills existing tenant state. Same SMTP hard-gate, same error codes (`SmtpRequired`, `NoMethodsEnabled`).
+- **Admin sidebar Security rail restructured**: now contains Security Policy (moved from Settings), MFA, Passkeys, Sessions. The Security rail landing page changes from `/sessions` to `/settings/security`.
+- **Portal nav gains a Security parent group**: Overview, Two-Factor Auth, Passkeys, Sessions. Route paths unchanged for backward compatibility.
+- **Portal sessions page extracted** into its own route at `/t/<slug>/account/sessions`. The old Security page becomes an Overview summarising each child feature.
+
+### Migrations
+
+- `V55__consolidate_password_login_flag.sql` — updates `security_config.passwordLoginEnabled=false` for tenants that had set `password_login_disabled=true`, then drops the column.
+
+### Fixed
+
+- `GET /change-password` activePage now correctly activates the Security group without highlighting the Overview leaf.
+- Dead `?saved=true` query parameter removed from the change-password GET handler; the POST success path redirects to login rather than back to the form.
+
+---
+
 ## [1.20.0] - 2026-07-09
 
 Passkeys / WebAuthn — passwordless sign-in via device biometrics or hardware keys.

@@ -51,10 +51,13 @@ fun DIV.breadcrumb(vararg crumbs: Pair<String, String?>) {
 
 /**
  * Renders the standard page header with title, optional meta row, and actions.
+ *
+ * subtitleContent takes precedence over subtitle when both are provided.
  */
 fun DIV.pageHeader(
     title: String,
     subtitle: String? = null,
+    subtitleContent: (P.() -> Unit)? = null,
     left: (DIV.() -> Unit)? = null,
     meta: (DIV.() -> Unit)? = null,
     actions: (DIV.() -> Unit)? = null,
@@ -64,8 +67,9 @@ fun DIV.pageHeader(
             left?.invoke(this)
             div("page-header__identity") {
                 h1("page-header__title") { +title }
-                if (subtitle != null) {
-                    p("page-header__sub") { +subtitle }
+                when {
+                    subtitleContent != null -> p("page-header__sub") { subtitleContent() }
+                    subtitle != null -> p("page-header__sub") { +subtitle }
                 }
                 if (meta != null) {
                     div("page-header__meta") { meta() }
@@ -164,15 +168,17 @@ fun FlowOrInteractiveOrPhrasingContent.copyBtn(textToCopy: String) {
     }
 }
 
-/** Notice banner (amber warning by default). */
+/** Notice banner (amber warning by default). Pass modifier e.g. "notice--info" for semantic variants. */
 fun DIV.notice(
     title: String,
     description: String,
+    modifier: String? = null,
+    iconName: String = "warning",
     linkHref: String? = null,
     linkText: String? = null,
 ) {
-    div("notice") {
-        span("notice__icon") { inlineSvgIcon("warning", "warning") }
+    div("notice${if (modifier != null) " $modifier" else ""}") {
+        span("notice__icon") { inlineSvgIcon(iconName, iconName) }
         div("notice__body") {
             span("notice__title") { +title }
             span("notice__desc") { +description }

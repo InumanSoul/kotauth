@@ -9,6 +9,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.WorkspaceSettingsService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -16,6 +17,7 @@ import com.kauth.fakes.FakeAuditLogRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakeGroupRepository
+import com.kauth.fakes.FakeIdentityProviderRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeRoleRepository
@@ -69,6 +71,7 @@ class AdminSettingsTest {
     private val sessionRepo = FakeSessionRepository()
     private val roleRepo = FakeRoleRepository()
     private val groupRepo = FakeGroupRepository()
+    private val idpRepo = FakeIdentityProviderRepository()
     private val auditLogRepo = FakeAuditLogRepository()
     private val auditLogPort = FakeAuditLogPort()
     private val hasher = FakePasswordHasher()
@@ -165,11 +168,18 @@ class AdminSettingsTest {
             auditLog = auditLogPort,
         )
 
+    private fun buildSecurityMethodsService() =
+        SecurityMethodsService(
+            tenantRepository = tenantRepo,
+            identityProviderRepository = idpRepo,
+        )
+
     @BeforeTest
     fun setup() {
         tenantRepo.clear()
         userRepo.clear()
         roleRepo.clear()
+        idpRepo.clear()
         auditLogPort.clear()
         themeRepo.clear()
         emailBrandingRepo.clear()
@@ -323,13 +333,13 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
-    // Passkeys / SMTP hard-gate
+    // Auth methods grid POST (now at /settings/sign-in-methods)
     // =========================================================================
 
     @Test
-    fun `POST security passwordLoginDisabled=true is rejected when tenant SMTP not ready`() =
+    fun `POST sign-in-methods saves method grid and redirects with saved=methods`() =
         testApplication {
-            application { installTestApp() }
+            application { installTestAppWithSecurityMethods() }
             val authed =
                 createClient {
                     install(HttpCookies)
@@ -337,77 +347,96 @@ class AdminSettingsTest {
                 }
             login(authed)
 
-            // workspace has no SMTP configured (smtpEnabled=false by default)
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
                     formParameters =
                         Parameters.build {
-                            append("passwordLoginDisabled", "true")
+                            append("enabled_password", "on")
+                            append("enabled_passkey", "on")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertContains(response.headers["Location"] ?: "", "saved=methods")
+
+            val persisted = tenantRepo.findBySlug("acme")!!
+            assertTrue(persisted.securityConfig.passwordLoginEnabled)
+            assertTrue(persisted.passkeysEnabled)
+        }
+
+    @Test
+    fun `POST sign-in-methods silently drops toggles on non-toggleable rows`() =
+        testApplication {
+            application { installTestAppWithSecurityMethods() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // enabled_social_google is submitted but the workspace has no Google IDP credentials,
+            // so its row is non-toggleable — the handler must silently drop it, not error out.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
+                    formParameters =
+                        Parameters.build {
+                            append("enabled_password", "on")
+                            append("enabled_social_google", "on")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertContains(response.headers["Location"] ?: "", "saved=methods")
+        }
+
+    @Test
+    fun `POST sign-in-methods rejects with NoMethodsEnabled when all methods off`() =
+        testApplication {
+            application { installTestAppWithSecurityMethods() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // No enabled_* params — every toggleable method maps to false.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
+                    formParameters = Parameters.build {},
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertContains(response.bodyAsText(), "NoMethodsEnabled")
+        }
+
+    @Test
+    fun `POST sign-in-methods rejects with SmtpRequired when password disabled without SMTP`() =
+        testApplication {
+            application { installTestAppWithSecurityMethods() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // Only passkey on, password off — workspace has no SMTP.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
+                    formParameters =
+                        Parameters.build {
+                            append("enabled_passkey", "on")
                         },
                 )
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertContains(response.bodyAsText(), "SmtpRequired")
-        }
-
-    @Test
-    fun `POST security passwordLoginDisabled=true is accepted when SMTP is ready`() =
-        testApplication {
-            application { installTestApp() }
-            val authed =
-                createClient {
-                    install(HttpCookies)
-                    followRedirects = false
-                }
-            login(authed)
-
-            // configure acme workspace with valid SMTP
-            val smtpReadyWorkspace =
-                workspace.copy(
-                    smtpEnabled = true,
-                    smtpHost = "smtp.example.com",
-                    smtpFromAddress = "no-reply@acme.dev",
-                )
-            tenantRepo.add(smtpReadyWorkspace)
-
-            val response =
-                authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
-                    formParameters =
-                        Parameters.build {
-                            append("passwordLoginDisabled", "true")
-                        },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
-            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
-        }
-
-    @Test
-    fun `POST security passkeysEnabled=false persists without SMTP requirement`() =
-        testApplication {
-            application { installTestApp() }
-            val authed =
-                createClient {
-                    install(HttpCookies)
-                    followRedirects = false
-                }
-            login(authed)
-
-            // workspace has no SMTP — should still allow toggling passkeysEnabled alone
-            val response =
-                authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
-                    formParameters =
-                        Parameters.build {
-                            append("passkeysEnabled", "false")
-                        },
-                )
-
-            assertEquals(HttpStatusCode.Found, response.status)
-            val saved = tenantRepo.findBySlug("acme")
-            assertFalse(saved?.passkeysEnabled ?: true, "passkeysEnabled should be persisted as false")
         }
 
     // =========================================================================
@@ -557,7 +586,13 @@ class AdminSettingsTest {
         )
     }
 
-    private fun io.ktor.server.application.Application.installTestApp() {
+    private fun io.ktor.server.application.Application.installTestAppWithSecurityMethods() {
+        installTestApp(securityMethodsService = buildSecurityMethodsService())
+    }
+
+    private fun io.ktor.server.application.Application.installTestApp(
+        securityMethodsService: SecurityMethodsService? = null,
+    ) {
         install(ContentNegotiation) { json() }
         install(Sessions) {
             cookie<AdminSession>("KOTAUTH_ADMIN") {
@@ -600,6 +635,7 @@ class AdminSettingsTest {
                     com.kauth.infrastructure.CachingClaimMapperService(
                         mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
                     ),
+                securityMethodsService = securityMethodsService,
             )
         }
     }

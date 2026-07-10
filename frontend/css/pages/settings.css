@@ -152,3 +152,66 @@
   font-family: var(--font-mono);
   font-size: 11px;
 }
+
+/* ── Auth Methods grid (v1.20.1) ── */
+.method-table { width: 100%; border-collapse: collapse; }
+.method-table th,
+.method-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--color-border); }
+.method-table__label { font-weight: var(--weight-medium); }
+.method-table__desc { font-size: var(--text-sm); color: var(--color-muted); margin-top: 2px; }
+.row-locked { display: inline-flex; gap: 4px; align-items: center; color: var(--color-amber); }
+.row-locked a { text-decoration: underline; }
+.notice--warn { padding: 10px; margin-top: 12px; background: var(--color-amber-bg); border-left: 3px solid var(--color-amber); }
+
+.method-table input[type="checkbox"] {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  min-height: 14px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 0;
+  background: rgba(255,255,255,0.05);
+  border: 0.5px solid var(--color-border-md);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.12s;
+  vertical-align: middle;
+}
+.method-table input[type="checkbox"]:checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.method-table input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 7px;
+  border: 1.5px solid #05080a;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+.method-table input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.methods-idp-hint {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  margin-top: var(--space-3);
+}
+
+.methods-idp-hint a {
+  color: var(--color-accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.methods-idp-hint a:hover { opacity: 0.8; }

@@ -515,6 +515,7 @@ fun Application.module(
             webAuthnService = s.webAuthnService,
             mfaService = s.mfaService,
             auditLogPort = s.auditLogPort,
+            securityMethodsService = s.securityMethodsService,
         )
     }
 }

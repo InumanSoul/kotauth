@@ -86,11 +86,27 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         error: String? = null,
-        saved: Boolean = false,
-        enrolledPasskeyUsers: Int = 0,
-        totalUsers: Int = 0,
+        savedParam: String? = null,
     ): HTML.() -> Unit =
-        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, saved, enrolledPasskeyUsers, totalUsers)
+        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam)
+
+    fun signInMethodsPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        rows: List<com.kauth.domain.model.AuthMethodRow>,
+        toastMessage: String? = null,
+        error: String? = null,
+    ): HTML.() -> Unit = {
+        signInMethodsAdminPage(workspace, allWorkspaces, loggedInAs, rows, toastMessage, error)
+    }
+
+    fun passkeysPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        userWithPasskey: List<Pair<com.kauth.domain.model.User, Boolean>> = emptyList(),
+    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, userWithPasskey) }
 
     fun brandingPage(
         workspace: Tenant,

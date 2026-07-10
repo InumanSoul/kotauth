@@ -211,7 +211,7 @@ class WebAuthnService(
         tenantId: TenantId,
     ): WebAuthnResult<Unit> {
         val tenant = tenantRepository?.findById(tenantId)
-        if (tenant?.passwordLoginDisabled == true) {
+        if (tenant != null && !tenant.securityConfig.passwordLoginEnabled) {
             val remaining = credentialRepository.findByUserId(userId, tenantId)
             if (remaining.size == 1 && remaining.first().id == credentialPk) {
                 return WebAuthnResult.Failure(WebAuthnError.CannotRevokeLast)
