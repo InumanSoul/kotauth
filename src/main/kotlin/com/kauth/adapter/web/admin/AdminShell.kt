@@ -211,7 +211,7 @@ internal fun HTML.adminShell(
                         iconKey = "directory",
                     )
                     railItem(
-                        href = ws?.let { "/admin/workspaces/$it/sessions" },
+                        href = ws?.let { "/admin/workspaces/$it/settings/security" },
                         key = "security",
                         activeKey = activeRail,
                         iconKey = "security",
@@ -395,7 +395,9 @@ internal fun DIV.renderSecurityCtxPanel(
 ) {
     span("sidebar__heading") { +"Security" }
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
+    ctxLink("$base/settings/security", "security", activeSection, "Security Policy")
     ctxLink("$base/mfa", "mfa", activeSection, "MFA")
+    ctxLink("$base/settings/passkeys", "passkeys", activeSection, "Passkeys")
     ctxLink("$base/sessions", "sessions", activeSection, "Sessions")
 }
 
@@ -418,7 +420,6 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink("$base/branding", "branding", activeSection, "Branding")
     ctxLink("$base/smtp", "smtp", activeSection, "SMTP")
     div("sidebar__divider") {}
-    ctxLink("$base/security", "security", activeSection, "Security policy")
     ctxLink("$base/signing-keys", "signing-keys", activeSection, "Signing Keys")
     ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
     div("sidebar__divider") {}

@@ -408,6 +408,15 @@ object EnglishStrings {
     const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
     const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
 
+    // Passkeys workspace page (v1.20.1)
+    const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
+    const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
+    const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
+    const val ADMIN_PASSKEYS_CONFIG_LABEL = "Passkey configuration"
+    const val ADMIN_PASSKEYS_CONFIG_BODY =
+        "Passkey sign-in is controlled from the Sign-in methods grid on the Security Policy page."
+    const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Security Policy"
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 

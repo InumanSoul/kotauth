@@ -93,6 +93,14 @@ object AdminView {
     ): HTML.() -> Unit =
         securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam, enrolledPasskeyUsers, totalUsers, rows)
 
+    fun passkeysPage(
+        workspace: Tenant,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        enrolledCount: Int = 0,
+        totalUsers: Int = 0,
+    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, enrolledCount, totalUsers) }
+
     fun brandingPage(
         workspace: Tenant,
         allWorkspaces: List<WorkspaceStub>,

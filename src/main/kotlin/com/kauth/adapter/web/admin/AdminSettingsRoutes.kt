@@ -471,6 +471,22 @@ fun Route.adminSettingsRoutes(
     }
 
     // -------------------------------------------------------------------
+    // Passkeys workspace page
+    // -------------------------------------------------------------------
+
+    get("/settings/passkeys") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
+        val enrolled = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
+        val total = userRepository.countByTenantId(workspace.id).toInt()
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.passkeysPage(workspace, wsPairs, session.username, enrolled, total),
+        )
+    }
+
+    // -------------------------------------------------------------------
     // MFA overview
     // -------------------------------------------------------------------
 

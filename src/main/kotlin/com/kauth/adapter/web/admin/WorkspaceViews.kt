@@ -588,7 +588,7 @@ internal fun securityPolicyPageImpl(
 
         adminShell(
             pageTitle = "Security Policy — ${workspace.displayName}",
-            activeRail = "settings",
+            activeRail = "security",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -606,7 +606,7 @@ internal fun securityPolicyPageImpl(
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
-                "Settings" to "/admin/workspaces/$slug/settings",
+                "Security" to "/admin/workspaces/$slug/settings/security",
                 "Security Policy" to null,
             )
 
