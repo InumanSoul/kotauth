@@ -59,8 +59,8 @@ import kotlin.test.assertTrue
  *
  * Checks that:
  * - The Security ctx-panel contains the correct entries in the correct order.
- * - The Settings ctx-panel no longer lists Security Policy.
- * - The Security rail landing URL points to /settings/security.
+ * - Sign-in Methods is the first Security rail entry and the rail landing URL.
+ * - The Settings ctx-panel does not list Security Policy.
  */
 class AdminSidebarTest {
     private val tenantRepo = FakeTenantRepository()
@@ -131,20 +131,24 @@ class AdminSidebarTest {
     }
 
     @Test
-    fun `security ctx-panel lists Security Policy, MFA, Passkeys, Sessions in order`() =
+    fun `security ctx-panel lists Sign-in Methods, Security Policy, MFA, Passkeys, Sessions in order`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val html = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            // Use the MFA page so "MFA" in the sidebar doesn't collide with a page heading.
+            val html = authed.get("/admin/workspaces/acme/mfa").bodyAsText()
 
-            val secIdx = html.indexOf("Security Policy")
-            val mfaIdx = html.indexOf(">MFA<")
-            val passkeysIdx = html.indexOf(">Passkeys<")
-            val sessionsIdx = html.indexOf(">Sessions<")
+            // Anchor hrefs are unambiguous across the full document.
+            val signInIdx = html.indexOf("settings/sign-in-methods")
+            val secIdx = html.indexOf("settings/security\"")
+            val mfaIdx = html.indexOf("href=\"/admin/workspaces/acme/mfa\"")
+            val passkeysIdx = html.indexOf("settings/passkeys")
+            val sessionsIdx = html.indexOf("/sessions\"")
 
-            assertTrue(secIdx > 0, "Security Policy link not found in sidebar")
+            assertTrue(signInIdx > 0, "Sign-in Methods link not found in sidebar")
+            assertTrue(secIdx > signInIdx, "Security Policy must appear after Sign-in Methods")
             assertTrue(mfaIdx > secIdx, "MFA must appear after Security Policy")
             assertTrue(passkeysIdx > mfaIdx, "Passkeys must appear after MFA")
             assertTrue(sessionsIdx > passkeysIdx, "Sessions must appear after Passkeys")
@@ -180,7 +184,7 @@ class AdminSidebarTest {
         }
 
     @Test
-    fun `security rail links to settings-security not sessions`() =
+    fun `security rail links to sign-in-methods as landing`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
@@ -189,9 +193,21 @@ class AdminSidebarTest {
             val html = authed.get("/admin/workspaces/acme/mfa").bodyAsText()
 
             assertTrue(
-                html.contains("href=\"/admin/workspaces/acme/settings/security\""),
-                "Security rail item must point to /settings/security",
+                html.contains("href=\"/admin/workspaces/acme/settings/sign-in-methods\""),
+                "Security rail item must point to /settings/sign-in-methods",
             )
+        }
+
+    @Test
+    fun `GET settings sign-in-methods returns 200`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val response = authed.get("/admin/workspaces/acme/settings/sign-in-methods")
+
+            assertEquals(HttpStatusCode.OK, response.status)
         }
 
     @Test

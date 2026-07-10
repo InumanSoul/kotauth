@@ -247,28 +247,28 @@ class AuthMethodsGridTest {
     }
 
     @Test
-    fun `GET security page returns 200 and renders method-table`() =
+    fun `GET sign-in-methods page returns 200 and renders method-table`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val response = authed.get("/admin/workspaces/acme/settings/security")
+            val response = authed.get("/admin/workspaces/acme/settings/sign-in-methods")
 
             assertEquals(HttpStatusCode.OK, response.status)
             assertContains(response.bodyAsText(), "method-table")
         }
 
     @Test
-    fun `GET security page renders all method rows including social`() =
+    fun `GET sign-in-methods page renders all method rows including social`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
             assertContains(body, "Password")
             assertContains(body, "Passkey")
@@ -277,43 +277,40 @@ class AuthMethodsGridTest {
         }
 
     @Test
-    fun `GET security page shows OAuth credentials required for unconfigured social providers`() =
+    fun `GET sign-in-methods page shows OAuth credentials required for unconfigured social providers`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
             assertContains(body, "OAuth credentials required")
         }
 
     @Test
-    fun `GET security page shows password-off warning when password login disabled`() =
+    fun `GET sign-in-methods page shows password-off warning when password login disabled`() =
         testApplication {
             val ws = workspaceWith(smtpReady = true, passwordEnabled = false)
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
             assertTrue(body.contains("Disabling passwords"))
         }
 
     @Test
-    fun `GET security page shows passkey insight when users exist`() =
+    fun `GET security page still loads after sign-in-methods split`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
-
-            // insight bar only shows when totalUsers > 0; userRepo has no workspace users
-            // so no enrollment bar expected — just verify the page loads
+            // Security Policy page no longer contains the grid — just verify it loads
             assertEquals(HttpStatusCode.OK, authed.get("/admin/workspaces/acme/settings/security").status)
         }
 }

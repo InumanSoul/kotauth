@@ -408,6 +408,9 @@ object EnglishStrings {
     const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
     const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
 
+    // Security rail nav labels (v1.20.1)
+    const val ADMIN_NAV_SIGN_IN_METHODS = "Sign-in Methods"
+
     // Passkeys workspace page (v1.20.1)
     const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
     const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"

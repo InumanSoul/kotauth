@@ -329,15 +329,15 @@ class AdminSettingsTest {
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            assertTrue(response.headers["Location"]?.contains("saved=methods") == true)
+            assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
 
     // =========================================================================
-    // Auth methods grid POST
+    // Auth methods grid POST (now at /settings/sign-in-methods)
     // =========================================================================
 
     @Test
-    fun `POST security saves method grid and redirects with saved=methods`() =
+    fun `POST sign-in-methods saves method grid and redirects with saved=methods`() =
         testApplication {
             application { installTestAppWithSecurityMethods() }
             val authed =
@@ -349,7 +349,7 @@ class AdminSettingsTest {
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
                     formParameters =
                         Parameters.build {
                             append("enabled_password", "on")
@@ -366,7 +366,7 @@ class AdminSettingsTest {
         }
 
     @Test
-    fun `POST security silently drops toggles on non-toggleable rows`() =
+    fun `POST sign-in-methods silently drops toggles on non-toggleable rows`() =
         testApplication {
             application { installTestAppWithSecurityMethods() }
             val authed =
@@ -380,7 +380,7 @@ class AdminSettingsTest {
             // so its row is non-toggleable — the handler must silently drop it, not error out.
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
                     formParameters =
                         Parameters.build {
                             append("enabled_password", "on")
@@ -393,7 +393,7 @@ class AdminSettingsTest {
         }
 
     @Test
-    fun `POST security rejects with NoMethodsEnabled when all methods off`() =
+    fun `POST sign-in-methods rejects with NoMethodsEnabled when all methods off`() =
         testApplication {
             application { installTestAppWithSecurityMethods() }
             val authed =
@@ -406,7 +406,7 @@ class AdminSettingsTest {
             // No enabled_* params — every toggleable method maps to false.
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
                     formParameters = Parameters.build {},
                 )
 
@@ -415,7 +415,7 @@ class AdminSettingsTest {
         }
 
     @Test
-    fun `POST security rejects with SmtpRequired when password disabled without SMTP`() =
+    fun `POST sign-in-methods rejects with SmtpRequired when password disabled without SMTP`() =
         testApplication {
             application { installTestAppWithSecurityMethods() }
             val authed =
@@ -428,7 +428,7 @@ class AdminSettingsTest {
             // Only passkey on, password off — workspace has no SMTP.
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/security",
+                    url = "/admin/workspaces/acme/settings/sign-in-methods",
                     formParameters =
                         Parameters.build {
                             append("enabled_passkey", "on")

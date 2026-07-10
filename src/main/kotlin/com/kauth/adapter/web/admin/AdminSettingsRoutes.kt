@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
@@ -288,7 +289,6 @@ fun Route.adminSettingsRoutes(
         val savedParam = call.request.queryParameters["saved"]
         val allUsers = userRepository.findByTenantId(workspace.id, null)
         val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
-        val methodRows = securityMethodsService?.list(workspace) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.securityPolicyPage(
@@ -298,7 +298,6 @@ fun Route.adminSettingsRoutes(
                 savedParam = savedParam,
                 enrolledPasskeyUsers = enrolledPasskeyUsers,
                 totalUsers = allUsers.size,
-                rows = methodRows,
             ),
         )
     }
@@ -311,9 +310,6 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
-        // Policy settings (password rules, MFA, lockout, CORS, HIBP).
-        // Auth-method toggles are owned by securityMethodsService below.
-        // emailOtpSignupEnabled has no UI toggle in v1.20.1 — editable via backup import or admin API only.
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
                 passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
@@ -332,50 +328,84 @@ fun Route.adminSettingsRoutes(
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
             )
 
-        val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)
-        if (policyResult is AdminResult.Failure) {
-            val rows = securityMethodsService?.list(workspace) ?: emptyList()
-            return@post call.respondHtml(
-                HttpStatusCode.UnprocessableEntity,
-                AdminView.securityPolicyPage(
-                    workspace,
-                    wsPairs,
-                    session.username,
-                    error = policyResult.error.message,
-                    rows = rows,
-                ),
-            )
+        when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
+            is AdminResult.Failure ->
+                call.respondHtml(
+                    HttpStatusCode.UnprocessableEntity,
+                    AdminView.securityPolicyPage(
+                        workspace,
+                        wsPairs,
+                        session.username,
+                        error = policyResult.error.message,
+                    ),
+                )
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Sign-in Methods
+    // -------------------------------------------------------------------
+
+    get("/settings/sign-in-methods") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
+        val savedParam = call.request.queryParameters["saved"]
+        val rows = securityMethodsService?.list(workspace) ?: emptyList()
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.signInMethodsPage(
+                workspace,
+                wsPairs,
+                session.username,
+                rows = rows,
+                toastMessage = if (savedParam == "methods") EnglishStrings.TOAST_SIGN_IN_METHODS_SAVED else null,
+            ),
+        )
+    }
+
+    post("/settings/sign-in-methods") {
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
+        val wsPairs = call.attributes[WsPairsAttr]
+        val params = call.receiveParameters()
+        val session = call.sessions.get<AdminSession>()!!
+
+        val svc = securityMethodsService
+        if (svc == null) {
+            call.respondRedirect("/admin/workspaces/$slug/settings/sign-in-methods?saved=methods")
+            return@post
         }
 
-        if (securityMethodsService != null) {
-            // Only include keys the current row set allows toggling; drop any that the
-            // browser shouldn't have submitted (e.g. unconfigured social providers).
-            val toggleableKeys =
-                securityMethodsService
-                    .list(workspace)
-                    .filter { it.toggleable }
-                    .map { it.key }
-                    .toSet()
-            val requested =
-                MethodKey.entries
-                    .filter { it in toggleableKeys }
-                    .associateWith { key -> params["enabled_${key.name.lowercase()}"] == "on" }
-            when (val methodResult = securityMethodsService.updateSecurityMethods(workspace.id, requested)) {
-                is AdminResult.Success -> Unit
-                is AdminResult.Failure -> {
-                    val (status, errorCode) =
-                        when (methodResult.error) {
-                            AdminError.NoMethodsEnabled -> HttpStatusCode.BadRequest to "NoMethodsEnabled"
-                            AdminError.SmtpRequired -> HttpStatusCode.BadRequest to "SmtpRequired"
-                            is AdminError.NotFound -> HttpStatusCode.NotFound to "NotFound"
-                            else -> HttpStatusCode.BadRequest to "UnknownError"
-                        }
-                    return@post call.respond(status, mapOf("error" to errorCode))
-                }
+        // Only include keys the current row set allows toggling; drop any that the
+        // browser shouldn't have submitted (e.g. unconfigured social providers).
+        val toggleableKeys =
+            svc
+                .list(workspace)
+                .filter { it.toggleable }
+                .map { it.key }
+                .toSet()
+        val requested =
+            MethodKey.entries
+                .filter { it in toggleableKeys }
+                .associateWith { key -> params["enabled_${key.name.lowercase()}"] == "on" }
+
+        when (val methodResult = svc.updateSecurityMethods(workspace.id, requested)) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/sign-in-methods?saved=methods")
+            is AdminResult.Failure -> {
+                val (status, errorCode) =
+                    when (methodResult.error) {
+                        AdminError.NoMethodsEnabled -> HttpStatusCode.BadRequest to "NoMethodsEnabled"
+                        AdminError.SmtpRequired -> HttpStatusCode.BadRequest to "SmtpRequired"
+                        is AdminError.NotFound -> HttpStatusCode.NotFound to "NotFound"
+                        else -> HttpStatusCode.BadRequest to "UnknownError"
+                    }
+                call.respond(status, mapOf("error" to errorCode))
             }
         }
-
-        call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=methods")
     }
 
     // -------------------------------------------------------------------

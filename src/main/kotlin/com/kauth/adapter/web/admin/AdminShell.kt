@@ -211,7 +211,7 @@ internal fun HTML.adminShell(
                         iconKey = "directory",
                     )
                     railItem(
-                        href = ws?.let { "/admin/workspaces/$it/settings/security" },
+                        href = ws?.let { "/admin/workspaces/$it/settings/sign-in-methods" },
                         key = "security",
                         activeKey = activeRail,
                         iconKey = "security",
@@ -395,6 +395,12 @@ internal fun DIV.renderSecurityCtxPanel(
 ) {
     span("sidebar__heading") { +"Security" }
     val base = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug" else "/admin"
+    ctxLink(
+        "$base/settings/sign-in-methods",
+        "sign-in-methods",
+        activeSection,
+        com.kauth.adapter.web.EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS,
+    )
     ctxLink("$base/settings/security", "security", activeSection, "Security Policy")
     ctxLink("$base/mfa", "mfa", activeSection, "MFA")
     ctxLink("$base/settings/passkeys", "passkeys", activeSection, "Passkeys")

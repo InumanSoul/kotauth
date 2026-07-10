@@ -581,7 +581,6 @@ internal fun securityPolicyPageImpl(
     savedParam: String? = null,
     enrolledPasskeyUsers: Int = 0,
     totalUsers: Int = 0,
-    rows: List<com.kauth.domain.model.AuthMethodRow> = emptyList(),
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -596,11 +595,7 @@ internal fun securityPolicyPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
-            toastMessage = when (savedParam) {
-                "methods" -> EnglishStrings.TOAST_SIGN_IN_METHODS_SAVED
-                "true" -> EnglishStrings.TOAST_SECURITY_POLICY_SAVED
-                else -> null
-            },
+            toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
 ) {
             div("content-inner") {
             breadcrumb(
@@ -839,10 +834,6 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
-                // ── Auth Methods grid ────────────────────────────────
-                div {
-                    with(AuthMethodsGridView) { render(rows, workspace) }
-                }
             }
                     }
 }
