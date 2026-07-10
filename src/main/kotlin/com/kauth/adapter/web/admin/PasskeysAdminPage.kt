@@ -42,11 +42,7 @@ internal fun HTML.passkeysAdminPage(
                     span("insight-item__label") { +EnglishStrings.ADMIN_PASSKEYS_ENROLLMENT_LABEL }
                     span("insight-item__value insight-item__value--mono") {
                         +"$enrolledCount"
-                        span {
-                            attributes["style"] =
-                                "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
-                            +" / $totalUsers"
-                        }
+                        span("insight-item__denominator") { +" / $totalUsers" }
                     }
                     span("insight-item__hint") { +EnglishStrings.ADMIN_PASSKEYS_ENROLLMENT_HINT }
                 }

@@ -417,6 +417,25 @@ object EnglishStrings {
         "Passkey sign-in is controlled from the Sign-in methods grid on the Security Policy page."
     const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Security Policy"
 
+    // MFA overview page (v1.20.1)
+    const val ADMIN_MFA_ALERT_NO_ENROLLED_TITLE = "No users have enrolled in MFA"
+    const val ADMIN_MFA_ALERT_REQUIRED_DESC_PREFIX = "MFA policy is set to"
+    const val ADMIN_MFA_ALERT_REQUIRED_DESC_SUFFIX =
+        ". Users who have not enrolled cannot complete sign-in."
+    const val ADMIN_MFA_ALERT_OPTIONAL_DESC =
+        "MFA policy is Optional — no sign-in impact. Share the enrollment URL below to encourage " +
+            "users to set up two-factor authentication."
+    const val ADMIN_MFA_ALERT_REQUIRED_LINK = "Review policy"
+    const val ADMIN_MFA_ALERT_OPTIONAL_LINK = "Change policy"
+    const val ADMIN_MFA_TABLE_COL_USERNAME = "Username"
+    const val ADMIN_MFA_TABLE_COL_FULL_NAME = "Full Name"
+    const val ADMIN_MFA_TABLE_COL_EMAIL = "Email"
+    const val ADMIN_MFA_TABLE_COL_STATUS = "MFA Status"
+    const val ADMIN_MFA_TABLE_BADGE_ENROLLED = "Enrolled"
+    const val ADMIN_MFA_TABLE_BADGE_NOT_ENROLLED = "Not enrolled"
+    const val ADMIN_MFA_EMPTY_USERS_TITLE = "No users in this workspace"
+    const val ADMIN_MFA_EMPTY_USERS_DESC = "Users will appear here once they are added."
+
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
 

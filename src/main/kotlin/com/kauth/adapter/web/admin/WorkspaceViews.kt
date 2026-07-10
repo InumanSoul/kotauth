@@ -606,7 +606,6 @@ internal fun securityPolicyPageImpl(
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
-                "Security" to "/admin/workspaces/$slug/settings/security",
                 "Security Policy" to null,
             )
 
@@ -638,11 +637,7 @@ internal fun securityPolicyPageImpl(
                         span("insight-item__label") { +"Passkey enrollment" }
                         span("insight-item__value insight-item__value--mono") {
                             +"$enrolledPasskeyUsers"
-                            span {
-                                attributes["style"] =
-                                    "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
-                                +" / $totalUsers"
-                            }
+                            span("insight-item__denominator") { +" / $totalUsers" }
                         }
                         span("insight-item__hint") { +"users have enrolled at least one passkey" }
                     }
