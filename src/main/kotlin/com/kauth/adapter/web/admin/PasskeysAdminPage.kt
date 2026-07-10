@@ -52,7 +52,7 @@ internal fun HTML.passkeysAdminPage(
                 div("ov-card__section-label") { +EnglishStrings.ADMIN_PASSKEYS_CONFIG_LABEL }
                 p { +EnglishStrings.ADMIN_PASSKEYS_CONFIG_BODY }
                 a(
-                    href = "/admin/workspaces/$slug/settings/security",
+                    href = "/admin/workspaces/$slug/settings/sign-in-methods",
                     classes = "btn btn--outline",
                 ) {
                     +EnglishStrings.ADMIN_PASSKEYS_OPEN_POLICY

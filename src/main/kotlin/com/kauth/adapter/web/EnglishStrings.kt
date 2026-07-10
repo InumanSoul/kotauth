@@ -417,8 +417,8 @@ object EnglishStrings {
     const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
     const val ADMIN_PASSKEYS_CONFIG_LABEL = "Passkey configuration"
     const val ADMIN_PASSKEYS_CONFIG_BODY =
-        "Passkey sign-in is controlled from the Sign-in methods grid on the Security Policy page."
-    const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Security Policy"
+        "Passkey sign-in is enabled or disabled from the Sign-in Methods page."
+    const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Sign-in Methods"
 
     // MFA overview page (v1.20.1)
     const val ADMIN_MFA_ALERT_NO_ENROLLED_TITLE = "No users have enrolled in MFA"

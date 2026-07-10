@@ -223,7 +223,7 @@ class AdminSidebarTest {
         }
 
     @Test
-    fun `passkeys page renders enrollment insight and security policy link`() =
+    fun `passkeys page renders enrollment insight and sign-in methods link`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
@@ -232,7 +232,7 @@ class AdminSidebarTest {
             val html = authed.get("/admin/workspaces/acme/settings/passkeys").bodyAsText()
 
             assertTrue(html.contains("Passkey enrollment"), "Enrollment insight label missing")
-            assertTrue(html.contains("Open Security Policy"), "Security Policy link missing")
+            assertTrue(html.contains("Open Sign-in Methods"), "Sign-in Methods link missing")
         }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
