@@ -40,4 +40,7 @@ interface WebAuthnCredentialRepository {
     ): Int
 
     fun countEnrolledUsersByTenantId(tenantId: TenantId): Int
+
+    /** Returns the set of user IDs that have at least one credential in [tenantId]. */
+    fun findUserIdsWithCredential(tenantId: TenantId): Set<UserId>
 }

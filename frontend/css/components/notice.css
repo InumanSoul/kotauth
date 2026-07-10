@@ -83,3 +83,4 @@
 .notice--info { background: var(--color-accent-bg); border-color: var(--color-accent-border); }
 .notice--info .notice__icon,
 .notice--info .notice__title { color: var(--color-accent); }
+.notice--info .notice__link { color: var(--color-accent); border-bottom-color: var(--color-accent-border); }

@@ -82,4 +82,10 @@ class FakeWebAuthnCredentialRepository : WebAuthnCredentialRepository {
             .map { it.userId }
             .distinct()
             .size
+
+    override fun findUserIdsWithCredential(tenantId: TenantId): Set<UserId> =
+        store.values
+            .filter { it.tenantId == tenantId }
+            .map { it.userId }
+            .toSet()
 }

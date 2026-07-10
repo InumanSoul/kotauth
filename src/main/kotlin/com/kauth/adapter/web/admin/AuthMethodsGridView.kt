@@ -1,9 +1,11 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AuthMethodRow
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.Requirement
+import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -29,6 +31,16 @@ object AuthMethodsGridView {
             val passwordRow = rows.firstOrNull { it.key == MethodKey.PASSWORD }
             if (passwordRow != null && !passwordRow.enabled) {
                 div("notice notice--warn") { +EnglishStrings.AUTH_METHODS_PASSWORD_OFF_WARNING }
+            }
+        }
+
+        val socialRowCount = rows.count { it.key == MethodKey.SOCIAL_GOOGLE || it.key == MethodKey.SOCIAL_GITHUB }
+        if (socialRowCount < SocialProvider.entries.size) {
+            p("methods-idp-hint") {
+                a("/admin/workspaces/${tenant.slug}/settings/identity-providers") {
+                    +EnglishStrings.ADMIN_METHODS_MORE_SIGN_IN_OPTIONS
+                    inlineSvgIcon("arrow-small", "arrow")
+                }
             }
         }
     }

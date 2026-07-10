@@ -261,7 +261,7 @@ class AuthMethodsGridTest {
         }
 
     @Test
-    fun `GET sign-in-methods page renders all method rows including social`() =
+    fun `GET sign-in-methods page renders core method rows`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
@@ -272,12 +272,10 @@ class AuthMethodsGridTest {
 
             assertContains(body, "Password")
             assertContains(body, "Passkey")
-            assertContains(body, "Google")
-            assertContains(body, "GitHub")
         }
 
     @Test
-    fun `GET sign-in-methods page shows OAuth credentials required for unconfigured social providers`() =
+    fun `GET sign-in-methods page does not show social rows when no IDPs configured`() =
         testApplication {
             val ws = workspaceWith()
             application { installTestApp(ws) }
@@ -286,7 +284,7 @@ class AuthMethodsGridTest {
 
             val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
-            assertContains(body, "OAuth credentials required")
+            assertTrue(!body.contains("OAuth credentials required"))
         }
 
     @Test

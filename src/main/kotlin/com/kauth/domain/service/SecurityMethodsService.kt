@@ -63,29 +63,25 @@ class SecurityMethodsService(
         val allIdps = identityProviderRepository.findAllByTenant(tenant.id)
         val enabledProviders = allIdps.filter { it.enabled }.map { it.provider }.toSet()
 
+        // Only emit rows for providers that have credentials configured.
+        // Unconfigured providers are noise for the operator; they can add them via Identity Providers.
         SocialProvider.entries.forEach { socialProvider ->
+            val hasCredentials = allIdps.any { it.provider == socialProvider }
+            if (!hasCredentials) return@forEach
+
             val key =
                 when (socialProvider) {
                     SocialProvider.GOOGLE -> MethodKey.SOCIAL_GOOGLE
                     SocialProvider.GITHUB -> MethodKey.SOCIAL_GITHUB
                 }
-            val configured = socialProvider in enabledProviders
-            val hasCredentials = allIdps.any { it.provider == socialProvider }
             rows +=
                 AuthMethodRow(
                     key = key,
                     labelKey = "AUTH_METHOD_${key.name}_LABEL",
                     descriptionKey = null,
-                    enabled = configured,
-                    requirements =
-                        if (!hasCredentials) {
-                            listOf(
-                                Requirement.OAuthCredentialsRequired(socialProvider.value),
-                            )
-                        } else {
-                            emptyList()
-                        },
-                    toggleable = hasCredentials,
+                    enabled = socialProvider in enabledProviders,
+                    requirements = emptyList(),
+                    toggleable = true,
                 )
         }
 

@@ -223,7 +223,7 @@ class AdminSidebarTest {
         }
 
     @Test
-    fun `passkeys page renders enrollment insight and sign-in methods link`() =
+    fun `passkeys page renders 2-column insight bar and policy badge`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
@@ -231,8 +231,49 @@ class AdminSidebarTest {
 
             val html = authed.get("/admin/workspaces/acme/settings/passkeys").bodyAsText()
 
-            assertTrue(html.contains("Passkey enrollment"), "Enrollment insight label missing")
-            assertTrue(html.contains("Open Sign-in Methods"), "Sign-in Methods link missing")
+            assertTrue(html.contains("Enrolled Users"), "Enrolled Users insight label missing")
+            assertTrue(html.contains("Not Enrolled"), "Not Enrolled insight label missing")
+            // workspace uses default passkeysEnabled=true → badge should read Enabled
+            assertTrue(html.contains("Enabled"), "Policy badge missing")
+        }
+
+    @Test
+    fun `passkeys page renders alert with sign-in methods link when passkeys disabled`() =
+        testApplication {
+            val disabledWorkspace = workspace.copy(passkeysEnabled = false)
+            tenantRepo.update(disabledWorkspace)
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val html = authed.get("/admin/workspaces/acme/settings/passkeys").bodyAsText()
+
+            assertTrue(html.contains("Passkey sign-in is disabled"), "Alert title missing")
+            assertTrue(html.contains("sign-in-methods"), "Sign-in Methods link missing")
+        }
+
+    @Test
+    fun `passkeys page renders users table with not-enrolled badge`() =
+        testApplication {
+            userRepo.add(
+                User(
+                    id = UserId(10),
+                    tenantId = TenantId(2),
+                    username = "alice",
+                    email = "alice@acme.dev",
+                    fullName = "Alice",
+                    passwordHash = hasher.hash("pass"),
+                    enabled = true,
+                ),
+            )
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val html = authed.get("/admin/workspaces/acme/settings/passkeys").bodyAsText()
+
+            assertTrue(html.contains("alice"), "User row missing")
+            assertTrue(html.contains("Not enrolled"), "Not-enrolled badge missing")
         }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

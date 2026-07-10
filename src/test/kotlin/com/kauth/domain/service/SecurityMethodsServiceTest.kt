@@ -75,45 +75,59 @@ class SecurityMethodsServiceTest {
     }
 
     @Test
-    fun `list includes social rows for unconfigured providers with OAuthCredentialsRequired`() {
+    fun `list returns only 4 rows when no IDPs configured — no social rows`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
 
         val rows = service.list(tenant)
 
-        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
-        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GITHUB })
-        val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
-        assertTrue(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
-        assertFalse(googleRow.toggleable)
+        assertEquals(4, rows.size)
+        assertFalse(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
+        assertFalse(rows.any { it.key == MethodKey.SOCIAL_GITHUB })
     }
 
     @Test
-    fun `list includes social rows for configured providers`() {
+    fun `list includes Google row when Google credentials configured and enabled`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
         idpRepo.seed(tenantId, provider = "google", enabled = true)
 
         val rows = service.list(tenant)
 
+        assertEquals(5, rows.size)
         val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
         assertTrue(googleRow.enabled)
-        assertFalse(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
+        assertTrue(googleRow.requirements.isEmpty())
         assertTrue(googleRow.toggleable)
     }
 
     @Test
-    fun `list makes social row toggleable when credentials present but disabled`() {
+    fun `list includes Google row when credentials present but disabled`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
         idpRepo.seed(tenantId, provider = "google", enabled = false)
 
         val rows = service.list(tenant)
 
+        assertEquals(5, rows.size)
         val googleRow = rows.first { it.key == MethodKey.SOCIAL_GOOGLE }
         assertFalse(googleRow.enabled)
         assertTrue(googleRow.toggleable)
-        assertFalse(googleRow.requirements.any { it is Requirement.OAuthCredentialsRequired })
+        assertTrue(googleRow.requirements.isEmpty())
+    }
+
+    @Test
+    fun `list returns 6 rows when both Google and GitHub credentials configured`() {
+        val tenant = tenantOf()
+        tenantRepo.save(tenant)
+        idpRepo.seed(tenantId, provider = "google", enabled = true)
+        idpRepo.seed(tenantId, provider = "github", enabled = true)
+
+        val rows = service.list(tenant)
+
+        assertEquals(6, rows.size)
+        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GOOGLE })
+        assertTrue(rows.any { it.key == MethodKey.SOCIAL_GITHUB })
     }
 
     @Test

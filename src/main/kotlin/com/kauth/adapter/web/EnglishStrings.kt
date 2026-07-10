@@ -411,7 +411,7 @@ object EnglishStrings {
     // Security rail nav labels (v1.20.1)
     const val ADMIN_NAV_SIGN_IN_METHODS = "Sign-in Methods"
 
-    // Passkeys workspace page (v1.20.1)
+    // Passkeys workspace page (v1.20.1 rewrite)
     const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
     const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
     const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
@@ -419,6 +419,32 @@ object EnglishStrings {
     const val ADMIN_PASSKEYS_CONFIG_BODY =
         "Passkey sign-in is enabled or disabled from the Sign-in Methods page."
     const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Sign-in Methods"
+
+    // Passkeys admin page — alerts
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_NO_USERS_TITLE = "Passkey sign-in is disabled"
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_NO_USERS_DESC =
+        "Enable it on Sign-in Methods to let users enroll."
+    const val ADMIN_PASSKEYS_ALERT_ENABLED_NO_USERS_TITLE = "No users have enrolled a passkey yet"
+    const val ADMIN_PASSKEYS_ALERT_ENABLED_NO_USERS_DESC =
+        "Sharing the enrollment URL below is the fastest way to get started."
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_HAS_USERS_TITLE = "Passkey sign-in is currently disabled"
+    const val ADMIN_PASSKEYS_ALERT_SIGN_IN_METHODS_LINK = "Open Sign-in Methods"
+
+    // Passkeys admin page — enrollment URL card
+    const val ADMIN_PASSKEYS_ENROLLMENT_URL_LABEL = "Self-service enrollment URL"
+    const val ADMIN_PASSKEYS_ENROLLMENT_URL_DESC =
+        "Share this URL with users to let them register a passkey on their device. " +
+            "The link requires them to be signed in."
+
+    // Passkeys admin page — users table
+    const val ADMIN_PASSKEYS_TABLE_COL_STATUS = "Passkey Status"
+    const val ADMIN_PASSKEYS_TABLE_BADGE_ENROLLED = "Enrolled"
+    const val ADMIN_PASSKEYS_TABLE_BADGE_NOT_ENROLLED = "Not enrolled"
+    const val ADMIN_PASSKEYS_EMPTY_USERS_TITLE = "No users in this workspace"
+    const val ADMIN_PASSKEYS_EMPTY_USERS_DESC = "Users will appear here once they are added."
+
+    // Sign-in Methods — footer note
+    const val ADMIN_METHODS_MORE_SIGN_IN_OPTIONS = "Add more sign-in options via Identity Providers"
 
     // MFA overview page (v1.20.1)
     const val ADMIN_MFA_ALERT_NO_ENROLLED_TITLE = "No users have enrolled in MFA"

@@ -107,9 +107,8 @@ object AdminView {
         workspace: Tenant,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-        enrolledCount: Int = 0,
-        totalUsers: Int = 0,
-    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, enrolledCount, totalUsers) }
+        userWithPasskey: List<Pair<com.kauth.domain.model.User, Boolean>> = emptyList(),
+    ): HTML.() -> Unit = { passkeysAdminPage(workspace, allWorkspaces, loggedInAs, userWithPasskey) }
 
     fun brandingPage(
         workspace: Tenant,

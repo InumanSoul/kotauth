@@ -508,11 +508,12 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
-        val enrolled = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
-        val total = userRepository.countByTenantId(workspace.id).toInt()
+        val users = userRepository.findByTenantId(workspace.id, null)
+        val enrolledUserIds = webAuthnCredentialRepository?.findUserIdsWithCredential(workspace.id) ?: emptySet()
+        val userWithPasskey = users.map { u -> u to (u.id in enrolledUserIds) }
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.passkeysPage(workspace, wsPairs, session.username, enrolled, total),
+            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey),
         )
     }
 
