@@ -76,6 +76,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnService
@@ -175,6 +176,7 @@ data class ServiceGraph(
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
+    val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
@@ -653,6 +655,11 @@ data class ServiceGraph(
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
                 webAuthnCredentialRepository = webAuthnCredentialRepository,
+                securityMethodsService =
+                    SecurityMethodsService(
+                        tenantRepository = tenantRepository,
+                        identityProviderRepository = identityProviderRepository,
+                    ),
                 passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
             )

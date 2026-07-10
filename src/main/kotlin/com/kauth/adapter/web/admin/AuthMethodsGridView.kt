@@ -10,7 +10,7 @@ import kotlinx.html.*
 object AuthMethodsGridView {
     fun DIV.render(
         rows: List<AuthMethodRow>,
-        @Suppress("UNUSED_PARAMETER") tenant: Tenant,
+        tenant: Tenant,
     ) {
         div("ov-card") {
             div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_TABLE_HEADING }
@@ -23,7 +23,7 @@ object AuthMethodsGridView {
                     }
                 }
                 tbody {
-                    rows.forEach { row -> renderRow(row) }
+                    rows.forEach { row -> renderRow(row, tenant.slug) }
                 }
             }
             val passwordRow = rows.firstOrNull { it.key == MethodKey.PASSWORD }
@@ -33,7 +33,7 @@ object AuthMethodsGridView {
         }
     }
 
-    private fun TBODY.renderRow(row: AuthMethodRow) {
+    private fun TBODY.renderRow(row: AuthMethodRow, tenantSlug: String) {
         tr {
             attributes["data-method-key"] = row.key.name
             td("method-table__method") {
@@ -54,7 +54,9 @@ object AuthMethodsGridView {
                         span("row-locked") {
                             +EnglishStrings.REQUIREMENT_SMTP_REQUIRED
                             +" — "
-                            a(href = "/settings/smtp") { +EnglishStrings.REQUIREMENT_SMTP_LINK }
+                            a(href = "/admin/workspaces/$tenantSlug/settings/smtp") {
+                                +EnglishStrings.REQUIREMENT_SMTP_LINK
+                            }
                         }
                     }
                 }
