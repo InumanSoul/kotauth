@@ -412,6 +412,10 @@ object EnglishStrings {
     const val ADMIN_NAV_SIGN_IN_METHODS = "Sign-in Methods"
 
     // Passkeys workspace page (v1.20.1 rewrite)
+    // Admin — Security Policy page section labels
+    const val ADMIN_SECURITY_PASSWORD_POLICY_SECTION = "Password Policy"
+    const val ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION = "Password Requirements"
+
     const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
     const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
     const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"

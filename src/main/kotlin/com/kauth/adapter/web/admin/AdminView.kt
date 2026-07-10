@@ -87,10 +87,8 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
         savedParam: String? = null,
-        enrolledPasskeyUsers: Int = 0,
-        totalUsers: Int = 0,
     ): HTML.() -> Unit =
-        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam, enrolledPasskeyUsers, totalUsers)
+        securityPolicyPageImpl(workspace, allWorkspaces, loggedInAs, error, savedParam)
 
     fun signInMethodsPage(
         workspace: Tenant,

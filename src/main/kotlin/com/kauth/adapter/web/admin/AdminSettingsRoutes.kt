@@ -287,8 +287,6 @@ fun Route.adminSettingsRoutes(
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
         val savedParam = call.request.queryParameters["saved"]
-        val allUsers = userRepository.findByTenantId(workspace.id, null)
-        val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.securityPolicyPage(
@@ -296,8 +294,6 @@ fun Route.adminSettingsRoutes(
                 wsPairs,
                 session.username,
                 savedParam = savedParam,
-                enrolledPasskeyUsers = enrolledPasskeyUsers,
-                totalUsers = allUsers.size,
             ),
         )
     }

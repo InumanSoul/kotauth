@@ -579,8 +579,6 @@ internal fun securityPolicyPageImpl(
     loggedInAs: String,
     error: String? = null,
     savedParam: String? = null,
-    enrolledPasskeyUsers: Int = 0,
-    totalUsers: Int = 0,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -625,20 +623,6 @@ internal fun securityPolicyPageImpl(
                 div("notice notice--error") { +error }
             }
 
-            // ── Insight bar ──────────────────────────────────────────
-            if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
-                div("insight-bar insight-bar--cols-1") {
-                    div("insight-item insight-item--static") {
-                        span("insight-item__label") { +"Passkey enrollment" }
-                        span("insight-item__value insight-item__value--mono") {
-                            +"$enrolledPasskeyUsers"
-                            span("insight-item__denominator") { +" / $totalUsers" }
-                        }
-                        span("insight-item__hint") { +"users have enrolled at least one passkey" }
-                    }
-                }
-            }
-
             // ── Form (wraps both cards) ──────────────────────────────
             form(
                 action = "/admin/workspaces/$slug/settings/security",
@@ -647,9 +631,9 @@ internal fun securityPolicyPageImpl(
             ) {
                 id = "security-form"
 
-                // ── Password Policy ──────────────────────────────────
+                // ── Password Policy (numeric limits) ─────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Password Policy" }
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_PASSWORD_POLICY_SECTION }
                     div("edit-row") {
                         span("edit-row__label") { +"Minimum Length" }
                         div {
@@ -662,6 +646,37 @@ internal fun securityPolicyPageImpl(
                             }
                             div("edit-row__hint") { +"Between 4 and 128 characters." }
                         }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password History" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyHistoryCount") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "24"
+                                value = workspace.passwordPolicyHistoryCount.toString()
+                            }
+                            div("edit-row__hint") { +"Previous passwords to remember. 0 = disabled, max 24." }
+                        }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password Expiry" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "365"
+                                value = workspace.passwordPolicyMaxAgeDays.toString()
+                            }
+                            div("edit-row__hint") { +"Days before forced change. 0 = never expires." }
+                        }
+                    }
+                }
+
+                // ── Password requirements (character-class checkboxes) ──
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        +EnglishStrings.ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION
                     }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireSpecial") {
@@ -691,30 +706,6 @@ internal fun securityPolicyPageImpl(
                             if (workspace.passwordPolicyBlacklistEnabled) checked = true
                         }
                         span("check-row__label") { +"Block common / breached passwords" }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +"Password History" }
-                        div {
-                            input(type = InputType.number, name = "passwordPolicyHistoryCount") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "0"
-                                attributes["max"] = "24"
-                                value = workspace.passwordPolicyHistoryCount.toString()
-                            }
-                            div("edit-row__hint") { +"Previous passwords to remember. 0 = disabled, max 24." }
-                        }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +"Password Expiry" }
-                        div {
-                            input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "0"
-                                attributes["max"] = "365"
-                                value = workspace.passwordPolicyMaxAgeDays.toString()
-                            }
-                            div("edit-row__hint") { +"Days before forced change. 0 = never expires." }
-                        }
                     }
                 }
 
