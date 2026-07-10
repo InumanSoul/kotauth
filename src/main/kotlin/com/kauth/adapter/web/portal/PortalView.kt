@@ -365,17 +365,13 @@ object PortalView {
         session: PortalSession,
         ctx: ViewContext,
         layout: PortalLayout = PortalLayout.SIDEBAR,
-        successMsg: String?,
         errorMsg: String?,
         passwordPolicy: SecurityConfig = SecurityConfig(),
     ): HTML.() -> Unit =
         {
             head { portalPageHead("${ctx.t("PORTAL_SECURITY_TITLE")} — ${ctx.workspaceName}", ctx.theme, layout) }
             body {
-                if (successMsg != null) {
-                    attributes["data-toast-msg"] = EnglishStrings.TOAST_PASSWORD_CHANGED
-                }
-                portalShell(slug, ctx, session.username, "security/overview", layout) {
+                portalShell(slug, ctx, session.username, "security/change-password", layout) {
                     div(classes = "page-header") {
                         h1(classes = "page-header__title") { +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD") }
                         p(classes = "page-header__subtitle") { +ctx.t("PORTAL_CHANGE_PASSWORD_SUBTITLE") }
