@@ -89,7 +89,12 @@ object EnglishStrings {
 
     // Portal — security page
     const val PORTAL_SECURITY_TITLE = "Security"
-    const val PORTAL_SECURITY_SUBTITLE = "Password and active sessions"
+    const val PORTAL_SECURITY_SUBTITLE = "Manage your authentication settings"
+    const val PORTAL_CHANGE_PASSWORD_SUBTITLE = "Change your account password"
+    const val PORTAL_SESSIONS_REVOKE_OTHERS_CONFIRM =
+        "Sign out of all other sessions? Only your current session will remain active."
+    const val PORTAL_SESSIONS_REVOKE_CONFIRM =
+        "Revoke this session? The user will be signed out immediately."
     const val PORTAL_SECURITY_CHANGE_PASSWORD = "Change password"
     const val PORTAL_SECURITY_CURRENT_PASSWORD = "Current password"
     const val PORTAL_SECURITY_SIGNOUT_NOTE = "Changing your password signs you out of all active sessions"

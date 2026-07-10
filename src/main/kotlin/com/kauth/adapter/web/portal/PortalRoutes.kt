@@ -458,6 +458,7 @@ fun Route.portalRoutes(
         get("/change-password") {
             val slug = call.parameters["slug"] ?: return@get call.respond(HttpStatusCode.BadRequest)
             val session = call.portalSession(slug) ?: return@get call.respondRedirect("/t/$slug/account/login")
+            if (session.isImpersonation) return@get call.respond(HttpStatusCode.Forbidden)
             val tenant = tenantRepository.findBySlug(slug) ?: return@get call.respond(HttpStatusCode.NotFound)
             val successMsg = call.request.queryParameters["saved"]
             val errorMsg = call.request.queryParameters["error"]

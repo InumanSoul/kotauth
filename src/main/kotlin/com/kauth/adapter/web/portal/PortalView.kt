@@ -377,8 +377,8 @@ object PortalView {
                 }
                 portalShell(slug, ctx, session.username, "security/overview", layout) {
                     div(classes = "page-header") {
-                        h1(classes = "page-header__title") { +ctx.t("PORTAL_SECURITY_TITLE") }
-                        p(classes = "page-header__subtitle") { +ctx.t("PORTAL_SECURITY_SUBTITLE") }
+                        h1(classes = "page-header__title") { +ctx.t("PORTAL_SECURITY_CHANGE_PASSWORD") }
+                        p(classes = "page-header__subtitle") { +ctx.t("PORTAL_CHANGE_PASSWORD_SUBTITLE") }
                     }
                     if (!errorMsg.isNullOrBlank()) {
                         div(classes = "alert alert-error") { +errorMsg }

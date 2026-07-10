@@ -51,8 +51,7 @@ fun HTML.portalSessionsPage(
                                     type = ButtonType.submit,
                                     classes = "btn btn--danger btn--sm",
                                 ) {
-                                    attributes["data-confirm"] =
-                                        "Sign out of all other sessions? Only your current session will remain active."
+                                    attributes["data-confirm"] = ctx.t("PORTAL_SESSIONS_REVOKE_OTHERS_CONFIRM")
                                     +ctx.t("PORTAL_SECURITY_REVOKE_OTHERS")
                                 }
                             }
@@ -111,8 +110,7 @@ fun HTML.portalSessionsPage(
                                                         type = ButtonType.submit,
                                                         classes = "btn btn--danger btn--sm",
                                                     ) {
-                                                        attributes["data-confirm"] =
-                                                            "Revoke this session? The user will be signed out immediately."
+                                                        attributes["data-confirm"] = ctx.t("PORTAL_SESSIONS_REVOKE_CONFIRM")
                                                         +ctx.t("PORTAL_SECURITY_REVOKE")
                                                     }
                                                 }
