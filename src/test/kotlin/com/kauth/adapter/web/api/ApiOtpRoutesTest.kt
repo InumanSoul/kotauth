@@ -17,6 +17,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
@@ -49,6 +50,7 @@ class ApiOtpRoutesTest {
     private val roles = FakeRoleRepository()
     private val email = FakeEmailPort()
     private val audit = FakeAuditLogPort()
+    private val resources = FakeResourceServerRepository()
     private val apiKeys = FakeApiKeyRepository()
 
     private val apiKeyService = ApiKeyService(apiKeys, tenants)
@@ -61,6 +63,7 @@ class ApiOtpRoutesTest {
             authorizationCodeRepository = authCodes,
             emailPort = email,
             auditLog = audit,
+            resourceServerRepository = resources,
             roleRepository = roles,
         )
 
@@ -77,6 +80,7 @@ class ApiOtpRoutesTest {
         roles.clear()
         email.clear()
         audit.clear()
+        resources.clear()
         apiKeys.clear()
 
         val tenant =

@@ -18,6 +18,11 @@ interface ResourceServerRepository {
         identifier: String,
     ): ResourceServer?
 
+    fun findByIdentifiers(
+        tenantId: TenantId,
+        identifiers: Set<String>,
+    ): List<ResourceServer>
+
     fun create(
         tenantId: TenantId,
         identifier: String,

@@ -22,6 +22,7 @@ import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordPolicyPort
 import com.kauth.fakes.FakePasswordResetTokenRepository
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
@@ -56,6 +57,7 @@ class EmailOtpLoginRoutesTest {
     private val authCodes = FakeAuthorizationCodeRepository()
     private val sessions = FakeSessionRepository()
     private val roles = FakeRoleRepository()
+    private val resources = FakeResourceServerRepository()
     private val hasher = FakePasswordHasher()
     private val auditLog = FakeAuditLogPort()
     private val emails = FakeEmailPort()
@@ -109,6 +111,7 @@ class EmailOtpLoginRoutesTest {
             authorizationCodeRepository = authCodes,
             emailPort = emails,
             auditLog = auditLog,
+            resourceServerRepository = resources,
             roleRepository = roles,
         )
 
@@ -157,6 +160,7 @@ class EmailOtpLoginRoutesTest {
         authCodes.clear()
         sessions.clear()
         roles.clear()
+        resources.clear()
         prTokens.clear()
         evTokens.clear()
         emails.clear()

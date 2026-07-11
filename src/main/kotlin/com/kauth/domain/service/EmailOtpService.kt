@@ -20,6 +20,8 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.util.sha256Hex
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -49,7 +51,7 @@ class EmailOtpService(
     private val authorizationCodeRepository: AuthorizationCodeRepository,
     private val emailPort: EmailPort,
     private val auditLog: AuditLogPort,
-    private val resourceServerRepository: ResourceServerRepository? = null,
+    private val resourceServerRepository: ResourceServerRepository,
     private val roleRepository: RoleRepository? = null,
     private val clock: Clock = Clock.systemUTC(),
 ) {
@@ -149,7 +151,7 @@ class EmailOtpService(
                     mapOf(
                         "resend_count" to challenge.resendCount.toString(),
                         "originating_client_id" to (originatingClientId ?: ""),
-                        "resources" to challenge.resources.joinToString(","),
+                        "resources" to Json.encodeToString(challenge.resources),
                     ),
             ),
         )
@@ -321,11 +323,14 @@ class EmailOtpService(
     ): List<String>? {
         val challengeResources = requestedResources.normalizedResources()
         if (challengeResources.isEmpty()) return emptyList()
-        val repo = resourceServerRepository ?: return null
-        val authorized = repo.listAuthorizedFor(clientPk).map { it.identifier }.toSet()
+        val authorized = resourceServerRepository.listAuthorizedFor(clientPk).map { it.identifier }.toSet()
+        val resourcesByIdentifier =
+            resourceServerRepository
+                .findByIdentifiers(tenant.id, challengeResources.toSet())
+                .associateBy { it.identifier }
         return challengeResources.takeIf {
             it.all { identifier ->
-                val resource = repo.findByIdentifier(tenant.id, identifier)
+                val resource = resourcesByIdentifier[identifier]
                 resource != null && resource.enabled && identifier in authorized
             }
         }

@@ -1,4 +1,4 @@
--- V54: Bind RFC 8707 resource indicators to email-OTP challenges.
+-- V56: Bind RFC 8707 resource indicators to email-OTP challenges.
 --
 -- Email OTP is a back-channel authorization-code issuer. Store the resources
 -- requested by the originating client when the code is sent, then copy them to
