@@ -7,6 +7,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
@@ -21,6 +22,7 @@ internal fun stubEmailOtpService(): EmailOtpService =
         authorizationCodeRepository = FakeAuthorizationCodeRepository(),
         emailPort = FakeEmailPort(),
         auditLog = FakeAuditLogPort(),
+        resourceServerRepository = FakeResourceServerRepository(),
         roleRepository = FakeRoleRepository(),
     )
 

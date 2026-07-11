@@ -38,10 +38,7 @@ class EmailOtpServiceTest {
     private val challenges = FakeEmailOtpChallengeRepository()
     private val apps = FakeApplicationRepository()
     private val authCodes = FakeAuthorizationCodeRepository()
-    private val resources =
-        FakeResourceServerRepository { appId ->
-            apps.findById(appId)?.tenantId
-        }
+    private val resources = FakeResourceServerRepository()
     private val roles = FakeRoleRepository()
     private val email = FakeEmailPort()
     private val audit = FakeAuditLogPort()
@@ -100,6 +97,7 @@ class EmailOtpServiceTest {
                     redirectUris = listOf("https://bff.acme.example.com/auth/callback"),
                 ),
             )
+        resources.registerClient(clientApp.id, clientApp.tenantId)
     }
 
     // ----- sendOtp -----
@@ -149,6 +147,7 @@ class EmailOtpServiceTest {
         assertTrue(result is OtpSendResult.Success)
         val saved = challenges.findByChallengeId(result.challengeId)!!
         assertEquals(listOf("orders-api"), saved.resources)
+        assertEquals("[\"orders-api\"]", audit.events.single().details["resources"])
     }
 
     @Test
@@ -370,6 +369,7 @@ class EmailOtpServiceTest {
                 authorizationCodeRepository = authCodes,
                 emailPort = email,
                 auditLog = audit,
+                resourceServerRepository = resources,
                 roleRepository = roles,
                 clock = expiredClock,
             )

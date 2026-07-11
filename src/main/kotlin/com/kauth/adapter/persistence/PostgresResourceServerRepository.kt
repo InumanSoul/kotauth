@@ -49,6 +49,22 @@ class PostgresResourceServerRepository : ResourceServerRepository {
                 ?.toResourceServer()
         }
 
+    override fun findByIdentifiers(
+        tenantId: TenantId,
+        identifiers: Set<String>,
+    ): List<ResourceServer> {
+        if (identifiers.isEmpty()) return emptyList()
+        return transaction {
+            ResourceServersTable
+                .selectAll()
+                .where {
+                    (ResourceServersTable.tenantId eq tenantId.value) and
+                        (ResourceServersTable.identifier inList identifiers)
+                }.orderBy(ResourceServersTable.id)
+                .map { it.toResourceServer() }
+        }
+    }
+
     override fun create(
         tenantId: TenantId,
         identifier: String,

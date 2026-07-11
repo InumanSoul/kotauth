@@ -104,7 +104,7 @@ class PostgresEmailOtpChallengeRepository : EmailOtpChallengeRepository {
             challengeId = this[EmailOtpChallengesTable.challengeId],
             codeHash = this[EmailOtpChallengesTable.codeHash],
             originatingClientId = this[EmailOtpChallengesTable.originatingClientId],
-            resources = Json.decodeFromString(this[EmailOtpChallengesTable.resources].ifBlank { "[]" }),
+            resources = Json.decodeFromString(this[EmailOtpChallengesTable.resources]),
             attemptCount = this[EmailOtpChallengesTable.attemptCount],
             resendCount = this[EmailOtpChallengesTable.resendCount],
             expiresAt = this[EmailOtpChallengesTable.expiresAt].toInstant(),

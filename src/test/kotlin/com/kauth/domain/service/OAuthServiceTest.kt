@@ -54,10 +54,7 @@ class OAuthServiceTest {
     private val hasher = FakePasswordHasher()
     private val tokens = FakeTokenPort()
     private val auditLog = FakeAuditLogPort()
-    private val resourceServers =
-        com.kauth.fakes.FakeResourceServerRepository(
-            clientTenantLookup = { id -> apps.findById(id)?.tenantId },
-        )
+    private val resourceServers = com.kauth.fakes.FakeResourceServerRepository()
 
     private val svc =
         OAuthService(
@@ -133,6 +130,8 @@ class OAuthServiceTest {
         users.add(testUser)
         apps.add(publicClient)
         apps.add(confidentialClient, secretHash = hasher.hash("secret123"))
+        resourceServers.registerClient(publicClient.id, publicClient.tenantId)
+        resourceServers.registerClient(confidentialClient.id, confidentialClient.tenantId)
     }
 
     // =========================================================================
