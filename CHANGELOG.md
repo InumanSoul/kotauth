@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.20.2] - 2026-07-11
+
+Completes RFC 8707 resource-indicator support for the Email OTP back-channel flow so access tokens can target an API audience without changing the ID token audience.
+
+### Added
+
+- `POST /api/v1/auth/send-otp` accepts optional `resources` and persists the normalized indicators with the OTP challenge.
+- Successful OTP verification validates that every requested resource is enabled and authorized for the originating client, then binds the resources to the single-use authorization code.
+- Email OTP resource-indicator usage is documented in the operator guide and OpenAPI schema.
+
+### Changed
+
+- `EmailOtpService` now requires `ResourceServerRepository` composition and resolves requested resources in one tenant-scoped batch.
+
+### Migrations
+
+- `V56__email_otp_challenge_resources.sql` — adds the non-null JSONB `resources` column to `email_otp_challenges` with an empty-list default.
+
+---
+
 ## [1.20.1] - 2026-07-10
 
 Polish release for v1.20.0 Passkeys — consolidates the two overlapping "disable password sign-in" flags into one canonical column, replaces the split "Authentication Methods" and "Passkeys" cards with a single Sign-in Methods grid, restructures the admin Security rail to actually hold security pages, and nests MFA, Passkeys, and Sessions under a Security parent group in the portal nav.

@@ -8,17 +8,24 @@ import com.kauth.domain.port.ResourceAuthorizationError
 import com.kauth.domain.port.ResourceServerRepository
 import java.time.Instant
 
-class FakeResourceServerRepository(
-    private val clientTenantLookup: (ApplicationId) -> TenantId? = { null },
-) : ResourceServerRepository {
+class FakeResourceServerRepository : ResourceServerRepository {
     private val byId = mutableMapOf<Int, ResourceServer>()
     private val authorizations = mutableMapOf<Int, MutableSet<Int>>()
+    private val clientTenants = mutableMapOf<Int, TenantId>()
     private var nextId = 1
 
     fun clear() {
         byId.clear()
         authorizations.clear()
+        clientTenants.clear()
         nextId = 1
+    }
+
+    fun registerClient(
+        clientPk: ApplicationId,
+        tenantId: TenantId,
+    ) {
+        clientTenants[clientPk.value] = tenantId
     }
 
     fun seed(rs: ResourceServer): ResourceServer {
@@ -41,6 +48,14 @@ class FakeResourceServerRepository(
         tenantId: TenantId,
         identifier: String,
     ): ResourceServer? = byId.values.firstOrNull { it.tenantId == tenantId && it.identifier == identifier }
+
+    override fun findByIdentifiers(
+        tenantId: TenantId,
+        identifiers: Set<String>,
+    ): List<ResourceServer> =
+        byId.values
+            .filter { it.tenantId == tenantId && it.identifier in identifiers }
+            .sortedBy { it.id!!.value }
 
     override fun create(
         tenantId: TenantId,
@@ -105,8 +120,7 @@ class FakeResourceServerRepository(
         clientPk: ApplicationId,
         resourceServerIds: List<ResourceServerId>,
     ): ResourceAuthorizationError? {
-        val clientTenantId =
-            clientTenantLookup(clientPk) ?: return ResourceAuthorizationError.UnknownClient
+        val clientTenantId = clientTenants[clientPk.value] ?: return ResourceAuthorizationError.UnknownClient
 
         for (rsId in resourceServerIds) {
             val rs = byId[rsId.value] ?: return ResourceAuthorizationError.UnknownResource(rsId)

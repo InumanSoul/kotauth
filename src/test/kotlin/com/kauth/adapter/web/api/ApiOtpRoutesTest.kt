@@ -17,6 +17,7 @@ import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
@@ -49,6 +50,7 @@ class ApiOtpRoutesTest {
     private val roles = FakeRoleRepository()
     private val email = FakeEmailPort()
     private val audit = FakeAuditLogPort()
+    private val resources = FakeResourceServerRepository()
     private val apiKeys = FakeApiKeyRepository()
 
     private val apiKeyService = ApiKeyService(apiKeys, tenants)
@@ -61,6 +63,7 @@ class ApiOtpRoutesTest {
             authorizationCodeRepository = authCodes,
             emailPort = email,
             auditLog = audit,
+            resourceServerRepository = resources,
             roleRepository = roles,
         )
 
@@ -77,14 +80,15 @@ class ApiOtpRoutesTest {
         roles.clear()
         email.clear()
         audit.clear()
+        resources.clear()
         apiKeys.clear()
 
         val tenant =
             tenants.add(
                 Tenant(
                     id = TenantId(0),
-                    slug = "zion",
-                    displayName = "Zion",
+                    slug = "acme",
+                    displayName = "Acme",
                     issuerUrl = null,
                     securityConfig = SecurityConfig(emailOtpSignupEnabled = true),
                 ),
@@ -93,12 +97,12 @@ class ApiOtpRoutesTest {
             Application(
                 id = ApplicationId(0),
                 tenantId = tenant.id,
-                clientId = "zion-bff",
-                name = "Zion BFF",
+                clientId = "acme-bff",
+                name = "Acme BFF",
                 description = null,
                 accessType = AccessType.CONFIDENTIAL,
                 enabled = true,
-                redirectUris = listOf("https://bff.zion.test/auth/callback"),
+                redirectUris = listOf("https://bff.acme.test/auth/callback"),
             ),
         )
 
@@ -115,14 +119,17 @@ class ApiOtpRoutesTest {
         testApplication {
             application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
             val response =
-                client.post("/t/zion/api/v1/auth/send-otp") {
+                client.post("/t/acme/api/v1/auth/send-otp") {
                     bearerAuth(sendKey)
                     contentType(ContentType.Application.Json)
-                    setBody("""{"email":"applicant@zion.test","originatingClientId":"zion-bff"}""")
+                    setBody(
+                        """{"email":"alice@acme.test","originatingClientId":"acme-bff","resources":["orders-api"]}""",
+                    )
                 }
             assertEquals(HttpStatusCode.Accepted, response.status)
             assertTrue(""""challengeId"""" in response.bodyAsText())
             assertEquals(1, email.otps.size)
+            assertEquals(listOf("orders-api"), challenges.all().single().resources)
         }
 
     @Test
@@ -138,7 +145,7 @@ class ApiOtpRoutesTest {
                     ) as ApiKeyResult.Success
                 ).value.rawKey
             val response =
-                client.post("/t/zion/api/v1/auth/send-otp") {
+                client.post("/t/acme/api/v1/auth/send-otp") {
                     bearerAuth(unscoped)
                     contentType(ContentType.Application.Json)
                     setBody("""{"email":"x@y.test"}""")
@@ -162,10 +169,10 @@ class ApiOtpRoutesTest {
                 }
             application { installApp(blocker, AlwaysAllowLimiter()) }
             val response =
-                client.post("/t/zion/api/v1/auth/send-otp") {
+                client.post("/t/acme/api/v1/auth/send-otp") {
                     bearerAuth(sendKey)
                     contentType(ContentType.Application.Json)
-                    setBody("""{"email":"applicant@zion.test"}""")
+                    setBody("""{"email":"alice@acme.test"}""")
                 }
             assertEquals(HttpStatusCode.TooManyRequests, response.status)
         }
@@ -174,16 +181,16 @@ class ApiOtpRoutesTest {
     fun `verify-otp returns 200 with an authorization code on the happy path`() =
         testApplication {
             application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
-            client.post("/t/zion/api/v1/auth/send-otp") {
+            client.post("/t/acme/api/v1/auth/send-otp") {
                 bearerAuth(sendKey)
                 contentType(ContentType.Application.Json)
-                setBody("""{"email":"applicant@zion.test","originatingClientId":"zion-bff"}""")
+                setBody("""{"email":"alice@acme.test","originatingClientId":"acme-bff"}""")
             }
             val sent = email.otps.single()
             val challengeId = challenges.all().single().challengeId
 
             val verify =
-                client.post("/t/zion/api/v1/auth/verify-otp") {
+                client.post("/t/acme/api/v1/auth/verify-otp") {
                     bearerAuth(verifyKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"challengeId":"$challengeId","otp":"${sent.code}"}""")
@@ -197,13 +204,13 @@ class ApiOtpRoutesTest {
         testApplication {
             application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
             // Create a challenge that's already past expiry.
-            val tenant = tenants.findBySlug("zion")!!
+            val tenant = tenants.findBySlug("acme")!!
             val user =
                 users.add(
                     com.kauth.domain.model.User(
                         tenantId = tenant.id,
                         username = "ghost",
-                        email = "ghost@zion.test",
+                        email = "ghost@acme.test",
                         fullName = "Ghost",
                         passwordHash = "x",
                     ),
@@ -224,7 +231,7 @@ class ApiOtpRoutesTest {
             )
 
             val verify =
-                client.post("/t/zion/api/v1/auth/verify-otp") {
+                client.post("/t/acme/api/v1/auth/verify-otp") {
                     bearerAuth(verifyKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"challengeId":"expired-handle","otp":"123456"}""")
@@ -236,15 +243,15 @@ class ApiOtpRoutesTest {
     fun `verify-otp returns 422 invalid_otp on wrong code`() =
         testApplication {
             application { installApp(AlwaysAllowLimiter(), AlwaysAllowLimiter()) }
-            client.post("/t/zion/api/v1/auth/send-otp") {
+            client.post("/t/acme/api/v1/auth/send-otp") {
                 bearerAuth(sendKey)
                 contentType(ContentType.Application.Json)
-                setBody("""{"email":"applicant@zion.test","originatingClientId":"zion-bff"}""")
+                setBody("""{"email":"alice@acme.test","originatingClientId":"acme-bff"}""")
             }
             val challengeId = challenges.all().single().challengeId
 
             val verify =
-                client.post("/t/zion/api/v1/auth/verify-otp") {
+                client.post("/t/acme/api/v1/auth/verify-otp") {
                     bearerAuth(verifyKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"challengeId":"$challengeId","otp":"999999"}""")
@@ -293,7 +300,7 @@ class ApiOtpRoutesTest {
             )
 
             val verify =
-                client.post("/t/zion/api/v1/auth/verify-otp") {
+                client.post("/t/acme/api/v1/auth/verify-otp") {
                     bearerAuth(verifyKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"challengeId":"alien-handle","otp":"123456"}""")

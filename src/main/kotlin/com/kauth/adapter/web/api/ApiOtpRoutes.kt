@@ -64,6 +64,7 @@ internal fun Route.apiOtpRoutes(
                             tenantSlug = tenantSlug,
                             email = normalizedEmail,
                             originatingClientId = body.originatingClientId,
+                            resources = body.resources,
                             ipAddress = ip,
                         )
                 ) {
@@ -147,6 +148,7 @@ private suspend fun ApplicationCall.respondOtpError(error: OtpError) {
 data class SendOtpRequest(
     val email: String,
     val originatingClientId: String? = null,
+    val resources: List<String> = emptyList(),
 )
 
 @Serializable

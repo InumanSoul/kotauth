@@ -19,20 +19,13 @@ class ResourceServerRepositoryContractTest {
     private val clientInA = ApplicationId(100)
     private val clientInB = ApplicationId(200)
 
-    private val tenantLookup: (ApplicationId) -> TenantId? =
-        { id ->
-            when (id) {
-                clientInA -> tenantA
-                clientInB -> tenantB
-                else -> null
-            }
-        }
-
-    private val repo = FakeResourceServerRepository(clientTenantLookup = tenantLookup)
+    private val repo = FakeResourceServerRepository()
 
     @BeforeTest
     fun setup() {
         repo.clear()
+        repo.registerClient(clientInA, tenantA)
+        repo.registerClient(clientInB, tenantB)
     }
 
     @Test
@@ -58,6 +51,17 @@ class ResourceServerRepositoryContractTest {
         assertEquals(tenantB, fromB.tenantId)
         assertEquals("Payment API", fromA.name)
         assertEquals("Other Payment API", fromB.name)
+    }
+
+    @Test
+    fun `findByIdentifiers resolves a tenant-scoped batch`() {
+        repo.create(tenantA, "payment-api", "Payment API", null)
+        repo.create(tenantA, "ledger-api", "Ledger API", null)
+        repo.create(tenantB, "payment-api", "Other Payment API", null)
+
+        val found = repo.findByIdentifiers(tenantA, setOf("payment-api", "ledger-api", "missing"))
+
+        assertEquals(listOf("payment-api", "ledger-api"), found.map { it.identifier })
     }
 
     @Test

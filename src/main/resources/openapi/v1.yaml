@@ -322,6 +322,16 @@ components:
             OAuth client_id that triggered the send. Required at verify-otp
             time to bind the authorization code to a registered client. The
             client must have at least one redirect URI configured.
+        resources:
+          type: array
+          uniqueItems: true
+          default: []
+          items:
+            type: string
+          description: |
+            Optional RFC 8707 resource indicators to bind to the challenge and
+            resulting authorization code. Each resource must be enabled in the
+            workspace and authorized for originatingClientId.
 
     SendOtpResponse:
       type: object
@@ -1148,6 +1158,11 @@ paths:
         `originatingClientId` is required for the verify-otp authorization-code
         issuance to bind the resulting code to a confidential client. The
         client must have at least one redirect URI registered.
+
+        Optional RFC 8707 `resources` are persisted with the challenge. On
+        successful verification, every resource must be enabled and authorized
+        for `originatingClientId`; the resulting authorization code carries the
+        resource indicators into the token exchange.
       tags: [Auth — Email OTP]
       security: [{ bearerAuth: [auth:send-otp] }]
       requestBody:
