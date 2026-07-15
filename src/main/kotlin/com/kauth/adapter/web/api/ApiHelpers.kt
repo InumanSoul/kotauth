@@ -225,6 +225,9 @@ data class ProblemDetail(
     val emailVerified: Boolean,
     val enabled: Boolean,
     val mfaEnabled: Boolean,
+    val requiredActions: List<String>,
+    val isLocked: Boolean,
+    val createdAt: String? = null,
 )
 
 @Serializable data class RoleDto(
@@ -300,6 +303,9 @@ internal fun com.kauth.domain.model.User.toApiDto() =
         emailVerified = emailVerified,
         enabled = enabled,
         mfaEnabled = mfaEnabled,
+        requiredActions = requiredActions.map { it.name },
+        isLocked = lockedUntil?.isAfter(java.time.Instant.now()) == true,
+        createdAt = createdAt?.let { isoFormatter.format(it) },
     )
 
 internal fun com.kauth.domain.model.Role.toApiDto() =

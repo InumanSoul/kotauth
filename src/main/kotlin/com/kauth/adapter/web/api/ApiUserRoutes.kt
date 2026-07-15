@@ -26,15 +26,23 @@ internal fun Route.apiUserRoutes(
             requireScope(call, ApiScope.USERS_READ) ?: return@get
             val tenantId = call.attributes[TenantIdAttr]
             val search = call.request.queryParameters["search"]
-            // TODO: Add pagination support to the REST API (limit/offset or page/pageSize query params)
-            //  to avoid returning unbounded result sets over the network. The port layer already
-            //  supports limit/offset — this just needs wiring here + updating ApiMeta with pagination fields.
-            val users = adminUserService.listUsers(tenantId, search)
+            val limit =
+                call.request.queryParameters["limit"]
+                    ?.toIntOrNull()
+                    ?.coerceIn(1, 200)
+                    ?: 50
+            val offset =
+                call.request.queryParameters["offset"]
+                    ?.toIntOrNull()
+                    ?.coerceAtLeast(0)
+                    ?: 0
+            val users = adminUserService.listUsers(tenantId, search, limit, offset)
+            val total = adminUserService.countUsers(tenantId, search).toInt()
             call.respond(
                 HttpStatusCode.OK,
                 ApiResponse(
                     data = users.map { it.toApiDto() },
-                    meta = ApiMeta(total = users.size),
+                    meta = ApiMeta(total = total, offset = offset, limit = limit),
                 ),
             )
         }

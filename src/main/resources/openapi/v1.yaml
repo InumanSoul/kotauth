@@ -103,15 +103,36 @@ components:
     # ---- Users ----
     UserDto:
       type: object
-      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled]
+      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled, requiredActions, isLocked]
       properties:
-        id:            { type: integer }
-        username:      { type: string }
-        email:         { type: string, format: email }
-        fullName:      { type: string }
-        emailVerified: { type: boolean }
-        enabled:       { type: boolean }
-        mfaEnabled:    { type: boolean }
+        id:              { type: integer }
+        username:        { type: string }
+        email:           { type: string, format: email }
+        fullName:        { type: string }
+        emailVerified:   { type: boolean }
+        enabled:         { type: boolean }
+        mfaEnabled:      { type: boolean }
+        requiredActions:
+          type: array
+          items:
+            type: string
+            enum: [SET_PASSWORD, CHANGE_PASSWORD]
+          description: |
+            Actions the user must complete on next login. Empty for fully
+            provisioned accounts. `SET_PASSWORD` = user was invited and has
+            not yet chosen a password. `CHANGE_PASSWORD` = admin issued a
+            temporary password / forced reset.
+        isLocked:
+          type: boolean
+          description: |
+            True if the account currently has an active lockout (usually from
+            failed-login threshold or OTP-brute-force protection). Task 2 will
+            add `POST /users/{id}/enable` to clear it.
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 timestamp of user creation. Nullable for legacy rows.
 
     CreateUserRequest:
       type: object
@@ -415,6 +436,14 @@ paths:
           name: search
           schema: { type: string }
           description: Filter by username, email, or full name prefix
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+          description: Max number of results (1–200, default 50). Invalid values coerce to default.
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+          description: Zero-based offset for pagination. Invalid values coerce to 0.
       responses:
         "200":
           description: User list
