@@ -182,6 +182,14 @@ data class ProblemDetail(
     val description: String? = null,
 )
 
+@Serializable data class CreateApplicationRequest(
+    val clientId: String,
+    val name: String,
+    val description: String? = null,
+    val accessType: String = "public",
+    val redirectUris: List<String>,
+)
+
 @Serializable data class UpdateApplicationRequest(
     val name: String? = null,
     val description: String? = null,
@@ -267,6 +275,27 @@ data class ProblemDetail(
     val enabled: Boolean,
     val redirectUris: List<String>,
     val audience: String? = null,
+)
+
+/**
+ * Response body for `POST /applications`. `clientSecret` is the raw secret and
+ * is returned exactly once, present only when `application.accessType ==
+ * "confidential"`. Callers MUST persist it before the response is discarded;
+ * there is no way to retrieve it again.
+ */
+@Serializable data class CreateApplicationResponse(
+    val application: ApplicationDto,
+    val clientSecret: String? = null,
+)
+
+/**
+ * Response body for `POST /applications/{id}/regenerate-secret`. The
+ * `clientSecret` field is the raw secret and is returned exactly once —
+ * callers MUST persist it before the response is discarded; there is no way
+ * to retrieve it again.
+ */
+@Serializable data class ClientSecretResponse(
+    val clientSecret: String,
 )
 
 @Serializable data class SessionDto(

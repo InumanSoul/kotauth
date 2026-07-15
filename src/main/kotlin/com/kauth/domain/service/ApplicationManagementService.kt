@@ -238,6 +238,43 @@ class ApplicationManagementService(
         return AdminResult.Success(secret)
     }
 
+    fun deleteApplication(
+        appId: ApplicationId,
+        tenantId: TenantId,
+    ): AdminResult<Unit> {
+        val app =
+            applicationRepository.findById(appId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Application not found."))
+
+        if (app.tenantId != tenantId) {
+            return AdminResult.Failure(AdminError.NotFound("Application not found in this workspace."))
+        }
+
+        val deleted = applicationRepository.softDelete(appId)
+        if (!deleted) {
+            // Race: another actor deleted it between findById and softDelete, OR
+            // findById returned a row but the ID was already flipped elsewhere.
+            // Treat as idempotent success — the caller's goal state is satisfied.
+            return AdminResult.Success(Unit)
+        }
+
+        invalidateCors(tenantId)
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = appId,
+                eventType = AuditEventType.ADMIN_CLIENT_DELETED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("clientId" to app.clientId),
+            ),
+        )
+
+        return AdminResult.Success(Unit)
+    }
+
     private fun invalidateCors(tenantId: TenantId) {
         val port = corsPort ?: return
         tenantRepository.findById(tenantId)?.slug?.let(port::invalidate)

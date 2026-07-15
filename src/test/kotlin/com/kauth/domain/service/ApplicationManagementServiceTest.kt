@@ -1,6 +1,7 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.TenantId
 import com.kauth.fakes.FakeApplicationRepository
@@ -158,6 +159,73 @@ class ApplicationManagementServiceTest {
         val event = auditLog.events.first { it.eventType == AuditEventType.ADMIN_CLIENT_CREATED }
         assertEquals(tenantId, event.tenantId)
         assertEquals(result.value.id, event.clientId)
+        assertEquals("my-app", event.details["clientId"])
+    }
+
+    @Test
+    fun `deleteApplication returns Success and calls softDelete`() {
+        val app =
+            applicationRepo.create(
+                tenantId,
+                "my-app",
+                "My App",
+                null,
+                "public",
+                listOf("https://example.com/cb"),
+            )
+
+        val result = service.deleteApplication(app.id, tenantId)
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(null, applicationRepo.findById(app.id))
+    }
+
+    @Test
+    fun `deleteApplication returns NotFound for unknown appId`() {
+        val result = service.deleteApplication(ApplicationId(99999), tenantId)
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `deleteApplication returns NotFound when appId belongs to a different tenant`() {
+        val app =
+            applicationRepo.create(
+                tenantId,
+                "my-app",
+                "My App",
+                null,
+                "public",
+                listOf("https://example.com/cb"),
+            )
+        val otherTenantId = TenantId(2)
+
+        val result = service.deleteApplication(app.id, otherTenantId)
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
+    }
+
+    @Test
+    fun `deleteApplication emits ADMIN_CLIENT_DELETED audit event on success`() {
+        val app =
+            applicationRepo.create(
+                tenantId,
+                "my-app",
+                "My App",
+                null,
+                "public",
+                listOf("https://example.com/cb"),
+            )
+
+        val result = service.deleteApplication(app.id, tenantId)
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(1, auditLog.countOf(AuditEventType.ADMIN_CLIENT_DELETED))
+        val event = auditLog.events.first { it.eventType == AuditEventType.ADMIN_CLIENT_DELETED }
+        assertEquals(tenantId, event.tenantId)
+        assertEquals(app.id, event.clientId)
         assertEquals("my-app", event.details["clientId"])
     }
 }

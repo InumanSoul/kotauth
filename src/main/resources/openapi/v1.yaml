@@ -260,6 +260,43 @@ components:
         accessType:   { type: string, enum: [public, confidential] }
         redirectUris: { type: array, items: { type: string, format: uri } }
 
+    CreateApplicationRequest:
+      type: object
+      required: [clientId, name, redirectUris]
+      properties:
+        clientId:
+          type: string
+          pattern: "^[a-z0-9-]+$"
+          description: Lowercase alphanumeric + hyphens only. Must be unique per workspace.
+        name: { type: string }
+        description: { type: string, nullable: true }
+        accessType:
+          type: string
+          enum: [public, confidential]
+          default: public
+        redirectUris:
+          type: array
+          items: { type: string, format: uri }
+          minItems: 1
+
+    CreateApplicationResponse:
+      type: object
+      required: [application]
+      properties:
+        application: { $ref: "#/components/schemas/ApplicationDto" }
+        clientSecret:
+          type: string
+          nullable: true
+          description: Present only when `accessType == "confidential"`. Returned exactly once.
+
+    ClientSecretResponse:
+      type: object
+      required: [clientSecret]
+      properties:
+        clientSecret:
+          type: string
+          description: Raw client secret. Returned exactly once — persist immediately.
+
     # ---- Sessions ----
     SessionDto:
       type: object
@@ -987,6 +1024,34 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+    post:
+      operationId: createApplication
+      summary: Create an OAuth2/OIDC client application
+      tags: [Applications]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateApplicationRequest" }
+      responses:
+        "201":
+          description: |
+            Application created. If accessType is `confidential`, the response
+            includes a freshly-minted `clientSecret` — persist it now, it
+            cannot be retrieved later.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateApplicationResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Client ID already in use in this workspace (including previously deleted apps)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /applications/{appId}:
     parameters:
       - in: path
@@ -1029,12 +1094,45 @@ paths:
         "422": { $ref: "#/components/responses/ValidationError" }
 
     delete:
-      operationId: disableApplication
-      summary: Disable an application
+      operationId: deleteApplication
+      summary: Soft-delete an application
+      description: |
+        Marks the application as deleted. The row is preserved so that
+        historical audit logs and tokens issued to this client_id continue
+        to resolve. The client_id is NOT reusable for a new application —
+        creating a new app with the same client_id in this workspace
+        returns 409 Conflict.
       tags: [Applications]
-      description: Soft-disables the application. Existing tokens remain valid until they expire.
+      security: [{ bearerAuth: [] }]
       responses:
-        "204": { description: Application disabled }
+        "204": { description: Application deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /applications/{appId}/regenerate-secret:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: regenerateApplicationSecret
+      summary: Rotate the client_secret for a confidential application
+      description: |
+        Generates a new random secret, hashes it into storage, and returns
+        the raw secret exactly once in the response body. Callers MUST
+        persist the returned value — it is not retrievable afterwards.
+        Also usable for public applications (harmless no-op — the secret
+        is minted but unused; recommend not calling for public apps).
+      tags: [Applications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Secret rotated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientSecretResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
