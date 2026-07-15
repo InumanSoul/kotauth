@@ -1003,6 +1003,64 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /groups/{groupId}/roles/{roleRef}:
+    parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: roleRef
+        required: true
+        schema: { type: string }
+        description: Numeric role id or role name. Names must be unambiguous across scopes.
+    post:
+      operationId: assignRoleToGroup
+      summary: Assign a role to a group
+      description: |
+        Every user who is (or later becomes) a member of the group inherits
+        this role. Idempotent — assigning the same role twice succeeds
+        silently.
+      tags: [Groups]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Role assigned }
+        "400":
+          description: Missing roleRef path parameter
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Group or role not found in this workspace
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422":
+          description: Role name is ambiguous — use the numeric role id
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+    delete:
+      operationId: unassignRoleFromGroup
+      summary: Remove a role from a group
+      description: |
+        Members of the group lose this role assignment (their own directly-
+        assigned roles are unaffected). Idempotent — removing a role that
+        wasn't assigned succeeds silently.
+      tags: [Groups]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Role removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Group not found in this workspace
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
   # ==========================================================================
   # Applications
   # ==========================================================================

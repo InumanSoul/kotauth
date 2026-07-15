@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminError
@@ -64,6 +65,17 @@ internal suspend inline fun ApplicationCall.parseUserIdOr(bail: () -> Nothing): 
         bail()
     } else {
         UserId(raw)
+    }
+}
+
+/** Parses the `{groupId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
+internal suspend inline fun ApplicationCall.parseGroupIdOr(bail: () -> Nothing): GroupId? {
+    val raw = parameters["groupId"]?.toIntOrNull()
+    return if (raw == null) {
+        respondProblem(HttpStatusCode.BadRequest, "Invalid group ID", "groupId must be an integer.")
+        bail()
+    } else {
+        GroupId(raw)
     }
 }
 
