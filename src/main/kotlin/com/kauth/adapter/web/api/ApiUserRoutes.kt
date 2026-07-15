@@ -20,6 +20,8 @@ internal fun Route.apiUserRoutes(
     accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
     roleGroupService: RoleGroupService,
+    mfaService: com.kauth.domain.service.MfaService,
+    sessionRepository: com.kauth.domain.port.SessionRepository,
 ) {
     route("/users") {
         get {
@@ -100,13 +102,7 @@ internal fun Route.apiUserRoutes(
             get {
                 requireScope(call, ApiScope.USERS_READ) ?: return@get
                 val tenantId = call.attributes[TenantIdAttr]
-                val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
-                        ?: return@get call.respondProblem(
-                            HttpStatusCode.BadRequest,
-                            "Invalid user ID",
-                            "userId must be an integer.",
-                        )
+                val userId = call.parseUserIdOr { return@get } ?: return@get
                 val user =
                     when (val r = adminUserService.getUser(userId, tenantId)) {
                         is AdminResult.Success -> r.value
@@ -123,13 +119,7 @@ internal fun Route.apiUserRoutes(
             put {
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@put
                 val tenantId = call.attributes[TenantIdAttr]
-                val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
-                        ?: return@put call.respondProblem(
-                            HttpStatusCode.BadRequest,
-                            "Invalid user ID",
-                            "userId must be an integer.",
-                        )
+                val userId = call.parseUserIdOr { return@put } ?: return@put
                 val body = call.receive<UpdateUserRequest>()
 
                 when (val result = adminUserService.updateUser(userId, tenantId, body.email, body.fullName)) {
@@ -141,13 +131,7 @@ internal fun Route.apiUserRoutes(
             delete {
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
                 val tenantId = call.attributes[TenantIdAttr]
-                val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
-                        ?: return@delete call.respondProblem(
-                            HttpStatusCode.BadRequest,
-                            "Invalid user ID",
-                            "userId must be an integer.",
-                        )
+                val userId = call.parseUserIdOr { return@delete } ?: return@delete
 
                 when (val result = adminUserService.setUserEnabled(userId, tenantId, false)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
@@ -163,13 +147,7 @@ internal fun Route.apiUserRoutes(
             post("/send-reset-email") {
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@post
                 val tenantId = call.attributes[TenantIdAttr]
-                val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
-                        ?: return@post call.respondProblem(
-                            HttpStatusCode.BadRequest,
-                            "Invalid user ID",
-                            "userId must be an integer.",
-                        )
+                val userId = call.parseUserIdOr { return@post } ?: return@post
                 val baseUrl = call.resolvedBaseUrl()
                 when (val result = accountService.sendPasswordResetEmail(userId, tenantId, baseUrl)) {
                     is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
@@ -191,13 +169,7 @@ internal fun Route.apiUserRoutes(
             post("/temporary-password") {
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@post
                 val tenantId = call.attributes[TenantIdAttr]
-                val userId =
-                    call.parameters["userId"]?.toIntOrNull()?.let { UserId(it) }
-                        ?: return@post call.respondProblem(
-                            HttpStatusCode.BadRequest,
-                            "Invalid user ID",
-                            "userId must be an integer.",
-                        )
+                val userId = call.parseUserIdOr { return@post } ?: return@post
                 when (val result = accountService.setTemporaryPassword(userId, tenantId)) {
                     is AdminResult.Success -> {
                         val slug = call.parameters["tenantSlug"] ?: ""
@@ -218,6 +190,58 @@ internal fun Route.apiUserRoutes(
                     }
                     is AdminResult.Failure -> call.respondAdminError(result.error)
                 }
+            }
+
+            /** Enable a previously disabled user. Idempotent. */
+            post("/enable") {
+                requireScope(call, ApiScope.USERS_WRITE) ?: return@post
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId = call.parseUserIdOr { return@post } ?: return@post
+                when (val result = adminUserService.setUserEnabled(userId, tenantId, true)) {
+                    is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                    is AdminResult.Failure -> call.respondAdminError(result.error)
+                }
+            }
+
+            /**
+             * Reset MFA for the user — removes all TOTP enrollments and recovery
+             * codes. Helpdesk-triggered when a user is locked out of their MFA app.
+             * Idempotent: succeeds even if no MFA was enrolled.
+             */
+            delete("/mfa/reset") {
+                requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId = call.parseUserIdOr { return@delete } ?: return@delete
+                mfaService.disableMfa(userId, tenantId)
+                call.respond(HttpStatusCode.NoContent, "")
+            }
+
+            /**
+             * Revokes all active sessions for the user. Used by security-alert
+             * response playbooks. Returns the count of sessions revoked.
+             */
+            post("/revoke-sessions") {
+                requireScope(call, ApiScope.SESSIONS_WRITE) ?: return@post
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId = call.parseUserIdOr { return@post } ?: return@post
+                val active = sessionRepository.findActiveByUser(tenantId, userId)
+                sessionRepository.revokeAllForUser(tenantId, userId, java.time.Instant.now())
+                call.respond(HttpStatusCode.OK, RevokeSessionsResponse(revoked = active.size))
+            }
+
+            /** List active sessions for the user. */
+            get("/sessions") {
+                requireScope(call, ApiScope.SESSIONS_READ) ?: return@get
+                val tenantId = call.attributes[TenantIdAttr]
+                val userId = call.parseUserIdOr { return@get } ?: return@get
+                val sessions = sessionRepository.findActiveByUser(tenantId, userId)
+                call.respond(
+                    HttpStatusCode.OK,
+                    ApiResponse(
+                        data = sessions.map { it.toApiDto() },
+                        meta = ApiMeta(total = sessions.size, offset = 0, limit = sessions.size),
+                    ),
+                )
             }
 
             route("/roles") {

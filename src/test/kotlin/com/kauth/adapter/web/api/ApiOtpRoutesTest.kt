@@ -335,6 +335,18 @@ class ApiOtpRoutesTest {
         credentialFlowService = stubSelfService(audit),
     )
 
+    private fun stubMfaService(
+        tenants: com.kauth.fakes.FakeTenantRepository,
+        users: com.kauth.fakes.FakeUserRepository,
+        audit: com.kauth.fakes.FakeAuditLogPort,
+    ) = com.kauth.domain.service.MfaService(
+        mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+        userRepository = users,
+        tenantRepository = tenants,
+        passwordHasher = com.kauth.fakes.FakePasswordHasher(),
+        auditLog = audit,
+    )
+
     private fun io.ktor.server.application.Application.installApp(
         emailLimiter: RateLimiterPort,
         ipLimiter: RateLimiterPort,
@@ -374,6 +386,7 @@ class ApiOtpRoutesTest {
                         credentialFlowService = stubSelfService(audit),
                     ),
                 adminUserService = stubAdminUserService(tenants, users, audit),
+                mfaService = stubMfaService(tenants, users, audit),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(
                         applicationRepository = apps,

@@ -39,6 +39,7 @@ fun Route.apiRoutes(
     roleGroupService: RoleGroupService,
     accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
+    mfaService: com.kauth.domain.service.MfaService,
     applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     userAttributeService: UserAttributeService,
     claimMapperService: CachingClaimMapperService,
@@ -114,7 +115,7 @@ fun Route.apiRoutes(
                 }
             install(apiContextPlugin)
 
-            apiUserRoutes(accountService, adminUserService, roleGroupService)
+            apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)

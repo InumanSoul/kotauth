@@ -1,15 +1,18 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
-import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.MfaEnrollment
+import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
@@ -18,6 +21,7 @@ import com.kauth.fakes.FakeAuditLogRepository
 import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakeGroupRepository
+import com.kauth.fakes.FakeMfaRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeRoleRepository
@@ -29,7 +33,9 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
@@ -42,7 +48,6 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -54,11 +59,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Integration tests for `GET /users` pagination (v1.21.0) and the
- * `UserDto` fields added alongside it: `requiredActions`, `isLocked`,
- * `createdAt`.
+ * Integration tests for the v1.21.0 user state management endpoints:
+ *   - POST   /users/{id}/enable
+ *   - DELETE /users/{id}/mfa/reset
+ *   - POST   /users/{id}/revoke-sessions
+ *   - GET    /users/{id}/sessions
  */
-class ApiUserRoutesTest {
+class ApiUserStateTest {
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val appRepo = FakeApplicationRepository()
@@ -73,6 +80,7 @@ class ApiUserRoutesTest {
     private val emailPort = FakeEmailPort()
     private val userAttributeRepo = FakeUserAttributeRepository()
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
+    private val mfaRepo = FakeMfaRepository()
     private val hasher = FakePasswordHasher()
 
     private val tenant =
@@ -118,8 +126,8 @@ class ApiUserRoutesTest {
         )
 
     private val mfaService =
-        com.kauth.domain.service.MfaService(
-            mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+        MfaService(
+            mfaRepository = mfaRepo,
             userRepository = userRepo,
             tenantRepository = tenantRepo,
             passwordHasher = hasher,
@@ -168,6 +176,7 @@ class ApiUserRoutesTest {
         prTokenRepo.clear()
         emailPort.clear()
         sessionRepo.clear()
+        mfaRepo.clear()
 
         tenantRepo.add(tenant)
 
@@ -176,251 +185,288 @@ class ApiUserRoutesTest {
                 apiKeyService.create(
                     tenantId = TenantId(1),
                     name = "Test Key",
-                    scopes = listOf(ApiScope.USERS_READ),
+                    scopes = listOf(ApiScope.USERS_WRITE, ApiScope.SESSIONS_READ, ApiScope.SESSIONS_WRITE),
                 ) as ApiKeyResult.Success
             ).value.rawKey
     }
 
-    private fun seedUsers(
-        count: Int,
-        prefix: String = "user",
-    ): List<User> =
-        (1..count).map { i ->
-            userRepo.add(
-                User(
-                    tenantId = TenantId(1),
-                    username = "$prefix$i",
-                    email = "$prefix$i@acme.com",
-                    fullName = "$prefix $i",
-                    passwordHash = hasher.hash("pass"),
-                ),
-            )
-        }
+    private fun seedUser(
+        username: String = "alice",
+        enabled: Boolean = true,
+        mfaEnabled: Boolean = false,
+    ): User =
+        userRepo.add(
+            User(
+                tenantId = TenantId(1),
+                username = username,
+                email = "$username@acme.com",
+                fullName = username,
+                passwordHash = hasher.hash("pass"),
+                enabled = enabled,
+                mfaEnabled = mfaEnabled,
+            ),
+        )
+
+    private fun seedSession(
+        userId: UserId,
+        revoked: Boolean = false,
+    ): Session =
+        sessionRepo.save(
+            Session(
+                tenantId = TenantId(1),
+                userId = userId,
+                clientId = null,
+                scopes = "openid",
+                accessTokenHash = "hash-${System.nanoTime()}",
+                refreshTokenHash = null,
+                ipAddress = "127.0.0.1",
+                createdAt = Instant.now(),
+                expiresAt = Instant.now().plusSeconds(3600),
+                revokedAt = if (revoked) Instant.now() else null,
+            ),
+        )
+
+    private fun apiKeyMissingScope(scopes: List<String>): String =
+        (
+            apiKeyService.create(
+                tenantId = TenantId(1),
+                name = "Limited Key",
+                scopes = scopes,
+            ) as ApiKeyResult.Success
+        ).value.rawKey
 
     // =========================================================================
-    // GET /users — pagination
+    // POST /users/{id}/enable
     // =========================================================================
 
     @Test
-    fun `GET users returns first page with default limit when no params supplied`() =
+    fun `POST users enable returns 204 and flips enabled flag on a disabled user`() =
         testApplication {
             application { installTestApp() }
-            seedUsers(10)
+            val user = seedUser(enabled = false)
+            val userId = user.id!!
 
             val response =
-                client.get("/t/acme/api/v1/users") {
+                client.post("/t/acme/api/v1/users/${userId.value}/enable") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            val updated = userRepo.findById(userId, TenantId(1))
+            assertEquals(true, updated?.enabled)
+        }
+
+    @Test
+    fun `POST users enable is idempotent for already-enabled user`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser(enabled = true)
+            val userId = user.id!!
+
+            val response =
+                client.post("/t/acme/api/v1/users/${userId.value}/enable") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            val updated = userRepo.findById(userId, TenantId(1))
+            assertEquals(true, updated?.enabled)
+        }
+
+    @Test
+    fun `POST users enable returns 404 for unknown user`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/users/99999/enable") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // =========================================================================
+    // DELETE /users/{id}/mfa/reset
+    // =========================================================================
+
+    @Test
+    fun `DELETE users mfa reset returns 204 and clears mfaEnabled + enrollments`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser(mfaEnabled = true)
+            val userId = user.id!!
+            mfaRepo.saveEnrollment(
+                MfaEnrollment(
+                    userId = userId,
+                    tenantId = TenantId(1),
+                    secret = "SECRET",
+                    verified = true,
+                ),
+            )
+
+            val response =
+                client.delete("/t/acme/api/v1/users/${userId.value}/mfa/reset") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            val updated = userRepo.findById(userId, TenantId(1))
+            assertEquals(false, updated?.mfaEnabled)
+            assertEquals(null, mfaRepo.findEnrollmentByUserId(userId, "TOTP"))
+        }
+
+    @Test
+    fun `DELETE users mfa reset is idempotent when user has no MFA enrolled`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser(mfaEnabled = false)
+
+            val response =
+                client.delete("/t/acme/api/v1/users/${user.id!!.value}/mfa/reset") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+        }
+
+    // =========================================================================
+    // POST /users/{id}/revoke-sessions
+    // =========================================================================
+
+    @Test
+    fun `POST users revoke-sessions returns count and revokes all active sessions for user`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser()
+            val userId = user.id!!
+            seedSession(userId)
+            seedSession(userId)
+            seedSession(userId, revoked = true)
+
+            val response =
+                client.post("/t/acme/api/v1/users/${userId.value}/revoke-sessions") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(2, body["revoked"]!!.jsonPrimitive.int)
+            assertTrue(sessionRepo.findActiveByUser(TenantId(1), userId).isEmpty())
+        }
+
+    @Test
+    fun `POST users revoke-sessions returns revoked 0 for user with no sessions`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser()
+
+            val response =
+                client.post("/t/acme/api/v1/users/${user.id!!.value}/revoke-sessions") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["revoked"]!!.jsonPrimitive.int)
+        }
+
+    @Test
+    fun `POST users revoke-sessions does not touch other users' sessions in same tenant`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser("alice")
+            val other = seedUser("bob")
+            val userId = user.id!!
+            val otherId = other.id!!
+            seedSession(userId)
+            seedSession(otherId)
+
+            val response =
+                client.post("/t/acme/api/v1/users/${userId.value}/revoke-sessions") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(1, sessionRepo.findActiveByUser(TenantId(1), otherId).size)
+        }
+
+    // =========================================================================
+    // GET /users/{id}/sessions
+    // =========================================================================
+
+    @Test
+    fun `GET users sessions returns active sessions filtered to that user`() =
+        testApplication {
+            application { installTestApp() }
+            val user = seedUser("alice")
+            val other = seedUser("bob")
+            val userId = user.id!!
+            seedSession(userId)
+            seedSession(userId)
+            seedSession(other.id!!)
+
+            val response =
+                client.get("/t/acme/api/v1/users/${userId.value}/sessions") {
                     bearerAuth(rawApiKey)
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             val data = body["data"]!!.jsonArray
-            val meta = body["meta"]!!.jsonObject
-            assertEquals(10, data.size)
-            assertEquals(10, meta["total"]!!.jsonPrimitive.int)
-            assertEquals(0, meta["offset"]!!.jsonPrimitive.int)
-            assertEquals(50, meta["limit"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `GET users respects limit param`() =
-        testApplication {
-            application { installTestApp() }
-            seedUsers(15)
-
-            val response =
-                client.get("/t/acme/api/v1/users?limit=5") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val data = body["data"]!!.jsonArray
-            val meta = body["meta"]!!.jsonObject
-            assertEquals(5, data.size)
-            assertEquals(5, meta["limit"]!!.jsonPrimitive.int)
-            assertEquals(15, meta["total"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `GET users respects offset param`() =
-        testApplication {
-            application { installTestApp() }
-            seedUsers(5, prefix = "seq")
-
-            val response =
-                client.get("/t/acme/api/v1/users?limit=2&offset=2") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val data = body["data"]!!.jsonArray
             assertEquals(2, data.size)
-            val usernames = data.map { it.jsonObject["username"]!!.jsonPrimitive.content }
-            assertEquals(listOf("seq3", "seq4"), usernames)
+            assertTrue(data.all { it.jsonObject["userId"]!!.jsonPrimitive.int == userId.value })
         }
 
     @Test
-    fun `GET users caps limit at 200`() =
+    fun `GET users sessions returns empty data array when user has no sessions`() =
         testApplication {
             application { installTestApp() }
-            seedUsers(3)
+            val user = seedUser()
 
             val response =
-                client.get("/t/acme/api/v1/users?limit=999") {
+                client.get("/t/acme/api/v1/users/${user.id!!.value}/sessions") {
                     bearerAuth(rawApiKey)
                 }
 
+            assertEquals(HttpStatusCode.OK, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val meta = body["meta"]!!.jsonObject
-            assertEquals(200, meta["limit"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `GET users coerces invalid limit to default`() =
-        testApplication {
-            application { installTestApp() }
-            seedUsers(3)
-
-            val response =
-                client.get("/t/acme/api/v1/users?limit=abc") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val meta = body["meta"]!!.jsonObject
-            assertEquals(50, meta["limit"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `GET users search filters and pagination combined`() =
-        testApplication {
-            application { installTestApp() }
-            seedUsers(7, prefix = "other")
-            seedUsers(3, prefix = "match")
-
-            val response =
-                client.get("/t/acme/api/v1/users?search=match&limit=3") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val data = body["data"]!!.jsonArray
-            val meta = body["meta"]!!.jsonObject
-            assertEquals(3, data.size)
-            assertEquals(3, meta["total"]!!.jsonPrimitive.int)
-            assertTrue(
-                data.all {
-                    it.jsonObject["username"]!!
-                        .jsonPrimitive.content
-                        .startsWith("match")
-                },
-            )
+            assertEquals(0, body["data"]!!.jsonArray.size)
+            assertEquals(0, body["meta"]!!.jsonObject["total"]!!.jsonPrimitive.int)
         }
 
     // =========================================================================
-    // UserDto field completeness — GET /users/{id}
+    // Scope enforcement
     // =========================================================================
 
     @Test
-    fun `UserDto includes requiredActions in response`() =
+    fun `scope enforcement key without USERS_WRITE gets 403 on POST enable`() =
         testApplication {
             application { installTestApp() }
-            val user =
-                userRepo.add(
-                    User(
-                        tenantId = TenantId(1),
-                        username = "pending",
-                        email = "pending@acme.com",
-                        fullName = "Pending User",
-                        passwordHash = hasher.hash("pass"),
-                        requiredActions = setOf(RequiredAction.CHANGE_PASSWORD),
-                    ),
-                )
+            val user = seedUser(enabled = false)
+            val limitedKey = apiKeyMissingScope(listOf(ApiScope.SESSIONS_READ, ApiScope.SESSIONS_WRITE))
 
             val response =
-                client.get("/t/acme/api/v1/users/${user.id!!.value}") {
-                    bearerAuth(rawApiKey)
+                client.post("/t/acme/api/v1/users/${user.id!!.value}/enable") {
+                    bearerAuth(limitedKey)
                 }
 
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val requiredActions = body["requiredActions"]!!.jsonArray.map { it.jsonPrimitive.content }
-            assertTrue("CHANGE_PASSWORD" in requiredActions)
+            assertEquals(HttpStatusCode.Forbidden, response.status)
         }
 
     @Test
-    fun `UserDto isLocked is true when lockedUntil is in future`() =
+    fun `scope enforcement key without SESSIONS_WRITE gets 403 on POST revoke-sessions`() =
         testApplication {
             application { installTestApp() }
-            val user =
-                userRepo.add(
-                    User(
-                        tenantId = TenantId(1),
-                        username = "locked",
-                        email = "locked@acme.com",
-                        fullName = "Locked User",
-                        passwordHash = hasher.hash("pass"),
-                        lockedUntil = Instant.now().plusSeconds(3600),
-                    ),
-                )
+            val user = seedUser()
+            val limitedKey = apiKeyMissingScope(listOf(ApiScope.USERS_WRITE, ApiScope.SESSIONS_READ))
 
             val response =
-                client.get("/t/acme/api/v1/users/${user.id!!.value}") {
-                    bearerAuth(rawApiKey)
+                client.post("/t/acme/api/v1/users/${user.id!!.value}/revoke-sessions") {
+                    bearerAuth(limitedKey)
                 }
 
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(true, body["isLocked"]!!.jsonPrimitive.boolean)
-        }
-
-    @Test
-    fun `UserDto isLocked is false when lockedUntil is in past`() =
-        testApplication {
-            application { installTestApp() }
-            val user =
-                userRepo.add(
-                    User(
-                        tenantId = TenantId(1),
-                        username = "unlocked",
-                        email = "unlocked@acme.com",
-                        fullName = "Unlocked User",
-                        passwordHash = hasher.hash("pass"),
-                        lockedUntil = Instant.now().minusSeconds(3600),
-                    ),
-                )
-
-            val response =
-                client.get("/t/acme/api/v1/users/${user.id!!.value}") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(false, body["isLocked"]!!.jsonPrimitive.boolean)
-        }
-
-    @Test
-    fun `UserDto createdAt is ISO-8601 when non-null`() =
-        testApplication {
-            application { installTestApp() }
-            val createdAt = Instant.parse("2026-01-01T00:00:00Z")
-            val user =
-                userRepo.add(
-                    User(
-                        tenantId = TenantId(1),
-                        username = "dated",
-                        email = "dated@acme.com",
-                        fullName = "Dated User",
-                        passwordHash = hasher.hash("pass"),
-                        createdAt = createdAt,
-                    ),
-                )
-
-            val response =
-                client.get("/t/acme/api/v1/users/${user.id!!.value}") {
-                    bearerAuth(rawApiKey)
-                }
-
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(isoFormatter.format(createdAt), body["createdAt"]!!.jsonPrimitive.content)
+            assertEquals(HttpStatusCode.Forbidden, response.status)
         }
 
     // -------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AttributeResult
 import io.ktor.http.HttpHeaders
@@ -53,6 +54,17 @@ internal suspend fun ApplicationCall.respondProblem(
             detail = detail,
         ),
     )
+}
+
+/** Parses the `{userId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
+internal suspend inline fun ApplicationCall.parseUserIdOr(bail: () -> Nothing): UserId? {
+    val raw = parameters["userId"]?.toIntOrNull()
+    return if (raw == null) {
+        respondProblem(HttpStatusCode.BadRequest, "Invalid user ID", "userId must be an integer.")
+        bail()
+    } else {
+        UserId(raw)
+    }
 }
 
 internal suspend fun ApplicationCall.respondAdminError(error: AdminError): Unit =
@@ -290,6 +302,11 @@ data class ProblemDetail(
 
 @Serializable data class ClaimMappersDto(
     val mappers: List<ClaimMapperDto>,
+)
+
+/** Response for `POST /users/{id}/revoke-sessions` — count of sessions revoked (0 if the user had none). */
+@Serializable data class RevokeSessionsResponse(
+    val revoked: Int,
 )
 
 // -- Domain → DTO mappers ----------------------------------------------------

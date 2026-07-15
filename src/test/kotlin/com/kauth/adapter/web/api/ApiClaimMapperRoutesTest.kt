@@ -360,6 +360,14 @@ class ApiClaimMapperRoutesTest {
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                         credentialFlowService = buildFakeSelfService(),
                     ),
+                mfaService =
+                    com.kauth.domain.service.MfaService(
+                        mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+                        userRepository = userRepo,
+                        tenantRepository = tenantRepo,
+                        passwordHasher = hasher,
+                        auditLog = com.kauth.fakes.FakeAuditLogPort(),
+                    ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(
                         applicationRepository = com.kauth.fakes.FakeApplicationRepository(),

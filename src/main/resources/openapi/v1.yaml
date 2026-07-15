@@ -178,6 +178,14 @@ components:
           type: string
           format: date-time
 
+    RevokeSessionsResponse:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: integer
+          description: Number of active sessions that were revoked (0 if user had none).
+
     # ---- Roles ----
     RoleDto:
       type: object
@@ -623,6 +631,91 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/enable:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: enableUser
+      summary: Enable a disabled user
+      description: Idempotent. Also clears the account's active lockout if any.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: User enabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/mfa/reset:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: resetUserMfa
+      summary: Reset MFA for a user
+      description: |
+        Removes all TOTP enrollments and recovery codes. Helpdesk operation
+        for users locked out of their authenticator. Idempotent — succeeds
+        even if the user has no MFA enrolled.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: MFA reset }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{userId}/revoke-sessions:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: revokeUserSessions
+      summary: Revoke all active sessions for a user
+      description: Used by security-incident response playbooks.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Sessions revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevokeSessionsResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{userId}/sessions:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUserSessions
+      summary: List active sessions for a user
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SessionDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /users/{userId}/roles/{roleId}:
     parameters:

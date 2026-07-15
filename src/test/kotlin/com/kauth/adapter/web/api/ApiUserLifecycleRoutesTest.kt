@@ -138,6 +138,15 @@ class ApiUserLifecycleRoutesTest {
             credentialFlowService = accountSelfService,
         )
 
+    private val mfaService =
+        com.kauth.domain.service.MfaService(
+            mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
+        )
+
     private val applicationManagementService =
         com.kauth.domain.service.ApplicationManagementService(
             applicationRepository = appRepo,
@@ -396,6 +405,7 @@ class ApiUserLifecycleRoutesTest {
                 roleGroupService = roleGroupService,
                 accountService = adminService,
                 adminUserService = adminUserService,
+                mfaService = mfaService,
                 applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,

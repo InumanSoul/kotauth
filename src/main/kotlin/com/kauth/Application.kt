@@ -456,6 +456,7 @@ fun Application.module(
             roleGroupService = s.roleGroupService,
             accountService = s.accountService,
             adminUserService = s.adminUserService,
+            mfaService = s.mfaService,
             applicationManagementService = s.applicationManagementService,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
