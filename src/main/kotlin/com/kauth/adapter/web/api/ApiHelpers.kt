@@ -350,6 +350,52 @@ data class ProblemDetail(
     val revoked: Int,
 )
 
+/**
+ * Read-only workspace configuration: tenant metadata, enabled sign-in methods, security/password
+ * policy, MFA policy, and magic-link/email-OTP limits. SMTP credentials are NEVER included — SMTP
+ * is configured and inspected exclusively via the admin UI. Not editable via API in v1.21.0.
+ */
+@Serializable data class WorkspaceDto(
+    val id: Int,
+    val slug: String,
+    val displayName: String,
+    val issuerUrl: String? = null,
+    val tokenExpirySeconds: Long,
+    val refreshTokenExpirySeconds: Long,
+    val registrationEnabled: Boolean,
+    val emailVerificationRequired: Boolean,
+    val passkeysEnabled: Boolean,
+    val maxConcurrentSessions: Int? = null,
+    val signInMethods: WorkspaceSignInMethodsDto,
+    val passwordPolicy: WorkspacePasswordPolicyDto,
+    val mfaPolicy: String,
+    val lockoutMaxAttempts: Int,
+    val lockoutDurationMinutes: Int,
+    val magicLinkTtlMinutes: Int,
+    val emailOtpSignupEnabled: Boolean,
+    val emailOtpLockoutThreshold: Int,
+    val corsAllowCredentials: Boolean,
+    val portalLayout: String,
+)
+
+@Serializable data class WorkspaceSignInMethodsDto(
+    val password: Boolean,
+    val passkey: Boolean,
+    val magicLink: Boolean,
+    val emailOtp: Boolean,
+)
+
+@Serializable data class WorkspacePasswordPolicyDto(
+    val minLength: Int,
+    val requireSpecial: Boolean,
+    val requireUppercase: Boolean,
+    val requireNumber: Boolean,
+    val historyCount: Int,
+    val maxAgeDays: Int,
+    val blacklistEnabled: Boolean,
+    val hibpCheckEnabled: Boolean,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -424,3 +470,45 @@ internal fun com.kauth.domain.model.TenantClaimMapper.toApiDto() =
         includeInAccess = includeInAccess,
         includeInId = includeInId,
     )
+
+internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {
+    val sc = securityConfig
+    return WorkspaceDto(
+        id = id.value,
+        slug = slug,
+        displayName = displayName,
+        issuerUrl = issuerUrl,
+        tokenExpirySeconds = tokenExpirySeconds,
+        refreshTokenExpirySeconds = refreshTokenExpirySeconds,
+        registrationEnabled = registrationEnabled,
+        emailVerificationRequired = emailVerificationRequired,
+        passkeysEnabled = passkeysEnabled,
+        maxConcurrentSessions = maxConcurrentSessions,
+        signInMethods =
+            WorkspaceSignInMethodsDto(
+                password = sc.passwordLoginEnabled,
+                passkey = passkeysEnabled,
+                magicLink = sc.magicLinkEnabled,
+                emailOtp = sc.emailOtpLoginEnabled,
+            ),
+        passwordPolicy =
+            WorkspacePasswordPolicyDto(
+                minLength = sc.passwordMinLength,
+                requireSpecial = sc.passwordRequireSpecial,
+                requireUppercase = sc.passwordRequireUppercase,
+                requireNumber = sc.passwordRequireNumber,
+                historyCount = sc.passwordHistoryCount,
+                maxAgeDays = sc.passwordMaxAgeDays,
+                blacklistEnabled = sc.passwordBlacklistEnabled,
+                hibpCheckEnabled = sc.hibpCheckEnabled,
+            ),
+        mfaPolicy = sc.mfaPolicy,
+        lockoutMaxAttempts = sc.lockoutMaxAttempts,
+        lockoutDurationMinutes = sc.lockoutDurationMinutes,
+        magicLinkTtlMinutes = sc.magicLinkTokenTtlMinutes,
+        emailOtpSignupEnabled = sc.emailOtpSignupEnabled,
+        emailOtpLockoutThreshold = sc.emailOtpLockoutThreshold,
+        corsAllowCredentials = sc.corsAllowCredentials,
+        portalLayout = portalConfig.layout.name,
+    )
+}

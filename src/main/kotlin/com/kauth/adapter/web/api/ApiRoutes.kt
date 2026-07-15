@@ -117,6 +117,7 @@ fun Route.apiRoutes(
 
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
+            apiWorkspaceRoutes(tenantRepository)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)

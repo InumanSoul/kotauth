@@ -63,6 +63,9 @@ object ApiScope {
     /** Verify an email OTP challenge and exchange it for an authorization code. */
     const val AUTH_VERIFY_OTP = "auth:verify-otp"
 
+    /** Read tenant metadata, sign-in methods, and security/MFA policy. SMTP credentials excluded. */
+    const val WORKSPACE_READ = "workspace:read"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -84,5 +87,6 @@ object ApiScope {
             TENANTS_IMPORT,
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
+            WORKSPACE_READ,
         )
 }

@@ -39,6 +39,7 @@ info:
     | `claim_mappers:write`   | Create, update, delete claim mappers      |
     | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
     | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
+    | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
 
     ## Custom attributes and JWT claims
 
@@ -309,6 +310,61 @@ components:
         ipAddress: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+
+    # ---- Workspace ----
+    WorkspaceDto:
+      type: object
+      required:
+        [id, slug, displayName, tokenExpirySeconds, refreshTokenExpirySeconds,
+         registrationEnabled, emailVerificationRequired, passkeysEnabled,
+         signInMethods, passwordPolicy, mfaPolicy, lockoutMaxAttempts,
+         lockoutDurationMinutes, magicLinkTtlMinutes, emailOtpSignupEnabled,
+         emailOtpLockoutThreshold, corsAllowCredentials, portalLayout]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        displayName: { type: string }
+        issuerUrl: { type: string, nullable: true }
+        tokenExpirySeconds: { type: integer, format: int64 }
+        refreshTokenExpirySeconds: { type: integer, format: int64 }
+        registrationEnabled: { type: boolean }
+        emailVerificationRequired: { type: boolean }
+        passkeysEnabled: { type: boolean }
+        maxConcurrentSessions: { type: integer, nullable: true }
+        signInMethods: { $ref: "#/components/schemas/WorkspaceSignInMethodsDto" }
+        passwordPolicy: { $ref: "#/components/schemas/WorkspacePasswordPolicyDto" }
+        mfaPolicy: { type: string, enum: [optional, required, required_admins] }
+        lockoutMaxAttempts: { type: integer }
+        lockoutDurationMinutes: { type: integer }
+        magicLinkTtlMinutes: { type: integer }
+        emailOtpSignupEnabled: { type: boolean }
+        emailOtpLockoutThreshold: { type: integer }
+        corsAllowCredentials: { type: boolean }
+        portalLayout: { type: string, enum: [SIDEBAR, CENTERED] }
+
+    WorkspaceSignInMethodsDto:
+      type: object
+      required: [password, passkey, magicLink, emailOtp]
+      properties:
+        password: { type: boolean }
+        passkey: { type: boolean }
+        magicLink: { type: boolean }
+        emailOtp: { type: boolean }
+
+    WorkspacePasswordPolicyDto:
+      type: object
+      required:
+        [minLength, requireSpecial, requireUppercase, requireNumber,
+         historyCount, maxAgeDays, blacklistEnabled, hibpCheckEnabled]
+      properties:
+        minLength: { type: integer }
+        requireSpecial: { type: boolean }
+        requireUppercase: { type: boolean }
+        requireNumber: { type: boolean }
+        historyCount: { type: integer }
+        maxAgeDays: { type: integer }
+        blacklistEnabled: { type: boolean }
+        hibpCheckEnabled: { type: boolean }
 
     # ---- Audit Logs ----
     AuditEventDto:
@@ -1203,6 +1259,29 @@ paths:
       operationId: listSessions
       summary: List active sessions
       tags: [Sessions]
+      parameters:
+        - in: query
+          name: user_id
+          schema: { type: integer }
+          description: Filter by user id
+        - in: query
+          name: application_id
+          schema: { type: integer }
+          description: Filter by client (application) id
+        - in: query
+          name: active_only
+          schema: { type: boolean, default: true }
+          description: |
+            Only `true` is supported in v1.21.0. Passing `false` returns
+            HTTP 400. Reserved for a future release when revoked-session
+            history is exposed here (currently reconstructable via the
+            audit-logs API).
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200":
           description: Active session list
@@ -1213,6 +1292,11 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: "#/components/schemas/SessionDto" } }
                   meta: { $ref: "#/components/schemas/ApiMeta" }
+        "400":
+          description: active_only=false is not supported in v1.21.0
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -1229,6 +1313,30 @@ paths:
       tags: [Sessions]
       responses:
         "204": { description: Session revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Workspace
+  # ==========================================================================
+  /workspace:
+    get:
+      operationId: getWorkspace
+      summary: Read the workspace configuration
+      description: |
+        Returns tenant metadata + which sign-in methods are enabled +
+        security/password/MFA policy + magic-link/email-OTP limits. SMTP
+        credentials are NEVER returned — configure and inspect SMTP via
+        the admin UI. Not editable via API in v1.21.0.
+      tags: [Workspace]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Workspace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceDto" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -1531,6 +1639,8 @@ tags:
     description: OAuth 2.0 client applications
   - name: Sessions
     description: Active user sessions
+  - name: Workspace
+    description: Tenant metadata, sign-in methods, and security/MFA policy (read-only; SMTP excluded)
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes
