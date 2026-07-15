@@ -19,6 +19,56 @@ class ApplicationManagementService(
     private val auditLog: AuditLogPort,
     private val corsPort: CorsPort? = null,
 ) {
+    fun createApplication(
+        tenantId: TenantId,
+        clientId: String,
+        name: String,
+        description: String?,
+        accessType: String,
+        redirectUris: List<String>,
+    ): AdminResult<Application> {
+        if (clientId.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Client ID is required."))
+        }
+        if (!clientId.matches(Regex("[a-z0-9-]+"))) {
+            return AdminResult.Failure(
+                AdminError.Validation("Client ID may only contain lowercase letters, numbers, and hyphens."),
+            )
+        }
+        if (name.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Name is required."))
+        }
+        if (redirectUris.isEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "At least one redirect URI is required. The authorization code flow " +
+                        "needs a registered URI to bind to.",
+                ),
+            )
+        }
+        if (applicationRepository.existsByClientId(tenantId, clientId)) {
+            return AdminResult.Failure(AdminError.Conflict("Client ID '$clientId' already exists."))
+        }
+
+        val created = applicationRepository.create(tenantId, clientId, name, description, accessType, redirectUris)
+
+        invalidateCors(tenantId)
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = null,
+                clientId = created.id,
+                eventType = AuditEventType.ADMIN_CLIENT_CREATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("clientId" to created.clientId),
+            ),
+        )
+
+        return AdminResult.Success(created)
+    }
+
     fun updateApplication(
         appId: ApplicationId,
         tenantId: TenantId,
