@@ -1788,12 +1788,21 @@ paths:
         Soft-revoke — sets `enabled = false` and preserves the row for audit.
         Hard-delete is not exposed via REST; use the admin CLI if a hard
         cleanup is required.
+
+        Bootstrap keys (managed via `KAUTH_BOOTSTRAP_API_KEYS`) cannot be
+        revoked through this endpoint and return 403.
       tags: [API Keys]
       security: [{ bearerAuth: [] }]
       responses:
         "204": { description: Key revoked }
         "401": { $ref: "#/components/responses/Unauthorized" }
-        "403": { $ref: "#/components/responses/Forbidden" }
+        "403":
+          description: >-
+            Insufficient scope, or the key is bootstrap-provisioned and can
+            only be revoked via KAUTH_BOOTSTRAP_API_KEYS
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ==========================================================================

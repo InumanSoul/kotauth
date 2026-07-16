@@ -65,6 +65,14 @@ internal fun Route.apiKeyManagementRoutes(apiKeyService: ApiKeyService) {
                         "Invalid API key ID",
                         "id must be an integer.",
                     )
+            val existing = apiKeyService.findById(id, tenantId)
+            if (existing?.bootstrapName != null) {
+                return@delete call.respondProblem(
+                    HttpStatusCode.Forbidden,
+                    "Forbidden",
+                    "Bootstrap-provisioned keys can only be revoked via KAUTH_BOOTSTRAP_API_KEYS.",
+                )
+            }
             when (val result = apiKeyService.revoke(id, tenantId)) {
                 is ApiKeyResult.Success -> call.respond(HttpStatusCode.NoContent, "")
                 is ApiKeyResult.Failure -> call.respondApiKeyError(result.error)

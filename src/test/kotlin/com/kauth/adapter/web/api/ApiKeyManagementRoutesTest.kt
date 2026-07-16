@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -409,6 +410,31 @@ class ApiKeyManagementRoutesTest {
             val response = client.delete("/t/acme/api/v1/api-keys/999999") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `DELETE api-keys id returns 403 for bootstrap-provisioned key`() =
+        testApplication {
+            application { installTestApp() }
+            val bootstrapKey =
+                apiKeyRepo.save(
+                    ApiKey(
+                        tenantId = TenantId(1),
+                        name = "kauth-cli",
+                        keyPrefix = "kauth_acme_boot",
+                        keyHash = "hash-v1",
+                        scopes = listOf(ApiScope.API_KEYS_WRITE),
+                        bootstrapName = "kauth-cli",
+                    ),
+                )
+
+            val response =
+                client.delete("/t/acme/api/v1/api-keys/${bootstrapKey.id}") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertTrue(response.bodyAsText().contains("KAUTH_BOOTSTRAP_API_KEYS"))
+            val stored = apiKeyRepo.findById(bootstrapKey.id!!, TenantId(1))
+            assertTrue(stored!!.enabled)
         }
 
     @Test
