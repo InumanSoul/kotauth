@@ -8,6 +8,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
@@ -15,6 +16,7 @@ import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
@@ -50,6 +52,8 @@ fun Route.apiRoutes(
     otpIpRateLimiter: RateLimiterPort,
     webhookService: WebhookService,
     resourceServerService: ResourceServerService,
+    webAuthnService: WebAuthnService,
+    webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -130,6 +134,7 @@ fun Route.apiRoutes(
             apiClaimMapperRoutes(claimMapperService)
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
             apiKeyManagementRoutes(apiKeyService)
+            apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)
         }
     }
 }

@@ -7,6 +7,7 @@ import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.ApiKeyError
 import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ResourceServerError
+import com.kauth.domain.service.WebAuthnError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -164,6 +165,45 @@ internal suspend fun ApplicationCall.respondApiKeyError(error: ApiKeyError): Uni
         is ApiKeyError.NotFound -> respondProblem(HttpStatusCode.NotFound, "Not Found", error.message)
         is ApiKeyError.Validation ->
             respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", error.message)
+    }
+
+/**
+ * Maps [WebAuthnError] to Problem+JSON responses for the passkey admin API. The
+ * last branch handles error variants that are only ever produced by the
+ * auth-flow challenge/verify endpoints (never by list/revoke) — included so the
+ * `when` stays exhaustive on the sealed hierarchy.
+ */
+internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError): Unit =
+    when (error) {
+        WebAuthnError.CredentialNotFound ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey credential not found.")
+        WebAuthnError.CannotRevokeLast ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Cannot revoke last passkey",
+                "This is the user's last passkey and password login is disabled — enable password login " +
+                    "or add another passkey before revoking this one.",
+            )
+        WebAuthnError.TenantMismatch ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey does not belong to this workspace.")
+        WebAuthnError.TenantDisabled, WebAuthnError.PasskeysDisabledForTenant ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Passkeys disabled",
+                "Passkeys are not enabled for this workspace.",
+            )
+        WebAuthnError.UserDisabled ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "User disabled", "The user is not enabled.")
+        WebAuthnError.InvalidChallenge,
+        WebAuthnError.CounterReplayDetected,
+        is WebAuthnError.VerificationFailed,
+        is WebAuthnError.RateLimited,
+        ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "WebAuthn error",
+                "Unexpected WebAuthn error — this endpoint doesn't produce challenge/auth flows.",
+            )
     }
 
 // -- Response envelope --------------------------------------------------------
@@ -508,6 +548,25 @@ data class ProblemDetail(
     val rawKey: String,
 )
 
+/**
+ * Passkey credential summary. Deliberately excludes `publicKeyCose` (raw COSE
+ * public-key bytes — internal), `signCounter` (WebAuthn replay-protection
+ * state — internal), `tenantId`, and `userId` (redundant with URL context on
+ * GET, internal for DELETE).
+ */
+@Serializable data class PasskeyDto(
+    val id: Long,
+    val credentialId: String,
+    val name: String,
+    /** AAGUID as UUID string, or null when the authenticator did not report one. */
+    val aaguid: String? = null,
+    val transports: List<String>,
+    val backupEligible: Boolean,
+    val backupState: Boolean,
+    val createdAt: String,
+    val lastUsedAt: String? = null,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -615,6 +674,19 @@ internal fun com.kauth.domain.model.ApiKey.toApiDto(): ApiKeyDto =
         enabled = enabled,
         bootstrapName = bootstrapName,
         createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.WebAuthnCredential.toApiDto(): PasskeyDto =
+    PasskeyDto(
+        id = id!!,
+        credentialId = credentialId,
+        name = name,
+        aaguid = aaguid?.toString(),
+        transports = transports,
+        backupEligible = backupEligible,
+        backupState = backupState,
+        createdAt = isoFormatter.format(createdAt),
+        lastUsedAt = lastUsedAt?.let { isoFormatter.format(it) },
     )
 
 internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {

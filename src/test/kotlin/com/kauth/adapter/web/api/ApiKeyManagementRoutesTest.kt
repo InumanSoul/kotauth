@@ -13,6 +13,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
@@ -24,6 +25,7 @@ import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakeMfaRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
+import com.kauth.fakes.FakeRelyingPartyAdapter
 import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
@@ -31,6 +33,7 @@ import com.kauth.fakes.FakeTenantClaimMapperRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebAuthnCredentialRepository
 import com.kauth.fakes.FakeWebhookDeliveryRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
@@ -518,6 +521,15 @@ class ApiKeyManagementRoutesTest {
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
+                webAuthnService =
+                    WebAuthnService(
+                        credentialRepository = FakeWebAuthnCredentialRepository(),
+                        relyingParty = FakeRelyingPartyAdapter(),
+                        secretKey = "test-secret-key-32chars-long-xxxx",
+                        auditLog = FakeAuditLogPort(),
+                        userRepository = FakeUserRepository(),
+                    ),
+                webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
             )
         }
     }

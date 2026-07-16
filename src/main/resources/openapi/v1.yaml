@@ -515,6 +515,26 @@ components:
             Plaintext key value. Returned exactly once. Include this in
             future requests as `Authorization: Bearer <rawKey>`.
 
+    # ---- Passkeys ----
+    PasskeyDto:
+      type: object
+      required: [id, credentialId, name, transports, backupEligible, backupState, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        credentialId: { type: string }
+        name: { type: string }
+        aaguid:
+          type: string
+          nullable: true
+          description: AAGUID of the authenticator, when reported by the client.
+        transports:
+          type: array
+          items: { type: string }
+        backupEligible: { type: boolean }
+        backupState: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+
     # ---- Audit Logs ----
     AuditEventDto:
       type: object
@@ -1806,6 +1826,67 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ==========================================================================
+  # Passkeys
+  # ==========================================================================
+  /users/{userId}/passkeys:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUserPasskeys
+      summary: List passkey credentials for a user
+      tags: [Passkeys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Passkeys for the user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PasskeyDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "400":
+          description: Invalid user ID
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /passkeys/{credentialPk}:
+    parameters:
+      - in: path
+        name: credentialPk
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      operationId: revokePasskey
+      summary: Revoke a passkey credential
+      description: |
+        Deletes the passkey from the user's account and records an audit
+        event. Returns 409 with `CannotRevokeLast` if this is the user's
+        only remaining passkey and password login is disabled for the
+        workspace.
+      tags: [Passkeys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Passkey revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Cannot revoke last passkey when password login disabled
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+  # ==========================================================================
   # Audit Logs
   # ==========================================================================
   /audit-logs:
@@ -2111,6 +2192,8 @@ tags:
     description: RFC 8707 resource indicators (audiences) and their client authorization edges
   - name: API Keys
     description: Machine-to-machine credentials for the REST API itself (raw value returned once, at creation)
+  - name: Passkeys
+    description: WebAuthn/FIDO2 credential inspection and revocation for a user
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes

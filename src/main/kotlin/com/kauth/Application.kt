@@ -465,6 +465,8 @@ fun Application.module(
             otpIpRateLimiter = s.otpIpRateLimiter,
             webhookService = s.webhookService,
             resourceServerService = s.resourceServerService,
+            webAuthnService = s.webAuthnService,
+            webAuthnCredentialRepository = s.webAuthnCredentialRepository,
             corsService = s.corsService,
         )
 
