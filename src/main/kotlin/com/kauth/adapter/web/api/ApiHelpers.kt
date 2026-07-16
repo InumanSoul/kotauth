@@ -4,6 +4,7 @@ import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminError
+import com.kauth.domain.service.ApiKeyError
 import com.kauth.domain.service.AttributeResult
 import com.kauth.domain.service.ResourceServerError
 import io.ktor.http.HttpHeaders
@@ -158,6 +159,13 @@ internal suspend fun ApplicationCall.respondResourceServerError(error: ResourceS
             )
     }
 
+internal suspend fun ApplicationCall.respondApiKeyError(error: ApiKeyError): Unit =
+    when (error) {
+        is ApiKeyError.NotFound -> respondProblem(HttpStatusCode.NotFound, "Not Found", error.message)
+        is ApiKeyError.Validation ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", error.message)
+    }
+
 // -- Response envelope --------------------------------------------------------
 
 @Serializable
@@ -291,6 +299,13 @@ data class ProblemDetail(
 
 @Serializable data class SetAuthorizedResourceServersRequest(
     val resourceServerIds: List<Int>,
+)
+
+@Serializable data class CreateApiKeyRequest(
+    val name: String,
+    val scopes: List<String>,
+    /** Optional ISO-8601 timestamp. Null = never expires. */
+    val expiresAt: String? = null,
 )
 
 // -- Response DTOs ------------------------------------------------------------
@@ -472,6 +487,27 @@ data class ProblemDetail(
     val createdAt: String,
 )
 
+@Serializable data class ApiKeyDto(
+    val id: Int,
+    val name: String,
+    val keyPrefix: String,
+    val scopes: List<String>,
+    val expiresAt: String? = null,
+    val lastUsedAt: String? = null,
+    val enabled: Boolean,
+    val bootstrapName: String? = null,
+    val createdAt: String,
+)
+
+/**
+ * Response for POST /api-keys. The `rawKey` field is the plaintext value —
+ * returned exactly ONCE. Persist it now; the server retains only a hash.
+ */
+@Serializable data class CreateApiKeyResponse(
+    val apiKey: ApiKeyDto,
+    val rawKey: String,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -565,6 +601,19 @@ internal fun com.kauth.domain.model.ResourceServer.toApiDto(): ResourceServerDto
         description = description,
         enabled = enabled,
         scopes = scopes,
+        createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.ApiKey.toApiDto(): ApiKeyDto =
+    ApiKeyDto(
+        id = id!!,
+        name = name,
+        keyPrefix = keyPrefix,
+        scopes = scopes,
+        expiresAt = expiresAt?.let { isoFormatter.format(it) },
+        lastUsedAt = lastUsedAt?.let { isoFormatter.format(it) },
+        enabled = enabled,
+        bootstrapName = bootstrapName,
         createdAt = isoFormatter.format(createdAt),
     )
 

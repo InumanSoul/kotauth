@@ -44,6 +44,8 @@ info:
     | `webhooks:write`        | Create and delete webhook endpoints       |
     | `resource_servers:read`  | List and retrieve resource servers (RFC 8707 resource indicators) |
     | `resource_servers:write` | Create, update, delete resource servers; manage client authorization edges |
+    | `api_keys:read`          | List API keys (never exposes the key hash or raw value) |
+    | `api_keys:write`         | Create and revoke API keys — meta-circular: a key can revoke itself |
 
     ## Custom attributes and JWT claims
 
@@ -465,6 +467,53 @@ components:
           description: |
             Full replacement set of resource server IDs authorized for this
             client. Passing an empty array revokes all authorizations.
+
+    # ---- API Keys ----
+    ApiKeyDto:
+      type: object
+      required: [id, name, keyPrefix, scopes, enabled, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        keyPrefix:
+          type: string
+          description: First 16 chars of the raw key — safe to display in UI.
+        scopes:
+          type: array
+          items: { type: string }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        enabled: { type: boolean }
+        bootstrapName:
+          type: string
+          nullable: true
+          description: Set when the key was provisioned via KAUTH_BOOTSTRAP_API_KEYS.
+        createdAt: { type: string, format: date-time }
+
+    CreateApiKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name: { type: string, maxLength: 128 }
+        scopes:
+          type: array
+          items: { type: string }
+          minItems: 1
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateApiKeyResponse:
+      type: object
+      required: [apiKey, rawKey]
+      properties:
+        apiKey: { $ref: "#/components/schemas/ApiKeyDto" }
+        rawKey:
+          type: string
+          description: |
+            Plaintext key value. Returned exactly once. Include this in
+            future requests as `Authorization: Bearer <rawKey>`.
 
     # ---- Audit Logs ----
     AuditEventDto:
@@ -1667,6 +1716,87 @@ paths:
         "422": { $ref: "#/components/responses/ValidationError" }
 
   # ==========================================================================
+  # API Keys
+  # ==========================================================================
+  /api-keys:
+    get:
+      operationId: listApiKeys
+      summary: List API keys for the workspace
+      description: |
+        Never returns raw key material. Only prefix, scopes, metadata, and
+        status. Use the prefix (first 16 chars) to identify keys in the UI.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ApiKeyDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createApiKey
+      summary: Create a new API key
+      description: |
+        Returns the raw key value exactly ONCE in the `rawKey` field. Persist
+        it now; the server retains only a SHA-256 hash.
+
+        **Meta-circular note:** a key with `api_keys:write` scope can create,
+        revoke, or rotate other keys — including itself. Bootstrap keys
+        (managed via `KAUTH_BOOTSTRAP_API_KEYS`) are read-only via this API
+        and can only be modified through the environment.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateApiKeyRequest" }
+      responses:
+        "201":
+          description: Key created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateApiKeyResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Workspace not found (should not happen in practice — tenant is resolved from URL)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api-keys/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: revokeApiKey
+      summary: Revoke (soft-disable) an API key
+      description: |
+        Soft-revoke — sets `enabled = false` and preserves the row for audit.
+        Hard-delete is not exposed via REST; use the admin CLI if a hard
+        cleanup is required.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Key revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
   # Audit Logs
   # ==========================================================================
   /audit-logs:
@@ -1970,6 +2100,8 @@ tags:
     description: Outbound event notification endpoints (signing secret is returned once, at creation)
   - name: Resource Servers
     description: RFC 8707 resource indicators (audiences) and their client authorization edges
+  - name: API Keys
+    description: Machine-to-machine credentials for the REST API itself (raw value returned once, at creation)
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes

@@ -129,6 +129,7 @@ fun Route.apiRoutes(
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
+            apiKeyManagementRoutes(apiKeyService)
         }
     }
 }

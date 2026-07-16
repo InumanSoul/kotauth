@@ -78,6 +78,12 @@ object ApiScope {
     /** Create, update, delete resource servers; manage client authorization edges. */
     const val RESOURCE_SERVERS_WRITE = "resource_servers:write"
 
+    /** List API keys for the workspace (never exposes the key hash or raw value). */
+    const val API_KEYS_READ = "api_keys:read"
+
+    /** Create and revoke API keys — meta-circular: includes the authenticating key itself. */
+    const val API_KEYS_WRITE = "api_keys:write"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -104,5 +110,7 @@ object ApiScope {
             WEBHOOKS_WRITE,
             RESOURCE_SERVERS_READ,
             RESOURCE_SERVERS_WRITE,
+            API_KEYS_READ,
+            API_KEYS_WRITE,
         )
 }
