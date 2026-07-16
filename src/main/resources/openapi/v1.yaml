@@ -42,6 +42,8 @@ info:
     | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
     | `webhooks:read`         | List webhook endpoints (never exposes the signing secret) |
     | `webhooks:write`        | Create and delete webhook endpoints       |
+    | `resource_servers:read`  | List and retrieve resource servers (RFC 8707 resource indicators) |
+    | `resource_servers:write` | Create, update, delete resource servers; manage client authorization edges |
 
     ## Custom attributes and JWT claims
 
@@ -411,6 +413,58 @@ components:
           description: |
             Plaintext HMAC-SHA256 signing key. Returned exactly once; the
             server does not retain a plaintext copy.
+
+    # ---- Resource Servers ----
+    ResourceServerDto:
+      type: object
+      required: [id, identifier, name, enabled, scopes, createdAt]
+      properties:
+        id:          { type: integer }
+        identifier:  { type: string, description: "RFC 8707 resource indicator (audience). Unique per workspace." }
+        name:        { type: string }
+        description: { type: string, nullable: true }
+        enabled:     { type: boolean }
+        scopes:      { type: array, items: { type: string } }
+        createdAt:   { type: string, format: date-time }
+
+    CreateResourceServerRequest:
+      type: object
+      required: [identifier, name]
+      properties:
+        identifier:
+          type: string
+          description: |
+            RFC 8707 resource indicator. Either an absolute URI with a host,
+            or an opaque string with no whitespace. Must be unique per
+            workspace.
+        name: { type: string }
+        description: { type: string, nullable: true }
+        scopes:
+          type: array
+          items: { type: string }
+          default: []
+
+    UpdateResourceServerRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        scopes:
+          type: array
+          items: { type: string }
+          default: []
+
+    SetAuthorizedResourceServersRequest:
+      type: object
+      required: [resourceServerIds]
+      properties:
+        resourceServerIds:
+          type: array
+          items: { type: integer }
+          description: |
+            Full replacement set of resource server IDs authorized for this
+            client. Passing an empty array revokes all authorizations.
 
     # ---- Audit Logs ----
     AuditEventDto:
@@ -1457,6 +1511,162 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
 
   # ==========================================================================
+  # Resource Servers
+  # ==========================================================================
+  /resource-servers:
+    get:
+      operationId: listResourceServers
+      summary: List resource servers
+      description: |
+        Resource servers (RFC 8707 resource indicators) represent APIs that
+        access tokens can be scoped to via the `resource` parameter.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Resource server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ResourceServerDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createResourceServer
+      summary: Create a resource server
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateResourceServerRequest" }
+      responses:
+        "201":
+          description: Resource server created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: A resource server with this identifier already exists
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /resource-servers/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getResourceServer
+      summary: Get a resource server by ID
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Resource server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateResourceServer
+      summary: Update a resource server
+      description: The identifier is immutable after creation — only name, description, and scopes may change.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateResourceServerRequest" }
+      responses:
+        "200":
+          description: Updated resource server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deleteResourceServer
+      summary: Delete a resource server
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Resource server deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /applications/{appId}/authorized-resource-servers:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: listAuthorizedResourceServers
+      summary: List resource servers authorized for a client
+      description: |
+        Returns the resource servers this application (OAuth client) is
+        currently authorized to request tokens for via the `resource`
+        parameter.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Authorized resource server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ResourceServerDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: setAuthorizedResourceServers
+      summary: Replace the set of resource servers authorized for a client
+      description: |
+        Full replacement — any resource server IDs not included are
+        de-authorized. All IDs must belong to the same workspace as the
+        application, or the request fails with 422.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetAuthorizedResourceServersRequest" }
+      responses:
+        "204": { description: Authorization set updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  # ==========================================================================
   # Audit Logs
   # ==========================================================================
   /audit-logs:
@@ -1758,6 +1968,8 @@ tags:
     description: Tenant metadata, sign-in methods, and security/MFA policy (read-only; SMTP excluded)
   - name: Webhooks
     description: Outbound event notification endpoints (signing secret is returned once, at creation)
+  - name: Resource Servers
+    description: RFC 8707 resource indicators (audiences) and their client authorization edges
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes

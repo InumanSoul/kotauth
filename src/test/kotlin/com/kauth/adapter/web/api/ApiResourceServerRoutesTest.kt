@@ -1,6 +1,10 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -38,6 +42,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -59,16 +64,19 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Integration tests for the v1.21.0 webhook CRUD REST API:
- *   - GET    /webhooks
- *   - POST   /webhooks
- *   - DELETE /webhooks/{endpointId}
+ * Integration tests for the v1.21.0 resource servers CRUD REST API:
+ *   - GET    /resource-servers
+ *   - POST   /resource-servers
+ *   - GET    /resource-servers/{id}
+ *   - PUT    /resource-servers/{id}
+ *   - DELETE /resource-servers/{id}
+ *   - GET    /applications/{appId}/authorized-resource-servers
+ *   - PUT    /applications/{appId}/authorized-resource-servers
  */
-class ApiWebhookRoutesTest {
+class ApiResourceServerRoutesTest {
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val appRepo = FakeApplicationRepository()
@@ -87,6 +95,7 @@ class ApiWebhookRoutesTest {
     private val hasher = FakePasswordHasher()
     private val webhookEndpointRepo = FakeWebhookEndpointRepository()
     private val webhookDeliveryRepo = FakeWebhookDeliveryRepository()
+    private val resourceServerRepo = FakeResourceServerRepository()
 
     private val tenant =
         Tenant(
@@ -94,6 +103,16 @@ class ApiWebhookRoutesTest {
             slug = "acme",
             displayName = "Acme Corp",
             issuerUrl = "https://acme.kotauth.dev",
+            theme = TenantTheme.DEFAULT,
+            securityConfig = SecurityConfig(),
+        )
+
+    private val otherTenant =
+        Tenant(
+            id = TenantId(2),
+            slug = "other",
+            displayName = "Other Corp",
+            issuerUrl = "https://other.kotauth.dev",
             theme = TenantTheme.DEFAULT,
             securityConfig = SecurityConfig(),
         )
@@ -174,6 +193,8 @@ class ApiWebhookRoutesTest {
             scope = CoroutineScope(Dispatchers.Unconfined),
         )
 
+    private val resourceServerService = ResourceServerService(resourceServerRepo)
+
     private val jsonCodec = Json { ignoreUnknownKeys = true }
 
     private var rawApiKey: String = ""
@@ -182,6 +203,7 @@ class ApiWebhookRoutesTest {
     fun setup() {
         tenantRepo.clear()
         userRepo.clear()
+        appRepo.clear()
         apiKeyRepo.clear()
         auditLogRepo.clear()
         auditLogPort.clear()
@@ -192,15 +214,17 @@ class ApiWebhookRoutesTest {
         mfaRepo.clear()
         webhookEndpointRepo.clear()
         webhookDeliveryRepo.clear()
+        resourceServerRepo.clear()
 
         tenantRepo.add(tenant)
+        tenantRepo.add(otherTenant)
 
         rawApiKey =
             (
                 apiKeyService.create(
                     tenantId = TenantId(1),
                     name = "Test Key",
-                    scopes = listOf(ApiScope.WEBHOOKS_READ, ApiScope.WEBHOOKS_WRITE),
+                    scopes = listOf(ApiScope.RESOURCE_SERVERS_READ, ApiScope.RESOURCE_SERVERS_WRITE),
                 ) as ApiKeyResult.Success
             ).value.rawKey
     }
@@ -214,22 +238,29 @@ class ApiWebhookRoutesTest {
             ) as ApiKeyResult.Success
         ).value.rawKey
 
-    private fun createWebhookBody(
-        url: String = "https://example.com/hooks/kotauth",
-        description: String = "My integration",
-        events: String = """["user.created", "login.success"]""",
-    ) = """{"url":"$url","description":"$description","events":$events}"""
+    private fun createBody(
+        identifier: String = "https://api.acme.dev",
+        name: String = "Acme API",
+        description: String = "Internal API",
+        scopes: String = """["read:orders", "write:orders"]""",
+    ) = """{"identifier":"$identifier","name":"$name","description":"$description","scopes":$scopes}"""
+
+    private fun updateBody(
+        name: String = "Acme API v2",
+        description: String = "Updated description",
+        scopes: String = """["read:orders"]""",
+    ) = """{"name":"$name","description":"$description","scopes":$scopes}"""
 
     // -------------------------------------------------------------------------
-    // GET /webhooks
+    // GET /resource-servers
     // -------------------------------------------------------------------------
 
     @Test
-    fun `GET webhooks returns empty envelope when no endpoints`() =
+    fun `GET resource-servers returns empty envelope`() =
         testApplication {
             application { installTestApp() }
 
-            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
+            val response = client.get("/t/acme/api/v1/resource-servers") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
@@ -244,234 +275,341 @@ class ApiWebhookRoutesTest {
         }
 
     @Test
-    fun `GET webhooks returns configured endpoints without exposing the secret`() =
+    fun `GET resource-servers returns configured servers`() =
         testApplication {
             application { installTestApp() }
-            webhookEndpointRepo.add(
-                com.kauth.domain.model.WebhookEndpoint(
+            resourceServerRepo.seed(
+                ResourceServer(
                     tenantId = TenantId(1),
-                    url = "https://example.com/hooks/kotauth",
-                    secret = "super-secret-hmac-key",
-                    events = setOf(com.kauth.domain.model.WebhookEventType.USER_CREATED),
-                    description = "My integration",
+                    identifier = "https://api.acme.dev",
+                    name = "Acme API",
+                    description = "Internal API",
+                    scopes = listOf("read:orders"),
                 ),
             )
 
-            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
+            val response = client.get("/t/acme/api/v1/resource-servers") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
-            val rawBody = response.bodyAsText()
-            assertFalse(rawBody.contains("super-secret-hmac-key"))
-            val body = jsonCodec.parseToJsonElement(rawBody).jsonObject
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             val data = body["data"]!!.jsonArray
             assertEquals(1, data.size)
             val dto = data[0].jsonObject
-            assertEquals("https://example.com/hooks/kotauth", dto["url"]!!.jsonPrimitive.content)
-            assertEquals("My integration", dto["description"]!!.jsonPrimitive.content)
+            assertEquals("https://api.acme.dev", dto["identifier"]!!.jsonPrimitive.content)
+            assertEquals("Acme API", dto["name"]!!.jsonPrimitive.content)
             assertTrue(dto["enabled"]!!.jsonPrimitive.content.toBoolean())
-            assertEquals(listOf("user.created"), dto["events"]!!.jsonArray.map { it.jsonPrimitive.content })
         }
 
     // -------------------------------------------------------------------------
-    // POST /webhooks
+    // POST /resource-servers
     // -------------------------------------------------------------------------
 
     @Test
-    fun `POST webhooks creates an endpoint and returns plaintext secret one-time`() =
+    fun `POST resource-servers creates and returns 201`() =
         testApplication {
             application { installTestApp() }
 
             val response =
-                client.post("/t/acme/api/v1/webhooks") {
+                client.post("/t/acme/api/v1/resource-servers") {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody())
+                    setBody(createBody())
                 }
 
             assertEquals(HttpStatusCode.Created, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val secret = body["secret"]!!.jsonPrimitive.content
-            assertTrue(secret.isNotBlank())
-            val endpoint = body["endpoint"]!!.jsonObject
-            assertEquals("https://example.com/hooks/kotauth", endpoint["url"]!!.jsonPrimitive.content)
-            assertEquals(
-                listOf("login.success", "user.created"),
-                endpoint["events"]!!.jsonArray.map { it.jsonPrimitive.content },
+            assertEquals("https://api.acme.dev", body["identifier"]!!.jsonPrimitive.content)
+            assertEquals("Acme API", body["name"]!!.jsonPrimitive.content)
+            assertEquals(1, resourceServerRepo.findByTenantId(TenantId(1)).size)
+        }
+
+    @Test
+    fun `POST resource-servers returns 422 for invalid identifier with spaces and uppercase`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/resource-servers") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody(identifier = "Invalid Identifier With Spaces"))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST resource-servers returns 422 for blank name`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/resource-servers") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody(name = ""))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST resource-servers returns 409 for duplicate identifier`() =
+        testApplication {
+            application { installTestApp() }
+            resourceServerRepo.seed(
+                ResourceServer(
+                    tenantId = TenantId(1),
+                    identifier = "https://api.acme.dev",
+                    name = "Existing API",
+                ),
             )
 
-            // Persisted, and the following GET does not repeat the secret.
-            val listResponse = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
-            assertFalse(listResponse.bodyAsText().contains(secret))
-        }
-
-    @Test
-    fun `POST webhooks returns 422 for blank URL`() =
-        testApplication {
-            application { installTestApp() }
-
             val response =
-                client.post("/t/acme/api/v1/webhooks") {
+                client.post("/t/acme/api/v1/resource-servers") {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody(url = ""))
+                    setBody(createBody())
                 }
 
-            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-        }
-
-    @Test
-    fun `POST webhooks returns 422 for URL without http scheme`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.post("/t/acme/api/v1/webhooks") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody(url = "ftp://example.com/hooks"))
-                }
-
-            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-        }
-
-    @Test
-    fun `POST webhooks returns 422 for URL longer than 2048 chars`() =
-        testApplication {
-            application { installTestApp() }
-            val longUrl = "https://example.com/" + "a".repeat(2048)
-
-            val response =
-                client.post("/t/acme/api/v1/webhooks") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody(url = longUrl))
-                }
-
-            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-        }
-
-    @Test
-    fun `POST webhooks returns 422 for unknown event names with clear message`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.post("/t/acme/api/v1/webhooks") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody(events = """["user.created", "bogus.event"]"""))
-                }
-
-            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertTrue(body["detail"]!!.jsonPrimitive.content.contains("bogus.event"))
-        }
-
-    @Test
-    fun `POST webhooks accepts multiple valid events`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.post("/t/acme/api/v1/webhooks") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(
-                        createWebhookBody(
-                            events = """["user.created", "user.updated", "user.deleted", "session.revoked"]""",
-                        ),
-                    )
-                }
-
-            assertEquals(HttpStatusCode.Created, response.status)
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            val events = body["endpoint"]!!.jsonObject["events"]!!.jsonArray.map { it.jsonPrimitive.content }
-            assertEquals(
-                listOf("session.revoked", "user.created", "user.deleted", "user.updated"),
-                events,
-            )
+            assertEquals(HttpStatusCode.Conflict, response.status)
         }
 
     // -------------------------------------------------------------------------
-    // DELETE /webhooks/{endpointId}
+    // GET /resource-servers/{id}
     // -------------------------------------------------------------------------
 
     @Test
-    fun `DELETE webhooks id returns 204`() =
+    fun `GET resource-servers id returns 404 for unknown id`() =
         testApplication {
             application { installTestApp() }
-            val endpoint =
-                webhookEndpointRepo.add(
-                    com.kauth.domain.model.WebhookEndpoint(
+
+            val response = client.get("/t/acme/api/v1/resource-servers/999999") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    @Test
+    fun `GET resource-servers id returns 404 when server belongs to another tenant`() =
+        testApplication {
+            application { installTestApp() }
+            val other =
+                resourceServerRepo.seed(
+                    ResourceServer(
+                        tenantId = TenantId(2),
+                        identifier = "https://api.other.dev",
+                        name = "Other API",
+                    ),
+                )
+
+            val response = client.get("/t/acme/api/v1/resource-servers/${other.id!!.value}") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // PUT /resource-servers/{id}
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `PUT resource-servers id updates name description and scopes`() =
+        testApplication {
+            application { installTestApp() }
+            val existing =
+                resourceServerRepo.seed(
+                    ResourceServer(
                         tenantId = TenantId(1),
-                        url = "https://example.com/hooks/kotauth",
-                        secret = "hmac-key",
-                        events = emptySet(),
+                        identifier = "https://api.acme.dev",
+                        name = "Acme API",
+                        description = "Old description",
+                        scopes = listOf("read:orders", "write:orders"),
                     ),
                 )
 
             val response =
-                client.delete("/t/acme/api/v1/webhooks/${endpoint.id}") { bearerAuth(rawApiKey) }
-
-            assertEquals(HttpStatusCode.NoContent, response.status)
-            assertTrue(webhookEndpointRepo.findByTenantId(TenantId(1)).isEmpty())
-        }
-
-    @Test
-    fun `DELETE webhooks id is idempotent for unknown id`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response = client.delete("/t/acme/api/v1/webhooks/999999") { bearerAuth(rawApiKey) }
-
-            assertEquals(HttpStatusCode.NoContent, response.status)
-        }
-
-    // -------------------------------------------------------------------------
-    // Secret leakage + scope enforcement
-    // -------------------------------------------------------------------------
-
-    @Test
-    fun `Response DTO for GET webhooks does not contain secret field anywhere in the body`() =
-        testApplication {
-            application { installTestApp() }
-            webhookEndpointRepo.add(
-                com.kauth.domain.model.WebhookEndpoint(
-                    tenantId = TenantId(1),
-                    url = "https://example.com/hooks/kotauth",
-                    secret = "hmac-key-value",
-                    events = setOf(com.kauth.domain.model.WebhookEventType.LOGIN_FAILED),
-                ),
-            )
-
-            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
-
-            assertFalse(response.bodyAsText().contains("secret", ignoreCase = true))
-        }
-
-    @Test
-    fun `Scope enforcement key without webhooks_write gets 403 on POST`() =
-        testApplication {
-            application { installTestApp() }
-            val readOnlyKey = apiKeyWithScopes(listOf(ApiScope.WEBHOOKS_READ))
-
-            val response =
-                client.post("/t/acme/api/v1/webhooks") {
-                    bearerAuth(readOnlyKey)
+                client.put("/t/acme/api/v1/resource-servers/${existing.id!!.value}") {
+                    bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
-                    setBody(createWebhookBody())
+                    setBody(updateBody())
                 }
 
-            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("Acme API v2", body["name"]!!.jsonPrimitive.content)
+            assertEquals("Updated description", body["description"]!!.jsonPrimitive.content)
+            assertEquals(listOf("read:orders"), body["scopes"]!!.jsonArray.map { it.jsonPrimitive.content })
         }
 
     @Test
-    fun `Scope enforcement key without webhooks_read gets 403 on GET`() =
+    fun `PUT resource-servers id returns 422 for blank name`() =
         testApplication {
             application { installTestApp() }
-            val writeOnlyKey = apiKeyWithScopes(listOf(ApiScope.WEBHOOKS_WRITE))
+            val existing =
+                resourceServerRepo.seed(
+                    ResourceServer(
+                        tenantId = TenantId(1),
+                        identifier = "https://api.acme.dev",
+                        name = "Acme API",
+                    ),
+                )
 
-            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(writeOnlyKey) }
+            val response =
+                client.put("/t/acme/api/v1/resource-servers/${existing.id!!.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(updateBody(name = ""))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // DELETE /resource-servers/{id}
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `DELETE resource-servers id returns 204`() =
+        testApplication {
+            application { installTestApp() }
+            val existing =
+                resourceServerRepo.seed(
+                    ResourceServer(
+                        tenantId = TenantId(1),
+                        identifier = "https://api.acme.dev",
+                        name = "Acme API",
+                    ),
+                )
+
+            val response =
+                client.delete("/t/acme/api/v1/resource-servers/${existing.id!!.value}") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            assertTrue(resourceServerRepo.findByTenantId(TenantId(1)).isEmpty())
+        }
+
+    @Test
+    fun `DELETE resource-servers id returns 404 for unknown id`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.delete("/t/acme/api/v1/resource-servers/999999") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // GET/PUT /applications/{appId}/authorized-resource-servers
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `GET authorized-resource-servers returns list`() =
+        testApplication {
+            application { installTestApp() }
+            val app =
+                appRepo.add(
+                    Application(
+                        id = ApplicationId(0),
+                        tenantId = TenantId(1),
+                        clientId = "acme-app",
+                        name = "Acme App",
+                        description = null,
+                        accessType = AccessType.PUBLIC,
+                        enabled = true,
+                    ),
+                )
+            val rs =
+                resourceServerRepo.seed(
+                    ResourceServer(
+                        tenantId = TenantId(1),
+                        identifier = "https://api.acme.dev",
+                        name = "Acme API",
+                    ),
+                )
+            resourceServerRepo.registerClient(app.id, TenantId(1))
+            resourceServerRepo.setAuthorizedResources(app.id, listOf(rs.id!!))
+
+            val response =
+                client.get("/t/acme/api/v1/applications/${app.id.value}/authorized-resource-servers") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val data = body["data"]!!.jsonArray
+            assertEquals(1, data.size)
+            assertEquals("https://api.acme.dev", data[0].jsonObject["identifier"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `PUT authorized-resource-servers replaces list`() =
+        testApplication {
+            application { installTestApp() }
+            val app =
+                appRepo.add(
+                    Application(
+                        id = ApplicationId(0),
+                        tenantId = TenantId(1),
+                        clientId = "acme-app",
+                        name = "Acme App",
+                        description = null,
+                        accessType = AccessType.PUBLIC,
+                        enabled = true,
+                    ),
+                )
+            val rs1 =
+                resourceServerRepo.seed(
+                    ResourceServer(tenantId = TenantId(1), identifier = "https://api-1.acme.dev", name = "API 1"),
+                )
+            val rs2 =
+                resourceServerRepo.seed(
+                    ResourceServer(tenantId = TenantId(1), identifier = "https://api-2.acme.dev", name = "API 2"),
+                )
+            resourceServerRepo.registerClient(app.id, TenantId(1))
+            resourceServerRepo.setAuthorizedResources(app.id, listOf(rs1.id!!))
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${app.id.value}/authorized-resource-servers") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"resourceServerIds":[${rs2.id!!.value}]}""")
+                }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            val authorized = resourceServerRepo.listAuthorizedFor(app.id)
+            assertEquals(listOf(rs2.id!!.value), authorized.map { it.id!!.value })
+        }
+
+    @Test
+    fun `PUT authorized-resource-servers returns 404 for unknown app`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.put("/t/acme/api/v1/applications/999999/authorized-resource-servers") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"resourceServerIds":[]}""")
+                }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // Scope enforcement
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `Scope enforcement key without resource_servers_write gets 403 on POST`() =
+        testApplication {
+            application { installTestApp() }
+            val readOnlyKey = apiKeyWithScopes(listOf(ApiScope.RESOURCE_SERVERS_READ))
+
+            val response =
+                client.post("/t/acme/api/v1/resource-servers") {
+                    bearerAuth(readOnlyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody())
+                }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
@@ -510,7 +648,7 @@ class ApiWebhookRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
-                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
+                resourceServerService = resourceServerService,
             )
         }
     }

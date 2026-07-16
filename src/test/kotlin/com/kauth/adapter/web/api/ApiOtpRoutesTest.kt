@@ -11,6 +11,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
@@ -410,6 +411,7 @@ class ApiOtpRoutesTest {
                 otpEmailRateLimiter = emailLimiter,
                 otpIpRateLimiter = ipLimiter,
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
             )
         }
     }

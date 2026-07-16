@@ -9,10 +9,12 @@ import com.kauth.domain.model.UserAttribute
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakePasswordHasher
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
@@ -398,6 +400,7 @@ class ApiUserAttributeRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
             )
         }
     }

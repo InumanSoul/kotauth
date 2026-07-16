@@ -5,6 +5,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AttributeResult
+import com.kauth.domain.service.ResourceServerError
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -135,6 +136,28 @@ internal suspend fun ApplicationCall.respondAttributeError(result: AttributeResu
             )
     }
 
+internal suspend fun ApplicationCall.respondResourceServerError(error: ResourceServerError): Unit =
+    when (error) {
+        is ResourceServerError.InvalidIdentifier ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Invalid identifier", error.reason)
+        ResourceServerError.InvalidName ->
+            respondProblem(HttpStatusCode.UnprocessableEntity, "Validation Error", "Name cannot be blank.")
+        ResourceServerError.IdentifierAlreadyExists ->
+            respondProblem(
+                HttpStatusCode.Conflict,
+                "Conflict",
+                "A resource server with this identifier already exists.",
+            )
+        ResourceServerError.NotFound ->
+            respondProblem(HttpStatusCode.NotFound, "Not Found", "Resource server not found.")
+        ResourceServerError.CrossTenant ->
+            respondProblem(
+                HttpStatusCode.UnprocessableEntity,
+                "Cross-tenant",
+                "Resource does not belong to this workspace.",
+            )
+    }
+
 // -- Response envelope --------------------------------------------------------
 
 @Serializable
@@ -251,6 +274,23 @@ data class ProblemDetail(
     val url: String,
     val description: String = "",
     val events: List<String>,
+)
+
+@Serializable data class CreateResourceServerRequest(
+    val identifier: String,
+    val name: String,
+    val description: String? = null,
+    val scopes: List<String> = emptyList(),
+)
+
+@Serializable data class UpdateResourceServerRequest(
+    val name: String,
+    val description: String? = null,
+    val scopes: List<String> = emptyList(),
+)
+
+@Serializable data class SetAuthorizedResourceServersRequest(
+    val resourceServerIds: List<Int>,
 )
 
 // -- Response DTOs ------------------------------------------------------------
@@ -422,6 +462,16 @@ data class ProblemDetail(
     val secret: String,
 )
 
+@Serializable data class ResourceServerDto(
+    val id: Int,
+    val identifier: String,
+    val name: String,
+    val description: String? = null,
+    val enabled: Boolean,
+    val scopes: List<String>,
+    val createdAt: String,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -504,6 +554,17 @@ internal fun com.kauth.domain.model.WebhookEndpoint.toApiDto(): WebhookEndpointD
         description = description,
         events = events.map { it.value }.sorted(),
         enabled = enabled,
+        createdAt = isoFormatter.format(createdAt),
+    )
+
+internal fun com.kauth.domain.model.ResourceServer.toApiDto(): ResourceServerDto =
+    ResourceServerDto(
+        id = id!!.value,
+        identifier = identifier,
+        name = name,
+        description = description,
+        enabled = enabled,
+        scopes = scopes,
         createdAt = isoFormatter.format(createdAt),
     )
 

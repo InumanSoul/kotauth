@@ -13,6 +13,7 @@ import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
@@ -25,6 +26,7 @@ import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakeMfaRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantClaimMapperRepository
@@ -506,6 +508,7 @@ class ApiUserStateTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
             )
         }
     }

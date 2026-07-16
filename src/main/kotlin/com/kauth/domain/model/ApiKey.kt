@@ -72,6 +72,12 @@ object ApiScope {
     /** Create/delete webhook endpoints. */
     const val WEBHOOKS_WRITE = "webhooks:write"
 
+    /** List and retrieve resource servers (RFC 8707 resource indicators). */
+    const val RESOURCE_SERVERS_READ = "resource_servers:read"
+
+    /** Create, update, delete resource servers; manage client authorization edges. */
+    const val RESOURCE_SERVERS_WRITE = "resource_servers:write"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -96,5 +102,7 @@ object ApiScope {
             WORKSPACE_READ,
             WEBHOOKS_READ,
             WEBHOOKS_WRITE,
+            RESOURCE_SERVERS_READ,
+            RESOURCE_SERVERS_WRITE,
         )
 }

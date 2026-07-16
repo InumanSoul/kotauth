@@ -12,6 +12,7 @@ import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebhookService
@@ -48,6 +49,7 @@ fun Route.apiRoutes(
     otpEmailRateLimiter: RateLimiterPort,
     otpIpRateLimiter: RateLimiterPort,
     webhookService: WebhookService,
+    resourceServerService: ResourceServerService,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -121,6 +123,7 @@ fun Route.apiRoutes(
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiWorkspaceRoutes(tenantRepository)
             apiWebhookRoutes(webhookService)
+            apiResourceServerRoutes(resourceServerService, applicationRepository)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
