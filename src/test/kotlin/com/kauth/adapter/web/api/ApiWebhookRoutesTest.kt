@@ -1,13 +1,10 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.domain.model.ApiScope
-import com.kauth.domain.model.MfaEnrollment
-import com.kauth.domain.model.Session
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
-import com.kauth.domain.model.User
-import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
@@ -39,8 +36,11 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
@@ -51,24 +51,22 @@ import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.time.Instant
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
- * Integration tests for the v1.21.0 user state management endpoints:
- *   - POST   /users/{id}/enable
- *   - DELETE /users/{id}/mfa/reset
- *   - POST   /users/{id}/revoke-sessions
- *   - GET    /users/{id}/sessions
+ * Integration tests for the v1.21.0 webhook CRUD REST API:
+ *   - GET    /webhooks
+ *   - POST   /webhooks
+ *   - DELETE /webhooks/{endpointId}
  */
-class ApiUserStateTest {
+class ApiWebhookRoutesTest {
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val appRepo = FakeApplicationRepository()
@@ -85,14 +83,17 @@ class ApiUserStateTest {
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
     private val mfaRepo = FakeMfaRepository()
     private val hasher = FakePasswordHasher()
+    private val webhookEndpointRepo = FakeWebhookEndpointRepository()
+    private val webhookDeliveryRepo = FakeWebhookDeliveryRepository()
 
     private val tenant =
         Tenant(
             id = TenantId(1),
             slug = "acme",
-            displayName = "Acme",
-            issuerUrl = null,
+            displayName = "Acme Corp",
+            issuerUrl = "https://acme.kotauth.dev",
             theme = TenantTheme.DEFAULT,
+            securityConfig = SecurityConfig(),
         )
 
     private val apiKeyService = ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
@@ -164,6 +165,13 @@ class ApiUserStateTest {
     private val claimMapperService =
         CachingClaimMapperService(mapperRepository = claimMapperRepo)
 
+    private val webhookService =
+        WebhookService(
+            endpointRepository = webhookEndpointRepo,
+            deliveryRepository = webhookDeliveryRepo,
+            scope = CoroutineScope(Dispatchers.Unconfined),
+        )
+
     private val jsonCodec = Json { ignoreUnknownKeys = true }
 
     private var rawApiKey: String = ""
@@ -180,6 +188,8 @@ class ApiUserStateTest {
         emailPort.clear()
         sessionRepo.clear()
         mfaRepo.clear()
+        webhookEndpointRepo.clear()
+        webhookDeliveryRepo.clear()
 
         tenantRepo.add(tenant)
 
@@ -188,48 +198,12 @@ class ApiUserStateTest {
                 apiKeyService.create(
                     tenantId = TenantId(1),
                     name = "Test Key",
-                    scopes = listOf(ApiScope.USERS_WRITE, ApiScope.SESSIONS_READ, ApiScope.SESSIONS_WRITE),
+                    scopes = listOf(ApiScope.WEBHOOKS_READ, ApiScope.WEBHOOKS_WRITE),
                 ) as ApiKeyResult.Success
             ).value.rawKey
     }
 
-    private fun seedUser(
-        username: String = "alice",
-        enabled: Boolean = true,
-        mfaEnabled: Boolean = false,
-    ): User =
-        userRepo.add(
-            User(
-                tenantId = TenantId(1),
-                username = username,
-                email = "$username@acme.com",
-                fullName = username,
-                passwordHash = hasher.hash("pass"),
-                enabled = enabled,
-                mfaEnabled = mfaEnabled,
-            ),
-        )
-
-    private fun seedSession(
-        userId: UserId,
-        revoked: Boolean = false,
-    ): Session =
-        sessionRepo.save(
-            Session(
-                tenantId = TenantId(1),
-                userId = userId,
-                clientId = null,
-                scopes = "openid",
-                accessTokenHash = "hash-${System.nanoTime()}",
-                refreshTokenHash = null,
-                ipAddress = "127.0.0.1",
-                createdAt = Instant.now(),
-                expiresAt = Instant.now().plusSeconds(3600),
-                revokedAt = if (revoked) Instant.now() else null,
-            ),
-        )
-
-    private fun apiKeyMissingScope(scopes: List<String>): String =
+    private fun apiKeyWithScopes(scopes: List<String>): String =
         (
             apiKeyService.create(
                 tenantId = TenantId(1),
@@ -238,236 +212,264 @@ class ApiUserStateTest {
             ) as ApiKeyResult.Success
         ).value.rawKey
 
-    // =========================================================================
-    // POST /users/{id}/enable
-    // =========================================================================
+    private fun createWebhookBody(
+        url: String = "https://example.com/hooks/kotauth",
+        description: String = "My integration",
+        events: String = """["user.created", "login.success"]""",
+    ) = """{"url":"$url","description":"$description","events":$events}"""
+
+    // -------------------------------------------------------------------------
+    // GET /webhooks
+    // -------------------------------------------------------------------------
 
     @Test
-    fun `POST users enable returns 204 and flips enabled flag on a disabled user`() =
+    fun `GET webhooks returns empty envelope when no endpoints`() =
         testApplication {
             application { installTestApp() }
-            val user = seedUser(enabled = false)
-            val userId = user.id!!
 
-            val response =
-                client.post("/t/acme/api/v1/users/${userId.value}/enable") {
-                    bearerAuth(rawApiKey)
-                }
+            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
 
-            assertEquals(HttpStatusCode.NoContent, response.status)
-            val updated = userRepo.findById(userId, TenantId(1))
-            assertEquals(true, updated?.enabled)
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertTrue(body["data"]!!.jsonArray.isEmpty())
+            assertEquals(
+                0,
+                body["meta"]!!
+                    .jsonObject["total"]!!
+                    .jsonPrimitive.content
+                    .toInt(),
+            )
         }
 
     @Test
-    fun `POST users enable is idempotent for already-enabled user`() =
+    fun `GET webhooks returns configured endpoints without exposing the secret`() =
         testApplication {
             application { installTestApp() }
-            val user = seedUser(enabled = true)
-            val userId = user.id!!
-
-            val response =
-                client.post("/t/acme/api/v1/users/${userId.value}/enable") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.NoContent, response.status)
-            val updated = userRepo.findById(userId, TenantId(1))
-            assertEquals(true, updated?.enabled)
-        }
-
-    @Test
-    fun `POST users enable returns 404 for unknown user`() =
-        testApplication {
-            application { installTestApp() }
-
-            val response =
-                client.post("/t/acme/api/v1/users/99999/enable") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.NotFound, response.status)
-        }
-
-    // =========================================================================
-    // DELETE /users/{id}/mfa/reset
-    // =========================================================================
-
-    @Test
-    fun `DELETE users mfa reset returns 204 and clears mfaEnabled + enrollments`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser(mfaEnabled = true)
-            val userId = user.id!!
-            mfaRepo.saveEnrollment(
-                MfaEnrollment(
-                    userId = userId,
+            webhookEndpointRepo.add(
+                com.kauth.domain.model.WebhookEndpoint(
                     tenantId = TenantId(1),
-                    secret = "SECRET",
-                    verified = true,
+                    url = "https://example.com/hooks/kotauth",
+                    secret = "super-secret-hmac-key",
+                    events = setOf(com.kauth.domain.model.WebhookEventType.USER_CREATED),
+                    description = "My integration",
                 ),
             )
 
-            val response =
-                client.delete("/t/acme/api/v1/users/${userId.value}/mfa/reset") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.NoContent, response.status)
-            val updated = userRepo.findById(userId, TenantId(1))
-            assertEquals(false, updated?.mfaEnabled)
-            assertEquals(null, mfaRepo.findEnrollmentByUserId(userId, "TOTP"))
-        }
-
-    @Test
-    fun `DELETE users mfa reset is idempotent when user has no MFA enrolled`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser(mfaEnabled = false)
-
-            val response =
-                client.delete("/t/acme/api/v1/users/${user.id!!.value}/mfa/reset") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.NoContent, response.status)
-        }
-
-    // =========================================================================
-    // POST /users/{id}/revoke-sessions
-    // =========================================================================
-
-    @Test
-    fun `POST users revoke-sessions returns count and revokes all active sessions for user`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser()
-            val userId = user.id!!
-            seedSession(userId)
-            seedSession(userId)
-            seedSession(userId, revoked = true)
-
-            val response =
-                client.post("/t/acme/api/v1/users/${userId.value}/revoke-sessions") {
-                    bearerAuth(rawApiKey)
-                }
+            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(2, body["revoked"]!!.jsonPrimitive.int)
-            assertTrue(sessionRepo.findActiveByUser(TenantId(1), userId).isEmpty())
-        }
-
-    @Test
-    fun `POST users revoke-sessions returns revoked 0 for user with no sessions`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser()
-
-            val response =
-                client.post("/t/acme/api/v1/users/${user.id!!.value}/revoke-sessions") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.OK, response.status)
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(0, body["revoked"]!!.jsonPrimitive.int)
-        }
-
-    @Test
-    fun `POST users revoke-sessions does not touch other users' sessions in same tenant`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser("alice")
-            val other = seedUser("bob")
-            val userId = user.id!!
-            val otherId = other.id!!
-            seedSession(userId)
-            seedSession(otherId)
-
-            val response =
-                client.post("/t/acme/api/v1/users/${userId.value}/revoke-sessions") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.OK, response.status)
-            assertEquals(1, sessionRepo.findActiveByUser(TenantId(1), otherId).size)
-        }
-
-    // =========================================================================
-    // GET /users/{id}/sessions
-    // =========================================================================
-
-    @Test
-    fun `GET users sessions returns active sessions filtered to that user`() =
-        testApplication {
-            application { installTestApp() }
-            val user = seedUser("alice")
-            val other = seedUser("bob")
-            val userId = user.id!!
-            seedSession(userId)
-            seedSession(userId)
-            seedSession(other.id!!)
-
-            val response =
-                client.get("/t/acme/api/v1/users/${userId.value}/sessions") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.OK, response.status)
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val rawBody = response.bodyAsText()
+            assertFalse(rawBody.contains("super-secret-hmac-key"))
+            val body = jsonCodec.parseToJsonElement(rawBody).jsonObject
             val data = body["data"]!!.jsonArray
-            assertEquals(2, data.size)
-            assertTrue(data.all { it.jsonObject["userId"]!!.jsonPrimitive.int == userId.value })
+            assertEquals(1, data.size)
+            val dto = data[0].jsonObject
+            assertEquals("https://example.com/hooks/kotauth", dto["url"]!!.jsonPrimitive.content)
+            assertEquals("My integration", dto["description"]!!.jsonPrimitive.content)
+            assertTrue(dto["enabled"]!!.jsonPrimitive.content.toBoolean())
+            assertEquals(listOf("user.created"), dto["events"]!!.jsonArray.map { it.jsonPrimitive.content })
         }
 
+    // -------------------------------------------------------------------------
+    // POST /webhooks
+    // -------------------------------------------------------------------------
+
     @Test
-    fun `GET users sessions returns empty data array when user has no sessions`() =
+    fun `POST webhooks creates an endpoint and returns plaintext secret one-time`() =
         testApplication {
             application { installTestApp() }
-            val user = seedUser()
 
             val response =
-                client.get("/t/acme/api/v1/users/${user.id!!.value}/sessions") {
+                client.post("/t/acme/api/v1/webhooks") {
                     bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody())
                 }
 
-            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(HttpStatusCode.Created, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(0, body["data"]!!.jsonArray.size)
-            assertEquals(0, body["meta"]!!.jsonObject["total"]!!.jsonPrimitive.int)
+            val secret = body["secret"]!!.jsonPrimitive.content
+            assertTrue(secret.isNotBlank())
+            val endpoint = body["endpoint"]!!.jsonObject
+            assertEquals("https://example.com/hooks/kotauth", endpoint["url"]!!.jsonPrimitive.content)
+            assertEquals(
+                listOf("login.success", "user.created"),
+                endpoint["events"]!!.jsonArray.map { it.jsonPrimitive.content },
+            )
+
+            // Persisted, and the following GET does not repeat the secret.
+            val listResponse = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
+            assertFalse(listResponse.bodyAsText().contains(secret))
         }
 
-    // =========================================================================
-    // Scope enforcement
-    // =========================================================================
-
     @Test
-    fun `scope enforcement key without USERS_WRITE gets 403 on POST enable`() =
+    fun `POST webhooks returns 422 for blank URL`() =
         testApplication {
             application { installTestApp() }
-            val user = seedUser(enabled = false)
-            val limitedKey = apiKeyMissingScope(listOf(ApiScope.SESSIONS_READ, ApiScope.SESSIONS_WRITE))
 
             val response =
-                client.post("/t/acme/api/v1/users/${user.id!!.value}/enable") {
-                    bearerAuth(limitedKey)
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody(url = ""))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST webhooks returns 422 for URL without http scheme`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody(url = "ftp://example.com/hooks"))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST webhooks returns 422 for URL longer than 2048 chars`() =
+        testApplication {
+            application { installTestApp() }
+            val longUrl = "https://example.com/" + "a".repeat(2048)
+
+            val response =
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody(url = longUrl))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST webhooks returns 422 for unknown event names with clear message`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody(events = """["user.created", "bogus.event"]"""))
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertTrue(body["detail"]!!.jsonPrimitive.content.contains("bogus.event"))
+        }
+
+    @Test
+    fun `POST webhooks accepts multiple valid events`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        createWebhookBody(
+                            events = """["user.created", "user.updated", "user.deleted", "session.revoked"]""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val events = body["endpoint"]!!.jsonObject["events"]!!.jsonArray.map { it.jsonPrimitive.content }
+            assertEquals(
+                listOf("session.revoked", "user.created", "user.deleted", "user.updated"),
+                events,
+            )
+        }
+
+    // -------------------------------------------------------------------------
+    // DELETE /webhooks/{endpointId}
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `DELETE webhooks id returns 204`() =
+        testApplication {
+            application { installTestApp() }
+            val endpoint =
+                webhookEndpointRepo.add(
+                    com.kauth.domain.model.WebhookEndpoint(
+                        tenantId = TenantId(1),
+                        url = "https://example.com/hooks/kotauth",
+                        secret = "hmac-key",
+                        events = emptySet(),
+                    ),
+                )
+
+            val response =
+                client.delete("/t/acme/api/v1/webhooks/${endpoint.id}") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+            assertTrue(webhookEndpointRepo.findByTenantId(TenantId(1)).isEmpty())
+        }
+
+    @Test
+    fun `DELETE webhooks id is idempotent for unknown id`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.delete("/t/acme/api/v1/webhooks/999999") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.NoContent, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // Secret leakage + scope enforcement
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `Response DTO for GET webhooks does not contain secret field anywhere in the body`() =
+        testApplication {
+            application { installTestApp() }
+            webhookEndpointRepo.add(
+                com.kauth.domain.model.WebhookEndpoint(
+                    tenantId = TenantId(1),
+                    url = "https://example.com/hooks/kotauth",
+                    secret = "hmac-key-value",
+                    events = setOf(com.kauth.domain.model.WebhookEventType.LOGIN_FAILED),
+                ),
+            )
+
+            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(rawApiKey) }
+
+            assertFalse(response.bodyAsText().contains("secret", ignoreCase = true))
+        }
+
+    @Test
+    fun `Scope enforcement key without webhooks_write gets 403 on POST`() =
+        testApplication {
+            application { installTestApp() }
+            val readOnlyKey = apiKeyWithScopes(listOf(ApiScope.WEBHOOKS_READ))
+
+            val response =
+                client.post("/t/acme/api/v1/webhooks") {
+                    bearerAuth(readOnlyKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createWebhookBody())
                 }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
 
     @Test
-    fun `scope enforcement key without SESSIONS_WRITE gets 403 on POST revoke-sessions`() =
+    fun `Scope enforcement key without webhooks_read gets 403 on GET`() =
         testApplication {
             application { installTestApp() }
-            val user = seedUser()
-            val limitedKey = apiKeyMissingScope(listOf(ApiScope.USERS_WRITE, ApiScope.SESSIONS_READ))
+            val writeOnlyKey = apiKeyWithScopes(listOf(ApiScope.WEBHOOKS_WRITE))
 
-            val response =
-                client.post("/t/acme/api/v1/users/${user.id!!.value}/revoke-sessions") {
-                    bearerAuth(limitedKey)
-                }
+            val response = client.get("/t/acme/api/v1/webhooks") { bearerAuth(writeOnlyKey) }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
         }
@@ -505,7 +507,7 @@ class ApiUserStateTest {
                 emailOtpService = stubEmailOtpService(),
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
-                webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                webhookService = webhookService,
             )
         }
     }

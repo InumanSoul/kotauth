@@ -66,6 +66,12 @@ object ApiScope {
     /** Read tenant metadata, sign-in methods, and security/MFA policy. SMTP credentials excluded. */
     const val WORKSPACE_READ = "workspace:read"
 
+    /** List webhook endpoints (never exposes the signing secret). */
+    const val WEBHOOKS_READ = "webhooks:read"
+
+    /** Create/delete webhook endpoints. */
+    const val WEBHOOKS_WRITE = "webhooks:write"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -88,5 +94,7 @@ object ApiScope {
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
             WORKSPACE_READ,
+            WEBHOOKS_READ,
+            WEBHOOKS_WRITE,
         )
 }

@@ -247,6 +247,12 @@ data class ProblemDetail(
     val includeInId: Boolean = false,
 )
 
+@Serializable data class CreateWebhookRequest(
+    val url: String,
+    val description: String = "",
+    val events: List<String>,
+)
+
 // -- Response DTOs ------------------------------------------------------------
 
 @Serializable data class UserDto(
@@ -396,6 +402,26 @@ data class ProblemDetail(
     val hibpCheckEnabled: Boolean,
 )
 
+@Serializable data class WebhookEndpointDto(
+    val id: Int,
+    val url: String,
+    val description: String,
+    val events: List<String>,
+    val enabled: Boolean,
+    val createdAt: String,
+)
+
+/**
+ * Response for POST /webhooks. Contains the created endpoint metadata plus
+ * the HMAC signing secret in plaintext. The secret is returned exactly
+ * ONCE — the server stores it and uses it to sign delivery payloads;
+ * clients that need to verify incoming webhooks must persist it now.
+ */
+@Serializable data class CreateWebhookResponse(
+    val endpoint: WebhookEndpointDto,
+    val secret: String,
+)
+
 // -- Domain → DTO mappers ----------------------------------------------------
 
 internal fun com.kauth.domain.model.User.toApiDto() =
@@ -469,6 +495,16 @@ internal fun com.kauth.domain.model.TenantClaimMapper.toApiDto() =
         claimName = claimName,
         includeInAccess = includeInAccess,
         includeInId = includeInId,
+    )
+
+internal fun com.kauth.domain.model.WebhookEndpoint.toApiDto(): WebhookEndpointDto =
+    WebhookEndpointDto(
+        id = id!!,
+        url = url,
+        description = description,
+        events = events.map { it.value }.sorted(),
+        enabled = enabled,
+        createdAt = isoFormatter.format(createdAt),
     )
 
 internal fun com.kauth.domain.model.Tenant.toWorkspaceApiDto(): WorkspaceDto {

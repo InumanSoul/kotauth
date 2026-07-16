@@ -14,6 +14,7 @@ import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
@@ -46,6 +47,7 @@ fun Route.apiRoutes(
     emailOtpService: EmailOtpService,
     otpEmailRateLimiter: RateLimiterPort,
     otpIpRateLimiter: RateLimiterPort,
+    webhookService: WebhookService,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -118,6 +120,7 @@ fun Route.apiRoutes(
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
             apiWorkspaceRoutes(tenantRepository)
+            apiWebhookRoutes(webhookService)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)

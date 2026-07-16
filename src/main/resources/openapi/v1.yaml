@@ -40,6 +40,8 @@ info:
     | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
     | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
     | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
+    | `webhooks:read`         | List webhook endpoints (never exposes the signing secret) |
+    | `webhooks:write`        | Create and delete webhook endpoints       |
 
     ## Custom attributes and JWT claims
 
@@ -365,6 +367,50 @@ components:
         maxAgeDays: { type: integer }
         blacklistEnabled: { type: boolean }
         hibpCheckEnabled: { type: boolean }
+
+    # ---- Webhooks ----
+    WebhookEndpointDto:
+      type: object
+      required: [id, url, description, events, enabled, createdAt]
+      properties:
+        id: { type: integer }
+        url: { type: string, format: uri }
+        description: { type: string }
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              [user.created, user.updated, user.deleted, login.success,
+               login.failed, password.reset, mfa.enrolled, session.revoked]
+        enabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateWebhookRequest:
+      type: object
+      required: [url, events]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+        description: { type: string, default: "" }
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              [user.created, user.updated, user.deleted, login.success,
+               login.failed, password.reset, mfa.enrolled, session.revoked]
+          minItems: 1
+
+    CreateWebhookResponse:
+      type: object
+      required: [endpoint, secret]
+      properties:
+        endpoint: { $ref: "#/components/schemas/WebhookEndpointDto" }
+        secret:
+          type: string
+          description: |
+            Plaintext HMAC-SHA256 signing key. Returned exactly once; the
+            server does not retain a plaintext copy.
 
     # ---- Audit Logs ----
     AuditEventDto:
@@ -1342,6 +1388,75 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
 
   # ==========================================================================
+  # Webhooks
+  # ==========================================================================
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List webhook endpoints
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Webhook endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEndpointDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createWebhook
+      summary: Create a webhook endpoint
+      description: |
+        Returns the created endpoint plus a plaintext `secret` — this value
+        is the HMAC-SHA256 signing key. It is returned exactly ONCE. Persist
+        it now; the server has already hashed/stored its copy and cannot
+        return it again.
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateWebhookRequest" }
+      responses:
+        "201":
+          description: Endpoint created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateWebhookResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422":
+          description: Invalid URL, event name, or other validation failure
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+
+  /webhooks/{endpointId}:
+    parameters:
+      - in: path
+        name: endpointId
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteWebhook
+      summary: Delete a webhook endpoint
+      description: Idempotent — succeeds even if the endpoint does not exist.
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Endpoint deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ==========================================================================
   # Audit Logs
   # ==========================================================================
   /audit-logs:
@@ -1641,6 +1756,8 @@ tags:
     description: Active user sessions
   - name: Workspace
     description: Tenant metadata, sign-in methods, and security/MFA policy (read-only; SMTP excluded)
+  - name: Webhooks
+    description: Outbound event notification endpoints (signing secret is returned once, at creation)
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes

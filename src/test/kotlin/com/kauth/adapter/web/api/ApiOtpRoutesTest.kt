@@ -11,6 +11,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -21,6 +22,8 @@ import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebhookDeliveryRepository
+import com.kauth.fakes.FakeWebhookEndpointRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
@@ -406,6 +409,7 @@ class ApiOtpRoutesTest {
                 emailOtpService = otpService,
                 otpEmailRateLimiter = emailLimiter,
                 otpIpRateLimiter = ipLimiter,
+                webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
             )
         }
     }
