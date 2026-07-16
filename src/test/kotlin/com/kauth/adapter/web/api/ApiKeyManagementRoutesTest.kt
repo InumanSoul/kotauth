@@ -519,6 +519,7 @@ class ApiKeyManagementRoutesTest {
                 emailOtpService = stubEmailOtpService(),
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
+                apiWriteRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =

@@ -413,6 +413,7 @@ class ApiOtpRoutesTest {
                 emailOtpService = otpService,
                 otpEmailRateLimiter = emailLimiter,
                 otpIpRateLimiter = ipLimiter,
+                apiWriteRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =

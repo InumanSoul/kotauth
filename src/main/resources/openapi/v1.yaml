@@ -71,6 +71,13 @@ info:
     }
     ```
 
+    ## Rate limits
+
+    Write requests (`POST`/`PUT`/`PATCH`/`DELETE`) are limited to 60 per 60-second
+    window per API key per workspace. Exceeded requests receive `429 Too Many
+    Requests` with a `Retry-After` header (see `components.responses.TooManyRequests`).
+    Read requests (`GET`) are unrestricted in v1.21.0.
+
 servers:
   - url: "{baseUrl}/t/{tenantSlug}/api/v1"
     description: KotAuth REST API v1
@@ -687,6 +694,15 @@ components:
           schema: { $ref: "#/components/schemas/ProblemDetail" }
     ValidationError:
       description: Validation failed
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the seconds indicated by the `Retry-After` header.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait before retrying.
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/ProblemDetail" }

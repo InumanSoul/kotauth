@@ -463,6 +463,7 @@ fun Application.module(
             emailOtpService = s.emailOtpService,
             otpEmailRateLimiter = s.otpEmailRateLimiter,
             otpIpRateLimiter = s.otpIpRateLimiter,
+            apiWriteRateLimiter = s.apiWriteRateLimiter,
             webhookService = s.webhookService,
             resourceServerService = s.resourceServerService,
             webAuthnService = s.webAuthnService,

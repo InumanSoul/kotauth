@@ -160,6 +160,7 @@ data class ServiceGraph(
     val mfaRateLimiter: RateLimiterPort,
     val otpEmailRateLimiter: RateLimiterPort,
     val otpIpRateLimiter: RateLimiterPort,
+    val apiWriteRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
@@ -539,6 +540,7 @@ data class ServiceGraph(
             val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
+            val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -640,6 +642,7 @@ data class ServiceGraph(
                 mfaRateLimiter = mfaLimiter,
                 otpEmailRateLimiter = otpEmailLimiter,
                 otpIpRateLimiter = otpIpLimiter,
+                apiWriteRateLimiter = apiWriteLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,
