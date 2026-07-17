@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -1058,6 +1059,53 @@ internal fun brandingPageImpl(
                                         +" request a loaded locale. Add bundles via KAUTH_I18N_BUNDLE_DIR"
                                         +" to expand this list."
                                     }
+                                }
+                            }
+                        }
+
+                        div("ov-card") {
+                            div("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
+                            div("edit-row") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
+                                div {
+                                    select {
+                                        id = "themeLoginLayout"
+                                        name = "themeLoginLayout"
+                                        classes = setOf("edit-row__field")
+                                        LoginLayout.entries.forEach { layout ->
+                                            option {
+                                                value = layout.name
+                                                if (layout == t.loginLayout) selected = true
+                                                +layout.name.lowercase().replaceFirstChar { it.uppercase() }
+                                            }
+                                        }
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_DESC }
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
+                                div {
+                                    input(type = InputType.text, name = "themeLoginTagline") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-tagline"
+                                        value = t.loginTagline ?: ""
+                                        placeholder = workspace.displayName
+                                        attributes["maxlength"] = "200"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_HINT }
+                                }
+                            }
+                            div("edit-row") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
+                                div {
+                                    input(type = InputType.url, name = "themeLoginBackgroundUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-bg"
+                                        value = t.loginBackgroundUrl ?: ""
+                                        placeholder = "https://cdn.example.com/hero.jpg"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_BG_HINT }
                                 }
                             }
                         }
