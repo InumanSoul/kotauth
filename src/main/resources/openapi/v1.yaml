@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: KotAuth REST API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Machine-to-machine REST API for managing KotAuth identity platform resources.
 
@@ -77,6 +77,13 @@ info:
     window per API key per workspace. Exceeded requests receive `429 Too Many
     Requests` with a `Retry-After` header (see `components.responses.TooManyRequests`).
     Read requests (`GET`) are unrestricted in v1.21.0.
+
+    ## v1.21.0
+
+    Adds workspace read (`GET /workspace`), webhook endpoint management, RFC 8707
+    resource servers (with per-client authorization edges), self-service API key
+    management, and passkey inspection/revocation, plus extended filtering on the
+    users and sessions list endpoints. See `CHANGELOG.md` for the full release notes.
 
 servers:
   - url: "{baseUrl}/t/{tenantSlug}/api/v1"
@@ -1273,11 +1280,7 @@ paths:
               schema: { $ref: "#/components/schemas/ProblemDetail" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404":
-          description: Group or role not found in this workspace
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "422":
           description: Role name is ambiguous — use the numeric role id
           content:
@@ -1296,11 +1299,7 @@ paths:
         "204": { description: Role removed }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404":
-          description: Group not found in this workspace
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
 
   # ==========================================================================
   # Applications
@@ -1333,6 +1332,14 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateApplicationRequest" }
+            examples:
+              confidentialApp:
+                value:
+                  clientId: internal-dashboard
+                  name: Internal Dashboard
+                  accessType: confidential
+                  redirectUris:
+                    - https://dashboard.example.com/callback
       responses:
         "201":
           description: |
@@ -1444,6 +1451,7 @@ paths:
       operationId: listSessions
       summary: List active sessions
       tags: [Sessions]
+      security: [{ bearerAuth: [] }]
       parameters:
         - in: query
           name: user_id
@@ -1564,6 +1572,14 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateWebhookRequest" }
+            examples:
+              userLifecycle:
+                value:
+                  url: https://example.com/webhooks/kauth
+                  description: Sync users to CRM
+                  events:
+                    - user.created
+                    - user.deleted
       responses:
         "201":
           description: Endpoint created
@@ -1572,11 +1588,7 @@ paths:
               schema: { $ref: "#/components/schemas/CreateWebhookResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "422":
-          description: Invalid URL, event name, or other validation failure
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /webhooks/{endpointId}:
     parameters:
@@ -1630,6 +1642,14 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateResourceServerRequest" }
+            examples:
+              billingApi:
+                value:
+                  identifier: https://api.example.com/billing
+                  name: Billing API
+                  scopes:
+                    - billing:read
+                    - billing:write
       responses:
         "201":
           description: Resource server created
@@ -1678,6 +1698,15 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/UpdateResourceServerRequest" }
+            examples:
+              billingApi:
+                value:
+                  name: Billing API v2
+                  description: Updated scopes for v2 rollout
+                  scopes:
+                    - billing:read
+                    - billing:write
+                    - billing:refund
       responses:
         "200":
           description: Updated resource server
@@ -1744,6 +1773,10 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/SetAuthorizedResourceServersRequest" }
+            examples:
+              authorizeTwo:
+                value:
+                  resourceServerIds: [1, 2]
       responses:
         "204": { description: Authorization set updated }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -1796,6 +1829,14 @@ paths:
         content:
           application/json:
             schema: { $ref: "#/components/schemas/CreateApiKeyRequest" }
+            examples:
+              ciDeployKey:
+                value:
+                  name: CI deploy key
+                  scopes:
+                    - users:read
+                    - applications:read
+                  expiresAt: "2027-01-01T00:00:00Z"
       responses:
         "201":
           description: Key created
@@ -1804,11 +1845,7 @@ paths:
               schema: { $ref: "#/components/schemas/CreateApiKeyResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
-        "404":
-          description: Workspace not found (should not happen in practice — tenant is resolved from URL)
-          content:
-            application/problem+json:
-              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
 
   /api-keys/{id}:
