@@ -23,3 +23,60 @@ body {
   overflow: hidden;
   view-transition-name: auth-card;
 }
+
+/* ------- SPLIT layout (v1.21.0) ------- */
+
+.shell--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shell--split .shell__panel {
+  background-color: var(--color-accent);
+  background-size: cover;
+  background-position: center;
+  color: var(--color-accent-fg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+.shell--split .shell__panel-inner {
+  max-width: 400px;
+}
+
+.shell--split .shell__tagline {
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.shell--split .shell__form {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+
+/* Responsive collapse: single column on narrow viewports */
+@media (max-width: 640px) {
+  .shell--split {
+    grid-template-columns: 1fr;
+  }
+
+  .shell--split .shell__panel {
+    min-height: 200px;
+    padding: 2rem 1.5rem;
+  }
+
+  .shell--split .shell__form {
+    padding: 2rem 1.5rem;
+  }
+}
