@@ -39,7 +39,7 @@ internal fun BODY.authShell(
     div(shellClasses) {
         attributes["data-layout"] = theme.loginLayout.name.lowercase()
         if (theme.loginLayout == LoginLayout.SPLIT) {
-            val bgStyle = theme.loginBackgroundUrl?.let { "background-image:url('$it')" } ?: ""
+            val bgStyle = theme.loginBackgroundUrl?.let { "background-image:url('${sanitizeCssUrl(it)}')" } ?: ""
             aside(classes = "shell__panel") {
                 if (bgStyle.isNotEmpty()) attributes["style"] = bgStyle
                 div("shell__panel-inner") {
@@ -56,6 +56,15 @@ internal fun BODY.authShell(
         }
     }
 }
+
+// kotlinx.html attribute escaping doesn't encode single quotes, but the CSS url('...')
+// literal here is single-quoted — encode characters that could break out of it or the style attribute.
+private fun sanitizeCssUrl(url: String): String =
+    url
+        .replace("\\", "%5C")
+        .replace("'", "%27")
+        .replace("\n", "%0A")
+        .replace("\r", "%0D")
 
 internal fun FlowContent.brandBlock(
     theme: TenantTheme,

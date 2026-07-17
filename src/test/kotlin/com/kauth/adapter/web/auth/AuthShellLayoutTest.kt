@@ -97,6 +97,20 @@ class AuthShellLayoutTest {
     }
 
     @Test
+    fun `SPLIT layout escapes single quotes in loginBackgroundUrl`() {
+        val html =
+            renderShell(
+                TenantTheme.DEFAULT.copy(
+                    loginLayout = LoginLayout.SPLIT,
+                    loginBackgroundUrl = "https://acme.dev/foo');background:red;//",
+                ),
+            )
+
+        assertContains(html, "%27")
+        assertFalse(html.contains("');background:red"), "single quote must not break out of the url() literal")
+    }
+
+    @Test
     fun `SPLIT layout omits background style when loginBackgroundUrl is null`() {
         val html =
             renderShell(
