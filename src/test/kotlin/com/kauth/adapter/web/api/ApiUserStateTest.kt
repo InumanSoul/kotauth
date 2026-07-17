@@ -338,6 +338,54 @@ class ApiUserStateTest {
             assertEquals(HttpStatusCode.NoContent, response.status)
         }
 
+    @Test
+    fun `DELETE users mfa reset returns 404 for user in a different tenant — MFA enrollments preserved`() =
+        testApplication {
+            application { installTestApp() }
+            val tenantB =
+                Tenant(
+                    id = TenantId(2),
+                    slug = "globex",
+                    displayName = "Globex",
+                    issuerUrl = null,
+                    theme = TenantTheme.DEFAULT,
+                )
+            tenantRepo.add(tenantB)
+            val otherTenantUser =
+                userRepo.add(
+                    User(
+                        tenantId = TenantId(2),
+                        username = "carol",
+                        email = "carol@globex.com",
+                        fullName = "carol",
+                        passwordHash = hasher.hash("pass"),
+                        enabled = true,
+                        mfaEnabled = true,
+                    ),
+                )
+            val otherTenantUserId = otherTenantUser.id!!
+            val savedEnrollment =
+                mfaRepo.saveEnrollment(
+                    MfaEnrollment(
+                        userId = otherTenantUserId,
+                        tenantId = TenantId(2),
+                        secret = "SECRET",
+                        verified = true,
+                    ),
+                )
+
+            // rawApiKey belongs to tenant A ("acme") — attempt to reset MFA for a tenant B user.
+            val response =
+                client.delete("/t/acme/api/v1/users/${otherTenantUserId.value}/mfa/reset") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertEquals(savedEnrollment, mfaRepo.findEnrollmentByUserId(otherTenantUserId, "TOTP"))
+            assertEquals(true, userRepo.findById(otherTenantUserId, TenantId(2))?.mfaEnabled)
+            assertEquals(false, auditLogPort.hasEvent(com.kauth.domain.model.AuditEventType.MFA_DISABLED))
+        }
+
     // =========================================================================
     // POST /users/{id}/revoke-sessions
     // =========================================================================

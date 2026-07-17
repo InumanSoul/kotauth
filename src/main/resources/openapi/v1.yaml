@@ -147,8 +147,9 @@ components:
           type: boolean
           description: |
             True if the account currently has an active lockout (usually from
-            failed-login threshold or OTP-brute-force protection). Task 2 will
-            add `POST /users/{id}/enable` to clear it.
+            failed-login threshold or OTP-brute-force protection). This is
+            independent of `enabled` — `POST /users/{id}/enable` does not
+            clear an active lockout; use the admin console for that.
         createdAt:
           type: string
           format: date-time
@@ -926,7 +927,11 @@ paths:
     post:
       operationId: enableUser
       summary: Enable a disabled user
-      description: Idempotent. Also clears the account's active lockout if any.
+      description: |
+        Re-enables a previously disabled user. Idempotent — no-op if the user
+        is already enabled. Note that this does NOT clear an active account
+        lockout (from failed-login threshold); use the admin console to clear
+        the lockout separately.
       tags: [Users]
       security: [{ bearerAuth: [] }]
       responses:

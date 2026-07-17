@@ -387,13 +387,13 @@ class MfaService(
         ipAddress: String? = null,
         userAgent: String? = null,
     ): MfaResult<Unit> {
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return MfaResult.Success(Unit) // cross-tenant / missing user — no-op, no audit
+
         mfaRepository.deleteEnrollmentsByUser(userId)
         mfaRepository.deleteRecoveryCodesByUser(userId)
-
-        val user = userRepository.findById(userId, tenantId)
-        if (user != null) {
-            userRepository.update(user.copy(mfaEnabled = false))
-        }
+        userRepository.update(user.copy(mfaEnabled = false))
 
         auditLog.record(
             AuditEvent(

@@ -212,8 +212,16 @@ internal fun Route.apiUserRoutes(
                 requireScope(call, ApiScope.USERS_WRITE) ?: return@delete
                 val tenantId = call.attributes[TenantIdAttr]
                 val userId = call.parseUserIdOr { return@delete } ?: return@delete
-                mfaService.disableMfa(userId, tenantId)
-                call.respond(HttpStatusCode.NoContent, "")
+                when (val existing = adminUserService.getUser(userId, tenantId)) {
+                    is AdminResult.Failure -> {
+                        call.respondAdminError(existing.error)
+                        return@delete
+                    }
+                    is AdminResult.Success -> {
+                        mfaService.disableMfa(userId, tenantId)
+                        call.respond(HttpStatusCode.NoContent, "")
+                    }
+                }
             }
 
             /**

@@ -334,6 +334,7 @@ class ApiPasskeyRoutesTest {
             val response = client.delete("/t/acme/api/v1/passkeys/999999") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
+            assertTrue(response.bodyAsText().contains("\"detail\":\"Passkey not found.\""))
         }
 
     @Test
@@ -357,6 +358,9 @@ class ApiPasskeyRoutesTest {
                 client.delete("/t/acme/api/v1/passkeys/${otherTenantCredential.id}") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
+            // Same message as the missing-id case above — credential existence must not be
+            // enumerable across tenants by diffing 404 detail strings.
+            assertTrue(response.bodyAsText().contains("\"detail\":\"Passkey not found.\""))
             // Not leaked: the credential still exists (untouched by the cross-tenant request).
             assertEquals(otherTenantCredential, credentialRepo.findById(otherTenantCredential.id!!))
         }

@@ -49,17 +49,14 @@ internal fun Route.apiPasskeyRoutes(
                         "Invalid credential ID",
                         "credentialPk must be an integer.",
                     )
-            // Look up the credential first: the DELETE service call needs userId, and the
-            // tenant check here also guards against leaking cross-tenant credential existence.
+            // Look up the credential first: the DELETE service call needs userId. Both the
+            // missing-row and cross-tenant-row cases below respond with the identical message
+            // so that credential existence can't be enumerated across tenants.
             val credential =
                 webAuthnCredentialRepository.findById(credentialPk)
                     ?: return@delete call.respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey not found.")
             if (credential.tenantId != tenantId) {
-                return@delete call.respondProblem(
-                    HttpStatusCode.NotFound,
-                    "Not Found",
-                    "Passkey not found in this workspace.",
-                )
+                return@delete call.respondProblem(HttpStatusCode.NotFound, "Not Found", "Passkey not found.")
             }
             when (val result = webAuthnService.revoke(credential.userId, credentialPk, tenantId)) {
                 is WebAuthnResult.Success -> call.respond(HttpStatusCode.NoContent, "")
