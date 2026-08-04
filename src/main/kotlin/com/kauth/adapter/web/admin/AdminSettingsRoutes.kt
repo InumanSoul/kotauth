@@ -2,6 +2,7 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SocialProvider
@@ -450,6 +451,12 @@ fun Route.adminSettingsRoutes(
                 logoUrl = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 faviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 defaultLocale = resolvedLocale,
+                loginLayout =
+                    params["themeLoginLayout"]?.let {
+                        runCatching { LoginLayout.valueOf(it.uppercase()) }.getOrNull()
+                    } ?: workspace.theme.loginLayout,
+                loginBackgroundUrl = params["themeLoginBackgroundUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                loginTagline = params["themeLoginTagline"]?.trim()?.takeIf { it.isNotBlank() },
             )
         when (val result = workspaceSettingsService.updateTheme(slug, theme)) {
             is AdminResult.Success -> {

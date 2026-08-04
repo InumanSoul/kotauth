@@ -1,5 +1,6 @@
 package com.kauth.domain.port
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
@@ -57,15 +58,27 @@ interface SessionRepository {
         revokedAt: Instant = Instant.now(),
     ): Int
 
-    /** Returns active (non-revoked, non-expired) sessions across all users in a tenant, optionally paginated. */
+    /**
+     * Returns active (non-revoked, non-expired) sessions across all users in a tenant, optionally
+     * filtered by [userId] and/or [applicationId], and paginated.
+     */
     fun findActiveByTenant(
         tenantId: TenantId,
+        userId: UserId? = null,
+        applicationId: ApplicationId? = null,
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
     ): List<Session>
 
-    /** Returns total count of active sessions for [tenantId]. Used for pagination/display. */
-    fun countActiveByTenant(tenantId: TenantId): Int
+    /**
+     * Returns total count of active sessions for [tenantId], optionally filtered by [userId]
+     * and/or [applicationId]. Used for pagination/display.
+     */
+    fun countActiveByTenant(
+        tenantId: TenantId,
+        userId: UserId? = null,
+        applicationId: ApplicationId? = null,
+    ): Int
 
     /**
      * Counts active (non-revoked, non-expired) sessions for a user within a tenant.

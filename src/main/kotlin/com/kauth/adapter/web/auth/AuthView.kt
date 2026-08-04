@@ -130,17 +130,7 @@ object AuthView {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
-                div("shell") {
-                    div("brand") {
-                        if (ctx.theme.logoUrl != null) {
-                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
-                                width = "180"
-                                height = "48"
-                            }
-                        } else {
-                            div("brand-name") { +ctx.workspaceName }
-                        }
-                    }
+                authShell(ctx.workspaceName, ctx.theme) {
                     div("card") {
                         h1("card-title") { +ctx.t("LOGIN_WELCOME_BACK") }
                         p("card-subtitle") {
@@ -366,17 +356,7 @@ object AuthView {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_REGISTER", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
-                div("shell") {
-                    div("brand") {
-                        if (ctx.theme.logoUrl != null) {
-                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
-                                width = "180"
-                                height = "48"
-                            }
-                        } else {
-                            div("brand-name") { +ctx.workspaceName }
-                        }
-                    }
+                authShell(ctx.workspaceName, ctx.theme) {
                     div("card") {
                         h1("card-title") { +ctx.t("REGISTER_TITLE") }
                         p("card-subtitle") {
@@ -570,17 +550,7 @@ object AuthView {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_FORGOT", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
-                div("shell") {
-                    div("brand") {
-                        if (ctx.theme.logoUrl != null) {
-                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
-                                width = "180"
-                                height = "48"
-                            }
-                        } else {
-                            div("brand-name") { +ctx.workspaceName }
-                        }
-                    }
+                authShell(ctx.workspaceName, ctx.theme) {
                     div("card") {
                         h1("card-title") { +ctx.t("FORGOT_TITLE") }
 
@@ -907,17 +877,7 @@ object AuthView {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_MAGIC_LINK", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
-                div("shell") {
-                    div("brand") {
-                        if (ctx.theme.logoUrl != null) {
-                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
-                                width = "180"
-                                height = "48"
-                            }
-                        } else {
-                            div("brand-name") { +ctx.workspaceName }
-                        }
-                    }
+                authShell(ctx.workspaceName, ctx.theme) {
                     div("card") {
                         h1("card-title") { +ctx.t("MAGIC_LINK_TITLE") }
 
@@ -1510,18 +1470,11 @@ object AuthView {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_MFA", ctx.workspaceName), ctx.theme) }
             body {
                 demoBanner()
-                div("shell") {
-                    div("brand") {
-                        if (ctx.theme.logoUrl != null) {
-                            img(src = ctx.theme.logoUrl, classes = "brand-logo", alt = ctx.workspaceName) {
-                                width = "180"
-                                height = "48"
-                            }
-                        } else {
-                            div("brand-name") { +ctx.workspaceName }
-                        }
-                        div("brand-tagline") { +ctx.t("MFA_TAGLINE") }
-                    }
+                authShell(
+                    ctx.workspaceName,
+                    ctx.theme,
+                    brandExtra = { div("brand-tagline") { +ctx.t("MFA_TAGLINE") } },
+                ) {
                     div("card") {
                         h1("card-title") { +ctx.t("MFA_VERIFY_IDENTITY") }
                         p("card-subtitle") { +ctx.t("MFA_SUBTITLE") }

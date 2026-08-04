@@ -705,6 +705,17 @@ object EnglishStrings {
     const val BRAND_IDENTITY_HEADING = "Brand Identity"
     const val VISUAL_THEME_HEADING = "Visual Theme"
 
+    const val BRANDING_LOGIN_LAYOUT_TITLE = "Login layout"
+    const val BRANDING_LOGIN_LAYOUT_DESC =
+        "Choose how the auth pages (login, register, MFA) are structured. Split adds a branded left panel."
+    const val BRANDING_LOGIN_LAYOUT_FIELD = "Layout"
+    const val BRANDING_LOGIN_TAGLINE_FIELD = "Tagline (split layout)"
+    const val BRANDING_LOGIN_TAGLINE_HINT =
+        "Shown on the left panel when using the Split layout. Falls back to the workspace name if empty."
+    const val BRANDING_LOGIN_BG_FIELD = "Background image URL (split layout)"
+    const val BRANDING_LOGIN_BG_HINT =
+        "Optional image for the left panel. Must be an https URL. If empty, the panel uses the accent color."
+
     const val POST_MAGIC_LINK_TITLE = "Sign in complete"
     const val POST_MAGIC_LINK_INTRO =
         "Adding a passkey lets you sign in faster next time without a magic link."

@@ -160,34 +160,48 @@ class PostgresSessionRepository : SessionRepository {
 
     override fun findActiveByTenant(
         tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
         limit: Int,
         offset: Int,
     ): List<Session> =
         transaction {
             val now = OffsetDateTime.now()
-            SessionsTable
-                .selectAll()
-                .where {
-                    (SessionsTable.tenantId eq tenantId.value) and
-                        (SessionsTable.revokedAt.isNull()) and
-                        (SessionsTable.expiresAt greater now)
-                }.orderBy(SessionsTable.createdAt, SortOrder.DESC)
+            val query =
+                SessionsTable
+                    .selectAll()
+                    .where {
+                        (SessionsTable.tenantId eq tenantId.value) and
+                            (SessionsTable.revokedAt.isNull()) and
+                            (SessionsTable.expiresAt greater now)
+                    }
+            if (userId != null) query.andWhere { SessionsTable.userId eq userId.value }
+            if (applicationId != null) query.andWhere { SessionsTable.clientId eq applicationId.value }
+            query
+                .orderBy(SessionsTable.createdAt, SortOrder.DESC)
                 .limit(limit)
                 .offset(offset.toLong())
                 .map { it.toSession() }
         }
 
-    override fun countActiveByTenant(tenantId: TenantId): Int =
+    override fun countActiveByTenant(
+        tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
+    ): Int =
         transaction {
             val now = OffsetDateTime.now()
-            SessionsTable
-                .selectAll()
-                .where {
-                    (SessionsTable.tenantId eq tenantId.value) and
-                        (SessionsTable.revokedAt.isNull()) and
-                        (SessionsTable.expiresAt greater now)
-                }.count()
-                .toInt()
+            val query =
+                SessionsTable
+                    .selectAll()
+                    .where {
+                        (SessionsTable.tenantId eq tenantId.value) and
+                            (SessionsTable.revokedAt.isNull()) and
+                            (SessionsTable.expiresAt greater now)
+                    }
+            if (userId != null) query.andWhere { SessionsTable.userId eq userId.value }
+            if (applicationId != null) query.andWhere { SessionsTable.clientId eq applicationId.value }
+            query.count().toInt()
         }
 
     override fun countActiveByUser(

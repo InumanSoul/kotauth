@@ -175,4 +175,43 @@
       syncPreviewLogo(logoInput.value);
     });
   }
+
+  /* ── SPLIT layout live preview ── */
+  const mockEl        = document.getElementById('preview-mock');
+  const panelEl       = document.getElementById('preview-panel-split');
+  const panelTagline  = document.getElementById('preview-panel-tagline');
+  const layoutSelect  = document.getElementById('themeLoginLayout');
+  const taglineInput  = document.getElementById('field-login-tagline');
+  const bgInput       = document.getElementById('field-login-bg');
+
+  const workspaceFallback = panelTagline ? panelTagline.textContent : '';
+
+  const syncLayout = (value) => {
+    if (!mockEl) return;
+    if (value === 'SPLIT') mockEl.classList.add('auth-mock--split');
+    else mockEl.classList.remove('auth-mock--split');
+  };
+  const syncTagline = (value) => {
+    if (!panelTagline) return;
+    panelTagline.textContent = (value && value.trim()) ? value : workspaceFallback;
+  };
+  const syncPanelBg = (value) => {
+    if (!panelEl) return;
+    if (value && /^https?:\/\//i.test(value)) {
+      const safe = value.replace(/'/g, '%27');
+      panelEl.style.backgroundImage = `url('${safe}')`;
+    } else {
+      panelEl.style.backgroundImage = '';
+    }
+  };
+
+  if (layoutSelect) {
+    layoutSelect.addEventListener('change', () => syncLayout(layoutSelect.value));
+  }
+  if (taglineInput) {
+    taglineInput.addEventListener('input', () => syncTagline(taglineInput.value));
+  }
+  if (bgInput) {
+    bgInput.addEventListener('input', () => syncPanelBg(bgInput.value));
+  }
 })();

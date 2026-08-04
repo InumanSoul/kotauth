@@ -20,7 +20,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         transaction {
             ClientsTable
                 .selectAll()
-                .where { ClientsTable.tenantId eq tenantId.value }
+                .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.isDeleted eq false) }
                 .orderBy(ClientsTable.id)
                 .map { row ->
                     val uris = urisForClientPk(row[ClientsTable.id])
@@ -36,8 +36,11 @@ class PostgresApplicationRepository : ApplicationRepository {
             val row =
                 ClientsTable
                     .selectAll()
-                    .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.clientId eq clientId) }
-                    .singleOrNull() ?: return@transaction null
+                    .where {
+                        (ClientsTable.tenantId eq tenantId.value) and
+                            (ClientsTable.clientId eq clientId) and
+                            (ClientsTable.isDeleted eq false)
+                    }.singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
             row.toApplication(uris)
         }
@@ -47,7 +50,7 @@ class PostgresApplicationRepository : ApplicationRepository {
             val row =
                 ClientsTable
                     .selectAll()
-                    .where { ClientsTable.id eq id.value }
+                    .where { (ClientsTable.id eq id.value) and (ClientsTable.isDeleted eq false) }
                     .singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
             row.toApplication(uris)
@@ -157,6 +160,14 @@ class PostgresApplicationRepository : ApplicationRepository {
         }
         Unit
     }
+
+    override fun softDelete(appId: ApplicationId): Boolean =
+        transaction {
+            ClientsTable
+                .update({ ClientsTable.id eq appId.value }) {
+                    it[isDeleted] = true
+                } > 0
+        }
 
     // ------------------------------------------------------------------
     // Helpers

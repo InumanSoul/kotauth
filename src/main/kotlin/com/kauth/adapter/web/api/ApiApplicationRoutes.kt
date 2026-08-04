@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.RoleId
@@ -14,6 +15,7 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 
@@ -55,6 +57,45 @@ internal fun Route.apiApplicationRoutes(
             call.respond(HttpStatusCode.OK, app.toApiDto())
         }
 
+        post {
+            requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@post
+            val tenantId = call.attributes[TenantIdAttr]
+            val body = call.receive<CreateApplicationRequest>()
+
+            when (
+                val result =
+                    applicationManagementService.createApplication(
+                        tenantId = tenantId,
+                        clientId = body.clientId,
+                        name = body.name,
+                        description = body.description,
+                        accessType = body.accessType,
+                        redirectUris = body.redirectUris,
+                    )
+            ) {
+                is AdminResult.Failure -> call.respondAdminError(result.error)
+                is AdminResult.Success -> {
+                    val app = result.value
+                    val secret =
+                        if (app.accessType == AccessType.CONFIDENTIAL) {
+                            when (val rotate = applicationManagementService.regenerateClientSecret(app.id, tenantId)) {
+                                is AdminResult.Success -> rotate.value
+                                is AdminResult.Failure -> {
+                                    // Application was just created; regeneration failing here is a bug — fail loudly.
+                                    return@post call.respondAdminError(rotate.error)
+                                }
+                            }
+                        } else {
+                            null
+                        }
+                    call.respond(
+                        HttpStatusCode.Created,
+                        CreateApplicationResponse(application = app.toApiDto(), clientSecret = secret),
+                    )
+                }
+            }
+        }
+
         put("/{appId}") {
             requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@put
             val tenantId = call.attributes[TenantIdAttr]
@@ -87,10 +128,27 @@ internal fun Route.apiApplicationRoutes(
                     ?: return@delete call.respondProblem(
                         HttpStatusCode.BadRequest,
                         "Invalid application ID",
-                        "",
+                        "appId must be an integer.",
                     )
-            when (val result = applicationManagementService.setApplicationEnabled(appId, tenantId, false)) {
+            when (val result = applicationManagementService.deleteApplication(appId, tenantId)) {
                 is AdminResult.Success -> call.respond(HttpStatusCode.NoContent, "")
+                is AdminResult.Failure -> call.respondAdminError(result.error)
+            }
+        }
+
+        post("/{appId}/regenerate-secret") {
+            requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@post
+            val tenantId = call.attributes[TenantIdAttr]
+            val appId =
+                call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
+                    ?: return@post call.respondProblem(
+                        HttpStatusCode.BadRequest,
+                        "Invalid application ID",
+                        "appId must be an integer.",
+                    )
+            when (val result = applicationManagementService.regenerateClientSecret(appId, tenantId)) {
+                is AdminResult.Success ->
+                    call.respond(HttpStatusCode.Created, ClientSecretResponse(clientSecret = result.value))
                 is AdminResult.Failure -> call.respondAdminError(result.error)
             }
         }
