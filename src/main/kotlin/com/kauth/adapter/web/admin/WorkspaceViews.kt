@@ -1124,7 +1124,28 @@ internal fun brandingPageImpl(
                                 id = "preview-body"
                                 style = "background:${t.bgDeep};"
 
-                                div("auth-mock") {
+                                div {
+                                    val mockClasses =
+                                        if (t.loginLayout == LoginLayout.SPLIT) {
+                                            "auth-mock auth-mock--split"
+                                        } else {
+                                            "auth-mock"
+                                        }
+                                    classes = setOf(*mockClasses.split(" ").toTypedArray())
+                                    id = "preview-mock"
+
+                                    aside("auth-mock__panel") {
+                                        id = "preview-panel-split"
+                                        val bg = t.loginBackgroundUrl
+                                        if (!bg.isNullOrBlank()) {
+                                            style = "background-image:url('${bg.replace("'", "%27")}');"
+                                        }
+                                        p("auth-mock__panel-tagline") {
+                                            id = "preview-panel-tagline"
+                                            +(t.loginTagline ?: workspace.displayName)
+                                        }
+                                    }
+
                                     div("auth-mock__card") {
                                         id = "preview-card"
                                         style = "--pm-accent:${t.accentColor};--pm-accent-fg:${t.accentForeground};--pm-card:${t.surface};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"

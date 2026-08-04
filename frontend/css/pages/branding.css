@@ -165,3 +165,39 @@
   font-size: 11px; color: var(--pm-muted, #6b6b75);
 }
 .auth-mock__footer a { color: var(--pm-accent, #1fbcff); text-decoration: none; }
+
+/* ── SPLIT layout preview (v1.21.0) ── */
+.auth-mock__panel {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background-color: var(--pm-accent, #1fbcff);
+  background-size: cover;
+  background-position: center;
+  color: var(--pm-accent-fg, #05080a);
+  border-radius: var(--pm-radius, 8px) 0 0 var(--pm-radius, 8px);
+  min-height: 220px;
+}
+.auth-mock__panel-tagline {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  margin: 0;
+}
+.auth-mock--split {
+  max-width: 360px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--pm-border, rgba(255,255,255,0.10));
+  border-radius: var(--pm-radius, 8px);
+  overflow: hidden;
+}
+.auth-mock--split .auth-mock__panel { display: flex; }
+.auth-mock--split .auth-mock__card {
+  border: none;
+  border-radius: 0;
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-3);
+}
