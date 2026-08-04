@@ -1,7 +1,41 @@
-/* ── two-column branding layout ── */
+/* ── Collapsible ov-card variant (branding form sections) ── */
+details.ov-card--collapsible {
+  padding: 0;
+}
+details.ov-card--collapsible > summary {
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  padding-right: calc(var(--space-4) + 16px);
+  user-select: none;
+}
+/* Suppress the default disclosure marker (WebKit + Firefox). */
+details.ov-card--collapsible > summary::-webkit-details-marker { display: none; }
+details.ov-card--collapsible > summary::marker { content: ''; }
+/* Custom chevron on the right of the section label — rotates when open. */
+details.ov-card--collapsible > summary::after {
+  content: '';
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--color-subtle);
+  border-bottom: 1.5px solid var(--color-subtle);
+  transform: translateY(-70%) rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+details.ov-card--collapsible[open] > summary::after {
+  transform: translateY(-30%) rotate(45deg);
+}
+details.ov-card--collapsible > summary:hover::after {
+  border-color: var(--color-text);
+}
+
+/* ── two-column branding layout — form narrow (left), preview wide (right) ── */
 .branding-layout {
   display: grid;
-  grid-template-columns: 1fr 35%;
+  grid-template-columns: minmax(360px, 400px) 1fr;
   gap: var(--space-6);
   align-items: start;
 }
@@ -108,13 +142,13 @@
 .preview-panel__body {
   padding: var(--space-6) var(--space-5);
   display: flex; align-items: center; justify-content: center;
-  min-height: 420px;
+  min-height: 520px;
 }
 
 /* ── auth screen mockup (inside preview) ── */
 .auth-mock {
   width: 100%;
-  max-width: 260px;
+  max-width: 360px;
   display: flex; flex-direction: column; gap: 0;
   font-family: var(--font-sans);
 }
@@ -187,7 +221,7 @@
   margin: 0;
 }
 .auth-mock--split {
-  max-width: 360px;
+  max-width: 520px;
   display: grid;
   grid-template-columns: 1fr 1fr;
   border: 1px solid var(--pm-border, rgba(255,255,255,0.10));

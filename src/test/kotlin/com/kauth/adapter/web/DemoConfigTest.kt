@@ -40,37 +40,27 @@ class DemoConfigTest {
         val html = renderBanner()
 
         assertTrue(html.contains("demo-banner"))
-        assertTrue(html.contains("badge badge--warn"))
-        assertTrue(html.contains("Demo"))
     }
 
     @Test
-    fun `demoBanner contains admin credentials`() {
+    fun `demoBanner carries ARIA semantics for assistive tech`() {
         DemoConfig.enabled = true
 
         val html = renderBanner()
 
-        assertTrue(html.contains("admin"), "Should show admin username")
-        assertTrue(html.contains("Demo1234!"), "Should show admin password")
+        assertTrue(html.contains("role=\"status\""), "Banner should announce status via role")
+        assertTrue(html.contains("aria-label=\"Demo mode\""), "Banner should label itself for screen readers")
     }
 
     @Test
-    fun `demoBanner contains acme user credentials`() {
+    fun `demoBanner does not render credentials inline`() {
         DemoConfig.enabled = true
 
         val html = renderBanner()
 
-        assertTrue(html.contains("sarah.chen"), "Should show Acme demo username")
-        assertTrue(html.contains("Demo1234!"), "Should show Acme demo password")
-    }
-
-    @Test
-    fun `demoBanner mentions data resets`() {
-        DemoConfig.enabled = true
-
-        val html = renderBanner()
-
-        assertTrue(html.contains("Data resets periodically"))
+        assertFalse(html.contains("Demo1234!"), "Credentials must live in the demo docs repo, not in the UI")
+        assertFalse(html.contains("sarah.chen"), "Credentials must live in the demo docs repo, not in the UI")
+        assertFalse(html.contains("Data resets"), "Reset copy was removed with the visible banner text")
     }
 
     private fun renderBanner(): String =

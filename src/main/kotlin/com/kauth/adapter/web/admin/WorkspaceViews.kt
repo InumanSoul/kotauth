@@ -900,8 +900,9 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-form") {
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
                             div("edit-row") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
@@ -953,8 +954,9 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
                             div("edit-row") {
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
@@ -1063,8 +1065,9 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
                             div("edit-row") {
                                 span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
                                 div {
@@ -1116,10 +1119,7 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-preview") {
                         div("preview-panel") {
-                            div("preview-panel__header") {
-                                +"Preview"
-                                span("preview-panel__label") { +"Live — updates as you edit" }
-                            }
+                            div("preview-panel__header") { +"Preview" }
                             div("preview-panel__body") {
                                 id = "preview-body"
                                 style = "background:${t.bgDeep};"
