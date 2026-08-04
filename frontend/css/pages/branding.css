@@ -1,3 +1,25 @@
+/* ── Stacked form row (label above field) — narrow-form legibility variant ── */
+.edit-col {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+}
+.edit-col:last-of-type { border-bottom: none; }
+.edit-col > .edit-row__label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  padding-top: 0;
+  margin-bottom: var(--space-2);
+}
+.edit-col > .edit-row__hint,
+.edit-col .edit-row__hint {
+  margin-top: var(--space-2);
+}
+
 /* ── Collapsible ov-card variant (branding form sections) ── */
 details.ov-card--collapsible {
   padding: 0;
@@ -74,14 +96,8 @@ details.ov-card--collapsible > summary:hover::after {
 }
 
 .color-field {
-  padding: var(--space-3) var(--space-4);
-  border-right: 0.5px solid var(--color-border);
-  border-bottom: 0.5px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
 }
-/* Remove right border from even columns */
-.color-field:nth-child(2n) { border-right: none; }
-/* Remove bottom border from last row */
-.color-field:nth-last-child(-n+2) { border-bottom: none; }
 
 .color-field__label {
   font-size: 10px; font-weight: 500; letter-spacing: 0.07em;

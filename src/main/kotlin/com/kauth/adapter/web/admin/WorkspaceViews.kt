@@ -903,7 +903,7 @@ internal fun brandingPageImpl(
                         details("ov-card ov-card--collapsible") {
                             attributes["open"] = ""
                             summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
                                     input(type = InputType.url, name = "themeLogoUrl") {
@@ -918,7 +918,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Favicon URL" }
                                 div {
                                     input(type = InputType.url, name = "themeFaviconUrl") {
@@ -932,14 +932,14 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Accent Color" }
                                 div {
                                     colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 }
                             }
                             val eb = workspace.emailBranding
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Support email" }
                                 div {
                                     input(type = InputType.email, name = "emailSupportEmail") {
@@ -957,7 +957,7 @@ internal fun brandingPageImpl(
                         details("ov-card ov-card--collapsible") {
                             attributes["open"] = ""
                             summary("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
@@ -977,7 +977,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Colors" }
                                 div("color-grid") {
                                     colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
@@ -990,7 +990,7 @@ internal fun brandingPageImpl(
                                     colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Font Family" }
                                 val fontOptions = listOf(
                                     "Inter",
@@ -1011,7 +1011,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Border Radius" }
                                 div {
                                     div("preset-group") {
@@ -1037,7 +1037,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Language" }
                                 div {
                                     select {
@@ -1068,7 +1068,7 @@ internal fun brandingPageImpl(
                         details("ov-card ov-card--collapsible") {
                             attributes["open"] = ""
                             summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
                                 div {
                                     select {
@@ -1086,7 +1086,7 @@ internal fun brandingPageImpl(
                                     div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_DESC }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
                                 div {
                                     input(type = InputType.text, name = "themeLoginTagline") {
@@ -1099,7 +1099,7 @@ internal fun brandingPageImpl(
                                     div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_HINT }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
                                 div {
                                     input(type = InputType.url, name = "themeLoginBackgroundUrl") {
