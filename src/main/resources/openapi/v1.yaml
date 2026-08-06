@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: KotAuth REST API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Machine-to-machine REST API for managing KotAuth identity platform resources.
 
@@ -39,6 +39,13 @@ info:
     | `claim_mappers:write`   | Create, update, delete claim mappers      |
     | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
     | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
+    | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
+    | `webhooks:read`         | List webhook endpoints (never exposes the signing secret) |
+    | `webhooks:write`        | Create and delete webhook endpoints       |
+    | `resource_servers:read`  | List and retrieve resource servers (RFC 8707 resource indicators) |
+    | `resource_servers:write` | Create, update, delete resource servers; manage client authorization edges |
+    | `api_keys:read`          | List API keys (never exposes the key hash or raw value) |
+    | `api_keys:write`         | Create and revoke API keys — meta-circular: a key can revoke itself |
 
     ## Custom attributes and JWT claims
 
@@ -63,6 +70,20 @@ info:
       "detail": "Username may only contain letters, digits, dots, underscores, and hyphens."
     }
     ```
+
+    ## Rate limits
+
+    Write requests (`POST`/`PUT`/`PATCH`/`DELETE`) are limited to 60 per 60-second
+    window per API key per workspace. Exceeded requests receive `429 Too Many
+    Requests` with a `Retry-After` header (see `components.responses.TooManyRequests`).
+    Read requests (`GET`) are unrestricted in v1.21.0.
+
+    ## v1.21.0
+
+    Adds workspace read (`GET /workspace`), webhook endpoint management, RFC 8707
+    resource servers (with per-client authorization edges), self-service API key
+    management, and passkey inspection/revocation, plus extended filtering on the
+    users and sessions list endpoints. See `CHANGELOG.md` for the full release notes.
 
 servers:
   - url: "{baseUrl}/t/{tenantSlug}/api/v1"
@@ -103,15 +124,37 @@ components:
     # ---- Users ----
     UserDto:
       type: object
-      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled]
+      required: [id, username, email, fullName, emailVerified, enabled, mfaEnabled, requiredActions, isLocked]
       properties:
-        id:            { type: integer }
-        username:      { type: string }
-        email:         { type: string, format: email }
-        fullName:      { type: string }
-        emailVerified: { type: boolean }
-        enabled:       { type: boolean }
-        mfaEnabled:    { type: boolean }
+        id:              { type: integer }
+        username:        { type: string }
+        email:           { type: string, format: email }
+        fullName:        { type: string }
+        emailVerified:   { type: boolean }
+        enabled:         { type: boolean }
+        mfaEnabled:      { type: boolean }
+        requiredActions:
+          type: array
+          items:
+            type: string
+            enum: [SET_PASSWORD, CHANGE_PASSWORD]
+          description: |
+            Actions the user must complete on next login. Empty for fully
+            provisioned accounts. `SET_PASSWORD` = user was invited and has
+            not yet chosen a password. `CHANGE_PASSWORD` = admin issued a
+            temporary password / forced reset.
+        isLocked:
+          type: boolean
+          description: |
+            True if the account currently has an active lockout (usually from
+            failed-login threshold or OTP-brute-force protection). This is
+            independent of `enabled` — `POST /users/{id}/enable` does not
+            clear an active lockout; use the admin console for that.
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 timestamp of user creation. Nullable for legacy rows.
 
     CreateUserRequest:
       type: object
@@ -156,6 +199,14 @@ components:
         expiresAt:
           type: string
           format: date-time
+
+    RevokeSessionsResponse:
+      type: object
+      required: [revoked]
+      properties:
+        revoked:
+          type: integer
+          description: Number of active sessions that were revoked (0 if user had none).
 
     # ---- Roles ----
     RoleDto:
@@ -231,6 +282,43 @@ components:
         accessType:   { type: string, enum: [public, confidential] }
         redirectUris: { type: array, items: { type: string, format: uri } }
 
+    CreateApplicationRequest:
+      type: object
+      required: [clientId, name, redirectUris]
+      properties:
+        clientId:
+          type: string
+          pattern: "^[a-z0-9-]+$"
+          description: Lowercase alphanumeric + hyphens only. Must be unique per workspace.
+        name: { type: string }
+        description: { type: string, nullable: true }
+        accessType:
+          type: string
+          enum: [public, confidential]
+          default: public
+        redirectUris:
+          type: array
+          items: { type: string, format: uri }
+          minItems: 1
+
+    CreateApplicationResponse:
+      type: object
+      required: [application]
+      properties:
+        application: { $ref: "#/components/schemas/ApplicationDto" }
+        clientSecret:
+          type: string
+          nullable: true
+          description: Present only when `accessType == "confidential"`. Returned exactly once.
+
+    ClientSecretResponse:
+      type: object
+      required: [clientSecret]
+      properties:
+        clientSecret:
+          type: string
+          description: Raw client secret. Returned exactly once — persist immediately.
+
     # ---- Sessions ----
     SessionDto:
       type: object
@@ -243,6 +331,224 @@ components:
         ipAddress: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+
+    # ---- Workspace ----
+    WorkspaceDto:
+      type: object
+      required:
+        [id, slug, displayName, tokenExpirySeconds, refreshTokenExpirySeconds,
+         registrationEnabled, emailVerificationRequired, passkeysEnabled,
+         signInMethods, passwordPolicy, mfaPolicy, lockoutMaxAttempts,
+         lockoutDurationMinutes, magicLinkTtlMinutes, emailOtpSignupEnabled,
+         emailOtpLockoutThreshold, corsAllowCredentials, portalLayout]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        displayName: { type: string }
+        issuerUrl: { type: string, nullable: true }
+        tokenExpirySeconds: { type: integer, format: int64 }
+        refreshTokenExpirySeconds: { type: integer, format: int64 }
+        registrationEnabled: { type: boolean }
+        emailVerificationRequired: { type: boolean }
+        passkeysEnabled: { type: boolean }
+        maxConcurrentSessions: { type: integer, nullable: true }
+        signInMethods: { $ref: "#/components/schemas/WorkspaceSignInMethodsDto" }
+        passwordPolicy: { $ref: "#/components/schemas/WorkspacePasswordPolicyDto" }
+        mfaPolicy: { type: string, enum: [optional, required, required_admins] }
+        lockoutMaxAttempts: { type: integer }
+        lockoutDurationMinutes: { type: integer }
+        magicLinkTtlMinutes: { type: integer }
+        emailOtpSignupEnabled: { type: boolean }
+        emailOtpLockoutThreshold: { type: integer }
+        corsAllowCredentials: { type: boolean }
+        portalLayout: { type: string, enum: [SIDEBAR, CENTERED] }
+
+    WorkspaceSignInMethodsDto:
+      type: object
+      required: [password, passkey, magicLink, emailOtp]
+      properties:
+        password: { type: boolean }
+        passkey: { type: boolean }
+        magicLink: { type: boolean }
+        emailOtp: { type: boolean }
+
+    WorkspacePasswordPolicyDto:
+      type: object
+      required:
+        [minLength, requireSpecial, requireUppercase, requireNumber,
+         historyCount, maxAgeDays, blacklistEnabled, hibpCheckEnabled]
+      properties:
+        minLength: { type: integer }
+        requireSpecial: { type: boolean }
+        requireUppercase: { type: boolean }
+        requireNumber: { type: boolean }
+        historyCount: { type: integer }
+        maxAgeDays: { type: integer }
+        blacklistEnabled: { type: boolean }
+        hibpCheckEnabled: { type: boolean }
+
+    # ---- Webhooks ----
+    WebhookEndpointDto:
+      type: object
+      required: [id, url, description, events, enabled, createdAt]
+      properties:
+        id: { type: integer }
+        url: { type: string, format: uri }
+        description: { type: string }
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              [user.created, user.updated, user.deleted, login.success,
+               login.failed, password.reset, mfa.enrolled, session.revoked]
+        enabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+
+    CreateWebhookRequest:
+      type: object
+      required: [url, events]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+        description: { type: string, default: "" }
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              [user.created, user.updated, user.deleted, login.success,
+               login.failed, password.reset, mfa.enrolled, session.revoked]
+          minItems: 1
+
+    CreateWebhookResponse:
+      type: object
+      required: [endpoint, secret]
+      properties:
+        endpoint: { $ref: "#/components/schemas/WebhookEndpointDto" }
+        secret:
+          type: string
+          description: |
+            Plaintext HMAC-SHA256 signing key. Returned exactly once; the
+            server does not retain a plaintext copy.
+
+    # ---- Resource Servers ----
+    ResourceServerDto:
+      type: object
+      required: [id, identifier, name, enabled, scopes, createdAt]
+      properties:
+        id:          { type: integer }
+        identifier:  { type: string, description: "RFC 8707 resource indicator (audience). Unique per workspace." }
+        name:        { type: string }
+        description: { type: string, nullable: true }
+        enabled:     { type: boolean }
+        scopes:      { type: array, items: { type: string } }
+        createdAt:   { type: string, format: date-time }
+
+    CreateResourceServerRequest:
+      type: object
+      required: [identifier, name]
+      properties:
+        identifier:
+          type: string
+          description: |
+            RFC 8707 resource indicator. Either an absolute URI with a host,
+            or an opaque string with no whitespace. Must be unique per
+            workspace.
+        name: { type: string }
+        description: { type: string, nullable: true }
+        scopes:
+          type: array
+          items: { type: string }
+          default: []
+
+    UpdateResourceServerRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+        scopes:
+          type: array
+          items: { type: string }
+          default: []
+
+    SetAuthorizedResourceServersRequest:
+      type: object
+      required: [resourceServerIds]
+      properties:
+        resourceServerIds:
+          type: array
+          items: { type: integer }
+          description: |
+            Full replacement set of resource server IDs authorized for this
+            client. Passing an empty array revokes all authorizations.
+
+    # ---- API Keys ----
+    ApiKeyDto:
+      type: object
+      required: [id, name, keyPrefix, scopes, enabled, createdAt]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        keyPrefix:
+          type: string
+          description: First 16 chars of the raw key — safe to display in UI.
+        scopes:
+          type: array
+          items: { type: string }
+        expiresAt: { type: string, format: date-time, nullable: true }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
+        enabled: { type: boolean }
+        bootstrapName:
+          type: string
+          nullable: true
+          description: Set when the key was provisioned via KAUTH_BOOTSTRAP_API_KEYS.
+        createdAt: { type: string, format: date-time }
+
+    CreateApiKeyRequest:
+      type: object
+      required: [name, scopes]
+      properties:
+        name: { type: string, maxLength: 128 }
+        scopes:
+          type: array
+          items: { type: string }
+          minItems: 1
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateApiKeyResponse:
+      type: object
+      required: [apiKey, rawKey]
+      properties:
+        apiKey: { $ref: "#/components/schemas/ApiKeyDto" }
+        rawKey:
+          type: string
+          description: |
+            Plaintext key value. Returned exactly once. Include this in
+            future requests as `Authorization: Bearer <rawKey>`.
+
+    # ---- Passkeys ----
+    PasskeyDto:
+      type: object
+      required: [id, credentialId, name, transports, backupEligible, backupState, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        credentialId: { type: string }
+        name: { type: string }
+        aaguid:
+          type: string
+          nullable: true
+          description: AAGUID of the authenticator, when reported by the client.
+        transports:
+          type: array
+          items: { type: string }
+        backupEligible: { type: boolean }
+        backupState: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        lastUsedAt: { type: string, format: date-time, nullable: true }
 
     # ---- Audit Logs ----
     AuditEventDto:
@@ -322,6 +628,16 @@ components:
             OAuth client_id that triggered the send. Required at verify-otp
             time to bind the authorization code to a registered client. The
             client must have at least one redirect URI configured.
+        resources:
+          type: array
+          uniqueItems: true
+          default: []
+          items:
+            type: string
+          description: |
+            Optional RFC 8707 resource indicators to bind to the challenge and
+            resulting authorization code. Each resource must be enabled in the
+            workspace and authorized for originatingClientId.
 
     SendOtpResponse:
       type: object
@@ -389,6 +705,15 @@ components:
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/ProblemDetail" }
+    TooManyRequests:
+      description: Rate limit exceeded. Retry after the seconds indicated by the `Retry-After` header.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds to wait before retrying.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ProblemDetail" }
 
 paths:
   # ==========================================================================
@@ -405,6 +730,14 @@ paths:
           name: search
           schema: { type: string }
           description: Filter by username, email, or full name prefix
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+          description: Max number of results (1–200, default 50). Invalid values coerce to default.
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
+          description: Zero-based offset for pagination. Invalid values coerce to 0.
       responses:
         "200":
           description: User list
@@ -584,6 +917,95 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/enable:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: enableUser
+      summary: Enable a disabled user
+      description: |
+        Re-enables a previously disabled user. Idempotent — no-op if the user
+        is already enabled. Note that this does NOT clear an active account
+        lockout (from failed-login threshold); use the admin console to clear
+        the lockout separately.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: User enabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /users/{userId}/mfa/reset:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: resetUserMfa
+      summary: Reset MFA for a user
+      description: |
+        Removes all TOTP enrollments and recovery codes. Helpdesk operation
+        for users locked out of their authenticator. Idempotent — succeeds
+        even if the user has no MFA enrolled.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: MFA reset }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{userId}/revoke-sessions:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: revokeUserSessions
+      summary: Revoke all active sessions for a user
+      description: Used by security-incident response playbooks.
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Sessions revoked
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevokeSessionsResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /users/{userId}/sessions:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUserSessions
+      summary: List active sessions for a user
+      tags: [Users]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Active sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/SessionDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
 
   /users/{userId}/roles/{roleId}:
     parameters:
@@ -834,6 +1256,56 @@ paths:
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /groups/{groupId}/roles/{roleRef}:
+    parameters:
+      - in: path
+        name: groupId
+        required: true
+        schema: { type: integer }
+      - in: path
+        name: roleRef
+        required: true
+        schema: { type: string }
+        description: Numeric role id or role name. Names must be unambiguous across scopes.
+    post:
+      operationId: assignRoleToGroup
+      summary: Assign a role to a group
+      description: |
+        Every user who is (or later becomes) a member of the group inherits
+        this role. Idempotent — assigning the same role twice succeeds
+        silently.
+      tags: [Groups]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Role assigned }
+        "400":
+          description: Missing roleRef path parameter
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422":
+          description: Role name is ambiguous — use the numeric role id
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+    delete:
+      operationId: unassignRoleFromGroup
+      summary: Remove a role from a group
+      description: |
+        Members of the group lose this role assignment (their own directly-
+        assigned roles are unaffected). Idempotent — removing a role that
+        wasn't assigned succeeds silently.
+      tags: [Groups]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Role removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   # ==========================================================================
   # Applications
   # ==========================================================================
@@ -854,6 +1326,42 @@ paths:
                   meta: { $ref: "#/components/schemas/ApiMeta" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createApplication
+      summary: Create an OAuth2/OIDC client application
+      tags: [Applications]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateApplicationRequest" }
+            examples:
+              confidentialApp:
+                value:
+                  clientId: internal-dashboard
+                  name: Internal Dashboard
+                  accessType: confidential
+                  redirectUris:
+                    - https://dashboard.example.com/callback
+      responses:
+        "201":
+          description: |
+            Application created. If accessType is `confidential`, the response
+            includes a freshly-minted `clientSecret` — persist it now, it
+            cannot be retrieved later.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateApplicationResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: Client ID already in use in this workspace (including previously deleted apps)
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
 
   /applications/{appId}:
     parameters:
@@ -897,12 +1405,45 @@ paths:
         "422": { $ref: "#/components/responses/ValidationError" }
 
     delete:
-      operationId: disableApplication
-      summary: Disable an application
+      operationId: deleteApplication
+      summary: Soft-delete an application
+      description: |
+        Marks the application as deleted. The row is preserved so that
+        historical audit logs and tokens issued to this client_id continue
+        to resolve. The client_id is NOT reusable for a new application —
+        creating a new app with the same client_id in this workspace
+        returns 409 Conflict.
       tags: [Applications]
-      description: Soft-disables the application. Existing tokens remain valid until they expire.
+      security: [{ bearerAuth: [] }]
       responses:
-        "204": { description: Application disabled }
+        "204": { description: Application deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /applications/{appId}/regenerate-secret:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+    post:
+      operationId: regenerateApplicationSecret
+      summary: Rotate the client_secret for a confidential application
+      description: |
+        Generates a new random secret, hashes it into storage, and returns
+        the raw secret exactly once in the response body. Callers MUST
+        persist the returned value — it is not retrievable afterwards.
+        Also usable for public applications (harmless no-op — the secret
+        is minted but unused; recommend not calling for public apps).
+      tags: [Applications]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "201":
+          description: Secret rotated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClientSecretResponse" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -915,6 +1456,30 @@ paths:
       operationId: listSessions
       summary: List active sessions
       tags: [Sessions]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - in: query
+          name: user_id
+          schema: { type: integer }
+          description: Filter by user id
+        - in: query
+          name: application_id
+          schema: { type: integer }
+          description: Filter by client (application) id
+        - in: query
+          name: active_only
+          schema: { type: boolean, default: true }
+          description: |
+            Only `true` is supported in v1.21.0. Passing `false` returns
+            HTTP 400. Reserved for a future release when revoked-session
+            history is exposed here (currently reconstructable via the
+            audit-logs API).
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 0, default: 0 }
       responses:
         "200":
           description: Active session list
@@ -925,6 +1490,11 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: "#/components/schemas/SessionDto" } }
                   meta: { $ref: "#/components/schemas/ApiMeta" }
+        "400":
+          description: active_only=false is not supported in v1.21.0
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
@@ -944,6 +1514,435 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Workspace
+  # ==========================================================================
+  /workspace:
+    get:
+      operationId: getWorkspace
+      summary: Read the workspace configuration
+      description: |
+        Returns tenant metadata + which sign-in methods are enabled +
+        security/password/MFA policy + magic-link/email-OTP limits. SMTP
+        credentials are NEVER returned — configure and inspect SMTP via
+        the admin UI. Not editable via API in v1.21.0.
+      tags: [Workspace]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Workspace
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/WorkspaceDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Webhooks
+  # ==========================================================================
+  /webhooks:
+    get:
+      operationId: listWebhooks
+      summary: List webhook endpoints
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Webhook endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/WebhookEndpointDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      operationId: createWebhook
+      summary: Create a webhook endpoint
+      description: |
+        Returns the created endpoint plus a plaintext `secret` — this value
+        is the HMAC-SHA256 signing key. It is returned exactly ONCE. Persist
+        it now; the server has already hashed/stored its copy and cannot
+        return it again.
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateWebhookRequest" }
+            examples:
+              userLifecycle:
+                value:
+                  url: https://example.com/webhooks/kauth
+                  description: Sync users to CRM
+                  events:
+                    - user.created
+                    - user.deleted
+      responses:
+        "201":
+          description: Endpoint created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateWebhookResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /webhooks/{endpointId}:
+    parameters:
+      - in: path
+        name: endpointId
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: deleteWebhook
+      summary: Delete a webhook endpoint
+      description: Idempotent — succeeds even if the endpoint does not exist.
+      tags: [Webhooks]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Endpoint deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ==========================================================================
+  # Resource Servers
+  # ==========================================================================
+  /resource-servers:
+    get:
+      operationId: listResourceServers
+      summary: List resource servers
+      description: |
+        Resource servers (RFC 8707 resource indicators) represent APIs that
+        access tokens can be scoped to via the `resource` parameter.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Resource server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ResourceServerDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createResourceServer
+      summary: Create a resource server
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateResourceServerRequest" }
+            examples:
+              billingApi:
+                value:
+                  identifier: https://api.example.com/billing
+                  name: Billing API
+                  scopes:
+                    - billing:read
+                    - billing:write
+      responses:
+        "201":
+          description: Resource server created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409":
+          description: A resource server with this identifier already exists
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /resource-servers/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: getResourceServer
+      summary: Get a resource server by ID
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Resource server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: updateResourceServer
+      summary: Update a resource server
+      description: The identifier is immutable after creation — only name, description, and scopes may change.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateResourceServerRequest" }
+            examples:
+              billingApi:
+                value:
+                  name: Billing API v2
+                  description: Updated scopes for v2 rollout
+                  scopes:
+                    - billing:read
+                    - billing:write
+                    - billing:refund
+      responses:
+        "200":
+          description: Updated resource server
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResourceServerDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      operationId: deleteResourceServer
+      summary: Delete a resource server
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Resource server deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /applications/{appId}/authorized-resource-servers:
+    parameters:
+      - in: path
+        name: appId
+        required: true
+        schema: { type: integer }
+
+    get:
+      operationId: listAuthorizedResourceServers
+      summary: List resource servers authorized for a client
+      description: |
+        Returns the resource servers this application (OAuth client) is
+        currently authorized to request tokens for via the `resource`
+        parameter.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Authorized resource server list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { type: array, items: { $ref: "#/components/schemas/ResourceServerDto" } }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      operationId: setAuthorizedResourceServers
+      summary: Replace the set of resource servers authorized for a client
+      description: |
+        Full replacement — any resource server IDs not included are
+        de-authorized. All IDs must belong to the same workspace as the
+        application, or the request fails with 422.
+      tags: [Resource Servers]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetAuthorizedResourceServersRequest" }
+            examples:
+              authorizeTwo:
+                value:
+                  resourceServerIds: [1, 2]
+      responses:
+        "204": { description: Authorization set updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  # ==========================================================================
+  # API Keys
+  # ==========================================================================
+  /api-keys:
+    get:
+      operationId: listApiKeys
+      summary: List API keys for the workspace
+      description: |
+        Never returns raw key material. Only prefix, scopes, metadata, and
+        status. Use the prefix (first 16 chars) to identify keys in the UI.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/ApiKeyDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+    post:
+      operationId: createApiKey
+      summary: Create a new API key
+      description: |
+        Returns the raw key value exactly ONCE in the `rawKey` field. Persist
+        it now; the server retains only a SHA-256 hash.
+
+        **Meta-circular note:** a key with `api_keys:write` scope can create,
+        revoke, or rotate other keys — including itself. Bootstrap keys
+        (managed via `KAUTH_BOOTSTRAP_API_KEYS`) are read-only via this API
+        and can only be modified through the environment.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateApiKeyRequest" }
+            examples:
+              ciDeployKey:
+                value:
+                  name: CI deploy key
+                  scopes:
+                    - users:read
+                    - applications:read
+                  expiresAt: "2027-01-01T00:00:00Z"
+      responses:
+        "201":
+          description: Key created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CreateApiKeyResponse" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api-keys/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: integer }
+    delete:
+      operationId: revokeApiKey
+      summary: Revoke (soft-disable) an API key
+      description: |
+        Soft-revoke — sets `enabled = false` and preserves the row for audit.
+        Hard-delete is not exposed via REST; use the admin CLI if a hard
+        cleanup is required.
+
+        Bootstrap keys (managed via `KAUTH_BOOTSTRAP_API_KEYS`) cannot be
+        revoked through this endpoint and return 403.
+      tags: [API Keys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Key revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: >-
+            Insufficient scope, or the key is bootstrap-provisioned and can
+            only be revoked via KAUTH_BOOTSTRAP_API_KEYS
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  # ==========================================================================
+  # Passkeys
+  # ==========================================================================
+  /users/{userId}/passkeys:
+    parameters:
+      - in: path
+        name: userId
+        required: true
+        schema: { type: integer }
+    get:
+      operationId: listUserPasskeys
+      summary: List passkey credentials for a user
+      tags: [Passkeys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Passkeys for the user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/PasskeyDto" }
+                  meta: { $ref: "#/components/schemas/ApiMeta" }
+        "400":
+          description: Invalid user ID
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /passkeys/{credentialPk}:
+    parameters:
+      - in: path
+        name: credentialPk
+        required: true
+        schema: { type: integer, format: int64 }
+    delete:
+      operationId: revokePasskey
+      summary: Revoke a passkey credential
+      description: |
+        Deletes the passkey from the user's account and records an audit
+        event. Returns 409 with `CannotRevokeLast` if this is the user's
+        only remaining passkey and password login is disabled for the
+        workspace.
+      tags: [Passkeys]
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Passkey revoked }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Cannot revoke last passkey when password login disabled
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
 
   # ==========================================================================
   # Audit Logs
@@ -1148,6 +2147,11 @@ paths:
         `originatingClientId` is required for the verify-otp authorization-code
         issuance to bind the resulting code to a confidential client. The
         client must have at least one redirect URI registered.
+
+        Optional RFC 8707 `resources` are persisted with the challenge. On
+        successful verification, every resource must be enabled and authorized
+        for `originatingClientId`; the resulting authorization code carries the
+        resource indicators into the token exchange.
       tags: [Auth — Email OTP]
       security: [{ bearerAuth: [auth:send-otp] }]
       requestBody:
@@ -1238,6 +2242,16 @@ tags:
     description: OAuth 2.0 client applications
   - name: Sessions
     description: Active user sessions
+  - name: Workspace
+    description: Tenant metadata, sign-in methods, and security/MFA policy (read-only; SMTP excluded)
+  - name: Webhooks
+    description: Outbound event notification endpoints (signing secret is returned once, at creation)
+  - name: Resource Servers
+    description: RFC 8707 resource indicators (audiences) and their client authorization edges
+  - name: API Keys
+    description: Machine-to-machine credentials for the REST API itself (raw value returned once, at creation)
+  - name: Passkeys
+    description: WebAuthn/FIDO2 credential inspection and revocation for a user
   - name: Audit Logs
     description: Security event audit trail
   - name: User Attributes

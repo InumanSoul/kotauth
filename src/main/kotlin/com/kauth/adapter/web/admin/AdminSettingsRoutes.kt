@@ -1,6 +1,9 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantId
@@ -12,6 +15,7 @@ import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
@@ -34,6 +38,7 @@ fun Route.adminSettingsRoutes(
     mfaRepository: MfaRepository?,
     translationPort: TranslationPort,
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
+    securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -282,18 +287,14 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
-        val saved = call.request.queryParameters["saved"] == "true"
-        val allUsers = userRepository.findByTenantId(workspace.id, null)
-        val enrolledPasskeyUsers = webAuthnCredentialRepository?.countEnrolledUsersByTenantId(workspace.id) ?: 0
+        val savedParam = call.request.queryParameters["saved"]
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.securityPolicyPage(
                 workspace,
                 wsPairs,
                 session.username,
-                saved = saved,
-                enrolledPasskeyUsers = enrolledPasskeyUsers,
-                totalUsers = allUsers.size,
+                savedParam = savedParam,
             ),
         )
     }
@@ -302,18 +303,9 @@ fun Route.adminSettingsRoutes(
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug
+        val wsPairs = call.attributes[WsPairsAttr]
         val params = call.receiveParameters()
         val s = workspace.securityConfig
-
-        val requestedPasswordLoginDisabled = params["passwordLoginDisabled"] == "true"
-        val requestedPasskeysEnabled = params["passkeysEnabled"] == "true"
-
-        if (requestedPasswordLoginDisabled && !workspace.isSmtpReady) {
-            return@post call.respond(
-                HttpStatusCode.BadRequest,
-                mapOf("error" to "SmtpRequired", "message" to "SMTP must be configured to disable password sign-in."),
-            )
-        }
 
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
@@ -329,31 +321,86 @@ fun Route.adminSettingsRoutes(
                 lockoutDurationMinutes = params["lockoutDurationMinutes"]?.toIntOrNull() ?: s.lockoutDurationMinutes,
                 corsAllowCredentials = params["corsAllowCredentials"] == "true",
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
-                magicLinkEnabled = params["magicLinkEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
-                passwordLoginEnabled = params["requirePasswordless"] != "true",
-                emailOtpSignupEnabled = params["emailOtpSignupEnabled"] == "true",
-                emailOtpLockoutThreshold =
-                    params["emailOtpLockoutThreshold"]?.toIntOrNull() ?: s.emailOtpLockoutThreshold,
-                emailOtpLoginEnabled = params["emailOtpLoginEnabled"] == "true",
-                passkeysEnabled = requestedPasskeysEnabled,
-                passwordLoginDisabled = requestedPasswordLoginDisabled,
             )
-        when (val result = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
+
+        when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {
             is AdminResult.Success ->
                 call.respondRedirect("/admin/workspaces/$slug/settings/security?saved=true")
-            is AdminResult.Failure -> {
-                val wsPairs = call.attributes[WsPairsAttr]
+            is AdminResult.Failure ->
                 call.respondHtml(
                     HttpStatusCode.UnprocessableEntity,
                     AdminView.securityPolicyPage(
                         workspace,
                         wsPairs,
                         session.username,
-                        error = result.error.message,
+                        error = policyResult.error.message,
                     ),
                 )
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Sign-in Methods
+    // -------------------------------------------------------------------
+
+    get("/settings/sign-in-methods") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
+        val savedParam = call.request.queryParameters["saved"]
+        val rows = securityMethodsService?.list(workspace) ?: emptyList()
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.signInMethodsPage(
+                workspace,
+                wsPairs,
+                session.username,
+                rows = rows,
+                toastMessage = if (savedParam == "methods") EnglishStrings.TOAST_SIGN_IN_METHODS_SAVED else null,
+            ),
+        )
+    }
+
+    post("/settings/sign-in-methods") {
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
+        val wsPairs = call.attributes[WsPairsAttr]
+        val params = call.receiveParameters()
+        val session = call.sessions.get<AdminSession>()!!
+
+        val svc = securityMethodsService
+        if (svc == null) {
+            call.respondRedirect("/admin/workspaces/$slug/settings/sign-in-methods?saved=methods")
+            return@post
+        }
+
+        // Only include keys the current row set allows toggling; drop any that the
+        // browser shouldn't have submitted (e.g. unconfigured social providers).
+        val toggleableKeys =
+            svc
+                .list(workspace)
+                .filter { it.toggleable }
+                .map { it.key }
+                .toSet()
+        val requested =
+            MethodKey.entries
+                .filter { it in toggleableKeys }
+                .associateWith { key -> params["enabled_${key.name.lowercase()}"] == "on" }
+
+        when (val methodResult = svc.updateSecurityMethods(workspace.id, requested)) {
+            is AdminResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/sign-in-methods?saved=methods")
+            is AdminResult.Failure -> {
+                val (status, errorCode) =
+                    when (methodResult.error) {
+                        AdminError.NoMethodsEnabled -> HttpStatusCode.BadRequest to "NoMethodsEnabled"
+                        AdminError.SmtpRequired -> HttpStatusCode.BadRequest to "SmtpRequired"
+                        is AdminError.NotFound -> HttpStatusCode.NotFound to "NotFound"
+                        else -> HttpStatusCode.BadRequest to "UnknownError"
+                    }
+                call.respond(status, mapOf("error" to errorCode))
             }
         }
     }
@@ -404,6 +451,12 @@ fun Route.adminSettingsRoutes(
                 logoUrl = params["themeLogoUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 faviconUrl = params["themeFaviconUrl"]?.trim()?.takeIf { it.isNotBlank() },
                 defaultLocale = resolvedLocale,
+                loginLayout =
+                    params["themeLoginLayout"]?.let {
+                        runCatching { LoginLayout.valueOf(it.uppercase()) }.getOrNull()
+                    } ?: workspace.theme.loginLayout,
+                loginBackgroundUrl = params["themeLoginBackgroundUrl"]?.trim()?.takeIf { it.isNotBlank() },
+                loginTagline = params["themeLoginTagline"]?.trim()?.takeIf { it.isNotBlank() },
             )
         when (val result = workspaceSettingsService.updateTheme(slug, theme)) {
             is AdminResult.Success -> {
@@ -448,6 +501,23 @@ fun Route.adminSettingsRoutes(
                 )
             }
         }
+    }
+
+    // -------------------------------------------------------------------
+    // Passkeys workspace page
+    // -------------------------------------------------------------------
+
+    get("/settings/passkeys") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val wsPairs = call.attributes[WsPairsAttr]
+        val users = userRepository.findByTenantId(workspace.id, null)
+        val enrolledUserIds = webAuthnCredentialRepository?.findUserIdsWithCredential(workspace.id) ?: emptySet()
+        val userWithPasskey = users.map { u -> u to (u.id in enrolledUserIds) }
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.passkeysPage(workspace, wsPairs, session.username, userWithPasskey),
+        )
     }
 
     // -------------------------------------------------------------------

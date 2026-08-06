@@ -13,11 +13,13 @@ import com.kauth.domain.port.ApplicationRepository
 class FakeApplicationRepository : ApplicationRepository {
     private val store = mutableMapOf<Int, Application>()
     private val secretHashes = mutableMapOf<Int, String>() // appPk -> bcrypt-hash
+    private val deleted = mutableSetOf<Int>()
     private var nextId = 1
 
     fun clear() {
         store.clear()
         secretHashes.clear()
+        deleted.clear()
         nextId = 1
     }
 
@@ -32,14 +34,15 @@ class FakeApplicationRepository : ApplicationRepository {
         return a
     }
 
-    override fun findByTenantId(tenantId: TenantId) = store.values.filter { it.tenantId == tenantId }
+    override fun findByTenantId(tenantId: TenantId) =
+        store.values.filter { it.tenantId == tenantId && it.id.value !in deleted }
 
     override fun findByClientId(
         tenantId: TenantId,
         clientId: String,
-    ) = store.values.find { it.tenantId == tenantId && it.clientId == clientId }
+    ) = store.values.find { it.tenantId == tenantId && it.clientId == clientId && it.id.value !in deleted }
 
-    override fun findById(id: ApplicationId) = store[id.value]
+    override fun findById(id: ApplicationId) = if (id.value in deleted) null else store[id.value]
 
     override fun existsByClientId(
         tenantId: TenantId,
@@ -112,4 +115,12 @@ class FakeApplicationRepository : ApplicationRepository {
     ) {
         store[appId.value]?.let { store[appId.value] = it.copy(enabled = enabled) }
     }
+
+    override fun softDelete(appId: ApplicationId): Boolean =
+        if (store.containsKey(appId.value) && appId.value !in deleted) {
+            deleted.add(appId.value)
+            true
+        } else {
+            false
+        }
 }

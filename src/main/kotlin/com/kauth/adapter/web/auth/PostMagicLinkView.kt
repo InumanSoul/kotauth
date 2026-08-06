@@ -20,7 +20,7 @@ fun postMagicLinkPage(
         }
         body {
             demoBanner()
-            div("shell") {
+            authShell(ctx.workspaceName, ctx.theme) {
                 div("card") {
                     h1("card-title") { +ctx.t("POST_MAGIC_LINK_TITLE") }
                     p("card-subtitle") { +ctx.t("POST_MAGIC_LINK_INTRO") }

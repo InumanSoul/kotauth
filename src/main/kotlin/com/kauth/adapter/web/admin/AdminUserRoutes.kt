@@ -664,7 +664,7 @@ fun Route.adminUserRoutes(
                         call.parameters.typedId("userId", ::UserId)
                             ?: return@post call.respond(HttpStatusCode.BadRequest)
                     val actorId = UserId(ctx.session.userId)
-                    if (ctx.workspace.passwordLoginDisabled && !ctx.workspace.isSmtpReady) {
+                    if (!ctx.workspace.securityConfig.passwordLoginEnabled && !ctx.workspace.isSmtpReady) {
                         return@post call.respond(
                             HttpStatusCode.BadRequest,
                             mapOf("error" to "OperatorLockoutBlocked"),

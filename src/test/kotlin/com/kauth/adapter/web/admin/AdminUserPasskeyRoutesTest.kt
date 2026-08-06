@@ -383,7 +383,7 @@ class AdminUserPasskeyRoutesTest {
             tenantRepo.add(masterTenant)
             tenantRepo.add(
                 acmeTenant.copy(
-                    passwordLoginDisabled = true,
+                    securityConfig = acmeTenant.securityConfig.copy(passwordLoginEnabled = false),
                     smtpEnabled = false,
                 ),
             )

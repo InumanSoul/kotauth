@@ -3,7 +3,9 @@
  * Page-specific styles for the MFA settings page.
  *
  * Extends existing components:
+ *   .insight-bar--cols-2  — 2-column variant of the insight bar
  *   .insight-bar--cols-3  — 3-column variant of the insight bar
+ *   .insight-item__denominator — muted denominator text (e.g. " / 42") inside a value span
  *   .info-card-body       — padded body inside an ov-card (enrollment URL, etc.)
  *
  * Reuses from other files:
@@ -14,9 +16,19 @@
  *   .notice — notice.css
  */
 
-/* ── 3-column insight bar modifier ───────────────────────────────────────── */
+/* ── Insight bar column modifiers ─────────────────────────────────────────── */
 
+.insight-bar--cols-2 { grid-template-columns: repeat(2, 1fr); }
 .insight-bar--cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+/* ── Denominator text inside insight-item__value (e.g. " / 42") ─────────── */
+
+.insight-item__denominator {
+  font-size: 14px;
+  color: var(--color-subtle);
+  font-family: var(--font-sans);
+  font-weight: 400;
+}
 
 /* Non-clickable variant — remove pointer cursor and hover */
 .insight-item--static {

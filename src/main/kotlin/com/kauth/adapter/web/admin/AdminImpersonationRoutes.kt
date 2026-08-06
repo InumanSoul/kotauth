@@ -99,6 +99,7 @@ fun Route.adminUserImpersonationRoute(
                             }
 
                         is AdminError.Conflict -> "impersonation_failed"
+                        AdminError.SmtpRequired, AdminError.NoMethodsEnabled -> "impersonation_failed"
                     }
                 call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${userId.value}?saved=$flag")
             }

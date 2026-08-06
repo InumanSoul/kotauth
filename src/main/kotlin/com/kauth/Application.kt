@@ -456,12 +456,18 @@ fun Application.module(
             roleGroupService = s.roleGroupService,
             accountService = s.accountService,
             adminUserService = s.adminUserService,
+            mfaService = s.mfaService,
             applicationManagementService = s.applicationManagementService,
             userAttributeService = s.userAttributeService,
             claimMapperService = s.claimMapperService,
             emailOtpService = s.emailOtpService,
             otpEmailRateLimiter = s.otpEmailRateLimiter,
             otpIpRateLimiter = s.otpIpRateLimiter,
+            apiWriteRateLimiter = s.apiWriteRateLimiter,
+            webhookService = s.webhookService,
+            resourceServerService = s.resourceServerService,
+            webAuthnService = s.webAuthnService,
+            webAuthnCredentialRepository = s.webAuthnCredentialRepository,
             corsService = s.corsService,
         )
 
@@ -515,6 +521,7 @@ fun Application.module(
             webAuthnService = s.webAuthnService,
             mfaService = s.mfaService,
             auditLogPort = s.auditLogPort,
+            securityMethodsService = s.securityMethodsService,
         )
     }
 }

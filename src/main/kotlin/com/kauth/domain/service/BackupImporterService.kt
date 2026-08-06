@@ -9,6 +9,7 @@ import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
@@ -186,6 +187,11 @@ class BackupImporterService(
                     logoUrl = logoUrl,
                     faviconUrl = faviconUrl,
                     defaultLocale = defaultLocale,
+                    loginLayout =
+                        runCatching { LoginLayout.valueOf(loginLayout) }
+                            .getOrDefault(LoginLayout.CENTERED),
+                    loginBackgroundUrl = loginBackgroundUrl,
+                    loginTagline = loginTagline,
                 )
             }
         validateTenantTheme(importedTheme)?.let { error("theme: $it") }

@@ -63,6 +63,27 @@ object ApiScope {
     /** Verify an email OTP challenge and exchange it for an authorization code. */
     const val AUTH_VERIFY_OTP = "auth:verify-otp"
 
+    /** Read tenant metadata, sign-in methods, and security/MFA policy. SMTP credentials excluded. */
+    const val WORKSPACE_READ = "workspace:read"
+
+    /** List webhook endpoints (never exposes the signing secret). */
+    const val WEBHOOKS_READ = "webhooks:read"
+
+    /** Create/delete webhook endpoints. */
+    const val WEBHOOKS_WRITE = "webhooks:write"
+
+    /** List and retrieve resource servers (RFC 8707 resource indicators). */
+    const val RESOURCE_SERVERS_READ = "resource_servers:read"
+
+    /** Create, update, delete resource servers; manage client authorization edges. */
+    const val RESOURCE_SERVERS_WRITE = "resource_servers:write"
+
+    /** List API keys for the workspace (never exposes the key hash or raw value). */
+    const val API_KEYS_READ = "api_keys:read"
+
+    /** Create and revoke API keys — meta-circular: includes the authenticating key itself. */
+    const val API_KEYS_WRITE = "api_keys:write"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -84,5 +105,12 @@ object ApiScope {
             TENANTS_IMPORT,
             AUTH_SEND_OTP,
             AUTH_VERIFY_OTP,
+            WORKSPACE_READ,
+            WEBHOOKS_READ,
+            WEBHOOKS_WRITE,
+            RESOURCE_SERVERS_READ,
+            RESOURCE_SERVERS_WRITE,
+            API_KEYS_READ,
+            API_KEYS_WRITE,
         )
 }

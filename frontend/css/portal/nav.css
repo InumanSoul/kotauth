@@ -138,6 +138,31 @@
   border-radius: 0 2px 2px 0;
 }
 
+/* ── Group (parent nav item with nested children, e.g. Security) ──────── */
+
+.portal-nav__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-nav__group-label {
+  cursor: default;
+}
+
+.portal-nav__group--active .portal-nav__group-label {
+  color: var(--color-text);
+}
+
+.portal-nav__children {
+  display: flex;
+  flex-direction: column;
+  padding-left: 14px;
+}
+
+.portal-nav__child {
+  font-size: 0.85rem;
+}
+
 /* ── Footer: user identity + sign out ─────────────────────────────────── */
 
 .portal-sidebar__footer {

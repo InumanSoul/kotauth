@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.21.0] - 2026-07-17
+
+API-first release. 25 new REST endpoints across users, applications, sessions,
+workspace, webhooks, resource servers, API keys, and passkeys. Introduces
+per-key + per-tenant rate limiting on write endpoints. Adds a second auth-page
+layout variant (SPLIT) alongside the existing centered layout.
+
+### Added
+
+#### REST API endpoints
+
+**Users**
+- `POST /api/v1/users/{userId}/enable` — re-enable a disabled user.
+- `DELETE /api/v1/users/{userId}/mfa/reset` — reset MFA enrollments and recovery codes for a user.
+- `POST /api/v1/users/{userId}/revoke-sessions` — revoke every active session for a user.
+- `GET /api/v1/users/{userId}/sessions` — list active sessions for a user.
+- `GET /api/v1/users` — now supports `?limit=&offset=&search=` (envelope with `meta.total`).
+- `UserDto` gains `requiredActions`, `isLocked`, `createdAt`.
+- `GET /api/v1/users/{userId}/passkeys` — list a user's passkey credentials.
+
+**Applications**
+- `POST /api/v1/applications` — create an OAuth2/OIDC client; returns one-time client secret for confidential clients.
+- `POST /api/v1/applications/{appId}/regenerate-secret` — rotate the client secret (one-time in response).
+
+**Groups & Roles**
+- `POST /api/v1/groups/{groupId}/roles/{roleRef}` — assign a role to a group (atomic).
+- `DELETE /api/v1/groups/{groupId}/roles/{roleRef}` — remove a role from a group.
+
+**Sessions**
+- `GET /api/v1/sessions` — new query params: `user_id`, `application_id`, `active_only`, `limit`, `offset`.
+
+**Workspace**
+- `GET /api/v1/workspace` — read-only tenant configuration surface (sign-in methods, security policy, MFA, magic-link TTL, email OTP limits, portal layout). **SMTP credentials are omitted entirely.**
+
+**Webhooks**
+- `GET /api/v1/webhooks`, `POST /api/v1/webhooks` (returns HMAC signing secret one-time), `DELETE /api/v1/webhooks/{endpointId}`.
+
+**Resource servers**
+- `GET/POST/PUT/DELETE /api/v1/resource-servers`, `GET/PUT /api/v1/applications/{appId}/authorized-resource-servers`.
+
+**API keys**
+- `GET /api/v1/api-keys`, `POST /api/v1/api-keys` (raw key returned one-time), `DELETE /api/v1/api-keys/{id}` (soft-revoke; bootstrap-provisioned keys rejected with 403).
+
+**Passkey admin**
+- `DELETE /api/v1/passkeys/{credentialPk}` — revoke a passkey credential.
+
+#### Scopes
+
+- `workspace:read`, `webhooks:read`, `webhooks:write`, `resource_servers:read`, `resource_servers:write`, `api_keys:read`, `api_keys:write`.
+
+#### Auth UI
+
+- **SPLIT login layout** — new auth page variant with a branded left panel (background image + tagline) and the auth card on the right. Existing tenants stay on the default CENTERED layout — no visual regression.
+- Admin Branding page gains three inputs: layout picker, tagline (falls back to workspace name), background image URL (`http(s)://` only, validated at write time and escape-hardened at render time).
+
+#### Reliability
+
+- Write endpoints (POST/PUT/PATCH/DELETE under `/api/v1/*`) are rate-limited to 60 requests per 60-second window per API key per workspace. Reads (GET) are unrestricted. Exceeded requests receive `429 Too Many Requests` with a `Retry-After` header.
+- OpenAPI spec bumped to `1.1.0` with per-endpoint audit — every new endpoint has schema, examples, and normalized shared error responses.
+
+### Changed
+
+- **BREAKING: `DELETE /api/v1/applications/{appId}` semantics changed** — previously soft-disabled the application (`enabled = false`); now soft-deletes it (`is_deleted = true`). Historical audit trails still resolve `client_id → application`, but the row no longer appears in `GET /applications`, and re-creating a soft-deleted `client_id` returns `409 Conflict` (uniqueness includes soft-deleted rows). Consumers relying on the old soft-disable behavior must call `PUT /api/v1/applications/{appId}` with an explicit `enabled: false` field going forward.
+- `GET /api/v1/users` response shape changed to a pagination envelope with `meta.total`, `meta.offset`, `meta.limit`. The `data` array is unchanged in shape; consumers that only read `data` are unaffected.
+- `UserDto` gains three new fields (`requiredActions`, `isLocked`, `createdAt`) — additive for encoders, backward-compatible for typical decoders.
+
+### Fixed
+
+- API-key `DELETE` now rejects bootstrap-provisioned keys (`KAUTH_BOOTSTRAP_API_KEYS`) with `403 Forbidden`, matching the admin UI and OpenAPI documentation.
+- SPLIT layout background URL is percent-encoded before injection into the CSS `url('…')` literal, closing a CSS-injection vector on the operator-only field.
+
+### Migrations
+
+- `V57__login_layout.sql` — adds `login_layout` (`NOT NULL DEFAULT 'CENTERED'`), `login_background_url`, `login_tagline` to `workspace_theme`.
+- `V58__application_soft_delete.sql` — adds `is_deleted BOOLEAN NOT NULL DEFAULT FALSE` to `clients` with a partial index on `(tenant_id) WHERE is_deleted = FALSE`.
+
+---
+
+## [1.20.2] - 2026-07-11
+
+Completes RFC 8707 resource-indicator support for the Email OTP back-channel flow so access tokens can target an API audience without changing the ID token audience.
+
+### Added
+
+- `POST /api/v1/auth/send-otp` accepts optional `resources` and persists the normalized indicators with the OTP challenge.
+- Successful OTP verification validates that every requested resource is enabled and authorized for the originating client, then binds the resources to the single-use authorization code.
+- Email OTP resource-indicator usage is documented in the operator guide and OpenAPI schema.
+
+### Changed
+
+- `EmailOtpService` now requires `ResourceServerRepository` composition and resolves requested resources in one tenant-scoped batch.
+
+### Migrations
+
+- `V56__email_otp_challenge_resources.sql` — adds the non-null JSONB `resources` column to `email_otp_challenges` with an empty-list default.
+
+---
+
+## [1.20.1] - 2026-07-10
+
+Polish release for v1.20.0 Passkeys — consolidates the two overlapping "disable password sign-in" flags into one canonical column, replaces the split "Authentication Methods" and "Passkeys" cards with a single Sign-in Methods grid, restructures the admin Security rail to actually hold security pages, and nests MFA, Passkeys, and Sessions under a Security parent group in the portal nav.
+
+### Changed
+
+- **Sign-in Methods grid** replaces the two-card auth methods panel on the Security Policy page. One row per method (Password, Passkey, Email magic link, Email OTP, Google, GitHub). Locked rows show an inline "SMTP required — Set up SMTP" prompt when SMTP is not configured.
+- **`tenant.password_login_disabled` column removed.** The v1.20.0 flag is consolidated into `security_config.passwordLoginEnabled`. V55 migration back-fills existing tenant state. Same SMTP hard-gate, same error codes (`SmtpRequired`, `NoMethodsEnabled`).
+- **Admin sidebar Security rail restructured**: now contains Security Policy (moved from Settings), MFA, Passkeys, Sessions. The Security rail landing page changes from `/sessions` to `/settings/security`.
+- **Portal nav gains a Security parent group**: Overview, Two-Factor Auth, Passkeys, Sessions. Route paths unchanged for backward compatibility.
+- **Portal sessions page extracted** into its own route at `/t/<slug>/account/sessions`. The old Security page becomes an Overview summarising each child feature.
+
+### Migrations
+
+- `V55__consolidate_password_login_flag.sql` — updates `security_config.passwordLoginEnabled=false` for tenants that had set `password_login_disabled=true`, then drops the column.
+
+### Fixed
+
+- `GET /change-password` activePage now correctly activates the Security group without highlighting the Overview leaf.
+- Dead `?saved=true` query parameter removed from the change-password GET handler; the POST success path redirects to login rather than back to the form.
+
+---
+
 ## [1.20.0] - 2026-07-09
 
 Passkeys / WebAuthn — passwordless sign-in via device biometrics or hardware keys.

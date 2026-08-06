@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -578,16 +579,14 @@ internal fun securityPolicyPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
-    saved: Boolean = false,
-    enrolledPasskeyUsers: Int = 0,
-    totalUsers: Int = 0,
+    savedParam: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
 
         adminShell(
             pageTitle = "Security Policy — ${workspace.displayName}",
-            activeRail = "settings",
+            activeRail = "security",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -595,13 +594,12 @@ internal fun securityPolicyPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
                     contentClass = "content-outer",
-            toastMessage = if (saved) EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
+            toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
 ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
                 slug to "/admin/workspaces/$slug",
-                "Settings" to "/admin/workspaces/$slug/settings",
                 "Security Policy" to null,
             )
 
@@ -634,9 +632,9 @@ internal fun securityPolicyPageImpl(
             ) {
                 id = "security-form"
 
-                // ── Password Policy ──────────────────────────────────
+                // ── Password Policy (numeric limits) ─────────────────
                 div("ov-card") {
-                    div("ov-card__section-label") { +"Password Policy" }
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SECURITY_PASSWORD_POLICY_SECTION }
                     div("edit-row") {
                         span("edit-row__label") { +"Minimum Length" }
                         div {
@@ -649,6 +647,37 @@ internal fun securityPolicyPageImpl(
                             }
                             div("edit-row__hint") { +"Between 4 and 128 characters." }
                         }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password History" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyHistoryCount") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "24"
+                                value = workspace.passwordPolicyHistoryCount.toString()
+                            }
+                            div("edit-row__hint") { +"Previous passwords to remember. 0 = disabled, max 24." }
+                        }
+                    }
+                    div("edit-row") {
+                        span("edit-row__label") { +"Password Expiry" }
+                        div {
+                            input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
+                                classes = setOf("edit-row__field", "edit-row__field--mono")
+                                attributes["min"] = "0"
+                                attributes["max"] = "365"
+                                value = workspace.passwordPolicyMaxAgeDays.toString()
+                            }
+                            div("edit-row__hint") { +"Days before forced change. 0 = never expires." }
+                        }
+                    }
+                }
+
+                // ── Password requirements (character-class checkboxes) ──
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        +EnglishStrings.ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION
                     }
                     label("check-row") {
                         input(type = InputType.checkBox, name = "passwordPolicyRequireSpecial") {
@@ -678,30 +707,6 @@ internal fun securityPolicyPageImpl(
                             if (workspace.passwordPolicyBlacklistEnabled) checked = true
                         }
                         span("check-row__label") { +"Block common / breached passwords" }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +"Password History" }
-                        div {
-                            input(type = InputType.number, name = "passwordPolicyHistoryCount") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "0"
-                                attributes["max"] = "24"
-                                value = workspace.passwordPolicyHistoryCount.toString()
-                            }
-                            div("edit-row__hint") { +"Previous passwords to remember. 0 = disabled, max 24." }
-                        }
-                    }
-                    div("edit-row") {
-                        span("edit-row__label") { +"Password Expiry" }
-                        div {
-                            input(type = InputType.number, name = "passwordPolicyMaxAgeDays") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "0"
-                                attributes["max"] = "365"
-                                value = workspace.passwordPolicyMaxAgeDays.toString()
-                            }
-                            div("edit-row__hint") { +"Days before forced change. 0 = never expires." }
-                        }
                     }
                 }
 
@@ -821,130 +826,6 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
-                // ── Authentication Methods ───────────────────────────
-                val anyEmailOtpEnabled =
-                    workspace.securityConfig.emailOtpLoginEnabled ||
-                        workspace.securityConfig.emailOtpSignupEnabled
-                div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_CARD_TITLE }
-
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_SIGN_IN }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "magicLinkEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.magicLinkEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_DESC }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "emailOtpLoginEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.emailOtpLoginEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOGIN_DESC }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "emailOtpSignupEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.securityConfig.emailOtpSignupEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC }
-                        }
-                    }
-                    if (anyEmailOtpEnabled && !workspace.isSmtpReady) {
-                        div("check-row__body") {
-                            span("check-row__warn") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_SMTP_WARN }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "requirePasswordless") {
-                            attributes["value"] = "true"
-                            if (!workspace.securityConfig.passwordLoginEnabled) checked = true
-                            if (workspace.isMaster) attributes["disabled"] = "disabled"
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_LABEL }
-                            span("check-row__desc") { +EnglishStrings.AUTH_METHODS_PASSWORDLESS_DESC }
-                        }
-                    }
-
-                    div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_GROUP_LIMITS }
-                    div("edit-row") {
-                        span("edit-row__label") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_LABEL }
-                        div {
-                            input(type = InputType.number, name = "magicLinkTokenTtlMinutes") {
-                                classes = setOf("edit-row__field", "edit-row__field--mono")
-                                attributes["min"] = "1"
-                                attributes["max"] = "1440"
-                                value = workspace.securityConfig.magicLinkTokenTtlMinutes.toString()
-                            }
-                            div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_MAGIC_LINK_TTL_HINT }
-                        }
-                    }
-                    if (anyEmailOtpEnabled) {
-                        div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL }
-                            div {
-                                input(type = InputType.number, name = "emailOtpLockoutThreshold") {
-                                    classes = setOf("edit-row__field", "edit-row__field--mono")
-                                    attributes["min"] = "0"
-                                    attributes["max"] = "50"
-                                    value = workspace.securityConfig.emailOtpLockoutThreshold.toString()
-                                }
-                                div("edit-row__hint") { +EnglishStrings.AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT }
-                            }
-                        }
-                    }
-                }
-
-                // ── Passkeys ─────────────────────────────────────────
-                div("ov-card") {
-                    div("ov-card__section-label") { +EnglishStrings.ADMIN_PASSKEYS_HEADING }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "passkeysEnabled") {
-                            attributes["value"] = "true"
-                            if (workspace.passkeysEnabled) checked = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_ENABLED_LABEL }
-                        }
-                    }
-                    label("check-row") {
-                        input(type = InputType.checkBox, name = "passwordLoginDisabled") {
-                            attributes["value"] = "true"
-                            if (workspace.passwordLoginDisabled) checked = true
-                            if (!workspace.isSmtpReady) disabled = true
-                        }
-                        div("check-row__body") {
-                            span("check-row__label") { +EnglishStrings.ADMIN_PASSKEYS_PASSWORDLESS_LABEL }
-                            if (!workspace.isSmtpReady) {
-                                span("check-row__warn") { +EnglishStrings.ADMIN_PASSKEYS_SMTP_GATE_HINT }
-                            }
-                        }
-                    }
-                    if (totalUsers > 0 || enrolledPasskeyUsers > 0) {
-                        div("insight-item insight-item--static") {
-                            span("insight-item__label") { +"Passkey enrollment" }
-                            span("insight-item__value insight-item__value--mono") {
-                                +"$enrolledPasskeyUsers"
-                                span {
-                                    attributes["style"] =
-                                        "font-size:14px;color:var(--color-subtle);font-family:var(--font-sans);font-weight:400;"
-                                    +" / $totalUsers"
-                                }
-                            }
-                            span("insight-item__hint") { +"users have enrolled at least one passkey" }
-                        }
-                    }
-                }
             }
                     }
 }
@@ -1019,9 +900,10 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-form") {
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
                                     input(type = InputType.url, name = "themeLogoUrl") {
@@ -1036,7 +918,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Favicon URL" }
                                 div {
                                     input(type = InputType.url, name = "themeFaviconUrl") {
@@ -1050,14 +932,14 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Accent Color" }
                                 div {
                                     colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 }
                             }
                             val eb = workspace.emailBranding
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Support email" }
                                 div {
                                     input(type = InputType.email, name = "emailSupportEmail") {
@@ -1072,9 +954,10 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
@@ -1094,7 +977,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Colors" }
                                 div("color-grid") {
                                     colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
@@ -1107,7 +990,7 @@ internal fun brandingPageImpl(
                                     colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Font Family" }
                                 val fontOptions = listOf(
                                     "Inter",
@@ -1128,7 +1011,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Border Radius" }
                                 div {
                                     div("preset-group") {
@@ -1154,7 +1037,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Language" }
                                 div {
                                     select {
@@ -1181,6 +1064,54 @@ internal fun brandingPageImpl(
                                 }
                             }
                         }
+
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
+                                div {
+                                    select {
+                                        id = "themeLoginLayout"
+                                        name = "themeLoginLayout"
+                                        classes = setOf("edit-row__field")
+                                        LoginLayout.entries.forEach { layout ->
+                                            option {
+                                                value = layout.name
+                                                if (layout == t.loginLayout) selected = true
+                                                +layout.name.lowercase().replaceFirstChar { it.uppercase() }
+                                            }
+                                        }
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_DESC }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
+                                div {
+                                    input(type = InputType.text, name = "themeLoginTagline") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-tagline"
+                                        value = t.loginTagline ?: ""
+                                        placeholder = workspace.displayName
+                                        attributes["maxlength"] = "200"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_HINT }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
+                                div {
+                                    input(type = InputType.url, name = "themeLoginBackgroundUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-bg"
+                                        value = t.loginBackgroundUrl ?: ""
+                                        placeholder = "https://cdn.example.com/hero.jpg"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_BG_HINT }
+                                }
+                            }
+                        }
                     }
 
                     // ══════════════════════════════════════════════
@@ -1188,15 +1119,33 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-preview") {
                         div("preview-panel") {
-                            div("preview-panel__header") {
-                                +"Preview"
-                                span("preview-panel__label") { +"Live — updates as you edit" }
-                            }
+                            div("preview-panel__header") { +"Preview" }
                             div("preview-panel__body") {
                                 id = "preview-body"
                                 style = "background:${t.bgDeep};"
 
-                                div("auth-mock") {
+                                div {
+                                    val mockClasses =
+                                        if (t.loginLayout == LoginLayout.SPLIT) {
+                                            "auth-mock auth-mock--split"
+                                        } else {
+                                            "auth-mock"
+                                        }
+                                    classes = setOf(*mockClasses.split(" ").toTypedArray())
+                                    id = "preview-mock"
+
+                                    aside("auth-mock__panel") {
+                                        id = "preview-panel-split"
+                                        val bg = t.loginBackgroundUrl
+                                        if (!bg.isNullOrBlank()) {
+                                            style = "background-image:url('${bg.replace("'", "%27")}');"
+                                        }
+                                        p("auth-mock__panel-tagline") {
+                                            id = "preview-panel-tagline"
+                                            +(t.loginTagline ?: workspace.displayName)
+                                        }
+                                    }
+
                                     div("auth-mock__card") {
                                         id = "preview-card"
                                         style = "--pm-accent:${t.accentColor};--pm-accent-fg:${t.accentForeground};--pm-card:${t.surface};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"

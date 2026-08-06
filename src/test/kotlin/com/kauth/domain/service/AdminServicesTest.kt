@@ -1160,7 +1160,6 @@ class AdminServicesTest {
             emailOtpLockoutThreshold = 5,
             emailOtpLoginEnabled = false,
             passkeysEnabled = true,
-            passwordLoginDisabled = false,
         )
 
     @Test

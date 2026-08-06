@@ -12,6 +12,8 @@ class FakeTenantRepository : TenantRepository {
     private val store = mutableMapOf<Int, Tenant>()
     private var nextId = 1
 
+    fun save(tenant: Tenant): Tenant = add(tenant)
+
     fun add(tenant: Tenant): Tenant {
         val nextIdValue = if (tenant.id.value == 0) nextId++ else tenant.id.value
         val t = if (tenant.id.value == 0) tenant.copy(id = TenantId(nextIdValue)) else tenant

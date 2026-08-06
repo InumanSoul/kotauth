@@ -8,20 +8,26 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.WebAuthnService
+import com.kauth.domain.service.WebhookService
 import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.auth.AuthenticationChecked
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.request.httpMethod
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.Route
@@ -39,12 +45,18 @@ fun Route.apiRoutes(
     roleGroupService: RoleGroupService,
     accountService: AdminAccountService,
     adminUserService: com.kauth.domain.service.AdminUserService,
+    mfaService: com.kauth.domain.service.MfaService,
     applicationManagementService: com.kauth.domain.service.ApplicationManagementService,
     userAttributeService: UserAttributeService,
     claimMapperService: CachingClaimMapperService,
     emailOtpService: EmailOtpService,
     otpEmailRateLimiter: RateLimiterPort,
     otpIpRateLimiter: RateLimiterPort,
+    apiWriteRateLimiter: RateLimiterPort,
+    webhookService: WebhookService,
+    resourceServerService: ResourceServerService,
+    webAuthnService: WebAuthnService,
+    webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
 ) {
     get("/api/docs") {
@@ -114,13 +126,35 @@ fun Route.apiRoutes(
                 }
             install(apiContextPlugin)
 
-            apiUserRoutes(accountService, adminUserService, roleGroupService)
+            val writeRateLimitPlugin =
+                createRouteScopedPlugin("ApiWriteRateLimitPlugin") {
+                    on(AuthenticationChecked) { call ->
+                        val method = call.request.httpMethod
+                        if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
+                            return@on
+                        }
+                        val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+                        val slug = call.parameters["tenantSlug"] ?: return@on
+                        val bucketKey = "api_write:${key.keyPrefix}:$slug"
+                        if (!apiWriteRateLimiter.isAllowed(bucketKey)) {
+                            call.respondRateLimited(retryAfterSeconds = apiWriteRateLimiter.windowSeconds)
+                        }
+                    }
+                }
+            install(writeRateLimitPlugin)
+
+            apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
+            apiWorkspaceRoutes(tenantRepository)
+            apiWebhookRoutes(webhookService)
+            apiResourceServerRoutes(resourceServerService, applicationRepository)
             apiApplicationRoutes(applicationRepository, applicationManagementService, roleGroupService)
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
+            apiKeyManagementRoutes(apiKeyService)
+            apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)
         }
     }
 }

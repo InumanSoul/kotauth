@@ -20,6 +20,7 @@ object EnglishStrings {
     // Toast messages — success feedback after form saves
     const val TOAST_SETTINGS_SAVED = "Settings saved."
     const val TOAST_SECURITY_POLICY_SAVED = "Security policy saved."
+    const val TOAST_SIGN_IN_METHODS_SAVED = "Sign-in methods updated."
     const val TOAST_BRANDING_SAVED = "Branding saved."
     const val TOAST_SMTP_SAVED = "SMTP settings saved."
     const val TOAST_IDP_SAVED = "Identity provider settings saved."
@@ -65,7 +66,9 @@ object EnglishStrings {
     // Portal — navigation labels
     const val PORTAL_NAV_PROFILE = "Profile"
     const val PORTAL_NAV_SECURITY = "Security"
+    const val PORTAL_NAV_SECURITY_OVERVIEW = "Overview"
     const val PORTAL_NAV_MFA = "Two-Factor Auth"
+    const val PORTAL_NAV_SESSIONS = "Sessions"
     const val PORTAL_TOPBAR_TITLE = "Account settings"
 
     // Portal — profile page
@@ -86,7 +89,12 @@ object EnglishStrings {
 
     // Portal — security page
     const val PORTAL_SECURITY_TITLE = "Security"
-    const val PORTAL_SECURITY_SUBTITLE = "Password and active sessions"
+    const val PORTAL_SECURITY_SUBTITLE = "Manage your authentication settings"
+    const val PORTAL_CHANGE_PASSWORD_SUBTITLE = "Change your account password"
+    const val PORTAL_SESSIONS_REVOKE_OTHERS_CONFIRM =
+        "Sign out of all other sessions? Only your current session will remain active."
+    const val PORTAL_SESSIONS_REVOKE_CONFIRM =
+        "Revoke this session? The user will be signed out immediately."
     const val PORTAL_SECURITY_CHANGE_PASSWORD = "Change password"
     const val PORTAL_SECURITY_CURRENT_PASSWORD = "Current password"
     const val PORTAL_SECURITY_SIGNOUT_NOTE = "Changing your password signs you out of all active sessions"
@@ -137,10 +145,19 @@ object EnglishStrings {
     const val PORTAL_MFA_VERIFICATION_CODE = "Verification code"
     const val PORTAL_MFA_CONFIRM_SETUP = "Confirm setup"
 
+    // Portal — MFA page intro (used on the Security overview card)
+    const val PORTAL_MFA_INTRO = "Protect your account with a time-based one-time code from an authenticator app."
+
+    // Portal — Security overview card shared action label
+    const val PORTAL_SECURITY_MANAGE = "Manage"
+
     // Portal — passkeys page
     const val PORTAL_NAV_PASSKEYS = "Passkeys"
     const val PORTAL_PASSKEYS_TITLE = "Passkeys"
     const val PORTAL_PASSKEYS_INTRO = "Sign in without a password using your device's biometrics or a hardware key."
+
+    // Portal — sessions page intro (used on the Security overview card)
+    const val PORTAL_SESSIONS_INTRO = "See where you're signed in and revoke sessions."
     const val PORTAL_PASSKEYS_ADD_BUTTON = "Add a passkey"
     const val PORTAL_PASSKEYS_EMPTY_STATE = "You have no passkeys enrolled yet."
     const val PORTAL_PASSKEYS_ADDED_ON = "Added"
@@ -330,8 +347,10 @@ object EnglishStrings {
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
     // Authentication methods card (workspace security settings — v1.10)
-    const val AUTH_METHODS_CARD_TITLE = "Authentication Methods"
     const val AUTH_METHODS_GROUP_SIGN_IN = "Sign-in methods"
+    const val AUTH_METHODS_TABLE_COL_METHOD = "Method"
+    const val AUTH_METHODS_TABLE_COL_ENABLED = "Enabled"
+    const val AUTH_METHODS_TABLE_COL_NOTES = "Notes"
     const val AUTH_METHODS_GROUP_LIMITS = "Limits"
     const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
     const val AUTH_METHODS_MAGIC_LINK_DESC =
@@ -342,12 +361,6 @@ object EnglishStrings {
     const val AUTH_METHODS_MAGIC_LINK_TTL_HINT =
         "Minutes before a magic link expires. 1 to 1440 (default 15). " +
             "Raise it for slow corporate mail relays; lower it for high-assurance tenants."
-    const val AUTH_METHODS_PASSWORDLESS_LABEL = "Require passwordless sign-in"
-    const val AUTH_METHODS_PASSWORDLESS_DESC =
-        "Hides the password form and rejects password-based authentication. " +
-            "Users can still sign in with magic links and any enabled social providers. " +
-            "Email becomes the only first factor. Pair with MFA for higher-assurance environments."
-
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL =
         "Allow sign-in via Email OTP code"
     const val AUTH_METHODS_EMAIL_OTP_LOGIN_DESC =
@@ -369,14 +382,92 @@ object EnglishStrings {
         "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
+    // Sign-in Methods grid rows (v1.20.1 — SecurityMethodsService)
+    const val AUTH_METHOD_PASSWORD_LABEL = "Password"
+    const val AUTH_METHOD_PASSKEY_LABEL = "Passkey"
+    const val AUTH_METHOD_MAGIC_LINK_LABEL = "Magic link"
+    const val AUTH_METHOD_MAGIC_LINK_DESC =
+        "One-time sign-in link delivered by email. Single-use, expires after the configured window."
+    const val AUTH_METHOD_EMAIL_OTP_LABEL = "Email code"
+    const val AUTH_METHOD_EMAIL_OTP_DESC =
+        "6-digit code delivered by email. The user enters it after their email address."
+    const val AUTH_METHOD_SOCIAL_GOOGLE_LABEL = "Google"
+    const val AUTH_METHOD_SOCIAL_GITHUB_LABEL = "GitHub"
+
+    // Auth Methods grid (v1.20.1)
+    const val AUTH_METHODS_TABLE_HEADING = "Sign-in methods"
+    const val REQUIREMENT_SMTP_REQUIRED = "SMTP required"
+    const val REQUIREMENT_SMTP_LINK = "Set up SMTP"
+    const val REQUIREMENT_OAUTH_CREDENTIALS_REQUIRED = "OAuth credentials required"
+    const val AUTH_METHODS_PASSWORD_OFF_WARNING =
+        "Disabling passwords requires ≥1 other method and configured SMTP for magic-link recovery."
+
     // Passkeys card (workspace security settings — v1.20)
     const val ADMIN_PASSKEYS_HEADING = "Passkeys"
     const val ADMIN_PASSKEYS_ENABLED_LABEL = "Passkey sign-in enabled"
-    const val ADMIN_PASSKEYS_PASSWORDLESS_LABEL = "Disable password sign-in (passkey + magic link only)"
-    const val ADMIN_PASSKEYS_SMTP_GATE_HINT =
-        "SMTP is required to disable password sign-in — magic-link is the recovery path."
     const val ADMIN_PASSKEYS_RESET_ALL_BUTTON = "Reset all passkeys"
     const val ADMIN_MFA_RESET_BUTTON = "Reset MFA"
+
+    // Security rail nav labels (v1.20.1)
+    const val ADMIN_NAV_SIGN_IN_METHODS = "Sign-in Methods"
+
+    // Passkeys workspace page (v1.20.1 rewrite)
+    // Admin — Security Policy page section labels
+    const val ADMIN_SECURITY_PASSWORD_POLICY_SECTION = "Password Policy"
+    const val ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION = "Password Requirements"
+
+    const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
+    const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
+    const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
+    const val ADMIN_PASSKEYS_CONFIG_LABEL = "Passkey configuration"
+    const val ADMIN_PASSKEYS_CONFIG_BODY =
+        "Passkey sign-in is enabled or disabled from the Sign-in Methods page."
+    const val ADMIN_PASSKEYS_OPEN_POLICY = "Open Sign-in Methods"
+
+    // Passkeys admin page — alerts
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_NO_USERS_TITLE = "Passkey sign-in is disabled"
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_NO_USERS_DESC =
+        "Enable it on Sign-in Methods to let users enroll."
+    const val ADMIN_PASSKEYS_ALERT_ENABLED_NO_USERS_TITLE = "No users have enrolled a passkey yet"
+    const val ADMIN_PASSKEYS_ALERT_ENABLED_NO_USERS_DESC =
+        "Sharing the enrollment URL below is the fastest way to get started."
+    const val ADMIN_PASSKEYS_ALERT_DISABLED_HAS_USERS_TITLE = "Passkey sign-in is currently disabled"
+    const val ADMIN_PASSKEYS_ALERT_SIGN_IN_METHODS_LINK = "Open Sign-in Methods"
+
+    // Passkeys admin page — enrollment URL card
+    const val ADMIN_PASSKEYS_ENROLLMENT_URL_LABEL = "Self-service enrollment URL"
+    const val ADMIN_PASSKEYS_ENROLLMENT_URL_DESC =
+        "Share this URL with users to let them register a passkey on their device. " +
+            "The link requires them to be signed in."
+
+    // Passkeys admin page — users table
+    const val ADMIN_PASSKEYS_TABLE_COL_STATUS = "Passkey Status"
+    const val ADMIN_PASSKEYS_TABLE_BADGE_ENROLLED = "Enrolled"
+    const val ADMIN_PASSKEYS_TABLE_BADGE_NOT_ENROLLED = "Not enrolled"
+    const val ADMIN_PASSKEYS_EMPTY_USERS_TITLE = "No users in this workspace"
+    const val ADMIN_PASSKEYS_EMPTY_USERS_DESC = "Users will appear here once they are added."
+
+    // Sign-in Methods — footer note
+    const val ADMIN_METHODS_MORE_SIGN_IN_OPTIONS = "Add more sign-in options via Identity Providers"
+
+    // MFA overview page (v1.20.1)
+    const val ADMIN_MFA_ALERT_NO_ENROLLED_TITLE = "No users have enrolled in MFA"
+    const val ADMIN_MFA_ALERT_REQUIRED_DESC_PREFIX = "MFA policy is set to"
+    const val ADMIN_MFA_ALERT_REQUIRED_DESC_SUFFIX =
+        ". Users who have not enrolled cannot complete sign-in."
+    const val ADMIN_MFA_ALERT_OPTIONAL_DESC =
+        "MFA policy is Optional — no sign-in impact. Share the enrollment URL below to encourage " +
+            "users to set up two-factor authentication."
+    const val ADMIN_MFA_ALERT_REQUIRED_LINK = "Review policy"
+    const val ADMIN_MFA_ALERT_OPTIONAL_LINK = "Change policy"
+    const val ADMIN_MFA_TABLE_COL_USERNAME = "Username"
+    const val ADMIN_MFA_TABLE_COL_FULL_NAME = "Full Name"
+    const val ADMIN_MFA_TABLE_COL_EMAIL = "Email"
+    const val ADMIN_MFA_TABLE_COL_STATUS = "MFA Status"
+    const val ADMIN_MFA_TABLE_BADGE_ENROLLED = "Enrolled"
+    const val ADMIN_MFA_TABLE_BADGE_NOT_ENROLLED = "Not enrolled"
+    const val ADMIN_MFA_EMPTY_USERS_TITLE = "No users in this workspace"
+    const val ADMIN_MFA_EMPTY_USERS_DESC = "Users will appear here once they are added."
 
     const val TOAST_BACKUP_EXPORTED = "Backup exported. Download started."
     const val TOAST_BACKUP_IMPORTED = "Workspace imported successfully."
@@ -613,6 +704,17 @@ object EnglishStrings {
 
     const val BRAND_IDENTITY_HEADING = "Brand Identity"
     const val VISUAL_THEME_HEADING = "Visual Theme"
+
+    const val BRANDING_LOGIN_LAYOUT_TITLE = "Login layout"
+    const val BRANDING_LOGIN_LAYOUT_DESC =
+        "Choose how the auth pages (login, register, MFA) are structured. Split adds a branded left panel."
+    const val BRANDING_LOGIN_LAYOUT_FIELD = "Layout"
+    const val BRANDING_LOGIN_TAGLINE_FIELD = "Tagline (split layout)"
+    const val BRANDING_LOGIN_TAGLINE_HINT =
+        "Shown on the left panel when using the Split layout. Falls back to the workspace name if empty."
+    const val BRANDING_LOGIN_BG_FIELD = "Background image URL (split layout)"
+    const val BRANDING_LOGIN_BG_HINT =
+        "Optional image for the left panel. Must be an https URL. If empty, the panel uses the accent color."
 
     const val POST_MAGIC_LINK_TITLE = "Sign in complete"
     const val POST_MAGIC_LINK_INTRO =

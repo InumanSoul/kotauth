@@ -1,5 +1,5 @@
-val ktorVersion = "3.5.0"
-val exposedVersion = "1.3.0"
+val ktorVersion = "3.5.1"
+val exposedVersion = "1.3.1"
 val logbackVersion = "1.5.32"
 val flywayVersion = "12.11.0"
 val logstashEncoderVersion = "8.1"
@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.20.0"
+version = "1.21.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")

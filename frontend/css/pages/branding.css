@@ -1,7 +1,63 @@
-/* ── two-column branding layout ── */
+/* ── Stacked form row (label above field) — narrow-form legibility variant ── */
+.edit-col {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 0.5px solid var(--color-border);
+}
+.edit-col:last-of-type { border-bottom: none; }
+.edit-col > .edit-row__label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--color-subtle);
+  padding-top: 0;
+  margin-bottom: var(--space-2);
+}
+.edit-col > .edit-row__hint,
+.edit-col .edit-row__hint {
+  margin-top: var(--space-2);
+}
+
+/* ── Collapsible ov-card variant (branding form sections) ── */
+details.ov-card--collapsible {
+  padding: 0;
+}
+details.ov-card--collapsible > summary {
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+  padding-right: calc(var(--space-4) + 16px);
+  user-select: none;
+}
+/* Suppress the default disclosure marker (WebKit + Firefox). */
+details.ov-card--collapsible > summary::-webkit-details-marker { display: none; }
+details.ov-card--collapsible > summary::marker { content: ''; }
+/* Custom chevron on the right of the section label — rotates when open. */
+details.ov-card--collapsible > summary::after {
+  content: '';
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid var(--color-subtle);
+  border-bottom: 1.5px solid var(--color-subtle);
+  transform: translateY(-70%) rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+details.ov-card--collapsible[open] > summary::after {
+  transform: translateY(-30%) rotate(45deg);
+}
+details.ov-card--collapsible > summary:hover::after {
+  border-color: var(--color-text);
+}
+
+/* ── two-column branding layout — form narrow (left), preview wide (right) ── */
 .branding-layout {
   display: grid;
-  grid-template-columns: 1fr 35%;
+  grid-template-columns: minmax(360px, 400px) 1fr;
   gap: var(--space-6);
   align-items: start;
 }
@@ -40,14 +96,8 @@
 }
 
 .color-field {
-  padding: var(--space-3) var(--space-4);
-  border-right: 0.5px solid var(--color-border);
-  border-bottom: 0.5px solid var(--color-border);
+  padding: var(--space-1) var(--space-2);
 }
-/* Remove right border from even columns */
-.color-field:nth-child(2n) { border-right: none; }
-/* Remove bottom border from last row */
-.color-field:nth-last-child(-n+2) { border-bottom: none; }
 
 .color-field__label {
   font-size: 10px; font-weight: 500; letter-spacing: 0.07em;
@@ -108,13 +158,13 @@
 .preview-panel__body {
   padding: var(--space-6) var(--space-5);
   display: flex; align-items: center; justify-content: center;
-  min-height: 420px;
+  min-height: 520px;
 }
 
 /* ── auth screen mockup (inside preview) ── */
 .auth-mock {
   width: 100%;
-  max-width: 260px;
+  max-width: 360px;
   display: flex; flex-direction: column; gap: 0;
   font-family: var(--font-sans);
 }
@@ -165,3 +215,39 @@
   font-size: 11px; color: var(--pm-muted, #6b6b75);
 }
 .auth-mock__footer a { color: var(--pm-accent, #1fbcff); text-decoration: none; }
+
+/* ── SPLIT layout preview (v1.21.0) ── */
+.auth-mock__panel {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background-color: var(--pm-accent, #1fbcff);
+  background-size: cover;
+  background-position: center;
+  color: var(--pm-accent-fg, #05080a);
+  border-radius: var(--pm-radius, 8px) 0 0 var(--pm-radius, 8px);
+  min-height: 220px;
+}
+.auth-mock__panel-tagline {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  margin: 0;
+}
+.auth-mock--split {
+  max-width: 520px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--pm-border, rgba(255,255,255,0.10));
+  border-radius: var(--pm-radius, 8px);
+  overflow: hidden;
+}
+.auth-mock--split .auth-mock__panel { display: flex; }
+.auth-mock--split .auth-mock__card {
+  border: none;
+  border-radius: 0;
+  padding: var(--space-5) var(--space-4);
+  gap: var(--space-3);
+}

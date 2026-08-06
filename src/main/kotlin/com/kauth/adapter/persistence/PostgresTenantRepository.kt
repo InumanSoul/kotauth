@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
@@ -109,7 +110,6 @@ class PostgresTenantRepository(
                 it[smtpEnabled] = tenant.smtpEnabled
                 it[maxConcurrentSessions] = tenant.maxConcurrentSessions
                 it[passkeysEnabled] = tenant.passkeysEnabled
-                it[passwordLoginDisabled] = tenant.passwordLoginDisabled
             }
             // Upsert: update if exists, insert if the row was never created
             val updatedRows =
@@ -217,7 +217,6 @@ class PostgresTenantRepository(
             portalConfig = toPortalConfig(),
             emailBranding = toEmailBranding(),
             passkeysEnabled = this[TenantsTable.passkeysEnabled],
-            passwordLoginDisabled = this[TenantsTable.passwordLoginDisabled],
         )
     }
 
@@ -277,6 +276,11 @@ class PostgresTenantRepository(
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
             defaultLocale = this[WorkspaceThemeTable.defaultLocale],
+            loginLayout =
+                runCatching { LoginLayout.valueOf(this[WorkspaceThemeTable.loginLayout]) }
+                    .getOrDefault(LoginLayout.CENTERED),
+            loginBackgroundUrl = this[WorkspaceThemeTable.loginBackgroundUrl],
+            loginTagline = this[WorkspaceThemeTable.loginTagline],
         )
     }
 

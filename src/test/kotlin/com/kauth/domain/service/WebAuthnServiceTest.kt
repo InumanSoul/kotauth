@@ -504,7 +504,7 @@ class WebAuthnServiceTest {
 
     @Test
     fun `revoke rejects with CannotRevokeLast when tenant is passwordless-only and user has 1 credential`() {
-        tenantRepo.add(tenant.copy(passwordLoginDisabled = true))
+        tenantRepo.add(tenant.copy(securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = false)))
         val saved = seedCredential()
         val result = service.revoke(userId, saved.id!!, tenantId)
         assertIs<WebAuthnResult.Failure>(result)
@@ -513,7 +513,7 @@ class WebAuthnServiceTest {
 
     @Test
     fun `revoke succeeds when tenant is NOT passwordless-only even if user has 1 credential`() {
-        tenantRepo.add(tenant.copy(passwordLoginDisabled = false))
+        tenantRepo.add(tenant.copy(securityConfig = tenant.securityConfig.copy(passwordLoginEnabled = true)))
         val saved = seedCredential()
         val result = service.revoke(userId, saved.id!!, tenantId)
         assertIs<WebAuthnResult.Success<Unit>>(result)

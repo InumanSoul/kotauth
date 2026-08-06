@@ -251,7 +251,6 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
-                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
                 return@get
@@ -453,7 +452,6 @@ internal fun Route.oauthProtocolRoutes(
                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                 passkeysEnabled = tenant.passkeysEnabled,
-                passwordLoginDisabled = tenant.passwordLoginDisabled,
             ),
         )
     }
@@ -487,7 +485,6 @@ internal fun Route.oauthProtocolRoutes(
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
-                    passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                 ),
             )
         }
@@ -519,7 +516,6 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
-                        passwordLoginDisabled = tenant?.passwordLoginDisabled == true,
                     ),
                 )
             }
@@ -559,7 +555,6 @@ internal fun Route.oauthProtocolRoutes(
                                     passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                     emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                     passkeysEnabled = tenant.passkeysEnabled,
-                                    passwordLoginDisabled = tenant.passwordLoginDisabled,
                                 ),
                             )
                         }
@@ -607,7 +602,6 @@ internal fun Route.oauthProtocolRoutes(
                                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                 passkeysEnabled = tenant.passkeysEnabled,
-                                passwordLoginDisabled = tenant.passwordLoginDisabled,
                             ),
                         )
                     },

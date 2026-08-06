@@ -245,7 +245,6 @@ class WorkspaceSettingsService(
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
                 ),
             passkeysEnabled = update.passkeysEnabled,
-            passwordLoginDisabled = update.passwordLoginDisabled,
         )
 
     private fun recordWorkspaceSettingsAudit(
@@ -303,5 +302,8 @@ class WorkspaceSettingsService(
                     ?.trim()
                     ?.lowercase()
                     ?.takeIf { it.isNotBlank() },
+            loginLayout = theme.loginLayout,
+            loginBackgroundUrl = theme.loginBackgroundUrl?.trim()?.takeIf { it.isNotBlank() },
+            loginTagline = theme.loginTagline?.trim()?.takeIf { it.isNotBlank() },
         )
 }

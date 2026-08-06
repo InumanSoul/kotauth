@@ -76,6 +76,7 @@ import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnService
@@ -159,6 +160,7 @@ data class ServiceGraph(
     val mfaRateLimiter: RateLimiterPort,
     val otpEmailRateLimiter: RateLimiterPort,
     val otpIpRateLimiter: RateLimiterPort,
+    val apiWriteRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
@@ -175,6 +177,7 @@ data class ServiceGraph(
     val auditLogPort: AuditLogPort,
     val webAuthnService: WebAuthnService,
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
+    val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
@@ -364,6 +367,7 @@ data class ServiceGraph(
                     authorizationCodeRepository = authCodeRepository,
                     emailPort = emailAdapter,
                     auditLog = auditLogAdapter,
+                    resourceServerRepository = resourceServerRepository,
                     roleRepository = roleRepository,
                 )
             val apiKeyBootstrapService =
@@ -536,6 +540,7 @@ data class ServiceGraph(
             val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
+            val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -637,6 +642,7 @@ data class ServiceGraph(
                 mfaRateLimiter = mfaLimiter,
                 otpEmailRateLimiter = otpEmailLimiter,
                 otpIpRateLimiter = otpIpLimiter,
+                apiWriteRateLimiter = apiWriteLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,
@@ -653,6 +659,11 @@ data class ServiceGraph(
                 auditLogPort = auditLogAdapter,
                 webAuthnService = webAuthnService,
                 webAuthnCredentialRepository = webAuthnCredentialRepository,
+                securityMethodsService =
+                    SecurityMethodsService(
+                        tenantRepository = tenantRepository,
+                        identityProviderRepository = identityProviderRepository,
+                    ),
                 passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
             )

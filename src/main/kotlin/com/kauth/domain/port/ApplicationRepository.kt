@@ -59,4 +59,12 @@ interface ApplicationRepository {
         appId: ApplicationId,
         enabled: Boolean,
     )
+
+    /**
+     * Marks the application as soft-deleted. The row remains in place so
+     * audit-log lookups by `client_id` continue to resolve. Returns `true`
+     * if a row was actually flipped from active to deleted (idempotent for
+     * already-deleted rows returns `false`).
+     */
+    fun softDelete(appId: ApplicationId): Boolean
 }
