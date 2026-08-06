@@ -8,6 +8,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
@@ -540,6 +541,31 @@ class BackupExportImportTest {
             error.message.contains("theme", ignoreCase = true),
             "Failure must surface a theme-validation error so misconfigured backups don't silently pass",
         )
+    }
+
+    @Test
+    fun `theme round-trip preserves login layout fields`() {
+        val source = sourceTenants.findBySlug("acme")!!
+        sourceTenants.update(
+            source.copy(
+                theme =
+                    source.theme.copy(
+                        loginLayout = LoginLayout.SPLIT,
+                        loginTagline = "Welcome to Acme",
+                        loginBackgroundUrl = "https://acme.example.com/hero.jpg",
+                    ),
+            ),
+        )
+
+        val export = exportSuccessful(ExportOptions())
+        val result = importer().import(export, newSlug = "acme-restored", currentSchemaVersion = 38)
+        assertIs<BackupResult.Success<Unit>>(result)
+
+        val restoredTheme = destThemes.findByTenantId(destTenants.findBySlug("acme-restored")!!.id)
+        assertNotNull(restoredTheme)
+        assertEquals(LoginLayout.SPLIT, restoredTheme.loginLayout)
+        assertEquals("Welcome to Acme", restoredTheme.loginTagline)
+        assertEquals("https://acme.example.com/hero.jpg", restoredTheme.loginBackgroundUrl)
     }
 
     @Test

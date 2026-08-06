@@ -16,7 +16,10 @@ import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.WebAuthnService
+import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -26,10 +29,15 @@ import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
+import com.kauth.fakes.FakeRelyingPartyAdapter
+import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebAuthnCredentialRepository
+import com.kauth.fakes.FakeWebhookDeliveryRepository
+import com.kauth.fakes.FakeWebhookEndpointRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
@@ -149,6 +157,15 @@ class ApiRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = accountSelfService,
+        )
+
+    private val mfaService =
+        com.kauth.domain.service.MfaService(
+            mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+            userRepository = userRepo,
+            tenantRepository = tenantRepo,
+            passwordHasher = hasher,
+            auditLog = auditLogPort,
         )
 
     private val applicationManagementService =
@@ -937,12 +954,25 @@ class ApiRoutesTest {
                 roleGroupService = roleGroupService,
                 accountService = adminService,
                 adminUserService = adminUserService,
+                mfaService = mfaService,
                 applicationManagementService = applicationManagementService,
                 userAttributeService = userAttributeService,
                 claimMapperService = claimMapperService,
                 emailOtpService = stubEmailOtpService(),
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
+                apiWriteRateLimiter = AlwaysAllowLimiter(),
+                webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
+                webAuthnService =
+                    WebAuthnService(
+                        credentialRepository = FakeWebAuthnCredentialRepository(),
+                        relyingParty = FakeRelyingPartyAdapter(),
+                        secretKey = "test-secret-key-32chars-long-xxxx",
+                        auditLog = FakeAuditLogPort(),
+                        userRepository = FakeUserRepository(),
+                    ),
+                webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
             )
         }
     }

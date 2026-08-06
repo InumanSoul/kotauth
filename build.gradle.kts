@@ -8,7 +8,7 @@ val testcontainersVersion = "1.21.0"
 
 plugins {
     kotlin("jvm") version "2.3.20"
-    kotlin("plugin.serialization") version "2.3.20"
+    kotlin("plugin.serialization") version "2.4.0"
     id("io.ktor.plugin") version "3.5.1"
     id("com.gradleup.shadow") version "9.1.0"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.20.2"
+version = "1.21.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")

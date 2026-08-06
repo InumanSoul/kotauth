@@ -136,6 +136,9 @@ class BackupExporterService(
                             logoUrl = logoUrl,
                             faviconUrl = faviconUrl,
                             defaultLocale = defaultLocale,
+                            loginLayout = loginLayout.name,
+                            loginBackgroundUrl = loginBackgroundUrl,
+                            loginTagline = loginTagline,
                         )
                     },
                 portalConfig = PortalConfigBackup(layout = tenant.portalConfig.layout.name),

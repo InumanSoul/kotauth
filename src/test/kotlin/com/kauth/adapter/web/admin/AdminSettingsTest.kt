@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -561,6 +562,175 @@ class AdminSettingsTest {
                 html.contains("name=\"emailFromDisplayName\""),
                 "fromDisplayName input must not appear in the branding form",
             )
+        }
+
+    @Test
+    fun `POST branding accepts themeLoginLayout=SPLIT and persists it`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginLayout", "SPLIT")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(LoginLayout.SPLIT, themeRepo.findByTenantId(workspace.id)?.loginLayout)
+        }
+
+    @Test
+    fun `POST branding accepts themeLoginTagline and persists it`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginTagline", "Welcome back to Acme")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("Welcome back to Acme", themeRepo.findByTenantId(workspace.id)?.loginTagline)
+        }
+
+    @Test
+    fun `POST branding accepts themeLoginBackgroundUrl https and persists it`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginBackgroundUrl", "https://cdn.example.com/hero.jpg")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                "https://cdn.example.com/hero.jpg",
+                themeRepo.findByTenantId(workspace.id)?.loginBackgroundUrl,
+            )
+        }
+
+    @Test
+    fun `POST branding returns 422 when loginBackgroundUrl is not http or https`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginBackgroundUrl", "javascript:alert(1)")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals(null, themeRepo.findByTenantId(workspace.id)?.loginBackgroundUrl)
+        }
+
+    @Test
+    fun `POST branding returns 422 when loginTagline exceeds 200 chars`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginTagline", "a".repeat(201))
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
+    @Test
+    fun `POST branding preserves loginLayout when the field is unknown or malformed`() =
+        testApplication {
+            application { installTestApp() }
+            // Simulate a tenant whose current theme is SPLIT (production keeps Tenant.theme
+            // and ThemeRepository in sync via a JOIN; the fakes are independent stores, so
+            // both are seeded here to mirror that behavior for this request).
+            tenantRepo.add(workspace.copy(theme = TenantTheme.DEFAULT.copy(loginLayout = LoginLayout.SPLIT)))
+            themeRepo.upsert(workspace.id, TenantTheme.DEFAULT.copy(loginLayout = LoginLayout.SPLIT))
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/branding",
+                    formParameters =
+                        Parameters.build {
+                            append("themeLoginLayout", "NOT_A_REAL_LAYOUT")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginLayout.SPLIT,
+                themeRepo.findByTenantId(workspace.id)?.loginLayout,
+                "Unknown loginLayout value must preserve the existing SPLIT setting, not fall back to CENTERED",
+            )
+        }
+
+    @Test
+    fun `branding page renders login layout section with three new fields`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val html = authed.get("/admin/workspaces/acme/settings/branding").bodyAsText()
+
+            assertContains(html, "name=\"themeLoginLayout\"")
+            assertContains(html, "name=\"themeLoginTagline\"")
+            assertContains(html, "name=\"themeLoginBackgroundUrl\"")
         }
 
     @Test

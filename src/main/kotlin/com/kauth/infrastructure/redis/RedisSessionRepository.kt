@@ -1,5 +1,6 @@
 package com.kauth.infrastructure.redis
 
+import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
@@ -144,15 +145,39 @@ class RedisSessionRepository(
 
     override fun findActiveByTenant(
         tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
         limit: Int,
         offset: Int,
     ): List<Session> =
-        liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst = true)
+        activeTenantSessions(tenantId, userId, newestFirst = true)
+            .filter { applicationId == null || it.clientId == applicationId }
             .drop(offset)
             .take(limit)
 
-    override fun countActiveByTenant(tenantId: TenantId): Int =
-        liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst = false).size
+    override fun countActiveByTenant(
+        tenantId: TenantId,
+        userId: UserId?,
+        applicationId: ApplicationId?,
+    ): Int =
+        activeTenantSessions(tenantId, userId, newestFirst = false)
+            .count { applicationId == null || it.clientId == applicationId }
+
+    /**
+     * Active sessions for [tenantId], scoped to [userId]'s per-user ZSET when provided
+     * (there is no per-application index, so `applicationId` filtering happens in-memory
+     * by the caller after this returns).
+     */
+    private fun activeTenantSessions(
+        tenantId: TenantId,
+        userId: UserId?,
+        newestFirst: Boolean,
+    ): List<Session> =
+        if (userId != null) {
+            liveSessions(RedisKeys.activeUserSet(tenantId, userId), newestFirst)
+        } else {
+            liveSessions(RedisKeys.activeTenantSet(tenantId), newestFirst)
+        }
 
     override fun countActiveByUser(
         tenantId: TenantId,

@@ -125,6 +125,9 @@ data class ThemeBackup(
     val logoUrl: String?,
     val faviconUrl: String?,
     val defaultLocale: String?,
+    val loginLayout: String = "CENTERED",
+    val loginBackgroundUrl: String? = null,
+    val loginTagline: String? = null,
 )
 
 @Serializable

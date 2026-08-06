@@ -1,5 +1,6 @@
 package com.kauth.adapter.persistence
 
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalConfig
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
@@ -275,6 +276,11 @@ class PostgresTenantRepository(
             logoUrl = this[WorkspaceThemeTable.logoUrl],
             faviconUrl = this[WorkspaceThemeTable.faviconUrl],
             defaultLocale = this[WorkspaceThemeTable.defaultLocale],
+            loginLayout =
+                runCatching { LoginLayout.valueOf(this[WorkspaceThemeTable.loginLayout]) }
+                    .getOrDefault(LoginLayout.CENTERED),
+            loginBackgroundUrl = this[WorkspaceThemeTable.loginBackgroundUrl],
+            loginTagline = this[WorkspaceThemeTable.loginTagline],
         )
     }
 

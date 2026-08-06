@@ -11,16 +11,23 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.ApiKeyResult
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.ResourceServerService
+import com.kauth.domain.service.WebAuthnService
+import com.kauth.domain.service.WebhookService
 import com.kauth.fakes.FakeApiKeyRepository
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeEmailOtpChallengeRepository
 import com.kauth.fakes.FakeEmailPort
+import com.kauth.fakes.FakeRelyingPartyAdapter
 import com.kauth.fakes.FakeResourceServerRepository
 import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeUserRepository
+import com.kauth.fakes.FakeWebAuthnCredentialRepository
+import com.kauth.fakes.FakeWebhookDeliveryRepository
+import com.kauth.fakes.FakeWebhookEndpointRepository
 import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.post
@@ -335,6 +342,18 @@ class ApiOtpRoutesTest {
         credentialFlowService = stubSelfService(audit),
     )
 
+    private fun stubMfaService(
+        tenants: com.kauth.fakes.FakeTenantRepository,
+        users: com.kauth.fakes.FakeUserRepository,
+        audit: com.kauth.fakes.FakeAuditLogPort,
+    ) = com.kauth.domain.service.MfaService(
+        mfaRepository = com.kauth.fakes.FakeMfaRepository(),
+        userRepository = users,
+        tenantRepository = tenants,
+        passwordHasher = com.kauth.fakes.FakePasswordHasher(),
+        auditLog = audit,
+    )
+
     private fun io.ktor.server.application.Application.installApp(
         emailLimiter: RateLimiterPort,
         ipLimiter: RateLimiterPort,
@@ -374,6 +393,7 @@ class ApiOtpRoutesTest {
                         credentialFlowService = stubSelfService(audit),
                     ),
                 adminUserService = stubAdminUserService(tenants, users, audit),
+                mfaService = stubMfaService(tenants, users, audit),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(
                         applicationRepository = apps,
@@ -393,6 +413,18 @@ class ApiOtpRoutesTest {
                 emailOtpService = otpService,
                 otpEmailRateLimiter = emailLimiter,
                 otpIpRateLimiter = ipLimiter,
+                apiWriteRateLimiter = AlwaysAllowLimiter(),
+                webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
+                resourceServerService = ResourceServerService(FakeResourceServerRepository()),
+                webAuthnService =
+                    WebAuthnService(
+                        credentialRepository = FakeWebAuthnCredentialRepository(),
+                        relyingParty = FakeRelyingPartyAdapter(),
+                        secretKey = "test-secret-key-32chars-long-xxxx",
+                        auditLog = FakeAuditLogPort(),
+                        userRepository = FakeUserRepository(),
+                    ),
+                webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
             )
         }
     }

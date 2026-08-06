@@ -61,37 +61,34 @@ fun Route.adminApplicationRoutes(
                     accessType = accessType,
                     redirectUris = params["redirectUris"] ?: "",
                 )
-            val error =
-                when {
-                    clientId.isBlank() -> "Client ID is required."
-                    !clientId.matches(
-                        Regex("[a-z0-9-]+"),
-                    ) -> "Client ID may only contain lowercase letters, numbers, and hyphens."
-                    applicationRepository.existsByClientId(
-                        workspace.id,
-                        clientId,
-                    ) -> "Client ID '$clientId' already exists."
-                    name.isBlank() -> "Name is required."
-                    redirectUris.isEmpty() ->
-                        "At least one redirect URI is required. The authorization code flow needs a registered URI to bind to."
-                    else -> null
+            when (
+                val result =
+                    applicationManagementService.createApplication(
+                        tenantId = workspace.id,
+                        clientId = clientId,
+                        name = name,
+                        description = desc,
+                        accessType = accessType,
+                        redirectUris = redirectUris,
+                    )
+            ) {
+                is AdminResult.Failure -> {
+                    val wsPairs = call.attributes[WsPairsAttr]
+                    call.respondHtml(
+                        HttpStatusCode.UnprocessableEntity,
+                        AdminView.createApplicationPage(
+                            workspace,
+                            wsPairs,
+                            session.username,
+                            error = result.error.message,
+                            prefill = prefill,
+                        ),
+                    )
                 }
-            if (error != null) {
-                val wsPairs = call.attributes[WsPairsAttr]
-                return@post call.respondHtml(
-                    HttpStatusCode.UnprocessableEntity,
-                    AdminView.createApplicationPage(
-                        workspace,
-                        wsPairs,
-                        session.username,
-                        error = error,
-                        prefill = prefill,
-                    ),
-                )
+                is AdminResult.Success -> {
+                    call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+                }
             }
-            applicationRepository.create(workspace.id, clientId, name, desc, accessType, redirectUris)
-            corsPort?.invalidate(workspace.slug)
-            call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
         }
 
         route("/{clientId}") {

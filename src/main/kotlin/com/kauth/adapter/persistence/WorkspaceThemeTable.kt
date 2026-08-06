@@ -25,6 +25,9 @@ object WorkspaceThemeTable : Table("workspace_theme") {
     val logoUrl = varchar("logo_url", 500).nullable()
     val faviconUrl = varchar("favicon_url", 500).nullable()
     val defaultLocale = varchar("default_locale", 10).nullable()
+    val loginLayout = varchar("login_layout", 20).default("CENTERED")
+    val loginBackgroundUrl = varchar("login_background_url", 500).nullable()
+    val loginTagline = varchar("login_tagline", 200).nullable()
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

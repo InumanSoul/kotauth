@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -899,9 +900,10 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-form") {
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRAND_IDENTITY_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Logo URL" }
                                 div {
                                     input(type = InputType.url, name = "themeLogoUrl") {
@@ -916,7 +918,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Favicon URL" }
                                 div {
                                     input(type = InputType.url, name = "themeFaviconUrl") {
@@ -930,14 +932,14 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Accent Color" }
                                 div {
                                     colorField("Accent", "accent", "themeAccentColor", t.accentColor)
                                 }
                             }
                             val eb = workspace.emailBranding
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Support email" }
                                 div {
                                     input(type = InputType.email, name = "emailSupportEmail") {
@@ -952,9 +954,10 @@ internal fun brandingPageImpl(
                             }
                         }
 
-                        div("ov-card") {
-                            div("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
-                            div("edit-row") {
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.VISUAL_THEME_HEADING }
+                            div("edit-col") {
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
@@ -974,7 +977,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Colors" }
                                 div("color-grid") {
                                     colorField("Accent Hover", "accent-hover", "themeAccentHover", t.accentHoverColor)
@@ -987,7 +990,7 @@ internal fun brandingPageImpl(
                                     colorField("Text Muted", "muted", "themeTextMuted", t.textMuted)
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Font Family" }
                                 val fontOptions = listOf(
                                     "Inter",
@@ -1008,7 +1011,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Border Radius" }
                                 div {
                                     div("preset-group") {
@@ -1034,7 +1037,7 @@ internal fun brandingPageImpl(
                                     }
                                 }
                             }
-                            div("edit-row") {
+                            div("edit-col") {
                                 span("edit-row__label") { +"Language" }
                                 div {
                                     select {
@@ -1061,6 +1064,54 @@ internal fun brandingPageImpl(
                                 }
                             }
                         }
+
+                        details("ov-card ov-card--collapsible") {
+                            attributes["open"] = ""
+                            summary("ov-card__section-label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_TITLE }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_FIELD }
+                                div {
+                                    select {
+                                        id = "themeLoginLayout"
+                                        name = "themeLoginLayout"
+                                        classes = setOf("edit-row__field")
+                                        LoginLayout.entries.forEach { layout ->
+                                            option {
+                                                value = layout.name
+                                                if (layout == t.loginLayout) selected = true
+                                                +layout.name.lowercase().replaceFirstChar { it.uppercase() }
+                                            }
+                                        }
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_LAYOUT_DESC }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_FIELD }
+                                div {
+                                    input(type = InputType.text, name = "themeLoginTagline") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-tagline"
+                                        value = t.loginTagline ?: ""
+                                        placeholder = workspace.displayName
+                                        attributes["maxlength"] = "200"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_TAGLINE_HINT }
+                                }
+                            }
+                            div("edit-col") {
+                                span("edit-row__label") { +EnglishStrings.BRANDING_LOGIN_BG_FIELD }
+                                div {
+                                    input(type = InputType.url, name = "themeLoginBackgroundUrl") {
+                                        classes = setOf("edit-row__field")
+                                        id = "field-login-bg"
+                                        value = t.loginBackgroundUrl ?: ""
+                                        placeholder = "https://cdn.example.com/hero.jpg"
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.BRANDING_LOGIN_BG_HINT }
+                                }
+                            }
+                        }
                     }
 
                     // ══════════════════════════════════════════════
@@ -1068,15 +1119,33 @@ internal fun brandingPageImpl(
                     // ══════════════════════════════════════════════
                     div("branding-preview") {
                         div("preview-panel") {
-                            div("preview-panel__header") {
-                                +"Preview"
-                                span("preview-panel__label") { +"Live — updates as you edit" }
-                            }
+                            div("preview-panel__header") { +"Preview" }
                             div("preview-panel__body") {
                                 id = "preview-body"
                                 style = "background:${t.bgDeep};"
 
-                                div("auth-mock") {
+                                div {
+                                    val mockClasses =
+                                        if (t.loginLayout == LoginLayout.SPLIT) {
+                                            "auth-mock auth-mock--split"
+                                        } else {
+                                            "auth-mock"
+                                        }
+                                    classes = setOf(*mockClasses.split(" ").toTypedArray())
+                                    id = "preview-mock"
+
+                                    aside("auth-mock__panel") {
+                                        id = "preview-panel-split"
+                                        val bg = t.loginBackgroundUrl
+                                        if (!bg.isNullOrBlank()) {
+                                            style = "background-image:url('${bg.replace("'", "%27")}');"
+                                        }
+                                        p("auth-mock__panel-tagline") {
+                                            id = "preview-panel-tagline"
+                                            +(t.loginTagline ?: workspace.displayName)
+                                        }
+                                    }
+
                                     div("auth-mock__card") {
                                         id = "preview-card"
                                         style = "--pm-accent:${t.accentColor};--pm-accent-fg:${t.accentForeground};--pm-card:${t.surface};--pm-input:${t.bgInput};--pm-border:${t.borderColor};--pm-text:${t.textPrimary};--pm-muted:${t.textMuted};--pm-radius:${t.borderRadius};"
