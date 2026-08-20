@@ -20,6 +20,8 @@ data class Application(
     val accessType: AccessType,
     val enabled: Boolean,
     val redirectUris: List<String> = emptyList(),
+    /** Grants this client may use. Empty is valid only for BEARER_ONLY. */
+    val grantTypes: Set<GrantType> = emptySet(),
     /** Per-client override for access token lifetime in seconds. Null means use tenant/server default. */
     val tokenExpiryOverride: Int? = null,
     /** Public-facing URL the launcher tile navigates to. Null = app omitted from the launcher. */
@@ -55,5 +57,37 @@ enum class AccessType(
 
     companion object {
         fun fromValue(value: String): AccessType = entries.firstOrNull { it.value == value } ?: PUBLIC
+    }
+}
+
+/**
+ * Grants a client is registered to use (RFC 7591 `grant_types`).
+ * Members mirror exactly what the token endpoint dispatches on.
+ */
+enum class GrantType(
+    val value: String,
+) {
+    AUTHORIZATION_CODE("authorization_code"),
+    CLIENT_CREDENTIALS("client_credentials"),
+    REFRESH_TOKEN("refresh_token"),
+    ;
+
+    val label: String get() =
+        when (this) {
+            AUTHORIZATION_CODE -> "Authorization Code"
+            CLIENT_CREDENTIALS -> "Client Credentials"
+            REFRESH_TOKEN -> "Refresh Token"
+        }
+
+    companion object {
+        // Unknown grants return null rather than defaulting: silently substituting a permission is a security bug.
+        fun fromValue(value: String): GrantType? = entries.firstOrNull { it.value == value }
+
+        fun defaultsFor(accessType: AccessType): Set<GrantType> =
+            when (accessType) {
+                AccessType.CONFIDENTIAL -> setOf(AUTHORIZATION_CODE, CLIENT_CREDENTIALS, REFRESH_TOKEN)
+                AccessType.PUBLIC -> setOf(AUTHORIZATION_CODE, REFRESH_TOKEN)
+                AccessType.BEARER_ONLY -> emptySet()
+            }
     }
 }
