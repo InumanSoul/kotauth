@@ -72,7 +72,7 @@ internal fun Route.apiApplicationRoutes(
                         description = body.description,
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
-                        // TODO(Task 11): accept grantTypes on CreateApplicationRequest and use plaintextSecret.
+                        // Grants default until the request model accepts them; the creation secret isn't surfaced yet.
                         grantTypes = GrantType.defaultsFor(AccessType.fromValue(body.accessType)),
                     )
             ) {

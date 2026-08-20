@@ -72,7 +72,7 @@ fun Route.adminApplicationRoutes(
                         description = desc,
                         accessType = accessType,
                         redirectUris = redirectUris,
-                        // TODO(Task 8): drive from an admin UI grant-type selector.
+                        // Grants default until the admin form exposes a selector.
                         grantTypes = GrantType.defaultsFor(AccessType.fromValue(accessType)),
                     )
             ) {
