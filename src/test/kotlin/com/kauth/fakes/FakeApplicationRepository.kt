@@ -3,6 +3,7 @@ package com.kauth.fakes
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApplicationRepository
 
@@ -65,6 +66,9 @@ class FakeApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
+        clientSecretHash: String?,
+        audience: String?,
     ): Application {
         val app =
             Application(
@@ -76,8 +80,11 @@ class FakeApplicationRepository : ApplicationRepository {
                 accessType = AccessType.fromValue(accessType),
                 enabled = true,
                 redirectUris = redirectUris,
+                grantTypes = grantTypes,
+                audience = audience,
             )
         store[app.id.value] = app
+        if (clientSecretHash != null) secretHashes[app.id.value] = clientSecretHash
         return app
     }
 
@@ -87,6 +94,7 @@ class FakeApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
         launcherUrl: String?,
         iconUrl: String?,
         launcherVisible: Boolean,
@@ -99,6 +107,7 @@ class FakeApplicationRepository : ApplicationRepository {
                 description = description,
                 accessType = AccessType.fromValue(accessType),
                 redirectUris = redirectUris,
+                grantTypes = grantTypes,
                 launcherUrl = launcherUrl,
                 iconUrl = iconUrl,
                 launcherVisible = launcherVisible,

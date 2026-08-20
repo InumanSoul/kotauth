@@ -2,6 +2,7 @@ package com.kauth.domain.port
 
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.TenantId
 
 /**
@@ -38,6 +39,9 @@ interface ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
+        clientSecretHash: String?,
+        audience: String?,
     ): Application
 
     /** Updates mutable fields. clientId is immutable. */
@@ -47,6 +51,7 @@ interface ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
         launcherUrl: String? = null,
         iconUrl: String? = null,
         launcherVisible: Boolean = true,
