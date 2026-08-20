@@ -3,6 +3,7 @@ package com.kauth.adapter.web.api
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.service.AdminResult
@@ -71,11 +72,13 @@ internal fun Route.apiApplicationRoutes(
                         description = body.description,
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
+                        // TODO(Task 11): accept grantTypes on CreateApplicationRequest and use plaintextSecret.
+                        grantTypes = GrantType.defaultsFor(AccessType.fromValue(body.accessType)),
                     )
             ) {
                 is AdminResult.Failure -> call.respondAdminError(result.error)
                 is AdminResult.Success -> {
-                    val app = result.value
+                    val app = result.value.application
                     val secret =
                         if (app.accessType == AccessType.CONFIDENTIAL) {
                             when (val rotate = applicationManagementService.regenerateClientSecret(app.id, tenantId)) {

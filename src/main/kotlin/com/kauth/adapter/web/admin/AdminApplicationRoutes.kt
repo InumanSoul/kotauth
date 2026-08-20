@@ -1,6 +1,8 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.port.ApplicationRepository
@@ -70,6 +72,8 @@ fun Route.adminApplicationRoutes(
                         description = desc,
                         accessType = accessType,
                         redirectUris = redirectUris,
+                        // TODO(Task 8): drive from an admin UI grant-type selector.
+                        grantTypes = GrantType.defaultsFor(AccessType.fromValue(accessType)),
                     )
             ) {
                 is AdminResult.Failure -> {
