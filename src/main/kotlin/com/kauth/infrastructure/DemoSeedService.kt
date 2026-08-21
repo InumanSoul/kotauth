@@ -54,6 +54,7 @@ class DemoSeedService(
 
     companion object {
         const val DEMO_PASSWORD = "Demo1234!"
+        const val DEMO_M2M_CLIENT_SECRET = "DemoM2M1234!"
     }
 
     fun seedIfEmpty() {
@@ -66,8 +67,9 @@ class DemoSeedService(
         val start = System.currentTimeMillis()
 
         val passwordHash = passwordHasher.hash(DEMO_PASSWORD)
+        val m2mSecretHash = passwordHasher.hash(DEMO_M2M_CLIENT_SECRET)
 
-        val acme = seedAcmeWorkspace(passwordHash)
+        val acme = seedAcmeWorkspace(passwordHash, m2mSecretHash)
         val startupLabs = seedStartupLabsWorkspace(passwordHash)
 
         seedAuditEntries(acme.tenantId, acme.userIds)
@@ -86,7 +88,10 @@ class DemoSeedService(
 
     // ── Acme Corp ────────────────────────────────────────────────────────
 
-    private fun seedAcmeWorkspace(passwordHash: String): SeedResult {
+    private fun seedAcmeWorkspace(
+        passwordHash: String,
+        m2mSecretHash: String,
+    ): SeedResult {
         val tenant = tenantRepository.create("acme", "Acme Corp")
         themeRepository.upsert(tenant.id, TenantTheme.DEFAULT)
         val updated =
@@ -148,9 +153,9 @@ class DemoSeedService(
                 name = "Acme Dashboard",
                 description = "Internal admin dashboard, backed by a service account for scheduled jobs",
                 accessType = "confidential",
-                redirectUris = listOf("$baseUrl/callback", "http://localhost:3000/callback"),
+                redirectUris = emptyList(),
                 grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
-                clientSecretHash = null,
+                clientSecretHash = m2mSecretHash,
                 audience = null,
             )
         applicationRepository.create(

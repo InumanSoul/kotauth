@@ -26,6 +26,10 @@ The defaults are unsafe for anything beyond local evaluation. See [`production.m
 | `/t/acme/login` | `sarah.chen` | `Demo1234!` |
 | `/t/startup-labs/login` | `jordan.lee` | `Demo1234!` |
 
+| M2M client (`client_credentials`) | Client ID | Client secret |
+|---|---|---|
+| Acme Dashboard | `acme-dashboard` | `DemoM2M1234!` |
+
 ## Customizing the defaults
 
 Every value in `docker-compose.yml` uses `${VAR:-default}` substitution. Override by dropping a `.env` file next to `docker-compose.yml` or exporting the var in your shell:
