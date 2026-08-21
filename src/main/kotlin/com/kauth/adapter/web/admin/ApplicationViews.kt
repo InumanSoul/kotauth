@@ -5,6 +5,7 @@ import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -68,6 +69,9 @@ internal fun applicationDetailPageImpl(
     defaultRoles: List<Role> = emptyList(),
     // Tenant-scoped + this app's client-scoped roles, minus those already set.
     availableDefaultRoles: List<Role> = emptyList(),
+    // Null when the resource-server feature is disabled — the card is omitted rather than
+    // linking to a route that doesn't exist.
+    authorizedApis: List<ResourceServer>? = null,
 ): HTML.() -> Unit =
     {
         val appPairs = allApps.map { it.clientId to it.name }
@@ -200,6 +204,31 @@ internal fun applicationDetailPageImpl(
                     application.redirectUris.forEach { uri ->
                         div("ov-card__row") {
                             span("ov-card__value ov-card__value--mono") { +uri }
+                        }
+                    }
+                }
+            }
+
+            // ── Authorized APIs ──────────────────────────────────────
+            if (authorizedApis != null) {
+                div("ov-card") {
+                    div("ov-card__section-label") {
+                        +EnglishStrings.AUTHORIZED_APIS_CARD_TITLE
+                        a(
+                            href =
+                                "/admin/workspaces/${workspace.slug}/applications/" +
+                                    "${application.clientId}/authorized-apis",
+                            classes = "btn btn--ghost btn--sm",
+                        ) { +EnglishStrings.AUTHORIZED_APIS_CARD_ACTION }
+                    }
+                    if (authorizedApis.isEmpty()) {
+                        p("edit-row__hint") {
+                            style = "padding:8px 16px 12px;"
+                            +EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY
+                        }
+                    } else {
+                        authorizedApis.forEach { rs ->
+                            ovRowMono(rs.name, rs.identifier)
                         }
                     }
                 }

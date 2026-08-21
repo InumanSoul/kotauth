@@ -137,6 +137,7 @@ object AdminView {
         newSecret: String? = null,
         defaultRoles: List<com.kauth.domain.model.Role> = emptyList(),
         availableDefaultRoles: List<com.kauth.domain.model.Role> = emptyList(),
+        authorizedApis: List<com.kauth.domain.model.ResourceServer>? = null,
     ): HTML.() -> Unit =
         applicationDetailPageImpl(
             workspace,
@@ -147,6 +148,7 @@ object AdminView {
             newSecret,
             defaultRoles,
             availableDefaultRoles,
+            authorizedApis,
         )
 
     fun editApplicationPage(

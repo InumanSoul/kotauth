@@ -135,6 +135,7 @@ fun Route.adminApplicationRoutes(
                             role.id !in defaultRoleIds &&
                                 (role.scope == RoleScope.TENANT || role.clientId == app.id)
                         }
+                val authorizedApis = resourceServerService?.listAuthorized(app.id)
 
                 call.respondHtml(
                     HttpStatusCode.OK,
@@ -147,6 +148,7 @@ fun Route.adminApplicationRoutes(
                         newSecret,
                         defaultRoles,
                         availableDefaultRoles,
+                        authorizedApis,
                     ),
                 )
             }

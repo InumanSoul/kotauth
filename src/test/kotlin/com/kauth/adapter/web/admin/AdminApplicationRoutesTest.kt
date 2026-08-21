@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
@@ -339,6 +340,80 @@ class AdminApplicationRoutesTest {
                 ),
                 stored?.grantTypes,
             )
+        }
+
+    // =========================================================================
+    // GET /applications/{clientId} — Authorized APIs card
+    // =========================================================================
+
+    @Test
+    fun `the application detail page links to the authorized APIs page`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val created =
+                appRepo.create(
+                    tenantId = tenantId,
+                    clientId = "erp-caller",
+                    name = "ERP Caller",
+                    description = null,
+                    accessType = "confidential",
+                    redirectUris = emptyList(),
+                    grantTypes = setOf(com.kauth.domain.model.GrantType.CLIENT_CREDENTIALS),
+                    clientSecretHash = hasher.hash("secret"),
+                    audience = null,
+                )
+
+            val body =
+                authed
+                    .get("/admin/workspaces/$tenantSlug/applications/${created.clientId}")
+                    .bodyAsText()
+
+            assertTrue(body.contains("/admin/workspaces/$tenantSlug/applications/${created.clientId}/authorized-apis"))
+            assertTrue(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_TITLE))
+            assertTrue(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY))
+        }
+
+    @Test
+    fun `the application detail page lists the APIs the application is authorized for`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val created =
+                appRepo.create(
+                    tenantId = tenantId,
+                    clientId = "erp-caller",
+                    name = "ERP Caller",
+                    description = null,
+                    accessType = "confidential",
+                    redirectUris = emptyList(),
+                    grantTypes = setOf(com.kauth.domain.model.GrantType.CLIENT_CREDENTIALS),
+                    clientSecretHash = hasher.hash("secret"),
+                    audience = null,
+                )
+            val resourceServer =
+                fakeResourceServerRepo.seed(
+                    com.kauth.domain.model.ResourceServer(
+                        tenantId = tenantId,
+                        identifier = "https://api.acme.example.com",
+                        name = "ERP API",
+                    ),
+                )
+            fakeResourceServerRepo.registerClient(created.id, tenantId)
+            fakeResourceServerRepo.setAuthorizedResources(created.id, listOf(resourceServer.id!!))
+
+            val body =
+                authed
+                    .get("/admin/workspaces/$tenantSlug/applications/${created.clientId}")
+                    .bodyAsText()
+
+            assertTrue(body.contains("ERP API"))
+            assertTrue(body.contains("https://api.acme.example.com"))
+            assertFalse(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY))
         }
 
     // =========================================================================
