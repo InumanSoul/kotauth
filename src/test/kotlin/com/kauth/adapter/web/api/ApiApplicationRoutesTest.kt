@@ -274,6 +274,41 @@ class ApiApplicationRoutesTest {
         }
 
     @Test
+    fun `POST applications omitting grantTypes defaults to authorization code and refresh token`() =
+        testApplication {
+            application { installTestApp() }
+
+            client.post("/t/acme/api/v1/applications") {
+                bearerAuth(rawApiKey)
+                contentType(ContentType.Application.Json)
+                setBody(createAppBody())
+            }
+
+            val app = appRepo.findByClientId(TenantId(1), "new-app")!!
+            assertEquals(setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN), app.grantTypes)
+        }
+
+    @Test
+    fun `POST applications with explicit grantTypes stores exactly the requested set`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/applications") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"clientId":"m2m-app","name":"M2M App","accessType":"confidential",""" +
+                            """"redirectUris":[],"grantTypes":["client_credentials"]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val app = appRepo.findByClientId(TenantId(1), "m2m-app")!!
+            assertEquals(setOf(GrantType.CLIENT_CREDENTIALS), app.grantTypes)
+        }
+
+    @Test
     fun `POST applications returns 422 when clientId has uppercase`() =
         testApplication {
             application { installTestApp() }

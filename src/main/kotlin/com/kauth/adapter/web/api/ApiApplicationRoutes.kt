@@ -1,6 +1,5 @@
 package com.kauth.adapter.web.api
 
-import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.GrantType
@@ -62,6 +61,11 @@ internal fun Route.apiApplicationRoutes(
             requireScope(call, ApiScope.APPLICATIONS_WRITE) ?: return@post
             val tenantId = call.attributes[TenantIdAttr]
             val body = call.receive<CreateApplicationRequest>()
+            val grantTypes =
+                body.grantTypes
+                    ?.mapNotNull { GrantType.fromValue(it) }
+                    ?.toSet()
+                    ?: setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN)
 
             when (
                 val result =
@@ -72,28 +76,17 @@ internal fun Route.apiApplicationRoutes(
                         description = body.description,
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
-                        // Grants default until the request model accepts them; the creation secret isn't surfaced yet.
-                        grantTypes = GrantType.defaultsFor(AccessType.fromValue(body.accessType)),
+                        grantTypes = grantTypes,
                     )
             ) {
                 is AdminResult.Failure -> call.respondAdminError(result.error)
                 is AdminResult.Success -> {
-                    val app = result.value.application
-                    val secret =
-                        if (app.accessType == AccessType.CONFIDENTIAL) {
-                            when (val rotate = applicationManagementService.regenerateClientSecret(app.id, tenantId)) {
-                                is AdminResult.Success -> rotate.value
-                                is AdminResult.Failure -> {
-                                    // Application was just created; regeneration failing here is a bug — fail loudly.
-                                    return@post call.respondAdminError(rotate.error)
-                                }
-                            }
-                        } else {
-                            null
-                        }
                     call.respond(
                         HttpStatusCode.Created,
-                        CreateApplicationResponse(application = app.toApiDto(), clientSecret = secret),
+                        CreateApplicationResponse(
+                            application = result.value.application.toApiDto(),
+                            clientSecret = result.value.plaintextSecret,
+                        ),
                     )
                 }
             }
