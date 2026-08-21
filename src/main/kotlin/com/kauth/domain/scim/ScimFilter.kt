@@ -1,18 +1,14 @@
 package com.kauth.domain.scim
 
-// RFC 7644 §3.4.2.2 filter grammar, narrowed to what this server supports:
-//   filter     := orExpr
-//   orExpr     := andExpr ("or" andExpr)*
-//   andExpr    := primary ("and" primary)*
-//   primary    := "(" orExpr ")" | attr "eq" literal
-//   literal    := string | "true" | "false" | integer
-// `and` binds tighter than `or` because andExpr sits below orExpr in the grammar above.
-// Anything outside this — co/sw/pr/gt/ne, unknown attributes, malformed syntax — is
-// rejected rather than approximated: a dropped filter would make an IdP reconciliation
-// pass believe the whole directory changed.
+// RFC 7644 §3.4.2.2 grammar supported here: filter := orExpr; orExpr := andExpr ("or" andExpr)*;
+// andExpr := primary ("and" primary)*; primary := "(" orExpr ")" | attr "eq" literal.
+// `and` binds tighter than `or`.
 
-private val SUPPORTED_ATTRIBUTES = setOf("userName", "externalId", "displayName", "id", "active", "value")
+private val SUPPORTED_ATTRIBUTES = setOf("userName", "externalId", "displayName", "id", "active", "value", "type")
 private val KEYWORDS = setOf("and", "or", "eq", "true", "false")
+
+// Bounds recursion depth against pathological nesting (e.g. thousands of "("); not a grammar rule.
+private const val MAX_NESTING_DEPTH = 32
 
 sealed interface ScimFilter {
     data class Eq(
@@ -155,6 +151,7 @@ private class FilterParser(
     private val tokens: List<Token>,
 ) {
     private var pos = 0
+    private var depth = 0
 
     fun parseToEnd(): ScimFilter {
         val result = parseOr()
@@ -185,13 +182,18 @@ private class FilterParser(
 
     private fun parsePrimary(): ScimFilter {
         if (peek() is Token.LParen) {
-            advance()
+            val open = advance()
+            depth++
+            if (depth > MAX_NESTING_DEPTH) {
+                fail("filter nesting exceeds maximum depth of $MAX_NESTING_DEPTH", open.position)
+            }
             val inner = parseOr()
             val close = peek()
             if (close !is Token.RParen) {
                 fail("expected ')'", close.position)
             }
             advance()
+            depth--
             return inner
         }
         return parseComparison()
