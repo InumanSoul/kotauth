@@ -1,6 +1,5 @@
 package com.kauth.adapter.web.admin
 
-import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RoleId
@@ -55,6 +54,13 @@ fun Route.adminApplicationRoutes(
                     ?.lines()
                     ?.map { it.trim() }
                     ?.filter { it.isNotBlank() } ?: emptyList()
+            val grantTypes =
+                params
+                    .getAll("grantTypes")
+                    .orEmpty()
+                    .mapNotNull { GrantType.fromValue(it) }
+                    .toSet()
+            val audience = params["audience"]
             val prefill =
                 ApplicationPrefill(
                     clientId = clientId,
@@ -62,6 +68,8 @@ fun Route.adminApplicationRoutes(
                     description = desc ?: "",
                     accessType = accessType,
                     redirectUris = params["redirectUris"] ?: "",
+                    grantTypes = grantTypes,
+                    audience = audience ?: "",
                 )
             when (
                 val result =
@@ -72,8 +80,8 @@ fun Route.adminApplicationRoutes(
                         description = desc,
                         accessType = accessType,
                         redirectUris = redirectUris,
-                        // Grants default until the admin form exposes a selector.
-                        grantTypes = GrantType.defaultsFor(AccessType.fromValue(accessType)),
+                        grantTypes = grantTypes,
+                        audience = audience,
                     )
             ) {
                 is AdminResult.Failure -> {
@@ -90,7 +98,11 @@ fun Route.adminApplicationRoutes(
                     )
                 }
                 is AdminResult.Success -> {
-                    call.respondRedirect("/admin/workspaces/$slug/applications/$clientId")
+                    val flashToken = result.value.plaintextSecret?.let { FlashStore.put(it) }
+                    val suffix = if (flashToken != null) "?flash=$flashToken" else ""
+                    call.respondRedirect(
+                        "/admin/workspaces/$slug/applications/${result.value.application.clientId}$suffix",
+                    )
                 }
             }
         }
@@ -173,6 +185,12 @@ fun Route.adminApplicationRoutes(
                         ?.lines()
                         ?.map { it.trim() }
                         ?.filter { it.isNotBlank() } ?: emptyList()
+                val grantTypes =
+                    params
+                        .getAll("grantTypes")
+                        .orEmpty()
+                        .mapNotNull { GrantType.fromValue(it) }
+                        .toSet()
                 val launcherUrl = params["launcherUrl"]?.trim().orEmpty()
                 val iconUrl = params["iconUrl"]?.trim().orEmpty()
                 val launcherVisible = params["launcherVisible"] == "true"
@@ -188,6 +206,7 @@ fun Route.adminApplicationRoutes(
                             description = desc,
                             accessType = accessType,
                             redirectUris = redirectUris,
+                            grantTypes = grantTypes,
                             launcherUrl = launcherUrl,
                             iconUrl = iconUrl,
                             launcherVisible = launcherVisible,

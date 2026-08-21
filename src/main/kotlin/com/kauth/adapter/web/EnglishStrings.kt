@@ -287,6 +287,29 @@ object EnglishStrings {
         "Tokens issued for this API will be narrowed to scopes in this list. " +
             "Leave empty to disable narrowing."
 
+    // Grant types
+    const val GRANT_TYPES_LABEL = "Grant Types"
+    const val GRANT_TYPES_HINT =
+        "Which OAuth2 grants this application may use. Only the selected grants will be accepted at the " +
+            "token endpoint."
+    const val GRANT_AUTHORIZATION_CODE_HINT = "Browser sign-in. Requires at least one redirect URI."
+    const val GRANT_CLIENT_CREDENTIALS_HINT =
+        "Machine-to-machine. No user and no redirect URI. Confidential applications only."
+    const val GRANT_REFRESH_TOKEN_HINT = "Allows exchanging a refresh token for a new access token."
+    const val AUTHORIZED_APIS_CARD_TITLE = "Authorized APIs"
+    const val AUTHORIZED_APIS_CARD_EMPTY =
+        "This application is not authorized for any API. Until it is, token requests targeting an API " +
+            "will be refused."
+    const val AUTHORIZED_APIS_CARD_ACTION = "Manage Authorized APIs"
+
+    // Application forms — token audience
+    const val APPLICATION_AUDIENCE_LABEL = "Token Audience"
+    const val APPLICATION_AUDIENCE_PLACEHOLDER = "https://api.example.com"
+    const val APPLICATION_AUDIENCE_HINT_PREFIX = "Sets the "
+    const val APPLICATION_AUDIENCE_HINT_CLAIM = "aud"
+    const val APPLICATION_AUDIENCE_HINT_SUFFIX =
+        " claim in issued JWTs. Leave blank to use the client ID as the audience."
+
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"
     const val BACKUP_PAGE_TITLE = "Backup workspace"

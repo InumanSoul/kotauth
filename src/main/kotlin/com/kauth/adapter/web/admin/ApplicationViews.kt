@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
@@ -16,7 +18,47 @@ data class ApplicationPrefill(
     val description: String = "",
     val accessType: String = "public",
     val redirectUris: String = "", // newline-separated URIs
+    val grantTypes: Set<GrantType> = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+    val audience: String = "",
 )
+
+private fun grantTypeHint(grant: GrantType): String =
+    when (grant) {
+        GrantType.AUTHORIZATION_CODE -> EnglishStrings.GRANT_AUTHORIZATION_CODE_HINT
+        GrantType.CLIENT_CREDENTIALS -> EnglishStrings.GRANT_CLIENT_CREDENTIALS_HINT
+        GrantType.REFRESH_TOKEN -> EnglishStrings.GRANT_REFRESH_TOKEN_HINT
+    }
+
+// Grant-type checkbox group shared by the create and edit forms. `client_credentials` is
+// disabled when the access type isn't confidential — the server rejects that combination anyway.
+private fun DIV.grantTypeCheckboxes(
+    formId: String,
+    selected: Set<GrantType>,
+    confidential: Boolean,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.GRANT_TYPES_LABEL }
+        div {
+            GrantType.entries.forEach { grant ->
+                label("check-row") {
+                    input(type = InputType.checkBox, name = "grantTypes") {
+                        attributes["form"] = formId
+                        attributes["value"] = grant.value
+                        if (grant in selected) checked = true
+                        if (grant == GrantType.CLIENT_CREDENTIALS && !confidential) {
+                            disabled = true
+                        }
+                    }
+                    div("check-row__body") {
+                        span("check-row__label") { +grant.label }
+                        span("check-row__desc") { +grantTypeHint(grant) }
+                    }
+                }
+            }
+            div("edit-row__hint") { +EnglishStrings.GRANT_TYPES_HINT }
+        }
+    }
+}
 
 internal fun applicationDetailPageImpl(
     workspace: Tenant,
@@ -392,7 +434,7 @@ internal fun createApplicationPageImpl(
                                 placeholder = "my-frontend"
                                 required = true
                                 value = prefill.clientId
-                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                                attributes["pattern"] = "[a-z0-9-]+"
                             }
                             div("edit-row__hint") {
                                 +"Unique identifier, e.g. my-frontend. Immutable after creation."
@@ -467,6 +509,28 @@ internal fun createApplicationPageImpl(
                         div("edit-row__hint") {
                             +"One URI per line. Their origins are automatically CORS-allowed "
                             +"for SPAs in this workspace."
+                        }
+                    }
+                }
+                grantTypeCheckboxes(
+                    formId = "create-app-form",
+                    selected = prefill.grantTypes,
+                    confidential = prefill.accessType == "confidential",
+                )
+                div("edit-row") {
+                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
+                    div {
+                        input(type = InputType.text, name = "audience") {
+                            attributes["form"] = "create-app-form"
+                            classes = setOf("edit-row__field", "edit-row__field--mono")
+                            this.id = "audience"
+                            placeholder = EnglishStrings.APPLICATION_AUDIENCE_PLACEHOLDER
+                            value = prefill.audience
+                        }
+                        div("edit-row__hint") {
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_PREFIX
+                            code { +EnglishStrings.APPLICATION_AUDIENCE_HINT_CLAIM }
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_SUFFIX
                         }
                     }
                 }
@@ -625,20 +689,25 @@ internal fun editApplicationPageImpl(
                         }
                     }
                 }
+                grantTypeCheckboxes(
+                    formId = "edit-app-form",
+                    selected = application.grantTypes,
+                    confidential = application.accessType == AccessType.CONFIDENTIAL,
+                )
                 div("edit-row") {
-                    span("edit-row__label") { +"Token Audience" }
+                    span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
                     div {
                         input(type = InputType.text, name = "audience") {
                             attributes["form"] = "edit-app-form"
                             classes = setOf("edit-row__field", "edit-row__field--mono")
                             this.id = "audience"
-                            placeholder = "https://api.example.com"
+                            placeholder = EnglishStrings.APPLICATION_AUDIENCE_PLACEHOLDER
                             value = application.audience ?: ""
                         }
                         div("edit-row__hint") {
-                            +"Sets the "
-                            code { +"aud" }
-                            +" claim in issued JWTs. Leave blank to use the client ID as the audience."
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_PREFIX
+                            code { +EnglishStrings.APPLICATION_AUDIENCE_HINT_CLAIM }
+                            +EnglishStrings.APPLICATION_AUDIENCE_HINT_SUFFIX
                         }
                     }
                 }
