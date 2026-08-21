@@ -1,7 +1,9 @@
 package com.kauth.adapter.web.api
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -201,7 +203,18 @@ class ApiApplicationRoutesTest {
     private fun seedApp(
         clientId: String = "existing-app",
         accessType: String = "public",
-    ): Application = appRepo.create(TenantId(1), clientId, "Existing App", null, accessType, listOf("https://x/cb"))
+    ): Application =
+        appRepo.create(
+            tenantId = TenantId(1),
+            clientId = clientId,
+            name = "Existing App",
+            description = null,
+            accessType = accessType,
+            redirectUris = listOf("https://x/cb"),
+            grantTypes = GrantType.defaultsFor(AccessType.fromValue(accessType)),
+            clientSecretHash = null,
+            audience = null,
+        )
 
     private fun apiKeyMissingScope(scopes: List<String>): String =
         (

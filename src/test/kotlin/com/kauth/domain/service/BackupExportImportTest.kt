@@ -2,10 +2,12 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.ApplicationBackup
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
@@ -569,6 +571,44 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `grant types survive an export and import round trip`() {
+        sourceApps.add(
+            Application(
+                id = ApplicationId(0),
+                tenantId = sourceTenants.findBySlug("acme")!!.id,
+                clientId = "m2m",
+                name = "M2M Service",
+                description = "Service-to-service client",
+                accessType = AccessType.CONFIDENTIAL,
+                enabled = true,
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+            ),
+        )
+
+        val exported = exportSuccessful(ExportOptions())
+        val client = exported.applications.first { it.clientId == "m2m" }
+        assertEquals(listOf("client_credentials"), client.grantTypes)
+
+        val r = importer().import(exported, newSlug = "acme-m2m", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+        val restored = destApps.findByClientId(newTenantId, "m2m")!!
+        assertEquals(setOf(GrantType.CLIENT_CREDENTIALS), restored.grantTypes)
+    }
+
+    @Test
+    fun `a backup written before the grant types field restores grants derived from the access type`() {
+        val legacy = backupWithClient(accessType = "confidential", grantTypes = null)
+
+        val r = importer().import(legacy, newSlug = "acme-legacy", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+        val restored = destApps.findByClientId(newTenantId, "legacy-client")!!
+        assertEquals(GrantType.defaultsFor(AccessType.CONFIDENTIAL), restored.grantTypes)
+    }
+
+    @Test
     fun `export returns TenantNotFound for unknown slug`() {
         val r = exporter().export("missing", ExportOptions(), kotauthVersion = "1.9.0", currentSchemaVersion = 38)
         if (r !is BackupResult.Failure || r.error !is BackupError.TenantNotFound) {
@@ -580,6 +620,35 @@ class BackupExportImportTest {
         val r = exporter().export("acme", options, kotauthVersion = "1.9.0", currentSchemaVersion = 38)
         return (r as BackupResult.Success).value
     }
+
+    /**
+     * Builds a minimal backup carrying a single application, stripped of every
+     * cross-referencing entity (roles, groups, users) so it imports standalone.
+     */
+    private fun backupWithClient(
+        accessType: String,
+        grantTypes: List<String>?,
+    ): BackupExportV1 =
+        exportSuccessful(ExportOptions()).copy(
+            applications =
+                listOf(
+                    ApplicationBackup(
+                        clientId = "legacy-client",
+                        name = "Legacy Client",
+                        description = null,
+                        accessType = accessType,
+                        enabled = true,
+                        redirectUris = emptyList(),
+                        tokenExpiryOverride = null,
+                        grantTypes = grantTypes,
+                    ),
+                ),
+            roles = emptyList(),
+            groups = emptyList(),
+            users = emptyList(),
+            claimMappers = emptyList(),
+            socialProviders = emptyList(),
+        )
 
     private fun backupJson() =
         kotlinx.serialization.json.Json {

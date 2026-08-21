@@ -6,6 +6,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -851,7 +852,17 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
             val app =
-                appRepo.create(TenantId(1), "spa", "SPA", null, "public", listOf("https://spa.test/cb"))
+                appRepo.create(
+                    tenantId = TenantId(1),
+                    clientId = "spa",
+                    name = "SPA",
+                    description = null,
+                    accessType = "public",
+                    redirectUris = listOf("https://spa.test/cb"),
+                    grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+                    clientSecretHash = null,
+                    audience = null,
+                )
 
             val response =
                 client.get("/t/acme/api/v1/applications/${app.id.value}/default-roles") {
@@ -867,7 +878,17 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
             val app =
-                appRepo.create(TenantId(1), "spa", "SPA", null, "public", listOf("https://spa.test/cb"))
+                appRepo.create(
+                    tenantId = TenantId(1),
+                    clientId = "spa",
+                    name = "SPA",
+                    description = null,
+                    accessType = "public",
+                    redirectUris = listOf("https://spa.test/cb"),
+                    grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+                    clientSecretHash = null,
+                    audience = null,
+                )
             val role =
                 (
                     roleGroupService.createRole(
@@ -900,9 +921,29 @@ class ApiRoutesTest {
         testApplication {
             application { installTestApp() }
             val appA =
-                appRepo.create(TenantId(1), "app-a", "App A", null, "public", listOf("https://a.test/cb"))
+                appRepo.create(
+                    tenantId = TenantId(1),
+                    clientId = "app-a",
+                    name = "App A",
+                    description = null,
+                    accessType = "public",
+                    redirectUris = listOf("https://a.test/cb"),
+                    grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+                    clientSecretHash = null,
+                    audience = null,
+                )
             val appB =
-                appRepo.create(TenantId(1), "app-b", "App B", null, "public", listOf("https://b.test/cb"))
+                appRepo.create(
+                    tenantId = TenantId(1),
+                    clientId = "app-b",
+                    name = "App B",
+                    description = null,
+                    accessType = "public",
+                    redirectUris = listOf("https://b.test/cb"),
+                    grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+                    clientSecretHash = null,
+                    audience = null,
+                )
             val foreignRole =
                 (
                     roleGroupService.createRole(

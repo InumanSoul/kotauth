@@ -579,6 +579,7 @@ class AdminServicesTest {
                 description = "Updated",
                 accessType = "public",
                 redirectUris = listOf("http://new/callback"),
+                grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
             )
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("Renamed App", result.value.name)

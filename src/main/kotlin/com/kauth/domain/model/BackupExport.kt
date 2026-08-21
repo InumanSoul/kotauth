@@ -156,6 +156,8 @@ data class ApplicationBackup(
     val enabled: Boolean,
     val redirectUris: List<String>,
     val tokenExpiryOverride: Int?,
+    /** Null in backups written before grant types existed; the importer derives them from accessType. */
+    val grantTypes: List<String>? = null,
 )
 
 @Serializable

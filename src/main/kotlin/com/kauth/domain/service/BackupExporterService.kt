@@ -174,6 +174,7 @@ class BackupExporterService(
                     enabled = app.enabled,
                     redirectUris = app.redirectUris,
                     tokenExpiryOverride = app.tokenExpiryOverride,
+                    grantTypes = app.grantTypes.map { it.value },
                 )
             }
 
