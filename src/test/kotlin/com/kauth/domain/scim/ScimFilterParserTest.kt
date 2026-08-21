@@ -61,4 +61,18 @@ class ScimFilterParserTest {
     fun `matches compares against a scim value`() {
         assertTrue(ok("""value eq "42"""").matches(ScimValue.Complex(mapOf("value" to ScimValue.Str("42")))))
     }
+
+    @Test
+    fun `nesting beyond the depth cap fails instead of overflowing the stack`() {
+        // 40 opens comfortably exceeds any cap in the 32 range; if the cap were removed or
+        // raised past 40 this would start throwing StackOverflowError instead of failing.
+        val raw = "(".repeat(40) + "active eq true" + ")".repeat(40)
+        assertEquals(ScimErrorType.invalidFilter, failure(raw).type)
+    }
+
+    @Test
+    fun `reasonable nesting still parses`() {
+        val raw = "(".repeat(20) + "active eq true" + ")".repeat(20)
+        assertEquals(ScimFilter.Eq("active", ScimValue.Bool(true)), ok(raw))
+    }
 }
