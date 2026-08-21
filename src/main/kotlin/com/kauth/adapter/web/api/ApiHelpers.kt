@@ -296,6 +296,8 @@ data class ProblemDetail(
     val description: String? = null,
     val accessType: String? = null,
     val redirectUris: List<String>? = null,
+    /** Omit to leave grants unchanged. Pass an explicit list — including `[]` — to replace them. */
+    val grantTypes: List<String>? = null,
     val audience: String? = null,
 )
 
@@ -405,6 +407,7 @@ data class ProblemDetail(
     val accessType: String,
     val enabled: Boolean,
     val redirectUris: List<String>,
+    val grantTypes: List<String>,
     val audience: String? = null,
 )
 
@@ -628,6 +631,7 @@ internal fun com.kauth.domain.model.Application.toApiDto() =
         accessType = accessType.name.lowercase(),
         enabled = enabled,
         redirectUris = redirectUris,
+        grantTypes = grantTypes.map { it.value },
         audience = audience,
     )
 

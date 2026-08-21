@@ -101,6 +101,12 @@ internal fun Route.apiApplicationRoutes(
                 call.parameters["appId"]?.toIntOrNull()?.let { ApplicationId(it) }
                     ?: return@put call.respondProblem(HttpStatusCode.BadRequest, "Invalid application ID", "")
             val body = call.receive<UpdateApplicationRequest>()
+            val grantTypes =
+                if (body.grantTypes != null) {
+                    call.parseGrantTypesOrRespondInvalid(body.grantTypes) ?: return@put
+                } else {
+                    null
+                }
             when (
                 val result =
                     applicationManagementService.updateApplication(
@@ -110,6 +116,7 @@ internal fun Route.apiApplicationRoutes(
                         description = body.description,
                         accessType = body.accessType,
                         redirectUris = body.redirectUris,
+                        grantTypes = grantTypes,
                         audience = body.audience,
                     )
             ) {

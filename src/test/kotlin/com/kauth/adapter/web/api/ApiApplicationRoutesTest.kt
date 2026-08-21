@@ -44,6 +44,7 @@ import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
@@ -60,6 +61,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
@@ -408,6 +410,100 @@ class ApiApplicationRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
+        }
+
+    // =========================================================================
+    // PUT /applications/{id}
+    // =========================================================================
+
+    @Test
+    fun `PUT applications omitting grantTypes leaves the existing grants unchanged`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "unchanged-app", accessType = "confidential")
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"name":"Renamed"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(app.grantTypes, appRepo.findById(app.id)!!.grantTypes)
+        }
+
+    @Test
+    fun `PUT applications with explicit grantTypes replaces the stored set`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "narrowed-app", accessType = "confidential")
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"grantTypes":["client_credentials"]}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(setOf(GrantType.CLIENT_CREDENTIALS), appRepo.findById(app.id)!!.grantTypes)
+        }
+
+    @Test
+    fun `PUT applications can demote a confidential app to public once client_credentials is dropped`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "demoted-app", accessType = "confidential")
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"accessType":"public","redirectUris":["https://x/cb"],""" +
+                            """"grantTypes":["authorization_code","refresh_token"]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val updated = appRepo.findById(app.id)!!
+            assertEquals(AccessType.PUBLIC, updated.accessType)
+            assertEquals(setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN), updated.grantTypes)
+        }
+
+    @Test
+    fun `PUT applications returns 422 and leaves grants unchanged when grantTypes contains an unknown value`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "typo-update-app", accessType = "confidential")
+
+            val response =
+                client.put("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"grantTypes":["typo"]}""")
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals(app.grantTypes, appRepo.findById(app.id)!!.grantTypes)
+        }
+
+    @Test
+    fun `GET application includes grantTypes`() =
+        testApplication {
+            application { installTestApp() }
+            val app = seedApp(clientId = "readable-app", accessType = "confidential")
+
+            val response =
+                client.get("/t/acme/api/v1/applications/${app.id.value}") {
+                    bearerAuth(rawApiKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val grantTypes = body["grantTypes"]!!.jsonArray.map { it.jsonPrimitive.content }.toSet()
+            assertEquals(setOf("authorization_code", "client_credentials", "refresh_token"), grantTypes)
         }
 
     // =========================================================================
