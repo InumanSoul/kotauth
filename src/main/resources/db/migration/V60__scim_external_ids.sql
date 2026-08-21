@@ -14,8 +14,8 @@ ALTER TABLE groups
 -- The correlation key must be unique per tenant: a duplicate means two local
 -- accounts silently claiming the same identity-provider identity. Partial,
 -- because only provisioned rows carry one and NULLs must stay unconstrained.
-CREATE UNIQUE INDEX idx_users_external_id
+CREATE UNIQUE INDEX users_external_id_per_tenant
     ON users(tenant_id, external_id) WHERE external_id IS NOT NULL;
 
-CREATE UNIQUE INDEX idx_groups_external_id
+CREATE UNIQUE INDEX groups_external_id_per_tenant
     ON groups(tenant_id, external_id) WHERE external_id IS NOT NULL;
