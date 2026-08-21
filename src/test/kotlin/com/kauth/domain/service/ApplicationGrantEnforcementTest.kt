@@ -20,6 +20,7 @@ import com.kauth.fakes.FakeTenantRepository
 import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import java.security.MessageDigest
+import java.time.Instant
 import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -169,15 +170,32 @@ class ApplicationGrantEnforcementTest {
     }
 
     @Test
-    fun `a bearer only client backfilled with no grants is refused every grant`() {
-        apps.add(bearerOnlyApp(clientId = "api-only", grants = emptySet()), secretHash = hasher.hash("secret"))
+    fun `a bearer only client backfilled with no grants is refused client_credentials and authorization_code`() {
+        // refresh_token is not covered here: a bearer-only client can never establish a session in the
+        // first place (both flows below are refused), so there is no reachable state to exercise its guard.
+        val app =
+            apps.add(bearerOnlyApp(clientId = "api-only", grants = emptySet()), secretHash = hasher.hash("secret"))
 
-        val result = svc.clientCredentials("acme", "api-only", "secret", "read")
-
-        assertIs<OAuthResult.Failure>(result)
+        val credentialsResult = svc.clientCredentials("acme", "api-only", "secret", "read")
+        assertIs<OAuthResult.Failure>(credentialsResult)
         // BEARER_ONLY is refused earlier by the access-type check, not the grant check —
         // either way it must never mint a client_credentials token.
-        assertIs<OAuthError.InvalidClient>(result.error)
+        assertIs<OAuthError.InvalidClient>(credentialsResult.error)
+
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = app.clientId,
+                redirectUri = "https://api-only.example.com/callback",
+                scopes = "openid",
+                codeChallenge = null,
+                codeChallengeMethod = null,
+                nonce = null,
+                state = null,
+            )
+        assertIs<OAuthResult.Failure>(issueResult)
+        assertIs<OAuthError.UnauthorizedClient>(issueResult.error)
     }
 
     // =========================================================================
@@ -224,6 +242,52 @@ class ApplicationGrantEnforcementTest {
             )
 
         assertIs<OAuthResult.Success<AuthorizationCode>>(result)
+    }
+
+    // =========================================================================
+    // exchangeAuthorizationCode — guards every code producer, not just
+    // issueAuthorizationCode (e.g. EmailOtpService writes codes directly to
+    // the repository, bypassing issueAuthorizationCode's grant check).
+    // =========================================================================
+
+    @Test
+    fun `exchange refuses a directly-saved code when the client lacks authorization_code`() {
+        val app = apps.add(publicApp(clientId = "no-auth-code-exchange", grants = setOf(GrantType.REFRESH_TOKEN)))
+        val code = saveCodeDirectly(app)
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = app.clientId,
+                redirectUri = app.redirectUris.first(),
+                codeVerifier = null,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.UnauthorizedClient>(result.error)
+    }
+
+    @Test
+    fun `exchange is refused when the code was issued to a different client`() {
+        val issuedTo = apps.add(publicApp(clientId = "issued-to", grants = setOf(GrantType.AUTHORIZATION_CODE)))
+        val redeemedBy =
+            apps.add(publicApp(clientId = "redeemed-by", grants = setOf(GrantType.AUTHORIZATION_CODE)))
+        val code = saveCodeDirectly(issuedTo)
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = redeemedBy.clientId,
+                redirectUri = redeemedBy.redirectUris.first(),
+                codeVerifier = null,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidGrant>(result.error)
     }
 
     // =========================================================================
@@ -300,6 +364,27 @@ class ApplicationGrantEnforcementTest {
                 clientSecret = null,
             )
         return (exchangeResult as OAuthResult.Success<TokenResponse>).value.refresh_token!!
+    }
+
+    /**
+     * Mirrors EmailOtpService.issueAuthorizationCodeFor: writes a code straight to the
+     * repository for the given client, bypassing OAuthService.issueAuthorizationCode
+     * (and its grant check) entirely — exactly what the back-channel email-OTP flow does.
+     */
+    private fun saveCodeDirectly(client: Application): String {
+        val code = "direct-code-${client.clientId}"
+        authCodes.save(
+            AuthorizationCode(
+                code = code,
+                tenantId = TenantId(1),
+                clientId = client.id,
+                userId = UserId(10),
+                redirectUri = client.redirectUris.first(),
+                scopes = "openid",
+                expiresAt = Instant.now().plusSeconds(300),
+            ),
+        )
+        return code
     }
 
     private fun sha256Base64Url(input: String): String {

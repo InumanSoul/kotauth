@@ -244,9 +244,20 @@ class OAuthService(
             }
         }
 
+        if (GrantType.AUTHORIZATION_CODE !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the authorization_code grant"),
+            )
+        }
+
         val authCode =
             authCodeRepository.findByCode(code)
                 ?: return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code not found"))
+
+        // RFC 6749 §4.1.3: verify the code was issued to the client redeeming it
+        if (authCode.clientId != client.id) {
+            return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code was not issued to this client"))
+        }
 
         // Single-use enforcement
         if (!authCode.isValid) {

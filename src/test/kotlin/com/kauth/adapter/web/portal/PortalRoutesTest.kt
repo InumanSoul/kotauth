@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -381,6 +382,7 @@ class PortalRoutesTest {
                     accessType = com.kauth.domain.model.AccessType.PUBLIC,
                     enabled = true,
                     redirectUris = listOf("http://localhost/t/acme/account/callback"),
+                    grantTypes = GrantType.defaultsFor(com.kauth.domain.model.AccessType.PUBLIC),
                 ),
             )
 
@@ -504,6 +506,7 @@ class PortalRoutesTest {
                     accessType = com.kauth.domain.model.AccessType.PUBLIC,
                     enabled = true,
                     redirectUris = listOf("http://localhost/t/acme/account/callback"),
+                    grantTypes = GrantType.defaultsFor(com.kauth.domain.model.AccessType.PUBLIC),
                 ),
             )
 
@@ -591,6 +594,7 @@ class PortalRoutesTest {
                     accessType = com.kauth.domain.model.AccessType.PUBLIC,
                     enabled = true,
                     redirectUris = listOf("http://localhost/t/acme/account/callback"),
+                    grantTypes = GrantType.defaultsFor(com.kauth.domain.model.AccessType.PUBLIC),
                 ),
             )
 
