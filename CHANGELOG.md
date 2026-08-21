@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.22.0] - 2026-08-21
 
 Machine-to-machine (M2M) onboarding release. Applications now declare an
 explicit set of OAuth2 grant types, and the token endpoint refuses any grant
