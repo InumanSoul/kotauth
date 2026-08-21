@@ -336,6 +336,7 @@ class BackupImporterService(
                         description = gb.description,
                         parentGroupId = parentPk,
                         attributes = gb.attributes,
+                        externalId = gb.externalId,
                     ),
                 )
             val savedId = saved.id ?: error("GroupRepository.save returned a group with null id for '${gb.name}'")
@@ -365,6 +366,9 @@ class BackupImporterService(
                         lastPasswordChangeAt = ub.lastPasswordChangeAt?.let(Instant::ofEpochSecond),
                         mfaEnabled = false,
                         createdAt = ub.createdAt?.let(Instant::ofEpochSecond),
+                        externalId = ub.externalId,
+                        givenName = ub.givenName,
+                        familyName = ub.familyName,
                     ),
                 )
             val savedId = saved.id ?: error("UserRepository.save returned a user with null id for '${ub.username}'")

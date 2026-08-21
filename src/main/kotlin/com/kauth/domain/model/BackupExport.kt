@@ -200,6 +200,10 @@ data class UserBackup(
     val roleNames: List<String>,
     /** Group names by qualified path: `parent/child` for nested groups. */
     val groupPaths: List<String>,
+    // Null for backups taken before SCIM provisioning fields existed.
+    val externalId: String? = null,
+    val givenName: String? = null,
+    val familyName: String? = null,
 )
 
 @Serializable
@@ -224,6 +228,8 @@ data class GroupBackup(
     val parentGroupPath: String?,
     val attributes: Map<String, String>,
     val roleNames: List<String>,
+    // Null for backups taken before SCIM provisioning fields existed.
+    val externalId: String? = null,
 )
 
 @Serializable
