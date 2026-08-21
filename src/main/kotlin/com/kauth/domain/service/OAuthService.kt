@@ -6,6 +6,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -148,6 +149,12 @@ class OAuthService(
 
         if (!client.enabled) {
             return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
+        }
+
+        if (GrantType.AUTHORIZATION_CODE !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the authorization_code grant"),
+            )
         }
 
         // Validate redirect URI — exact match required (RFC 6749 §3.1.2.3)
@@ -397,6 +404,12 @@ class OAuthService(
             )
         }
 
+        if (GrantType.CLIENT_CREDENTIALS !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the client_credentials grant"),
+            )
+        }
+
         if (!client.enabled) {
             return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
         }
@@ -626,6 +639,12 @@ class OAuthService(
             if (storedHash == null || !passwordHasher.verify(clientSecret, storedHash)) {
                 return OAuthResult.Failure(OAuthError.InvalidClient("Invalid client_secret"))
             }
+        }
+
+        if (client != null && GrantType.REFRESH_TOKEN !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the refresh_token grant"),
+            )
         }
 
         // RFC 8707 §3: validate requested resources are a subset of the session's bound resources
@@ -997,6 +1016,10 @@ sealed class OAuthError {
     object PkceRequired : OAuthError()
 
     data class InvalidClient(
+        val reason: String,
+    ) : OAuthError()
+
+    data class UnauthorizedClient(
         val reason: String,
     ) : OAuthError()
 

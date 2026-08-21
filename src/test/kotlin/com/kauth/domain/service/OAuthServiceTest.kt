@@ -6,6 +6,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -96,6 +97,7 @@ class OAuthServiceTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     /** Confidential client — secret required, PKCE optional. */
@@ -109,6 +111,7 @@ class OAuthServiceTest {
             accessType = AccessType.CONFIDENTIAL,
             enabled = true,
             redirectUris = listOf("https://backend.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
         )
 
     // Stable PKCE pair used across multiple tests
@@ -684,6 +687,7 @@ class OAuthServiceTest {
                 accessType = AccessType.CONFIDENTIAL,
                 enabled = true,
                 redirectUris = emptyList(),
+                grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
                 audience = "https://api.example.com",
             )
         apps.add(clientWithAudience, secretHash = hasher.hash("m2m-secret"))

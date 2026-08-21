@@ -3,6 +3,7 @@ package com.kauth.adapter.web.auth
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -94,6 +95,7 @@ class SilentAuthTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     @BeforeTest

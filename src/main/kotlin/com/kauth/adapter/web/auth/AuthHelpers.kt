@@ -313,6 +313,7 @@ internal fun OAuthError.toErrorCode(): String =
     when (this) {
         is OAuthError.TenantNotFound -> "invalid_request"
         is OAuthError.InvalidClient -> "invalid_client"
+        is OAuthError.UnauthorizedClient -> "unauthorized_client"
         is OAuthError.InvalidGrant -> "invalid_grant"
         is OAuthError.InvalidRequest -> "invalid_request"
         is OAuthError.InvalidRedirectUri -> "invalid_request"
@@ -326,6 +327,7 @@ internal fun OAuthError.toDescription(): String =
     when (this) {
         is OAuthError.TenantNotFound -> "Tenant not found"
         is OAuthError.InvalidClient -> this.reason
+        is OAuthError.UnauthorizedClient -> this.reason
         is OAuthError.InvalidGrant -> this.reason
         is OAuthError.InvalidRequest -> this.reason
         is OAuthError.InvalidRedirectUri -> "Invalid redirect_uri: ${this.uri}"

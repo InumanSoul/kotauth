@@ -355,6 +355,9 @@ class PasskeyAuthRoutesTest {
                     accessType = com.kauth.domain.model.AccessType.CONFIDENTIAL,
                     enabled = true,
                     redirectUris = listOf("https://app.example.com/callback"),
+                    grantTypes =
+                        com.kauth.domain.model.GrantType
+                            .defaultsFor(com.kauth.domain.model.AccessType.CONFIDENTIAL),
                 )
             apps.add(app)
             application(appBlock())

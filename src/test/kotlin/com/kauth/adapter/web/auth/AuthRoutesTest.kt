@@ -5,6 +5,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -124,6 +125,7 @@ class AuthRoutesTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     private val confidentialApp =
@@ -136,6 +138,7 @@ class AuthRoutesTest {
             accessType = AccessType.CONFIDENTIAL,
             enabled = true,
             redirectUris = listOf("https://backend.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
         )
 
     private val pkceVerifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
