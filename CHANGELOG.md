@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+Machine-to-machine (M2M) onboarding release. Applications now declare an
+explicit set of OAuth2 grant types, and the token endpoint refuses any grant
+a client isn't registered for. Confidential applications receive their
+client secret at creation instead of requiring a separate "Regenerate"
+step, and a machine-to-machine client no longer needs a redirect URI it
+will never use.
+
+> **BREAKING CHANGE**
+>
+> Migration `V59` backfills every existing client with the grants it
+> already effectively had — confidential clients get all three grants,
+> public clients get `authorization_code` + `refresh_token` — so neither
+> changes behavior. **Bearer-only clients are backfilled with no grants
+> and will be refused (`unauthorized_client`) at the token endpoint after
+> upgrade.** This is deliberate: a bearer-only client validates tokens and
+> initiates no flows, which is what the access type means. If a
+> bearer-only client was in fact driving a flow, change its access type to
+> confidential or public and select the grants it actually uses.
+
+### Added
+
+- **Explicit grant types on applications.** Each application now carries an
+  explicit set of OAuth2 grant types (`authorization_code`,
+  `client_credentials`, `refresh_token`), selectable on the admin
+  create/edit forms and via the REST API. `POST /api/v1/applications`
+  accepts an optional `grantTypes` array, defaulting to
+  `authorization_code` + `refresh_token` when omitted so existing API
+  consumers are unaffected.
+- **Client secret issued at creation.** A confidential application now
+  receives its client secret the moment it's created — shown once in a
+  copy-now banner in the admin UI, and returned once as `clientSecret` in
+  the `POST /api/v1/applications` response. Previously a new confidential
+  client had no secret at all, and the operator's first action had to be
+  "Regenerate" — an action whose name implies it replaces something that
+  never existed.
+- **Redirect URI is conditional, not mandatory.** A redirect URI is now
+  required only when the application uses the `authorization_code` grant.
+  A machine-to-machine (`client_credentials`-only) application can be
+  registered with none — previously operators had to invent a fake one.
+- **Token audience settable at creation.** The application create form now
+  exposes the token `aud` override, previously only editable afterward via
+  Edit.
+- **Authorized APIs reachable from the application page.** The application
+  detail page now links directly to its Authorized APIs screen. The page
+  already existed and worked, but nothing linked to it — operators had to
+  type the URL, and skipping that step makes every token request targeting
+  an API fail with nothing pointing at the cause.
+- **APIs moved beside Applications.** The APIs screen moves from Settings
+  to sit next to Applications in the sidebar, and its subtitle now reads
+  "APIs (resource servers)" so the UI's term and the codebase's RFC 8707
+  term are greppable against each other. Routes are unchanged, so existing
+  bookmarks and links still work.
+
+### Changed
+
+- **The token endpoint now refuses any grant a client isn't registered
+  for**, returning `unauthorized_client`. Previously `client_credentials`
+  was gated only on the client being confidential — any confidential web
+  app could mint machine-to-machine tokens regardless of intent.
+- Backups now carry each application's grant types. Backups written before
+  this change restore with grants derived from the client's access type
+  (the same rule the `V59` migration backfill uses).
+- The Client ID field's browser-side validation pattern is narrowed to
+  match the server's rule — the form previously accepted input the server
+  then rejected.
+
+### Fixed
+
+- The `authorization_code` grant now verifies the code was issued to the
+  client redeeming it (RFC 6749 §4.1.3), rejecting the exchange with
+  `invalid_grant` when it wasn't.
+
+### Migrations
+
+- `V59__client_grant_types.sql` — adds the `client_grant_types` table and
+  backfills existing clients: confidential clients get all three grants,
+  public clients get `authorization_code` + `refresh_token`, bearer-only
+  clients get none (see the breaking change above).
+
+---
+
 ## [1.21.0] - 2026-07-17
 
 API-first release. 25 new REST endpoints across users, applications, sessions,

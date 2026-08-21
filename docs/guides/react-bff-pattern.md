@@ -59,7 +59,7 @@ In the Kotauth admin console:
    http://localhost:5173/
    https://app.yourdomain.com/
    ```
-5. Copy the **Client ID** and **Client Secret** — the BFF needs both
+5. Copy the **Client ID** and **Client Secret** shown on the confirmation banner — the BFF needs both, and the secret is shown only once. If you lose it, use **Regenerate Secret** on the application page to issue a new one.
 
 ## 2. The SPA side
 
