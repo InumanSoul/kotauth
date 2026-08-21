@@ -394,11 +394,18 @@ Each application manages:
 
 ```
 OAuth settings
+grant types
 login URLs
 redirect domains
 scopes
 token policies
 ```
+
+Grant types are explicit per application — the token endpoint refuses any
+grant a client isn't registered for. A redirect URI is only required for
+applications using the authorization code grant; a machine-to-machine
+(`client_credentials`-only) application needs none. Confidential
+applications receive their client secret once, at creation.
 
 ## Identity
 

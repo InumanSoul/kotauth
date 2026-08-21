@@ -6,7 +6,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 .DEFAULT_GOAL := help
-.PHONY: help css css-admin css-auth js lint lint-fix detekt detekt-baseline test test-redis e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up update-locks
+.PHONY: help css css-admin css-auth js lint lint-fix detekt detekt-baseline test test-redis test-postgres e2e build jar version up up-fresh down nuke logs health generate-key reset-mfa generate-api-key run infra-up update-locks
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,12 @@ test-redis: ## Run Redis-backed integration tests (Testcontainers, Docker requir
 	  DOCKER_API_VERSION=1.43 \
 	  TESTCONTAINERS_RYUK_DISABLED=true \
 	  ./gradlew redisTest
+
+test-postgres: ## Run Postgres-backed integration tests (Testcontainers, Docker required)
+	@DOCKER_HOST=$$(docker context inspect --format '{{.Endpoints.docker.Host}}') \
+	  DOCKER_API_VERSION=1.43 \
+	  TESTCONTAINERS_RYUK_DISABLED=true \
+	  ./gradlew postgresTest
 
 e2e: ## Run E2E browser smoke tests (Playwright, headless)
 	./gradlew e2eTest

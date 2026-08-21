@@ -244,7 +244,7 @@ internal fun HTML.adminShell(
                 if (workspaceSlug != null && showSidebar) {
                     div("sidebar") {
                         when (activeRail) {
-                            "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug)
+                            "apps" -> renderAppsCtxPanel(workspaceSlug, apps, activeAppSlug, activeAppSection)
                             "directory" -> renderDirectoryCtxPanel(workspaceSlug, activeAppSection)
                             "security" -> renderSecurityCtxPanel(workspaceSlug, activeAppSection)
                             "logs" -> renderLogsCtxPanel(workspaceSlug, activeAppSection)
@@ -355,6 +355,7 @@ internal fun DIV.renderAppsCtxPanel(
     workspaceSlug: String?,
     apps: List<Pair<String, String>>,
     activeAppSlug: String?,
+    activeAppSection: String = "",
 ) {
     span("sidebar__heading") { +"Applications" }
     if (apps.isEmpty()) {
@@ -376,6 +377,14 @@ internal fun DIV.renderAppsCtxPanel(
             }
         }
     }
+    div("sidebar__divider") {}
+    val apisHref =
+        if (workspaceSlug != null) {
+            "/admin/workspaces/$workspaceSlug/settings/apis"
+        } else {
+            "/admin/settings/apis"
+        }
+    ctxLink(apisHref, "apis", activeAppSection, com.kauth.adapter.web.EnglishStrings.API_NAV_LABEL)
 }
 
 internal fun DIV.renderDirectoryCtxPanel(
@@ -430,7 +439,6 @@ internal fun DIV.renderSettingsCtxPanel(
     ctxLink("$base/identity-providers", "identity-providers", activeSection, "Identity Providers")
     div("sidebar__divider") {}
     ctxLink("$base/api-keys", "api-keys", activeSection, "API Keys")
-    ctxLink("$base/apis", "apis", activeSection, "APIs")
     ctxLink("$base/webhooks", "webhooks", activeSection, "Webhooks")
     ctxLink("$base/claim-mappers", "claim-mappers", activeSection, "Claim Mappers")
     div("sidebar__divider") {}

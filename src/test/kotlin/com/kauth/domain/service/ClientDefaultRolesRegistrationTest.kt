@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SocialProvider
@@ -101,6 +102,9 @@ class ClientDefaultRolesRegistrationTest {
                 description = null,
                 accessType = AccessType.PUBLIC.value,
                 redirectUris = listOf("https://onboarding.acme.test/cb"),
+                grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+                clientSecretHash = null,
+                audience = null,
             )
         applicantRole =
             roles.add(Role(tenantId = tenant.id, name = "onboarding.applicant", scope = RoleScope.TENANT))

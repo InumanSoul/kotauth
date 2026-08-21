@@ -1,7 +1,9 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.RoleScope
@@ -52,6 +54,7 @@ class DemoSeedService(
 
     companion object {
         const val DEMO_PASSWORD = "Demo1234!"
+        const val DEMO_M2M_CLIENT_SECRET = "DemoM2M1234!"
     }
 
     fun seedIfEmpty() {
@@ -64,8 +67,9 @@ class DemoSeedService(
         val start = System.currentTimeMillis()
 
         val passwordHash = passwordHasher.hash(DEMO_PASSWORD)
+        val m2mSecretHash = passwordHasher.hash(DEMO_M2M_CLIENT_SECRET)
 
-        val acme = seedAcmeWorkspace(passwordHash)
+        val acme = seedAcmeWorkspace(passwordHash, m2mSecretHash)
         val startupLabs = seedStartupLabsWorkspace(passwordHash)
 
         seedAuditEntries(acme.tenantId, acme.userIds)
@@ -84,7 +88,10 @@ class DemoSeedService(
 
     // ── Acme Corp ────────────────────────────────────────────────────────
 
-    private fun seedAcmeWorkspace(passwordHash: String): SeedResult {
+    private fun seedAcmeWorkspace(
+        passwordHash: String,
+        m2mSecretHash: String,
+    ): SeedResult {
         val tenant = tenantRepository.create("acme", "Acme Corp")
         themeRepository.upsert(tenant.id, TenantTheme.DEFAULT)
         val updated =
@@ -144,9 +151,12 @@ class DemoSeedService(
                 tenantId = updated.id,
                 clientId = "acme-dashboard",
                 name = "Acme Dashboard",
-                description = "Internal admin dashboard",
+                description = "Internal admin dashboard, backed by a service account for scheduled jobs",
                 accessType = "confidential",
-                redirectUris = listOf("$baseUrl/callback", "http://localhost:3000/callback"),
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                clientSecretHash = m2mSecretHash,
+                audience = null,
             )
         applicationRepository.create(
             tenantId = updated.id,
@@ -155,6 +165,9 @@ class DemoSeedService(
             description = "iOS and Android mobile application",
             accessType = "public",
             redirectUris = listOf("com.acme.mobile://callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.fromValue("public")),
+            clientSecretHash = null,
+            audience = null,
         )
 
         // Client-scoped role (requires app to exist first)
@@ -282,6 +295,9 @@ class DemoSeedService(
             description = "Main web application",
             accessType = "confidential",
             redirectUris = listOf("$baseUrl/callback", "http://localhost:5173/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.fromValue("confidential")),
+            clientSecretHash = null,
+            audience = null,
         )
 
         // Users

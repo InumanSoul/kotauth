@@ -17,7 +17,7 @@ internal fun resourceServersListPageImpl(
         val slug = workspace.slug
         adminShell(
             pageTitle = "${EnglishStrings.API_PAGE_TITLE} — ${workspace.displayName}",
-            activeRail = "settings",
+            activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
@@ -31,7 +31,6 @@ internal fun resourceServersListPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    "Settings" to "/admin/workspaces/$slug/settings",
                     EnglishStrings.API_NAV_LABEL to null,
                 )
 
@@ -268,7 +267,7 @@ internal fun resourceServerFormPageImpl(
 
         adminShell(
             pageTitle = "$title — ${workspace.displayName}",
-            activeRail = "settings",
+            activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
             workspaceSlug = slug,
@@ -281,7 +280,6 @@ internal fun resourceServerFormPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    "Settings" to "/admin/workspaces/$slug/settings",
                     EnglishStrings.API_NAV_LABEL to "/admin/workspaces/$slug/settings/apis",
                     title to null,
                 )

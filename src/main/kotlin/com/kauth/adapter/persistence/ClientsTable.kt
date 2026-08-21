@@ -50,3 +50,10 @@ object ClientRedirectUrisTable : Table("client_redirect_uris") {
 
     override val primaryKey = PrimaryKey(id)
 }
+
+object ClientGrantTypesTable : Table("client_grant_types") {
+    val clientId = integer("client_id") references ClientsTable.id
+    val grantType = varchar("grant_type", 40)
+
+    override val primaryKey = PrimaryKey(clientId, grantType)
+}

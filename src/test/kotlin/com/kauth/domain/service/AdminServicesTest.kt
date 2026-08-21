@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -128,6 +129,7 @@ class AdminServicesTest {
             accessType = AccessType.CONFIDENTIAL,
             enabled = true,
             redirectUris = listOf("http://localhost/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
         )
 
     @BeforeTest
@@ -577,6 +579,7 @@ class AdminServicesTest {
                 description = "Updated",
                 accessType = "public",
                 redirectUris = listOf("http://new/callback"),
+                grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
             )
         assertIs<AdminResult.Success<Application>>(result)
         assertEquals("Renamed App", result.value.name)
@@ -647,6 +650,19 @@ class AdminServicesTest {
                 appId = ApplicationId(100),
                 tenantId = TenantId(1),
                 launcherUrl = "javascript:alert(1)",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateApplication - rejects bearer only access type when grants are still selected`() {
+        val result =
+            appSvc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                accessType = "bearer_only",
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
             )
         assertIs<AdminResult.Failure>(result)
         assertIs<AdminError.Validation>(result.error)

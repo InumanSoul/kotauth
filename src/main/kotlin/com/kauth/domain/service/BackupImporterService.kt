@@ -5,6 +5,7 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BackupExportV1
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
@@ -239,14 +240,35 @@ class BackupImporterService(
 
         val appPkByClientId: MutableMap<String, ApplicationId> = mutableMapOf()
         export.applications.forEach { ab ->
+            val accessType = AccessType.fromValue(ab.accessType)
+            // Backups written before grant types existed carry no grantTypes field; derive
+            // the same defaults an in-place upgrade would have assigned for this access type.
+            // An explicit list is trusted as-is — silently dropping an unrecognized value would
+            // restore a client with fewer grants than the backup recorded.
+            val grants =
+                if (ab.grantTypes != null) {
+                    val unknown = ab.grantTypes.filter { GrantType.fromValue(it) == null }
+                    if (unknown.isNotEmpty()) {
+                        error(
+                            "Application '${ab.clientId}' has unrecognized grant type(s): " +
+                                unknown.joinToString(", "),
+                        )
+                    }
+                    ab.grantTypes.mapNotNull { GrantType.fromValue(it) }.toSet()
+                } else {
+                    GrantType.defaultsFor(accessType)
+                }
             val saved =
                 applicationRepository.create(
                     tenantId = createdTenant.id,
                     clientId = ab.clientId,
                     name = ab.name,
                     description = ab.description,
-                    accessType = AccessType.fromValue(ab.accessType).value,
+                    accessType = accessType.value,
                     redirectUris = ab.redirectUris,
+                    grantTypes = grants,
+                    clientSecretHash = null,
+                    audience = null,
                 )
             val finalApp =
                 if (!ab.enabled) {

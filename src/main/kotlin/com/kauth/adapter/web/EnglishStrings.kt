@@ -246,8 +246,8 @@ object EnglishStrings {
     const val API_NAV_LABEL = "APIs"
     const val API_PAGE_TITLE = "APIs"
     const val API_PAGE_SUBTITLE =
-        "Register the APIs that your clients request audience-targeted tokens for. Each API has an " +
-            "identifier (the `aud` claim) that resource servers use to validate incoming tokens."
+        "Register the APIs (resource servers) that your clients request audience-targeted tokens for. " +
+            "Each API has an identifier (the `aud` claim) that resource servers use to validate incoming tokens."
     const val API_EMPTY_TITLE = "No APIs yet"
     const val API_EMPTY_BODY =
         "Register an API to start issuing audience-targeted M2M tokens. Authorize clients per API to " +
@@ -286,6 +286,29 @@ object EnglishStrings {
     const val RESOURCE_SERVER_SCOPES_HINT =
         "Tokens issued for this API will be narrowed to scopes in this list. " +
             "Leave empty to disable narrowing."
+
+    // Grant types
+    const val GRANT_TYPES_LABEL = "Grant Types"
+    const val GRANT_TYPES_HINT =
+        "Which OAuth2 grants this application may use. Only the selected grants will be accepted at the " +
+            "token endpoint."
+    const val GRANT_AUTHORIZATION_CODE_HINT = "Browser sign-in. Requires at least one redirect URI."
+    const val GRANT_CLIENT_CREDENTIALS_HINT =
+        "Machine-to-machine. No user and no redirect URI. Confidential applications only."
+    const val GRANT_REFRESH_TOKEN_HINT = "Allows exchanging a refresh token for a new access token."
+    const val AUTHORIZED_APIS_CARD_TITLE = "Authorized APIs"
+    const val AUTHORIZED_APIS_CARD_EMPTY_TITLE = "No APIs authorized"
+    const val AUTHORIZED_APIS_CARD_EMPTY =
+        "Token requests targeting an API will be refused until at least one API is authorized."
+    const val AUTHORIZED_APIS_CARD_ACTION = "Manage Authorized APIs"
+
+    // Application forms — token audience
+    const val APPLICATION_AUDIENCE_LABEL = "Token Audience"
+    const val APPLICATION_AUDIENCE_PLACEHOLDER = "https://api.example.com"
+    const val APPLICATION_AUDIENCE_HINT_PREFIX = "Sets the "
+    const val APPLICATION_AUDIENCE_HINT_CLAIM = "aud"
+    const val APPLICATION_AUDIENCE_HINT_SUFFIX =
+        " claim in issued JWTs. Leave blank to use the client ID as the audience."
 
     // Tenant backup / restore (v1.9.0)
     const val BACKUP_NAV_LABEL = "Backup"

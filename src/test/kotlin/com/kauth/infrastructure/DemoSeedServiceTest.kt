@@ -3,20 +3,27 @@ package com.kauth.infrastructure
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.WebhookEventType
+import com.kauth.domain.service.OAuthResult
+import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
+import com.kauth.fakes.FakeAuthorizationCodeRepository
 import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakeRoleRepository
+import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeTokenPort
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebhookEndpointRepository
 import io.mockk.mockk
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 /**
@@ -186,6 +193,43 @@ class DemoSeedServiceTest {
         val mobile = apps.findByClientId(acmeId, "acme-mobile")
         assertTrue(mobile != null)
         assertEquals("Acme Mobile App", mobile.name)
+    }
+
+    @Test
+    fun `seeded acme-dashboard client can complete a client_credentials request`() {
+        svc.seedIfEmpty()
+
+        val oauthService =
+            OAuthService(
+                tenantRepository = tenants,
+                userRepository = users,
+                applicationRepository = apps,
+                sessionRepository = FakeSessionRepository(),
+                authCodeRepository = FakeAuthorizationCodeRepository(),
+                tokenPort = FakeTokenPort(),
+                passwordHasher = hasher,
+                auditLog = auditLog,
+            )
+
+        val result =
+            oauthService.clientCredentials(
+                tenantSlug = "acme",
+                clientId = "acme-dashboard",
+                clientSecret = DemoSeedService.DEMO_M2M_CLIENT_SECRET,
+                scopes = "",
+            )
+
+        assertIs<OAuthResult.Success<TokenResponse>>(result)
+    }
+
+    @Test
+    fun `seeded acme-dashboard client has no redirect uris`() {
+        svc.seedIfEmpty()
+
+        val acmeId = tenants.findBySlug("acme")!!.id
+        val dashboard = apps.findByClientId(acmeId, "acme-dashboard")!!
+
+        assertEquals(emptyList(), dashboard.redirectUris)
     }
 
     @Test

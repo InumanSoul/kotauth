@@ -1,9 +1,11 @@
 package com.kauth.domain.service
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -11,6 +13,12 @@ import com.kauth.domain.port.CorsPort
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.util.SecureTokens
+
+/** A newly created application plus its one-time plaintext secret, if one was issued. */
+data class CreatedApplication(
+    val application: Application,
+    val plaintextSecret: String?,
+)
 
 class ApplicationManagementService(
     private val applicationRepository: ApplicationRepository,
@@ -26,7 +34,9 @@ class ApplicationManagementService(
         description: String?,
         accessType: String,
         redirectUris: List<String>,
-    ): AdminResult<Application> {
+        grantTypes: Set<GrantType>,
+        audience: String? = null,
+    ): AdminResult<CreatedApplication> {
         if (clientId.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Client ID is required."))
         }
@@ -38,7 +48,32 @@ class ApplicationManagementService(
         if (name.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
         }
-        if (redirectUris.isEmpty()) {
+
+        val resolvedAccessType = AccessType.fromValue(accessType)
+
+        if (grantTypes.isEmpty() && resolvedAccessType != AccessType.BEARER_ONLY) {
+            return AdminResult.Failure(
+                AdminError.Validation("Select at least one grant type this application will use."),
+            )
+        }
+        if (resolvedAccessType == AccessType.BEARER_ONLY && grantTypes.isNotEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Bearer-only applications validate tokens and never initiate a flow, so they " +
+                        "cannot be registered for any grant type. Clear the selected grants, or change " +
+                        "the access type to public or confidential.",
+                ),
+            )
+        }
+        if (GrantType.CLIENT_CREDENTIALS in grantTypes && resolvedAccessType != AccessType.CONFIDENTIAL) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "The client credentials grant requires a confidential application, " +
+                        "because it authenticates with a client secret.",
+                ),
+            )
+        }
+        if (GrantType.AUTHORIZATION_CODE in grantTypes && redirectUris.isEmpty()) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "At least one redirect URI is required. The authorization code flow " +
@@ -46,11 +81,28 @@ class ApplicationManagementService(
                 ),
             )
         }
+        val trimmedAudience = audience?.trim()?.takeIf { it.isNotBlank() }
+        if (trimmedAudience != null && trimmedAudience.length > 200) {
+            return AdminResult.Failure(AdminError.Validation("Token audience must be 200 characters or fewer."))
+        }
         if (applicationRepository.existsByClientId(tenantId, clientId)) {
             return AdminResult.Failure(AdminError.Conflict("Client ID '$clientId' already exists."))
         }
 
-        val created = applicationRepository.create(tenantId, clientId, name, description, accessType, redirectUris)
+        val secret = if (resolvedAccessType == AccessType.CONFIDENTIAL) SecureTokens.randomBase64Url(32) else null
+
+        val created =
+            applicationRepository.create(
+                tenantId = tenantId,
+                clientId = clientId,
+                name = name,
+                description = description,
+                accessType = accessType,
+                redirectUris = redirectUris,
+                grantTypes = grantTypes,
+                clientSecretHash = secret?.let { passwordHasher.hash(it) },
+                audience = trimmedAudience,
+            )
 
         invalidateCors(tenantId)
 
@@ -66,7 +118,7 @@ class ApplicationManagementService(
             ),
         )
 
-        return AdminResult.Success(created)
+        return AdminResult.Success(CreatedApplication(created, secret))
     }
 
     fun updateApplication(
@@ -76,6 +128,7 @@ class ApplicationManagementService(
         description: String? = null,
         accessType: String? = null,
         redirectUris: List<String>? = null,
+        grantTypes: Set<GrantType>? = null,
         launcherUrl: String? = null,
         iconUrl: String? = null,
         launcherVisible: Boolean? = null,
@@ -95,6 +148,7 @@ class ApplicationManagementService(
             if (description != null) description.trim().takeIf { it.isNotBlank() } else app.description
         val resolvedAccessType = accessType ?: app.accessType.value
         val resolvedRedirectUris = redirectUris ?: app.redirectUris
+        val resolvedGrantTypes = grantTypes ?: app.grantTypes
         val resolvedLauncherUrl =
             if (launcherUrl != null) launcherUrl.trim().takeIf { it.isNotBlank() } else app.launcherUrl
         val resolvedIconUrl =
@@ -107,7 +161,32 @@ class ApplicationManagementService(
         if (resolvedName.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Name is required."))
         }
-        if (resolvedRedirectUris.isEmpty()) {
+
+        val resolvedAccessTypeEnum = AccessType.fromValue(resolvedAccessType)
+
+        if (resolvedGrantTypes.isEmpty() && resolvedAccessTypeEnum != AccessType.BEARER_ONLY) {
+            return AdminResult.Failure(
+                AdminError.Validation("Select at least one grant type this application will use."),
+            )
+        }
+        if (resolvedAccessTypeEnum == AccessType.BEARER_ONLY && resolvedGrantTypes.isNotEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Bearer-only applications validate tokens and never initiate a flow, so they " +
+                        "cannot be registered for any grant type. Clear the selected grants, or change " +
+                        "the access type to public or confidential.",
+                ),
+            )
+        }
+        if (GrantType.CLIENT_CREDENTIALS in resolvedGrantTypes && resolvedAccessTypeEnum != AccessType.CONFIDENTIAL) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "The client credentials grant requires a confidential application, " +
+                        "because it authenticates with a client secret.",
+                ),
+            )
+        }
+        if (GrantType.AUTHORIZATION_CODE in resolvedGrantTypes && resolvedRedirectUris.isEmpty()) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "At least one redirect URI is required. The authorization code flow " +
@@ -153,6 +232,7 @@ class ApplicationManagementService(
                 description = resolvedDescription,
                 accessType = resolvedAccessType,
                 redirectUris = resolvedRedirectUris,
+                grantTypes = resolvedGrantTypes,
                 launcherUrl = resolvedLauncherUrl,
                 iconUrl = resolvedIconUrl,
                 launcherVisible = resolvedLauncherVisible,

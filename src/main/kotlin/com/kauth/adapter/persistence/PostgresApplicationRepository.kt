@@ -3,6 +3,7 @@ package com.kauth.adapter.persistence
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.ApplicationRepository
 import org.jetbrains.exposed.v1.core.*
@@ -18,14 +19,21 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 class PostgresApplicationRepository : ApplicationRepository {
     override fun findByTenantId(tenantId: TenantId): List<Application> =
         transaction {
-            ClientsTable
-                .selectAll()
-                .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.isDeleted eq false) }
-                .orderBy(ClientsTable.id)
-                .map { row ->
-                    val uris = urisForClientPk(row[ClientsTable.id])
-                    row.toApplication(uris)
-                }
+            val rows =
+                ClientsTable
+                    .selectAll()
+                    .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.isDeleted eq false) }
+                    .orderBy(ClientsTable.id)
+                    .toList()
+
+            val clientPks = rows.map { it[ClientsTable.id] }
+            val urisByClientPk = urisForClientPks(clientPks)
+            val grantsByClientPk = grantsForClientPks(clientPks)
+
+            rows.map { row ->
+                val pk = row[ClientsTable.id]
+                row.toApplication(urisByClientPk[pk].orEmpty(), grantsByClientPk[pk].orEmpty())
+            }
         }
 
     override fun findByClientId(
@@ -42,7 +50,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                             (ClientsTable.isDeleted eq false)
                     }.singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
-            row.toApplication(uris)
+            row.toApplication(uris, grantsForClientPk(row[ClientsTable.id]))
         }
 
     override fun findById(id: ApplicationId): Application? =
@@ -53,7 +61,7 @@ class PostgresApplicationRepository : ApplicationRepository {
                     .where { (ClientsTable.id eq id.value) and (ClientsTable.isDeleted eq false) }
                     .singleOrNull() ?: return@transaction null
             val uris = urisForClientPk(row[ClientsTable.id])
-            row.toApplication(uris)
+            row.toApplication(uris, grantsForClientPk(row[ClientsTable.id]))
         }
 
     override fun findClientSecretHash(clientPk: ApplicationId): String? =
@@ -93,6 +101,9 @@ class PostgresApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
+        clientSecretHash: String?,
+        audience: String?,
     ): Application =
         transaction {
             val insertedPk =
@@ -102,6 +113,8 @@ class PostgresApplicationRepository : ApplicationRepository {
                     it[ClientsTable.name] = name
                     it[ClientsTable.description] = description
                     it[ClientsTable.accessType] = AccessType.fromValue(accessType)
+                    it[ClientsTable.clientSecretHash] = clientSecretHash
+                    it[ClientsTable.audience] = audience
                 } get ClientsTable.id
 
             if (redirectUris.isNotEmpty()) {
@@ -110,10 +123,11 @@ class PostgresApplicationRepository : ApplicationRepository {
                     this[ClientRedirectUrisTable.uri] = uri
                 }
             }
+            replaceGrantsForClientPk(insertedPk, grantTypes)
 
             val row = ClientsTable.selectAll().where { ClientsTable.id eq insertedPk }.single()
             val uris = urisForClientPk(insertedPk)
-            row.toApplication(uris)
+            row.toApplication(uris, grantsForClientPk(insertedPk))
         }
 
     override fun update(
@@ -122,6 +136,7 @@ class PostgresApplicationRepository : ApplicationRepository {
         description: String?,
         accessType: String,
         redirectUris: List<String>,
+        grantTypes: Set<GrantType>,
         launcherUrl: String?,
         iconUrl: String?,
         launcherVisible: Boolean,
@@ -147,8 +162,9 @@ class PostgresApplicationRepository : ApplicationRepository {
                     this[ClientRedirectUrisTable.uri] = uri
                 }
             }
+            replaceGrantsForClientPk(appId.value, grantTypes)
             val row = ClientsTable.selectAll().where { ClientsTable.id eq appId.value }.single()
-            row.toApplication(urisForClientPk(appId.value))
+            row.toApplication(urisForClientPk(appId.value), grantsForClientPk(appId.value))
         }
 
     override fun setEnabled(
@@ -179,7 +195,53 @@ class PostgresApplicationRepository : ApplicationRepository {
             .where { ClientRedirectUrisTable.clientId eq clientPk }
             .map { it[ClientRedirectUrisTable.uri] }
 
-    private fun ResultRow.toApplication(uris: List<String> = emptyList()): Application =
+    private fun grantsForClientPk(clientPk: Int): Set<GrantType> =
+        ClientGrantTypesTable
+            .selectAll()
+            .where { ClientGrantTypesTable.clientId eq clientPk }
+            .mapNotNull { GrantType.fromValue(it[ClientGrantTypesTable.grantType]) }
+            .toSet()
+
+    /** Batched form of [urisForClientPk] for list endpoints — one query for all client PKs. */
+    private fun urisForClientPks(clientPks: List<Int>): Map<Int, List<String>> {
+        if (clientPks.isEmpty()) return emptyMap()
+        return ClientRedirectUrisTable
+            .selectAll()
+            .where { ClientRedirectUrisTable.clientId inList clientPks }
+            .orderBy(ClientRedirectUrisTable.id)
+            .groupBy({ it[ClientRedirectUrisTable.clientId] }) { it[ClientRedirectUrisTable.uri] }
+    }
+
+    /** Batched form of [grantsForClientPk] for list endpoints — one query for all client PKs. */
+    private fun grantsForClientPks(clientPks: List<Int>): Map<Int, Set<GrantType>> {
+        if (clientPks.isEmpty()) return emptyMap()
+        return ClientGrantTypesTable
+            .selectAll()
+            .where { ClientGrantTypesTable.clientId inList clientPks }
+            .mapNotNull { row ->
+                val grant = GrantType.fromValue(row[ClientGrantTypesTable.grantType]) ?: return@mapNotNull null
+                row[ClientGrantTypesTable.clientId] to grant
+            }.groupBy({ it.first }) { it.second }
+            .mapValues { it.value.toSet() }
+    }
+
+    private fun replaceGrantsForClientPk(
+        clientPk: Int,
+        grantTypes: Set<GrantType>,
+    ) {
+        ClientGrantTypesTable.deleteWhere { ClientGrantTypesTable.clientId eq clientPk }
+        if (grantTypes.isNotEmpty()) {
+            ClientGrantTypesTable.batchInsert(grantTypes) { grant ->
+                this[ClientGrantTypesTable.clientId] = clientPk
+                this[ClientGrantTypesTable.grantType] = grant.value
+            }
+        }
+    }
+
+    private fun ResultRow.toApplication(
+        uris: List<String> = emptyList(),
+        grantTypes: Set<GrantType> = emptySet(),
+    ): Application =
         Application(
             id = ApplicationId(this[ClientsTable.id]),
             tenantId = TenantId(this[ClientsTable.tenantId]),
@@ -189,6 +251,7 @@ class PostgresApplicationRepository : ApplicationRepository {
             accessType = this[ClientsTable.accessType],
             enabled = this[ClientsTable.enabled],
             redirectUris = uris,
+            grantTypes = grantTypes,
             tokenExpiryOverride = this[ClientsTable.tokenExpiryOverride],
             launcherUrl = this[ClientsTable.launcherUrl],
             iconUrl = this[ClientsTable.iconUrl],

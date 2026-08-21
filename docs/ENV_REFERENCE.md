@@ -290,6 +290,10 @@ KAUTH_DEMO_MODE=true
 | Acme Corp | `sarah.chen` | `Demo1234!` |
 | Startup Labs | `jordan.lee` | `Demo1234!` |
 
+| M2M client (`client_credentials`) | Client ID | Client secret |
+|---|---|---|
+| Acme Dashboard | `acme-dashboard` | `DemoM2M1234!` |
+
 ---
 
 ## Admin Bootstrap

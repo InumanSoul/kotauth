@@ -6,6 +6,7 @@ import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.ClaimTokenType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -110,6 +111,25 @@ class OAuthService(
     }
 
     /**
+     * Whether a known client is registered for [grant] — used at GET /authorize for early
+     * refusal, before the login page is ever rendered. Deliberately separate from
+     * [validateRedirectUri]: that function's `false` means "refuse the redirect_uri", and
+     * folding a grant check into it would make `false` ambiguous at call sites that branch on
+     * redirect-uri trust, producing a misleading "invalid redirect_uri" error for what is
+     * actually an unauthorized-client problem. Returns true (does not block) when the tenant or
+     * client is unknown — that is a different failure the caller already handles elsewhere.
+     */
+    fun clientHasGrant(
+        tenantSlug: String,
+        clientId: String,
+        grant: GrantType,
+    ): Boolean {
+        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return true
+        val client = applicationRepository.findByClientId(tenant.id, clientId) ?: return true
+        return grant in client.grantTypes
+    }
+
+    /**
      * Validates an authorization request and issues a short-lived code.
      * Called after the user has authenticated successfully.
      *
@@ -148,6 +168,12 @@ class OAuthService(
 
         if (!client.enabled) {
             return OAuthResult.Failure(OAuthError.InvalidClient("Client is disabled"))
+        }
+
+        if (GrantType.AUTHORIZATION_CODE !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the authorization_code grant"),
+            )
         }
 
         // Validate redirect URI — exact match required (RFC 6749 §3.1.2.3)
@@ -237,9 +263,20 @@ class OAuthService(
             }
         }
 
+        if (GrantType.AUTHORIZATION_CODE !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the authorization_code grant"),
+            )
+        }
+
         val authCode =
             authCodeRepository.findByCode(code)
                 ?: return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code not found"))
+
+        // RFC 6749 §4.1.3: verify the code was issued to the client redeeming it
+        if (authCode.clientId != client.id) {
+            return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code was not issued to this client"))
+        }
 
         // Single-use enforcement
         if (!authCode.isValid) {
@@ -314,7 +351,7 @@ class OAuthService(
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
         val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
-        val tokenResponse =
+        val issuedTokens =
             tokenPort.issueUserTokens(
                 user = user,
                 tenant = tenant,
@@ -327,6 +364,14 @@ class OAuthService(
                 authTime = authCode.authTime,
                 audiences = resolvedResources,
             )
+
+        // Never hand back or persist a refresh credential for a client not registered for that grant.
+        val tokenResponse =
+            if (GrantType.REFRESH_TOKEN !in client.grantTypes) {
+                issuedTokens.copy(refresh_token = null, refresh_expires_in = null)
+            } else {
+                issuedTokens
+            }
 
         sessionRepository.save(
             Session(
@@ -394,6 +439,12 @@ class OAuthService(
                 OAuthError.InvalidClient(
                     "client_credentials flow requires a CONFIDENTIAL client",
                 ),
+            )
+        }
+
+        if (GrantType.CLIENT_CREDENTIALS !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the client_credentials grant"),
             )
         }
 
@@ -626,6 +677,12 @@ class OAuthService(
             if (storedHash == null || !passwordHasher.verify(clientSecret, storedHash)) {
                 return OAuthResult.Failure(OAuthError.InvalidClient("Invalid client_secret"))
             }
+        }
+
+        if (client != null && GrantType.REFRESH_TOKEN !in client.grantTypes) {
+            return OAuthResult.Failure(
+                OAuthError.UnauthorizedClient("Client is not registered for the refresh_token grant"),
+            )
         }
 
         // RFC 8707 §3: validate requested resources are a subset of the session's bound resources
@@ -997,6 +1054,10 @@ sealed class OAuthError {
     object PkceRequired : OAuthError()
 
     data class InvalidClient(
+        val reason: String,
+    ) : OAuthError()
+
+    data class UnauthorizedClient(
         val reason: String,
     ) : OAuthError()
 

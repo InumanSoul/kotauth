@@ -21,7 +21,7 @@ tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJ
 }
 
 group = "com.kauth"
-version = "1.21.0"
+version = "1.22.0"
 
 application {
     mainClass.set("com.kauth.ApplicationKt")
@@ -79,14 +79,16 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
-    // Testcontainers — Redis integration tests (tagged @Tag("redis"); excluded from `make test`)
+    // Testcontainers — Redis/Postgres integration tests (tagged @Tag("redis")/@Tag("postgres");
+    // excluded from `make test`)
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
     testImplementation("org.testcontainers:junit-jupiter:$testcontainersVersion")
+    testImplementation("org.testcontainers:postgresql:$testcontainersVersion")
 }
 
 tasks.test {
     useJUnitPlatform {
-        excludeTags("redis")
+        excludeTags("redis", "postgres")
     }
 }
 
@@ -95,6 +97,24 @@ tasks.register<Test>("redisTest") {
     group = "verification"
     useJUnitPlatform {
         includeTags("redis")
+    }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+
+    // Forward Docker-related env vars (DOCKER_HOST for OrbStack/Colima/etc.,
+    // DOCKER_API_VERSION to override docker-java's stale default).
+    listOf("DOCKER_HOST", "DOCKER_API_VERSION", "TESTCONTAINERS_RYUK_DISABLED").forEach { name ->
+        System.getenv(name)?.let { environment(name, it) }
+    }
+    // docker-java reads `api.version` as a JVM system property (env var alone is not honored).
+    System.getenv("DOCKER_API_VERSION")?.let { systemProperty("api.version", it) }
+}
+
+tasks.register<Test>("postgresTest") {
+    description = "Runs Postgres-backed integration tests (Testcontainers, Docker required)"
+    group = "verification"
+    useJUnitPlatform {
+        includeTags("postgres")
     }
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath

@@ -6,10 +6,12 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.util.sha256Hex
@@ -96,6 +98,7 @@ class OAuthServiceTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
     /** Confidential client — secret required, PKCE optional. */
@@ -109,6 +112,7 @@ class OAuthServiceTest {
             accessType = AccessType.CONFIDENTIAL,
             enabled = true,
             redirectUris = listOf("https://backend.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
         )
 
     // Stable PKCE pair used across multiple tests
@@ -351,6 +355,56 @@ class OAuthServiceTest {
             )
         assertIs<OAuthResult.Failure>(replayResult)
         assertIs<OAuthError.InvalidGrant>(replayResult.error)
+    }
+
+    @Test
+    fun `exchangeAuthorizationCode omits refresh token for client not registered for refresh_token grant`() {
+        val codeOnlyClient =
+            Application(
+                id = ApplicationId(3),
+                tenantId = TenantId(1),
+                clientId = "code-only-app",
+                name = "Code Only",
+                description = null,
+                accessType = AccessType.PUBLIC,
+                enabled = true,
+                redirectUris = listOf("https://code-only.example.com/callback"),
+                grantTypes = setOf(GrantType.AUTHORIZATION_CODE),
+            )
+        apps.add(codeOnlyClient)
+        resourceServers.registerClient(codeOnlyClient.id, codeOnlyClient.tenantId)
+
+        val issueResult =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "code-only-app",
+                redirectUri = "https://code-only.example.com/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
+        val code = (issueResult as OAuthResult.Success<AuthorizationCode>).value.code
+
+        val result =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = code,
+                clientId = "code-only-app",
+                redirectUri = "https://code-only.example.com/callback",
+                codeVerifier = pkceVerifier,
+                clientSecret = null,
+            )
+
+        assertIs<OAuthResult.Success<TokenResponse>>(result)
+        assertNull(result.value.refresh_token)
+        assertNull(result.value.refresh_expires_in)
+
+        val session = sessions.all().single { it.clientId == codeOnlyClient.id }
+        assertNull(session.refreshTokenHash)
+        assertNull(session.refreshExpiresAt)
     }
 
     @Test
@@ -684,6 +738,7 @@ class OAuthServiceTest {
                 accessType = AccessType.CONFIDENTIAL,
                 enabled = true,
                 redirectUris = emptyList(),
+                grantTypes = GrantType.defaultsFor(AccessType.CONFIDENTIAL),
                 audience = "https://api.example.com",
             )
         apps.add(clientWithAudience, secretHash = hasher.hash("m2m-secret"))
