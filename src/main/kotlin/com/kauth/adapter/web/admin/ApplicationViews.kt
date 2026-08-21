@@ -168,6 +168,17 @@ internal fun applicationDetailPageImpl(
                         AccessType.BEARER_ONLY -> span("badge badge--public") { +"Bearer Only" }
                     }
                 }
+                ovRow(EnglishStrings.GRANT_TYPES_LABEL) {
+                    if (application.grantTypes.isEmpty()) {
+                        span("ov-card__value--muted") { +"None" }
+                    } else {
+                        div("badge-row") {
+                            application.grantTypes.forEach { grant ->
+                                span("badge badge--muted") { +grant.label }
+                            }
+                        }
+                    }
+                }
                 ovRow("Workspace") {
                     a(
                         href = "/admin/workspaces/${workspace.slug}",
