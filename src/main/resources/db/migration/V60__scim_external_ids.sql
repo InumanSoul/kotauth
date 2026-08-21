@@ -3,6 +3,11 @@ ALTER TABLE users
     ADD COLUMN given_name   VARCHAR(255),
     ADD COLUMN family_name  VARCHAR(255);
 
+-- A later phase composes full_name from given_name + family_name when SCIM sends no
+-- explicit display name; widen it to match so two long parts don't overflow the column.
+ALTER TABLE users
+    ALTER COLUMN full_name TYPE VARCHAR(255);
+
 ALTER TABLE groups
     ADD COLUMN external_id VARCHAR(255);
 

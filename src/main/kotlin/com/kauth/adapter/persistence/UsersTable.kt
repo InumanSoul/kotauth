@@ -17,7 +17,7 @@ object UsersTable : Table("users") {
     val username = varchar("username", 50)
     val email = varchar("email", 255)
     val passwordHash = varchar("password_hash", 128)
-    val fullName = varchar("full_name", 100)
+    val fullName = varchar("full_name", 255)
     val externalId = varchar("external_id", 255).nullable()
     val givenName = varchar("given_name", 255).nullable()
     val familyName = varchar("family_name", 255).nullable()
