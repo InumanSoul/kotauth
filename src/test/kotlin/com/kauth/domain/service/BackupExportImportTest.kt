@@ -609,6 +609,34 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `import rejects a backup whose explicit grant types list contains an unrecognized value`() {
+        val backup =
+            backupWithClient(
+                accessType = "confidential",
+                grantTypes = listOf("client_credentials", "carrier_pigeon"),
+            )
+
+        val r = importer().import(backup, newSlug = "acme-bad-grant", currentSchemaVersion = 38)
+
+        assertIs<BackupResult.Failure>(r)
+        val error = r.error
+        assertIs<BackupError.InvalidPayload>(error)
+        assertTrue(error.message.contains("carrier_pigeon"))
+    }
+
+    @Test
+    fun `import preserves an explicit empty grant types list for a bearer-only client`() {
+        val backup = backupWithClient(accessType = "public", grantTypes = emptyList())
+
+        val r = importer().import(backup, newSlug = "acme-bearer-only", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+        val restored = destApps.findByClientId(newTenantId, "legacy-client")!!
+        assertEquals(emptySet(), restored.grantTypes)
+    }
+
+    @Test
     fun `export returns TenantNotFound for unknown slug`() {
         val r = exporter().export("missing", ExportOptions(), kotauthVersion = "1.9.0", currentSchemaVersion = 38)
         if (r !is BackupResult.Failure || r.error !is BackupError.TenantNotFound) {

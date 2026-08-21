@@ -243,11 +243,21 @@ class BackupImporterService(
             val accessType = AccessType.fromValue(ab.accessType)
             // Backups written before grant types existed carry no grantTypes field; derive
             // the same defaults an in-place upgrade would have assigned for this access type.
+            // An explicit list is trusted as-is — silently dropping an unrecognized value would
+            // restore a client with fewer grants than the backup recorded.
             val grants =
-                ab.grantTypes
-                    ?.mapNotNull { GrantType.fromValue(it) }
-                    ?.toSet()
-                    ?: GrantType.defaultsFor(accessType)
+                if (ab.grantTypes != null) {
+                    val unknown = ab.grantTypes.filter { GrantType.fromValue(it) == null }
+                    if (unknown.isNotEmpty()) {
+                        error(
+                            "Application '${ab.clientId}' has unrecognized grant type(s): " +
+                                unknown.joinToString(", "),
+                        )
+                    }
+                    ab.grantTypes.mapNotNull { GrantType.fromValue(it) }.toSet()
+                } else {
+                    GrantType.defaultsFor(accessType)
+                }
             val saved =
                 applicationRepository.create(
                     tenantId = createdTenant.id,
