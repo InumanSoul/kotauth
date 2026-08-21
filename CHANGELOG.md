@@ -27,6 +27,18 @@ will never use.
 > initiates no flows, which is what the access type means. If a
 > bearer-only client was in fact driving a flow, change its access type to
 > confidential or public and select the grants it actually uses.
+>
+> **This also affects `POST /api/v1/applications` going forward.** When
+> `grantTypes` is omitted, the API defaults to `authorization_code` +
+> `refresh_token` — never to `client_credentials`, even for a confidential
+> application, because defaulting a confidential client into
+> machine-to-machine capability is the over-permissioning this release
+> exists to end. A provisioning script that has been creating confidential
+> clients for machine-to-machine use must now send `grantTypes`
+> (containing at least `client_credentials`) explicitly on every create
+> call. If it doesn't, the client it creates will be refused
+> (`unauthorized_client`) at the token endpoint the first time it tries to
+> get a token.
 
 ### Added
 
@@ -35,8 +47,9 @@ will never use.
   `client_credentials`, `refresh_token`), selectable on the admin
   create/edit forms and via the REST API. `POST /api/v1/applications`
   accepts an optional `grantTypes` array, defaulting to
-  `authorization_code` + `refresh_token` when omitted so existing API
-  consumers are unaffected.
+  `authorization_code` + `refresh_token` when omitted. **This is a
+  behavior change for API consumers creating confidential
+  machine-to-machine clients** — see the breaking-change note above.
 - **Client secret issued at creation.** A confidential application now
   receives its client secret the moment it's created — shown once in a
   copy-now banner in the admin UI, and returned once as `clientSecret` in
@@ -61,6 +74,14 @@ will never use.
   "APIs (resource servers)" so the UI's term and the codebase's RFC 8707
   term are greppable against each other. Routes are unchanged, so existing
   bookmarks and links still work.
+- **Grant types are readable, updatable, and visible.** `GET`/`PUT
+  /api/v1/applications/{id}` now return and accept `grantTypes`, and the
+  application detail page shows them on the Overview card. Previously
+  grants were write-once-on-create with no way back — a confidential
+  application backfilled with all three grants could never be demoted to
+  `public` over the API, because removing `client_credentials` had no
+  path — and an operator debugging an `unauthorized_client` error had to
+  open Edit to see what was registered.
 
 ### Changed
 
@@ -80,6 +101,20 @@ will never use.
 - The `authorization_code` grant now verifies the code was issued to the
   client redeeming it (RFC 6749 §4.1.3), rejecting the exchange with
   `invalid_grant` when it wasn't.
+- The APIs page now activates the Applications rail, matching where its
+  nav entry actually lives. It previously switched to the Settings rail,
+  which no longer contains an APIs link, so the entry appeared to vanish
+  with no way back to the app context.
+- `GET /authorize` now returns `unauthorized_client` immediately when the
+  client isn't registered for the `authorization_code` grant, instead of
+  rendering the full login page and only failing at code issuance —
+  after the user has already entered their password and MFA.
+- A bearer-only application can no longer be registered with grant types
+  selected. It validates tokens and initiates no flow, so any grant on it
+  ran with neither PKCE (it isn't public) nor client authentication (it
+  isn't confidential).
+- The REST API now rejects a `grantTypes` value it doesn't recognize
+  instead of silently creating the client without it.
 
 ### Migrations
 
