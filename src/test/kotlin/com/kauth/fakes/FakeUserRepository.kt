@@ -45,6 +45,11 @@ class FakeUserRepository : UserRepository {
         email: String,
     ) = store.values.find { it.tenantId == tenantId && it.email == email }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? = store.values.find { it.tenantId == tenantId && it.externalId == externalId }
+
     override fun findByTenantId(
         tenantId: TenantId,
         search: String?,

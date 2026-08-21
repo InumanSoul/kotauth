@@ -72,6 +72,20 @@ class PostgresGroupRepository : GroupRepository {
                 .map { it.toGroup() }
         }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): Group? =
+        transaction {
+            GroupsTable
+                .selectAll()
+                .where {
+                    (GroupsTable.tenantId eq tenantId.value) and
+                        (GroupsTable.externalId eq externalId)
+                }.singleOrNull()
+                ?.toGroup()
+        }
+
     override fun save(group: Group): Group =
         transaction {
             val id =

@@ -55,6 +55,20 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where {
+                    (UsersTable.tenantId eq tenantId.value) and
+                        (UsersTable.externalId eq externalId)
+                }.singleOrNull()
+                ?.toUser()
+        }
+
     override fun findByIds(
         ids: Collection<UserId>,
         tenantId: TenantId,

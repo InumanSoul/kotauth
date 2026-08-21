@@ -22,6 +22,12 @@ interface GroupRepository {
 
     fun findChildren(groupId: GroupId): List<Group>
 
+    /** Finds a group by the identity provider's key. Null when unprovisioned or unknown. */
+    fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): Group?
+
     fun save(group: Group): Group
 
     fun update(group: Group): Group

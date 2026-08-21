@@ -49,6 +49,11 @@ class FakeGroupRepository : GroupRepository {
 
     override fun findChildren(groupId: GroupId): List<Group> = store.values.filter { it.parentGroupId == groupId }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): Group? = store.values.find { it.tenantId == tenantId && it.externalId == externalId }
+
     override fun save(group: Group): Group {
         val g = if (group.id == null) group.copy(id = GroupId(nextId++)) else group
         store[g.id!!.value] = g
