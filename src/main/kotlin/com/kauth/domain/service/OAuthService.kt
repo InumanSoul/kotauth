@@ -351,7 +351,7 @@ class OAuthService(
         val effectiveRoles = roleRepository?.resolveEffectiveRoles(user.id!!, tenant.id) ?: emptyList()
         val (customAccessClaims, customIdClaims) = buildCustomClaims(user.id!!, tenant.id)
 
-        val tokenResponse =
+        val issuedTokens =
             tokenPort.issueUserTokens(
                 user = user,
                 tenant = tenant,
@@ -364,6 +364,14 @@ class OAuthService(
                 authTime = authCode.authTime,
                 audiences = resolvedResources,
             )
+
+        // Never hand back or persist a refresh credential for a client not registered for that grant.
+        val tokenResponse =
+            if (GrantType.REFRESH_TOKEN !in client.grantTypes) {
+                issuedTokens.copy(refresh_token = null, refresh_expires_in = null)
+            } else {
+                issuedTokens
+            }
 
         sessionRepository.save(
             Session(
