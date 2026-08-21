@@ -261,9 +261,16 @@ components:
         description: { type: string, nullable: true }
 
     # ---- Applications ----
+    GrantType:
+      type: string
+      enum: [authorization_code, client_credentials, refresh_token]
+      description: |
+        An OAuth2 grant the application is registered to use. The token endpoint refuses any
+        grant the application isn't registered for (`unauthorized_client`).
+
     ApplicationDto:
       type: object
-      required: [id, clientId, name, accessType, enabled, redirectUris]
+      required: [id, clientId, name, accessType, enabled, redirectUris, grantTypes]
       properties:
         id:           { type: integer }
         clientId:     { type: string }
@@ -272,6 +279,9 @@ components:
         accessType:   { type: string, enum: [public, confidential] }
         enabled:      { type: boolean }
         redirectUris: { type: array, items: { type: string, format: uri } }
+        grantTypes:
+          type: array
+          items: { $ref: "#/components/schemas/GrantType" }
 
     UpdateApplicationRequest:
       type: object
@@ -281,6 +291,13 @@ components:
         description:  { type: string, nullable: true }
         accessType:   { type: string, enum: [public, confidential] }
         redirectUris: { type: array, items: { type: string, format: uri } }
+        grantTypes:
+          type: array
+          items: { $ref: "#/components/schemas/GrantType" }
+          description: |
+            Omit to leave the application's grants unchanged. Pass an explicit array —
+            including `[]` — to replace them. Required to remove `client_credentials` from a
+            confidential application, e.g. before demoting it to `public`.
 
     CreateApplicationRequest:
       type: object
@@ -299,7 +316,18 @@ components:
         redirectUris:
           type: array
           items: { type: string, format: uri }
-          minItems: 1
+          description: |
+            Required only when `grantTypes` includes `authorization_code` (the default when
+            `grantTypes` is omitted). A `client_credentials`-only application needs none.
+        grantTypes:
+          type: array
+          items: { $ref: "#/components/schemas/GrantType" }
+          description: |
+            Defaults to `[authorization_code, refresh_token]` when omitted — never to
+            `client_credentials`, even for a confidential application, since that would grant
+            machine-to-machine capability by default. A confidential application that needs
+            `client_credentials` must request it explicitly, or it will be refused
+            (`unauthorized_client`) at the token endpoint.
 
     CreateApplicationResponse:
       type: object
@@ -1345,6 +1373,15 @@ paths:
                   accessType: confidential
                   redirectUris:
                     - https://dashboard.example.com/callback
+                  grantTypes: [authorization_code, refresh_token]
+              m2mClient:
+                summary: Machine-to-machine client (no redirect URI needed)
+                value:
+                  clientId: billing-worker
+                  name: Billing Worker
+                  accessType: confidential
+                  redirectUris: []
+                  grantTypes: [client_credentials]
       responses:
         "201":
           description: |
