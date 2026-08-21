@@ -246,8 +246,8 @@ object EnglishStrings {
     const val API_NAV_LABEL = "APIs"
     const val API_PAGE_TITLE = "APIs"
     const val API_PAGE_SUBTITLE =
-        "Register the APIs that your clients request audience-targeted tokens for. Each API has an " +
-            "identifier (the `aud` claim) that resource servers use to validate incoming tokens."
+        "Register the APIs (resource servers) that your clients request audience-targeted tokens for. " +
+            "Each API has an identifier (the `aud` claim) that resource servers use to validate incoming tokens."
     const val API_EMPTY_TITLE = "No APIs yet"
     const val API_EMPTY_BODY =
         "Register an API to start issuing audience-targeted M2M tokens. Authorize clients per API to " +
@@ -297,9 +297,9 @@ object EnglishStrings {
         "Machine-to-machine. No user and no redirect URI. Confidential applications only."
     const val GRANT_REFRESH_TOKEN_HINT = "Allows exchanging a refresh token for a new access token."
     const val AUTHORIZED_APIS_CARD_TITLE = "Authorized APIs"
+    const val AUTHORIZED_APIS_CARD_EMPTY_TITLE = "No APIs authorized"
     const val AUTHORIZED_APIS_CARD_EMPTY =
-        "This application is not authorized for any API. Until it is, token requests targeting an API " +
-            "will be refused."
+        "Token requests targeting an API will be refused until at least one API is authorized."
     const val AUTHORIZED_APIS_CARD_ACTION = "Manage Authorized APIs"
 
     // Application forms — token audience
