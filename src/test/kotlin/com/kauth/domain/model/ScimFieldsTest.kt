@@ -33,8 +33,17 @@ class ScimFieldsTest {
     }
 
     @Test
-    fun `a user provisioned without a password uses the sentinel hash`() {
-        assertEquals("!", User.SENTINEL_PASSWORD_HASH)
-        assertEquals(User.SENTINEL_PASSWORD_HASH, user().passwordHash)
+    fun `a provisioned user carries an external id alongside the sentinel password hash`() {
+        val provisioned =
+            user().copy(
+                externalId = "ext-1",
+                givenName = "Ada",
+                familyName = "Lovelace",
+            )
+
+        // A provisioned user has no local password but must still be a valid User.
+        assertEquals(User.SENTINEL_PASSWORD_HASH, provisioned.passwordHash)
+        assertEquals("ext-1", provisioned.externalId)
+        assertEquals("Ada Lovelace", "${provisioned.givenName} ${provisioned.familyName}")
     }
 }

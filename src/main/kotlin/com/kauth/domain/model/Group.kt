@@ -17,6 +17,7 @@ data class Group(
     val tenantId: TenantId,
     val name: String,
     val description: String? = null,
+    /** The identity provider's own key for this group. Null for locally-created groups. */
     val externalId: String? = null,
     val parentGroupId: GroupId? = null,
     val attributes: Map<String, String> = emptyMap(),
