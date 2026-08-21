@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.ResourceServerRepository
@@ -299,6 +300,32 @@ internal fun Route.oauthProtocolRoutes(
                     "error" to "invalid_request",
                     "error_description" to "Invalid redirect_uri for client",
                 ),
+            )
+            return@get
+        }
+
+        // RFC 6749 §4.1.2.1: refuse a client that isn't registered for authorization_code
+        // before the login page is ever rendered, instead of collecting the user's password
+        // and MFA only to fail at code issuance.
+        if (!oauthService.clientHasGrant(slug, clientId, GrantType.AUTHORIZATION_CODE)) {
+            if (!redirectUriTrusted) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf(
+                        "error" to "invalid_request",
+                        "error_description" to "Invalid redirect_uri for client",
+                    ),
+                )
+                return@get
+            }
+            call.respondRedirect(
+                buildString {
+                    append(redirectUri)
+                    append("?error=unauthorized_client")
+                    append("&error_description=")
+                        .append(encodeParam("Client is not registered for the authorization_code grant"))
+                    if (!state.isNullOrBlank()) append("&state=").append(encodeParam(state))
+                },
             )
             return@get
         }

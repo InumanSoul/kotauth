@@ -111,6 +111,25 @@ class OAuthService(
     }
 
     /**
+     * Whether a known client is registered for [grant] — used at GET /authorize for early
+     * refusal, before the login page is ever rendered. Deliberately separate from
+     * [validateRedirectUri]: that function's `false` means "refuse the redirect_uri", and
+     * folding a grant check into it would make `false` ambiguous at call sites that branch on
+     * redirect-uri trust, producing a misleading "invalid redirect_uri" error for what is
+     * actually an unauthorized-client problem. Returns true (does not block) when the tenant or
+     * client is unknown — that is a different failure the caller already handles elsewhere.
+     */
+    fun clientHasGrant(
+        tenantSlug: String,
+        clientId: String,
+        grant: GrantType,
+    ): Boolean {
+        val tenant = tenantRepository.findBySlug(tenantSlug) ?: return true
+        val client = applicationRepository.findByClientId(tenant.id, clientId) ?: return true
+        return grant in client.grantTypes
+    }
+
+    /**
      * Validates an authorization request and issues a short-lived code.
      * Called after the user has authenticated successfully.
      *

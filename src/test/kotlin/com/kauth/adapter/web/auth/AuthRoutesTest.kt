@@ -1139,6 +1139,120 @@ class AuthRoutesTest {
             assertEquals(null, response.headers["Location"], "Must not redirect to untrusted redirect_uri")
         }
 
+    @Test
+    fun `GET authorize redirects with unauthorized_client when client lacks the authorization_code grant`() =
+        testApplication {
+            resetFixtures()
+            val m2mOnlyApp =
+                Application(
+                    id = ApplicationId(3),
+                    tenantId = TenantId(1),
+                    clientId = "m2m-only",
+                    name = "M2M Only",
+                    description = null,
+                    accessType = AccessType.CONFIDENTIAL,
+                    enabled = true,
+                    redirectUris = listOf("https://m2m.example.com/callback"),
+                    grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                )
+            appRepo.add(m2mOnlyApp, secretHash = hasher.hash("m2m-secret"))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code" +
+                        "&client_id=m2m-only" +
+                        "&redirect_uri=https://m2m.example.com/callback" +
+                        "&scope=openid" +
+                        "&state=xyz",
+                )
+
+            assertEquals(
+                HttpStatusCode.Found,
+                response.status,
+                "Client not registered for authorization_code must be refused before the login page renders",
+            )
+            val location = response.headers["Location"]
+            assertNotNull(location)
+            assertTrue(location.startsWith("https://m2m.example.com/callback"))
+            assertTrue(location.contains("error=unauthorized_client"))
+            assertTrue(location.contains("state=xyz"))
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_AUTH_CONTEXT") },
+                "Must not set up an auth context for a client that can never complete this flow",
+            )
+        }
+
+    @Test
+    fun `GET authorize returns 400 when redirect_uri is untrusted and client lacks the authorization_code grant`() =
+        testApplication {
+            resetFixtures()
+            val m2mOnlyApp =
+                Application(
+                    id = ApplicationId(3),
+                    tenantId = TenantId(1),
+                    clientId = "m2m-only",
+                    name = "M2M Only",
+                    description = null,
+                    accessType = AccessType.CONFIDENTIAL,
+                    enabled = true,
+                    redirectUris = listOf("https://m2m.example.com/callback"),
+                    grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                )
+            appRepo.add(m2mOnlyApp, secretHash = hasher.hash("m2m-secret"))
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code" +
+                        "&client_id=m2m-only" +
+                        "&redirect_uri=https://evil.attacker.com/steal" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(null, response.headers["Location"], "Must not redirect to an unregistered redirect_uri")
+        }
+
     // =========================================================================
     // GET /t/{slug}/protocol/openid-connect/auth — legacy endpoint parameter validation
     // =========================================================================
