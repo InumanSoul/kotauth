@@ -204,6 +204,33 @@ class AdminApplicationRoutesTest {
         }
 
     @Test
+    fun `creating a confidential application with client credentials in one submit succeeds`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/$tenantSlug/applications",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "m2m-caller")
+                            append("name", "M2M Caller")
+                            append("accessType", "confidential")
+                            append("grantTypes", "client_credentials")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val stored = appRepo.findByClientId(tenantId, "m2m-caller")
+            assertEquals(
+                setOf(com.kauth.domain.model.GrantType.CLIENT_CREDENTIALS),
+                stored?.grantTypes,
+            )
+        }
+
+    @Test
     fun `creating a public application does not flash a secret`() =
         testApplication {
             application { installTestApp() }
@@ -249,6 +276,22 @@ class AdminApplicationRoutesTest {
                 authed.get("/admin/workspaces/$tenantSlug/applications/new").bodyAsText()
 
             assertTrue(body.contains("""pattern="[a-z0-9-]+""""))
+        }
+
+    @Test
+    fun `the create form does not disable the client credentials checkbox`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body =
+                authed.get("/admin/workspaces/$tenantSlug/applications/new").bodyAsText()
+
+            val checkbox =
+                Regex("""<input[^>]*value="client_credentials"[^>]*>""").find(body)?.value
+            assertTrue(checkbox != null, "client_credentials checkbox not found in create form")
+            assertFalse(checkbox.contains("disabled"))
         }
 
     // =========================================================================

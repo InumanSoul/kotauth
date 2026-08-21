@@ -29,12 +29,13 @@ private fun grantTypeHint(grant: GrantType): String =
         GrantType.REFRESH_TOKEN -> EnglishStrings.GRANT_REFRESH_TOKEN_HINT
     }
 
-// Grant-type checkbox group shared by the create and edit forms. `client_credentials` is
-// disabled when the access type isn't confidential — the server rejects that combination anyway.
+// Grant-type checkbox group shared by the create and edit forms. All grants are selectable
+// regardless of access type — the client_credentials + confidential constraint is stated in
+// its hint and enforced server-side, since disabling the checkbox would block picking
+// "Confidential" and "client_credentials" together in a single submit.
 private fun DIV.grantTypeCheckboxes(
     formId: String,
     selected: Set<GrantType>,
-    confidential: Boolean,
 ) {
     div("edit-row") {
         span("edit-row__label") { +EnglishStrings.GRANT_TYPES_LABEL }
@@ -45,9 +46,6 @@ private fun DIV.grantTypeCheckboxes(
                         attributes["form"] = formId
                         attributes["value"] = grant.value
                         if (grant in selected) checked = true
-                        if (grant == GrantType.CLIENT_CREDENTIALS && !confidential) {
-                            disabled = true
-                        }
                     }
                     div("check-row__body") {
                         span("check-row__label") { +grant.label }
@@ -515,7 +513,6 @@ internal fun createApplicationPageImpl(
                 grantTypeCheckboxes(
                     formId = "create-app-form",
                     selected = prefill.grantTypes,
-                    confidential = prefill.accessType == "confidential",
                 )
                 div("edit-row") {
                     span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
@@ -692,7 +689,6 @@ internal fun editApplicationPageImpl(
                 grantTypeCheckboxes(
                     formId = "edit-app-form",
                     selected = application.grantTypes,
-                    confidential = application.accessType == AccessType.CONFIDENTIAL,
                 )
                 div("edit-row") {
                     span("edit-row__label") { +EnglishStrings.APPLICATION_AUDIENCE_LABEL }
