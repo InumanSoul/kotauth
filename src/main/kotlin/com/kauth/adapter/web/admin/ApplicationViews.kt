@@ -211,24 +211,34 @@ internal fun applicationDetailPageImpl(
 
             // ── Authorized APIs ──────────────────────────────────────
             if (authorizedApis != null) {
+                val authorizedApisHref =
+                    "/admin/workspaces/${workspace.slug}/applications/" +
+                        "${application.clientId}/authorized-apis"
                 div("ov-card") {
                     div("ov-card__section-label") {
                         +EnglishStrings.AUTHORIZED_APIS_CARD_TITLE
                         a(
-                            href =
-                                "/admin/workspaces/${workspace.slug}/applications/" +
-                                    "${application.clientId}/authorized-apis",
+                            href = authorizedApisHref,
                             classes = "btn btn--ghost btn--sm",
                         ) { +EnglishStrings.AUTHORIZED_APIS_CARD_ACTION }
                     }
                     if (authorizedApis.isEmpty()) {
-                        p("edit-row__hint") {
-                            style = "padding:8px 16px 12px;"
-                            +EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY
+                        emptyState(
+                            iconName = "code",
+                            title = EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY_TITLE,
+                            description = EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY,
+                        ) {
+                            a(
+                                href = authorizedApisHref,
+                                classes = "empty-state__cta",
+                            ) { +EnglishStrings.AUTHORIZED_APIS_CARD_ACTION }
                         }
                     } else {
                         authorizedApis.forEach { rs ->
-                            ovRowMono(rs.name, rs.identifier)
+                            div("ov-card__row") {
+                                span("ov-card__value") { +rs.name }
+                                span("ov-card__value ov-card__value--mono") { +rs.identifier }
+                            }
                         }
                     }
                 }

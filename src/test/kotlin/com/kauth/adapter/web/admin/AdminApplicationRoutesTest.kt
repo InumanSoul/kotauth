@@ -373,7 +373,11 @@ class AdminApplicationRoutesTest {
 
             assertTrue(body.contains("/admin/workspaces/$tenantSlug/applications/${created.clientId}/authorized-apis"))
             assertTrue(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_TITLE))
+            assertTrue(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY_TITLE))
             assertTrue(body.contains(EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY))
+            // Confirms the "code" icon resolved to real markup rather than inlineSvgIcon
+            // silently rendering nothing for an unknown icon name.
+            assertTrue(body.contains("""aria-label="${EnglishStrings.AUTHORIZED_APIS_CARD_EMPTY_TITLE}""""))
         }
 
     @Test
