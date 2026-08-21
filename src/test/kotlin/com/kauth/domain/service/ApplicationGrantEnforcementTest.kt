@@ -296,8 +296,17 @@ class ApplicationGrantEnforcementTest {
 
     @Test
     fun `refresh is refused when the client is not registered for it`() {
-        val app = apps.add(publicApp(clientId = "no-refresh", grants = setOf(GrantType.AUTHORIZATION_CODE)))
-        val refreshToken = establishSession(app)
+        // Exchange while the client still holds refresh_token so a refresh credential exists,
+        // then narrow the client's grants — mirrors an admin removing refresh_token after issuance.
+        val grantedApp =
+            apps.add(
+                publicApp(
+                    clientId = "no-refresh",
+                    grants = setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN),
+                ),
+            )
+        val refreshToken = establishSession(grantedApp)
+        val app = apps.add(grantedApp.copy(grantTypes = setOf(GrantType.AUTHORIZATION_CODE)))
 
         val result = svc.refreshTokens(tenantSlug = "acme", refreshToken = refreshToken, clientId = app.clientId)
 
