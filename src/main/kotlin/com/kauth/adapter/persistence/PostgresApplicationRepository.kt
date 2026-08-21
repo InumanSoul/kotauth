@@ -19,14 +19,21 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 class PostgresApplicationRepository : ApplicationRepository {
     override fun findByTenantId(tenantId: TenantId): List<Application> =
         transaction {
-            ClientsTable
-                .selectAll()
-                .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.isDeleted eq false) }
-                .orderBy(ClientsTable.id)
-                .map { row ->
-                    val uris = urisForClientPk(row[ClientsTable.id])
-                    row.toApplication(uris, grantsForClientPk(row[ClientsTable.id]))
-                }
+            val rows =
+                ClientsTable
+                    .selectAll()
+                    .where { (ClientsTable.tenantId eq tenantId.value) and (ClientsTable.isDeleted eq false) }
+                    .orderBy(ClientsTable.id)
+                    .toList()
+
+            val clientPks = rows.map { it[ClientsTable.id] }
+            val urisByClientPk = urisForClientPks(clientPks)
+            val grantsByClientPk = grantsForClientPks(clientPks)
+
+            rows.map { row ->
+                val pk = row[ClientsTable.id]
+                row.toApplication(urisByClientPk[pk].orEmpty(), grantsByClientPk[pk].orEmpty())
+            }
         }
 
     override fun findByClientId(
@@ -194,6 +201,29 @@ class PostgresApplicationRepository : ApplicationRepository {
             .where { ClientGrantTypesTable.clientId eq clientPk }
             .mapNotNull { GrantType.fromValue(it[ClientGrantTypesTable.grantType]) }
             .toSet()
+
+    /** Batched form of [urisForClientPk] for list endpoints — one query for all client PKs. */
+    private fun urisForClientPks(clientPks: List<Int>): Map<Int, List<String>> {
+        if (clientPks.isEmpty()) return emptyMap()
+        return ClientRedirectUrisTable
+            .selectAll()
+            .where { ClientRedirectUrisTable.clientId inList clientPks }
+            .orderBy(ClientRedirectUrisTable.id)
+            .groupBy({ it[ClientRedirectUrisTable.clientId] }) { it[ClientRedirectUrisTable.uri] }
+    }
+
+    /** Batched form of [grantsForClientPk] for list endpoints — one query for all client PKs. */
+    private fun grantsForClientPks(clientPks: List<Int>): Map<Int, Set<GrantType>> {
+        if (clientPks.isEmpty()) return emptyMap()
+        return ClientGrantTypesTable
+            .selectAll()
+            .where { ClientGrantTypesTable.clientId inList clientPks }
+            .mapNotNull { row ->
+                val grant = GrantType.fromValue(row[ClientGrantTypesTable.grantType]) ?: return@mapNotNull null
+                row[ClientGrantTypesTable.clientId] to grant
+            }.groupBy({ it.first }) { it.second }
+            .mapValues { it.value.toSet() }
+    }
 
     private fun replaceGrantsForClientPk(
         clientPk: Int,
