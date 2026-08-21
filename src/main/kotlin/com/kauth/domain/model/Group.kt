@@ -17,6 +17,7 @@ data class Group(
     val tenantId: TenantId,
     val name: String,
     val description: String? = null,
+    val externalId: String? = null,
     val parentGroupId: GroupId? = null,
     val attributes: Map<String, String> = emptyMap(),
     val roleIds: List<RoleId> = emptyList(),
