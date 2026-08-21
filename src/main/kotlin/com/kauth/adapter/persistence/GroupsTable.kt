@@ -12,6 +12,7 @@ object GroupsTable : Table("groups") {
     val tenantId = integer("tenant_id") references TenantsTable.id
     val name = varchar("name", 100)
     val description = varchar("description", 500).nullable()
+    val externalId = varchar("external_id", 255).nullable()
     val parentGroupId = (integer("parent_group_id") references GroupsTable.id).nullable()
     val attributes = jsonb("attributes").default("{}") // JSONB — see JsonbColumnType
     val createdAt = timestampWithTimeZone("created_at")

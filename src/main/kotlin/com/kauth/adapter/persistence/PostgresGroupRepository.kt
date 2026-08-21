@@ -79,6 +79,7 @@ class PostgresGroupRepository : GroupRepository {
                     it[tenantId] = group.tenantId.value
                     it[name] = group.name
                     it[description] = group.description
+                    it[externalId] = group.externalId
                     it[parentGroupId] = group.parentGroupId?.value
                     it[attributes] = serializeAttributes(group.attributes)
                     it[createdAt] = OffsetDateTime.now(ZoneOffset.UTC)
@@ -92,6 +93,7 @@ class PostgresGroupRepository : GroupRepository {
             GroupsTable.update({ GroupsTable.id eq group.id!!.value }) {
                 it[name] = group.name
                 it[description] = group.description
+                it[externalId] = group.externalId
                 it[parentGroupId] = group.parentGroupId?.value
                 it[attributes] = serializeAttributes(group.attributes)
             }
@@ -217,6 +219,7 @@ class PostgresGroupRepository : GroupRepository {
             tenantId = TenantId(this[GroupsTable.tenantId]),
             name = this[GroupsTable.name],
             description = this[GroupsTable.description],
+            externalId = this[GroupsTable.externalId],
             parentGroupId = this[GroupsTable.parentGroupId]?.let { GroupId(it) },
             attributes = parseAttributes(this[GroupsTable.attributes]),
             roleIds =
