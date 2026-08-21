@@ -1,7 +1,9 @@
 package com.kauth.infrastructure
 
+import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.RoleScope
@@ -144,9 +146,12 @@ class DemoSeedService(
                 tenantId = updated.id,
                 clientId = "acme-dashboard",
                 name = "Acme Dashboard",
-                description = "Internal admin dashboard",
+                description = "Internal admin dashboard, backed by a service account for scheduled jobs",
                 accessType = "confidential",
                 redirectUris = listOf("$baseUrl/callback", "http://localhost:3000/callback"),
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+                clientSecretHash = null,
+                audience = null,
             )
         applicationRepository.create(
             tenantId = updated.id,
@@ -155,6 +160,9 @@ class DemoSeedService(
             description = "iOS and Android mobile application",
             accessType = "public",
             redirectUris = listOf("com.acme.mobile://callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.fromValue("public")),
+            clientSecretHash = null,
+            audience = null,
         )
 
         // Client-scoped role (requires app to exist first)
@@ -282,6 +290,9 @@ class DemoSeedService(
             description = "Main web application",
             accessType = "confidential",
             redirectUris = listOf("$baseUrl/callback", "http://localhost:5173/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.fromValue("confidential")),
+            clientSecretHash = null,
+            audience = null,
         )
 
         // Users
