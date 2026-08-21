@@ -250,6 +250,46 @@ class AdminServicesTest {
     }
 
     @Test
+    fun `createUser - email-shaped username is accepted`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "ada.lovelace@example.com",
+                email = "ada@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - plus-addressed username is accepted`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "ada+scim@example.com",
+                email = "ada2@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - username with slash is rejected`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob/smith",
+                email = "bob@x.com",
+                fullName = "Bob",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `createUser - invalid email`() {
         val result =
             userSvc.createUser(

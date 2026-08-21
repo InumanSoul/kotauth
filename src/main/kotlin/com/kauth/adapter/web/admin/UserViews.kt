@@ -907,10 +907,10 @@ internal fun createUserPageImpl(
                                 placeholder = "johndoe"
                                 autoComplete = "off"
                                 attributes["spellcheck"] = "false"
-                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                                attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                             }
                             div("edit-row__hint") {
-                                +"Letters, digits, dots, underscores, hyphens. Immutable after creation."
+                                +"Letters, digits, dots, underscores, hyphens, @, and +. Immutable after creation."
                             }
                         }
                     }

@@ -40,9 +40,11 @@ class AdminUserService(
         if (username.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
         }
-        if (!username.matches(Regex("[a-zA-Z0-9._-]+"))) {
+        if (!username.matches(Regex("[a-zA-Z0-9._@+-]+"))) {
             return AdminResult.Failure(
-                AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."),
+                AdminError.Validation(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
             )
         }
         if (email.isBlank() || !email.contains('@')) {

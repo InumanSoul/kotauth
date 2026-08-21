@@ -134,6 +134,20 @@ class RoleGroupServiceTest {
     }
 
     @Test
+    fun `createRole - name with at sign is rejected`() {
+        val result =
+            svc.createRole(
+                tenantId = TenantId(1),
+                name = "admin@example.com",
+                description = null,
+                scope = RoleScope.TENANT,
+                clientId = null,
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `createRole - client scope without clientId`() {
         val result =
             svc.createRole(
