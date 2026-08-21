@@ -309,6 +309,26 @@ class ApiApplicationRoutesTest {
         }
 
     @Test
+    fun `POST applications returns 422 and does not create the app when grantTypes contains an unknown value`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/applications") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"clientId":"typo-app","name":"Typo App","accessType":"public",""" +
+                            """"redirectUris":["https://example.com/callback"],"grantTypes":["authorization_code","typo"]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(response.bodyAsText().contains("typo"))
+            assertNull(appRepo.findByClientId(TenantId(1), "typo-app"))
+        }
+
+    @Test
     fun `POST applications returns 422 when clientId has uppercase`() =
         testApplication {
             application { installTestApp() }

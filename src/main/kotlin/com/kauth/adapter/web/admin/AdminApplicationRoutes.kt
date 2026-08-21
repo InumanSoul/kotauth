@@ -54,6 +54,10 @@ fun Route.adminApplicationRoutes(
                     ?.lines()
                     ?.map { it.trim() }
                     ?.filter { it.isNotBlank() } ?: emptyList()
+            // Dropping unrecognized values here is safe: these are checkboxes this same
+            // server rendered, so an unrecognized value can only come from a tampered
+            // request, not an operator's honest selection (unlike the REST API, where a
+            // caller-supplied grant list must be validated strictly).
             val grantTypes =
                 params
                     .getAll("grantTypes")
@@ -187,6 +191,9 @@ fun Route.adminApplicationRoutes(
                         ?.lines()
                         ?.map { it.trim() }
                         ?.filter { it.isNotBlank() } ?: emptyList()
+                // See the comment on the create-form grantTypes parsing above: dropping
+                // unrecognized values is safe here because they come from server-rendered
+                // checkboxes, not an untrusted caller-supplied list.
                 val grantTypes =
                     params
                         .getAll("grantTypes")

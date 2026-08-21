@@ -9,6 +9,7 @@ import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.ApplicationManagementService
 import com.kauth.domain.service.RoleGroupService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -62,10 +63,11 @@ internal fun Route.apiApplicationRoutes(
             val tenantId = call.attributes[TenantIdAttr]
             val body = call.receive<CreateApplicationRequest>()
             val grantTypes =
-                body.grantTypes
-                    ?.mapNotNull { GrantType.fromValue(it) }
-                    ?.toSet()
-                    ?: setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN)
+                if (body.grantTypes != null) {
+                    call.parseGrantTypesOrRespondInvalid(body.grantTypes) ?: return@post
+                } else {
+                    setOf(GrantType.AUTHORIZATION_CODE, GrantType.REFRESH_TOKEN)
+                }
 
             when (
                 val result =
@@ -196,4 +198,24 @@ internal fun Route.apiApplicationRoutes(
             }
         }
     }
+}
+
+/**
+ * Parses raw `grantTypes` strings from a request body into [GrantType]s, or responds 422 and
+ * returns null if any value is unrecognized. Unlike the admin UI form (whose checkboxes only
+ * ever submit values the server itself rendered), a REST caller can send anything — silently
+ * dropping an unrecognized value would create a client with a different grant set than the
+ * caller asked for.
+ */
+private suspend fun ApplicationCall.parseGrantTypesOrRespondInvalid(raw: List<String>): Set<GrantType>? {
+    val unknown = raw.filter { GrantType.fromValue(it) == null }
+    if (unknown.isNotEmpty()) {
+        respondProblem(
+            HttpStatusCode.UnprocessableEntity,
+            "Validation Error",
+            "Unrecognized grant type(s): ${unknown.joinToString(", ")}",
+        )
+        return null
+    }
+    return raw.mapNotNull { GrantType.fromValue(it) }.toSet()
 }
