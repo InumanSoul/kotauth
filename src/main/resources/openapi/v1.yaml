@@ -285,7 +285,6 @@ components:
 
     UpdateApplicationRequest:
       type: object
-      required: [name, accessType, redirectUris]
       properties:
         name:         { type: string }
         description:  { type: string, nullable: true }
