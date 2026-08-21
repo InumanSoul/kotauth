@@ -343,6 +343,23 @@ class ApplicationManagementServiceTest {
     }
 
     @Test
+    fun `createApplication rejects a bearer only client with grants selected`() {
+        val result =
+            service.createApplication(
+                tenantId = tenantId,
+                clientId = "bearer-with-grants",
+                name = "Bearer With Grants",
+                description = null,
+                accessType = "bearer_only",
+                redirectUris = emptyList(),
+                grantTypes = setOf(GrantType.AUTHORIZATION_CODE),
+            )
+
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `createApplication issues a client secret for a confidential client`() {
         val result =
             service.createApplication(

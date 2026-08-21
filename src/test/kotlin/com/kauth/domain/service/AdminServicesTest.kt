@@ -656,6 +656,19 @@ class AdminServicesTest {
     }
 
     @Test
+    fun `updateApplication - rejects bearer only access type when grants are still selected`() {
+        val result =
+            appSvc.updateApplication(
+                appId = ApplicationId(100),
+                tenantId = TenantId(1),
+                accessType = "bearer_only",
+                grantTypes = setOf(GrantType.CLIENT_CREDENTIALS),
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `updateApplication - rejects when redirect URIs is empty`() {
         val result =
             appSvc.updateApplication(

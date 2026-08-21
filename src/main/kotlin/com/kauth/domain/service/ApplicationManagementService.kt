@@ -56,6 +56,15 @@ class ApplicationManagementService(
                 AdminError.Validation("Select at least one grant type this application will use."),
             )
         }
+        if (resolvedAccessType == AccessType.BEARER_ONLY && grantTypes.isNotEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Bearer-only applications validate tokens and never initiate a flow, so they " +
+                        "cannot be registered for any grant type. Clear the selected grants, or change " +
+                        "the access type to public or confidential.",
+                ),
+            )
+        }
         if (GrantType.CLIENT_CREDENTIALS in grantTypes && resolvedAccessType != AccessType.CONFIDENTIAL) {
             return AdminResult.Failure(
                 AdminError.Validation(
@@ -158,6 +167,15 @@ class ApplicationManagementService(
         if (resolvedGrantTypes.isEmpty() && resolvedAccessTypeEnum != AccessType.BEARER_ONLY) {
             return AdminResult.Failure(
                 AdminError.Validation("Select at least one grant type this application will use."),
+            )
+        }
+        if (resolvedAccessTypeEnum == AccessType.BEARER_ONLY && resolvedGrantTypes.isNotEmpty()) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Bearer-only applications validate tokens and never initiate a flow, so they " +
+                        "cannot be registered for any grant type. Clear the selected grants, or change " +
+                        "the access type to public or confidential.",
+                ),
             )
         }
         if (GrantType.CLIENT_CREDENTIALS in resolvedGrantTypes && resolvedAccessTypeEnum != AccessType.CONFIDENTIAL) {
