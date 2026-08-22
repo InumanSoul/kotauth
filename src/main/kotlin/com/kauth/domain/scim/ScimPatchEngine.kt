@@ -1,12 +1,9 @@
 package com.kauth.domain.scim
 
-// RFC 7644 §3.5.2 PATCH semantics implemented here:
-//  - add on a multi-valued attribute appends to the existing collection.
-//  - add/replace on a singular (sub-)attribute overwrites just that attribute.
-//  - remove with a valued (filtered) path removes only the matching element(s);
-//    a plain path clears the whole attribute.
-//  - replace with a plain path on a multi-valued attribute replaces the entire list.
-//  - a null path merges [ScimPatchOp.value] into the resource as a partial update.
+// A ScimValue.Null attribute (explicitly cleared, see ScimResource.kt) is treated the
+// same as an absent one throughout this engine: cleared and never-set both mean "no
+// value here" for PATCH purposes, even though the distinction still matters for PUT
+// semantics at the mapping layer.
 
 enum class ScimPatchOpType { ADD, REPLACE, REMOVE }
 
@@ -97,7 +94,7 @@ class ScimPatchEngine {
         }
         // Whether to append is decided by the arity of the EXISTING value, not the
         // incoming one: a bare Complex added to an existing collection must still append.
-        val existing = resource.attributes[path.name]
+        val existing = normalizeAbsent(resource.attributes[path.name])
         val merged =
             when {
                 existing is ScimValue.MultiValued -> {
@@ -122,7 +119,7 @@ class ScimPatchEngine {
         val newValue = value ?: throw PatchException(ScimErrorType.invalidValue, "replace requires a value")
         val sub = path.sub ?: return resource.copy(attributes = resource.attributes + (path.name to newValue))
         val complex =
-            when (val current = resource.attributes[path.name]) {
+            when (val current = normalizeAbsent(resource.attributes[path.name])) {
                 null -> ScimValue.Complex(emptyMap())
                 is ScimValue.Complex -> current
                 else -> throw PatchException(ScimErrorType.invalidValue, "'${path.name}' is not a complex attribute")
@@ -140,7 +137,7 @@ class ScimPatchEngine {
         requireKnownAttribute(attr.name)
         // A valued path targets elements of an existing collection; nothing to target
         // when the attribute is absent means the operation is a no-op, not an error.
-        val existing = resource.attributes[attr.name] ?: return resource
+        val existing = normalizeAbsent(resource.attributes[attr.name]) ?: return resource
         val current =
             existing as? ScimValue.MultiValued
                 ?: throw PatchException(ScimErrorType.invalidValue, "'${attr.name}' is not multi-valued")
@@ -202,6 +199,9 @@ class ScimPatchEngine {
             throw PatchException(ScimErrorType.invalidPath, "unknown attribute '$name'")
         }
     }
+
+    /** An explicitly cleared value is, for PATCH purposes, indistinguishable from an absent one. */
+    private fun normalizeAbsent(value: ScimValue?): ScimValue? = if (value == ScimValue.Null) null else value
 }
 
 /** Internal-only: carries a typed, human-readable apply failure up to [ScimPatchEngine.apply]. */
