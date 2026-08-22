@@ -17,6 +17,14 @@ data class ScimPatchOp(
 private val KNOWN_ATTRIBUTES =
     setOf("userName", "externalId", "displayName", "active", "name", "emails", "members", "id", "schemas", "meta")
 
+// Sub-attribute vocabulary is only pinned down for the complex attributes this
+// implementation actually supports; attributes not listed here go unchecked at this level.
+private val KNOWN_SUB_ATTRIBUTES =
+    mapOf(
+        "name" to setOf("givenName", "familyName"),
+        "emails" to setOf("value", "type", "primary"),
+    )
+
 class ScimPatchEngine {
     /** Applies [ops] in order to a copy of [resource]. All-or-nothing: [resource] is never mutated. */
     fun apply(
@@ -64,6 +72,7 @@ class ScimPatchEngine {
         path: ScimPath.Attr,
     ): ScimResource {
         requireKnownAttribute(path.name)
+        path.sub?.let { requireKnownSubAttribute(path.name, it) }
         return when (op.op) {
             ScimPatchOpType.REMOVE -> removeAttr(resource, path)
             ScimPatchOpType.ADD -> addAttr(resource, path, op.value)
@@ -135,6 +144,7 @@ class ScimPatchEngine {
     ): ScimResource {
         val attr = path.attr
         requireKnownAttribute(attr.name)
+        path.sub?.let { requireKnownSubAttribute(attr.name, it) }
         // A valued path targets elements of an existing collection; nothing to target
         // when the attribute is absent means the operation is a no-op, not an error.
         val existing = normalizeAbsent(resource.attributes[attr.name]) ?: return resource
@@ -204,6 +214,16 @@ class ScimPatchEngine {
     private fun requireKnownAttribute(name: String) {
         if (name !in KNOWN_ATTRIBUTES) {
             throw PatchException(ScimErrorType.invalidPath, "unknown attribute '$name'")
+        }
+    }
+
+    private fun requireKnownSubAttribute(
+        attrName: String,
+        sub: String,
+    ) {
+        val allowed = KNOWN_SUB_ATTRIBUTES[attrName] ?: return
+        if (sub !in allowed) {
+            throw PatchException(ScimErrorType.invalidPath, "unknown sub-attribute '$attrName.$sub'")
         }
     }
 
