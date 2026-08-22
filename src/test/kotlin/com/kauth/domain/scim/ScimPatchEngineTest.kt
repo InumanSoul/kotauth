@@ -182,4 +182,86 @@ class ScimPatchEngineTest {
 
         assertEquals(listOf("1"), membersOf(out))
     }
+
+    @Test
+    fun `add of a bare complex to a multi-valued attribute still appends`() {
+        // Regression guard for the "add overwrites unless already wrapped" bug: the append
+        // decision must be driven by the existing attribute's shape, not the incoming value's.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.ADD, parsePath("members").getOrThrow(), member("3")),
+            ).getOrThrow()
+
+        assertEquals(listOf("1", "2", "3"), membersOf(out))
+    }
+
+    @Test
+    fun `add of a multi-valued value to an existing singular attribute promotes it`() {
+        val r = ScimResource(schemas = emptyList(), attributes = mapOf("displayName" to ScimValue.Str("eng")))
+        val out =
+            apply(
+                r,
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    parsePath("displayName").getOrThrow(),
+                    ScimValue.MultiValued(listOf(ScimValue.Str("extra"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(
+            ScimValue.MultiValued(listOf(ScimValue.Str("eng"), ScimValue.Str("extra"))),
+            out.attributes["displayName"],
+        )
+    }
+
+    @Test
+    fun `remove with a valued path on a null attribute is a no-op`() {
+        val r = ScimResource(schemas = emptyList(), attributes = mapOf("members" to ScimValue.Null))
+        val out =
+            apply(r, ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("""members[value eq "1"]""").getOrThrow(), null))
+                .getOrThrow()
+
+        assertEquals(ScimValue.Null, out.attributes["members"])
+    }
+
+    @Test
+    fun `replace on a sub-attribute of a null parent succeeds`() {
+        val r = ScimResource(schemas = emptyList(), attributes = mapOf("name" to ScimValue.Null))
+        val out =
+            apply(
+                r,
+                ScimPatchOp(ScimPatchOpType.REPLACE, parsePath("name.givenName").getOrThrow(), ScimValue.Str("Ada")),
+            ).getOrThrow()
+
+        val name = out.attributes["name"] as ScimValue.Complex
+        assertEquals(ScimValue.Str("Ada"), name.attributes["givenName"])
+    }
+
+    @Test
+    fun `a valued remove that empties the collection drops the key like a plain remove`() {
+        val out =
+            apply(
+                group("1"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("""members[value eq "1"]""").getOrThrow(), null),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["members"] == null)
+    }
+
+    @Test
+    fun `an unknown sub-attribute fails rather than being silently dropped`() {
+        val r =
+            ScimResource(
+                schemas = emptyList(),
+                attributes = mapOf("name" to ScimValue.Complex(mapOf("givenName" to ScimValue.Str("Ada")))),
+            )
+        val result =
+            apply(
+                r,
+                ScimPatchOp(ScimPatchOpType.REPLACE, parsePath("name.middleInitial").getOrThrow(), ScimValue.Str("L")),
+            )
+
+        assertEquals(ScimErrorType.invalidPath, (result.exceptionOrNull() as ScimFailure).type)
+    }
 }
