@@ -264,4 +264,34 @@ class ScimPatchEngineTest {
 
         assertEquals(ScimErrorType.invalidPath, (result.exceptionOrNull() as ScimFailure).type)
     }
+
+    @Test
+    fun `add of a bare complex after a valued remove empties the collection stays multi-valued`() {
+        // Regression guard: dropping the key when a valued remove empties a collection
+        // must not make a later bare-value add store a scalar in its place.
+        val out =
+            apply(
+                group("1"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("""members[value eq "1"]""").getOrThrow(), null),
+                ScimPatchOp(ScimPatchOpType.ADD, parsePath("members").getOrThrow(), member("9")),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["members"] is ScimValue.MultiValued)
+        assertEquals(listOf("9"), membersOf(out))
+    }
+
+    @Test
+    fun `an unknown member sub-attribute fails rather than being silently dropped`() {
+        val result =
+            apply(
+                group("1"),
+                ScimPatchOp(
+                    ScimPatchOpType.REPLACE,
+                    parsePath("""members[value eq "1"].dispaly""").getOrThrow(),
+                    ScimValue.Str("x"),
+                ),
+            )
+
+        assertEquals(ScimErrorType.invalidPath, (result.exceptionOrNull() as ScimFailure).type)
+    }
 }
