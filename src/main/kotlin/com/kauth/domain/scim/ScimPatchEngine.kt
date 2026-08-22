@@ -28,6 +28,8 @@ private val KNOWN_SUB_ATTRIBUTES =
     mapOf(
         "name" to setOf("givenName", "familyName"),
         "emails" to setOf("value", "type", "primary"),
+        // RFC 7643 §4.2 defines this set for the Group "members" attribute.
+        "members" to setOf("value", "\$ref", "type", "display"),
     )
 
 class ScimPatchEngine {
