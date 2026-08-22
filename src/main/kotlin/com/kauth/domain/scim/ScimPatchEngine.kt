@@ -17,6 +17,11 @@ data class ScimPatchOp(
 private val KNOWN_ATTRIBUTES =
     setOf("userName", "externalId", "displayName", "active", "name", "emails", "members", "id", "schemas", "meta")
 
+// The target arity of a path is a property of the attribute's definition, not of what
+// happens to be stored under it right now — inferring arity from a (possibly absent)
+// runtime value is what let ADD collapse a collection into a scalar.
+private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
+
 // Sub-attribute vocabulary is only pinned down for the complex attributes this
 // implementation actually supports; attributes not listed here go unchecked at this level.
 private val KNOWN_SUB_ATTRIBUTES =
@@ -109,6 +114,12 @@ class ScimPatchEngine {
                 existing is ScimValue.MultiValued -> {
                     val incoming = if (newValue is ScimValue.MultiValued) newValue.values else listOf(newValue)
                     ScimValue.MultiValued(existing.values + incoming)
+                }
+                // The attribute is absent (or was just cleared to empty) but its definition
+                // is multi-valued: the target shape still has to be a collection.
+                existing == null && path.name in MULTI_VALUED_ATTRIBUTES -> {
+                    val incoming = if (newValue is ScimValue.MultiValued) newValue.values else listOf(newValue)
+                    ScimValue.MultiValued(incoming)
                 }
                 existing == null -> newValue
                 // Existing is a singular scalar and the incoming value is a collection:
