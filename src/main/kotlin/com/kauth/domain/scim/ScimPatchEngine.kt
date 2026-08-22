@@ -95,13 +95,23 @@ class ScimPatchEngine {
         if (path.sub != null) {
             return replaceAttr(resource, path, newValue)
         }
-        if (newValue is ScimValue.MultiValued) {
-            val existing = (resource.attributes[path.name] as? ScimValue.MultiValued)?.values ?: emptyList()
-            val appended = ScimValue.MultiValued(existing + newValue.values)
-            return resource.copy(attributes = resource.attributes + (path.name to appended))
-        }
-        // Adding a singular value to a singular attribute is equivalent to replacing it.
-        return resource.copy(attributes = resource.attributes + (path.name to newValue))
+        // Whether to append is decided by the arity of the EXISTING value, not the
+        // incoming one: a bare Complex added to an existing collection must still append.
+        val existing = resource.attributes[path.name]
+        val merged =
+            when {
+                existing is ScimValue.MultiValued -> {
+                    val incoming = if (newValue is ScimValue.MultiValued) newValue.values else listOf(newValue)
+                    ScimValue.MultiValued(existing.values + incoming)
+                }
+                existing == null -> newValue
+                // Existing is a singular scalar and the incoming value is a collection:
+                // promote rather than silently drop the old value.
+                newValue is ScimValue.MultiValued -> ScimValue.MultiValued(listOf(existing) + newValue.values)
+                // Both singular: adding a singular value to a singular attribute is a set.
+                else -> newValue
+            }
+        return resource.copy(attributes = resource.attributes + (path.name to merged))
     }
 
     private fun replaceAttr(
