@@ -166,7 +166,14 @@ class ScimPatchEngine {
                     }
                 }
             }
-        return resource.copy(attributes = resource.attributes + (attr.name to ScimValue.MultiValued(updated)))
+        // RFC 7644 §3.5.2.2: a collection reduced to zero elements is unassigned. Removing
+        // the key here matches the plain-path remove form, so both representations of
+        // "empty" converge instead of disagreeing.
+        return if (sub == null && updated.isEmpty()) {
+            resource.copy(attributes = resource.attributes - attr.name)
+        } else {
+            resource.copy(attributes = resource.attributes + (attr.name to ScimValue.MultiValued(updated)))
+        }
     }
 
     private fun replaceValued(
