@@ -91,7 +91,10 @@ object ScimUserMapper {
         val givenName = (name?.attributes?.get("givenName") as? ScimValue.Str)?.value
         val familyName = (name?.attributes?.get("familyName") as? ScimValue.Str)?.value
 
-        val explicitDisplayName = (resource.attributes["displayName"] as? ScimValue.Str)?.value
+        // A blank displayName ("" or whitespace) is common in connector payloads for a
+        // cleared field; treated as absent so the chain falls through instead of storing "".
+        val explicitDisplayName =
+            (resource.attributes["displayName"] as? ScimValue.Str)?.value?.trim()?.takeIf { it.isNotEmpty() }
         val composedName =
             listOfNotNull(givenName, familyName)
                 .joinToString(" ")
@@ -116,12 +119,16 @@ object ScimUserMapper {
                 ?.takeIf { it.isNotEmpty() }
                 ?: existing?.externalId
 
+        // Same emptiness guard as displayName: a work entry with value "" must fall through
+        // to the existing address rather than blank it.
         val email =
             (resource.attributes["emails"] as? ScimValue.MultiValued)
                 ?.values
                 ?.filterIsInstance<ScimValue.Complex>()
                 ?.firstOrNull { (it.attributes["type"] as? ScimValue.Str)?.value == "work" }
                 ?.let { (it.attributes["value"] as? ScimValue.Str)?.value }
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
                 ?: existing?.email
                 ?: ""
 

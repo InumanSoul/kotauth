@@ -136,6 +136,35 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `an empty displayName falls through to the composed name`() {
+        // A cleared field often serialises as "" rather than being omitted; it must not
+        // win over a real composed name.
+        val r =
+            resourceWithName(given = "Grace", family = "Hopper")
+                .let { it.copy(attributes = it.attributes + ("displayName" to ScimValue.Str(""))) }
+
+        assertEquals(
+            "Grace Hopper",
+            ScimUserMapper
+                .toDomain(r, null, tenantId)
+                .getOrThrow()
+                .user.fullName,
+        )
+    }
+
+    @Test
+    fun `an empty displayName on update preserves the existing fullName`() {
+        val existing = user()
+        val r =
+            resourceWithName(given = null, family = null)
+                .let { it.copy(attributes = it.attributes + ("displayName" to ScimValue.Str("  "))) }
+
+        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+
+        assertEquals(existing.fullName, write.user.fullName)
+    }
+
+    @Test
     fun `toDomain rejects a composed fullName that exceeds the column`() {
         // full_name is varchar(255); two long parts can exceed it even though each fits.
         val r = resourceWithName(given = "g".repeat(200), family = "f".repeat(200))
@@ -207,6 +236,7 @@ class ScimUserMapperTest {
         val original = user()
         val back = ScimUserMapper.toDomain(ScimUserMapper.toResource(original), original, tenantId).getOrThrow().user
 
+        assertEquals(original.id, back.id)
         assertEquals(original.username, back.username)
         assertEquals(original.email, back.email)
         assertEquals(original.externalId, back.externalId)
