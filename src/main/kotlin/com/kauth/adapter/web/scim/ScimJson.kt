@@ -25,6 +25,10 @@ import kotlinx.serialization.json.putJsonArray
 private const val SCHEMAS_KEY = "schemas"
 private const val OPERATIONS_KEY = "Operations"
 
+// Bounds recursion depth against a pathologically nested request body; not a grammar rule.
+// Matches the filter parser's cap so the two decoders agree on what "too deep" means.
+private const val MAX_JSON_NESTING_DEPTH = 32
+
 /**
  * Decodes a JSON resource body into the protocol's neutral tree.
  *
@@ -40,10 +44,11 @@ fun JsonElement.toScimResource(): Result<ScimResource> {
         (obj[SCHEMAS_KEY] as? JsonArray)
             ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
             ?: emptyList()
-    val attributes =
-        obj.entries
-            .filter { it.key != SCHEMAS_KEY }
-            .associate { (key, value) -> key to value.toScimValue() }
+    val attributes = mutableMapOf<String, ScimValue>()
+    for ((key, value) in obj.entries) {
+        if (key == SCHEMAS_KEY) continue
+        attributes[key] = value.toScimValue().getOrElse { return Result.failure(it) }
+    }
     return Result.success(ScimResource(schemas = schemas, attributes = attributes))
 }
 
@@ -78,7 +83,12 @@ fun JsonElement.toScimPatchOps(): Result<List<ScimPatchOp>> {
         val path = opObj.toScimPath().getOrElse { return Result.failure(it) }
         // "value" absent means no value at all (Kotlin null); "value": null means an explicit
         // ScimValue.Null — the same distinction toScimResource preserves for resource bodies.
-        val value = if ("value" in opObj) opObj.getValue("value").toScimValue() else null
+        val value =
+            if ("value" in opObj) {
+                opObj.getValue("value").toScimValue().getOrElse { return Result.failure(it) }
+            } else {
+                null
+            }
         ops.add(ScimPatchOp(opType, path, value))
     }
     return Result.success(ops)
@@ -106,22 +116,43 @@ private fun JsonObject.toScimPath(): Result<ScimPath?> =
         else -> Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "'path' must be a string"))
     }
 
-private fun JsonElement.toScimValue(): ScimValue =
-    when (this) {
-        is JsonNull -> ScimValue.Null
+// depth counts JsonObject/JsonArray levels already descended through, so a pathologically
+// nested body fails as a value (400) instead of unwinding the JVM stack (StackOverflowError,
+// an Error the Result contract cannot carry).
+private fun JsonElement.toScimValue(depth: Int = 0): Result<ScimValue> {
+    if (depth > MAX_JSON_NESTING_DEPTH) {
+        return Result.failure(
+            ScimFailure(ScimErrorType.invalidSyntax, "value nesting exceeds maximum depth of $MAX_JSON_NESTING_DEPTH"),
+        )
+    }
+    return when (this) {
+        is JsonNull -> Result.success(ScimValue.Null)
         is JsonPrimitive ->
             when {
-                isString -> ScimValue.Str(content)
+                isString -> Result.success(ScimValue.Str(content))
                 else ->
-                    booleanOrNull?.let { ScimValue.Bool(it) }
-                        ?: longOrNull?.let { ScimValue.Num(it) }
+                    booleanOrNull?.let { Result.success(ScimValue.Bool(it)) }
+                        ?: longOrNull?.let { Result.success(ScimValue.Num(it)) }
                         // The domain model only carries integer numbers; anything else is
                         // preserved as text rather than silently dropped.
-                        ?: ScimValue.Str(content)
+                        ?: Result.success(ScimValue.Str(content))
             }
-        is JsonObject -> ScimValue.Complex(entries.associate { (key, value) -> key to value.toScimValue() })
-        is JsonArray -> ScimValue.MultiValued(map { it.toScimValue() })
+        is JsonObject -> {
+            val attributes = mutableMapOf<String, ScimValue>()
+            for ((key, value) in entries) {
+                attributes[key] = value.toScimValue(depth + 1).getOrElse { return Result.failure(it) }
+            }
+            Result.success(ScimValue.Complex(attributes))
+        }
+        is JsonArray -> {
+            val values = mutableListOf<ScimValue>()
+            for (element in this) {
+                values.add(element.toScimValue(depth + 1).getOrElse { return Result.failure(it) })
+            }
+            Result.success(ScimValue.MultiValued(values))
+        }
     }
+}
 
 private fun ScimValue.toJsonElement(): JsonElement =
     when (this) {

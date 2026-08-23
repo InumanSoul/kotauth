@@ -177,4 +177,34 @@ class ScimJsonTest {
         assertFalse("schemas" in decoded.attributes)
         assertEquals(ScimValue.Str("ada"), decoded.attributes["userName"])
     }
+
+    @Test
+    fun `a body nested beyond the depth cap fails with invalidSyntax instead of overflowing the stack`() {
+        // 50 levels comfortably exceeds the 32-level cap — unambiguously "too deep", not a
+        // boundary case that could fail for an unrelated reason.
+        val json = Json.parseToJsonElement("""{"schemas":[],"attr":${nestedObjectJson(50)}}""")
+
+        val result = json.toScimResource()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `a body nested to a reasonable depth still decodes`() {
+        val json = Json.parseToJsonElement("""{"schemas":[],"attr":${nestedObjectJson(5)}}""")
+
+        val decoded = json.toScimResource().getOrThrow()
+
+        var value = decoded.attributes.getValue("attr")
+        repeat(5) { value = (value as ScimValue.Complex).attributes.getValue("nested") }
+        assertEquals(ScimValue.Str("leaf"), value)
+    }
+
+    /** Builds `{"nested":{"nested":...{"nested":"leaf"}...}}` with [depth] levels of nesting. */
+    private fun nestedObjectJson(depth: Int): String {
+        var json = "\"leaf\""
+        repeat(depth) { json = """{"nested":$json}""" }
+        return json
+    }
 }
