@@ -40,6 +40,13 @@ class ScimJsonTest {
                             ScimValue.MultiValued(
                                 listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("ada@example.com")))),
                             ),
+                        // Null nested inside Complex/MultiValued, not just at the top level.
+                        "clearedNested" to ScimValue.Complex(mapOf("nickName" to ScimValue.Null)),
+                        "clearedInList" to
+                            ScimValue.MultiValued(
+                                listOf(ScimValue.Complex(mapOf("note" to ScimValue.Null))),
+                            ),
+                        "bigNum" to ScimValue.Num(Long.MAX_VALUE),
                     ),
             )
 
@@ -219,6 +226,49 @@ class ScimJsonTest {
 
         assertTrue(result.isFailure)
         assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `an unknown PATCH op verb fails with invalidSyntax`() {
+        val json = Json.parseToJsonElement("""{"Operations":[{"op":"frobnicate","path":"active","value":true}]}""")
+
+        val result = json.toScimPatchOps()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `an empty Operations array decodes to an empty operation list`() {
+        // The codec doesn't enforce "at least one operation" — that's left to whatever
+        // applies the ops, so an empty array is a structurally valid, if vacuous, PATCH body.
+        val json = Json.parseToJsonElement("""{"Operations":[]}""")
+
+        val ops = json.toScimPatchOps().getOrThrow()
+
+        assertTrue(ops.isEmpty())
+    }
+
+    @Test
+    fun `an add operation with no value decodes with a null value`() {
+        // Whether "add" requires a value is the patch engine's business, not the codec's —
+        // a missing value is structurally fine here and surfaces downstream as invalidValue.
+        val json = Json.parseToJsonElement("""{"Operations":[{"op":"add","path":"active"}]}""")
+
+        val ops = json.toScimPatchOps().getOrThrow()
+
+        assertEquals(1, ops.size)
+        assertEquals(ScimPatchOpType.ADD, ops[0].op)
+        assertNull(ops[0].value)
+    }
+
+    @Test
+    fun `PATCH op matching is deliberately case-insensitive`() {
+        val json = Json.parseToJsonElement("""{"Operations":[{"op":"REPLACE","path":"active","value":true}]}""")
+
+        val ops = json.toScimPatchOps().getOrThrow()
+
+        assertEquals(ScimPatchOpType.REPLACE, ops[0].op)
     }
 
     /** Builds `{"nested":{"nested":...{"nested":"leaf"}...}}` with [depth] levels of nesting. */
