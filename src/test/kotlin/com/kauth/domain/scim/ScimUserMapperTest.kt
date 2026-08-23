@@ -165,6 +165,68 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `an empty work email on update preserves the existing email`() {
+        // Same emptiness guard as displayName: an update must not blank a login-relevant
+        // address just because the IdP sent an empty value instead of omitting it.
+        val existing = user()
+        val r =
+            resourceWithName(given = "A", family = "B")
+                .let {
+                    it.copy(
+                        attributes =
+                            it.attributes +
+                                (
+                                    "emails" to
+                                        ScimValue.MultiValued(
+                                            listOf(
+                                                ScimValue.Complex(
+                                                    mapOf(
+                                                        "value" to ScimValue.Str(""),
+                                                        "type" to ScimValue.Str("work"),
+                                                    ),
+                                                ),
+                                            ),
+                                        )
+                                ),
+                    )
+                }
+
+        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+
+        assertEquals(existing.email, write.user.email)
+    }
+
+    @Test
+    fun `a whitespace-only work email on update preserves the existing email`() {
+        val existing = user()
+        val r =
+            resourceWithName(given = "A", family = "B")
+                .let {
+                    it.copy(
+                        attributes =
+                            it.attributes +
+                                (
+                                    "emails" to
+                                        ScimValue.MultiValued(
+                                            listOf(
+                                                ScimValue.Complex(
+                                                    mapOf(
+                                                        "value" to ScimValue.Str("   "),
+                                                        "type" to ScimValue.Str("work"),
+                                                    ),
+                                                ),
+                                            ),
+                                        )
+                                ),
+                    )
+                }
+
+        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+
+        assertEquals(existing.email, write.user.email)
+    }
+
+    @Test
     fun `toDomain rejects a composed fullName that exceeds the column`() {
         // full_name is varchar(255); two long parts can exceed it even though each fits.
         val r = resourceWithName(given = "g".repeat(200), family = "f".repeat(200))
