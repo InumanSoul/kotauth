@@ -355,7 +355,13 @@ class ScimDiscoveryRoutesTest {
 
             val response = client.get("/t/globex/scim/v2/ServiceProviderConfig") { bearerAuth(scimKey) }
 
-            assertFalse(response.status == HttpStatusCode.OK)
+            // ApiKeyService.validate rejects on tenant mismatch before any scope check runs, so
+            // this fails at authentication (401, REST envelope) rather than reaching
+            // requireScimScope's 403 (SCIM envelope) — pin the REST shape, not just non-200.
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("Invalid API key", body["title"]?.jsonPrimitive?.content)
+            assertTrue(body["schemas"] == null)
         }
 
     // -------------------------------------------------------------------------

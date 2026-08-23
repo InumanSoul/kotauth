@@ -24,11 +24,7 @@ private const val SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema"
 private const val USER_SCHEMA_URN = "urn:ietf:params:scim:schemas:core:2.0:User"
 private const val GROUP_SCHEMA_URN = "urn:ietf:params:scim:schemas:core:2.0:Group"
 
-/**
- * Cap on resources returned from a single filtered query. Discovery advertises this number now
- * so connectors size their sync accordingly; the query endpoint that will enforce it is a later
- * phase, but the number lives here so the two can never drift apart.
- */
+// Shared with the future query endpoint so the advertised cap and the enforced one can't drift.
 internal const val SCIM_FILTER_MAX_RESULTS = 200
 
 /**
@@ -67,16 +63,8 @@ private suspend fun ApplicationCall.respondScim(
     respond(status, body)
 }
 
-/**
- * `/ServiceProviderConfig`, `/ResourceTypes`, and `/Schemas` — RFC 7644 §4. Both major IdP
- * connector families probe these before attempting anything else and refuse to proceed if
- * they're missing or malformed, so they're implemented first even though no resource endpoint
- * exists yet to back them.
- *
- * Every capability advertised here reflects what is actually implemented: patch and filter are
- * built (see ScimPatchEngine.kt, ScimFilter.kt); bulk, sort, etag, and changePassword are not,
- * and are advertised as unsupported rather than left to fail on first use.
- */
+// `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas` — RFC 7644 §4. Capabilities advertised
+// below reflect only what's actually implemented (see ScimPatchEngine.kt, ScimFilter.kt).
 fun Route.scimDiscoveryRoutes() {
     get("/ServiceProviderConfig") {
         requireScimScope(call) ?: return@get
@@ -135,9 +123,7 @@ private val RESOURCE_TYPES: JsonObject =
         put("totalResults", 2)
         putJsonArray("Resources") {
             add(resourceType(id = "User", endpoint = "/Users", description = "User Account", schema = USER_SCHEMA_URN))
-            // Group's endpoint does not exist yet — provisioning only handles Users so far. It is
-            // still listed here, deliberately: the entry describes the surface the Group schema
-            // (below) defines, and omitting it would leave /ResourceTypes inconsistent with /Schemas.
+            // /Groups doesn't exist yet — listed anyway, deliberately, so this stays consistent with /Schemas.
             add(resourceType(id = "Group", endpoint = "/Groups", description = "Group", schema = GROUP_SCHEMA_URN))
         }
     }
@@ -239,9 +225,7 @@ private fun userSchema(): JsonObject =
             },
     )
 
-// No Group endpoint exists yet (see the comment in RESOURCE_TYPES), so nothing maps this schema
-// to the domain model today — it exists here to keep /Schemas honest about the surface /ResourceTypes
-// advertises, ready for the mapper the next phase adds.
+// No Group mapper exists yet either — this schema just keeps /Schemas honest with /ResourceTypes.
 private fun groupSchema(): JsonObject =
     schemaResource(
         id = GROUP_SCHEMA_URN,
