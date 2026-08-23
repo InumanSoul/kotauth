@@ -294,4 +294,52 @@ class ScimPatchEngineTest {
 
         assertEquals(ScimErrorType.invalidPath, (result.exceptionOrNull() as ScimFailure).type)
     }
+
+    @Test
+    fun `password is a known attribute so a provisioned user can have one set`() {
+        val user =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes = mapOf("userName" to ScimValue.Str("ada")),
+            )
+        val out =
+            engine
+                .apply(
+                    user,
+                    listOf(
+                        ScimPatchOp(
+                            ScimPatchOpType.REPLACE,
+                            parsePath("password").getOrThrow(),
+                            ScimValue.Str("s3cret"),
+                        ),
+                    ),
+                ).getOrThrow()
+
+        assertEquals(ScimValue.Str("s3cret"), out.attributes["password"])
+    }
+
+    @Test
+    fun `groups is read-only and reports mutability rather than an unknown path`() {
+        // RFC 7643 section 4.1.2: a user's group membership is written via the Groups
+        // resource. Reporting invalidPath would tell an integrator the attribute does
+        // not exist, sending them to debug the wrong thing.
+        val user =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes = mapOf("userName" to ScimValue.Str("ada")),
+            )
+        val result =
+            engine.apply(
+                user,
+                listOf(
+                    ScimPatchOp(
+                        ScimPatchOpType.ADD,
+                        parsePath("groups").getOrThrow(),
+                        ScimValue.MultiValued(listOf(ScimValue.Str("g1"))),
+                    ),
+                ),
+            )
+
+        assertEquals(ScimErrorType.mutability, (result.exceptionOrNull() as ScimFailure).type)
+    }
 }

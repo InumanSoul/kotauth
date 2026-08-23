@@ -15,12 +15,29 @@ data class ScimPatchOp(
 )
 
 private val KNOWN_ATTRIBUTES =
-    setOf("userName", "externalId", "displayName", "active", "name", "emails", "members", "id", "schemas", "meta")
+    setOf(
+        "userName",
+        "externalId",
+        "displayName",
+        "active",
+        "name",
+        "emails",
+        "members",
+        "id",
+        "schemas",
+        "meta",
+        "password",
+        "groups",
+    )
 
 // The target arity of a path is a property of the attribute's definition, not of what
 // happens to be stored under it right now — inferring arity from a (possibly absent)
 // runtime value is what let ADD collapse a collection into a scalar.
 private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
+
+// Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
+// into debugging a typo that isn't there, when the real issue is a read-only target.
+private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta")
 
 // Sub-attribute vocabulary is only pinned down for the complex attributes this
 // implementation actually supports; attributes not listed here go unchecked at this level.
@@ -69,7 +86,7 @@ class ScimPatchEngine {
         val partial =
             op.value as? ScimValue.Complex
                 ?: throw PatchException(ScimErrorType.invalidValue, "a null path requires a complex value")
-        partial.attributes.keys.forEach(::requireKnownAttribute)
+        partial.attributes.keys.forEach(::requireWritableAttribute)
         return resource.copy(attributes = resource.attributes + partial.attributes)
     }
 
@@ -78,7 +95,7 @@ class ScimPatchEngine {
         op: ScimPatchOp,
         path: ScimPath.Attr,
     ): ScimResource {
-        requireKnownAttribute(path.name)
+        requireWritableAttribute(path.name)
         path.sub?.let { requireKnownSubAttribute(path.name, it) }
         return when (op.op) {
             ScimPatchOpType.REMOVE -> removeAttr(resource, path)
@@ -156,7 +173,7 @@ class ScimPatchEngine {
         path: ScimPath.Valued,
     ): ScimResource {
         val attr = path.attr
-        requireKnownAttribute(attr.name)
+        requireWritableAttribute(attr.name)
         path.sub?.let { requireKnownSubAttribute(attr.name, it) }
         // A valued path targets elements of an existing collection; nothing to target
         // when the attribute is absent means the operation is a no-op, not an error.
@@ -227,6 +244,13 @@ class ScimPatchEngine {
     private fun requireKnownAttribute(name: String) {
         if (name !in KNOWN_ATTRIBUTES) {
             throw PatchException(ScimErrorType.invalidPath, "unknown attribute '$name'")
+        }
+    }
+
+    private fun requireWritableAttribute(name: String) {
+        requireKnownAttribute(name)
+        if (name in READ_ONLY_ATTRIBUTES) {
+            throw PatchException(ScimErrorType.mutability, "'$name' is read-only")
         }
     }
 
