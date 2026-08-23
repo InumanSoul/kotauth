@@ -1,0 +1,180 @@
+package com.kauth.adapter.web.scim
+
+import com.kauth.domain.scim.ScimErrorType
+import com.kauth.domain.scim.ScimFailure
+import com.kauth.domain.scim.ScimPatchOpType
+import com.kauth.domain.scim.ScimPath
+import com.kauth.domain.scim.ScimResource
+import com.kauth.domain.scim.ScimValue
+import io.ktor.http.HttpStatusCode
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+class ScimJsonTest {
+    @Test
+    fun `a resource round-trips to JSON and back unchanged`() {
+        val resource =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes =
+                    mapOf(
+                        "userName" to ScimValue.Str("ada"),
+                        "active" to ScimValue.Bool(true),
+                        "age" to ScimValue.Num(30),
+                        "name" to
+                            ScimValue.Complex(
+                                mapOf(
+                                    "givenName" to ScimValue.Str("Ada"),
+                                    "familyName" to ScimValue.Str("Lovelace"),
+                                ),
+                            ),
+                        "emails" to
+                            ScimValue.MultiValued(
+                                listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("ada@example.com")))),
+                            ),
+                    ),
+            )
+
+        val json = resource.toJson()
+        // Serialize and reparse to exercise the actual wire format, not just the in-memory tree.
+        val reparsed = Json.parseToJsonElement(json.toString())
+        val decoded = reparsed.toScimResource().getOrThrow()
+
+        assertEquals(resource, decoded)
+    }
+
+    @Test
+    fun `a JSON null decodes to explicit Null and an absent key decodes to no entry`() {
+        val json = Json.parseToJsonElement("""{"schemas":[],"nickName":null}""")
+
+        val decoded = json.toScimResource().getOrThrow()
+
+        assertEquals(ScimValue.Null, decoded.attributes["nickName"])
+        assertTrue("nickName" in decoded.attributes)
+        assertFalse("displayName" in decoded.attributes)
+        assertNull(decoded.attributes["displayName"])
+    }
+
+    @Test
+    fun `a PATCH body decodes Operations including one with no path`() {
+        val json =
+            Json.parseToJsonElement(
+                """
+                {
+                  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                  "Operations": [
+                    {"op": "replace", "path": "active", "value": false},
+                    {"op": "add", "value": {"givenName": "Ada"}}
+                  ]
+                }
+                """.trimIndent(),
+            )
+
+        val ops = json.toScimPatchOps().getOrThrow()
+
+        assertEquals(2, ops.size)
+        val first = ops[0]
+        assertEquals(ScimPatchOpType.REPLACE, first.op)
+        assertEquals(ScimValue.Bool(false), first.value)
+        val path = assertIs<ScimPath.Attr>(first.path)
+        assertEquals("active", path.name)
+
+        val second = ops[1]
+        assertEquals(ScimPatchOpType.ADD, second.op)
+        assertNull(second.path)
+        assertEquals(ScimValue.Complex(mapOf("givenName" to ScimValue.Str("Ada"))), second.value)
+    }
+
+    @Test
+    fun `an unparseable path in an operation surfaces as invalidPath, not a decode crash`() {
+        val json =
+            Json.parseToJsonElement(
+                """{"Operations": [{"op": "replace", "path": "1invalid", "value": true}]}""",
+            )
+
+        val result = json.toScimPatchOps()
+
+        assertTrue(result.isFailure)
+        val failure = assertIs<ScimFailure>(result.exceptionOrNull())
+        assertEquals(ScimErrorType.invalidPath, failure.type)
+    }
+
+    @Test
+    fun `a uniqueness failure maps to 409 with the SCIM error schema and scimType`() {
+        val failure = ScimFailure(ScimErrorType.uniqueness, "userName already exists")
+
+        val (status, body) = failure.toResponse()
+
+        assertEquals(HttpStatusCode.Conflict, status)
+        assertEquals(409, status.value)
+        val schemas = body["schemas"]?.jsonArray?.map { it.jsonPrimitive.content }
+        assertEquals(listOf("urn:ietf:params:scim:api:messages:2.0:Error"), schemas)
+        assertEquals("uniqueness", body["scimType"]?.jsonPrimitive?.content)
+        assertEquals("userName already exists", body["detail"]?.jsonPrimitive?.content)
+        // status is a SCIM wire STRING, not a JSON number.
+        assertTrue(body["status"]?.jsonPrimitive?.isString == true)
+        assertEquals("409", body["status"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `every ScimErrorType maps to a status`() {
+        val expected =
+            mapOf(
+                ScimErrorType.uniqueness to HttpStatusCode.Conflict,
+                ScimErrorType.invalidFilter to HttpStatusCode.BadRequest,
+                ScimErrorType.invalidPath to HttpStatusCode.BadRequest,
+                ScimErrorType.invalidValue to HttpStatusCode.BadRequest,
+                ScimErrorType.invalidSyntax to HttpStatusCode.BadRequest,
+                ScimErrorType.mutability to HttpStatusCode.BadRequest,
+                ScimErrorType.noTarget to HttpStatusCode.BadRequest,
+            )
+
+        for (type in ScimErrorType.entries) {
+            val (status, body) = ScimFailure(type, "detail").toResponse()
+            val expectedStatus =
+                expected[type] ?: error("no expected status mapping for $type — add one to this test")
+            assertEquals(expectedStatus, status, "unexpected status for $type")
+            assertEquals(
+                expectedStatus.value.toString(),
+                body["status"]?.jsonPrimitive?.content,
+                "status must be a string for $type",
+            )
+            assertEquals(type.name, body["scimType"]?.jsonPrimitive?.content)
+        }
+    }
+
+    @Test
+    fun `a resource JsonElement that is not an object fails with invalidSyntax`() {
+        val result = Json.parseToJsonElement("[]").toScimResource()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `a PATCH body missing Operations fails with invalidSyntax`() {
+        val result = Json.parseToJsonElement("""{"schemas":[]}""").toScimPatchOps()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `the object case of toScimResource strips schemas from attributes`() {
+        val json = Json.parseToJsonElement("""{"schemas":["urn:x"],"userName":"ada"}""").jsonObject
+
+        val decoded = json.toScimResource().getOrThrow()
+
+        assertEquals(listOf("urn:x"), decoded.schemas)
+        assertFalse("schemas" in decoded.attributes)
+        assertEquals(ScimValue.Str("ada"), decoded.attributes["userName"])
+    }
+}
