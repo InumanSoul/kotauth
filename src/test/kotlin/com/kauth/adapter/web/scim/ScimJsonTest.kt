@@ -201,6 +201,26 @@ class ScimJsonTest {
         assertEquals(ScimValue.Str("leaf"), value)
     }
 
+    @Test
+    fun `a fractional number fails with invalidSyntax rather than silently becoming a string`() {
+        val json = Json.parseToJsonElement("""{"schemas":[],"score":3.14}""")
+
+        val result = json.toScimResource()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `a number overflowing Long fails with invalidSyntax rather than silently becoming a string`() {
+        val json = Json.parseToJsonElement("""{"schemas":[],"huge":99999999999999999999}""")
+
+        val result = json.toScimResource()
+
+        assertTrue(result.isFailure)
+        assertEquals(ScimErrorType.invalidSyntax, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
     /** Builds `{"nested":{"nested":...{"nested":"leaf"}...}}` with [depth] levels of nesting. */
     private fun nestedObjectJson(depth: Int): String {
         var json = "\"leaf\""

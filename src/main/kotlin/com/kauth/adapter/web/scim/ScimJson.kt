@@ -133,9 +133,15 @@ private fun JsonElement.toScimValue(depth: Int = 0): Result<ScimValue> {
                 else ->
                     booleanOrNull?.let { Result.success(ScimValue.Bool(it)) }
                         ?: longOrNull?.let { Result.success(ScimValue.Num(it)) }
-                        // The domain model only carries integer numbers; anything else is
-                        // preserved as text rather than silently dropped.
-                        ?: Result.success(ScimValue.Str(content))
+                        // The domain model only carries integer numbers. Coercing a fractional
+                        // or overflowing literal into Str would silently change its type for
+                        // any caller matching on ScimValue.Num — fail instead of surprise them.
+                        ?: Result.failure(
+                            ScimFailure(
+                                ScimErrorType.invalidSyntax,
+                                "'$content' is not a boolean or an integer number",
+                            ),
+                        )
             }
         is JsonObject -> {
             val attributes = mutableMapOf<String, ScimValue>()
