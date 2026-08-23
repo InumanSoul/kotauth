@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
+import com.kauth.adapter.web.scim.scimDiscoveryRoutes
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
@@ -75,6 +76,50 @@ fun Route.apiRoutes(
         call.respondText(spec, ContentType.parse("application/yaml"), HttpStatusCode.OK)
     }
 
+    // Resolves {tenantSlug} and the API key against it, then stamps ApiKeyAttr/TenantIdAttr.
+    // Shared by the REST API and SCIM route trees below — both need the same tenant/key
+    // resolution, and defining it once keeps that resolution identical for both.
+    val apiContextPlugin =
+        createRouteScopedPlugin("ApiContextPlugin") {
+            on(AuthenticationChecked) { call ->
+                val slug =
+                    call.parameters["tenantSlug"]
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.BadRequest,
+                            title = "Missing tenant slug",
+                            detail = "The tenantSlug path parameter is required.",
+                        )
+
+                val tenant =
+                    tenantRepository.findBySlug(slug)
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.NotFound,
+                            title = "Tenant not found",
+                            detail = "No workspace with slug '$slug' exists.",
+                        )
+
+                val principal =
+                    call.principal<ApiKeyPrincipal>()
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.Unauthorized,
+                            title = "Unauthorized",
+                            detail =
+                                "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
+                        )
+
+                val resolvedKey =
+                    apiKeyService.validate(principal.rawToken, tenant.id)
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.Unauthorized,
+                            title = "Invalid API key",
+                            detail = "The provided API key is invalid, expired, or has been revoked.",
+                        )
+
+                call.attributes.put(ApiKeyAttr, resolvedKey)
+                call.attributes.put(TenantIdAttr, tenant.id)
+            }
+        }
+
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
             if (corsService != null) {
@@ -84,46 +129,6 @@ fun Route.apiRoutes(
                 }
             }
 
-            val apiContextPlugin =
-                createRouteScopedPlugin("ApiContextPlugin") {
-                    on(AuthenticationChecked) { call ->
-                        val slug =
-                            call.parameters["tenantSlug"]
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.BadRequest,
-                                    title = "Missing tenant slug",
-                                    detail = "The tenantSlug path parameter is required.",
-                                )
-
-                        val tenant =
-                            tenantRepository.findBySlug(slug)
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.NotFound,
-                                    title = "Tenant not found",
-                                    detail = "No workspace with slug '$slug' exists.",
-                                )
-
-                        val principal =
-                            call.principal<ApiKeyPrincipal>()
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.Unauthorized,
-                                    title = "Unauthorized",
-                                    detail =
-                                        "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
-                                )
-
-                        val resolvedKey =
-                            apiKeyService.validate(principal.rawToken, tenant.id)
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.Unauthorized,
-                                    title = "Invalid API key",
-                                    detail = "The provided API key is invalid, expired, or has been revoked.",
-                                )
-
-                        call.attributes.put(ApiKeyAttr, resolvedKey)
-                        call.attributes.put(TenantIdAttr, tenant.id)
-                    }
-                }
             install(apiContextPlugin)
 
             val writeRateLimitPlugin =
@@ -155,6 +160,11 @@ fun Route.apiRoutes(
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
             apiKeyManagementRoutes(apiKeyService)
             apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)
+        }
+
+        route("/t/{tenantSlug}/scim/v2") {
+            install(apiContextPlugin)
+            scimDiscoveryRoutes()
         }
     }
 }

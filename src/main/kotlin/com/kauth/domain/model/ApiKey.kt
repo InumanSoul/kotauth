@@ -84,6 +84,13 @@ object ApiScope {
     /** Create and revoke API keys — meta-circular: includes the authenticating key itself. */
     const val API_KEYS_WRITE = "api_keys:write"
 
+    /**
+     * Full access to the SCIM 2.0 provisioning surface. Deliberately not split into
+     * read/write: a provisioning connector needs both to function, so a read-only key would
+     * connect successfully and only fail once it attempts its first write.
+     */
+    const val SCIM = "scim"
+
     val ALL =
         listOf(
             USERS_READ,
@@ -112,5 +119,6 @@ object ApiScope {
             RESOURCE_SERVERS_WRITE,
             API_KEYS_READ,
             API_KEYS_WRITE,
+            SCIM,
         )
 }

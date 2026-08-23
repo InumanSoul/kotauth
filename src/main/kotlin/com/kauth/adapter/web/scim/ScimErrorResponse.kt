@@ -24,18 +24,35 @@ private fun statusFor(type: ScimErrorType): HttpStatusCode =
     }
 
 /**
- * Renders a domain failure as the SCIM error envelope (RFC 7644 §3.12). `status` is a JSON
- * string per the spec, not a number — a numeric `status` is a wire-format violation some
- * clients reject outright.
+ * Builds the SCIM error envelope (RFC 7644 §3.12). `status` is a JSON string per the spec, not
+ * a number — a numeric `status` is a wire-format violation some clients reject outright.
+ * `scimType` is omitted when null: RFC 7644 only defines scimType values for the 400-series
+ * conditions in [ScimErrorType] — it has no value for authentication or authorization failures.
  */
+private fun errorEnvelope(
+    status: HttpStatusCode,
+    detail: String,
+    scimType: String? = null,
+): JsonObject =
+    buildJsonObject {
+        putJsonArray("schemas") { add(ERROR_SCHEMA) }
+        scimType?.let { put("scimType", it) }
+        put("detail", detail)
+        put("status", status.value.toString())
+    }
+
+/** Renders a domain failure as the SCIM error envelope (RFC 7644 §3.12). */
 fun ScimFailure.toResponse(): Pair<HttpStatusCode, JsonObject> {
     val status = statusFor(type)
-    val body =
-        buildJsonObject {
-            putJsonArray("schemas") { add(ERROR_SCHEMA) }
-            put("scimType", type.name)
-            put("detail", detail)
-            put("status", status.value.toString())
-        }
-    return status to body
+    return status to errorEnvelope(status, detail, type.name)
 }
+
+/**
+ * Renders an authentication/authorization failure as the SCIM error envelope. Used for gates
+ * that run before any [ScimErrorType]-shaped domain failure is possible — e.g. a missing or
+ * under-scoped API key — so callers get the SCIM shape without inventing a fake scimType.
+ */
+fun scimAuthError(
+    status: HttpStatusCode,
+    detail: String,
+): Pair<HttpStatusCode, JsonObject> = status to errorEnvelope(status, detail)
