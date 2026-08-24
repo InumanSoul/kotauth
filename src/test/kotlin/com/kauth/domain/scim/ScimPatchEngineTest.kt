@@ -662,6 +662,65 @@ class ScimPatchEngineTest {
     }
 
     @Test
+    fun `remove matches a padded member id, the same one add stored`() {
+        // ScimGroupMapper.parseMembers trims before parsing, so `add` of " 2 " puts user 2 in the
+        // group. A remove comparing the raw wire string matches nothing and answers 200 while the
+        // user keeps the group's roles — a deprovisioning miss reported as success.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member(" 2 "))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
+    fun `remove matches a leading-zero member id`() {
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("002"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
+    fun `remove matches a member added under a padded id`() {
+        // The mirror-image pair end to end: the padded form goes in, the canonical form comes out.
+        val added =
+            apply(
+                group("1"),
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member(" 42 "))),
+                ),
+            ).getOrThrow()
+
+        val out =
+            apply(
+                added,
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("42"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
     fun `remove with a plain path and no value still clears the whole collection`() {
         // Regression guard on the reading that is already correct: no value means remove all.
         val out =

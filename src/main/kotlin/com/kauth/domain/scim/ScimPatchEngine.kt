@@ -31,6 +31,10 @@ private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
 // the collection rather than growing it — the only outcome the caller can actually observe.
 private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 
+// Attributes whose `value` sub-attribute is a numeric id rather than free text, so entry identity
+// is compared on the parsed id (see canonicalNumericIdentity).
+private val NUMERIC_IDENTITY_ATTRIBUTES = setOf("members")
+
 // Attributes RFC 7643 defines as singular *complex*, read off the one shape table. Checking it
 // here as well as at the mapper's entry point costs nothing and names the offending path.
 // `meta` is in this set and unreachable through it: requireWritableAttribute rejects it as
@@ -179,7 +183,7 @@ class ScimPatchEngine {
         // answer whether or not the attribute happens to hold anything right now.
         val listed = removalIdentities(name, supplied)
         val current = normalizeAbsent(resource.attributes[name]) as? ScimValue.MultiValued ?: return resource
-        val kept = current.values.filterNot { it.multiValuedIdentity() in listed }
+        val kept = current.values.filterNot { it.multiValuedIdentity(name) in listed }
         // Emptied to a collection rather than dropped: the mappers read an absent attribute and an
         // empty one under different rules, and only the empty one unambiguously means "no members".
         return resource.copy(attributes = resource.attributes + (name to ScimValue.MultiValued(kept)))
@@ -207,7 +211,7 @@ class ScimPatchEngine {
             }
         return entries
             .mapIndexed { index, entry ->
-                entry.multiValuedIdentity()
+                entry.multiValuedIdentity(name)
                     ?: throw PatchException(
                         ScimErrorType.invalidValue,
                         "'$name[$index]' remove value must be an object with a 'value' sub-attribute",
@@ -392,9 +396,17 @@ class ScimPatchEngine {
     private fun normalizeAbsent(value: ScimValue?): ScimValue? = if (value == ScimValue.Null) null else value
 
     /** RFC 7643 §2.4: the `value` sub-attribute identifies an entry of a multi-valued attribute. */
-    private fun ScimValue.multiValuedIdentity(): String? =
-        ((this as? ScimValue.Complex)?.attributes?.get("value") as? ScimValue.Str)?.value
+    private fun ScimValue.multiValuedIdentity(name: String): String? =
+        ((this as? ScimValue.Complex)?.attributes?.get("value") as? ScimValue.Str)
+            ?.value
+            ?.let { if (name in NUMERIC_IDENTITY_ATTRIBUTES) canonicalNumericIdentity(it) else it }
 }
+
+// A member id is compared the way ScimGroupMapper.parseMembers reads one — trimmed and parsed —
+// rather than as the raw wire string. Without this, `add` of `" 42 "` puts user 42 in the group
+// and the mirror-image `remove` matches nothing, answers 200, and leaves the user's access intact:
+// a deprovisioning miss reported as success. `"042"` names the same user for the same reason.
+private fun canonicalNumericIdentity(raw: String): String = raw.trim().let { it.toIntOrNull()?.toString() ?: it }
 
 /** Internal-only: carries a typed, human-readable apply failure up to [ScimPatchEngine.apply]. */
 private class PatchException(

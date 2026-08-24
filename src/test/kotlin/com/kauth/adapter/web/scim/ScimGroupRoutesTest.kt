@@ -309,6 +309,29 @@ class ScimGroupRoutesTest {
             .jsonObject["scimType"]!!
             .jsonPrimitive.content
 
+    @Test
+    fun `PATCH remove of a padded member id actually removes the member`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+            val group = addGroup("Engineering", members = listOf(member))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"members","value":[""" +
+                            """{"value":" ${member.id!!.value} "}]}]}""",
+                    )
+                }
+
+            // A 200 that left the member in place is a deprovisioning miss reported as success.
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(emptyList(), groupRepo.findUserIdsInGroup(group.id!!))
+        }
+
     private fun keyWithDialect(dialect: String): String =
         (
             apiKeyService.create(
