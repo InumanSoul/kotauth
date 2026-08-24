@@ -254,8 +254,20 @@ fun Route.scimGroupRoutes(
             call.respondScimError(HttpStatusCode.NotFound, "Group not found.")
             return@delete
         }
-        // Deletes the group row only. user_groups rows cascade (ON DELETE CASCADE, V12) but the
-        // users themselves are untouched — SCIM group deprovisioning must never delete accounts.
+        // groups.parent_group_id cascades (ON DELETE CASCADE, V12): deleting a group with
+        // children would silently remove every descendant group along with their memberships
+        // and role assignments. Refuse rather than let an IdP nuke subgroups it never targeted;
+        // it can delete them explicitly if it means to. Member users are untouched either way —
+        // user_groups also cascades, but a user row itself is never deleted by this.
+        if (groupRepository.findChildren(groupId).isNotEmpty()) {
+            call.respondScimFailure(
+                ScimFailure(
+                    ScimErrorType.uniqueness,
+                    "group has child groups; delete or reparent them before deleting this group",
+                ),
+            )
+            return@delete
+        }
         groupRepository.delete(groupId)
         call.respond(HttpStatusCode.NoContent)
     }

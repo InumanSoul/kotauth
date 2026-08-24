@@ -5,6 +5,7 @@ import com.kauth.adapter.web.api.apiRoutes
 import com.kauth.adapter.web.api.stubEmailOtpService
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -253,8 +254,18 @@ class ScimGroupRoutesTest {
         externalId: String? = null,
         roleIds: List<RoleId> = emptyList(),
         members: List<User> = emptyList(),
+        parentGroupId: GroupId? = null,
     ): Group {
-        val group = groupRepo.add(Group(tenantId = tenantId, name = name, externalId = externalId, roleIds = roleIds))
+        val group =
+            groupRepo.add(
+                Group(
+                    tenantId = tenantId,
+                    name = name,
+                    externalId = externalId,
+                    roleIds = roleIds,
+                    parentGroupId = parentGroupId,
+                ),
+            )
         members.forEach { groupRepo.addUserToGroup(it.id!!, group.id!!) }
         return group
     }
@@ -922,6 +933,20 @@ class ScimGroupRoutesTest {
 
             val getUserResponse = client.get("/t/acme/scim/v2/Users/${alice.id!!.value}") { bearerAuth(scimKey) }
             assertEquals(HttpStatusCode.OK, getUserResponse.status)
+        }
+
+    @Test
+    fun `DELETE on a group with children is refused and the children still exist`() =
+        testApplication {
+            application { installTestApp() }
+            val parent = addGroup("Engineering")
+            val child = addGroup("Backend", parentGroupId = parent.id)
+
+            val response = client.delete(groupUrl(parent.id!!.value)) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertEquals(true, groupRepo.findById(parent.id) != null)
+            assertEquals(true, groupRepo.findById(child.id!!) != null)
         }
 
     private fun io.ktor.server.application.Application.installTestApp() {
