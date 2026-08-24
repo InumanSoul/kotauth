@@ -1297,6 +1297,49 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `POST with a mis-cased attribute name is accepted, not rejected as unknown`() =
+        testApplication {
+            application { installTestApp() }
+
+            // RFC 7643 2.1 makes attribute names case-insensitive. Exact-match lookups turned a
+            // mis-cased name into an unknown attribute, and a 400 makes a client drop the record.
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"DISPLAYNAME":"Engineering","externalid":"grp-7"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val stored = groupRepo.findByTenantId(acme.id).single()
+            assertEquals("Engineering", stored.name)
+            assertEquals("grp-7", stored.externalId)
+        }
+
+    @Test
+    fun `PATCH with a mis-cased path targets the same attribute`() =
+        testApplication {
+            application { installTestApp() }
+            val group = addGroup("Engineering")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Groups/${group.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],""" +
+                            """"Operations":[{"op":"replace","path":"displayname","value":"Platform"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("Platform", groupRepo.findById(group.id!!)!!.name)
+        }
+
+    @Test
     fun `POST with a User attribute is rejected on a Group, not accepted and ignored`() =
         testApplication {
             application { installTestApp() }

@@ -199,8 +199,35 @@ internal enum class ScimResourceScope(
 
     internal fun ignores(name: String): Boolean = isSchemaUrn(name) || name in unstored
 
+    internal val knownNames: Set<String> get() = stored + unstored
+
     internal fun rejection(name: String): String = "unknown attribute '$name' for $subject"
 }
+
+/**
+ * Every attribute and sub-attribute name this implementation knows, keyed by its lower-cased form.
+ *
+ * RFC 7643 §2.1 makes attribute names case-INSENSITIVE, and every lookup downstream — the shape
+ * table, `attributes["externalId"]`, the mapper reads — is an exact-match on a map key. Before the
+ * unknown-attribute rule existed a mis-cased `displayname` was silently ignored, which was already
+ * wrong; with that rule it became a 400, and a provisioning client reads a 400 as permanent and
+ * drops the record. Canonicalising once at the parse boundary lets every exact-match lookup stand.
+ */
+private val CANONICAL_ATTRIBUTE_NAMES: Map<String, String> =
+    buildMap {
+        SCIM_ATTRIBUTE_SHAPES.forEach { (name, spec) ->
+            put(name.lowercase(), name)
+            spec.subAttributes.keys.forEach { put(it.lowercase(), it) }
+        }
+        ScimResourceScope.entries.forEach { scope -> scope.knownNames.forEach { put(it.lowercase(), it) } }
+    }
+
+/**
+ * [name] respelled the way this implementation spells it, or unchanged when it is not a name we
+ * know. Schema URNs are left alone: they are case-sensitive identifiers, not attribute names.
+ */
+fun canonicalScimAttributeName(name: String): String =
+    if (isSchemaUrn(name)) name else CANONICAL_ATTRIBUTE_NAMES[name.lowercase()] ?: name
 
 /**
  * A schema URN key — `"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {...}` — is

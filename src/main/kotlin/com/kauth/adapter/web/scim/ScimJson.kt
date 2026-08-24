@@ -7,6 +7,7 @@ import com.kauth.domain.scim.ScimPatchOpType
 import com.kauth.domain.scim.ScimPath
 import com.kauth.domain.scim.ScimResource
 import com.kauth.domain.scim.ScimValue
+import com.kauth.domain.scim.canonicalScimAttributeName
 import com.kauth.domain.scim.parsePath
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -41,13 +42,16 @@ fun JsonElement.toScimResource(): Result<ScimResource> {
         this as? JsonObject
             ?: return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "a SCIM resource must be a JSON object"))
     val schemas =
-        (obj[SCHEMAS_KEY] as? JsonArray)
+        (obj.entries.firstOrNull { canonicalScimAttributeName(it.key) == SCHEMAS_KEY }?.value as? JsonArray)
             ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
             ?: emptyList()
     val attributes = mutableMapOf<String, ScimValue>()
     for ((key, value) in obj.entries) {
-        if (key == SCHEMAS_KEY) continue
-        attributes[key] = value.toScimValue().getOrElse { return Result.failure(it) }
+        // RFC 7643 §2.1: attribute names are case-insensitive. Respelling them canonically here
+        // is what lets every downstream exact-match lookup stay an exact-match lookup.
+        val name = canonicalScimAttributeName(key)
+        if (name == SCHEMAS_KEY) continue
+        attributes[name] = value.toScimValue().getOrElse { return Result.failure(it) }
     }
     return Result.success(ScimResource(schemas = schemas, attributes = attributes))
 }
@@ -146,7 +150,10 @@ private fun JsonElement.toScimValue(depth: Int = 0): Result<ScimValue> {
         is JsonObject -> {
             val attributes = mutableMapOf<String, ScimValue>()
             for ((key, value) in entries) {
-                attributes[key] = value.toScimValue(depth + 1).getOrElse { return Result.failure(it) }
+                // Sub-attribute names are case-insensitive too, so `{"name":{"givenname":"Ada"}}`
+                // has to reach the mapper's `attributes["givenName"]` read.
+                attributes[canonicalScimAttributeName(key)] =
+                    value.toScimValue(depth + 1).getOrElse { return Result.failure(it) }
             }
             Result.success(ScimValue.Complex(attributes))
         }

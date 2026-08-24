@@ -111,7 +111,9 @@ private class PathParser(
         if (!ATTR_NAME.matches(name)) {
             fail("invalid attribute name '$name'", offset)
         }
-        return name
+        // RFC 7643 §2.1: attribute names are case-insensitive, and a path names the same
+        // vocabulary a body does, so `path: "displayname"` has to reach the same target.
+        return canonicalScimAttributeName(name)
     }
 
     private fun findMatchingBracket(openIndex: Int): Int {
