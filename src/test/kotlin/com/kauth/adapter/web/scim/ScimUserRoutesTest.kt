@@ -524,6 +524,46 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `a compound filter matches correctly across multiple bounded scan chunks`() =
+        testApplication {
+            application { installTestApp() }
+            // Chunk size is 500; 650 users guarantees a match in each of two chunks.
+            repeat(650) { addUser("user%04d".format(it)) }
+
+            val response =
+                client.get(usersUrl("""userName eq "user0010" or userName eq "user0600"""")) {
+                    bearerAuth(scimKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(2, body["totalResults"]!!.jsonPrimitive.int)
+            val names =
+                body["Resources"]!!
+                    .jsonArray
+                    .map { it.jsonObject["userName"]!!.jsonPrimitive.content }
+                    .toSet()
+            assertEquals(setOf("user0010", "user0600"), names)
+        }
+
+    @Test
+    fun `totalResults reflects the true match count across chunks even when count is smaller`() =
+        testApplication {
+            application { installTestApp() }
+            repeat(650) { addUser("user%04d".format(it)) }
+
+            val response =
+                client.get(usersUrl("""userName eq "user0010" or userName eq "user0600"""") + "&count=1") {
+                    bearerAuth(scimKey)
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(2, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(1, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
     fun `an unsupported filter returns 400 invalidFilter, never an unfiltered list`() =
         testApplication {
             application { installTestApp() }

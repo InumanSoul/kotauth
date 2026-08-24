@@ -48,6 +48,10 @@ private const val PASSWORD_UPDATE_UNSUPPORTED =
 // filter on one of these goes straight to that lookup instead of scanning the tenant.
 private val SCIM_FAST_PATH_ATTRIBUTES = setOf("userName", "externalId", "id")
 
+// Bounds how many User rows are materialised at once while scanning a tenant for a filter with
+// no indexed lookup (compound filters, displayName, active); independent of how many match.
+private const val SCIM_FILTER_SCAN_CHUNK_SIZE = 500
+
 /** `/Users` — RFC 7644 §3.2-3.6. Every write goes through [AdminUserService], never the repository directly. */
 fun Route.scimUserRoutes(
     adminUserService: AdminUserService,
@@ -109,7 +113,7 @@ fun Route.scimUserRoutes(
         val matched: List<User> =
             filter.asFastPathEquality()?.let { (attr, literal) ->
                 listOfNotNull(lookupFastPath(adminUserService, tenantId, attr, literal))
-            } ?: unindexedFilterScan(adminUserService, tenantId, filter)
+            } ?: scanForMatches(adminUserService, tenantId, filter)
 
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
         // no Resources returned, never the resources themselves.
@@ -285,17 +289,29 @@ private fun lookupFastPath(
     }
 
 /**
- * Evaluates [filter] against every user in [tenantId] for the filter shapes with no indexed
- * lookup (compound and/or, or a single eq on displayName/active).
+ * Evaluates [filter] against every user in [tenantId], one bounded chunk at a time, for the
+ * filter shapes with no indexed lookup (compound and/or, or a single eq on displayName/active).
+ * Memory stays proportional to [SCIM_FILTER_SCAN_CHUNK_SIZE] rather than the tenant's directory
+ * size, while [totalResults][listResponse] still reflects a true full-tenant match count.
  */
-private fun unindexedFilterScan(
+private fun scanForMatches(
     adminUserService: AdminUserService,
     tenantId: TenantId,
     filter: ScimFilter,
-): List<User> =
-    adminUserService.listUsers(tenantId).filter { user ->
-        filter.matches(ScimValue.Complex(ScimUserMapper.toResource(user).attributes))
+): List<User> {
+    val matches = mutableListOf<User>()
+    var offset = 0
+    while (true) {
+        val chunk = adminUserService.listUsers(tenantId, limit = SCIM_FILTER_SCAN_CHUNK_SIZE, offset = offset)
+        chunk.forEach { user ->
+            val attributes = ScimUserMapper.toResource(user).attributes
+            if (filter.matches(ScimValue.Complex(attributes))) matches += user
+        }
+        if (chunk.size < SCIM_FILTER_SCAN_CHUNK_SIZE) break
+        offset += SCIM_FILTER_SCAN_CHUNK_SIZE
     }
+    return matches
+}
 
 /** Applies a resolved [ScimUserWrite] to an existing user and responds with the fresh resource. */
 private suspend fun ApplicationCall.applyScimWrite(
