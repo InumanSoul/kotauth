@@ -172,7 +172,8 @@ object ScimUserMapper {
             return Result.failure(
                 ScimFailure(
                     ScimErrorType.invalidValue,
-                    "'emails' cannot be emptied: an address is required. Use 'replace' to change it.",
+                    "'emails' cannot be emptied: an address is required. Send the new address instead " +
+                        "of an empty list.",
                 ),
             )
         }

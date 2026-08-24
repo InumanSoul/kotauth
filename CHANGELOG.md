@@ -109,10 +109,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   NULL` column, so "this user has no email" is not a state it can hold. Both
   before and after the fix above, a `PATCH` that emptied `emails` fell back to
   the stored address and answered `200 OK` echoing it — a deletion request
-  answered with the thing it asked to delete. An `emails` that arrives emptied
-  (a `PATCH remove` naming the stored address, or a `PUT` sending `[]`) is now
-  a `400 invalidValue` saying the address is required; `replace` is how a
-  connector changes it.
+  answered with the thing it asked to delete. An `emails` that reaches the
+  mapper as a present-but-empty collection — a plain-path `PATCH remove`
+  naming the stored address, or a `PUT` sending `[]` — is now a
+  `400 invalidValue` saying the address is required. The forms that drop the
+  attribute outright rather than emptying it (a `remove` with no `value`, or
+  one on a valued path) still fall through to the stored address, which is the
+  same absent-attribute rule a `PUT` omitting `emails` follows.
 
 ---
 

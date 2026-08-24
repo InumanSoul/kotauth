@@ -170,7 +170,7 @@ class AdminScimRoutesTest {
 
             // It sits directly under the notice saying a user DELETE is reversible, which reads as
             // a promise about DELETE in general unless the group case is spelled out.
-            assertTrue(body.contains("DELETE on a group is permanent"))
+            assertTrue(body.contains(com.kauth.adapter.web.EnglishStrings.SCIM_DELETE_GROUP_PERMANENT))
         }
 
     @Test
