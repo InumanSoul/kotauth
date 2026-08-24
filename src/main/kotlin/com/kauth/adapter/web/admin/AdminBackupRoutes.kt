@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.api.respondProblem
+import com.kauth.adapter.web.plugin.MaxRequestBodyBytesAttr
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
@@ -49,6 +50,10 @@ fun Route.adminBackupRoutes(
     auditLogPort: AuditLogPort,
     currentSchemaVersion: Int,
     kotauthVersion: String,
+    // A full tenant export, base64-encoded, is far larger than any other JSON body this server
+    // accepts — the global request-body limit would reject legitimate imports, so this route
+    // gets its own higher ceiling instead of raising the limit for every other endpoint.
+    maxImportBodyBytes: Long,
 ) {
     authenticate("api-key") {
         route("/admin/api/v1") {
@@ -161,6 +166,10 @@ fun Route.adminBackupRoutes(
             }
 
             post("/tenants/import") {
+                // Must be set before the first call.receive() below — the size-limit plugin
+                // reads this override lazily, at the moment the body is actually consumed.
+                call.attributes.put(MaxRequestBodyBytesAttr, maxImportBodyBytes)
+
                 val masterKey = call.requireMasterAdminKey(apiKeyService, tenantRepository) ?: return@post
                 if (ApiScope.TENANTS_IMPORT !in masterKey.scopes) {
                     return@post call.respondProblem(

@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.plugin.MaxRequestBodyBytesAttr
 import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.port.BackupDecryptResult
 import com.kauth.domain.port.BackupDecryptionError
@@ -137,6 +138,9 @@ fun Route.adminBackupImportRoutes(
     backupImporterService: BackupImporterService,
     backupEncryptionPort: BackupEncryptionPort,
     currentSchemaVersion: Int,
+    // Same reasoning as the JSON API import endpoint (AdminBackupRoutes.kt): an uploaded backup
+    // file is an entire tenant export, far larger than any other multipart upload this UI takes.
+    maxImportBodyBytes: Long,
 ) {
     get("/import") {
         val session = call.sessions.get<AdminSession>()!!
@@ -151,6 +155,10 @@ fun Route.adminBackupImportRoutes(
     }
 
     post("/import") {
+        // Must be set before receiveMultipart() below — the size-limit plugin reads this
+        // override lazily, at the moment the body is actually consumed.
+        call.attributes.put(MaxRequestBodyBytesAttr, maxImportBodyBytes)
+
         val session = call.sessions.get<AdminSession>()!!
         val wsPairs =
             tenantRepository.findAll().map {

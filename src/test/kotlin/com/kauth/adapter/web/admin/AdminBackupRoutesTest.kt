@@ -1,5 +1,7 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.api.respondProblem
+import com.kauth.adapter.web.plugin.requestBodySizeLimitPlugin
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.Application
@@ -42,7 +44,9 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.bearer
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
@@ -345,6 +349,38 @@ class AdminBackupRoutesTest {
             assertTrue(auditPort.hasEvent(AuditEventType.ADMIN_TENANT_IMPORTED))
         }
 
+    @Test
+    fun `import accepts a body larger than the global limit but under its own higher limit`() =
+        testApplication {
+            application { installTestApp() }
+
+            // Padded well past TEST_GLOBAL_MAX_BYTES (4 KB) but comfortably under
+            // TEST_IMPORT_MAX_BYTES (5 MB) — the envelope content is garbage, so decryption
+            // fails, but that 422 (not 413) proves the body was accepted and read in full.
+            val paddedEnvelope = "bkp1." + "A".repeat(60_000)
+            val response =
+                client.post("/admin/api/v1/tenants/import") {
+                    bearerAuth(fullScopeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        Json.encodeToString(
+                            kotlinx.serialization.json.JsonObject
+                                .serializer(),
+                            kotlinx.serialization.json.buildJsonObject {
+                                put("envelope", kotlinx.serialization.json.JsonPrimitive(paddedEnvelope))
+                                put(
+                                    "passphrase",
+                                    kotlinx.serialization.json.JsonPrimitive("this-is-a-strong-passphrase"),
+                                )
+                                put("newSlug", kotlinx.serialization.json.JsonPrimitive("acme-padded"))
+                            },
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+        }
+
     private suspend fun exportEnvelope(
         client: io.ktor.server.testing.ApplicationTestBuilder,
         key: String,
@@ -363,6 +399,16 @@ class AdminBackupRoutesTest {
     }
 
     private fun io.ktor.server.application.Application.installTestApp() {
+        install(requestBodySizeLimitPlugin(TEST_GLOBAL_MAX_BYTES))
+        install(StatusPages) {
+            exception<PayloadTooLargeException> { call, cause ->
+                call.respondProblem(
+                    HttpStatusCode.PayloadTooLarge,
+                    "Payload Too Large",
+                    cause.message ?: "Request body exceeds the maximum allowed size.",
+                )
+            }
+        }
         install(ContentNegotiation) { json() }
         install(Authentication) {
             bearer("api-key") {
@@ -410,7 +456,14 @@ class AdminBackupRoutesTest {
                 auditLogPort = auditPort,
                 currentSchemaVersion = 38,
                 kotauthVersion = "test",
+                maxImportBodyBytes = TEST_IMPORT_MAX_BYTES,
             )
         }
     }
 }
+
+/** Deliberately small so a padded-envelope test can exceed it without a multi-MB body. */
+private const val TEST_GLOBAL_MAX_BYTES = 4_096L
+
+/** Comfortably above [TEST_GLOBAL_MAX_BYTES] — the override this test suite exercises. */
+private const val TEST_IMPORT_MAX_BYTES = 5 * 1024 * 1024L
