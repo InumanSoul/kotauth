@@ -86,7 +86,7 @@ fun Route.adminRoutes(
     backupImporterService: BackupImporterService? = null,
     backupEncryptionPort: BackupEncryptionPort? = null,
     flywaySchemaVersion: Int = 0,
-    maxImportBodyBytes: Long = DEFAULT_MAX_IMPORT_BODY_BYTES,
+    maxImportBodyBytes: Long = com.kauth.config.EnvironmentConfig.DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES,
     corsPort: CorsPort? = null,
     baseUrl: String = "",
     translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
@@ -582,7 +582,3 @@ fun Route.adminRoutes(
         }
     }
 }
-
-/** Mirrors EnvironmentConfig's default for KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES — used only when a
- * caller (e.g. a test) doesn't wire the real configured value through. */
-private const val DEFAULT_MAX_IMPORT_BODY_BYTES = 100 * 1024 * 1024L
