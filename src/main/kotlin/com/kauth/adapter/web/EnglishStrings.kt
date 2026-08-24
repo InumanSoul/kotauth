@@ -871,6 +871,27 @@ object EnglishStrings {
         )
 
     /**
+     * Markers for a record an identity provider owns via SCIM.
+     *
+     * KotAuth stores that an `externalId` was set, never which provider set it, so the copy names
+     * no vendor. The overwrite warning is the reason the badge exists: without it an operator edits
+     * a name here, the next sync reverts it, and nothing on screen explains why.
+     */
+    const val SCIM_IDP_MANAGED_HEADING = "Identity provider"
+    const val SCIM_IDP_MANAGED_BADGE = "IdP-managed"
+    const val SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN =
+        "This record is provisioned by an identity provider. Changes made here may be overwritten by the " +
+            "identity provider on its next sync \u2014 edit it there instead."
+    const val SCIM_IDP_EXTERNAL_ID_LABEL = "External ID"
+    const val SCIM_IDP_EXTERNAL_ID_HINT =
+        "The identifier the identity provider uses for this record. It is how a sync finds the record again."
+
+    /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
+    const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
+        "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
+            "sync never changes them."
+
+    /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for
      * `EnglishOnlyTranslation` and as the fallback inside `BundleTranslation`.

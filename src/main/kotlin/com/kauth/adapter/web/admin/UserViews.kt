@@ -107,6 +107,9 @@ internal fun userDetailPageImpl(
                                     +EnglishStrings.BADGE_INVITE_PENDING
                                 }
                             }
+                            if (user.externalId != null) {
+                                idpManagedBadge()
+                            }
                         }
                     }
                 }
@@ -210,6 +213,10 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
+
+            // ── Identity provider ────────────────────────────────────
+            // Above the profile card, because the profile is what a sync overwrites.
+            user.externalId?.let { idpManagedCard(it) }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)

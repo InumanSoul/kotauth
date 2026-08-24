@@ -673,7 +673,12 @@ internal fun groupDetailPageImpl(
             div("page-header") {
                 div("page-header__left") {
                     div("page-header__identity") {
-                        h1("page-header__title") { +group.name }
+                        div("page-header__title-row") {
+                            h1("page-header__title") { +group.name }
+                            if (group.externalId != null) {
+                                idpManagedBadge()
+                            }
+                        }
                         p("page-header__sub") {
                             val parent = allGroups.find { it.id == group.parentGroupId }
                             +(if (parent != null) "Child of ${parent.name}" else "Top-level group")
@@ -713,6 +718,13 @@ internal fun groupDetailPageImpl(
                 div("notice notice--warn") {
                     +EnglishStrings.groupDeleteBlockedBySubgroups(group.name, childGroups)
                 }
+            }
+
+            // ── Identity provider ────────────────────────────────────
+            // Roles ride along as the editable exception: SCIM carries no roles, so this page is
+            // the only place they are ever set.
+            group.externalId?.let {
+                idpManagedCard(it, alsoEditable = EnglishStrings.SCIM_IDP_MANAGED_ROLES_EDITABLE)
             }
 
             // ── Edit name/description ────────────────────────────────

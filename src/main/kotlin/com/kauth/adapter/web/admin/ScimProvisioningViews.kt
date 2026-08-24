@@ -239,3 +239,42 @@ internal fun DIV.scimDialectSelector(selectedId: String) {
         }
     }
 }
+
+/**
+ * The badge that marks a record an identity provider owns.
+ *
+ * Rendered from `externalId` alone, which is all KotAuth stores — no provider name is available,
+ * so none is claimed.
+ */
+internal fun FlowContent.idpManagedBadge() {
+    span("badge badge--info") {
+        title = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN
+        +EnglishStrings.SCIM_IDP_MANAGED_BADGE
+    }
+}
+
+/**
+ * The card that explains the badge, placed above whatever the operator is about to edit.
+ *
+ * [alsoEditable] carries the opposite message for the one field provisioning does not touch,
+ * so the warning does not leave an operator afraid to change what only this UI can change.
+ */
+internal fun DIV.idpManagedCard(
+    externalId: String,
+    alsoEditable: String? = null,
+) {
+    ovCard {
+        ovSectionLabel(EnglishStrings.SCIM_IDP_MANAGED_HEADING)
+        notice(
+            title = EnglishStrings.SCIM_IDP_MANAGED_BADGE,
+            description = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN,
+            modifier = "notice--info",
+            iconName = "info",
+        )
+        ovRowMono(EnglishStrings.SCIM_IDP_EXTERNAL_ID_LABEL, externalId, copyable = true)
+        ovRowMuted("", EnglishStrings.SCIM_IDP_EXTERNAL_ID_HINT)
+        if (alsoEditable != null) {
+            ovRowMuted("", alsoEditable)
+        }
+    }
+}
