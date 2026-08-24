@@ -351,6 +351,17 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `toDomain on update clears externalId when it is omitted from a PUT`() {
+        // PUT is a full replace: an IdP unlinking a user by dropping externalId must not
+        // leave the stale correlation key in place forever.
+        val existing = user()
+        val r = resourceWithName(given = "A", family = "B")
+
+        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        assertNull(write.user.externalId)
+    }
+
+    @Test
     fun `toDomain rejects a composed fullName that exceeds the column`() {
         // full_name is varchar(255); two long parts can exceed it even though each fits.
         val r = resourceWithName(given = "g".repeat(200), family = "f".repeat(200))

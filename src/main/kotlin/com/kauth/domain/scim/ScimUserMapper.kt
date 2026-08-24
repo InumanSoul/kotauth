@@ -79,11 +79,18 @@ object ScimUserMapper {
 
     /**
      * [resource] must be a fully merged representation — the complete desired state, not a bare
-     * PATCH body. An absent attribute here is treated as "no value for this attribute" (falling
-     * back to [existing] where one applies), which is correct for a PUT's full replacement but
-     * would silently clear every attribute a PATCH request didn't mention. Callers handling PATCH
-     * must merge the operations onto [ScimUserMapper.toResource] of the current user first
-     * (see `ScimPatchEngine`) and pass the merged result here — never the raw PATCH body.
+     * PATCH body. Callers handling PATCH must merge the operations onto [ScimUserMapper.toResource]
+     * of the current user first (see `ScimPatchEngine`) and pass the merged result here — never the
+     * raw PATCH body.
+     *
+     * **Absent-attribute policy (PUT is a full replace, RFC 7644 §3.5.1):** an attribute missing
+     * from [resource] clears the corresponding field — [externalId], [User.givenName], and
+     * [User.familyName] all go to `null` when omitted. The two exceptions are `email` and
+     * `fullName`/`displayName`: both back a `NOT NULL` database column, so "clear" isn't a value
+     * they can take. Omitting them instead falls back to [existing]'s value, and on create (no
+     * [existing]) an omitted email is rejected downstream by [com.kauth.domain.service.AdminUserService]
+     * ("A valid email address is required."). Silently keeping a stale `externalId` across a PUT
+     * that dropped it would leave a dangling correlation key the IdP believes it removed.
      */
     fun toDomain(
         resource: ScimResource,
@@ -119,13 +126,14 @@ object ScimUserMapper {
 
         // externalId is an opaque IdP key: trimmed because surrounding whitespace is never
         // meaningful and creates duplicates the unique index can't see, but never lower-cased
-        // because case may be significant to the IdP.
+        // because case may be significant to the IdP. It is nullable and not NOT NULL-constrained,
+        // so — unlike email/fullName below — a PUT that omits it clears it (see KDoc above):
+        // an IdP unlinking a user by dropping externalId must not leave the stale key in place.
         val externalId =
             (resource.attributes["externalId"] as? ScimValue.Str)
                 ?.value
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
-                ?: existing?.externalId
 
         // Same emptiness guard as displayName: a work entry with value "" must fall through
         // to the existing address rather than blank it.
