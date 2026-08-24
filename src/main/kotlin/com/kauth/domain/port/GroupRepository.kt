@@ -12,22 +12,20 @@ import com.kauth.domain.model.UserId
 interface GroupRepository {
     fun findById(id: GroupId): Group?
 
-    /** Returns groups in a tenant, optionally paginated. Unbounded by default for existing callers. */
+    /**
+     * Returns groups in a tenant, optionally paginated. Unbounded by default for existing callers.
+     *
+     * Passing `loadRoles = false` leaves every returned [Group.roleIds] empty instead of loading
+     * it — for callers, like SCIM, that never read roles and would otherwise pay one extra query
+     * per row for data they discard. The empty list then means "not loaded", not "no roles", so
+     * it must never be read as an answer; it is a parameter rather than a separate method so that
+     * the omission is visible at the call site.
+     */
     fun findByTenantId(
         tenantId: TenantId,
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
-    ): List<Group>
-
-    /**
-     * Same as [findByTenantId], but every returned [Group.roleIds] is empty rather than loaded —
-     * for callers, like SCIM, that never read roles and would otherwise pay one extra query per
-     * row for data they discard.
-     */
-    fun findByTenantIdWithoutRoles(
-        tenantId: TenantId,
-        limit: Int = Int.MAX_VALUE,
-        offset: Int = 0,
+        loadRoles: Boolean = true,
     ): List<Group>
 
     /** Returns total count of groups in [tenantId]. Used for pagination. */

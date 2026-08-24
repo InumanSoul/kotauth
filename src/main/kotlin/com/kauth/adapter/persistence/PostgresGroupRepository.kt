@@ -38,6 +38,7 @@ class PostgresGroupRepository : GroupRepository {
         tenantId: TenantId,
         limit: Int,
         offset: Int,
+        loadRoles: Boolean,
     ): List<Group> =
         transaction {
             GroupsTable
@@ -46,22 +47,7 @@ class PostgresGroupRepository : GroupRepository {
                 .orderBy(GroupsTable.name)
                 .limit(limit)
                 .offset(offset.toLong())
-                .map { it.toGroup() }
-        }
-
-    override fun findByTenantIdWithoutRoles(
-        tenantId: TenantId,
-        limit: Int,
-        offset: Int,
-    ): List<Group> =
-        transaction {
-            GroupsTable
-                .selectAll()
-                .where { GroupsTable.tenantId eq tenantId.value }
-                .orderBy(GroupsTable.name)
-                .limit(limit)
-                .offset(offset.toLong())
-                .map { it.toGroup(loadRoles = false) }
+                .map { it.toGroup(loadRoles = loadRoles) }
         }
 
     override fun countByTenantId(tenantId: TenantId): Long =

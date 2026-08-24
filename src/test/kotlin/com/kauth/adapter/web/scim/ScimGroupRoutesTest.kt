@@ -1131,6 +1131,33 @@ class ScimGroupRoutesTest {
             assertEquals(setOf(u1.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
         }
 
+    @Test
+    fun `GET Groups lists without loading roles`() =
+        testApplication {
+            application { installTestApp() }
+            val group = addGroup("Engineering", roleIds = listOf(RoleId(42)))
+
+            val response = client.get(groupsUrl()) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(listOf(false), groupRepo.findByTenantIdLoadRolesFlags)
+            // The group really does have a role; the list path just never pays to load it.
+            assertEquals(listOf(RoleId(42)), groupRepo.findById(group.id!!)!!.roleIds)
+        }
+
+    @Test
+    fun `filter scanning Groups does not load roles either`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Engineering", roleIds = listOf(RoleId(42)))
+
+            val response = client.get(groupsUrl("""displayName eq "Engineering"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(true, groupRepo.findByTenantIdLoadRolesFlags.isNotEmpty())
+            assertEquals(false, groupRepo.findByTenantIdLoadRolesFlags.any { it })
+        }
+
     // -------------------------------------------------------------------------
     // DELETE
     // -------------------------------------------------------------------------
