@@ -476,6 +476,7 @@ class ApiUserRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

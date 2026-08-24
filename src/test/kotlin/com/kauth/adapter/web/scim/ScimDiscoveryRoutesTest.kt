@@ -33,6 +33,7 @@ import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantClaimMapperRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
@@ -409,6 +410,7 @@ class ScimDiscoveryRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                transactionRunner = FakeTransactionRunner(),
             )
         }
     }

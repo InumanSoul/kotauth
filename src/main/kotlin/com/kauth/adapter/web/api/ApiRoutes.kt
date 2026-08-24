@@ -61,9 +61,10 @@ fun Route.apiRoutes(
     webAuthnService: WebAuthnService,
     webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
-    // Only the SCIM /Users write path needs a real rollback boundary; other route trees never
-    // pass this, so a no-op default keeps their tests untouched.
-    transactionRunner: TransactionRunner = NoOpTransactionRunner,
+    // Only the SCIM /Users write path needs this, but it's required rather than defaulted to a
+    // no-op — a future wiring regression should fail to compile, not silently drop the rollback
+    // boundary.
+    transactionRunner: TransactionRunner,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -176,11 +177,6 @@ fun Route.apiRoutes(
 }
 
 private object ApiRoutes
-
-/** Default for route trees that never combine multiple writes and so need no real rollback boundary. */
-private object NoOpTransactionRunner : TransactionRunner {
-    override fun <T> runInTransaction(block: () -> T): T = block()
-}
 
 private fun swaggerUiHtml() =
     """

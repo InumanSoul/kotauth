@@ -461,6 +461,7 @@ class ApiPasskeyRoutesTest {
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService = webAuthnService,
                 webAuthnCredentialRepository = credentialRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }
