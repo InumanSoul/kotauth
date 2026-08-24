@@ -614,6 +614,28 @@ class ScimUserRoutesTest {
     // -------------------------------------------------------------------------
 
     @Test
+    fun `PUT renaming userName is rejected with mutability, not silently dropped`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("original")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"renamed",""" +
+                            """"emails":[{"value":"original@example.com","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("mutability", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals("original", userRepo.findById(user.id!!, acme.id)?.username)
+        }
+
+    @Test
     fun `PATCH replace on active deactivates the user`() =
         testApplication {
             application { installTestApp() }
@@ -688,6 +710,30 @@ class ScimUserRoutesTest {
     // -------------------------------------------------------------------------
     // DELETE /Users/{id} — deactivate, not delete
     // -------------------------------------------------------------------------
+
+    @Test
+    fun `PATCH renaming userName is rejected with mutability, not silently dropped`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("original")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                         "Operations":[{"op":"replace","path":"userName","value":"renamed"}]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("mutability", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals("original", userRepo.findById(user.id!!, acme.id)?.username)
+        }
 
     @Test
     fun `DELETE deactivates rather than deleting - the user stays fetchable with active false`() =

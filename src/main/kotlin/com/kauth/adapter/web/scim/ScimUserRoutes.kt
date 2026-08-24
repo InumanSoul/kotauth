@@ -150,6 +150,7 @@ fun Route.scimUserRoutes(
                 call.respondScimFailure(it)
                 return@put
             }
+        call.rejectUsernameRename(existing.value.username, write) ?: return@put
         call.warnIfPasswordUnsupported(userId, write)
         call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
     }
@@ -185,6 +186,7 @@ fun Route.scimUserRoutes(
                 call.respondScimFailure(it)
                 return@patch
             }
+        call.rejectUsernameRename(existing.value.username, write) ?: return@patch
         call.warnIfPasswordUnsupported(userId, write)
         call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
     }
@@ -255,6 +257,21 @@ private fun <T> runScimTransaction(
     } catch (e: ScimWriteRollback) {
         AdminResult.Failure(e.error)
     }
+
+/** `userName` is the SCIM correlation key; a PUT/PATCH that tries to change it is rejected, never silently dropped. */
+private suspend fun ApplicationCall.rejectUsernameRename(
+    existingUsername: String,
+    write: ScimUserWrite,
+): Unit? {
+    if (write.user.username == existingUsername) return Unit
+    val (status, body) =
+        ScimFailure(
+            ScimErrorType.mutability,
+            "userName cannot be changed once assigned; it is the SCIM correlation key.",
+        ).toResponse()
+    respondScim(status, body)
+    return null
+}
 
 /**
  * AdminUserService has no method that applies an admin-supplied plaintext password to an
