@@ -37,21 +37,20 @@ private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 // Arity is deliberately NOT enforced here: RFC 7644 §3.5.2.1 lets an `add` or `replace` on a
 // multi-valued attribute carry a single element, which this engine then folds into the collection.
 // The canonical array shape is checked once, on the merged result, by ScimGroupMapper/ScimUserMapper.
-private val COMPLEX_ATTRIBUTES = SCIM_ATTRIBUTE_SHAPES.filterValues { it == ScimShape.COMPLEX }.keys
+private val COMPLEX_ATTRIBUTES = SCIM_ATTRIBUTE_SHAPES.filterValues { it.shape == ScimShape.COMPLEX }.keys
 
 // Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
 // into debugging a typo that isn't there, when the real issue is a read-only target.
 private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta")
 
-// Sub-attribute vocabulary is only pinned down for the complex attributes this
-// implementation actually supports; attributes not listed here go unchecked at this level.
+// Sub-attribute vocabulary is only pinned down for the complex attributes this implementation
+// actually reads inside, which is exactly where the shape table declares sub-attribute shapes.
+// Deriving it keeps a path check and a body check from disagreeing about what `emails.primary` is.
+// An attribute with no declared sub-attributes goes unchecked at this level.
 private val KNOWN_SUB_ATTRIBUTES =
-    mapOf(
-        "name" to setOf("givenName", "familyName"),
-        "emails" to setOf("value", "type", "primary"),
-        // RFC 7643 §4.2 defines this set for the Group "members" attribute.
-        "members" to setOf("value", "\$ref", "type", "display"),
-    )
+    SCIM_ATTRIBUTE_SHAPES
+        .filterValues { it.subAttributes.isNotEmpty() }
+        .mapValues { (_, spec) -> spec.subAttributes.keys }
 
 class ScimPatchEngine {
     /** Applies [ops] in order to a copy of [resource]. All-or-nothing: [resource] is never mutated. */

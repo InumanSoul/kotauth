@@ -1427,6 +1427,29 @@ class ScimGroupRoutesTest {
             assertEquals(0L, groupRepo.countByTenantId(acme.id))
         }
 
+    @Test
+    fun `PUT with a numeric member type is rejected rather than admitting an unguarded member`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"Eng",""" +
+                            """"members":[{"value":"${u1.id!!.value}","type":7}]}""",
+                    )
+                }
+
+            // `type` is what the nested-group guard reads; a number cast to null slips past it.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Authentication) {

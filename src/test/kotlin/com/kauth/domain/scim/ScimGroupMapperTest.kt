@@ -320,6 +320,25 @@ class ScimGroupMapperTest {
         )
     }
 
+    @Test
+    fun `a numeric member type is rejected rather than read as absent`() {
+        // `type` is what the nested-group guard reads. A number cast to null there means the guard
+        // never sees the entry it was written to catch, and the member lands as a plain user.
+        val members =
+            ScimValue.MultiValued(
+                listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("1"), "type" to ScimValue.Num(2)))),
+            )
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(attributes = it.attributes + ("members" to members))
+            }
+
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("members[0].type"), failure.detail)
+    }
+
     private fun ScimValue.toArray() = ScimValue.MultiValued(listOf(this))
 
     private fun resourceWith(

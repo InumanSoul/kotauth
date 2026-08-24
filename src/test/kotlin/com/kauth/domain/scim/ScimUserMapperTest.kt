@@ -607,6 +607,65 @@ class ScimUserMapperTest {
         assertTrue(failure.detail.contains("userName"), failure.detail)
     }
 
+    @Test
+    fun `a numeric givenName is rejected instead of erasing the stored one`() {
+        // `name` is a Complex, so the top-level shape check passes and the sub-attribute cast used
+        // to yield null — writing givenName = null over "Ada" under a 200 OK.
+        val name = ScimValue.Complex(mapOf("givenName" to ScimValue.Num(123)))
+        val failure = shapeFailureOf(userResourceWith("name" to name), user())
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("name.givenName"), failure.detail)
+        assertTrue(failure.detail.contains("a string"), failure.detail)
+    }
+
+    @Test
+    fun `a numeric emails value is rejected instead of echoing the stored address back`() {
+        val emails =
+            ScimValue.MultiValued(
+                listOf(
+                    ScimValue.Complex(
+                        mapOf("value" to ScimValue.Num(123), "type" to ScimValue.Str("work")),
+                    ),
+                ),
+            )
+        val failure = shapeFailureOf(userResourceWith("emails" to emails), user())
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("emails[0].value"), failure.detail)
+    }
+
+    @Test
+    fun `a shape failure inside an array names the offending index`() {
+        val emails =
+            ScimValue.MultiValued(
+                listOf(
+                    ScimValue.Complex(mapOf("value" to ScimValue.Str("ada@example.com"))),
+                    ScimValue.Complex(
+                        mapOf("value" to ScimValue.Str("ada@x.example"), "primary" to ScimValue.Str("yes")),
+                    ),
+                ),
+            )
+        val failure = shapeFailureOf(userResourceWith("emails" to emails), user())
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("emails[1].primary"), failure.detail)
+        assertTrue(failure.detail.contains("a boolean"), failure.detail)
+    }
+
+    @Test
+    fun `a sub-attribute this implementation does not read is left alone`() {
+        // Unknown sub-attributes stay unchecked: RFC 7643 defines several `name` parts Kotauth
+        // does not store, and rejecting them would drop records over data nobody reads.
+        val name =
+            ScimValue.Complex(
+                mapOf("givenName" to ScimValue.Str("Ada"), "honorificPrefix" to ScimValue.Num(7)),
+            )
+        val write = ScimUserMapper.toDomain(userResourceWith("name" to name).merged(), user(), tenantId)
+
+        assertEquals("Ada", write.getOrThrow().user.givenName)
+    }
+
     private fun resourceWithName(
         given: String?,
         family: String?,

@@ -1468,6 +1468,73 @@ class ScimUserRoutesTest {
             assertEquals("usr-1", userRepo.findById(user.id, acme.id)!!.externalId)
         }
 
+    @Test
+    fun `PUT with a numeric givenName is rejected instead of erasing the stored one`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"name":{"givenName":123,"familyName":"Lovelace"}}""",
+                    )
+                }
+
+            // `name` is an object, so the top-level shape check passed and the null cast wrote
+            // givenName = null over "Ada" under a 200.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("Ada", userRepo.findById(user.id, acme.id)!!.givenName)
+        }
+
+    @Test
+    fun `PUT with a numeric emails value is rejected instead of echoing the stored address back`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"emails":[{"value":123,"type":"work"}]}""",
+                    )
+                }
+
+            // The byte-equivalent shape on /Groups (`{"members":[{"value":123}]}`) has always been
+            // a 400; /Users answered 200 with the old address echoed back.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
+        }
+
+    @Test
+    fun `PATCH replacing a filtered emails value with a number is rejected, not a 200 no-op`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":""" +
+                            """[{"op":"replace","path":"emails[type eq \"work\"].value","value":123}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
+        }
+
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Authentication) {

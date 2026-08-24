@@ -65,30 +65,106 @@ private fun shapeFailure(
 ): ScimFailure = ScimFailure(ScimErrorType.invalidValue, "'$name' must be $expected, got ${actual.shapeName()}")
 
 /**
+ * One attribute's declared shape, plus the shapes of the sub-attributes this implementation
+ * actually reads out of it.
+ *
+ * [subAttributes] is deliberately a partial vocabulary rather than a closed one: RFC 7643 gives
+ * `name` and `emails` more parts than Kotauth stores, and a name absent from it is left unchecked
+ * and unread. Rejecting those would drop whole records over data nothing looks at, which is the
+ * failure mode a strict unknown-*attribute* rule already has to be careful about one level up.
+ */
+internal data class ScimAttributeSpec(
+    val shape: ScimShape,
+    val subAttributes: Map<String, ScimShape> = emptyMap(),
+)
+
+/**
  * Every attribute this implementation defines, with the shape its value must have. One table for
  * both resource types on purpose: no attribute name means a different shape for a User than for a
  * Group, and sharing it is what stops `/Users` and `/Groups` disagreeing about identical malformed
  * input — one answering 400 where the other answers 200.
  *
+ * The table reaches one level down, because the same defect hides there: `{"name":{"givenName":123}}`
+ * and `{"emails":[{"value":123}]}` both satisfy the top-level shape, and the sub-attribute cast that
+ * follows used to yield null and either discard the value or erase the stored one, under a 200 OK.
+ *
+ * `groups` and `meta` declare no sub-attribute shapes: both are server-managed, no `toDomain` reads
+ * anything inside them, and a resource echoed back by a read-modify-write client carries them
+ * verbatim — there is nothing there to erase and nothing to gain by refusing it.
+ *
  * This is also the vocabulary of known attributes: a name absent from it is a typo (or an
  * unimplemented extension), which [validateAttributeShapes] and [ScimPatchEngine] both reject
  * rather than silently drop.
  */
-internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimShape> =
+internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimAttributeSpec> =
     mapOf(
-        "userName" to ScimShape.STRING,
-        "externalId" to ScimShape.STRING,
-        "displayName" to ScimShape.STRING,
-        "password" to ScimShape.STRING,
-        "id" to ScimShape.STRING,
-        "active" to ScimShape.BOOLEAN,
-        "name" to ScimShape.COMPLEX,
-        "meta" to ScimShape.COMPLEX,
-        "schemas" to ScimShape.STRING_ARRAY,
-        "emails" to ScimShape.COMPLEX_ARRAY,
-        "members" to ScimShape.COMPLEX_ARRAY,
-        "groups" to ScimShape.COMPLEX_ARRAY,
+        "userName" to ScimAttributeSpec(ScimShape.STRING),
+        "externalId" to ScimAttributeSpec(ScimShape.STRING),
+        "displayName" to ScimAttributeSpec(ScimShape.STRING),
+        "password" to ScimAttributeSpec(ScimShape.STRING),
+        "id" to ScimAttributeSpec(ScimShape.STRING),
+        "active" to ScimAttributeSpec(ScimShape.BOOLEAN),
+        "name" to
+            ScimAttributeSpec(
+                ScimShape.COMPLEX,
+                mapOf("givenName" to ScimShape.STRING, "familyName" to ScimShape.STRING),
+            ),
+        "meta" to ScimAttributeSpec(ScimShape.COMPLEX),
+        "schemas" to ScimAttributeSpec(ScimShape.STRING_ARRAY),
+        "emails" to
+            ScimAttributeSpec(
+                ScimShape.COMPLEX_ARRAY,
+                mapOf(
+                    "value" to ScimShape.STRING,
+                    "type" to ScimShape.STRING,
+                    "primary" to ScimShape.BOOLEAN,
+                ),
+            ),
+        "members" to
+            ScimAttributeSpec(
+                ScimShape.COMPLEX_ARRAY,
+                mapOf(
+                    "value" to ScimShape.STRING,
+                    "type" to ScimShape.STRING,
+                    "display" to ScimShape.STRING,
+                    "\$ref" to ScimShape.STRING,
+                ),
+            ),
+        "groups" to ScimAttributeSpec(ScimShape.COMPLEX_ARRAY),
     )
+
+/** The failure [value] earns under this spec, sub-attributes included, or null when it conforms. */
+internal fun ScimAttributeSpec.mismatch(
+    name: String,
+    value: ScimValue,
+): ScimFailure? {
+    shape.mismatch(name, value)?.let { return it }
+    if (subAttributes.isEmpty()) return null
+    return when (value) {
+        is ScimValue.Complex -> subMismatch(name, value)
+        // The element type is already guaranteed by ScimShape.mismatch above, so a non-Complex
+        // entry cannot reach here for a COMPLEX_ARRAY.
+        is ScimValue.MultiValued ->
+            value.values
+                .asSequence()
+                .mapIndexedNotNull { index, entry ->
+                    (entry as? ScimValue.Complex)?.let { subMismatch("$name[$index]", it) }
+                }.firstOrNull()
+        else -> null
+    }
+}
+
+private fun ScimAttributeSpec.subMismatch(
+    path: String,
+    value: ScimValue.Complex,
+): ScimFailure? {
+    for ((sub, subValue) in value.attributes) {
+        if (subValue == ScimValue.Null) continue
+        val subShape = subAttributes[sub] ?: continue
+        subShape.mismatch("$path.$sub", subValue)?.let { return it }
+    }
+    return null
+}
 
 /**
  * Rejects any PRESENT attribute whose value has the wrong JSON shape, and any attribute name this
@@ -110,11 +186,11 @@ internal fun ScimResource.validateAttributeShapes(): Result<Unit> {
         // An undefined name is a typo, and dropping it silently is how the singular `"member"`
         // returned 200 while emptying the group — the same typo a PATCH path already rejects.
         // invalidSyntax rather than PATCH's invalidPath: there is no path in a PUT or POST body.
-        val shape =
+        val spec =
             SCIM_ATTRIBUTE_SHAPES[name]
                 ?: return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "unknown attribute '$name'"))
         if (value == ScimValue.Null) continue
-        shape.mismatch(name, value)?.let { return Result.failure(it) }
+        spec.mismatch(name, value)?.let { return Result.failure(it) }
     }
     return Result.success(Unit)
 }

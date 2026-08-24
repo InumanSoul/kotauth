@@ -28,7 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   known attribute — `"active": "false"`, `"externalId": 9182`,
   `"emails": "a@example.com"` — is a `400 invalidValue` naming the attribute
   and the shape received. It is never coerced and never silently discarded: a
-  deprovision that quietly does nothing is worse than a visible error. Unknown
+  deprovision that quietly does nothing is worse than a visible error. The
+  check reaches sub-attributes too, naming the offending array index:
+  `"name": {"givenName": 123}` and `"emails": [{"value": 123}]` are rejected
+  rather than writing a null over the stored value under a `200 OK`. Unknown
   attribute names are rejected on `PUT`/`POST` as well as `PATCH`.
 
 ### Changed
