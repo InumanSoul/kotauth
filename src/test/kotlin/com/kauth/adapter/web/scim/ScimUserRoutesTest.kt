@@ -636,6 +636,29 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `PUT with a password on an existing user is rejected and the hash is untouched`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+            val hashBefore = userRepo.findById(user.id!!, acme.id)?.passwordHash
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"alice",""" +
+                            """"emails":[{"value":"alice@example.com","type":"work"}],"password":"new-password-1"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals(hashBefore, userRepo.findById(user.id!!, acme.id)?.passwordHash)
+        }
+
+    @Test
     fun `PATCH replace on active deactivates the user`() =
         testApplication {
             application { installTestApp() }
@@ -733,6 +756,31 @@ class ScimUserRoutesTest {
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             assertEquals("mutability", body["scimType"]?.jsonPrimitive?.content)
             assertEquals("original", userRepo.findById(user.id!!, acme.id)?.username)
+        }
+
+    @Test
+    fun `PATCH with a password on an existing user is rejected and the hash is untouched`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+            val hashBefore = userRepo.findById(user.id!!, acme.id)?.passwordHash
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                         "Operations":[{"op":"replace","path":"password","value":"new-password-1"}]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals(hashBefore, userRepo.findById(user.id!!, acme.id)?.passwordHash)
         }
 
     @Test

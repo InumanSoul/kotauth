@@ -20,7 +20,6 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
-import io.ktor.server.application.log
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -38,6 +37,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 private const val LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+private const val PASSWORD_UPDATE_UNSUPPORTED = "password updates for existing users are not supported over SCIM"
 
 /** `/Users` — RFC 7644 §3.2-3.6. Every write goes through [AdminUserService], never the repository directly. */
 fun Route.scimUserRoutes(
@@ -151,7 +151,7 @@ fun Route.scimUserRoutes(
                 return@put
             }
         call.rejectUsernameRename(existing.value.username, write) ?: return@put
-        call.warnIfPasswordUnsupported(userId, write)
+        call.rejectPasswordUpdate(write) ?: return@put
         call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
     }
 
@@ -187,7 +187,7 @@ fun Route.scimUserRoutes(
                 return@patch
             }
         call.rejectUsernameRename(existing.value.username, write) ?: return@patch
-        call.warnIfPasswordUnsupported(userId, write)
+        call.rejectPasswordUpdate(write) ?: return@patch
         call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
     }
 
@@ -275,21 +275,15 @@ private suspend fun ApplicationCall.rejectUsernameRename(
 
 /**
  * AdminUserService has no method that applies an admin-supplied plaintext password to an
- * *existing* user through the tenant's password policy — only user creation has one. Rather than
- * hash it here or write it straight into passwordHash, the supplied value is dropped and the
- * existing hash is left untouched; this is logged (never the password itself) so the gap is visible.
+ * *existing* user through the tenant's password policy — only user creation has one. Silently
+ * accepting and dropping it would be an undetectable divergence (the IdP believes a rotated
+ * password took effect); rejecting fails loudly at the connector's next sync instead.
  */
-private fun ApplicationCall.warnIfPasswordUnsupported(
-    userId: UserId,
-    write: ScimUserWrite,
-) {
-    if (write.plaintextPassword != null) {
-        application.log.warn(
-            "SCIM update for user {} included a password; updating an existing user's password " +
-                "via SCIM is not supported yet, so it was ignored.",
-            userId.value,
-        )
-    }
+private suspend fun ApplicationCall.rejectPasswordUpdate(write: ScimUserWrite): Unit? {
+    if (write.plaintextPassword == null) return Unit
+    val (status, body) = ScimFailure(ScimErrorType.invalidValue, PASSWORD_UPDATE_UNSUPPORTED).toResponse()
+    respondScim(status, body)
+    return null
 }
 
 private suspend fun ApplicationCall.respondScimUser(
