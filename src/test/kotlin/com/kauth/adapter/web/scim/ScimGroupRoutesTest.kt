@@ -1227,6 +1227,51 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `PUT with a singular member typo is rejected instead of silently emptying the group`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Eng","member":[{"value":"${u1.id!!.value}"}]}""",
+                    )
+                }
+
+            // The same typo in a PATCH path has always been a 400; a PUT used to answer 200 with
+            // the group emptied, because the misspelled attribute was dropped and `members` read
+            // as absent, which PUT treats as "clear".
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidSyntax", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `POST with an unknown attribute is rejected rather than dropping it`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Engineering","nickName":"Eng"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidSyntax", scimTypeOf(response.bodyAsText()))
+            assertEquals(0L, groupRepo.countByTenantId(acme.id))
+        }
+
+    @Test
     fun `GET Groups filtering on a User attribute is invalidFilter, not an empty result set`() =
         testApplication {
             application { installTestApp() }

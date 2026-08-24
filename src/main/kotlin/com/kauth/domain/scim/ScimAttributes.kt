@@ -70,8 +70,9 @@ private fun shapeFailure(
  * Group, and sharing it is what stops `/Users` and `/Groups` disagreeing about identical malformed
  * input — one answering 400 where the other answers 200.
  *
- * This is also the vocabulary of known attributes [ScimPatchEngine] validates a PATCH path
- * against.
+ * This is also the vocabulary of known attributes: a name absent from it is a typo (or an
+ * unimplemented extension), which [validateAttributeShapes] and [ScimPatchEngine] both reject
+ * rather than silently drop.
  */
 internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimShape> =
     mapOf(
@@ -106,7 +107,12 @@ internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimShape> =
  */
 internal fun ScimResource.validateAttributeShapes(): Result<Unit> {
     for ((name, value) in attributes) {
-        val shape = SCIM_ATTRIBUTE_SHAPES[name] ?: continue
+        // An undefined name is a typo, and dropping it silently is how the singular `"member"`
+        // returned 200 while emptying the group — the same typo a PATCH path already rejects.
+        // invalidSyntax rather than PATCH's invalidPath: there is no path in a PUT or POST body.
+        val shape =
+            SCIM_ATTRIBUTE_SHAPES[name]
+                ?: return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "unknown attribute '$name'"))
         if (value == ScimValue.Null) continue
         shape.mismatch(name, value)?.let { return Result.failure(it) }
     }
