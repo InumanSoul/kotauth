@@ -360,6 +360,16 @@ fun Application.module(
                     call.respondProblem(HttpStatusCode.PayloadTooLarge, "Payload Too Large", detail)
                 path.startsWith("/admin") ->
                     call.respondAdminErrorPage(s, HttpStatusCode.PayloadTooLarge)
+                // Portal and auth routes (e.g. /t/{slug}/account, /t/{slug}/login) don't share
+                // /admin's error-page template, but they are still browsers — an oversized form
+                // POST must not render raw JSON in the tab. Checked via Accept, not path, since
+                // these routes don't share a common prefix the way /admin, /api/v1 and /scim/v2 do.
+                call.request.accept()?.contains("text/html", ignoreCase = true) == true ->
+                    call.respondText(
+                        genericBrowserErrorHtml("Payload Too Large", detail),
+                        ContentType.Text.Html,
+                        HttpStatusCode.PayloadTooLarge,
+                    )
                 else ->
                     call.respond(
                         HttpStatusCode.PayloadTooLarge,
@@ -548,6 +558,35 @@ fun Application.module(
         )
     }
 }
+
+/**
+ * Minimal, dependency-free HTML error body for browser-facing surfaces that have no shared
+ * error-page template the way `/admin` does (portal, auth login/register/OTP/magic-link) — used
+ * only so a browser doesn't render raw JSON for an oversized form POST.
+ */
+private fun genericBrowserErrorHtml(
+    title: String,
+    detail: String,
+): String {
+    val escapedTitle = title.escapeHtml()
+    val escapedDetail = detail.escapeHtml()
+    return """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head><meta charset="UTF-8"><title>$escapedTitle</title></head>
+        <body>
+        <h1>$escapedTitle</h1>
+        <p>$escapedDetail</p>
+        </body>
+        </html>
+        """.trimIndent()
+}
+
+private fun String.escapeHtml(): String =
+    replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
 
 /** Shared admin-UI HTML error page, used by every StatusPages handler that answers a `/admin` request. */
 private suspend fun io.ktor.server.application.ApplicationCall.respondAdminErrorPage(
