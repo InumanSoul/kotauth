@@ -7,6 +7,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.TransactionRunner
+import com.kauth.domain.scim.MergedScimResource
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
 import com.kauth.domain.scim.ScimFilter
@@ -138,8 +139,10 @@ fun Route.scimUserRoutes(
         val tenantId = call.attributes[TenantIdAttr]
 
         val resource = call.receiveScimResource() ?: return@post
+        // POST creates a resource from scratch: the body is the complete initial state, not a
+        // partial patch, so it is wrapped directly rather than going through a merge step.
         val write =
-            ScimUserMapper.toDomain(resource, existing = null, tenantId).getOrElse {
+            ScimUserMapper.toDomain(MergedScimResource(resource), existing = null, tenantId).getOrElse {
                 call.respondScimFailure(it)
                 return@post
             }
@@ -203,10 +206,10 @@ fun Route.scimUserRoutes(
         }
 
         val resource = call.receiveScimResource() ?: return@put
-        // PUT is a full replace: the raw body IS the desired end state, so it goes to toDomain
-        // directly rather than through the merge-first path PATCH requires.
+        // PUT is a full replace: the raw body IS the desired end state, so it is wrapped directly
+        // rather than going through the merge-first path PATCH requires.
         val write =
-            ScimUserMapper.toDomain(resource, existing = existing.value, tenantId).getOrElse {
+            ScimUserMapper.toDomain(MergedScimResource(resource), existing = existing.value, tenantId).getOrElse {
                 call.respondScimFailure(it)
                 return@put
             }
@@ -241,7 +244,7 @@ fun Route.scimUserRoutes(
                 return@patch
             }
         val write =
-            ScimUserMapper.toDomain(merged, existing = existing.value, tenantId).getOrElse {
+            ScimUserMapper.toDomain(MergedScimResource(merged), existing = existing.value, tenantId).getOrElse {
                 call.respondScimFailure(it)
                 return@patch
             }

@@ -98,13 +98,14 @@ object ScimUserMapper {
     }
 
     /**
-     * [resource] must be a fully merged representation — the complete desired state, not a bare
+     * [merged] must wrap a fully merged representation — the complete desired state, not a bare
      * PATCH body. Callers handling PATCH must merge the operations onto [ScimUserMapper.toResource]
-     * of the current user first (see `ScimPatchEngine`) and pass the merged result here — never the
-     * raw PATCH body.
+     * of the current user first (see `ScimPatchEngine`), then wrap the merged result in
+     * [MergedScimResource] before calling this — the type is what stops a raw PATCH body from being
+     * passed here by mistake; see [MergedScimResource]'s KDoc for why the contract exists at all.
      *
      * **Absent-attribute policy (PUT is a full replace, RFC 7644 §3.5.1):** an attribute missing
-     * from [resource] clears the corresponding field — [externalId], [User.givenName], and
+     * from [merged] clears the corresponding field — [externalId], [User.givenName], and
      * [User.familyName] all go to `null` when omitted. The two exceptions are `email` and
      * `fullName`/`displayName`: both back a `NOT NULL` database column, so "clear" isn't a value
      * they can take. Omitting them instead falls back to [existing]'s value, and on create (no
@@ -113,10 +114,11 @@ object ScimUserMapper {
      * that dropped it would leave a dangling correlation key the IdP believes it removed.
      */
     fun toDomain(
-        resource: ScimResource,
+        merged: MergedScimResource,
         existing: User?,
         tenantId: TenantId,
     ): Result<ScimUserWrite> {
+        val resource = merged.value
         val username = (resource.attributes["userName"] as? ScimValue.Str)?.value?.trim()
         if (username.isNullOrEmpty()) {
             return Result.failure(ScimFailure(ScimErrorType.invalidValue, "userName is required"))

@@ -32,6 +32,10 @@ class ScimUserMapperTest {
         k: String,
     ) = (r.attributes[k] as? ScimValue.Str)?.value
 
+    // Every fixture below is already a complete representation (a synthetic PUT/POST body, or
+    // toResource(existing)), so wrapping it here is a bare formality — never a real merge step.
+    private fun ScimResource.merged() = MergedScimResource(this)
+
     @Test
     fun `toResource emits the core attributes`() {
         val r = ScimUserMapper.toResource(user())
@@ -145,7 +149,7 @@ class ScimUserMapperTest {
                     ),
             )
 
-        val write = ScimUserMapper.toDomain(r, existing = null, tenantId = tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing = null, tenantId = tenantId).getOrThrow()
 
         assertEquals("grace@example.com", write.user.username)
         assertEquals("ext-2", write.user.externalId)
@@ -161,7 +165,7 @@ class ScimUserMapperTest {
         assertEquals(
             "Grace",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.fullName,
         )
@@ -176,7 +180,7 @@ class ScimUserMapperTest {
         assertEquals(
             "Admiral Hopper",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.fullName,
         )
@@ -193,7 +197,7 @@ class ScimUserMapperTest {
         assertEquals(
             "Grace Hopper",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.fullName,
         )
@@ -206,7 +210,7 @@ class ScimUserMapperTest {
             resourceWithName(given = null, family = null)
                 .let { it.copy(attributes = it.attributes + ("displayName" to ScimValue.Str("  "))) }
 
-        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
 
         assertEquals(existing.fullName, write.user.fullName)
     }
@@ -238,7 +242,7 @@ class ScimUserMapperTest {
                     )
                 }
 
-        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
 
         assertEquals(existing.email, write.user.email)
     }
@@ -268,7 +272,7 @@ class ScimUserMapperTest {
                     )
                 }
 
-        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
 
         assertEquals(existing.email, write.user.email)
     }
@@ -300,7 +304,7 @@ class ScimUserMapperTest {
         assertEquals(
             "primary@example.com",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.email,
         )
@@ -327,7 +331,7 @@ class ScimUserMapperTest {
         assertEquals(
             "only@example.com",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.email,
         )
@@ -351,7 +355,7 @@ class ScimUserMapperTest {
                     ),
             )
 
-        val write = ScimUserMapper.toDomain(r, existing = null, tenantId = tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing = null, tenantId = tenantId).getOrThrow()
         assertEquals("noType@example.com", write.user.email)
     }
 
@@ -388,7 +392,7 @@ class ScimUserMapperTest {
         assertEquals(
             "work@example.com",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.email,
         )
@@ -411,7 +415,7 @@ class ScimUserMapperTest {
                 )
             }
 
-        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
         assertEquals("new@example.com", write.user.email)
     }
 
@@ -422,7 +426,7 @@ class ScimUserMapperTest {
         val existing = user()
         val r = resourceWithName(given = "A", family = "B")
 
-        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
         assertNull(write.user.externalId)
     }
 
@@ -430,7 +434,7 @@ class ScimUserMapperTest {
     fun `toDomain rejects a composed fullName that exceeds the column`() {
         // full_name is varchar(255); two long parts can exceed it even though each fits.
         val r = resourceWithName(given = "g".repeat(200), family = "f".repeat(200))
-        val failure = ScimUserMapper.toDomain(r, null, tenantId).exceptionOrNull() as ScimFailure
+        val failure = ScimUserMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
 
         assertEquals(ScimErrorType.invalidValue, failure.type)
     }
@@ -451,7 +455,7 @@ class ScimUserMapperTest {
         assertEquals(
             "ext-3",
             ScimUserMapper
-                .toDomain(r, null, tenantId)
+                .toDomain(r.merged(), null, tenantId)
                 .getOrThrow()
                 .user.externalId,
         )
@@ -462,7 +466,7 @@ class ScimUserMapperTest {
         val existing = user().copy(passwordHash = "a-real-hash")
         val r = ScimUserMapper.toResource(existing)
 
-        val write = ScimUserMapper.toDomain(r, existing = existing, tenantId = tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), existing = existing, tenantId = tenantId).getOrThrow()
 
         assertEquals("a-real-hash", write.user.passwordHash)
         assertEquals(UserId(7), write.user.id)
@@ -478,7 +482,7 @@ class ScimUserMapperTest {
                 )
             }
 
-        val write = ScimUserMapper.toDomain(r, null, tenantId).getOrThrow()
+        val write = ScimUserMapper.toDomain(r.merged(), null, tenantId).getOrThrow()
 
         assertEquals("s3cret", write.plaintextPassword)
         // The mapper does not hash — that is the service's job, with its policy checks.
@@ -488,7 +492,7 @@ class ScimUserMapperTest {
     @Test
     fun `toDomain requires userName`() {
         val r = ScimResource(schemas = emptyList(), attributes = mapOf("externalId" to ScimValue.Str("x")))
-        val failure = ScimUserMapper.toDomain(r, null, tenantId).exceptionOrNull() as ScimFailure
+        val failure = ScimUserMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
 
         assertEquals(ScimErrorType.invalidValue, failure.type)
     }
@@ -496,7 +500,14 @@ class ScimUserMapperTest {
     @Test
     fun `round trip preserves every mapped attribute`() {
         val original = user()
-        val back = ScimUserMapper.toDomain(ScimUserMapper.toResource(original), original, tenantId).getOrThrow().user
+        val back =
+            ScimUserMapper
+                .toDomain(
+                    ScimUserMapper.toResource(original).merged(),
+                    original,
+                    tenantId,
+                ).getOrThrow()
+                .user
 
         assertEquals(original.id, back.id)
         assertEquals(original.username, back.username)
