@@ -107,6 +107,33 @@ class ScimGroupMapperTest {
     }
 
     @Test
+    fun `toDomain rejects a nested group member regardless of type casing`() {
+        // The rejection is a security boundary, not a display convention: RFC 7643's examples
+        // use "Group" but a connector sending lowercase "group" must not slip past it.
+        val nested =
+            ScimValue.MultiValued(
+                listOf(
+                    ScimValue.Complex(
+                        mapOf(
+                            "value" to ScimValue.Str("7"),
+                            "type" to ScimValue.Str("group"),
+                        ),
+                    ),
+                ),
+            )
+        val r =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:Group"),
+                attributes = mapOf("displayName" to ScimValue.Str("Eng"), "members" to nested),
+            )
+
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("nested", ignoreCase = true))
+    }
+
+    @Test
     fun `toDomain rejects a member id that is not numeric`() {
         val r = resourceWith(members = listOf("not-an-id"))
         val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure

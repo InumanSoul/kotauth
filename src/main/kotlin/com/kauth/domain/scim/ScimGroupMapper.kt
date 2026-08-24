@@ -128,8 +128,11 @@ object ScimGroupMapper {
 
         val memberIds = mutableListOf<UserId>()
         for (entry in entries) {
+            // Case-insensitive: this guards a security decision (reject nesting rather than
+            // flatten it), and RFC 7643's examples use "Group" but do not guarantee a connector
+            // sends that exact casing. A lowercase "group" must not slip past it.
             val type = (entry.attributes["type"] as? ScimValue.Str)?.value
-            if (type == MEMBER_TYPE_GROUP) {
+            if (type?.equals(MEMBER_TYPE_GROUP, ignoreCase = true) == true) {
                 return Result.failure(
                     ScimFailure(
                         ScimErrorType.invalidValue,
