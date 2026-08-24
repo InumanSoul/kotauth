@@ -1,5 +1,7 @@
 package com.kauth.adapter.web
 
+import com.kauth.domain.model.Group
+import com.kauth.domain.service.childGroupsBlockDeleteMessage
 import java.lang.reflect.Modifier
 
 @Suppress("unused")
@@ -752,11 +754,15 @@ object EnglishStrings {
 
     fun groupDeleteConfirm(groupName: String) = "Delete group $groupName?"
 
+    /**
+     * One wording for one rule. The service's copy is the one that reaches API and SCIM clients,
+     * so it is the source; this re-export keeps a view author finding the string here rather than
+     * writing a second, subtly different sentence for the same refusal.
+     */
     fun groupDeleteBlockedBySubgroups(
-        subgroupCount: Int,
-        subgroupNames: String,
-    ) = "This group has $subgroupCount subgroup(s): $subgroupNames. " +
-        "Delete or reparent them before deleting this group."
+        groupName: String,
+        subgroups: List<Group>,
+    ) = childGroupsBlockDeleteMessage(groupName, subgroups)
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

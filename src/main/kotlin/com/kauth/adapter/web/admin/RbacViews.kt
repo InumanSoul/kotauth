@@ -711,10 +711,7 @@ internal fun groupDetailPageImpl(
 
             if (childGroups.isNotEmpty()) {
                 div("notice notice--warn") {
-                    +EnglishStrings.groupDeleteBlockedBySubgroups(
-                        childGroups.size,
-                        childGroups.joinToString(", ") { it.name },
-                    )
+                    +EnglishStrings.groupDeleteBlockedBySubgroups(group.name, childGroups)
                 }
             }
 
