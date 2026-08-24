@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.UpdateBannerConfig
 import com.kauth.adapter.web.demoBanner
@@ -401,7 +402,7 @@ internal fun DIV.renderDirectoryCtxPanel(
         "$base/provisioning",
         "provisioning",
         activeSection,
-        com.kauth.adapter.web.EnglishStrings.SCIM_NAV_LABEL,
+        EnglishStrings.SCIM_NAV_LABEL,
     )
 }
 
