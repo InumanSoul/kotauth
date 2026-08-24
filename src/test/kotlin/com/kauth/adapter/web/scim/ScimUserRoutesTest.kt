@@ -325,15 +325,81 @@ class ScimUserRoutesTest {
     fun `count above the advertised cap is clamped to 200`() =
         testApplication {
             application { installTestApp() }
-            repeat(3) { addUser("user$it") }
+            repeat(201) { addUser("user%03d".format(it)) }
 
             val response = client.get("/t/acme/scim/v2/Users?count=5000") { bearerAuth(scimKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            // Fewer than the cap exist, so this pins that the request didn't get rejected —
-            // the cap itself is exercised by not erroring on a request far above it.
-            assertEquals(3, body["Resources"]!!.jsonArray.size)
+            assertEquals(201, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(200, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
+    fun `startIndex 2 skips the first user`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+            addUser("bob")
+            addUser("carol")
+
+            val response = client.get("/t/acme/scim/v2/Users?startIndex=2&count=1") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val resources = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject["Resources"]!!.jsonArray
+            assertEquals(1, resources.size)
+            assertEquals("bob", resources[0].jsonObject["userName"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `startIndex beyond the total returns an empty page with the true totalResults`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+            addUser("bob")
+
+            val response = client.get("/t/acme/scim/v2/Users?startIndex=50") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+            assertEquals(2, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(50, body["startIndex"]!!.jsonPrimitive.int)
+        }
+
+    @Test
+    fun `startIndex 0 is coerced to 1`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+            addUser("bob")
+
+            val response = client.get("/t/acme/scim/v2/Users?startIndex=0&count=1") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(1, body["startIndex"]!!.jsonPrimitive.int)
+            assertEquals(
+                "alice",
+                body["Resources"]!!
+                    .jsonArray[0]
+                    .jsonObject["userName"]!!
+                    .jsonPrimitive.content,
+            )
+        }
+
+    @Test
+    fun `a filter matching no user returns an empty Resources array with totalResults 0`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+
+            val response = client.get(usersUrl("""userName eq "ghost"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
         }
 
     @Test
@@ -477,6 +543,28 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `POST with active false creates a deactivated user`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"disableduser",""" +
+                            """"emails":[{"value":"disableduser@example.com","type":"work"}],"active":false}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(false, body["active"]!!.jsonPrimitive.boolean)
+            val stored = userRepo.findByUsername(acme.id, "disableduser")
+            assertEquals(false, stored?.enabled)
+        }
+
+    @Test
     fun `a passwordless create on an SMTP-ready tenant sends an invite with an absolute link`() =
         testApplication {
             application { installTestApp() }
@@ -558,11 +646,10 @@ class ScimUserRoutesTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `PUT clears an omitted attribute while PATCH leaves it alone`() =
+    fun `PUT clears an omitted attribute, in both the response and the stored user`() =
         testApplication {
             application { installTestApp() }
             val putUser = addUser("puttarget", givenName = "Ada", familyName = "Lovelace")
-            val patchUser = addUser("patchtarget", givenName = "Grace", familyName = "Hopper")
 
             val putResponse =
                 client.put("/t/acme/scim/v2/Users/${putUser.id!!.value}") {
@@ -572,9 +659,20 @@ class ScimUserRoutesTest {
                         """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"puttarget"}""",
                     )
                 }
+
             assertEquals(HttpStatusCode.OK, putResponse.status)
             val putBody = jsonCodec.parseToJsonElement(putResponse.bodyAsText()).jsonObject
             assertNull(putBody["name"])
+            val stored = userRepo.findById(putUser.id!!, acme.id)
+            assertNull(stored?.givenName)
+            assertNull(stored?.familyName)
+        }
+
+    @Test
+    fun `PATCH leaves an unmentioned attribute alone, in both the response and the stored user`() =
+        testApplication {
+            application { installTestApp() }
+            val patchUser = addUser("patchtarget", givenName = "Grace", familyName = "Hopper")
 
             val patchResponse =
                 client.patch("/t/acme/scim/v2/Users/${patchUser.id!!.value}") {
@@ -587,10 +685,14 @@ class ScimUserRoutesTest {
                         """.trimIndent(),
                     )
                 }
+
             assertEquals(HttpStatusCode.OK, patchResponse.status)
             val patchBody = jsonCodec.parseToJsonElement(patchResponse.bodyAsText()).jsonObject
             assertEquals("Grace", patchBody["name"]!!.jsonObject["givenName"]!!.jsonPrimitive.content)
             assertEquals("Hopper", patchBody["name"]!!.jsonObject["familyName"]!!.jsonPrimitive.content)
+            val stored = userRepo.findById(patchUser.id!!, acme.id)
+            assertEquals("Grace", stored?.givenName)
+            assertEquals("Hopper", stored?.familyName)
         }
 
     @Test
@@ -730,10 +832,6 @@ class ScimUserRoutesTest {
             assertEquals("Ada L.", body["displayName"]!!.jsonPrimitive.content)
         }
 
-    // -------------------------------------------------------------------------
-    // DELETE /Users/{id} — deactivate, not delete
-    // -------------------------------------------------------------------------
-
     @Test
     fun `PATCH renaming userName is rejected with mutability, not silently dropped`() =
         testApplication {
@@ -782,6 +880,31 @@ class ScimUserRoutesTest {
             assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
             assertEquals(hashBefore, userRepo.findById(user.id!!, acme.id)?.passwordHash)
         }
+
+    @Test
+    fun `PATCH on another workspace's user is 404`() =
+        testApplication {
+            application { installTestApp() }
+            val foreignUser = addUser("eve", tenantId = globex.id)
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${foreignUser.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                         "Operations":[{"op":"replace","path":"active","value":false}]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // DELETE /Users/{id} — deactivate, not delete
+    // -------------------------------------------------------------------------
 
     @Test
     fun `DELETE deactivates rather than deleting - the user stays fetchable with active false`() =
