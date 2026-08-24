@@ -113,16 +113,29 @@ internal fun ScimResource.validateAttributeShapes(): Result<Unit> {
     return Result.success(Unit)
 }
 
+// users.external_id and groups.external_id are both VARCHAR(255). Without this check an overlong
+// value reaches Postgres and comes back a 500, which connectors treat as retryable and loop on,
+// where invalidValue is terminal and names what the operator has to shorten. displayName already
+// gets the same treatment at its own column width.
+internal const val EXTERNAL_ID_MAX_LENGTH = 255
+
 /**
  * The one reading of `externalId` both resource types share: trimmed, because surrounding
  * whitespace is never meaningful and creates duplicates the tenant-unique index cannot see, but
  * never lower-cased, because case may be significant to the identity provider. Blank reads as
  * absent so it clears rather than storing "".
  */
-internal fun ScimResource.parseExternalId(): Result<String?> =
-    Result.success(
+internal fun ScimResource.parseExternalId(): Result<String?> {
+    val value =
         (attributes["externalId"] as? ScimValue.Str)
             ?.value
             ?.trim()
-            ?.takeIf { it.isNotEmpty() },
-    )
+            ?.takeIf { it.isNotEmpty() }
+            ?: return Result.success(null)
+    if (value.length > EXTERNAL_ID_MAX_LENGTH) {
+        return Result.failure(
+            ScimFailure(ScimErrorType.invalidValue, "externalId exceeds $EXTERNAL_ID_MAX_LENGTH characters"),
+        )
+    }
+    return Result.success(value)
+}

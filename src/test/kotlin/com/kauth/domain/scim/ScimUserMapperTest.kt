@@ -587,6 +587,14 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `an externalId longer than the column is rejected instead of reaching Postgres`() {
+        val failure = shapeFailureOf(userResourceWith("externalId" to ScimValue.Str("e".repeat(256))), user())
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("externalId"), failure.detail)
+    }
+
+    @Test
     fun `a scalar userName is rejected rather than read as absent`() {
         val r =
             ScimResource(

@@ -279,6 +279,31 @@ class ScimGroupMapperTest {
         assertTrue(failure.detail.length < 200, "detail must stay bounded, was ${failure.detail.length}")
     }
 
+    @Test
+    fun `toDomain rejects an externalId longer than the column instead of letting Postgres 500`() {
+        // A 500 is retryable to a connector, so it loops on the same doomed record; invalidValue
+        // is terminal and names what to shorten.
+        val r = resourceWith(members = emptyList(), externalId = "e".repeat(256))
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("externalId"), failure.detail)
+    }
+
+    @Test
+    fun `an externalId exactly at the column width is accepted`() {
+        val exact = "e".repeat(255)
+        val r = resourceWith(members = emptyList(), externalId = exact)
+
+        assertEquals(
+            exact,
+            ScimGroupMapper
+                .toDomain(r.merged(), null, tenantId)
+                .getOrThrow()
+                .group.externalId,
+        )
+    }
+
     private fun ScimValue.toArray() = ScimValue.MultiValued(listOf(this))
 
     private fun resourceWith(
