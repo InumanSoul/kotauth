@@ -508,6 +508,37 @@ class ScimGroupRoutesTest {
             assertEquals(HttpStatusCode.OK, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             assertEquals(2, body["totalResults"]!!.jsonPrimitive.int)
+            // Asserting only totalResults would still pass if another workspace's group leaked
+            // into Resources — check the actual identities returned, not just the count.
+            val names =
+                body["Resources"]!!.jsonArray.map { it.jsonObject["displayName"]!!.jsonPrimitive.content }.toSet()
+            assertEquals(setOf("Engineering", "Sales"), names)
+        }
+
+    @Test
+    fun `GET Groups honors startIndex and count for pagination`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Alpha")
+            addGroup("Beta")
+            addGroup("Gamma")
+
+            val response =
+                client.get(groupsUrl() + "?startIndex=2&count=1") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(3, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(2, body["startIndex"]!!.jsonPrimitive.int)
+            assertEquals(1, body["Resources"]!!.jsonArray.size)
+            // Groups are ordered by name: Alpha, Beta, Gamma — startIndex=2 lands on Beta.
+            assertEquals(
+                "Beta",
+                body["Resources"]!!
+                    .jsonArray[0]
+                    .jsonObject["displayName"]!!
+                    .jsonPrimitive.content,
+            )
         }
 
     @Test
@@ -640,6 +671,48 @@ class ScimGroupRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(emptySet(), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PUT with a member from another workspace is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            val foreign = addUser("mallory", tenantId = globex.id)
+            val group = addGroup("Engineering")
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("Engineering", memberIds = listOf(foreign.id!!.value)))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]!!.jsonPrimitive.content)
+            assertEquals(emptySet(), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PUT with a nested type Group member is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            val group = addGroup("Engineering")
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"Engineering",""" +
+                            """"members":[{"value":"1","type":"Group"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]!!.jsonPrimitive.content)
             assertEquals(emptySet(), groupRepo.findUserIdsInGroup(group.id).toSet())
         }
 
