@@ -17,6 +17,8 @@ import com.kauth.domain.scim.ScimPatchEngine
 import com.kauth.domain.scim.ScimResource
 import com.kauth.domain.scim.ScimValue
 import com.kauth.domain.scim.parseFilter
+import com.kauth.domain.service.AdminResult
+import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.ScimGroupMembershipService
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -58,6 +60,7 @@ private const val SCIM_GROUP_FILTER_SCAN_CHUNK_SIZE = 500
  */
 fun Route.scimGroupRoutes(
     groupRepository: GroupRepository,
+    roleGroupService: RoleGroupService,
     scimGroupMembershipService: ScimGroupMembershipService,
     transactionRunner: TransactionRunner,
 ) {
@@ -257,27 +260,12 @@ fun Route.scimGroupRoutes(
         val tenantId = call.attributes[TenantIdAttr]
         val groupId =
             call.groupIdParam() ?: return@delete call.respondScimError(HttpStatusCode.NotFound, "Group not found.")
-        val existing = resolveTenantGroup(groupRepository, groupId, tenantId)
-        if (existing == null) {
-            call.respondScimError(HttpStatusCode.NotFound, "Group not found.")
-            return@delete
+        // Deletes through the service, never the repository: tenant scoping, the child-group
+        // conflict and the audit record are then one rule shared with the admin UI and REST API.
+        when (val result = roleGroupService.deleteGroup(groupId, tenantId)) {
+            is AdminResult.Success -> call.respond(HttpStatusCode.NoContent)
+            is AdminResult.Failure -> call.respondAdminError(result.error)
         }
-        // groups.parent_group_id cascades (ON DELETE CASCADE, V12): deleting a group with
-        // children would silently remove every descendant group along with their memberships
-        // and role assignments. Refuse rather than let an IdP nuke subgroups it never targeted;
-        // it can delete them explicitly if it means to. Member users are untouched either way —
-        // user_groups also cascades, but a user row itself is never deleted by this.
-        if (groupRepository.findChildren(groupId).isNotEmpty()) {
-            call.respondScimFailure(
-                ScimFailure(
-                    ScimErrorType.uniqueness,
-                    "group has child groups; delete or reparent them before deleting this group",
-                ),
-            )
-            return@delete
-        }
-        groupRepository.delete(groupId)
-        call.respond(HttpStatusCode.NoContent)
     }
 }
 
@@ -441,13 +429,17 @@ private fun groupListResponse(
 ): JsonObject {
     val membersByGroup =
         if (page.isEmpty()) emptyMap() else groupRepository.findUserIdsForGroups(page.mapNotNull { it.id })
+    // Skips an id-less group the same way the membership lookup above does — a persisted group
+    // always has an id, and a `!!` here would turn a broken invariant into a 500 mid-page.
     val resources =
-        page.map { group ->
-            ScimGroupMapper.toResource(
-                group,
-                membersByGroup[group.id] ?: emptyList(),
-                location = "$resourceBase/${group.id!!.value}",
-            )
+        page.mapNotNull { group ->
+            group.id?.let { id ->
+                ScimGroupMapper.toResource(
+                    group,
+                    membersByGroup[id] ?: emptyList(),
+                    location = "$resourceBase/${id.value}",
+                )
+            }
         }
     return buildJsonObject {
         putJsonArray("schemas") { add(LIST_RESPONSE_SCHEMA) }

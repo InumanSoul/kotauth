@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.Role
@@ -643,9 +644,11 @@ internal fun groupDetailPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     toastMessage: String? = null,
+    error: String? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
+        val childGroups = allGroups.filter { it.parentGroupId == group.id }
 
         adminShell(
             pageTitle = "${group.name} — Groups",
@@ -690,10 +693,28 @@ internal fun groupDetailPageImpl(
                     ) {
                         button(type = ButtonType.submit) {
                             classes = setOf("btn", "btn--danger")
-                            attributes["data-confirm"] = "Delete group ${group.name}?"
-                            +"Delete"
+                            if (childGroups.isEmpty()) {
+                                attributes["data-confirm"] = EnglishStrings.groupDeleteConfirm(group.name)
+                            } else {
+                                disabled = true
+                                title = EnglishStrings.GROUP_DELETE_BLOCKED_TITLE
+                            }
+                            +EnglishStrings.GROUP_DELETE
                         }
                     }
+                }
+            }
+
+            if (error != null) {
+                div("notice notice--error") { +error }
+            }
+
+            if (childGroups.isNotEmpty()) {
+                div("notice notice--warn") {
+                    +EnglishStrings.groupDeleteBlockedBySubgroups(
+                        childGroups.size,
+                        childGroups.joinToString(", ") { it.name },
+                    )
                 }
             }
 

@@ -542,6 +542,13 @@ class RoleGroupService(
             return AdminResult.Failure(AdminError.NotFound("Group not found in this workspace."))
         }
 
+        // The database refuses this delete too (V61), but a constraint violation tells an
+        // operator nothing about which subgroups are in the way.
+        val children = groupRepository.findChildren(groupId)
+        if (children.isNotEmpty()) {
+            return AdminResult.Failure(AdminError.Conflict(childGroupsBlockDeleteMessage(group.name, children)))
+        }
+
         groupRepository.delete(groupId)
 
         auditLog.record(
@@ -704,4 +711,18 @@ class RoleGroupService(
         val ids = roleRepository.findUserIdsForRole(roleId)
         return if (ids.isEmpty()) emptyList() else userRepository.findByIds(ids, tenantId)
     }
+}
+
+// A group with hundreds of children would otherwise put every name in one error string.
+private const val NAMED_CHILD_GROUPS_LIMIT = 5
+
+internal fun childGroupsBlockDeleteMessage(
+    groupName: String,
+    children: List<Group>,
+): String {
+    val named = children.take(NAMED_CHILD_GROUPS_LIMIT).joinToString(", ") { it.name }
+    val remaining = children.size - minOf(children.size, NAMED_CHILD_GROUPS_LIMIT)
+    val listed = if (remaining > 0) "$named and $remaining more" else named
+    return "Group '$groupName' has ${children.size} subgroup(s): $listed. " +
+        "Delete or reparent them before deleting this group."
 }

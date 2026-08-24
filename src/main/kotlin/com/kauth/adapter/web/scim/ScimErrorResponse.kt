@@ -2,7 +2,9 @@ package com.kauth.adapter.web.scim
 
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
+import com.kauth.domain.service.AdminError
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
@@ -56,3 +58,24 @@ fun scimAuthError(
     status: HttpStatusCode,
     detail: String,
 ): Pair<HttpStatusCode, JsonObject> = status to errorEnvelope(status, detail)
+
+/**
+ * Renders an [AdminError] from a domain service as the SCIM error envelope. Tenant-scoped
+ * lookups already fold "belongs to another tenant" into "not found" (never 403).
+ */
+internal fun AdminError.toScimResponse(): Pair<HttpStatusCode, JsonObject> =
+    when (this) {
+        is AdminError.NotFound -> scimAuthError(HttpStatusCode.NotFound, message)
+        is AdminError.Conflict -> ScimFailure(ScimErrorType.uniqueness, message).toResponse()
+        is AdminError.Validation -> ScimFailure(ScimErrorType.invalidValue, message).toResponse()
+        AdminError.SmtpRequired, AdminError.NoMethodsEnabled ->
+            ScimFailure(
+                ScimErrorType.invalidValue,
+                message,
+            ).toResponse()
+    }
+
+internal suspend fun ApplicationCall.respondAdminError(error: AdminError) {
+    val (status, body) = error.toScimResponse()
+    respondScim(status, body)
+}

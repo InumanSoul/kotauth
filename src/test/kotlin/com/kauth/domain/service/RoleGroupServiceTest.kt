@@ -23,6 +23,7 @@ import com.kauth.fakes.FakeUserRepository
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -560,6 +561,30 @@ class RoleGroupServiceTest {
         val result = svc.deleteGroup(group.id!!, TenantId(1))
         assertIs<AdminResult.Success<Unit>>(result)
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_GROUP_DELETED))
+    }
+
+    @Test
+    fun `deleteGroup - refused while the group still has children, naming them`() {
+        val parent = (svc.createGroup(TenantId(1), "engineering", null, null) as AdminResult.Success).value
+        svc.createGroup(TenantId(1), "backend", null, parent.id)
+
+        val result = svc.deleteGroup(parent.id!!, TenantId(1))
+
+        val failure = assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Conflict>(failure.error)
+        assertTrue(failure.error.message.contains("backend"), failure.error.message)
+        assertEquals(emptyList(), groups.deleteCalls)
+        assertFalse(auditLog.hasEvent(AuditEventType.ADMIN_GROUP_DELETED))
+    }
+
+    @Test
+    fun `deleteGroup - allowed once the child has been reparented away`() {
+        val parent = (svc.createGroup(TenantId(1), "engineering", null, null) as AdminResult.Success).value
+        val child = (svc.createGroup(TenantId(1), "backend", null, parent.id) as AdminResult.Success).value
+        groups.update(child.copy(parentGroupId = null))
+
+        assertIs<AdminResult.Success<Unit>>(svc.deleteGroup(parent.id!!, TenantId(1)))
+        assertEquals(listOf(parent.id), groups.deleteCalls)
     }
 
     // =========================================================================

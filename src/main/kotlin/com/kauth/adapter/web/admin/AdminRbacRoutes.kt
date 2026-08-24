@@ -352,8 +352,31 @@ fun Route.adminRbacRoutes(
                         ?: return@post call.respond(HttpStatusCode.BadRequest)
                 val workspace = call.attributes[WorkspaceAttr]
                 val slug = workspace.slug
-                roleGroupService.deleteGroup(groupId, workspace.id)
-                call.respondRedirect("/admin/workspaces/$slug/groups")
+                when (val result = roleGroupService.deleteGroup(groupId, workspace.id)) {
+                    is AdminResult.Success -> call.respondRedirect("/admin/workspaces/$slug/groups")
+                    // The delete button is already disabled while subgroups exist; this covers a
+                    // stale page or a direct POST, so the reason is stated instead of swallowed.
+                    is AdminResult.Failure -> {
+                        val session = call.sessions.get<AdminSession>()!!
+                        val wsPairs = call.attributes[WsPairsAttr]
+                        val groups = roleGroupService.listGroups(workspace.id)
+                        val group =
+                            groups.find { it.id == groupId } ?: return@post call.respond(HttpStatusCode.NotFound)
+                        call.respondHtml(
+                            HttpStatusCode.Conflict,
+                            AdminView.groupDetailPage(
+                                workspace,
+                                group,
+                                groups,
+                                roleGroupService.listRoles(workspace.id),
+                                roleGroupService.getUsersInGroup(groupId, workspace.id),
+                                wsPairs,
+                                session.username,
+                                error = result.error.message,
+                            ),
+                        )
+                    }
+                }
             }
 
             post("/assign-role") {

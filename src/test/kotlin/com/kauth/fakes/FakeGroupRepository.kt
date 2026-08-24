@@ -31,6 +31,7 @@ class FakeGroupRepository : GroupRepository {
         store.clear()
         groupRoles.clear()
         groupMembers.clear()
+        deleteCalls.clear()
         findGroupsForUsersCallSizes.clear()
         findUserIdsForGroupsCallSizes.clear()
         addUserToGroupCalls.clear()
@@ -86,7 +87,12 @@ class FakeGroupRepository : GroupRepository {
         return group
     }
 
+    // Records every delete so tests can assert a refused delete never reached the repository.
+    // The fake models no FK cascade, so "the child row still exists" alone proves nothing.
+    val deleteCalls = mutableListOf<GroupId>()
+
     override fun delete(groupId: GroupId) {
+        deleteCalls += groupId
         store.remove(groupId.value)
         groupRoles.remove(groupId.value)
         groupMembers.remove(groupId.value)

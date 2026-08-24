@@ -367,8 +367,19 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         toastMessage: String? = null,
+        error: String? = null,
     ): HTML.() -> Unit =
-        groupDetailPageImpl(workspace, group, allGroups, allRoles, members, allWorkspaces, loggedInAs, toastMessage)
+        groupDetailPageImpl(
+            workspace,
+            group,
+            allGroups,
+            allRoles,
+            members,
+            allWorkspaces,
+            loggedInAs,
+            toastMessage,
+            error,
+        )
 
     // ── Security ────────────────────────────────────────────────────────
 

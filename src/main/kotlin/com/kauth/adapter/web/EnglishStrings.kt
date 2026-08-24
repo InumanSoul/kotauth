@@ -746,6 +746,18 @@ object EnglishStrings {
     const val POST_MAGIC_LINK_SKIP_CTA = "Continue without a passkey"
     const val POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME = "This device"
 
+    // Admin — groups
+    const val GROUP_DELETE = "Delete"
+    const val GROUP_DELETE_BLOCKED_TITLE = "Subgroups must be resolved first"
+
+    fun groupDeleteConfirm(groupName: String) = "Delete group $groupName?"
+
+    fun groupDeleteBlockedBySubgroups(
+        subgroupCount: Int,
+        subgroupNames: String,
+    ) = "This group has $subgroupCount subgroup(s): $subgroupNames. " +
+        "Delete or reparent them before deleting this group."
+
     /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for

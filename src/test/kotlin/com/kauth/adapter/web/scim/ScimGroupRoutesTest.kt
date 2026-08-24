@@ -73,6 +73,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 /**
@@ -1031,7 +1032,7 @@ class ScimGroupRoutesTest {
         }
 
     @Test
-    fun `DELETE on a group with children is refused and the children still exist`() =
+    fun `DELETE on a group with children is refused before any delete reaches the repository`() =
         testApplication {
             application { installTestApp() }
             val parent = addGroup("Engineering")
@@ -1040,8 +1041,35 @@ class ScimGroupRoutesTest {
             val response = client.delete(groupUrl(parent.id!!.value)) { bearerAuth(scimKey) }
 
             assertEquals(HttpStatusCode.Conflict, response.status)
-            assertEquals(true, groupRepo.findById(parent.id) != null)
-            assertEquals(true, groupRepo.findById(child.id!!) != null)
+            // The service refuses before calling delete at all; asserting the child survives
+            // would pass against a cascade the fake does not model, so assert the call itself.
+            assertEquals(emptyList(), groupRepo.deleteCalls)
+            assertNotNull(groupRepo.findById(parent.id))
+            assertNotNull(groupRepo.findById(child.id!!))
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("uniqueness", body["scimType"]!!.jsonPrimitive.content)
+            assertEquals(true, body["detail"]!!.jsonPrimitive.content.contains("Backend"))
+        }
+
+    @Test
+    fun `DELETE succeeds once the child group has been reparented away`() =
+        testApplication {
+            application { installTestApp() }
+            val parent = addGroup("Engineering")
+            val child = addGroup("Backend", parentGroupId = parent.id)
+
+            assertEquals(
+                HttpStatusCode.Conflict,
+                client.delete(groupUrl(parent.id!!.value)) { bearerAuth(scimKey) }.status,
+            )
+            groupRepo.update(child.copy(parentGroupId = null))
+
+            assertEquals(
+                HttpStatusCode.NoContent,
+                client.delete(groupUrl(parent.id.value)) { bearerAuth(scimKey) }.status,
+            )
+            assertNull(groupRepo.findById(parent.id))
+            assertNotNull(groupRepo.findById(child.id!!))
         }
 
     private fun io.ktor.server.application.Application.installTestApp() {

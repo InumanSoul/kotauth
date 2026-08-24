@@ -450,24 +450,6 @@ private fun ApplicationCall.userLocation(id: UserId): String {
 
 private fun ApplicationCall.userIdParam(): UserId? = parameters["id"]?.toIntOrNull()?.let { UserId(it) }
 
-private suspend fun ApplicationCall.respondAdminError(error: AdminError) {
-    val (status, body) = error.toScimResponse()
-    respondScim(status, body)
-}
-
-/** Tenant-scoped lookups already fold "belongs to another tenant" into "not found" (never 403). */
-private fun AdminError.toScimResponse(): Pair<HttpStatusCode, JsonObject> =
-    when (this) {
-        is AdminError.NotFound -> scimAuthError(HttpStatusCode.NotFound, message)
-        is AdminError.Conflict -> ScimFailure(ScimErrorType.uniqueness, message).toResponse()
-        is AdminError.Validation -> ScimFailure(ScimErrorType.invalidValue, message).toResponse()
-        AdminError.SmtpRequired, AdminError.NoMethodsEnabled ->
-            ScimFailure(
-                ScimErrorType.invalidValue,
-                message,
-            ).toResponse()
-    }
-
 // Body parsing can throw several different exception types across content negotiation and the
 // JSON parser; all of them mean the same thing here: a malformed request. PayloadTooLargeException
 // is a distinct condition (body too big, not malformed) and must reach StatusPages so SCIM clients

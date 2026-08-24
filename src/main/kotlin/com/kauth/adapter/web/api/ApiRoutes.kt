@@ -208,7 +208,7 @@ fun Route.apiRoutes(
                 ScimGroupMembershipService(groupRepository, userRepository, transactionRunner)
             scimDiscoveryRoutes()
             scimUserRoutes(adminUserService, groupRepository, transactionRunner)
-            scimGroupRoutes(groupRepository, scimGroupMembershipService, transactionRunner)
+            scimGroupRoutes(groupRepository, roleGroupService, scimGroupMembershipService, transactionRunner)
         }
     }
 }
