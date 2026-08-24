@@ -22,6 +22,7 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.principal
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -76,7 +77,11 @@ fun Route.adminBackupRoutes(
                         )
 
                 val request =
-                    runCatching { call.receive<ExportRequest>() }.getOrElse {
+                    try {
+                        call.receive<ExportRequest>()
+                    } catch (e: PayloadTooLargeException) {
+                        throw e
+                    } catch (e: Exception) {
                         return@post call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid request body",
@@ -180,7 +185,11 @@ fun Route.adminBackupRoutes(
                 }
 
                 val request =
-                    runCatching { call.receive<ImportRequest>() }.getOrElse {
+                    try {
+                        call.receive<ImportRequest>()
+                    } catch (e: PayloadTooLargeException) {
+                        throw e
+                    } catch (e: Exception) {
                         return@post call.respondProblem(
                             HttpStatusCode.BadRequest,
                             "Invalid request body",

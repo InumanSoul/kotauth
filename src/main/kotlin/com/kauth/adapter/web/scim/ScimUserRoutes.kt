@@ -23,6 +23,7 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.request.path
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -462,10 +463,14 @@ private fun AdminError.toScimResponse(): Pair<HttpStatusCode, JsonObject> =
     }
 
 // Body parsing can throw several different exception types across content negotiation and the
-// JSON parser; all of them mean the same thing here: a malformed request.
+// JSON parser; all of them mean the same thing here: a malformed request. PayloadTooLargeException
+// is a distinct condition (body too big, not malformed) and must reach StatusPages so SCIM clients
+// get 413 with a scimType, not a 400 they'll treat as permanent and drop the record for.
 private suspend fun ApplicationCall.receiveJsonElementOrRespondError(): JsonElement? =
     try {
         receive<JsonElement>()
+    } catch (e: PayloadTooLargeException) {
+        throw e
     } catch (e: Exception) {
         respondScimError(HttpStatusCode.BadRequest, "Malformed JSON body: ${e.message}")
         null
