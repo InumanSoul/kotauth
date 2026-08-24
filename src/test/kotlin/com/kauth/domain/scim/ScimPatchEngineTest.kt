@@ -721,6 +721,33 @@ class ScimPatchEngineTest {
     }
 
     @Test
+    fun `remove with an explicit null value is rejected rather than emptying the collection`() {
+        // The decision behind this: an explicit null is a caller who sent the `value` member and
+        // could not fill it, which is the least informative input there is. Reading it as "remove
+        // everything" hands it the most destructive outcome, while a merely malformed value is
+        // already a 400. Omitting `value` is still how a caller means "remove every entry".
+        val result =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("members").getOrThrow(), ScimValue.Null),
+            )
+
+        assertEquals(ScimErrorType.invalidValue, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `an explicit null value stays a clear on replace, where the Null policy is unchanged`() {
+        // Scoped to `remove`: an attribute's null INSIDE a resource still means "cleared".
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.REPLACE, parsePath("externalId").getOrThrow(), ScimValue.Null),
+            ).getOrThrow()
+
+        assertEquals(ScimValue.Null, out.attributes["externalId"])
+    }
+
+    @Test
     fun `remove with a plain path and no value still clears the whole collection`() {
         // Regression guard on the reading that is already correct: no value means remove all.
         val out =

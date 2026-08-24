@@ -310,6 +310,49 @@ class ScimGroupRoutesTest {
             .jsonPrimitive.content
 
     @Test
+    fun `PATCH remove with an explicit null value does not empty the group`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+            val group = addGroup("Engineering", members = listOf(member))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"members","value":null}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(listOf(member.id), groupRepo.findUserIdsInGroup(group.id!!))
+        }
+
+    @Test
+    fun `PATCH remove with no value member at all still clears the membership`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+            val group = addGroup("Engineering", members = listOf(member))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"members"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(emptyList(), groupRepo.findUserIdsInGroup(group.id!!))
+        }
+
+    @Test
     fun `PATCH remove of a padded member id actually removes the member`() =
         testApplication {
             application { installTestApp() }
