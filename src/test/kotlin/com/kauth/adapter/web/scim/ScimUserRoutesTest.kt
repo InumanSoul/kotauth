@@ -958,6 +958,57 @@ class ScimUserRoutesTest {
     // -------------------------------------------------------------------------
 
     @Test
+    fun `PATCH pathless add of emails stores the new address`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"add","value":{"emails":[""" +
+                            """{"value":"new@corp.example","type":"work","primary":true}]}}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("new@corp.example", userRepo.findById(user.id!!, acme.id)?.email)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(
+                "new@corp.example",
+                body["emails"]!!
+                    .jsonArray
+                    .single()
+                    .jsonObject["value"]!!
+                    .jsonPrimitive.content,
+            )
+        }
+
+    @Test
+    fun `PATCH targeted add of emails stores the new address`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"add","path":"emails","value":[""" +
+                            """{"value":"targeted@corp.example","type":"work"}]}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("targeted@corp.example", userRepo.findById(user.id!!, acme.id)?.email)
+        }
+
+    @Test
     fun `PUT renaming userName is rejected with mutability, not silently dropped`() =
         testApplication {
             application { installTestApp() }

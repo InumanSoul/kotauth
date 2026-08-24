@@ -163,9 +163,10 @@ class ScimPatchEngineTest {
     }
 
     @Test
-    fun `a pathless add of emails on a User appends rather than replaces`() {
-        // The same pathless-add bug applies to /Users: {"op":"add","value":{"emails":[...]}}
-        // must not drop every email the user already had.
+    fun `a pathless add of emails sets the address instead of hiding it behind the stored one`() {
+        // Kotauth stores exactly one address and renders it as a single type:"work" entry, so an
+        // appending `add` leaves ScimUserMapper.selectEmail picking the stored address back and
+        // the request is a silent no-op. `add` therefore sets emails; the shape stays a collection.
         fun email(addr: String) = ScimValue.Complex(mapOf("value" to ScimValue.Str(addr)))
         val user =
             ScimResource(
@@ -190,7 +191,37 @@ class ScimPatchEngineTest {
             (out.attributes["emails"] as ScimValue.MultiValued)
                 .values
                 .map { ((it as ScimValue.Complex).attributes["value"] as ScimValue.Str).value }
-        assertEquals(listOf("ada@old.example", "ada@new.example"), addresses)
+        assertEquals(listOf("ada@new.example"), addresses)
+    }
+
+    @Test
+    fun `a targeted add of emails also sets rather than appends`() {
+        fun email(addr: String) = ScimValue.Complex(mapOf("value" to ScimValue.Str(addr)))
+        val user =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes =
+                    mapOf(
+                        "userName" to ScimValue.Str("ada"),
+                        "emails" to ScimValue.MultiValued(listOf(email("ada@old.example"))),
+                    ),
+            )
+        val out =
+            apply(
+                user,
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    parsePath("emails").getOrThrow(),
+                    ScimValue.MultiValued(listOf(email("ada@new.example"))),
+                ),
+            ).getOrThrow()
+
+        val emails = out.attributes["emails"] as ScimValue.MultiValued
+        assertEquals(1, emails.values.size)
+        assertEquals(
+            "ada@new.example",
+            ((emails.values.single() as ScimValue.Complex).attributes["value"] as ScimValue.Str).value,
+        )
     }
 
     private fun userWithName(

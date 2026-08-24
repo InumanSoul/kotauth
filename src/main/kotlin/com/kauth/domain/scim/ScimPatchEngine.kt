@@ -35,6 +35,14 @@ private val KNOWN_ATTRIBUTES =
 // runtime value is what let ADD collapse a collection into a scalar.
 private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
 
+// RFC 7644 §3.5.2.1 appends on `add` to a multi-valued attribute, which is what a group's
+// membership needs. `emails` is deliberately not here: Kotauth persists exactly one address and
+// renders it as a single `type: "work"` entry, so appending puts the incoming address behind the
+// stored one, ScimUserMapper.selectEmail picks the stored one back, and the `add` becomes a
+// silent no-op that answers 200 with the unchanged address. An `add` of `emails` therefore sets
+// the collection rather than growing it — the only outcome the caller can actually observe.
+private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
+
 // Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
 // into debugging a typo that isn't there, when the real issue is a read-only target.
 private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta")
@@ -101,20 +109,16 @@ class ScimPatchEngine {
         if (op.op != ScimPatchOpType.ADD) {
             return resource.copy(attributes = resource.attributes + partial.attributes)
         }
-        // RFC 7644 §3.5.2.1: for `add`, a multi-valued attribute inside a pathless partial is
-        // appended to, not replaced, and a complex attribute has its named sub-attributes added
-        // without disturbing siblings that weren't named — the same semantics a targeted-path
-        // `add` already has. A plain overwrite (REPLACE, or ADD where neither shape applies)
-        // stays a plain merge.
+        // RFC 7644 §3.5.2.1: for `add`, a multi-valued attribute inside a pathless partial keeps
+        // its collection shape (appending or setting per APPEND_ON_ADD_ATTRIBUTES), and a complex
+        // attribute has its named sub-attributes added without disturbing siblings that weren't
+        // named — the same semantics a targeted-path `add` already has. A plain overwrite
+        // (REPLACE, or ADD where neither shape applies) stays a plain merge.
         val merged =
             partial.attributes.mapValues { (name, value) ->
                 val existing = normalizeAbsent(resource.attributes[name])
                 when {
-                    name in MULTI_VALUED_ATTRIBUTES -> {
-                        val existingValues = (existing as? ScimValue.MultiValued)?.values
-                        val incoming = if (value is ScimValue.MultiValued) value.values else listOf(value)
-                        ScimValue.MultiValued((existingValues ?: emptyList()) + incoming)
-                    }
+                    name in MULTI_VALUED_ATTRIBUTES -> addToMultiValued(name, existing, value)
                     value is ScimValue.Complex && existing is ScimValue.Complex ->
                         existing.copy(attributes = existing.attributes + value.attributes)
                     else -> value
@@ -158,21 +162,16 @@ class ScimPatchEngine {
         if (path.sub != null) {
             return replaceAttr(resource, path, newValue)
         }
-        // Whether to append is decided by the arity of the EXISTING value, not the
-        // incoming one: a bare Complex added to an existing collection must still append.
+        // The target arity is decided by the EXISTING value, not the incoming one: a bare
+        // Complex added to an existing collection must stay a collection.
         val existing = normalizeAbsent(resource.attributes[path.name])
         val merged =
             when {
-                existing is ScimValue.MultiValued -> {
-                    val incoming = if (newValue is ScimValue.MultiValued) newValue.values else listOf(newValue)
-                    ScimValue.MultiValued(existing.values + incoming)
-                }
+                existing is ScimValue.MultiValued -> addToMultiValued(path.name, existing, newValue)
                 // The attribute is absent (or was just cleared to empty) but its definition
                 // is multi-valued: the target shape still has to be a collection.
-                existing == null && path.name in MULTI_VALUED_ATTRIBUTES -> {
-                    val incoming = if (newValue is ScimValue.MultiValued) newValue.values else listOf(newValue)
-                    ScimValue.MultiValued(incoming)
-                }
+                existing == null && path.name in MULTI_VALUED_ATTRIBUTES ->
+                    addToMultiValued(path.name, null, newValue)
                 existing == null -> newValue
                 // Existing is a singular scalar and the incoming value is a collection:
                 // promote rather than silently drop the old value.
@@ -295,6 +294,25 @@ class ScimPatchEngine {
         if (sub !in allowed) {
             throw PatchException(ScimErrorType.invalidPath, "unknown sub-attribute '$attrName.$sub'")
         }
+    }
+
+    /**
+     * `add` onto a multi-valued attribute. The result is always a collection, so the attribute's
+     * arity survives; whether the existing elements survive with it is [APPEND_ON_ADD_ATTRIBUTES].
+     */
+    private fun addToMultiValued(
+        name: String,
+        existing: ScimValue?,
+        incoming: ScimValue,
+    ): ScimValue.MultiValued {
+        val incomingValues = if (incoming is ScimValue.MultiValued) incoming.values else listOf(incoming)
+        val kept =
+            if (name in APPEND_ON_ADD_ATTRIBUTES) {
+                (existing as? ScimValue.MultiValued)?.values.orEmpty()
+            } else {
+                emptyList()
+            }
+        return ScimValue.MultiValued(kept + incomingValues)
     }
 
     /** An explicitly cleared value is, for PATCH purposes, indistinguishable from an absent one. */
