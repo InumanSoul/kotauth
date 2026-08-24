@@ -205,6 +205,37 @@ class AdminUserRoutesTest {
         }
 
     @Test
+    fun `editing a profile preserves the externalId the identity provider set`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada", externalId = "idp-ada-1")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                            append("givenName", "Ada")
+                            append("familyName", "Lovelace")
+                        },
+                )
+
+            // The form has no externalId field and replaceUserProfile treats every parameter as
+            // authoritative, so passing null there would unlink the user from its IdP under a
+            // success redirect, with nothing on screen saying it happened.
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("idp-ada-1", userRepo.findById(user.id!!, workspace.id)!!.externalId)
+        }
+
+    @Test
     fun `clearing a name part stores null rather than an empty string`() =
         testApplication {
             application { installTestApp() }

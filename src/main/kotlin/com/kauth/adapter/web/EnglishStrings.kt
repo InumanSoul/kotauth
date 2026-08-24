@@ -805,6 +805,14 @@ object EnglishStrings {
     const val SCIM_STATUS_NO_KEY =
         "Not connected. This workspace has no API key holding the scim scope, so every provisioning request " +
             "is rejected."
+
+    /**
+     * Distinct from [SCIM_STATUS_NO_KEY]: the table right below this row lists the revoked keys
+     * with their badge, so telling the operator there is no such key contradicts the screen.
+     */
+    const val SCIM_STATUS_KEYS_REVOKED =
+        "Not connected. Every API key holding the scim scope in this workspace is revoked, so every " +
+            "provisioning request is rejected. Create a new key to reconnect."
     const val SCIM_STATUS_LAST_USE_HINT =
         "Last API use counts any request made with the key, not only provisioning requests."
 
@@ -816,6 +824,15 @@ object EnglishStrings {
     const val SCIM_BEHAVIOUR_GROUPS =
         "Groups map to KotAuth groups. Member pushes carry user ids; a member the workspace does not have " +
             "is rejected rather than created."
+
+    /**
+     * The counterpart to [SCIM_DELETE_DEACTIVATES], and the reason it is spelled out: the notice
+     * above it explains that deleting a user is reversible, which reads as a promise about DELETE
+     * in general unless the group case says otherwise.
+     */
+    const val SCIM_DELETE_GROUP_PERMANENT =
+        "DELETE on a group is permanent \u2014 unlike a user, it is removed outright, along with its " +
+            "memberships and role grants. A group that still has subgroups is refused rather than deleted."
 
     const val SCIM_NOTES_HEADING = "Identity provider notes"
     const val SCIM_NOTES_INTRO =

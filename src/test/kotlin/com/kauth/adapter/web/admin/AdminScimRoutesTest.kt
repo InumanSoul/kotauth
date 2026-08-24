@@ -160,6 +160,54 @@ class AdminScimRoutesTest {
         }
 
     @Test
+    fun `the provisioning page states that a group DELETE is permanent`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/provisioning").bodyAsText()
+
+            // It sits directly under the notice saying a user DELETE is reversible, which reads as
+            // a promise about DELETE in general unless the group case is spelled out.
+            assertTrue(body.contains("DELETE on a group is permanent"))
+        }
+
+    @Test
+    fun `a workspace whose only scim key is revoked is not told it has no such key`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+            apiKeyService.revoke(key.id!!, TenantId(2))
+
+            val body = authed.get("/admin/workspaces/acme/provisioning").bodyAsText()
+
+            // The table right below the status row shows this key with a Revoked badge.
+            assertTrue(body.contains("Directory sync"), "the revoked key is still listed")
+            assertFalse(
+                body.contains(com.kauth.adapter.web.EnglishStrings.SCIM_STATUS_NO_KEY),
+                "the workspace has a scim-scoped key; it is revoked, which is a different sentence",
+            )
+            assertTrue(body.contains(com.kauth.adapter.web.EnglishStrings.SCIM_STATUS_KEYS_REVOKED))
+        }
+
+    @Test
+    fun `a workspace with no scim key at all is still told so`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/provisioning").bodyAsText()
+
+            assertTrue(body.contains(com.kauth.adapter.web.EnglishStrings.SCIM_STATUS_NO_KEY))
+        }
+
+    @Test
     fun `the provisioning page lists only the keys holding the scim scope`() =
         testApplication {
             application { installTestApp() }

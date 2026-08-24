@@ -67,10 +67,12 @@ internal fun scimProvisioningPageImpl(
                 ovSectionLabel(EnglishStrings.SCIM_STATUS_HEADING)
                 ovRowMuted(
                     "",
-                    if (scimKeys.none { it.enabled }) {
-                        EnglishStrings.SCIM_STATUS_NO_KEY
-                    } else {
-                        EnglishStrings.SCIM_STATUS_UNKNOWN
+                    when {
+                        scimKeys.isEmpty() -> EnglishStrings.SCIM_STATUS_NO_KEY
+                        // The table below lists these keys with a Revoked badge, so "no such key"
+                        // would contradict the screen it sits on.
+                        scimKeys.none { it.enabled } -> EnglishStrings.SCIM_STATUS_KEYS_REVOKED
+                        else -> EnglishStrings.SCIM_STATUS_UNKNOWN
                     },
                 )
             }
@@ -115,6 +117,7 @@ internal fun scimProvisioningPageImpl(
                     iconName = "info",
                 )
                 ovRowMuted("", EnglishStrings.SCIM_BEHAVIOUR_GROUPS)
+                ovRowMuted("", EnglishStrings.SCIM_DELETE_GROUP_PERMANENT)
             }
 
             // ── Per-provider notes ───────────────────────────────────
