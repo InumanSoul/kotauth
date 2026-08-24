@@ -200,6 +200,7 @@ private fun userSchema(): JsonObject =
                             buildJsonArray {
                                 add(attribute(name = "value", type = "string"))
                                 add(attribute(name = "type", type = "string"))
+                                add(attribute(name = "primary", type = "boolean"))
                             },
                     ),
                 )
@@ -263,6 +264,7 @@ private fun groupSchema(): JsonObject =
                                 add(attribute(name = "value", type = "string"))
                                 add(attribute(name = "display", type = "string"))
                                 add(attribute(name = "type", type = "string"))
+                                add(attribute(name = "\$ref", type = "reference"))
                             },
                     ),
                 )

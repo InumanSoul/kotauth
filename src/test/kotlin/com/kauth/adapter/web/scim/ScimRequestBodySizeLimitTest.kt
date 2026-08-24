@@ -99,7 +99,7 @@ class ScimRequestBodySizeLimitTest {
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
     private val mfaRepo = FakeMfaRepository()
     private val hasher = FakePasswordHasher()
-    private val transactionRunner = FakeTransactionRunner()
+    private val transactionRunner = FakeTransactionRunner.passThrough()
 
     private val acme =
         Tenant(

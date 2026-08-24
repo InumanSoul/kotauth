@@ -41,10 +41,23 @@ fun JsonElement.toScimResource(): Result<ScimResource> {
     val obj =
         this as? JsonObject
             ?: return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "a SCIM resource must be a JSON object"))
+    // `schemas` is lifted out of the attribute map, so the shape table never sees it. Checking it
+    // here is what keeps `{"schemas":"..."}` from being silently ignored the way every other
+    // wrongly-shaped value used to be.
+    val rawSchemas = obj.entries.firstOrNull { canonicalScimAttributeName(it.key) == SCHEMAS_KEY }?.value
     val schemas =
-        (obj.entries.firstOrNull { canonicalScimAttributeName(it.key) == SCHEMAS_KEY }?.value as? JsonArray)
-            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-            ?: emptyList()
+        when {
+            rawSchemas == null || rawSchemas is JsonNull -> emptyList()
+            rawSchemas !is JsonArray ->
+                return Result.failure(
+                    ScimFailure(ScimErrorType.invalidValue, "'schemas' must be an array of strings"),
+                )
+            rawSchemas.any { (it as? JsonPrimitive)?.isString != true } ->
+                return Result.failure(
+                    ScimFailure(ScimErrorType.invalidValue, "'schemas' must be an array of strings"),
+                )
+            else -> rawSchemas.map { (it as JsonPrimitive).content }
+        }
     val attributes = mutableMapOf<String, ScimValue>()
     for ((key, value) in obj.entries) {
         // RFC 7643 §2.1: attribute names are case-insensitive. Respelling them canonically here

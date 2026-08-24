@@ -33,6 +33,8 @@ private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 
 // Attributes RFC 7643 defines as singular *complex*, read off the one shape table. Checking it
 // here as well as at the mapper's entry point costs nothing and names the offending path.
+// `meta` is in this set and unreachable through it: requireWritableAttribute rejects it as
+// read-only first. Derived rather than listed so it cannot drift from the table.
 //
 // Arity is deliberately NOT enforced here: RFC 7644 §3.5.2.1 lets an `add` or `replace` on a
 // multi-valued attribute carry a single element, which this engine then folds into the collection.
@@ -41,7 +43,7 @@ private val COMPLEX_ATTRIBUTES = SCIM_ATTRIBUTE_SHAPES.filterValues { it.shape =
 
 // Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
 // into debugging a typo that isn't there, when the real issue is a read-only target.
-private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta")
+private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta", "schemas")
 
 // Sub-attribute vocabulary is only pinned down for the complex attributes this implementation
 // actually reads inside, which is exactly where the shape table declares sub-attribute shapes.

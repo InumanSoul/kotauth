@@ -23,6 +23,15 @@ class FakeTransactionRunner(
     var invocations: Int = 0
         private set
 
+    companion object {
+        /**
+         * A runner that deliberately provides no rollback boundary, for tests where the code under
+         * test validates before it writes. Named rather than left to the argument-less constructor
+         * so that a test which needs a real boundary cannot get a pass-through by omission.
+         */
+        fun passThrough(): FakeTransactionRunner = FakeTransactionRunner()
+    }
+
     override fun <T> runInTransaction(block: () -> T): T {
         invocations++
         val snapshots = participants.map { it.snapshot() }

@@ -94,7 +94,12 @@ class ScimUserRoutesTest {
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
     private val mfaRepo = FakeMfaRepository()
     private val hasher = FakePasswordHasher()
-    private val transactionRunner = FakeTransactionRunner()
+
+    // A real boundary, not a pass-through: the combined profile-write-plus-toggle in
+    // applyScimWrite exists to be rolled back. That throw is unreachable through HTTP today (the
+    // toggle fails only for a user the profile write just proved exists), so the boundary itself is
+    // asserted in FakeTransactionRunnerRollbackTest rather than staged here.
+    private val transactionRunner = FakeTransactionRunner(userRepo)
 
     private val acme =
         Tenant(
@@ -1417,13 +1422,19 @@ class ScimUserRoutesTest {
                     contentType(ContentType.Application.Json)
                     setBody(
                         """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
-                            """"userName":"ada","emails":"ada@new.example"}""",
+                            """"userName":"ada","displayName":"Renamed",""" +
+                            """"emails":"ada@new.example"}""",
                     )
                 }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
-            assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
+            // displayName carries the guard: asserting only the unchanged address would pass even
+            // against the pre-fix behaviour, which fell back to that same stored address. A
+            // rejected request must leave the name it also carried untouched.
+            val stored = userRepo.findById(user.id, acme.id)!!
+            assertEquals("ada@example.com", stored.email)
+            assertEquals(user.fullName, stored.fullName)
         }
 
     @Test

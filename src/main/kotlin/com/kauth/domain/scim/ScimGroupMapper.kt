@@ -151,9 +151,17 @@ object ScimGroupMapper {
 
         val memberIds = mutableListOf<UserId>()
         for ((index, rawEntry) in entries.withIndex()) {
-            // validateAttributeShapes has already rejected any non-object entry, so this narrowing
-            // can never drop a member the caller actually sent.
-            val entry = rawEntry as? ScimValue.Complex ?: continue
+            // validateAttributeShapes has already rejected any non-object entry, so this is
+            // unreachable — but a `continue` here would silently drop a member, which is the exact
+            // defect that emptied groups under a 200 before that check existed. Fail loudly instead.
+            val entry =
+                rawEntry as? ScimValue.Complex
+                    ?: return Result.failure(
+                        ScimFailure(
+                            ScimErrorType.invalidValue,
+                            "members[$index] must be an object with a 'value' sub-attribute",
+                        ),
+                    )
             // Case-insensitive: this guards a security decision (reject nesting rather than
             // flatten it), and RFC 7643's examples use "Group" but do not guarantee a connector
             // sends that exact casing. A lowercase "group" must not slip past it.

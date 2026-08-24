@@ -462,7 +462,7 @@ class ScimDiscoveryRoutesTest {
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
                 userRepository = userRepo,
-                transactionRunner = FakeTransactionRunner(),
+                transactionRunner = FakeTransactionRunner.passThrough(),
             )
         }
     }
