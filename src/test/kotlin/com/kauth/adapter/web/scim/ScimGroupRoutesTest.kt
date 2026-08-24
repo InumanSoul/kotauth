@@ -332,6 +332,33 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `PATCH remove on a valued path with an explicit null value still removes the member`() =
+        testApplication {
+            application { installTestApp() }
+            val stays = addUser("ada")
+            val goes = addUser("grace")
+            val group = addGroup("Engineering", members = listOf(stays, goes))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    // Both shipped dialects hand an explicit null straight through, so a connector
+                    // whose serialiser emits one must not lose every remove it sends.
+                    bearerAuth(keyWithDialect(OktaDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"members[value eq \"${goes.id!!.value}\"]",""" +
+                            """"value":null}]}""",
+                    )
+                }
+
+            // The filter already says which member to remove; refusing here is a deprovisioning
+            // miss, and the group keeping `goes` is the security outcome.
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(listOf(stays.id), groupRepo.findUserIdsInGroup(group.id!!))
+        }
+
+    @Test
     fun `PATCH remove with no value member at all still clears the membership`() =
         testApplication {
             application { installTestApp() }

@@ -300,6 +300,31 @@ class ScimUserRoutesTest {
         append("}")
     }
 
+    @Test
+    fun `PATCH remove externalId with an explicit null value still unlinks the user`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", externalId = "idp-ada-1")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    // The dialects pass an explicit null through untouched, so this is the shape a
+                    // connector with a null-emitting serialiser actually sends.
+                    bearerAuth(keyWithDialect(EntraDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"externalId","value":null}]}""",
+                    )
+                }
+
+            // externalId is singular: there are no entries to select between, so its `value` is
+            // never read and there is nothing ambiguous to refuse. Rejecting it would break the
+            // IdP-unlink flow the mapper's absent-attribute policy exists for.
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertNull(userRepo.findById(user.id!!, acme.id)?.externalId)
+        }
+
     private fun keyWithDialect(dialect: String): String =
         (
             apiKeyService.create(

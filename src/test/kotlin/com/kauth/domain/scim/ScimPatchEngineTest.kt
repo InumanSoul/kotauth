@@ -737,7 +737,8 @@ class ScimPatchEngineTest {
 
     @Test
     fun `an explicit null value stays a clear on replace, where the Null policy is unchanged`() {
-        // Scoped to `remove`: an attribute's null INSIDE a resource still means "cleared".
+        // Scoped to `remove`: a `replace`'s value IS the new state, and RFC 7644 §3.5.2.3 makes
+        // null a meaningful one — the same way an attribute's null inside a resource clears it.
         val out =
             apply(
                 group("1", "2"),
@@ -745,6 +746,63 @@ class ScimPatchEngineTest {
             ).getOrThrow()
 
         assertEquals(ScimValue.Null, out.attributes["externalId"])
+    }
+
+    @Test
+    fun `an explicit null on replace still clears a multi-valued attribute`() {
+        // The shape the refusal is deliberately NOT extended to: `replace` says "this is the new
+        // state", and an empty one is a state. Only `remove` has an argument it could misread.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.REPLACE, parsePath("members").getOrThrow(), ScimValue.Null),
+            ).getOrThrow()
+
+        assertEquals(ScimValue.Null, out.attributes["members"])
+    }
+
+    @Test
+    fun `an explicit null value on a valued-path remove still removes the match`() {
+        // A valued path carries its own filter, so the `value` is never read and there was never
+        // anything ambiguous to refuse. Rejecting it here is a deprovisioning miss.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members[value eq \"2\"]").getOrThrow(),
+                    ScimValue.Null,
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
+    fun `an explicit null value on a singular remove still clears the attribute`() {
+        // externalId is the IdP-unlink flow ScimUserMapper's absent-attribute policy calls out; a
+        // singular attribute has no entries to select between, so its `value` is never read.
+        val withExternalId =
+            group("1").let { it.copy(attributes = it.attributes + ("externalId" to ScimValue.Str("idp-1"))) }
+
+        val out =
+            apply(
+                withExternalId,
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("externalId").getOrThrow(), ScimValue.Null),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["externalId"] == null)
+    }
+
+    @Test
+    fun `an explicit null value on a displayName remove still clears the attribute`() {
+        val out =
+            apply(
+                group("1"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("displayName").getOrThrow(), ScimValue.Null),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["displayName"] == null)
     }
 
     @Test

@@ -5,9 +5,12 @@ package com.kauth.domain.scim
 // value here" for PATCH purposes, even though the distinction still matters for PUT
 // semantics at the mapping layer.
 //
-// That policy is about an attribute's value INSIDE a resource. The `value` member of an operation
-// is a different position — the operation's argument, not an attribute — and a `remove` carrying
-// an explicit null there is rejected rather than folded into "no value supplied". See applyOp.
+// One narrow exception, in removeWholeAttr. On a plain-path `remove` of a multi-valued attribute
+// the `value` is the operation's ARGUMENT rather than a new state: it decides between "remove
+// these entries" and "remove every entry", so a null there is refused instead of guessed at. A
+// `replace`'s value IS the new state, and null is a meaningful one (RFC 7644 §3.5.2.3) — it keeps
+// clearing the attribute exactly as `{"active": null}` does. Nowhere else does a `remove` read its
+// `value` at all, so nowhere else has anything to refuse.
 
 enum class ScimPatchOpType { ADD, REPLACE, REMOVE }
 
@@ -93,18 +96,6 @@ class ScimPatchEngine {
         resource: ScimResource,
         op: ScimPatchOp,
     ): ScimResource {
-        // RFC 7644 §3.5.2.2's "no value means remove everything" reading is about an ABSENT `value`
-        // member, not an explicit JSON null. Folding the two together gives the least informative
-        // input the most destructive outcome: a malformed `value` is already a 400 here, an empty
-        // array removes nothing, and null would empty the whole group under a 200. The engine
-        // refuses to guess at a value it cannot read (see removalIdentities) — this is the same
-        // refusal. Omitting `value` entirely is still how a caller clears a collection.
-        if (op.op == ScimPatchOpType.REMOVE && op.value == ScimValue.Null) {
-            throw PatchException(
-                ScimErrorType.invalidValue,
-                "a 'remove' with an explicit null 'value' is ambiguous; omit 'value' to remove every entry",
-            )
-        }
         val path = op.path ?: return mergePartial(resource, op)
         return when (path) {
             is ScimPath.Attr -> applyAttr(resource, op, path)
@@ -191,6 +182,23 @@ class ScimPatchEngine {
         name: String,
         value: ScimValue?,
     ): ScimResource {
+        // RFC 7644 §3.5.2.2's "no value means remove everything" reading is about an ABSENT
+        // `value`, not an explicit JSON null. Folding the two together gives the least informative
+        // input the most destructive outcome: a malformed `value` is already a 400 here, an empty
+        // array removes nothing, and null would empty the whole collection under a 200. The engine
+        // refuses to guess at a value it cannot read (see removalIdentities) — this is the same
+        // refusal. Omitting `value` entirely is still how a caller clears a collection.
+        //
+        // Deliberately narrow: this is the one position where a `remove`'s value is read at all. A
+        // valued path carries its own filter and a singular attribute has nothing to select, so a
+        // null there was never ambiguous and refusing it would reject working deprovisions.
+        if (value == ScimValue.Null && name in MULTI_VALUED_ATTRIBUTES) {
+            throw PatchException(
+                ScimErrorType.invalidValue,
+                "a 'remove' of '$name' with an explicit null 'value' is ambiguous; " +
+                    "omit 'value' to remove every entry",
+            )
+        }
         val supplied = normalizeAbsent(value)
         if (supplied == null || name !in MULTI_VALUED_ATTRIBUTES) {
             return resource.copy(attributes = resource.attributes - name)

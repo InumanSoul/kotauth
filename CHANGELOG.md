@@ -98,10 +98,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   member of that group** while answering `200 OK` to say it had worked. Only
   the listed entries are removed now, and a `value` the engine cannot read as
   member entries is a `400 invalidValue` rather than a fallback to removing
-  everything. An explicit `"value": null` is refused for the same reason: RFC
-  7644's "no value" reading means an *absent* `value`, and treating a null as
-  one gave the least informative payload the most destructive outcome.
-  Omitting `value` entirely is still how a caller clears a collection.
+  everything. On that same plain-path form, an explicit `"value": null` is
+  refused for the same reason: RFC 7644's "no value" reading means an *absent*
+  `value`, and treating a null as one gave the least informative payload the
+  most destructive outcome. Omitting `value` entirely is still how a caller
+  clears a collection, a `remove` on a valued path or a singular attribute
+  never reads its `value` at all, and `replace` with a null still clears.
 - **A SCIM `remove` of a user's last email address is now rejected instead of
   silently doing nothing.** KotAuth stores exactly one address, in a `NOT
   NULL` column, so "this user has no email" is not a state it can hold. Both
