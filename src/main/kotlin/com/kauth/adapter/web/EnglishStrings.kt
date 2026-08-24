@@ -840,6 +840,14 @@ object EnglishStrings {
     const val SCIM_DIALECT_ENV_MANAGED_REFUSAL =
         "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS."
 
+    /**
+     * A submitted id outside the registry means a stale or tampered form, not a new provider: the
+     * selector only ever offers registered ids, so the submission is refused rather than quietly
+     * saved as something else.
+     */
+    const val SCIM_DIALECT_UNKNOWN_REFUSAL =
+        "That SCIM dialect is not one this version offers. Reload the page and pick a dialect from the list."
+
     const val SCIM_DIALECT_RFC_LABEL = "Standard SCIM 2.0 (RFC 7644)"
     const val SCIM_DIALECT_ENTRA_LABEL = "Microsoft Entra ID"
     const val SCIM_DIALECT_OKTA_LABEL = "Okta"

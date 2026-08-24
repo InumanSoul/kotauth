@@ -2,6 +2,7 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.scim.scimDialectFor
+import com.kauth.adapter.web.scim.scimDialects
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.service.ApiKeyService
 import io.ktor.http.HttpStatusCode
@@ -58,9 +59,23 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
         val params = call.receiveParameters()
         val name = params["name"]?.trim() ?: ""
         val scopes = params.getAll("scopes") ?: emptyList()
-        // Resolving through the registry means an unknown id is stored as the RFC default rather
-        // than as a value the SCIM surface would silently ignore later.
-        val scimDialect = scimDialectFor(params["scimDialect"]).id
+        // A submitted id outside the registry is refused, not resolved: the selector only offers
+        // registered ids, so anything else is a stale or tampered form. Reads are the opposite
+        // question and keep scimDialectFor's fallback.
+        val submittedDialect = params["scimDialect"]?.takeIf { it.isNotBlank() }
+        if (submittedDialect != null && scimDialects.none { it.id == submittedDialect }) {
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.createApiKeyPage(
+                    workspace,
+                    wsPairs,
+                    session.username,
+                    error = EnglishStrings.SCIM_DIALECT_UNKNOWN_REFUSAL,
+                    preselectedScopes = scopes.toSet(),
+                ),
+            )
+        }
+        val scimDialect = scimDialectFor(submittedDialect).id
         val expiresAt =
             params["expiresAt"]?.takeIf { it.isNotBlank() }?.let {
                 runCatching {
@@ -116,7 +131,11 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 EnglishStrings.SCIM_DIALECT_ENV_MANAGED_REFUSAL,
             )
         }
-        val dialect = scimDialectFor(call.receiveParameters()["scimDialect"]).id
+        val submittedDialect = call.receiveParameters()["scimDialect"]?.takeIf { it.isNotBlank() }
+        if (submittedDialect != null && scimDialects.none { it.id == submittedDialect }) {
+            return@post call.respond(HttpStatusCode.BadRequest, EnglishStrings.SCIM_DIALECT_UNKNOWN_REFUSAL)
+        }
+        val dialect = scimDialectFor(submittedDialect).id
         // The lookup above makes a failure here rare — the key would have to vanish between the two
         // reads — but the saved toast is only honest when the write actually happened.
         when (val result = svc.updateScimDialect(keyId, workspace.id, dialect)) {

@@ -624,6 +624,36 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `a key whose stored dialect is no longer registered still serves through the RFC pass-through`() =
+        testApplication {
+            application { installTestApp() }
+
+            // The read side is deliberately the opposite of the admin form, which refuses an
+            // unregistered id: a key configured for a dialect this build dropped must keep
+            // provisioning against the spec rather than failing every request.
+            val retiredDialectKey =
+                (
+                    apiKeyService.create(
+                        tenantId = acme.id,
+                        name = "Retired dialect key",
+                        scopes = listOf(ApiScope.SCIM),
+                        scimDialect = "a-dialect-this-build-no-longer-ships",
+                    ) as ApiKeyResult.Success
+                ).value.rawKey
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(retiredDialectKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("newuser"))
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("newuser", body["userName"]!!.jsonPrimitive.content)
+        }
+
+    @Test
     fun `a supplied password is hashed through the tenant's password policy, not written raw`() =
         testApplication {
             application { installTestApp() }

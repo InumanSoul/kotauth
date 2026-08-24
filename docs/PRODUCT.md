@@ -297,7 +297,9 @@ Kotauth should focus on the 80/20 rule for its first version.
 ## Provisioning
 
 * SCIM 2.0 provisioning (RFC 7644 protocol, RFC 7643 schema)
-* user and group create, update, and deactivate from an external identity source
+* user create, update, and deactivate from an external identity source
+* group create, update, and delete — a deleted group takes its memberships, not the member accounts
+* a group with subgroups is refused, never cascaded
 * externalId correlation, unique per workspace
 * per-key wire dialects that normalise the deviations major identity providers document
 

@@ -232,24 +232,32 @@ class AdminScimRoutesTest {
         }
 
     @Test
-    fun `an unregistered dialect falls back to the RFC default`() =
+    fun `an unregistered dialect is refused on the create form and no key is created`() =
         testApplication {
             application { installTestApp() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
 
-            authed.submitForm(
-                url = "/admin/workspaces/acme/settings/api-keys",
-                formParameters =
-                    Parameters.build {
-                        append("name", "Directory sync")
-                        append("scopes", ApiScope.SCIM)
-                        append("scimDialect", "not-a-dialect")
-                    },
-            )
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys",
+                    formParameters =
+                        Parameters.build {
+                            append("name", "Directory sync")
+                            append("scopes", ApiScope.SCIM)
+                            append("scimDialect", "not-a-dialect")
+                        },
+                )
 
-            val stored = apiKeyRepo.findByTenantId(TenantId(2)).single()
-            assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, stored.scimDialect)
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(
+                response.bodyAsText().contains(com.kauth.adapter.web.EnglishStrings.SCIM_DIALECT_UNKNOWN_REFUSAL),
+                "the form must say why the submission was refused",
+            )
+            assertTrue(
+                apiKeyRepo.findByTenantId(TenantId(2)).isEmpty(),
+                "a refused submission must not create a key under a substituted dialect",
+            )
         }
 
     @Test
@@ -324,7 +332,7 @@ class AdminScimRoutesTest {
         }
 
     @Test
-    fun `an unregistered dialect submitted to the edit route stores the RFC default`() =
+    fun `an unregistered dialect is refused on the edit form and the stored dialect is unchanged`() =
         testApplication {
             application { installTestApp() }
             val authed =
@@ -334,15 +342,28 @@ class AdminScimRoutesTest {
                 }
             login(authed)
 
-            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            // Created on a non-default dialect, so "unchanged" is distinguishable from "coerced
+            // to rfc" — the exact substitution this route must no longer make.
+            val existing =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+            val created =
+                apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM), scimDialect = existing)
             val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
 
-            authed.submitForm(
-                url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
-                formParameters = Parameters.build { append("scimDialect", "not-a-dialect") },
-            )
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                    formParameters = Parameters.build { append("scimDialect", "not-a-dialect") },
+                )
 
-            assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(
+                response.bodyAsText().contains(com.kauth.adapter.web.EnglishStrings.SCIM_DIALECT_UNKNOWN_REFUSAL),
+                "the refusal must say why",
+            )
+            assertEquals(existing, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
         }
 
     @Test

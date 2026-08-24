@@ -168,7 +168,9 @@ Phase 3 was the largest phase, delivered in four increments (3a–3d).
 - API key authentication — a key carrying the `scim` scope; every request is scoped to the workspace in the path
 - `externalId` correlation on users and groups — unique per workspace, so a provisioning client finds the record it created without matching on a mutable attribute
 - Filtering and pagination — `eq` filters combined with `and`/`or`, `startIndex`/`count` paging, filter attributes scoped per resource type
-- Deprovisioning deactivates rather than deletes — audit history and group membership survive a deprovision
+- Deprovisioning a user deactivates rather than deletes — the account stays fetchable and its audit history is intact
+- Deleting a group removes the group and its memberships — the member accounts themselves are untouched
+- A group that still has subgroups is refused rather than cascaded, so a delete cannot silently destroy a subtree
 - Per-key wire dialects — chosen explicitly by the operator on the API key, never sniffed from a request header; the non-default dialects normalise the wire-format deviations the major identity providers document, leaving the spec-compliant path untouched
 - Admin provisioning page — endpoint URL, SCIM-scoped keys, in-place dialect correction, and a marker on every record a provisioning client owns
 
