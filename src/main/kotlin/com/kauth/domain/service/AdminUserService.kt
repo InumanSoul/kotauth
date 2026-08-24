@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -35,6 +36,10 @@ class AdminUserService(
         externalId: String? = null,
         givenName: String? = null,
         familyName: String? = null,
+        // False lets a caller that holds this create inside its own DB transaction (SCIM's
+        // create-then-enable/disable pair) defer the SMTP round-trip until after it commits,
+        // via dispatchPendingInvite. Every other caller keeps the send-inline default.
+        dispatchInvite: Boolean = true,
     ): AdminResult<User> {
         val tenant =
             tenantRepository.findById(tenantId)
@@ -125,25 +130,59 @@ class AdminUserService(
             ),
         )
 
-        if (sendInvite && tenant.isSmtpReady) {
-            when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
-                is SelfServiceResult.Success ->
-                    auditLog.record(
-                        AuditEvent(
-                            tenantId = tenantId,
-                            userId = user.id,
-                            clientId = null,
-                            eventType = AuditEventType.USER_INVITE_SENT,
-                            ipAddress = null,
-                            userAgent = null,
-                            details = mapOf("username" to username),
-                        ),
-                    )
-                is SelfServiceResult.Failure -> Unit
-            }
+        if (sendInvite && dispatchInvite && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
         }
 
         return AdminResult.Success(user)
+    }
+
+    /**
+     * Sends the invite email [createUser] would otherwise send inline, for a user created with
+     * `dispatchInvite = false`. Exists so a caller holding a DB transaction across create — e.g.
+     * SCIM provisioning, which must also roll back an enable/disable failure — can commit first
+     * and only then pay for the SMTP round-trip, instead of holding a pool connection across it.
+     * A no-op (not a failure) when there's no pending invite or SMTP isn't configured, mirroring
+     * [createUser]'s own silent skip in those cases.
+     */
+    fun dispatchPendingInvite(
+        userId: UserId,
+        tenantId: TenantId,
+        baseUrl: String,
+    ): AdminResult<Unit> {
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        if (RequiredAction.SET_PASSWORD in user.requiredActions && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
+        }
+        return AdminResult.Success(Unit)
+    }
+
+    private fun dispatchInviteEmail(
+        user: User,
+        tenant: Tenant,
+        baseUrl: String,
+    ) {
+        when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
+            is SelfServiceResult.Success ->
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = user.id,
+                        clientId = null,
+                        eventType = AuditEventType.USER_INVITE_SENT,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username),
+                    ),
+                )
+            is SelfServiceResult.Failure -> Unit
+        }
     }
 
     fun resendInvite(

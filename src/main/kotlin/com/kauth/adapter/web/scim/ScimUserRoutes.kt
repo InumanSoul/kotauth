@@ -125,6 +125,9 @@ fun Route.scimUserRoutes(
                         externalId = write.user.externalId,
                         givenName = write.user.givenName,
                         familyName = write.user.familyName,
+                        // Deferred past the transaction below — an SMTP round-trip must not
+                        // hold the DB connection this create/enable-disable pair needs.
+                        dispatchInvite = false,
                     )
                 if (result is AdminResult.Success && !write.user.enabled) {
                     val disabled = adminUserService.setUserEnabled(result.value.id!!, tenantId, false)
@@ -136,6 +139,7 @@ fun Route.scimUserRoutes(
         when (created) {
             is AdminResult.Success -> {
                 val id = created.value.id!!
+                adminUserService.dispatchPendingInvite(id, tenantId, baseUrl)
                 val location = "$baseUrl${call.request.path()}/${id.value}"
                 call.respondScimUser(adminUserService, id, tenantId, HttpStatusCode.Created, location)
             }
