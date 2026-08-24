@@ -250,7 +250,13 @@ class ScimUserMapperTest {
                 )
             }
 
-        assertEquals("primary@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+        assertEquals(
+            "primary@example.com",
+            ScimUserMapper
+                .toDomain(r, null, tenantId)
+                .getOrThrow()
+                .user.email,
+        )
     }
 
     @Test
@@ -271,7 +277,13 @@ class ScimUserMapperTest {
                 )
             }
 
-        assertEquals("only@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+        assertEquals(
+            "only@example.com",
+            ScimUserMapper
+                .toDomain(r, null, tenantId)
+                .getOrThrow()
+                .user.email,
+        )
     }
 
     @Test
@@ -326,7 +338,13 @@ class ScimUserMapperTest {
                 )
             }
 
-        assertEquals("work@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+        assertEquals(
+            "work@example.com",
+            ScimUserMapper
+                .toDomain(r, null, tenantId)
+                .getOrThrow()
+                .user.email,
+        )
     }
 
     @Test

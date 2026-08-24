@@ -138,7 +138,8 @@ object ScimUserMapper {
         // Same emptiness guard as displayName: a work entry with value "" must fall through
         // to the existing address rather than blank it.
         val email =
-            resource.selectEmail()
+            resource
+                .selectEmail()
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?: existing?.email
