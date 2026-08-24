@@ -72,6 +72,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 /**
  * Integration tests for `/Users`, mounted at `/t/{tenantSlug}/scim/v2/Users`.
@@ -768,6 +769,8 @@ class ScimUserRoutesTest {
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
             assertEquals(hashBefore, userRepo.findById(user.id!!, acme.id)?.passwordHash)
+            // The rejection must point the integrator somewhere, not just say no.
+            assertTrue(body["detail"]!!.jsonPrimitive.content.contains("admin API"))
         }
 
     @Test

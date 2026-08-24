@@ -37,7 +37,9 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
 private const val LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-private const val PASSWORD_UPDATE_UNSUPPORTED = "password updates for existing users are not supported over SCIM"
+private const val PASSWORD_UPDATE_UNSUPPORTED =
+    "password updates for existing users are not supported over SCIM; " +
+        "use the admin API or a password-reset invite instead"
 
 /** `/Users` — RFC 7644 §3.2-3.6. Every write goes through [AdminUserService], never the repository directly. */
 fun Route.scimUserRoutes(
