@@ -127,7 +127,6 @@ private val RESOURCE_TYPES: JsonObject =
         put("totalResults", 2)
         putJsonArray("Resources") {
             add(resourceType(id = "User", endpoint = "/Users", description = "User Account", schema = USER_SCHEMA_URN))
-            // /Groups doesn't exist yet — listed anyway, deliberately, so this stays consistent with /Schemas.
             add(resourceType(id = "Group", endpoint = "/Groups", description = "Group", schema = GROUP_SCHEMA_URN))
         }
     }
@@ -239,7 +238,6 @@ private fun userSchema(): JsonObject =
             },
     )
 
-// No Group mapper exists yet either — this schema just keeps /Schemas honest with /ResourceTypes.
 private fun groupSchema(): JsonObject =
     schemaResource(
         id = GROUP_SCHEMA_URN,

@@ -32,6 +32,7 @@ class FakeGroupRepository : GroupRepository {
         groupRoles.clear()
         groupMembers.clear()
         findGroupsForUsersCallSizes.clear()
+        findUserIdsForGroupsCallSizes.clear()
         addUserToGroupCalls.clear()
         removeUserFromGroupCalls.clear()
         nextId = 1
@@ -39,7 +40,18 @@ class FakeGroupRepository : GroupRepository {
 
     override fun findById(id: GroupId): Group? = store[id.value]
 
-    override fun findByTenantId(tenantId: TenantId): List<Group> = store.values.filter { it.tenantId == tenantId }
+    override fun findByTenantId(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ): List<Group> =
+        store.values
+            .filter { it.tenantId == tenantId }
+            .sortedBy { it.name }
+            .drop(offset)
+            .take(limit)
+
+    override fun countByTenantId(tenantId: TenantId): Long = store.values.count { it.tenantId == tenantId }.toLong()
 
     override fun findByName(
         tenantId: TenantId,
@@ -133,6 +145,19 @@ class FakeGroupRepository : GroupRepository {
 
     override fun findUserIdsInGroup(groupId: GroupId): List<UserId> =
         groupMembers[groupId.value]?.map { UserId(it) }?.toList() ?: emptyList()
+
+    // Records the size of every findUserIdsForGroups call so tests can assert the page of groups
+    // loads membership in one batch rather than once per group.
+    val findUserIdsForGroupsCallSizes = mutableListOf<Int>()
+
+    override fun findUserIdsForGroups(groupIds: List<GroupId>): Map<GroupId, List<UserId>> {
+        findUserIdsForGroupsCallSizes += groupIds.size
+        return groupIds
+            .mapNotNull { groupId ->
+                val members = findUserIdsInGroup(groupId)
+                if (members.isEmpty()) null else groupId to members
+            }.toMap()
+    }
 
     override fun findAncestorGroupIds(groupId: GroupId): List<GroupId> {
         val ancestors = mutableListOf<GroupId>()

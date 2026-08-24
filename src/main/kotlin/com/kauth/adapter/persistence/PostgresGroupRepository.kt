@@ -34,13 +34,27 @@ class PostgresGroupRepository : GroupRepository {
                 ?.toGroup()
         }
 
-    override fun findByTenantId(tenantId: TenantId): List<Group> =
+    override fun findByTenantId(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ): List<Group> =
         transaction {
             GroupsTable
                 .selectAll()
                 .where { GroupsTable.tenantId eq tenantId.value }
                 .orderBy(GroupsTable.name)
+                .limit(limit)
+                .offset(offset.toLong())
                 .map { it.toGroup() }
+        }
+
+    override fun countByTenantId(tenantId: TenantId): Long =
+        transaction {
+            GroupsTable
+                .selectAll()
+                .where { GroupsTable.tenantId eq tenantId.value }
+                .count()
         }
 
     override fun findByName(
@@ -205,6 +219,18 @@ class PostgresGroupRepository : GroupRepository {
                 .selectAll()
                 .where { UserGroupsTable.groupId eq groupId.value }
                 .map { UserId(it[UserGroupsTable.userId]) }
+        }
+
+    override fun findUserIdsForGroups(groupIds: List<GroupId>): Map<GroupId, List<UserId>> =
+        if (groupIds.isEmpty()) {
+            emptyMap()
+        } else {
+            transaction {
+                UserGroupsTable
+                    .selectAll()
+                    .where { UserGroupsTable.groupId inList groupIds.map { it.value } }
+                    .groupBy({ GroupId(it[UserGroupsTable.groupId]) }, { UserId(it[UserGroupsTable.userId]) })
+            }
         }
 
     // -------------------------------------------------------------------------

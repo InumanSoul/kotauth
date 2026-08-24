@@ -307,6 +307,7 @@ class ScimRateLimitTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = transactionRunner,
             )
         }

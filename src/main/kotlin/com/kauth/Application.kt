@@ -500,6 +500,7 @@ fun Application.module(
             webAuthnCredentialRepository = s.webAuthnCredentialRepository,
             corsService = s.corsService,
             transactionRunner = s.transactionRunner,
+            userRepository = s.userRepository,
         )
 
         adminBackupRoutes(

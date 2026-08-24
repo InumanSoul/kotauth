@@ -320,6 +320,7 @@ class ScimRequestBodySizeLimitTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = transactionRunner,
             )
         }

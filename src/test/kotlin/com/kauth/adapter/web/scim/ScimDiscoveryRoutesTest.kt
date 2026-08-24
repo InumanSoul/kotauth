@@ -461,6 +461,7 @@ class ScimDiscoveryRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = FakeTransactionRunner(),
             )
         }

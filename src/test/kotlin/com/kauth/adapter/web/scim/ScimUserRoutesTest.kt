@@ -1243,6 +1243,7 @@ class ScimUserRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = transactionRunner,
             )
         }

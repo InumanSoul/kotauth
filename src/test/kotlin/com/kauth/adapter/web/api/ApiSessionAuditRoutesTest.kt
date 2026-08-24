@@ -392,6 +392,7 @@ class ApiSessionAuditRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }

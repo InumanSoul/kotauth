@@ -3,6 +3,7 @@ package com.kauth.adapter.web.api
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.adapter.web.scim.ScimScopePlugin
 import com.kauth.adapter.web.scim.scimDiscoveryRoutes
+import com.kauth.adapter.web.scim.scimGroupRoutes
 import com.kauth.adapter.web.scim.scimUserRoutes
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
@@ -12,6 +13,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TransactionRunner
+import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
@@ -19,6 +21,7 @@ import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.ScimGroupMembershipService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
@@ -63,10 +66,13 @@ fun Route.apiRoutes(
     webAuthnService: WebAuthnService,
     webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
-    // Only the SCIM /Users write path needs this, but it's required rather than defaulted to a
-    // no-op — a future wiring regression should fail to compile, not silently drop the rollback
-    // boundary.
+    // Only the SCIM /Users and /Groups write paths need this, but it's required rather than
+    // defaulted to a no-op — a future wiring regression should fail to compile, not silently drop
+    // the rollback boundary.
     transactionRunner: TransactionRunner,
+    // Only SCIM group membership reconciliation needs this directly (everything else goes through
+    // a domain service) — required for the same reason transactionRunner is.
+    userRepository: UserRepository,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -198,8 +204,11 @@ fun Route.apiRoutes(
             install(ScimScopePlugin)
             install(writeRateLimitPlugin)
             install(readRateLimitPlugin)
+            val scimGroupMembershipService =
+                ScimGroupMembershipService(groupRepository, userRepository, transactionRunner)
             scimDiscoveryRoutes()
             scimUserRoutes(adminUserService, groupRepository, transactionRunner)
+            scimGroupRoutes(groupRepository, scimGroupMembershipService, transactionRunner)
         }
     }
 }

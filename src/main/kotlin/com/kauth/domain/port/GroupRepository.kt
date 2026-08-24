@@ -12,7 +12,15 @@ import com.kauth.domain.model.UserId
 interface GroupRepository {
     fun findById(id: GroupId): Group?
 
-    fun findByTenantId(tenantId: TenantId): List<Group>
+    /** Returns groups in a tenant, optionally paginated. Unbounded by default for existing callers. */
+    fun findByTenantId(
+        tenantId: TenantId,
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
+    ): List<Group>
+
+    /** Returns total count of groups in [tenantId]. Used for pagination. */
+    fun countByTenantId(tenantId: TenantId): Long
 
     fun findByName(
         tenantId: TenantId,
@@ -68,6 +76,13 @@ interface GroupRepository {
     fun findGroupsForUsers(userIds: List<UserId>): Map<UserId, List<Group>>
 
     fun findUserIdsInGroup(groupId: GroupId): List<UserId>
+
+    /**
+     * Batches [findUserIdsInGroup] across many groups in a single query, grouped in memory by
+     * group id. A group with no members has no entry in the result map. Exists so a page of SCIM
+     * `/Groups` results can load membership once instead of once per group.
+     */
+    fun findUserIdsForGroups(groupIds: List<GroupId>): Map<GroupId, List<UserId>>
 
     /**
      * Returns all ancestor group IDs for a group (walking up the hierarchy).

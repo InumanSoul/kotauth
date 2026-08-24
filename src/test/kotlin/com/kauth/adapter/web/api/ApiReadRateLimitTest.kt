@@ -296,6 +296,7 @@ class ApiReadRateLimitTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
                 transactionRunner = FakeTransactionRunner(),
             )
         }

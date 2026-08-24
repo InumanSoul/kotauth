@@ -426,6 +426,7 @@ class ApiOtpRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = users,
                 transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
