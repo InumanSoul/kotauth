@@ -209,6 +209,7 @@ class ScimUserRoutesTest {
 
     private var scimKey: String = ""
     private var smtpTenantScimKey: String = ""
+    private var noScimKey: String = ""
 
     @BeforeTest
     fun setup() {
@@ -242,6 +243,15 @@ class ScimUserRoutesTest {
                     tenantId = smtpTenant.id,
                     name = "Provisioning Key",
                     scopes = listOf(ApiScope.SCIM),
+                ) as ApiKeyResult.Success
+            ).value.rawKey
+
+        noScimKey =
+            (
+                apiKeyService.create(
+                    tenantId = acme.id,
+                    name = "Other Key",
+                    scopes = listOf(ApiScope.USERS_READ),
                 ) as ApiKeyResult.Success
             ).value.rawKey
     }
@@ -930,6 +940,54 @@ class ScimUserRoutesTest {
             val response = client.delete("/t/acme/scim/v2/Users/${foreignUser.id!!.value}") { bearerAuth(scimKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+    // -------------------------------------------------------------------------
+    // Scope enforcement — one route-scoped plugin guards every /Users handler
+    // (see ScimScopePlugin), rather than a hand-written check per handler.
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `GET Users without the scim scope gets 403 in the SCIM error envelope`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.get("/t/acme/scim/v2/Users") { bearerAuth(noScimKey) }
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(
+                "urn:ietf:params:scim:api:messages:2.0:Error",
+                body["schemas"]!!.jsonArray[0].jsonPrimitive.content,
+            )
+        }
+
+    @Test
+    fun `POST Users without the scim scope gets 403 and creates nothing`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(noScimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("blocked"))
+                }
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertNull(userRepo.findByUsername(acme.id, "blocked"))
+        }
+
+    @Test
+    fun `DELETE Users without the scim scope gets 403 and leaves the user untouched`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+
+            val response = client.delete("/t/acme/scim/v2/Users/${user.id!!.value}") { bearerAuth(noScimKey) }
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertEquals(true, userRepo.findById(user.id!!, acme.id)?.enabled)
         }
 
     // -------------------------------------------------------------------------

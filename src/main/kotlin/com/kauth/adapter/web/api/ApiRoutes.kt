@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
+import com.kauth.adapter.web.scim.ScimScopePlugin
 import com.kauth.adapter.web.scim.scimDiscoveryRoutes
 import com.kauth.adapter.web.scim.scimUserRoutes
 import com.kauth.domain.port.ApplicationRepository
@@ -172,6 +173,7 @@ fun Route.apiRoutes(
 
         route("/t/{tenantSlug}/scim/v2") {
             install(apiContextPlugin)
+            install(ScimScopePlugin)
             install(writeRateLimitPlugin)
             scimDiscoveryRoutes()
             scimUserRoutes(adminUserService, transactionRunner)

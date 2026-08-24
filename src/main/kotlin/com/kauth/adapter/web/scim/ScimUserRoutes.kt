@@ -45,7 +45,6 @@ fun Route.scimUserRoutes(
     transactionRunner: TransactionRunner,
 ) {
     get("/Users") {
-        requireScimScope(call) ?: return@get
         val tenantId = call.attributes[TenantIdAttr]
 
         val filter =
@@ -100,7 +99,6 @@ fun Route.scimUserRoutes(
     }
 
     post("/Users") {
-        requireScimScope(call) ?: return@post
         val tenantId = call.attributes[TenantIdAttr]
 
         val resource = call.receiveScimResource() ?: return@post
@@ -148,7 +146,6 @@ fun Route.scimUserRoutes(
     }
 
     get("/Users/{id}") {
-        requireScimScope(call) ?: return@get
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@get call.respondAdminError(AdminError.NotFound("User not found."))
         when (val result = adminUserService.getUser(userId, tenantId)) {
@@ -162,7 +159,6 @@ fun Route.scimUserRoutes(
     }
 
     put("/Users/{id}") {
-        requireScimScope(call) ?: return@put
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@put call.respondAdminError(AdminError.NotFound("User not found."))
         val existing = adminUserService.getUser(userId, tenantId)
@@ -185,7 +181,6 @@ fun Route.scimUserRoutes(
     }
 
     patch("/Users/{id}") {
-        requireScimScope(call) ?: return@patch
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@patch call.respondAdminError(AdminError.NotFound("User not found."))
         val existing = adminUserService.getUser(userId, tenantId)
@@ -221,7 +216,6 @@ fun Route.scimUserRoutes(
     }
 
     delete("/Users/{id}") {
-        requireScimScope(call) ?: return@delete
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@delete call.respondAdminError(AdminError.NotFound("User not found."))
         // Deactivates rather than deletes: the account stays fetchable, audited like any other

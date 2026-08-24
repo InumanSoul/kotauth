@@ -5,6 +5,8 @@ import com.kauth.domain.model.ApiScope
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.auth.AuthenticationChecked
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -28,24 +30,28 @@ private const val GROUP_SCHEMA_URN = "urn:ietf:params:scim:schemas:core:2.0:Grou
 internal const val SCIM_FILTER_MAX_RESULTS = 200
 
 /**
- * Scope gate for the SCIM surface. Mirrors `requireScope` in `ApiHelpers.kt` — same check, same
- * attribute — but responds with the SCIM error envelope (RFC 7644 §3.12) instead of the REST
- * problem+json shape, because SCIM clients only parse the former. `requireScope` itself is left
- * untouched: the rest of the REST API depends on its response shape.
+ * Scope gate for the SCIM surface, installed once on the `/scim/v2` route tree (see
+ * `ApiRoutes.kt`) rather than repeated as a first line in every handler — a handler that
+ * forgot the check would otherwise be an unguarded endpoint with nothing to catch it.
+ * Mirrors `requireScope` in `ApiHelpers.kt` — same check, same attribute — but responds with
+ * the SCIM error envelope (RFC 7644 §3.12) instead of the REST problem+json shape for the
+ * scope-missing case, because SCIM clients only parse the former. `requireScope` itself is
+ * left untouched: the rest of the REST API depends on its response shape.
+ *
+ * No-ops when [ApiKeyAttr] isn't set: `apiContextPlugin` (installed first, same
+ * `AuthenticationChecked` hook) already rejected an unknown tenant or invalid key with its own
+ * response by then, and sibling hooks in the same phase all run regardless — this plugin must
+ * not clobber that response with a second one, the same reason `writeRateLimitPlugin` no-ops here.
  */
-internal suspend fun requireScimScope(call: ApplicationCall): Unit? {
-    val key =
-        call.attributes.getOrNull(ApiKeyAttr)
-            ?: run {
-                call.respondScimError(HttpStatusCode.Unauthorized, "A valid API key is required.")
-                return null
+internal val ScimScopePlugin =
+    createRouteScopedPlugin("ScimScopePlugin") {
+        on(AuthenticationChecked) { call ->
+            val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+            if (ApiScope.SCIM !in key.scopes) {
+                call.respondScimError(HttpStatusCode.Forbidden, "This API key does not have the 'scim' permission.")
             }
-    if (ApiScope.SCIM !in key.scopes) {
-        call.respondScimError(HttpStatusCode.Forbidden, "This API key does not have the 'scim' permission.")
-        return null
+        }
     }
-    return Unit
-}
 
 internal suspend fun ApplicationCall.respondScimError(
     status: HttpStatusCode,
@@ -68,17 +74,14 @@ internal suspend fun ApplicationCall.respondScim(
 // below reflect only what's actually implemented (see ScimPatchEngine.kt, ScimFilter.kt).
 fun Route.scimDiscoveryRoutes() {
     get("/ServiceProviderConfig") {
-        requireScimScope(call) ?: return@get
         call.respondScim(HttpStatusCode.OK, SERVICE_PROVIDER_CONFIG)
     }
 
     get("/ResourceTypes") {
-        requireScimScope(call) ?: return@get
         call.respondScim(HttpStatusCode.OK, RESOURCE_TYPES)
     }
 
     get("/Schemas") {
-        requireScimScope(call) ?: return@get
         call.respondScim(HttpStatusCode.OK, SCHEMAS)
     }
 }
