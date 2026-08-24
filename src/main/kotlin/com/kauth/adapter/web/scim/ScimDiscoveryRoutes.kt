@@ -171,8 +171,10 @@ private fun userSchema(): JsonObject =
                         name = "userName",
                         type = "string",
                         required = true,
+                        caseExact = true,
+                        mutability = "immutable",
                         uniqueness = "server",
-                        description = "Unique identifier for the user, used to log in.",
+                        description = "Unique identifier for the user, used to log in. Immutable once created.",
                     ),
                 )
                 add(
@@ -200,7 +202,15 @@ private fun userSchema(): JsonObject =
                     ),
                 )
                 add(attribute(name = "active", type = "boolean", description = "Whether the user is enabled."))
-                add(attribute(name = "externalId", type = "string", description = "Identifier assigned by the IdP."))
+                add(
+                    attribute(
+                        name = "externalId",
+                        type = "string",
+                        caseExact = true,
+                        uniqueness = "server",
+                        description = "Identifier assigned by the IdP.",
+                    ),
+                )
                 add(
                     attribute(
                         name = "password",

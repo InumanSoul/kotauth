@@ -315,6 +315,56 @@ class ScimDiscoveryRoutesTest {
             assertTrue("urn:ietf:params:scim:schemas:core:2.0:Group" in ids)
         }
 
+    @Test
+    fun `the User schema advertises userName as case-sensitive and immutable`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.get("/t/acme/scim/v2/Schemas") { bearerAuth(scimKey) }
+            val userSchema =
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["Resources"]!!
+                    .jsonArray
+                    .first {
+                        it.jsonObject["id"]!!.jsonPrimitive.content == "urn:ietf:params:scim:schemas:core:2.0:User"
+                    }
+            val userName =
+                userSchema.jsonObject["attributes"]!!
+                    .jsonArray
+                    .first { it.jsonObject["name"]!!.jsonPrimitive.content == "userName" }
+                    .jsonObject
+
+            // Matching is case-sensitive end to end (ScimFilter, PostgresUserRepository), and a
+            // PUT/PATCH rename is rejected — the schema must not claim otherwise.
+            assertEquals(true, userName["caseExact"]?.jsonPrimitive?.boolean)
+            assertEquals("immutable", userName["mutability"]?.jsonPrimitive?.content)
+        }
+
+    @Test
+    fun `the User schema advertises externalId as case-sensitive and server-unique, matching the DB index`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response = client.get("/t/acme/scim/v2/Schemas") { bearerAuth(scimKey) }
+            val userSchema =
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["Resources"]!!
+                    .jsonArray
+                    .first {
+                        it.jsonObject["id"]!!.jsonPrimitive.content == "urn:ietf:params:scim:schemas:core:2.0:User"
+                    }
+            val externalId =
+                userSchema.jsonObject["attributes"]!!
+                    .jsonArray
+                    .first { it.jsonObject["name"]!!.jsonPrimitive.content == "externalId" }
+                    .jsonObject
+
+            assertEquals(true, externalId["caseExact"]?.jsonPrimitive?.boolean)
+            assertEquals("server", externalId["uniqueness"]?.jsonPrimitive?.content)
+        }
+
     // -------------------------------------------------------------------------
     // Scope enforcement
     // -------------------------------------------------------------------------
