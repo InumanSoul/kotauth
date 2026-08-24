@@ -38,7 +38,7 @@ For configuration knobs — set your own `KAUTH_SECRET_KEY`, point at an externa
 - **User self-service** — Email verification, password reset, session management, MFA enrollment
 - **Admin console** — Web UI for workspaces, users, applications, audit logs, webhooks, branding
 - **REST API v1** — 30+ endpoints, API key authentication, OpenAPI 3.1 spec with Swagger UI
-- **SCIM 2.0 provisioning** — `/Users` and `/Groups` per workspace, conforming to RFC 7644 over the RFC 7643 schema; per-key wire dialects normalise the deviations major identity providers document
+- **SCIM 2.0 provisioning** — `/Users` and `/Groups` per workspace, targeting RFC 7644 over the RFC 7643 schema; per-key wire dialects normalise the deviations major identity providers document. No verification against, or certification for, any particular identity product is claimed
 - **Webhooks** — HMAC-signed event delivery with exponential backoff retry
 - **Audit logging** — 30+ immutable event types with per-tenant HMAC chain, queryable via API and admin UI
 - **Security** — bcrypt passwords, AES-256-GCM secrets at rest, sliding-window rate limiting, security response headers, per-tenant RS256 key pairs, file-based secret injection (`*_FILE`)
