@@ -26,8 +26,14 @@ data class ApiKey(
     val enabled: Boolean = true,
     /** Non-null when provisioned via `KAUTH_BOOTSTRAP_API_KEYS` — admin UI marks these read-only. */
     val bootstrapName: String? = null,
+    /** SCIM wire dialect this key's client speaks; `rfc` is the spec-canonical pass-through. */
+    val scimDialect: String = DEFAULT_SCIM_DIALECT,
     val createdAt: Instant = Instant.now(),
-)
+) {
+    companion object {
+        const val DEFAULT_SCIM_DIALECT = "rfc"
+    }
+}
 
 /**
  * Canonical scope strings for the REST API.

@@ -15,4 +15,7 @@ data class ApiKeyPrincipal(
     val rawToken: String,
     /** Populated by the route after successful tenant-scoped validation. */
     val resolvedKey: ApiKey? = null,
-) : Principal
+) : Principal {
+    /** Falls back to the spec-canonical dialect until the key is resolved. */
+    val scimDialect: String get() = resolvedKey?.scimDialect ?: ApiKey.DEFAULT_SCIM_DIALECT
+}

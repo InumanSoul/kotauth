@@ -139,7 +139,7 @@ fun Route.scimUserRoutes(
     post("/Users") {
         val tenantId = call.attributes[TenantIdAttr]
 
-        val resource = call.receiveScimResource() ?: return@post
+        val resource = call.receiveScimResource(call.scimDialect()) ?: return@post
         // POST creates a resource from scratch: the body is the complete initial state, not a
         // partial patch, so it is wrapped directly rather than going through a merge step.
         val write =
@@ -206,7 +206,7 @@ fun Route.scimUserRoutes(
             return@put
         }
 
-        val resource = call.receiveScimResource() ?: return@put
+        val resource = call.receiveScimResource(call.scimDialect()) ?: return@put
         // PUT is a full replace: the raw body IS the desired end state, so it is wrapped directly
         // rather than going through the merge-first path PATCH requires.
         val write =
@@ -232,7 +232,7 @@ fun Route.scimUserRoutes(
 
         val body = call.receiveJsonElementOrRespondError() ?: return@patch
         val ops =
-            body.toScimPatchOps().getOrElse {
+            call.scimDialect().normalizeOps(body).getOrElse {
                 call.respondScimFailure(it)
                 return@patch
             }
@@ -465,9 +465,9 @@ private suspend fun ApplicationCall.receiveJsonElementOrRespondError(): JsonElem
         null
     }
 
-private suspend fun ApplicationCall.receiveScimResource(): ScimResource? {
+private suspend fun ApplicationCall.receiveScimResource(dialect: ScimDialect): ScimResource? {
     val element = receiveJsonElementOrRespondError() ?: return null
-    return element.toScimResource().getOrElse {
+    return dialect.normalizeResource(element).getOrElse {
         respondScimFailure(it)
         null
     }
