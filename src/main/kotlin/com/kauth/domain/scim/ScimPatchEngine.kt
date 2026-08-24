@@ -65,6 +65,17 @@ class ScimPatchEngine {
             Result.failure(ScimFailure(e.type, e.message ?: "invalid patch operation"))
         }
 
+    /**
+     * Same as [apply], but wraps the result as a [MergedScimResource] directly — a PATCH route
+     * should call this instead of [apply], since [MergedScimResource] has no public factory that
+     * accepts an arbitrary [ScimResource] for the merge case. Going through this method is what
+     * proves a mapper's `toDomain` is receiving an actually-merged resource, not just a wrapped one.
+     */
+    fun applyMerged(
+        resource: ScimResource,
+        ops: List<ScimPatchOp>,
+    ): Result<MergedScimResource> = apply(resource, ops).map { MergedScimResource.fromPatchEngineResult(it) }
+
     private fun applyOp(
         resource: ScimResource,
         op: ScimPatchOp,

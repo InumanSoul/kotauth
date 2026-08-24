@@ -142,7 +142,7 @@ fun Route.scimUserRoutes(
         // POST creates a resource from scratch: the body is the complete initial state, not a
         // partial patch, so it is wrapped directly rather than going through a merge step.
         val write =
-            ScimUserMapper.toDomain(MergedScimResource(resource), existing = null, tenantId).getOrElse {
+            ScimUserMapper.toDomain(MergedScimResource.fromFullReplace(resource), existing = null, tenantId).getOrElse {
                 call.respondScimFailure(it)
                 return@post
             }
@@ -209,10 +209,12 @@ fun Route.scimUserRoutes(
         // PUT is a full replace: the raw body IS the desired end state, so it is wrapped directly
         // rather than going through the merge-first path PATCH requires.
         val write =
-            ScimUserMapper.toDomain(MergedScimResource(resource), existing = existing.value, tenantId).getOrElse {
-                call.respondScimFailure(it)
-                return@put
-            }
+            ScimUserMapper
+                .toDomain(MergedScimResource.fromFullReplace(resource), existing = existing.value, tenantId)
+                .getOrElse {
+                    call.respondScimFailure(it)
+                    return@put
+                }
         call.rejectUsernameRename(existing.value.username, write) ?: return@put
         call.rejectPasswordUpdate(write) ?: return@put
         call.applyScimWrite(adminUserService, groupRepository, transactionRunner, userId, tenantId, write)
@@ -236,15 +238,16 @@ fun Route.scimUserRoutes(
 
         // Merge before mapping: build the current resource, apply the ops to a copy of it, and
         // only then map to the domain. Mapping a bare patch body would treat every attribute the
-        // caller didn't mention as cleared — see ScimUserMapper.toDomain's KDoc.
+        // caller didn't mention as cleared — see ScimUserMapper.toDomain's KDoc. applyMerged (not
+        // apply) is required here: it is the only way to produce a MergedScimResource for PATCH.
         val currentResource = ScimUserMapper.toResource(existing.value)
         val merged =
-            ScimPatchEngine().apply(currentResource, ops).getOrElse {
+            ScimPatchEngine().applyMerged(currentResource, ops).getOrElse {
                 call.respondScimFailure(it)
                 return@patch
             }
         val write =
-            ScimUserMapper.toDomain(MergedScimResource(merged), existing = existing.value, tenantId).getOrElse {
+            ScimUserMapper.toDomain(merged, existing = existing.value, tenantId).getOrElse {
                 call.respondScimFailure(it)
                 return@patch
             }

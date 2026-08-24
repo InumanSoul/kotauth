@@ -99,10 +99,10 @@ object ScimUserMapper {
 
     /**
      * [merged] must wrap a fully merged representation — the complete desired state, not a bare
-     * PATCH body. Callers handling PATCH must merge the operations onto [ScimUserMapper.toResource]
-     * of the current user first (see `ScimPatchEngine`), then wrap the merged result in
-     * [MergedScimResource] before calling this — the type is what stops a raw PATCH body from being
-     * passed here by mistake; see [MergedScimResource]'s KDoc for why the contract exists at all.
+     * PATCH body. A PATCH route must call [ScimPatchEngine.applyMerged] against
+     * [ScimUserMapper.toResource] of the current user — that is the only way to obtain a
+     * [MergedScimResource] for the PATCH case; there is no public factory that builds one from an
+     * arbitrary resource. See [MergedScimResource]'s KDoc for why the contract exists at all.
      *
      * **Absent-attribute policy (PUT is a full replace, RFC 7644 §3.5.1):** an attribute missing
      * from [merged] clears the corresponding field — [externalId], [User.givenName], and

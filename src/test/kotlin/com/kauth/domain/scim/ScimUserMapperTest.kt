@@ -33,8 +33,8 @@ class ScimUserMapperTest {
     ) = (r.attributes[k] as? ScimValue.Str)?.value
 
     // Every fixture below is already a complete representation (a synthetic PUT/POST body, or
-    // toResource(existing)), so wrapping it here is a bare formality — never a real merge step.
-    private fun ScimResource.merged() = MergedScimResource(this)
+    // toResource(existing)), so this is the fromFullReplace case — never a real merge step.
+    private fun ScimResource.merged() = MergedScimResource.fromFullReplace(this)
 
     @Test
     fun `toResource emits the core attributes`() {

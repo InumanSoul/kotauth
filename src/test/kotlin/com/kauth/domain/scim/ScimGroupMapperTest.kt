@@ -32,7 +32,7 @@ class ScimGroupMapperTest {
             .values
             .map { ((it as ScimValue.Complex).attributes["value"] as ScimValue.Str).value }
 
-    private fun ScimResource.merged() = MergedScimResource(this)
+    private fun ScimResource.merged() = MergedScimResource.fromFullReplace(this)
 
     @Test
     fun `toResource emits displayName, externalId and members`() {

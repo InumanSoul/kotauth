@@ -59,9 +59,10 @@ object ScimGroupMapper {
 
     /**
      * [merged] must wrap a fully merged representation — the complete desired state, not a bare
-     * PATCH body. A PATCH route must merge its operations onto [ScimGroupMapper.toResource] of
-     * the current group first (see `ScimPatchEngine`), then wrap the merged result in
-     * [MergedScimResource]; see that type's KDoc for why the contract exists at all.
+     * PATCH body. A PATCH route must call [ScimPatchEngine.applyMerged] against
+     * [ScimGroupMapper.toResource] of the current group — that is the only way to obtain a
+     * [MergedScimResource] for the PATCH case; there is no public factory that builds one from an
+     * arbitrary resource. See [MergedScimResource]'s KDoc for why the contract exists at all.
      *
      * **Absent-attribute policy (PUT is a full replace, RFC 7644 §3.5.1):** `groups.name` is a
      * `NOT NULL` column, so it cannot represent "clear" — an omitted `displayName` falls back to
