@@ -149,12 +149,14 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         keyHash: String,
         scopes: List<String>,
         bootstrapName: String,
+        scimDialect: String,
     ) = transaction {
         ApiKeysTable.update({ ApiKeysTable.id eq id }) {
             it[ApiKeysTable.keyHash] = keyHash
             it[ApiKeysTable.scopes] = scopes.joinToString(",")
             it[ApiKeysTable.enabled] = true
             it[ApiKeysTable.bootstrapName] = bootstrapName
+            it[ApiKeysTable.scimDialect] = scimDialect
         }
         Unit
     }

@@ -83,6 +83,7 @@ class FakeApiKeyRepository : ApiKeyRepository {
         keyHash: String,
         scopes: List<String>,
         bootstrapName: String,
+        scimDialect: String,
     ) {
         store[id]?.let {
             store[id] =
@@ -91,6 +92,7 @@ class FakeApiKeyRepository : ApiKeyRepository {
                     scopes = scopes,
                     enabled = true,
                     bootstrapName = bootstrapName,
+                    scimDialect = scimDialect,
                 )
         }
     }

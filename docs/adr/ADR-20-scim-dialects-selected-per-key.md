@@ -30,7 +30,8 @@ key that authenticated the request.**
   rendered from.
 - The id is persisted on the key: `api_keys.scim_dialect VARCHAR(16) NOT NULL DEFAULT 'rfc'` (V62). An
   operator picks it when creating a provisioning key and can correct it afterwards from the workspace
-  provisioning page.
+  provisioning page. A key provisioned through `KAUTH_BOOTSTRAP_API_KEYS` carries it as the entry's
+  optional `scimDialect` field, validated against the registry at startup and re-asserted on every boot.
 - `call.scimDialect()` resolves the authenticated key's id through the registry. **No request header is
   consulted, ever.**
 - An id the running build does not recognise resolves to `RfcDialect` rather than failing the request.
@@ -107,8 +108,9 @@ captured traffic. That pass is what upgrades the claim; nothing else does.
 - The dialect is the one field of an existing key an operator can correct in place. Choosing wrong surfaces
   later as rejected payloads, and forcing a new key would mean reconfiguring the connector for a typo. Key
   material, scopes, expiry and the enabled flag each keep their own decision. A key provisioned through
-  `KAUTH_BOOTSTRAP_API_KEYS` refuses the edit: the environment owns it, and a change here would last until the
-  next restart.
+  `KAUTH_BOOTSTRAP_API_KEYS` refuses the edit *because the environment has its own field for it*: the entry's
+  `scimDialect`, which every restart re-applies. The refusal points the operator at that field, so declining
+  the edit closes a door that has another one beside it rather than the only one there is.
 - The provisioning page does not claim a connection is healthy. Nothing in the audit log records an individual
   SCIM request or the key that made it, so any status shown would be inferred rather than observed, and an
   operator trusting a wrong "connected" is worse off than one told plainly that the answer is not available

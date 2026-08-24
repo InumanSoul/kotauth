@@ -9,6 +9,7 @@ import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
+import com.kauth.domain.service.ApiKeyBootstrapService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.RoleGroupService
@@ -398,7 +399,7 @@ class AdminScimRoutesTest {
         }
 
     @Test
-    fun `a bootstrapped key keeps the dialect its environment defines`() =
+    fun `a bootstrapped key gets the dialect its environment names, and the form cannot change it`() =
         testApplication {
             application { installTestApp() }
             val authed =
@@ -408,34 +409,35 @@ class AdminScimRoutesTest {
                 }
             login(authed)
 
-            val bootstrapped =
-                apiKeyRepo.save(
-                    ApiKey(
-                        tenantId = TenantId(2),
-                        name = "kauth-cli",
-                        keyPrefix = "kauth_acme_boot",
-                        keyHash = "hash-v1",
-                        scopes = listOf(ApiScope.SCIM),
-                        bootstrapName = "kauth-cli",
-                    ),
-                )
-            val target =
+            // Provisioned the way KAUTH_BOOTSTRAP_API_KEYS provisions it, dialect included — the
+            // refusal below is only honest if the environment can actually set one.
+            val envDialect =
                 com.kauth.adapter.web.scim.scimDialects
                     .last()
                     .id
+            ApiKeyBootstrapService(apiKeyRepo, tenantRepo).ensureBootstrapped(
+                listOf(
+                    ApiKeyBootstrapService.Entry(
+                        tenantSlug = "acme",
+                        name = "kauth-cli",
+                        scopes = listOf(ApiScope.SCIM),
+                        keyHash = "hash-v1",
+                        scimDialect = envDialect,
+                    ),
+                ),
+            )
+            val bootstrapped = apiKeyRepo.findByTenantAndName(TenantId(2), "kauth-cli")!!
+            assertEquals(envDialect, bootstrapped.scimDialect)
 
             val response =
                 authed.submitForm(
                     url = "/admin/workspaces/acme/settings/api-keys/${bootstrapped.id}/scim-dialect",
-                    formParameters = Parameters.build { append("scimDialect", target) },
+                    formParameters = Parameters.build { append("scimDialect", ApiKey.DEFAULT_SCIM_DIALECT) },
                 )
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
             assertTrue(response.bodyAsText().contains("KAUTH_BOOTSTRAP_API_KEYS"))
-            assertEquals(
-                ApiKey.DEFAULT_SCIM_DIALECT,
-                apiKeyRepo.findById(bootstrapped.id!!, TenantId(2))!!.scimDialect,
-            )
+            assertEquals(envDialect, apiKeyRepo.findById(bootstrapped.id!!, TenantId(2))!!.scimDialect)
         }
 
     @Test

@@ -54,7 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses, per-provider setup notes, and what a deprovision actually does. The
   dialect selector here is the one field of an existing key an operator can
   correct in place — a key provisioned through `KAUTH_BOOTSTRAP_API_KEYS`
-  keeps the dialect the environment sets. The page does not claim a
+  keeps the dialect the environment sets, as the entry's new optional
+  `scimDialect` field. An unregistered id there is fatal at startup rather
+  than silently falling back to `rfc`, and an entry that omits the field
+  stays on `rfc`. The page does not claim a
   connection is healthy: KotAuth does not yet record individual SCIM requests
   in the audit log, so it says so plainly rather than showing a green badge.
 - **IdP-managed badges** on user and group detail wherever an `externalId` is

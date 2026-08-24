@@ -831,14 +831,17 @@ object EnglishStrings {
     const val SCIM_DIALECT_SAVED_TOAST = "Dialect updated. The next provisioning request uses it."
 
     /**
-     * A bootstrapped key's dialect is part of `KAUTH_BOOTSTRAP_API_KEYS`, so editing it here would
-     * last only until the next restart re-applied the environment. The row says so instead.
+     * A bootstrapped key's dialect is the entry's optional `scimDialect` field, re-asserted on every
+     * restart, so editing it here would last only until the next one. The row points at the field
+     * that does own it rather than leaving the operator without a way to change it.
      */
     const val SCIM_DIALECT_ENV_MANAGED = "Env-managed"
     const val SCIM_DIALECT_ENV_MANAGED_HINT =
-        "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 this key's dialect follows the environment, not this page."
+        "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 set the entry's \"scimDialect\" field there; every " +
+            "restart re-applies it."
     const val SCIM_DIALECT_ENV_MANAGED_REFUSAL =
-        "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS."
+        "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS. Set the entry's " +
+            "\"scimDialect\" field there instead."
 
     /**
      * A submitted id outside the registry means a stale or tampered form, not a new provider: the
