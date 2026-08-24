@@ -61,6 +61,22 @@ class ScimGroupMapperTest {
     }
 
     @Test
+    fun `toResource emits meta created, as the User resource type does`() {
+        val created = java.time.Instant.parse("2026-01-02T03:04:05Z")
+        val r = ScimGroupMapper.toResource(group().copy(createdAt = created), emptyList())
+        val meta = r.attributes["meta"] as ScimValue.Complex
+
+        assertEquals(ScimValue.Str(created.toString()), meta.attributes["created"])
+    }
+
+    @Test
+    fun `toResource never emits meta lastModified — there is no update timestamp to source it from`() {
+        val meta = ScimGroupMapper.toResource(group(), emptyList()).attributes["meta"] as ScimValue.Complex
+
+        assertNull(meta.attributes["lastModified"])
+    }
+
+    @Test
     fun `toDomain preserves existing role assignments`() {
         // A directory sync must never strip permissions. PUT clears absent attributes,
         // so roles surviving this call is the whole safeguard.

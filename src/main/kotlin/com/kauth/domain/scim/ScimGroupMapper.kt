@@ -53,6 +53,12 @@ object ScimGroupMapper {
                 buildMap {
                     put("resourceType", ScimValue.Str("Group"))
                     location?.let { put("location", ScimValue.Str(it)) }
+                    // Emitted for the same reason ScimUserMapper emits it: both repositories load
+                    // the timestamp, so the two resource types have no excuse to disagree about
+                    // whether a client can see it. `lastModified` stays absent on both — neither
+                    // model tracks an update time, and fabricating one from creation time tells a
+                    // delta sync nothing has changed since creation.
+                    put("created", ScimValue.Str(group.createdAt.toString()))
                 },
             )
 
