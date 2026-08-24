@@ -32,6 +32,8 @@ class FakeGroupRepository : GroupRepository {
         groupRoles.clear()
         groupMembers.clear()
         findGroupsForUsersCallSizes.clear()
+        addUserToGroupCalls.clear()
+        removeUserFromGroupCalls.clear()
         nextId = 1
     }
 
@@ -89,10 +91,16 @@ class FakeGroupRepository : GroupRepository {
     override fun findRoleIdsForGroup(groupId: GroupId): List<RoleId> =
         groupRoles[groupId.value]?.map { RoleId(it) }?.toList() ?: emptyList()
 
+    // Records every add/remove call so tests can assert a no-op reconcile issues zero writes —
+    // a set-equality check on the resulting membership alone would pass either way.
+    val addUserToGroupCalls = mutableListOf<Pair<UserId, GroupId>>()
+    val removeUserFromGroupCalls = mutableListOf<Pair<UserId, GroupId>>()
+
     override fun addUserToGroup(
         userId: UserId,
         groupId: GroupId,
     ) {
+        addUserToGroupCalls += userId to groupId
         groupMembers.getOrPut(groupId.value) { mutableSetOf() }.add(userId.value)
     }
 
@@ -100,6 +108,7 @@ class FakeGroupRepository : GroupRepository {
         userId: UserId,
         groupId: GroupId,
     ) {
+        removeUserFromGroupCalls += userId to groupId
         groupMembers[groupId.value]?.remove(userId.value)
     }
 
