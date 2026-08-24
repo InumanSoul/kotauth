@@ -80,11 +80,27 @@ core *rejects*, never what gets stored. Dropping the advisory `display` beside a
 either way — no mapper reads it — but it means a connector sending that sub-attribute with the wrong JSON type
 loses the sub-attribute rather than the whole member push.
 
-### Why an unrecognised id falls back instead of failing
+### Why an unrecognised id falls back instead of failing — and where it does not
 
 A key configured for a dialect a later build no longer ships must keep provisioning against the spec, not
 start rejecting every payload. Falling back to `rfc` degrades to the standard; failing closed on a
 configuration value degrades to an outage.
+
+That reasoning covers an id *already stored on a key*, and only that. Two other positions deliberately
+refuse the same id, because they are answering a different question:
+
+- **A `scimDialect` in `KAUTH_BOOTSTRAP_API_KEYS` is fatal at startup.** An id being unregistered there means
+  the operator typed it wrong in the file they are editing right now — nothing has been provisioned against
+  it yet, no connector depends on it, and falling back would boot cleanly while parsing every payload with a
+  dialect they did not choose. Failing at boot costs a restart; falling back costs a silent misparse the
+  operator has no way to see.
+- **An id submitted through the admin form is a `400`.** The selector only ever offers registered ids, so
+  anything else is a stale or tampered form, not a new provider.
+
+The distinction is the direction of travel. Reading a value that is already in the database must never break
+a running connector, so it degrades. Accepting a *new* value must never record something the operator did not
+mean, so it refuses. Both rules exist to keep an operator from being misled — they differ on which failure
+does the misleading.
 
 ### What the fixtures are, and what they are not
 
