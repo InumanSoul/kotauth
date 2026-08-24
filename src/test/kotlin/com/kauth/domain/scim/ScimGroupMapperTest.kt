@@ -150,6 +150,22 @@ class ScimGroupMapperTest {
     }
 
     @Test
+    fun `an empty displayName on update preserves the existing name`() {
+        val existing = group()
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(
+                    attributes =
+                        it.attributes + ("displayName" to ScimValue.Str("  ")),
+                )
+            }
+
+        val write = ScimGroupMapper.toDomain(r.merged(), existing, tenantId).getOrThrow()
+
+        assertEquals(existing.name, write.group.name)
+    }
+
+    @Test
     fun `toDomain rejects a member id that is not numeric`() {
         val r = resourceWith(members = listOf("not-an-id"))
         val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
