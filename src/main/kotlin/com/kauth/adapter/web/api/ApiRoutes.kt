@@ -176,7 +176,7 @@ fun Route.apiRoutes(
             install(ScimScopePlugin)
             install(writeRateLimitPlugin)
             scimDiscoveryRoutes()
-            scimUserRoutes(adminUserService, transactionRunner)
+            scimUserRoutes(adminUserService, groupRepository, transactionRunner)
         }
     }
 }

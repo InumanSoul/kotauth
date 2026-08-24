@@ -688,6 +688,39 @@ class ScimUserRoutesTest {
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
 
+    @Test
+    fun `GET includes the user's actual group memberships, not an empty placeholder`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+            val engineering =
+                groupRepo.add(
+                    com.kauth.domain.model
+                        .Group(tenantId = acme.id, name = "Engineering"),
+                )
+            groupRepo.addUserToGroup(user.id!!, engineering.id!!)
+
+            val response = client.get("/t/acme/scim/v2/Users/${user.id!!.value}") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val groups = body["groups"]!!.jsonArray
+            assertEquals(1, groups.size)
+            assertEquals("Engineering", groups[0].jsonObject["display"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `GET omits groups for a user with no memberships`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+
+            val response = client.get("/t/acme/scim/v2/Users/${user.id!!.value}") { bearerAuth(scimKey) }
+
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertNull(body["groups"])
+        }
+
     // -------------------------------------------------------------------------
     // PUT /Users/{id} — full replace
     // -------------------------------------------------------------------------

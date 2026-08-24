@@ -3,7 +3,9 @@ package com.kauth.adapter.web.scim
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.adapter.web.api.TenantIdAttr
 import com.kauth.domain.model.TenantId
+import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
@@ -44,6 +46,7 @@ private const val PASSWORD_UPDATE_UNSUPPORTED =
 /** `/Users` — RFC 7644 §3.2-3.6. Every write goes through [AdminUserService], never the repository directly. */
 fun Route.scimUserRoutes(
     adminUserService: AdminUserService,
+    groupRepository: GroupRepository,
     transactionRunner: TransactionRunner,
 ) {
     get("/Users") {
@@ -64,6 +67,15 @@ fun Route.scimUserRoutes(
 
         val resourceBase = "${call.resolvedBaseUrl()}${call.request.path()}"
 
+        // One membership lookup per user, capped by the 200-row page window above — acceptable
+        // N+1 at this scale; batching would need a new GroupRepository method out of this phase's scope.
+        fun toResourceWithGroups(user: User) =
+            ScimUserMapper.toResource(
+                user,
+                groups = groupRepository.findGroupsForUser(user.id!!),
+                location = "$resourceBase/${user.id.value}",
+            )
+
         if (filter == null) {
             // No filter: the database can page directly, so this request materialises only
             // one page of ScimResource trees instead of the whole tenant directory.
@@ -74,7 +86,7 @@ fun Route.scimUserRoutes(
                 } else {
                     adminUserService
                         .listUsers(tenantId, limit = count, offset = startIndex - 1)
-                        .map { ScimUserMapper.toResource(it, location = "$resourceBase/${it.id!!.value}") }
+                        .map(::toResourceWithGroups)
                 }
             call.respondScim(
                 HttpStatusCode.OK,
@@ -90,11 +102,7 @@ fun Route.scimUserRoutes(
         // A filter can reference any SCIM attribute (RFC 7644 §3.4.2.2), and the repository has
         // no query translation for that today, so this path still materialises the whole tenant
         // directory to evaluate it in memory. Left as a follow-up — see the fix-wave report.
-        val resources =
-            adminUserService
-                .listUsers(
-                    tenantId,
-                ).map { ScimUserMapper.toResource(it, location = "$resourceBase/${it.id!!.value}") }
+        val resources = adminUserService.listUsers(tenantId).map(::toResourceWithGroups)
         val matched = resources.filter { r -> filter.matches(ScimValue.Complex(r.attributes)) }
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
         // no Resources returned, never the resources themselves.
@@ -148,6 +156,7 @@ fun Route.scimUserRoutes(
                 adminUserService.dispatchPendingInvite(id, tenantId, baseUrl)
                 call.respondScimUser(
                     adminUserService,
+                    groupRepository,
                     id,
                     tenantId,
                     HttpStatusCode.Created,
@@ -161,7 +170,7 @@ fun Route.scimUserRoutes(
     get("/Users/{id}") {
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@get call.respondAdminError(AdminError.NotFound("User not found."))
-        call.respondScimUser(adminUserService, userId, tenantId, HttpStatusCode.OK)
+        call.respondScimUser(adminUserService, groupRepository, userId, tenantId, HttpStatusCode.OK)
     }
 
     put("/Users/{id}") {
@@ -183,7 +192,7 @@ fun Route.scimUserRoutes(
             }
         call.rejectUsernameRename(existing.value.username, write) ?: return@put
         call.rejectPasswordUpdate(write) ?: return@put
-        call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
+        call.applyScimWrite(adminUserService, groupRepository, transactionRunner, userId, tenantId, write)
     }
 
     patch("/Users/{id}") {
@@ -218,7 +227,7 @@ fun Route.scimUserRoutes(
             }
         call.rejectUsernameRename(existing.value.username, write) ?: return@patch
         call.rejectPasswordUpdate(write) ?: return@patch
-        call.applyScimWrite(adminUserService, transactionRunner, userId, tenantId, write)
+        call.applyScimWrite(adminUserService, groupRepository, transactionRunner, userId, tenantId, write)
     }
 
     delete("/Users/{id}") {
@@ -236,6 +245,7 @@ fun Route.scimUserRoutes(
 /** Applies a resolved [ScimUserWrite] to an existing user and responds with the fresh resource. */
 private suspend fun ApplicationCall.applyScimWrite(
     adminUserService: AdminUserService,
+    groupRepository: GroupRepository,
     transactionRunner: TransactionRunner,
     userId: UserId,
     tenantId: TenantId,
@@ -261,7 +271,14 @@ private suspend fun ApplicationCall.applyScimWrite(
         }
 
     when (result) {
-        is AdminResult.Success -> respondScimUser(adminUserService, userId, tenantId, HttpStatusCode.OK)
+        is AdminResult.Success ->
+            respondScimUser(
+                adminUserService,
+                groupRepository,
+                userId,
+                tenantId,
+                HttpStatusCode.OK,
+            )
         is AdminResult.Failure -> respondAdminError(result.error)
     }
 }
@@ -317,6 +334,7 @@ private suspend fun ApplicationCall.rejectPasswordUpdate(write: ScimUserWrite): 
 
 private suspend fun ApplicationCall.respondScimUser(
     adminUserService: AdminUserService,
+    groupRepository: GroupRepository,
     userId: UserId,
     tenantId: TenantId,
     status: HttpStatusCode,
@@ -326,7 +344,8 @@ private suspend fun ApplicationCall.respondScimUser(
         is AdminResult.Success -> {
             val location = userLocation(userId)
             if (includeLocationHeader) response.headers.append(HttpHeaders.Location, location)
-            respondScim(status, ScimUserMapper.toResource(fresh.value, location = location).toJson())
+            val groups = groupRepository.findGroupsForUser(userId)
+            respondScim(status, ScimUserMapper.toResource(fresh.value, groups = groups, location = location).toJson())
         }
         is AdminResult.Failure -> respondAdminError(fresh.error)
     }

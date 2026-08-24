@@ -1,5 +1,7 @@
 package com.kauth.domain.scim
 
+import com.kauth.domain.model.Group
+import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -68,6 +70,23 @@ class ScimUserMapperTest {
         val meta = r.attributes["meta"] as ScimValue.Complex
 
         assertNull(meta.attributes["lastModified"])
+    }
+
+    @Test
+    fun `toResource populates groups from the caller-supplied membership list`() {
+        val group = Group(id = GroupId(9), tenantId = tenantId, name = "Engineering")
+        val r = ScimUserMapper.toResource(user(), groups = listOf(group))
+
+        val groups = r.attributes["groups"] as ScimValue.MultiValued
+        val entry = groups.values.single() as ScimValue.Complex
+        assertEquals(ScimValue.Str("9"), entry.attributes["value"])
+        assertEquals(ScimValue.Str("Engineering"), entry.attributes["display"])
+    }
+
+    @Test
+    fun `toResource omits groups entirely — not an empty array — when there are none`() {
+        val r = ScimUserMapper.toResource(user())
+        assertNull(r.attributes["groups"])
     }
 
     @Test
