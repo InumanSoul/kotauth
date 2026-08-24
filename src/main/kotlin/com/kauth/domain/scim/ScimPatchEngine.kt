@@ -39,7 +39,7 @@ private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
 private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 
 // Attributes whose `value` sub-attribute is a numeric id rather than free text, so entry identity
-// is compared on the parsed id (see canonicalNumericIdentity).
+// is compared on the parsed id (see canonicalNumericId). Every identity is trimmed regardless.
 private val NUMERIC_IDENTITY_ATTRIBUTES = setOf("members")
 
 // Attributes RFC 7643 defines as singular *complex*, read off the one shape table. Checking it
@@ -419,18 +419,26 @@ class ScimPatchEngine {
     /** An explicitly cleared value is, for PATCH purposes, indistinguishable from an absent one. */
     private fun normalizeAbsent(value: ScimValue?): ScimValue? = if (value == ScimValue.Null) null else value
 
-    /** RFC 7643 §2.4: the `value` sub-attribute identifies an entry of a multi-valued attribute. */
+    /**
+     * RFC 7643 §2.4: the `value` sub-attribute identifies an entry of a multi-valued attribute.
+     *
+     * Read the way the mappers read it, never as the raw wire string. Both trim before they store:
+     * `ScimGroupMapper.parseMembers` trims and parses a member id, `ScimUserMapper` trims an
+     * address. Comparing raw here lets an `add` and its mirror-image `remove` disagree about the
+     * same entry — `add` of `" 42 "` puts user 42 in the group, the `remove` matches nothing and
+     * answers 200, and the user keeps the group's roles. A padded address is the same defect one
+     * attribute over, and the whitespace variant is the one that reports success.
+     */
     private fun ScimValue.multiValuedIdentity(name: String): String? =
         ((this as? ScimValue.Complex)?.attributes?.get("value") as? ScimValue.Str)
             ?.value
-            ?.let { if (name in NUMERIC_IDENTITY_ATTRIBUTES) canonicalNumericIdentity(it) else it }
+            ?.trim()
+            ?.let { if (name in NUMERIC_IDENTITY_ATTRIBUTES) canonicalNumericId(it) else it }
 }
 
-// A member id is compared the way ScimGroupMapper.parseMembers reads one — trimmed and parsed —
-// rather than as the raw wire string. Without this, `add` of `" 42 "` puts user 42 in the group
-// and the mirror-image `remove` matches nothing, answers 200, and leaves the user's access intact:
-// a deprovisioning miss reported as success. `"042"` names the same user for the same reason.
-private fun canonicalNumericIdentity(raw: String): String = raw.trim().let { it.toIntOrNull()?.toString() ?: it }
+// `"042"` and `"42"` name the same user, so a member id is compared as the parsed number the
+// mapper will store. A value the mapper would reject outright is left as-is for it to reject.
+private fun canonicalNumericId(raw: String): String = raw.toIntOrNull()?.toString() ?: raw
 
 /** Internal-only: carries a typed, human-readable apply failure up to [ScimPatchEngine.apply]. */
 private class PatchException(

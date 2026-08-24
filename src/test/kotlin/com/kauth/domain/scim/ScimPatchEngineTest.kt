@@ -806,6 +806,23 @@ class ScimPatchEngineTest {
     }
 
     @Test
+    fun `remove of emails matches a padded address, the same one the mapper stores`() {
+        // The whitespace variant used to answer 200 with the address unchanged while the unpadded
+        // form was a 400: same intent, two answers, and the padded one reported success.
+        val out =
+            apply(
+                user(email("ada@example.com"), email("ada@work.example")),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("emails").getOrThrow(),
+                    ScimValue.MultiValued(listOf(email(" ada@work.example "))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("ada@example.com"), emailsOf(out))
+    }
+
+    @Test
     fun `remove with a plain path and no value still clears the whole collection`() {
         // Regression guard on the reading that is already correct: no value means remove all.
         val out =
