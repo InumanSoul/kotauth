@@ -1,0 +1,19 @@
+{
+  "_source": "Vendor documentation, NOT captured from a live tenant.",
+  "_replace_during": "end-to-end verification pass (see specs/scim/07-acceptance.md)",
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "value": {
+        "emails": [
+          {
+            "type": "work",
+            "value": "ada@example.com",
+            "primary": true
+          }
+        ]
+      }
+    }
+  ]
+}

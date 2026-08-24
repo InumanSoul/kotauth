@@ -1,0 +1,8 @@
+{
+  "_source": "Vendor documentation, NOT captured from a live tenant.",
+  "_replace_during": "end-to-end verification pass (see specs/scim/07-acceptance.md)",
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "ada@example.com",
+  "displayName": "Ada Lovelace",
+  "active": "False"
+}
