@@ -555,6 +555,25 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `GET Groups with count=0 returns the total and no resources`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Alpha")
+            addGroup("Beta")
+            addGroup("Other Workspace Group", tenantId = globex.id)
+
+            // A connector probes for the tenant's size before it pages; count=0 must answer with
+            // the total and send nothing back (RFC 7644 3.4.2.4).
+            val response = client.get(groupsUrl() + "?count=0") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(2, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+            assertEquals(0, body["itemsPerPage"]!!.jsonPrimitive.int)
+        }
+
+    @Test
     fun `GET Groups loads membership for the page in one batch, not once per group`() =
         testApplication {
             application { installTestApp() }

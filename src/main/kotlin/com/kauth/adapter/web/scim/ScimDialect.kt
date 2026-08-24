@@ -33,7 +33,7 @@ object RfcDialect : ScimDialect {
     override fun normalizeResource(body: JsonElement): Result<ScimResource> = body.toScimResource()
 }
 
-private val DIALECTS: Map<String, ScimDialect> = listOf(RfcDialect, EntraDialect).associateBy { it.id }
+private val DIALECTS: Map<String, ScimDialect> = listOf(RfcDialect, EntraDialect, OktaDialect).associateBy { it.id }
 
 /**
  * Resolves a persisted dialect id. An unrecognised id falls back to [RfcDialect] rather than

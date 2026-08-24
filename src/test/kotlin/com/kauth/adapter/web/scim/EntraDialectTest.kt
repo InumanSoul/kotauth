@@ -3,9 +3,6 @@ package com.kauth.adapter.web.scim
 import com.kauth.domain.scim.ScimPatchOpType
 import com.kauth.domain.scim.ScimValue
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -71,16 +68,5 @@ class EntraDialectTest {
     @Test
     fun `the dialect is reachable by its persisted id`() {
         assertEquals(EntraDialect, scimDialectFor("entra"))
-    }
-
-    /**
-     * Loads a hand-built fixture, dropping the `_`-prefixed provenance header so it can never
-     * reach the dialect and influence normalisation.
-     */
-    private fun fixture(path: String): JsonElement {
-        val raw =
-            checkNotNull(javaClass.getResourceAsStream("/scim/fixtures/$path")) { "missing fixture: $path" }
-                .use { it.readBytes().decodeToString() }
-        return JsonObject(Json.parseToJsonElement(raw).jsonObject.filterKeys { !it.startsWith("_") })
     }
 }
