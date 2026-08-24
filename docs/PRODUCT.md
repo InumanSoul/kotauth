@@ -294,6 +294,15 @@ Kotauth should focus on the 80/20 rule for its first version.
 * permissions
 * role assignments
 
+## Provisioning
+
+* SCIM 2.0 provisioning (RFC 7644 protocol, RFC 7643 schema)
+* user and group create, update, and deactivate from an external identity source
+* externalId correlation, unique per workspace
+* per-key wire dialects that normalise the deviations major identity providers document
+
+No verification against, or certification for, any particular identity product is claimed.
+
 ## OAuth / OIDC Provider
 
 Kotauth should function as an identity provider.
@@ -321,7 +330,6 @@ These features should not be built initially:
 
 * LDAP integration
 * SAML enterprise federation
-* SCIM provisioning
 * advanced policy engines
 
 These can be implemented later once the core platform stabilizes.
