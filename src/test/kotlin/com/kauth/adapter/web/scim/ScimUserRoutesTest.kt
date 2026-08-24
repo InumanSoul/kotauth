@@ -300,6 +300,116 @@ class ScimUserRoutesTest {
         append("}")
     }
 
+    private fun keyWithDialect(dialect: String): String =
+        (
+            apiKeyService.create(
+                tenantId = acme.id,
+                name = "Provisioning key ($dialect)",
+                scopes = listOf(ApiScope.SCIM),
+                scimDialect = dialect,
+            ) as ApiKeyResult.Success
+        ).value.rawKey
+
+    // -------------------------------------------------------------------------
+    // Dialect wiring — the stored dialect has to reach every body-parsing call site.
+    // Each test sends a payload only the non-default dialect accepts, then the same
+    // payload on an `rfc` key: without both halves, deleting the wiring stays green.
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `POST reads a string active on a key stored as the Entra dialect, and rejects it on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val body =
+                """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"deactivated",""" +
+                    """"emails":[{"value":"deactivated@example.com","type":"work"}],"active":"False"}"""
+
+            val accepted =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(keyWithDialect(EntraDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            assertEquals(HttpStatusCode.Created, accepted.status)
+            assertEquals(false, userRepo.findByUsername(acme.id, "deactivated")?.enabled)
+
+            val rejected =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body.replace("deactivated", "strict"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertNull(userRepo.findByUsername(acme.id, "strict"))
+        }
+
+    @Test
+    fun `PUT reads a string active on a key stored as the Entra dialect, and rejects it on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val lenient = addUser("ada")
+            val strict = addUser("grace")
+
+            fun body(username: String) =
+                """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"$username",""" +
+                    """"emails":[{"value":"$username@example.com","type":"work"}],"active":"False"}"""
+
+            val accepted =
+                client.put("/t/acme/scim/v2/Users/${lenient.id!!.value}") {
+                    bearerAuth(keyWithDialect(EntraDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body("ada"))
+                }
+
+            assertEquals(HttpStatusCode.OK, accepted.status)
+            assertEquals(false, userRepo.findById(lenient.id!!, acme.id)?.enabled)
+
+            val rejected =
+                client.put("/t/acme/scim/v2/Users/${strict.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body("grace"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertEquals(true, userRepo.findById(strict.id!!, acme.id)?.enabled)
+        }
+
+    @Test
+    fun `PATCH deprovisions on a key stored as the Entra dialect, and rejects the same body on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val lenient = addUser("ada")
+            val strict = addUser("grace")
+            // The deprovision shape that made the dialect necessary: a capitalised verb and
+            // `active` as the string "False".
+            val body =
+                """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                    """{"op":"Replace","path":"active","value":"False"}]}"""
+
+            val accepted =
+                client.patch("/t/acme/scim/v2/Users/${lenient.id!!.value}") {
+                    bearerAuth(keyWithDialect(EntraDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            assertEquals(HttpStatusCode.OK, accepted.status)
+            assertEquals(false, userRepo.findById(lenient.id!!, acme.id)?.enabled)
+
+            val rejected =
+                client.patch("/t/acme/scim/v2/Users/${strict.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertEquals(true, userRepo.findById(strict.id!!, acme.id)?.enabled)
+        }
+
     // -------------------------------------------------------------------------
     // GET /Users — listing, filtering, pagination
     // -------------------------------------------------------------------------

@@ -309,6 +309,125 @@ class ScimGroupRoutesTest {
             .jsonObject["scimType"]!!
             .jsonPrimitive.content
 
+    private fun keyWithDialect(dialect: String): String =
+        (
+            apiKeyService.create(
+                tenantId = acme.id,
+                name = "Provisioning key ($dialect)",
+                scopes = listOf(ApiScope.SCIM),
+                scimDialect = dialect,
+            ) as ApiKeyResult.Success
+        ).value.rawKey
+
+    // -------------------------------------------------------------------------
+    // Dialect wiring — /Groups threads the stored dialect through its own three call
+    // sites, so it needs its own guard. Each test sends a payload only the non-default
+    // dialect accepts, then the same payload on an `rfc` key.
+    // -------------------------------------------------------------------------
+
+    /**
+     * A member entry whose advisory `display` is not a string: the Okta dialect strips the
+     * sub-attribute before the shape check ever sees it, where `rfc` rejects the entry.
+     */
+    private fun memberWithWronglyTypedDisplay(id: Int) = """[{"value":"$id","display":42}]"""
+
+    @Test
+    fun `POST strips a wrongly-typed member display on an Okta-dialect key, and rejects it on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+
+            fun body(name: String) =
+                """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"$name",""" +
+                    """"members":${memberWithWronglyTypedDisplay(member.id!!.value)}}"""
+
+            val accepted =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(keyWithDialect(OktaDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body("Engineering"))
+                }
+
+            assertEquals(HttpStatusCode.Created, accepted.status)
+            val created = groupRepo.findByName(acme.id, "Engineering", null)!!
+            assertEquals(listOf(member.id), groupRepo.findUserIdsInGroup(created.id!!))
+
+            val rejected =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body("Strict"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertEquals(null, groupRepo.findByName(acme.id, "Strict", null))
+        }
+
+    @Test
+    fun `PUT strips a wrongly-typed member display on an Okta-dialect key, and rejects it on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+            val lenient = addGroup("Engineering")
+            val strict = addGroup("Support")
+
+            fun body(name: String) =
+                """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"$name",""" +
+                    """"members":${memberWithWronglyTypedDisplay(member.id!!.value)}}"""
+
+            val accepted =
+                client.put(groupUrl(lenient.id!!.value)) {
+                    bearerAuth(keyWithDialect(OktaDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body("Engineering"))
+                }
+
+            assertEquals(HttpStatusCode.OK, accepted.status)
+            assertEquals(listOf(member.id), groupRepo.findUserIdsInGroup(lenient.id!!))
+
+            val rejected =
+                client.put(groupUrl(strict.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body("Support"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertEquals(emptyList(), groupRepo.findUserIdsInGroup(strict.id!!))
+        }
+
+    @Test
+    fun `PATCH strips a wrongly-typed member display on an Okta-dialect key, and rejects it on an rfc key`() =
+        testApplication {
+            application { installTestApp() }
+            val member = addUser("ada")
+            val lenient = addGroup("Engineering")
+            val strict = addGroup("Support")
+            val body =
+                """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                    """{"op":"add","path":"members","value":${memberWithWronglyTypedDisplay(member.id!!.value)}}]}"""
+
+            val accepted =
+                client.patch(groupUrl(lenient.id!!.value)) {
+                    bearerAuth(keyWithDialect(OktaDialect.id))
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            assertEquals(HttpStatusCode.OK, accepted.status)
+            assertEquals(listOf(member.id), groupRepo.findUserIdsInGroup(lenient.id!!))
+
+            val rejected =
+                client.patch(groupUrl(strict.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, rejected.status)
+            assertEquals(emptyList(), groupRepo.findUserIdsInGroup(strict.id!!))
+        }
+
     // -------------------------------------------------------------------------
     // POST / GET / filtering
     // -------------------------------------------------------------------------
