@@ -93,6 +93,10 @@ fun Route.adminUserRoutes(
             val username = params["username"]?.trim() ?: ""
             val email = params["email"]?.trim() ?: ""
             val fullName = params["fullName"]?.trim() ?: ""
+            // A cleared field has to reach the column as null: SCIM reads absent and empty alike,
+            // so an empty string here would round-trip back out as a real name part.
+            val givenName = params["givenName"]?.trim()?.ifBlank { null }
+            val familyName = params["familyName"]?.trim()?.ifBlank { null }
             val setupMode = params["setupMode"] ?: "password"
             val sendInvite = setupMode == "invite"
             val password = if (sendInvite) null else (params["password"] ?: "")
@@ -107,12 +111,21 @@ fun Route.adminUserRoutes(
                         password,
                         sendInvite,
                         baseUrl,
+                        givenName = givenName,
+                        familyName = familyName,
                     )
             ) {
                 is AdminResult.Success ->
                     call.respondRedirect("/admin/workspaces/${ctx.slug}/users/${result.value.id?.value}")
                 is AdminResult.Failure -> {
-                    val prefill = UserPrefill(username = username, email = email, fullName = fullName)
+                    val prefill =
+                        UserPrefill(
+                            username = username,
+                            email = email,
+                            fullName = fullName,
+                            givenName = givenName ?: "",
+                            familyName = familyName ?: "",
+                        )
                     call.respondHtml(
                         HttpStatusCode.UnprocessableEntity,
                         AdminView.createUserPage(
@@ -313,8 +326,22 @@ fun Route.adminUserRoutes(
                 val params = call.receiveParameters()
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
+                val givenName = params["givenName"]?.trim()?.ifBlank { null }
+                val familyName = params["familyName"]?.trim()?.ifBlank { null }
                 val isHtmx = call.request.headers["HX-Request"] == "true"
-                when (val result = adminUserService.updateUser(userId, ctx.workspace.id, email, fullName)) {
+                // The form submits the whole mutable profile, so a name part left empty means
+                // "clear it" — which updateUser's null-means-unchanged parameters cannot express.
+                val result =
+                    adminUserService.replaceUserProfile(
+                        userId = userId,
+                        tenantId = ctx.workspace.id,
+                        email = email,
+                        fullName = fullName,
+                        externalId = user.externalId,
+                        givenName = givenName,
+                        familyName = familyName,
+                    )
+                when (result) {
                     is AdminResult.Success -> {
                         if (isHtmx) {
                             val updatedUser = result.value

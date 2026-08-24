@@ -359,8 +359,8 @@ class AdminUserService(
 
     /**
      * Replaces the full mutable profile in one write. Unlike [updateUser], every parameter here
-     * is authoritative — a null clears the field. Used by the SCIM PUT/PATCH flow, which always
-     * supplies a fully resolved desired state rather than a partial admin-UI edit.
+     * is authoritative — a null clears the field. Used by the SCIM PUT/PATCH flow and by the admin
+     * profile form, both of which supply a fully resolved desired state rather than a partial edit.
      */
     fun replaceUserProfile(
         userId: UserId,

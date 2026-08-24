@@ -55,12 +55,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * User detail's IdP-managed indicator. Rendered from `externalId` alone, so the assertions are
- * about what an operator reads before editing a field a sync owns.
+ * User detail's IdP-managed indicator and the editable SCIM name parts. The indicator is rendered
+ * from `externalId` alone, so its assertions are about what an operator reads before editing a
+ * field a sync owns; the name-part assertions pin that `fullName` stays the display name.
  */
 class AdminUserRoutesTest {
     private val tenantRepo = FakeTenantRepository()
@@ -170,9 +173,126 @@ class AdminUserRoutesTest {
             assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN))
         }
 
+    @Test
+    fun `editing a user persists both name parts without touching the display name`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                            append("givenName", "Ada")
+                            append("familyName", "Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val stored = userRepo.findById(user.id!!, workspace.id)!!
+            assertEquals("Ada", stored.givenName)
+            assertEquals("Lovelace", stored.familyName)
+            assertEquals("Ada Lovelace", stored.fullName)
+        }
+
+    @Test
+    fun `clearing a name part stores null rather than an empty string`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                formParameters =
+                    Parameters.build {
+                        append("email", "ada@example.com")
+                        append("fullName", "Ada Lovelace")
+                        append("givenName", "")
+                        append("familyName", "")
+                    },
+            )
+
+            val stored = userRepo.findById(user.id!!, workspace.id)!!
+            // An empty string in the column would round-trip back out through SCIM as a real value.
+            assertNull(stored.givenName)
+            assertNull(stored.familyName)
+        }
+
+    @Test
+    fun `creating a user persists the name parts alongside the display name`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "ada")
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                            append("givenName", "Ada")
+                            append("familyName", "Lovelace")
+                            append("setupMode", "password")
+                            append("password", "correct-horse-battery")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val stored = userRepo.findByUsername(workspace.id, "ada")!!
+            assertEquals("Ada", stored.givenName)
+            assertEquals("Lovelace", stored.familyName)
+            assertEquals("Ada Lovelace", stored.fullName)
+        }
+
+    @Test
+    fun `the edit form offers both name parts`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val body =
+                authed
+                    .get("/admin/workspaces/acme/users/${user.id!!.value}/edit-fragment")
+                    .bodyAsText()
+
+            assertTrue(body.contains("""name="givenName""""))
+            assertTrue(body.contains("""name="familyName""""))
+            assertTrue(body.contains(EnglishStrings.USER_NAME_PARTS_HINT))
+        }
+
     private fun addWorkspaceUser(
         username: String,
         externalId: String? = null,
+        givenName: String? = null,
+        familyName: String? = null,
     ): User =
         userRepo.add(
             User(
@@ -183,6 +303,8 @@ class AdminUserRoutesTest {
                 passwordHash = hasher.hash("pw"),
                 enabled = true,
                 externalId = externalId,
+                givenName = givenName,
+                familyName = familyName,
             ),
         )
 

@@ -886,6 +886,18 @@ object EnglishStrings {
     const val SCIM_IDP_EXTERNAL_ID_HINT =
         "The identifier the identity provider uses for this record. It is how a sync finds the record again."
 
+    /**
+     * The SCIM name parts on the user create and edit forms.
+     *
+     * They are stored beside the display name, never derived from it: the SCIM mapper keeps
+     * `name.givenName` and `name.familyName` independent of `fullName`, so the hint has to stop an
+     * operator expecting one to rewrite the other.
+     */
+    const val USER_GIVEN_NAME_LABEL = "Given name"
+    const val USER_FAMILY_NAME_LABEL = "Family name"
+    const val USER_NAME_PARTS_HINT =
+        "Optional. Stored separately from the display name \u2014 filling these in never rewrites Full Name."
+
     /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
         "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
