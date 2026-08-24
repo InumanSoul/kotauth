@@ -1297,6 +1297,48 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `POST with a User attribute is rejected on a Group, not accepted and ignored`() =
+        testApplication {
+            application { installTestApp() }
+
+            // `nickName` is valid RFC 7643 — on a User. One shared unstored-attribute list let it
+            // ride along here, which is the cross-resource-type leak the filter scope already fixed.
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Engineering","nickName":"Eng"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidSyntax", scimTypeOf(response.bodyAsText()))
+            assertEquals(0L, groupRepo.countByTenantId(acme.id))
+        }
+
+    @Test
+    fun `POST carrying a schema extension object creates the group rather than dropping the record`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Engineering",""" +
+                            """"urn:ietf:params:scim:schemas:extension:kauth:2.0:Group":{"costCenter":"42"}}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertEquals(1L, groupRepo.countByTenantId(acme.id))
+        }
+
+    @Test
     fun `GET Groups filtering on a User attribute is invalidFilter, not an empty result set`() =
         testApplication {
             application { installTestApp() }

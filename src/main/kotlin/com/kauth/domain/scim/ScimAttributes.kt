@@ -92,9 +92,9 @@ internal data class ScimAttributeSpec(
  * anything inside them, and a resource echoed back by a read-modify-write client carries them
  * verbatim — there is nothing there to erase and nothing to gain by refusing it.
  *
- * This is also the vocabulary of known attributes: a name absent from it is a typo (or an
- * unimplemented extension), which [validateAttributeShapes] and [ScimPatchEngine] both reject
- * rather than silently drop.
+ * This is also the vocabulary of *stored* attributes: a name absent from both this table and
+ * [UNSTORED_SCIM_ATTRIBUTES] is a typo, which [validateAttributeShapes] and [ScimPatchEngine] both
+ * reject rather than silently drop.
  */
 internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimAttributeSpec> =
     mapOf(
@@ -132,6 +132,91 @@ internal val SCIM_ATTRIBUTE_SHAPES: Map<String, ScimAttributeSpec> =
             ),
         "groups" to ScimAttributeSpec(ScimShape.COMPLEX_ARRAY),
     )
+
+/**
+ * Which top-level attributes each resource type accepts, and which of those it stores.
+ *
+ * Scoped per resource type for the reason [ScimFilterScope] is: one shared list let a User-only
+ * attribute ride along on a `POST /Groups`, so the singular-typo rejection that [ScimAttributeSpec]
+ * exists to make possible would have passed `nickName` on a Group.
+ *
+ * [unstored] holds RFC 7643 core attributes Kotauth parses and then discards. Without it, a client
+ * sending a perfectly valid `POST /Users` that happens to carry `"title"` gets a 400, reads it as
+ * permanent, and drops the record — the connector-drops-the-record failure this validation exists
+ * to prevent, caused by the validation itself. A genuine typo (`"member"` for `"members"`, which
+ * emptied a group under a 200) is in neither set, so it is still rejected.
+ *
+ * Nothing in [unstored] is ever persisted or echoed back: the read path builds its response from
+ * the domain object, so none of it can round-trip and look supported.
+ */
+internal enum class ScimResourceScope(
+    private val subject: String,
+    internal val stored: Set<String>,
+    private val unstored: Set<String>,
+) {
+    USER(
+        "User",
+        stored =
+            setOf(
+                "userName",
+                "externalId",
+                "displayName",
+                "password",
+                "id",
+                "active",
+                "name",
+                "meta",
+                "schemas",
+                "emails",
+                "groups",
+            ),
+        unstored =
+            setOf(
+                "phoneNumbers",
+                "ims",
+                "photos",
+                "addresses",
+                "entitlements",
+                "roles",
+                "x509Certificates",
+                "title",
+                "userType",
+                "nickName",
+                "profileUrl",
+                "preferredLanguage",
+                "locale",
+                "timezone",
+            ),
+    ),
+
+    /** RFC 7643 §4.2 defines no Group attribute beyond these, so nothing rides along unstored. */
+    GROUP(
+        "Group",
+        stored = setOf("displayName", "externalId", "id", "meta", "schemas", "members"),
+        unstored = emptySet(),
+    ),
+    ;
+
+    internal fun ignores(name: String): Boolean = isSchemaUrn(name) || name in unstored
+
+    internal fun rejection(name: String): String = "unknown attribute '$name' for $subject"
+}
+
+/**
+ * A schema URN key — `"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {...}` — is
+ * matched structurally rather than enumerated: RFC 7643 §3 lets a client send any extension,
+ * advertised or not, and no fixed list can cover them. A colon cannot appear in a bare attribute
+ * name (RFC 7643 §2.1 ATTRNAME), so it is an unambiguous marker.
+ */
+internal fun isSchemaUrn(name: String): Boolean = ':' in name
+
+/**
+ * The resource-type-agnostic half of [ScimResourceScope.ignores], for [ScimPatchEngine], which
+ * operates on a merged resource without knowing which type it is. Being permissive here is safe:
+ * the mapper's scoped check runs afterwards on the merged result and rejects what this let through.
+ */
+internal fun isIgnorableScimAttribute(name: String): Boolean =
+    isSchemaUrn(name) || ScimResourceScope.entries.any { it.ignores(name) }
 
 /** The failure [value] earns under this spec, sub-attributes included, or null when it conforms. */
 internal fun ScimAttributeSpec.mismatch(
@@ -181,16 +266,18 @@ private fun ScimAttributeSpec.subMismatch(
  * a security defect where a 400 is an operator's cue to fix the mapping. A vendor dialect layer,
  * not these core mappers, is where that leniency belongs.
  */
-internal fun ScimResource.validateAttributeShapes(): Result<Unit> {
+internal fun ScimResource.validateAttributeShapes(scope: ScimResourceScope): Result<Unit> {
     for ((name, value) in attributes) {
-        // An undefined name is a typo, and dropping it silently is how the singular `"member"`
-        // returned 200 while emptying the group — the same typo a PATCH path already rejects.
-        // invalidSyntax rather than PATCH's invalidPath: there is no path in a PUT or POST body.
-        val spec =
-            SCIM_ATTRIBUTE_SHAPES[name]
-                ?: return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, "unknown attribute '$name'"))
+        if (name !in scope.stored) {
+            // Valid SCIM this resource type does not store rides along and is dropped; anything
+            // else is a typo, and dropping THAT silently is how the singular `"member"` returned
+            // 200 while emptying the group. invalidSyntax rather than PATCH's invalidPath: there
+            // is no path in a PUT or POST body.
+            if (scope.ignores(name)) continue
+            return Result.failure(ScimFailure(ScimErrorType.invalidSyntax, scope.rejection(name)))
+        }
         if (value == ScimValue.Null) continue
-        spec.mismatch(name, value)?.let { return Result.failure(it) }
+        SCIM_ATTRIBUTE_SHAPES[name]?.mismatch(name, value)?.let { return Result.failure(it) }
     }
     return Result.success(Unit)
 }

@@ -361,6 +361,27 @@ class ScimPatchEngineTest {
     }
 
     @Test
+    fun `a pathless partial carrying an unstored core attribute merges instead of failing`() {
+        // A pathless partial is a body fragment, judged the way a PUT body is: an attribute SCIM
+        // defines and Kotauth does not persist rides along and is ignored. An explicit path naming
+        // the same attribute stays a failure — see the test above — because that is a targeted
+        // write, and answering 200 to one would be a lie.
+        val out =
+            apply(
+                group("1"),
+                ScimPatchOp(
+                    ScimPatchOpType.REPLACE,
+                    null,
+                    ScimValue.Complex(
+                        mapOf("displayName" to ScimValue.Str("sales"), "title" to ScimValue.Str("Engineer")),
+                    ),
+                ),
+            ).getOrThrow()
+
+        assertEquals(ScimValue.Str("sales"), out.attributes["displayName"])
+    }
+
+    @Test
     fun `remove with a valued path matching nothing is a no-op, not an error`() {
         val out =
             apply(

@@ -100,7 +100,13 @@ class ScimPatchEngine {
         val partial =
             op.value as? ScimValue.Complex
                 ?: throw PatchException(ScimErrorType.invalidValue, "a null path requires a complex value")
-        partial.attributes.keys.forEach(::requireWritableAttribute)
+        // A pathless partial is a body fragment, so it is judged the way a PUT body is: an
+        // attribute SCIM defines and Kotauth does not persist rides along and is ignored. A partial
+        // naming it is a client sending its whole record; an explicit `path` naming it is a
+        // deliberate write, which stays a failure rather than a 200 that did nothing.
+        partial.attributes.keys
+            .filterNot(::isIgnorableScimAttribute)
+            .forEach(::requireWritableAttribute)
         partial.attributes.forEach { (name, value) -> requireComplexShape(name, value) }
         if (op.op != ScimPatchOpType.ADD) {
             return resource.copy(attributes = resource.attributes + partial.attributes)

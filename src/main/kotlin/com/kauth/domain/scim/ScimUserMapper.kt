@@ -122,7 +122,7 @@ object ScimUserMapper {
         // One shape check for every attribute, before any of them is read: a present value of the
         // wrong JSON type is invalidValue here rather than a null cast that quietly discards it —
         // or, for `active`, silently leaves an account enabled after a deprovision.
-        resource.validateAttributeShapes().getOrElse { return Result.failure(it) }
+        resource.validateAttributeShapes(ScimResourceScope.USER).getOrElse { return Result.failure(it) }
 
         val username = (resource.attributes["userName"] as? ScimValue.Str)?.value?.trim()
         if (username.isNullOrEmpty()) {

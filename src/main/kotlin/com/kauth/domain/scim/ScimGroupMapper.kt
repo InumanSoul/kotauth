@@ -110,7 +110,7 @@ object ScimGroupMapper {
         val resource = merged.value
         // One shape check for every attribute, before any of them is read: a present value of the
         // wrong JSON type is invalidValue here rather than a null cast that quietly discards it.
-        resource.validateAttributeShapes().getOrElse { return Result.failure(it) }
+        resource.validateAttributeShapes(ScimResourceScope.GROUP).getOrElse { return Result.failure(it) }
 
         // A blank displayName ("" or whitespace) is a common connector shape for a cleared
         // field; treated as absent so it falls through to existing rather than storing "".

@@ -666,6 +666,45 @@ class ScimUserMapperTest {
         assertEquals("Ada", write.getOrThrow().user.givenName)
     }
 
+    @Test
+    fun `an RFC 7643 attribute Kotauth does not store is accepted and ignored`() {
+        val write =
+            ScimUserMapper.toDomain(
+                userResourceWith(
+                    "title" to ScimValue.Str("Engineer"),
+                    "phoneNumbers" to ScimValue.MultiValued(emptyList()),
+                ).merged(),
+                user(),
+                tenantId,
+            )
+
+        assertEquals("ada@example.com", write.getOrThrow().user.username)
+    }
+
+    @Test
+    fun `a schema-URN-keyed extension object is accepted and ignored`() {
+        val extension =
+            ScimValue.Complex(mapOf("department" to ScimValue.Str("R&D")))
+        val write =
+            ScimUserMapper.toDomain(
+                userResourceWith(
+                    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" to extension,
+                ).merged(),
+                user(),
+                tenantId,
+            )
+
+        assertEquals("ada@example.com", write.getOrThrow().user.username)
+    }
+
+    @Test
+    fun `a misspelled attribute is still rejected`() {
+        val failure = shapeFailureOf(userResourceWith("emailz" to ScimValue.Str("x@example.com")), user())
+
+        assertEquals(ScimErrorType.invalidSyntax, failure.type)
+        assertTrue(failure.detail.contains("emailz"), failure.detail)
+    }
+
     private fun resourceWithName(
         given: String?,
         family: String?,

@@ -1535,6 +1535,69 @@ class ScimUserRoutesTest {
             assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
         }
 
+    @Test
+    fun `POST with an RFC 7643 attribute Kotauth does not store creates the user and ignores it`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"emails":[{"value":"ada@x.example","type":"work"}],"title":"Engineer"}""",
+                    )
+                }
+
+            // A 400 here reads as permanent to a provisioning client, which drops the record —
+            // over an attribute that is valid SCIM and simply not persisted.
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertNull(jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject["title"])
+            assertEquals("ada", userRepo.findByUsername(acme.id, "ada")!!.username)
+        }
+
+    @Test
+    fun `POST carrying a schema extension object creates the user rather than dropping the record`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User",""" +
+                            """"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"],"userName":"ada",""" +
+                            """"emails":[{"value":"ada@x.example","type":"work"}],""" +
+                            """"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User":{"department":"R&D"}}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertEquals("ada", userRepo.findByUsername(acme.id, "ada")!!.username)
+        }
+
+    @Test
+    fun `POST with a misspelled attribute is still rejected rather than dropping it`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"emailz":[{"value":"ada@x.example","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidSyntax", scimTypeOf(response.bodyAsText()))
+            assertNull(userRepo.findByUsername(acme.id, "ada"))
+        }
+
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Authentication) {
