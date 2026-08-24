@@ -47,7 +47,7 @@ internal suspend fun requireScimScope(call: ApplicationCall): Unit? {
     return Unit
 }
 
-private suspend fun ApplicationCall.respondScimError(
+internal suspend fun ApplicationCall.respondScimError(
     status: HttpStatusCode,
     detail: String,
 ) {
@@ -55,7 +55,8 @@ private suspend fun ApplicationCall.respondScimError(
     respondScim(status, body)
 }
 
-private suspend fun ApplicationCall.respondScim(
+/** Shared by every route under `/scim/v2` — the content type and status/body shape must match. */
+internal suspend fun ApplicationCall.respondScim(
     status: HttpStatusCode,
     body: JsonObject,
 ) {

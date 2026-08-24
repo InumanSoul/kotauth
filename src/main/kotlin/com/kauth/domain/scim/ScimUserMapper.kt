@@ -77,6 +77,14 @@ object ScimUserMapper {
         return ScimResource(schemas = listOf(USER_SCHEMA), attributes = attributes)
     }
 
+    /**
+     * [resource] must be a fully merged representation — the complete desired state, not a bare
+     * PATCH body. An absent attribute here is treated as "no value for this attribute" (falling
+     * back to [existing] where one applies), which is correct for a PUT's full replacement but
+     * would silently clear every attribute a PATCH request didn't mention. Callers handling PATCH
+     * must merge the operations onto [ScimUserMapper.toResource] of the current user first
+     * (see `ScimPatchEngine`) and pass the merged result here — never the raw PATCH body.
+     */
     fun toDomain(
         resource: ScimResource,
         existing: User?,

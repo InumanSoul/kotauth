@@ -32,6 +32,9 @@ class AdminUserService(
         password: String? = null,
         sendInvite: Boolean = false,
         baseUrl: String = "",
+        externalId: String? = null,
+        givenName: String? = null,
+        familyName: String? = null,
     ): AdminResult<User> {
         val tenant =
             tenantRepository.findById(tenantId)
@@ -100,6 +103,9 @@ class AdminUserService(
                     emailVerified = !sendInvite,
                     enabled = true,
                     requiredActions = resolvedRequiredActions,
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
                 ),
             )
 
@@ -284,6 +290,58 @@ class AdminUserService(
         }
 
         val updated = userRepository.update(user.copy(email = resolvedEmail, fullName = resolvedFullName))
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_USER_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("username" to user.username),
+            ),
+        )
+
+        return AdminResult.Success(updated)
+    }
+
+    /**
+     * Replaces the full mutable profile in one write. Unlike [updateUser], every parameter here
+     * is authoritative — a null clears the field. Used by the SCIM PUT/PATCH flow, which always
+     * supplies a fully resolved desired state rather than a partial admin-UI edit.
+     */
+    fun replaceUserProfile(
+        userId: UserId,
+        tenantId: TenantId,
+        email: String,
+        fullName: String,
+        externalId: String?,
+        givenName: String?,
+        familyName: String?,
+    ): AdminResult<User> {
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        val resolvedEmail = email.trim().lowercase()
+        if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
+            return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
+        }
+        if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
+        }
+
+        val updated =
+            userRepository.update(
+                user.copy(
+                    email = resolvedEmail,
+                    fullName = fullName.trim(),
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
+                ),
+            )
 
         auditLog.record(
             AuditEvent(

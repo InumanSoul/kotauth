@@ -469,6 +469,7 @@ fun Application.module(
             webAuthnService = s.webAuthnService,
             webAuthnCredentialRepository = s.webAuthnCredentialRepository,
             corsService = s.corsService,
+            transactionRunner = s.transactionRunner,
         )
 
         adminBackupRoutes(

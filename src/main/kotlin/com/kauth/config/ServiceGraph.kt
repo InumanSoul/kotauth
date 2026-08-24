@@ -54,6 +54,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
+import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
@@ -181,6 +182,7 @@ data class ServiceGraph(
     val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
+    val transactionRunner: TransactionRunner,
 ) {
     companion object {
         fun create(config: EnvironmentConfig): ServiceGraph {
@@ -666,6 +668,7 @@ data class ServiceGraph(
                     ),
                 passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
+                transactionRunner = backupTransactionRunner,
             )
         }
     }

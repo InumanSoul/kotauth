@@ -2,6 +2,7 @@ package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
 import com.kauth.adapter.web.scim.scimDiscoveryRoutes
+import com.kauth.adapter.web.scim.scimUserRoutes
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
@@ -9,6 +10,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
@@ -59,6 +61,9 @@ fun Route.apiRoutes(
     webAuthnService: WebAuthnService,
     webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
+    // Only the SCIM /Users write path needs a real rollback boundary; other route trees never
+    // pass this, so a no-op default keeps their tests untouched.
+    transactionRunner: TransactionRunner = NoOpTransactionRunner,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -165,11 +170,17 @@ fun Route.apiRoutes(
         route("/t/{tenantSlug}/scim/v2") {
             install(apiContextPlugin)
             scimDiscoveryRoutes()
+            scimUserRoutes(adminUserService, transactionRunner)
         }
     }
 }
 
 private object ApiRoutes
+
+/** Default for route trees that never combine multiple writes and so need no real rollback boundary. */
+private object NoOpTransactionRunner : TransactionRunner {
+    override fun <T> runInTransaction(block: () -> T): T = block()
+}
 
 private fun swaggerUiHtml() =
     """
