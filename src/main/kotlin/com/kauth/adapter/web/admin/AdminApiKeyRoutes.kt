@@ -117,8 +117,14 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
             )
         }
         val dialect = scimDialectFor(call.receiveParameters()["scimDialect"]).id
-        svc.updateScimDialect(keyId, workspace.id, dialect)
-        call.respondRedirect("/admin/workspaces/$slug/provisioning?saved=dialect")
+        // The lookup above makes a failure here rare — the key would have to vanish between the two
+        // reads — but the saved toast is only honest when the write actually happened.
+        when (val result = svc.updateScimDialect(keyId, workspace.id, dialect)) {
+            is com.kauth.domain.service.ApiKeyResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/provisioning?saved=dialect")
+            is com.kauth.domain.service.ApiKeyResult.Failure ->
+                call.respond(HttpStatusCode.NotFound, result.error.message)
+        }
     }
 
     post("/settings/api-keys/{keyId}/revoke") {
