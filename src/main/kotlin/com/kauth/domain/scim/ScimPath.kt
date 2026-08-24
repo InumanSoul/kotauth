@@ -56,7 +56,7 @@ private class PathParser(
         // The caller of parsePath is patching, not querying, so a bad filter inside
         // brackets is reported as an invalid path, not surfaced as an invalid filter.
         val filter =
-            parseFilter(filterText).getOrElse { e ->
+            parseFilter(filterText, ScimFilterScope.VALUE_PATH).getOrElse { e ->
                 val detail = (e as? ScimFailure)?.detail ?: e.message ?: "invalid filter"
                 fail("invalid filter in path: $detail", bracketIndex + 1)
             }

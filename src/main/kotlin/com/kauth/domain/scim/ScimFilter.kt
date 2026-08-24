@@ -4,8 +4,32 @@ package com.kauth.domain.scim
 // andExpr := primary ("and" primary)*; primary := "(" orExpr ")" | attr "eq" literal.
 // `and` binds tighter than `or`.
 
-private val SUPPORTED_ATTRIBUTES = setOf("userName", "externalId", "displayName", "id", "active", "value", "type")
 private val KEYWORDS = setOf("and", "or", "eq", "true", "false")
+
+/**
+ * Which attributes a filter may name, and what to call the thing being filtered in an error.
+ *
+ * Scoped per resource type on purpose. One shared set let `GET /Groups?filter=userName eq "ada"`
+ * parse, match nothing, and answer `200 {"totalResults":0}` — which a provisioning client reads as
+ * "that group does not exist" and acts on by creating a duplicate. A filter naming an attribute the
+ * resource does not have is a client mistake, and `invalidFilter` is the only answer that says so.
+ */
+enum class ScimFilterScope(
+    private val subject: String,
+    internal val supportedAttributes: Set<String>,
+) {
+    USER("User", setOf("userName", "externalId", "displayName", "active", "id")),
+    GROUP("Group", setOf("displayName", "externalId", "id")),
+
+    /**
+     * Inside a valued path (`members[value eq "42"]`) the filter runs over one element of a
+     * multi-valued attribute, so it names sub-attributes rather than resource attributes.
+     */
+    VALUE_PATH("a multi-valued attribute element", setOf("value", "type", "primary", "display")),
+    ;
+
+    internal fun rejection(attribute: String): String = "unsupported attribute '$attribute' for $subject"
+}
 
 // Bounds recursion depth against pathological nesting (e.g. thousands of "("); not a grammar rule.
 private const val MAX_NESTING_DEPTH = 32
@@ -40,13 +64,19 @@ private fun resolveAttribute(
     value: ScimValue,
 ): ScimValue? = (value as? ScimValue.Complex)?.attributes?.get(attr)
 
-/** Parses an RFC 7644 §3.4.2.2 filter. Never throws; malformed input is a failure value. */
-fun parseFilter(raw: String): Result<ScimFilter> =
+/**
+ * Parses an RFC 7644 §3.4.2.2 filter. Never throws; malformed input is a failure value.
+ * [scope] decides which attribute names are legal — see [ScimFilterScope].
+ */
+fun parseFilter(
+    raw: String,
+    scope: ScimFilterScope,
+): Result<ScimFilter> =
     try {
         if (raw.isBlank()) {
             throw FilterSyntaxException("empty filter")
         }
-        Result.success(FilterParser(raw, tokenize(raw)).parseToEnd())
+        Result.success(FilterParser(raw, tokenize(raw), scope).parseToEnd())
     } catch (e: FilterSyntaxException) {
         Result.failure(ScimFailure(ScimErrorType.invalidFilter, e.message ?: "invalid filter: \"$raw\""))
     }
@@ -149,6 +179,7 @@ private fun tokenize(raw: String): List<Token> {
 private class FilterParser(
     private val raw: String,
     private val tokens: List<Token>,
+    private val scope: ScimFilterScope,
 ) {
     private var pos = 0
     private var depth = 0
@@ -204,8 +235,8 @@ private class FilterParser(
         if (attrToken.text in KEYWORDS) {
             fail("expected attribute name, found reserved word '${attrToken.text}'", attrToken.position)
         }
-        if (attrToken.text !in SUPPORTED_ATTRIBUTES) {
-            fail("unsupported attribute '${attrToken.text}'", attrToken.position)
+        if (attrToken.text !in scope.supportedAttributes) {
+            fail(scope.rejection(attrToken.text), attrToken.position)
         }
         val opToken = expectIdent("operator")
         if (opToken.text != "eq") {

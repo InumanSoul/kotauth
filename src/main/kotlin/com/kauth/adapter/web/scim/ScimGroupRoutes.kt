@@ -11,6 +11,7 @@ import com.kauth.domain.scim.MergedScimResource
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
 import com.kauth.domain.scim.ScimFilter
+import com.kauth.domain.scim.ScimFilterScope
 import com.kauth.domain.scim.ScimGroupMapper
 import com.kauth.domain.scim.ScimGroupWrite
 import com.kauth.domain.scim.ScimPatchEngine
@@ -69,7 +70,7 @@ fun Route.scimGroupRoutes(
 
         val filter =
             call.request.queryParameters["filter"]?.let { raw ->
-                parseFilter(raw).getOrElse {
+                parseFilter(raw, ScimFilterScope.GROUP).getOrElse {
                     call.respondScimFailure(it)
                     return@get
                 }

@@ -1226,6 +1226,20 @@ class ScimGroupRoutesTest {
             assertNotNull(groupRepo.findById(child.id!!))
         }
 
+    @Test
+    fun `GET Groups filtering on a User attribute is invalidFilter, not an empty result set`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Engineering")
+
+            val response = client.get(groupsUrl("""userName eq "ada"""")) { bearerAuth(scimKey) }
+
+            // 200 with totalResults 0 reads as "no such group", and a provisioning client acts
+            // on that by creating a duplicate.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidFilter", scimTypeOf(response.bodyAsText()))
+        }
+
     // -------------------------------------------------------------------------
     // Transaction boundary — a rejected member takes the metadata write with it
     // -------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import com.kauth.domain.scim.MergedScimResource
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
 import com.kauth.domain.scim.ScimFilter
+import com.kauth.domain.scim.ScimFilterScope
 import com.kauth.domain.scim.ScimPatchEngine
 import com.kauth.domain.scim.ScimResource
 import com.kauth.domain.scim.ScimUserMapper
@@ -65,7 +66,7 @@ fun Route.scimUserRoutes(
 
         val filter =
             call.request.queryParameters["filter"]?.let { raw ->
-                parseFilter(raw).getOrElse {
+                parseFilter(raw, ScimFilterScope.USER).getOrElse {
                     call.respondScimFailure(it)
                     return@get
                 }
