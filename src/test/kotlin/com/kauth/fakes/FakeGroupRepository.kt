@@ -53,6 +53,7 @@ class FakeGroupRepository :
         findUserIdsForGroupsCallSizes.clear()
         addUserToGroupCalls.clear()
         removeUserFromGroupCalls.clear()
+        assignRoleToGroupCalls.clear()
         nextId = 1
     }
 
@@ -124,10 +125,16 @@ class FakeGroupRepository :
         groupMembers.remove(groupId.value)
     }
 
+    // Records every role grant so a test can assert that a write path never issues one. SCIM
+    // never touches group_roles, and "the roles are still there afterwards" would pass even if it
+    // did, because re-granting the same role is indistinguishable from leaving it alone.
+    val assignRoleToGroupCalls = mutableListOf<Pair<GroupId, RoleId>>()
+
     override fun assignRoleToGroup(
         groupId: GroupId,
         roleId: RoleId,
     ) {
+        assignRoleToGroupCalls += groupId to roleId
         groupRoles.getOrPut(groupId.value) { mutableSetOf() }.add(roleId.value)
     }
 

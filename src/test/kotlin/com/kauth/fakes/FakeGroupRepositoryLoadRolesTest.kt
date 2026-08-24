@@ -1,19 +1,23 @@
-package com.kauth.domain.port
+package com.kauth.fakes
 
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.TenantId
-import com.kauth.fakes.FakeGroupRepository
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Pins the [GroupRepository.findByTenantId] `loadRoles` contract: the flag decides whether
- * [Group.roleIds] is loaded at all, so an empty list under `loadRoles = false` means "not
- * loaded" and never "this group has no roles".
+ * Pins [FakeGroupRepository]'s half of the `findByTenantId` `loadRoles` contract: the flag decides
+ * whether `roleIds` is loaded at all, so an empty list under `loadRoles = false` means "not loaded"
+ * and never "this group has no roles".
+ *
+ * Named for the fake, not for the port, because it only exercises the fake. The adapter's half —
+ * the `group_roles` join it has to skip — is covered by
+ * `PostgresGroupRepositoryIntegrationTest`, which needs a real database and runs under
+ * `./gradlew postgresTest`.
  */
-class GroupRepositoryContractTest {
+class FakeGroupRepositoryLoadRolesTest {
     private val tenant = TenantId(1)
     private val repo = FakeGroupRepository()
 

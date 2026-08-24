@@ -650,7 +650,7 @@ class ScimGroupRoutesTest {
     // -------------------------------------------------------------------------
 
     @Test
-    fun `PUT role assignments survive a PUT that omits them`() =
+    fun `PUT never writes role assignments, in either direction`() =
         testApplication {
             application { installTestApp() }
             val alice = addUser("alice")
@@ -664,6 +664,11 @@ class ScimGroupRoutesTest {
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
+            // No `update` implementation writes group_roles, so "the roles survived" cannot fail
+            // for the reason it sounds like. What this route actually has to guarantee is that it
+            // never issues a grant of its own — a PUT that clears absent attributes must not be
+            // able to touch permissions at all.
+            assertEquals(emptyList(), groupRepo.assignRoleToGroupCalls)
             assertEquals(listOf(RoleId(42)), groupRepo.findById(group.id)!!.roleIds)
         }
 
