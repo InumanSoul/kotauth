@@ -24,6 +24,7 @@ internal fun scimProvisioningPageImpl(
     endpointUrl: String,
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
+    toastMessage: String? = null,
 ): HTML.() -> Unit = {
     val slug = workspace.slug
     val apiKeysHref = "/admin/workspaces/$slug/settings/api-keys"
@@ -39,6 +40,7 @@ internal fun scimProvisioningPageImpl(
         loggedInAs = loggedInAs,
         activeAppSection = "provisioning",
         contentClass = "content-outer",
+        toastMessage = toastMessage,
     ) {
         div("content-inner") {
             breadcrumb(
@@ -90,7 +92,7 @@ internal fun scimProvisioningPageImpl(
                         },
                     )
                 } else {
-                    scimKeyTable(scimKeys)
+                    scimKeyTable(scimKeys, slug)
                     div("ov-card__row") {
                         span("ov-card__value ov-card__value--muted") { +EnglishStrings.SCIM_STATUS_LAST_USE_HINT }
                     }
@@ -130,7 +132,10 @@ internal fun scimProvisioningPageImpl(
     }
 }
 
-private fun DIV.scimKeyTable(scimKeys: List<ApiKey>) {
+private fun DIV.scimKeyTable(
+    scimKeys: List<ApiKey>,
+    slug: String,
+) {
     table("key-table") {
         thead {
             tr {
@@ -147,7 +152,7 @@ private fun DIV.scimKeyTable(scimKeys: List<ApiKey>) {
                         span("key-table__name") { +key.name }
                         span("key-table__meta") { +" ${key.keyPrefix}…" }
                     }
-                    td { span("key-table__meta") { +scimDialectFor(key.scimDialect).label } }
+                    td { scimDialectCell(key, slug) }
                     td {
                         span("key-table__meta") {
                             +(key.lastUsedAt?.toDisplayString() ?: EnglishStrings.SCIM_KEYS_NEVER_USED)
@@ -159,6 +164,56 @@ private fun DIV.scimKeyTable(scimKeys: List<ApiKey>) {
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The dialect of one key, editable in place.
+ *
+ * A bootstrapped key is read-only here for the same reason it is on the API keys list: its
+ * configuration comes from `KAUTH_BOOTSTRAP_API_KEYS`, and a value edited here would be
+ * overwritten the next time that environment is applied.
+ */
+private fun TD.scimDialectCell(
+    key: ApiKey,
+    slug: String,
+) {
+    if (key.bootstrapName != null) {
+        span("key-table__meta") { +scimDialectFor(key.scimDialect).label }
+        span("key-table__meta key-table__meta--with-icon") {
+            attributes["aria-label"] = EnglishStrings.SCIM_DIALECT_ENV_MANAGED_HINT
+            +" ${EnglishStrings.SCIM_DIALECT_ENV_MANAGED} "
+            span("inline-help") {
+                title = EnglishStrings.SCIM_DIALECT_ENV_MANAGED_HINT
+                inlineSvgIcon("info", EnglishStrings.SCIM_DIALECT_ENV_MANAGED)
+            }
+        }
+        return
+    }
+    // Resolved rather than compared raw, so the selection shown is the dialect the SCIM surface
+    // would actually apply to this key.
+    val current = scimDialectFor(key.scimDialect).id
+    form(
+        action = "/admin/workspaces/$slug/settings/api-keys/${key.id}/scim-dialect",
+        method = FormMethod.post,
+    ) {
+        style = "display:flex; align-items:center; gap:8px;"
+        select {
+            classes = setOf("edit-row__field", "edit-row__field--select")
+            name = "scimDialect"
+            attributes["aria-label"] = EnglishStrings.SCIM_DIALECT_FIELD_LABEL
+            scimDialects.forEach { dialect: ScimDialect ->
+                option {
+                    value = dialect.id
+                    if (dialect.id == current) selected = true
+                    +dialect.label
+                }
+            }
+        }
+        button(type = ButtonType.submit) {
+            classes = setOf("btn", "btn--ghost", "btn--sm")
+            +EnglishStrings.SCIM_DIALECT_SAVE_CTA
         }
     }
 }

@@ -447,7 +447,16 @@ object AdminView {
         endpointUrl: String,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
-    ): HTML.() -> Unit = scimProvisioningPageImpl(workspace, scimKeys, endpointUrl, allWorkspaces, loggedInAs)
+        toastMessage: String? = null,
+    ): HTML.() -> Unit =
+        scimProvisioningPageImpl(
+            workspace,
+            scimKeys,
+            endpointUrl,
+            allWorkspaces,
+            loggedInAs,
+            toastMessage,
+        )
 
     // ── Webhooks ────────────────────────────────────────────────────────
 

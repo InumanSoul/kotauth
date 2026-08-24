@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.service.ApiKeyService
 import io.ktor.http.HttpStatusCode
@@ -13,8 +14,8 @@ import io.ktor.server.sessions.sessions
 /**
  * Admin routes for the SCIM provisioning page.
  *
- * Read-only: everything an operator changes here (the key and its dialect) is changed through
- * the API key routes, so this page never becomes a second place that writes a key.
+ * Read-only: everything an operator changes here (the key and its dialect) is posted to the API
+ * key routes, so this page never becomes a second place that writes a key.
  */
 fun Route.adminScimRoutes(
     apiKeyService: ApiKeyService?,
@@ -30,6 +31,13 @@ fun Route.adminScimRoutes(
                 ?.filter { ApiScope.SCIM in it.scopes }
                 ?: emptyList()
 
+        val toast =
+            if (call.request.queryParameters["saved"] == "dialect") {
+                EnglishStrings.SCIM_DIALECT_SAVED_TOAST
+            } else {
+                null
+            }
+
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.scimProvisioningPage(
@@ -38,6 +46,7 @@ fun Route.adminScimRoutes(
                 endpointUrl = scimEndpointUrl(baseUrl, workspace.slug),
                 allWorkspaces = wsPairs,
                 loggedInAs = session.username,
+                toastMessage = toast,
             ),
         )
     }

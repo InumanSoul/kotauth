@@ -827,6 +827,19 @@ object EnglishStrings {
         "Applies only to keys holding the scim scope. Leave it on the default unless your identity provider " +
             "is listed."
 
+    const val SCIM_DIALECT_SAVE_CTA = "Save"
+    const val SCIM_DIALECT_SAVED_TOAST = "Dialect updated. The next provisioning request uses it."
+
+    /**
+     * A bootstrapped key's dialect is part of `KAUTH_BOOTSTRAP_API_KEYS`, so editing it here would
+     * last only until the next restart re-applied the environment. The row says so instead.
+     */
+    const val SCIM_DIALECT_ENV_MANAGED = "Env-managed"
+    const val SCIM_DIALECT_ENV_MANAGED_HINT =
+        "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 this key's dialect follows the environment, not this page."
+    const val SCIM_DIALECT_ENV_MANAGED_REFUSAL =
+        "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS."
+
     const val SCIM_DIALECT_RFC_LABEL = "Standard SCIM 2.0 (RFC 7644)"
     const val SCIM_DIALECT_ENTRA_LABEL = "Microsoft Entra ID"
     const val SCIM_DIALECT_OKTA_LABEL = "Okta"

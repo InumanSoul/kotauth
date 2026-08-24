@@ -137,6 +137,28 @@ class ApiKeyService(
         tenantId: TenantId,
     ): ApiKey? = apiKeyRepository.findById(id, tenantId)
 
+    /**
+     * Corrects the SCIM wire dialect on an existing key.
+     *
+     * The dialect registry lives in the web adapter, so the caller resolves the id first and this
+     * service stores what it is handed — the same contract as [create]. Nothing else on the key
+     * moves: key material, scopes, expiry, and the enabled flag each carry their own decision.
+     */
+    fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    ): ApiKeyResult<Unit> {
+        apiKeyRepository.findById(id, tenantId)
+            ?: return ApiKeyResult.Failure(ApiKeyError.NotFound("API key not found."))
+        apiKeyRepository.updateScimDialect(
+            id,
+            tenantId,
+            scimDialect.trim().ifBlank { ApiKey.DEFAULT_SCIM_DIALECT },
+        )
+        return ApiKeyResult.Success(Unit)
+    }
+
     fun revoke(
         id: Int,
         tenantId: TenantId,

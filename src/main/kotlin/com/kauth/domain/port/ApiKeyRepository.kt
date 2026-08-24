@@ -38,6 +38,13 @@ interface ApiKeyRepository {
         tenantId: TenantId,
     ): ApiKey?
 
+    /** Corrects the SCIM wire dialect on an existing key. Nothing else about the key is touched. */
+    fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    )
+
     /** Soft-revokes a key (sets enabled = false). */
     fun revoke(
         id: Int,

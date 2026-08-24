@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.scim.scimDialectFor
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.service.ApiKeyService
@@ -98,6 +99,26 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 )
             }
         }
+    }
+
+    // The dialect is the one field on a key an operator can correct in place: picking the wrong one
+    // only shows up later as rejected payloads, and a new key would mean reconfiguring the connector.
+    post("/settings/api-keys/{keyId}/scim-dialect") {
+        val workspace = call.attributes[WorkspaceAttr]
+        val slug = workspace.slug
+        val keyId =
+            call.parameters["keyId"]?.toIntOrNull() ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val svc = apiKeyService ?: return@post call.respond(HttpStatusCode.ServiceUnavailable)
+        val key = svc.findById(keyId, workspace.id) ?: return@post call.respond(HttpStatusCode.NotFound)
+        if (key.bootstrapName != null) {
+            return@post call.respond(
+                HttpStatusCode.Forbidden,
+                EnglishStrings.SCIM_DIALECT_ENV_MANAGED_REFUSAL,
+            )
+        }
+        val dialect = scimDialectFor(call.receiveParameters()["scimDialect"]).id
+        svc.updateScimDialect(keyId, workspace.id, dialect)
+        call.respondRedirect("/admin/workspaces/$slug/provisioning?saved=dialect")
     }
 
     post("/settings/api-keys/{keyId}/revoke") {

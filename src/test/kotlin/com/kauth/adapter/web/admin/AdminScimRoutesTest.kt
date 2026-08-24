@@ -253,6 +253,202 @@ class AdminScimRoutesTest {
         }
 
     @Test
+    fun `an operator can correct the dialect on an existing key`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+            val target =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                    formParameters = Parameters.build { append("scimDialect", target) },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(response.headers["Location"]?.contains("/provisioning") == true)
+            assertEquals(target, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
+
+            val body = authed.get("/admin/workspaces/acme/provisioning").bodyAsText()
+            assertTrue(
+                Regex("<option(?=[^>]*value=\"$target\")(?=[^>]*selected)[^>]*>").containsMatchIn(body),
+                "the provisioning page must show the corrected dialect as the selected option",
+            )
+        }
+
+    @Test
+    fun `correcting the dialect leaves the rest of the key untouched`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                formParameters =
+                    Parameters.build {
+                        append(
+                            "scimDialect",
+                            com.kauth.adapter.web.scim.scimDialects
+                                .last()
+                                .id,
+                        )
+                    },
+            )
+
+            val stored = apiKeyRepo.findById(key.id!!, TenantId(2))!!
+            assertEquals(key.name, stored.name)
+            assertEquals(key.scopes, stored.scopes)
+            assertEquals(key.keyPrefix, stored.keyPrefix)
+            assertEquals(key.keyHash, stored.keyHash)
+            assertEquals(key.enabled, stored.enabled)
+            assertEquals(key.expiresAt, stored.expiresAt)
+        }
+
+    @Test
+    fun `an unregistered dialect submitted to the edit route stores the RFC default`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                formParameters = Parameters.build { append("scimDialect", "not-a-dialect") },
+            )
+
+            assertEquals(ApiKey.DEFAULT_SCIM_DIALECT, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
+        }
+
+    @Test
+    fun `a key from another workspace is not found and is not updated`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(1), "Master sync", listOf(ApiScope.SCIM))
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+            val target =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                    formParameters = Parameters.build { append("scimDialect", target) },
+                )
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertEquals(
+                ApiKey.DEFAULT_SCIM_DIALECT,
+                apiKeyRepo.findById(key.id!!, TenantId(1))!!.scimDialect,
+            )
+        }
+
+    @Test
+    fun `a bootstrapped key keeps the dialect its environment defines`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val bootstrapped =
+                apiKeyRepo.save(
+                    ApiKey(
+                        tenantId = TenantId(2),
+                        name = "kauth-cli",
+                        keyPrefix = "kauth_acme_boot",
+                        keyHash = "hash-v1",
+                        scopes = listOf(ApiScope.SCIM),
+                        bootstrapName = "kauth-cli",
+                    ),
+                )
+            val target =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${bootstrapped.id}/scim-dialect",
+                    formParameters = Parameters.build { append("scimDialect", target) },
+                )
+
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertTrue(response.bodyAsText().contains("KAUTH_BOOTSTRAP_API_KEYS"))
+            assertEquals(
+                ApiKey.DEFAULT_SCIM_DIALECT,
+                apiKeyRepo.findById(bootstrapped.id!!, TenantId(2))!!.scimDialect,
+            )
+        }
+
+    @Test
+    fun `the provisioning page offers no dialect editor for a bootstrapped key`() =
+        testApplication {
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val bootstrapped =
+                apiKeyRepo.save(
+                    ApiKey(
+                        tenantId = TenantId(2),
+                        name = "kauth-cli",
+                        keyPrefix = "kauth_acme_boot",
+                        keyHash = "hash-v1",
+                        scopes = listOf(ApiScope.SCIM),
+                        bootstrapName = "kauth-cli",
+                    ),
+                )
+
+            val body = authed.get("/admin/workspaces/acme/provisioning").bodyAsText()
+
+            assertTrue(
+                body.contains(com.kauth.adapter.web.EnglishStrings.SCIM_DIALECT_ENV_MANAGED),
+                "the row must say the dialect follows the environment",
+            )
+            assertFalse(
+                body.contains("/settings/api-keys/${bootstrapped.id}/scim-dialect"),
+                "a bootstrapped key must not get an edit form",
+            )
+        }
+
+    @Test
     fun `the provisioning page is scoped to its own workspace`() =
         testApplication {
             application { installTestApp() }

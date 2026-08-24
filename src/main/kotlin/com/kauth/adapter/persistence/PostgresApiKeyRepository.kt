@@ -98,6 +98,19 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         Unit
     }
 
+    override fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    ) = transaction {
+        ApiKeysTable.update({
+            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value)
+        }) {
+            it[ApiKeysTable.scimDialect] = scimDialect
+        }
+        Unit
+    }
+
     override fun touchLastUsed(
         id: Int,
         at: Instant,
