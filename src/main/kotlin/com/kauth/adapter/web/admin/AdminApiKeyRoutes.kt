@@ -158,8 +158,12 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 "Bootstrapped keys can only be revoked via KAUTH_BOOTSTRAP_API_KEYS.",
             )
         }
-        svc.revoke(keyId, workspace.id)
-        call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+        when (val result = svc.revoke(keyId, workspace.id)) {
+            is com.kauth.domain.service.ApiKeyResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+            is com.kauth.domain.service.ApiKeyResult.Failure ->
+                call.respond(HttpStatusCode.NotFound, result.error.message)
+        }
     }
 
     post("/settings/api-keys/{keyId}/delete") {
@@ -174,7 +178,11 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 "Bootstrapped keys can only be deleted via KAUTH_BOOTSTRAP_API_KEYS.",
             )
         }
-        svc.delete(keyId, workspace.id)
-        call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+        when (val result = svc.delete(keyId, workspace.id)) {
+            is com.kauth.domain.service.ApiKeyResult.Success ->
+                call.respondRedirect("/admin/workspaces/$slug/settings/api-keys")
+            is com.kauth.domain.service.ApiKeyResult.Failure ->
+                call.respond(HttpStatusCode.NotFound, result.error.message)
+        }
     }
 }

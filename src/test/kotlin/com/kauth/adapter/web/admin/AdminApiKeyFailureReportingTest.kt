@@ -57,13 +57,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
 /**
- * A dialect update that does not happen must not be reported as saved.
+ * An API key mutation that does not happen must not be reported as done.
  *
- * The route looks the key up before writing, so the service's own failure branch is only
- * reachable when the key disappears between the two lookups — which [VanishingApiKeyRepository]
- * reproduces.
+ * Each of these routes looks the key up before writing, so the service's own failure branch is
+ * only reachable when the key disappears between the two lookups — which
+ * [VanishingApiKeyRepository] reproduces.
  */
-class AdminScimDialectFailureTest {
+class AdminApiKeyFailureReportingTest {
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val appRepo = FakeApplicationRepository()
@@ -164,6 +164,56 @@ class AdminScimDialectFailureTest {
             assertEquals(HttpStatusCode.NotFound, response.status)
             assertNull(response.headers["Location"], "a failed update must not redirect to the success toast")
             assertNull(backingApiKeyRepo.findById(key.id!!, TenantId(2)), "nothing was written")
+        }
+
+    @Test
+    fun `a revoke that fails does not redirect to the key list`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as ApiKeyResult.Success).value.apiKey
+            apiKeyRepo.vanishAfterNextFind = true
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/revoke",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertNull(response.headers["Location"], "a failed revoke must not look like it worked")
+        }
+
+    @Test
+    fun `a delete that fails does not redirect to the key list`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val created = apiKeyService.create(TenantId(2), "Directory sync", listOf(ApiScope.SCIM))
+            val key = (created as ApiKeyResult.Success).value.apiKey
+            apiKeyRepo.vanishAfterNextFind = true
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/delete",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+            assertNull(response.headers["Location"], "a failed delete must not look like it worked")
         }
 
     // =========================================================================
