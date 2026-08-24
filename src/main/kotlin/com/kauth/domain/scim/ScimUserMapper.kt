@@ -119,24 +119,19 @@ object ScimUserMapper {
         tenantId: TenantId,
     ): Result<ScimUserWrite> {
         val resource = merged.value
+        // One shape check for every attribute, before any of them is read: a present value of the
+        // wrong JSON type is invalidValue here rather than a null cast that quietly discards it —
+        // or, for `active`, silently leaves an account enabled after a deprovision.
+        resource.validateAttributeShapes().getOrElse { return Result.failure(it) }
+
         val username = (resource.attributes["userName"] as? ScimValue.Str)?.value?.trim()
         if (username.isNullOrEmpty()) {
             return Result.failure(ScimFailure(ScimErrorType.invalidValue, "userName is required"))
         }
 
-        // `name` is singular complex (RFC 7643 §4.1.1). A scalar here is not a partial set: read
-        // back as absent it would clear both parts, so a connector that flattened the object gets
-        // an error rather than a 200 with a wiped surname. Absent or explicitly null still clears.
-        val rawName = resource.attributes["name"]
-        if (rawName != null && rawName != ScimValue.Null && rawName !is ScimValue.Complex) {
-            return Result.failure(
-                ScimFailure(
-                    ScimErrorType.invalidValue,
-                    "'name' is a complex attribute and must be an object, got ${rawName.shapeName()}",
-                ),
-            )
-        }
-        val name = rawName as? ScimValue.Complex
+        // `name` is singular complex (RFC 7643 §4.1.1); a scalar written over it is rejected by
+        // the shape check above, so absent or explicitly null are the only ways it clears here.
+        val name = resource.attributes["name"] as? ScimValue.Complex
         val givenName = (name?.attributes?.get("givenName") as? ScimValue.Str)?.value
         val familyName = (name?.attributes?.get("familyName") as? ScimValue.Str)?.value
 
@@ -158,16 +153,10 @@ object ScimUserMapper {
             )
         }
 
-        // externalId is an opaque IdP key: trimmed because surrounding whitespace is never
-        // meaningful and creates duplicates the unique index can't see, but never lower-cased
-        // because case may be significant to the IdP. It is nullable and not NOT NULL-constrained,
-        // so — unlike email/fullName below — a PUT that omits it clears it (see KDoc above):
-        // an IdP unlinking a user by dropping externalId must not leave the stale key in place.
-        val externalId =
-            (resource.attributes["externalId"] as? ScimValue.Str)
-                ?.value
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
+        // externalId is nullable and not NOT NULL-constrained, so — unlike email/fullName below —
+        // a PUT that omits it clears it (see the KDoc above): an IdP unlinking a user by dropping
+        // externalId must not leave the stale correlation key in place.
+        val externalId = resource.parseExternalId().getOrElse { return Result.failure(it) }
 
         // Same emptiness guard as displayName: a work entry with value "" must fall through
         // to the existing address rather than blank it.
@@ -220,6 +209,9 @@ object ScimUserMapper {
      * validation error) and on update (address ignored, stale one kept).
      */
     private fun ScimResource.selectEmail(): String? {
+        // filterIsInstance cannot drop an entry here: validateAttributeShapes has already rejected
+        // `"emails":"ada@example.com"` and `"emails":["ada@example.com"]`, the two shapes that used
+        // to empty this list and leave the stored address in place under a 200.
         val entries = (attributes["emails"] as? ScimValue.MultiValued)?.values?.filterIsInstance<ScimValue.Complex>()
         val chosen =
             entries

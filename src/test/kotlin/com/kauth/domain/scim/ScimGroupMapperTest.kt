@@ -226,6 +226,61 @@ class ScimGroupMapperTest {
         assertEquals(members, write.memberIds)
     }
 
+    // -------------------------------------------------------------------------
+    // Attribute shapes — one table, checked once at the entry point
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `toDomain rejects a numeric externalId instead of erasing the stored correlation key`() {
+        // The cast used to yield null and write NULL, so the next sync's findByExternalId missed,
+        // the connector created a duplicate group, and the original was orphaned with its roles.
+        val existing = group()
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(attributes = it.attributes + ("externalId" to ScimValue.Num(9182)))
+            }
+
+        val failure = ScimGroupMapper.toDomain(r.merged(), existing, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("externalId"), failure.detail)
+        assertTrue(failure.detail.contains("a number"), failure.detail)
+    }
+
+    @Test
+    fun `toDomain rejects an array displayName instead of echoing the stored name back`() {
+        val existing = group()
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(
+                    attributes =
+                        it.attributes +
+                            ("displayName" to ScimValue.MultiValued(listOf(ScimValue.Str("Engineering")))),
+                )
+            }
+
+        val failure = ScimGroupMapper.toDomain(r.merged(), existing, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("displayName"), failure.detail)
+    }
+
+    @Test
+    fun `a shape failure detail names the attribute and the shape, never the value`() {
+        val secret = "s".repeat(4096)
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(attributes = it.attributes + ("externalId" to ScimValue.Str(secret).toArray()))
+            }
+
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertTrue(!failure.detail.contains(secret), "detail must not echo caller input")
+        assertTrue(failure.detail.length < 200, "detail must stay bounded, was ${failure.detail.length}")
+    }
+
+    private fun ScimValue.toArray() = ScimValue.MultiValued(listOf(this))
+
     private fun resourceWith(
         members: List<String>,
         externalId: String? = null,

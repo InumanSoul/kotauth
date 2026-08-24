@@ -102,6 +102,9 @@ object ScimGroupMapper {
         tenantId: TenantId,
     ): Result<ScimGroupWrite> {
         val resource = merged.value
+        // One shape check for every attribute, before any of them is read: a present value of the
+        // wrong JSON type is invalidValue here rather than a null cast that quietly discards it.
+        resource.validateAttributeShapes().getOrElse { return Result.failure(it) }
 
         // A blank displayName ("" or whitespace) is a common connector shape for a cleared
         // field; treated as absent so it falls through to existing rather than storing "".
@@ -116,13 +119,7 @@ object ScimGroupMapper {
             )
         }
 
-        // externalId is an opaque IdP key: trimmed because surrounding whitespace is never
-        // meaningful, but never lower-cased because case may be significant to the IdP.
-        val externalId =
-            (resource.attributes["externalId"] as? ScimValue.Str)
-                ?.value
-                ?.trim()
-                ?.takeIf { it.isNotEmpty() }
+        val externalId = resource.parseExternalId().getOrElse { return Result.failure(it) }
 
         val memberIds =
             resource.parseMembers().getOrElse { return Result.failure(it) }
@@ -142,37 +139,15 @@ object ScimGroupMapper {
     }
 
     private fun ScimResource.parseMembers(): Result<List<UserId>> {
-        val raw = attributes["members"]
-        // Absent, or explicitly cleared, means "no members" — the absent-clears rule in the KDoc
-        // above. Present but not an array is a caller mistake, and reading it as "no members" is
-        // how `{"members":"7"}` or `{"members":{"value":"7"}}` returns 200 and empties the group.
-        if (raw == null || raw == ScimValue.Null) return Result.success(emptyList())
-        val entries =
-            (raw as? ScimValue.MultiValued)?.values
-                ?: return Result.failure(
-                    ScimFailure(
-                        ScimErrorType.invalidValue,
-                        "members must be an array of objects, got ${raw.shapeName()}",
-                    ),
-                )
+        // The array-of-objects shape is already guaranteed by validateAttributeShapes, so the only
+        // remaining reading of a missing collection is the absent-clears rule in the KDoc above.
+        val entries = (attributes["members"] as? ScimValue.MultiValued)?.values ?: return Result.success(emptyList())
 
         val memberIds = mutableListOf<UserId>()
-        // Error details name the offending index and its shape, never the value itself: an entry
-        // can be a megabyte-long string or nested to the parser's depth cap, and echoing it puts
-        // unbounded caller input into the 400 body and into anything that logs responses.
         for ((index, rawEntry) in entries.withIndex()) {
-            // RFC 7643 §4.2 defines "members" as multi-valued *complex*, with "value" as a
-            // sub-attribute — a bare string id is not a legal member entry. Dropping it
-            // silently is how a `replace` of plain ids has emptied a group; reject instead.
-            val entry =
-                rawEntry as? ScimValue.Complex
-                    ?: return Result.failure(
-                        ScimFailure(
-                            ScimErrorType.invalidValue,
-                            "members[$index] is ${rawEntry.shapeName()}, " +
-                                "expected an object with a 'value' sub-attribute",
-                        ),
-                    )
+            // validateAttributeShapes has already rejected any non-object entry, so this narrowing
+            // can never drop a member the caller actually sent.
+            val entry = rawEntry as? ScimValue.Complex ?: continue
             // Case-insensitive: this guards a security decision (reject nesting rather than
             // flatten it), and RFC 7643's examples use "Group" but do not guarantee a connector
             // sends that exact casing. A lowercase "group" must not slip past it.

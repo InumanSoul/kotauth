@@ -519,6 +519,86 @@ class ScimUserMapperTest {
         assertEquals(original.enabled, back.enabled)
     }
 
+    // -------------------------------------------------------------------------
+    // Attribute shapes — one table, checked once at the entry point
+    // -------------------------------------------------------------------------
+
+    private fun userResourceWith(vararg extra: Pair<String, ScimValue>) =
+        ScimResource(
+            schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+            attributes = mapOf("userName" to ScimValue.Str("ada@example.com")) + extra,
+        )
+
+    private fun shapeFailureOf(
+        resource: ScimResource,
+        existing: User?,
+    ) = ScimUserMapper.toDomain(resource.merged(), existing, tenantId).exceptionOrNull() as ScimFailure
+
+    @Test
+    fun `a string active is rejected, not a silent failed deprovision`() {
+        // "active":"false" is real connector behaviour and the tempting fix is to coerce it. A
+        // coerced-away deprovision leaves the account authenticating while the IdP records it as
+        // disabled; a 400 is the operator's cue to fix the mapping. Leniency belongs in a dialect
+        // layer, never in this mapper.
+        val existing = user()
+        val failure = shapeFailureOf(userResourceWith("active" to ScimValue.Str("false")), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("active"), failure.detail)
+        assertTrue(failure.detail.contains("a boolean"), failure.detail)
+    }
+
+    @Test
+    fun `a bare-string emails value is rejected instead of keeping the stored address`() {
+        val existing = user()
+        val failure = shapeFailureOf(userResourceWith("emails" to ScimValue.Str("new@example.com")), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("emails"), failure.detail)
+    }
+
+    @Test
+    fun `an array of bare-string emails is rejected, the same answer Groups gives that shape`() {
+        val existing = user()
+        val emails = ScimValue.MultiValued(listOf(ScimValue.Str("new@example.com")))
+        val failure = shapeFailureOf(userResourceWith("emails" to emails), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("emails[0]"), failure.detail)
+    }
+
+    @Test
+    fun `a numeric externalId is rejected instead of erasing the stored correlation key`() {
+        val existing = user()
+        val failure = shapeFailureOf(userResourceWith("externalId" to ScimValue.Num(9182)), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("externalId"), failure.detail)
+    }
+
+    @Test
+    fun `an array displayName is rejected instead of echoing the stored name back`() {
+        val existing = user()
+        val displayName = ScimValue.MultiValued(listOf(ScimValue.Str("Ada L")))
+        val failure = shapeFailureOf(userResourceWith("displayName" to displayName), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("displayName"), failure.detail)
+    }
+
+    @Test
+    fun `a scalar userName is rejected rather than read as absent`() {
+        val r =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes = mapOf("userName" to ScimValue.Bool(true)),
+            )
+        val failure = shapeFailureOf(r, user())
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("userName"), failure.detail)
+    }
+
     private fun resourceWithName(
         given: String?,
         family: String?,

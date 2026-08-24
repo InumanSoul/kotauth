@@ -14,21 +14,9 @@ data class ScimPatchOp(
     val value: ScimValue?,
 )
 
-private val KNOWN_ATTRIBUTES =
-    setOf(
-        "userName",
-        "externalId",
-        "displayName",
-        "active",
-        "name",
-        "emails",
-        "members",
-        "id",
-        "schemas",
-        "meta",
-        "password",
-        "groups",
-    )
+// The attribute vocabulary is SCIM_ATTRIBUTE_SHAPES' keys, so the engine and the mappers cannot
+// drift into disagreeing about what a known attribute is.
+private val KNOWN_ATTRIBUTES = SCIM_ATTRIBUTE_SHAPES.keys
 
 // The target arity of a path is a property of the attribute's definition, not of what
 // happens to be stored under it right now — inferring arity from a (possibly absent)
@@ -43,11 +31,13 @@ private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
 // the collection rather than growing it — the only outcome the caller can actually observe.
 private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 
-// Attributes RFC 7643 defines as singular *complex*. A scalar written over one of these is not a
-// partial set: the mapper reads the attribute back with `as? ScimValue.Complex`, gets null, and
-// clears every sub-attribute — so `{"name":"Ada Lovelace"}` wipes both name parts and answers 200.
-// Rejected instead, the same accept-or-reject rule the members shape check follows.
-private val COMPLEX_ATTRIBUTES = setOf("name")
+// Attributes RFC 7643 defines as singular *complex*, read off the one shape table. Checking it
+// here as well as at the mapper's entry point costs nothing and names the offending path.
+//
+// Arity is deliberately NOT enforced here: RFC 7644 §3.5.2.1 lets an `add` or `replace` on a
+// multi-valued attribute carry a single element, which this engine then folds into the collection.
+// The canonical array shape is checked once, on the merged result, by ScimGroupMapper/ScimUserMapper.
+private val COMPLEX_ATTRIBUTES = SCIM_ATTRIBUTE_SHAPES.filterValues { it == ScimShape.COMPLEX }.keys
 
 // Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
 // into debugging a typo that isn't there, when the real issue is a read-only target.
@@ -302,11 +292,8 @@ class ScimPatchEngine {
     ) {
         if (name !in COMPLEX_ATTRIBUTES) return
         // Null is an explicit clear, which a complex attribute can legitimately take.
-        if (value is ScimValue.Complex || value == ScimValue.Null) return
-        throw PatchException(
-            ScimErrorType.invalidValue,
-            "'$name' is a complex attribute and must be an object, got ${value.shapeName()}",
-        )
+        if (value == ScimValue.Null) return
+        ScimShape.COMPLEX.mismatch(name, value)?.let { throw PatchException(it.type, it.detail) }
     }
 
     private fun requireKnownSubAttribute(

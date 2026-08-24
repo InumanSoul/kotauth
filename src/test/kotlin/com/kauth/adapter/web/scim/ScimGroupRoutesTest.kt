@@ -1220,6 +1220,71 @@ class ScimGroupRoutesTest {
             assertNotNull(groupRepo.findById(child.id!!))
         }
 
+    // -------------------------------------------------------------------------
+    // Attribute shapes — PUT, POST and PATCH all inherit the one table
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `PATCH replacing externalId with a number is rejected and the stored key survives`() =
+        testApplication {
+            application { installTestApp() }
+            val group = addGroup("Engineering", externalId = "grp-1")
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(patchBody("""{"op":"replace","path":"externalId","value":9182}"""))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            // The whole point: the correlation key is not NULLed out under a 200, which is what
+            // sent the next sync looking for a group it could no longer find.
+            assertEquals("grp-1", groupRepo.findById(group.id)!!.externalId)
+        }
+
+    @Test
+    fun `PUT with an array displayName is rejected instead of echoing the stored name back`() =
+        testApplication {
+            application { installTestApp() }
+            val group = addGroup("Engineering")
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":["Engineering"],"members":[]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("Engineering", groupRepo.findById(group.id)!!.name)
+        }
+
+    @Test
+    fun `POST with a numeric externalId is rejected instead of creating an uncorrelated group`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Engineering","externalId":9182}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(0L, groupRepo.countByTenantId(acme.id))
+        }
+
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Authentication) {

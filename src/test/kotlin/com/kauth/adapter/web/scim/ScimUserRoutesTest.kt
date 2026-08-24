@@ -1371,6 +1371,103 @@ class ScimUserRoutesTest {
     // Test wiring
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // Attribute shapes — PUT, POST and PATCH all inherit the one table
+    // -------------------------------------------------------------------------
+
+    private fun scimTypeOf(body: String) =
+        jsonCodec
+            .parseToJsonElement(body)
+            .jsonObject["scimType"]!!
+            .jsonPrimitive.content
+
+    @Test
+    fun `PATCH setting active to the string false is rejected, not a silent failed deprovision`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],""" +
+                            """"Operations":[{"op":"replace","path":"active","value":"false"}]}""",
+                    )
+                }
+
+            // A 200 here would tell the identity provider the account is deprovisioned while it
+            // keeps authenticating. The account is still enabled either way — the 400 is what
+            // stops the provider from believing otherwise.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(true, userRepo.findById(user.id, acme.id)!!.enabled)
+        }
+
+    @Test
+    fun `PUT with a bare-string emails value is rejected, the same answer Groups gives that shape`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
+                            """"userName":"ada","emails":"ada@new.example"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
+        }
+
+    @Test
+    fun `PUT with an array of bare-string emails is rejected rather than ignored`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
+                            """"userName":"ada","emails":["ada@new.example"]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("ada@example.com", userRepo.findById(user.id, acme.id)!!.email)
+        }
+
+    @Test
+    fun `PUT with a numeric externalId is rejected instead of erasing the stored key`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", externalId = "usr-1")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
+                            """"userName":"ada","externalId":9182}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("usr-1", userRepo.findById(user.id, acme.id)!!.externalId)
+        }
+
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
         install(Authentication) {
