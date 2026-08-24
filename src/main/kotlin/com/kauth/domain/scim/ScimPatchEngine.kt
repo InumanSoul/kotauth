@@ -43,6 +43,12 @@ private val MULTI_VALUED_ATTRIBUTES = setOf("members", "emails")
 // the collection rather than growing it — the only outcome the caller can actually observe.
 private val APPEND_ON_ADD_ATTRIBUTES = setOf("members")
 
+// Attributes RFC 7643 defines as singular *complex*. A scalar written over one of these is not a
+// partial set: the mapper reads the attribute back with `as? ScimValue.Complex`, gets null, and
+// clears every sub-attribute — so `{"name":"Ada Lovelace"}` wipes both name parts and answers 200.
+// Rejected instead, the same accept-or-reject rule the members shape check follows.
+private val COMPLEX_ATTRIBUTES = setOf("name")
+
 // Server-managed per RFC 7643: rejecting these as unknown would misdirect an integrator
 // into debugging a typo that isn't there, when the real issue is a read-only target.
 private val READ_ONLY_ATTRIBUTES = setOf("groups", "id", "meta")
@@ -106,6 +112,7 @@ class ScimPatchEngine {
             op.value as? ScimValue.Complex
                 ?: throw PatchException(ScimErrorType.invalidValue, "a null path requires a complex value")
         partial.attributes.keys.forEach(::requireWritableAttribute)
+        partial.attributes.forEach { (name, value) -> requireComplexShape(name, value) }
         if (op.op != ScimPatchOpType.ADD) {
             return resource.copy(attributes = resource.attributes + partial.attributes)
         }
@@ -134,6 +141,9 @@ class ScimPatchEngine {
     ): ScimResource {
         requireWritableAttribute(path.name)
         path.sub?.let { requireKnownSubAttribute(path.name, it) }
+        // Only a whole-attribute write can change the attribute's shape; a sub-attribute path
+        // targets one field inside it and leaves the complex wrapper in place.
+        if (path.sub == null) op.value?.let { requireComplexShape(path.name, it) }
         return when (op.op) {
             ScimPatchOpType.REMOVE -> removeAttr(resource, path)
             ScimPatchOpType.ADD -> addAttr(resource, path, op.value)
@@ -284,6 +294,19 @@ class ScimPatchEngine {
         if (name in READ_ONLY_ATTRIBUTES) {
             throw PatchException(ScimErrorType.mutability, "'$name' is read-only")
         }
+    }
+
+    private fun requireComplexShape(
+        name: String,
+        value: ScimValue,
+    ) {
+        if (name !in COMPLEX_ATTRIBUTES) return
+        // Null is an explicit clear, which a complex attribute can legitimately take.
+        if (value is ScimValue.Complex || value == ScimValue.Null) return
+        throw PatchException(
+            ScimErrorType.invalidValue,
+            "'$name' is a complex attribute and must be an object, got ${value.shapeName()}",
+        )
     }
 
     private fun requireKnownSubAttribute(

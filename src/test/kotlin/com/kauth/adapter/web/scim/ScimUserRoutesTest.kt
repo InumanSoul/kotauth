@@ -1009,6 +1009,98 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `PATCH with a scalar over the complex name is rejected and both parts survive`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"add","value":{"name":"Ada Lovelace"}}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            val stored = userRepo.findById(user.id!!, acme.id)!!
+            assertEquals("Ada", stored.givenName)
+            assertEquals("Lovelace", stored.familyName)
+        }
+
+    @Test
+    fun `PATCH with a targeted scalar over the complex name is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"replace","path":"name","value":"Ada Lovelace"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val stored = userRepo.findById(user.id!!, acme.id)!!
+            assertEquals("Ada", stored.givenName)
+            assertEquals("Lovelace", stored.familyName)
+        }
+
+    @Test
+    fun `PUT with a scalar over the complex name is rejected and both parts survive`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"name":"Ada Lovelace","emails":[{"value":"ada@example.com","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            val stored = userRepo.findById(user.id!!, acme.id)!!
+            assertEquals("Ada", stored.givenName)
+            assertEquals("Lovelace", stored.familyName)
+        }
+
+    @Test
+    fun `PUT omitting name entirely still clears both parts`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada", givenName = "Ada", familyName = "Lovelace")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"ada",""" +
+                            """"emails":[{"value":"ada@example.com","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val stored = userRepo.findById(user.id!!, acme.id)!!
+            assertEquals(null, stored.givenName)
+            assertEquals(null, stored.familyName)
+        }
+
+    @Test
     fun `PUT renaming userName is rejected with mutability, not silently dropped`() =
         testApplication {
             application { installTestApp() }

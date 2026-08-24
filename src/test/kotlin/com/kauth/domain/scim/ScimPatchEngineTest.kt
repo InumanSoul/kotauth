@@ -264,7 +264,10 @@ class ScimPatchEngineTest {
     }
 
     @Test
-    fun `a pathless add naming both sub-attributes of a complex attribute overwrites both`() {
+    fun `characterization - a pathless add naming every sub-attribute reads the same merged or overwritten`() {
+        // Not a guard: with both sub-attributes named, the sub-attribute merge and a plain
+        // overwrite produce the same result, so this passes either way. The guard for the merge
+        // is `a pathless add of one sub-attribute of a complex attribute preserves its siblings`.
         val out =
             apply(
                 userWithName("Ada", "Lovelace"),

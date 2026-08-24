@@ -124,7 +124,19 @@ object ScimUserMapper {
             return Result.failure(ScimFailure(ScimErrorType.invalidValue, "userName is required"))
         }
 
-        val name = resource.attributes["name"] as? ScimValue.Complex
+        // `name` is singular complex (RFC 7643 §4.1.1). A scalar here is not a partial set: read
+        // back as absent it would clear both parts, so a connector that flattened the object gets
+        // an error rather than a 200 with a wiped surname. Absent or explicitly null still clears.
+        val rawName = resource.attributes["name"]
+        if (rawName != null && rawName != ScimValue.Null && rawName !is ScimValue.Complex) {
+            return Result.failure(
+                ScimFailure(
+                    ScimErrorType.invalidValue,
+                    "'name' is a complex attribute and must be an object, got ${rawName.shapeName()}",
+                ),
+            )
+        }
+        val name = rawName as? ScimValue.Complex
         val givenName = (name?.attributes?.get("givenName") as? ScimValue.Str)?.value
         val familyName = (name?.attributes?.get("familyName") as? ScimValue.Str)?.value
 
