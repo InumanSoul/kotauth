@@ -329,6 +329,28 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `meta location is present and agrees with the POST Location header`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("Engineering"))
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val locationHeader = response.headers["Location"]
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val metaLocation =
+                body["meta"]!!
+                    .jsonObject["location"]!!
+                    .jsonPrimitive.content
+            assertEquals(locationHeader, metaLocation)
+        }
+
+    @Test
     fun `POST with a member includes it in the created resource`() =
         testApplication {
             application { installTestApp() }

@@ -32,16 +32,29 @@ object ScimGroupMapper {
     /** RFC 7643 §4.2's canonical value marking a member as another group rather than a user. */
     private const val MEMBER_TYPE_GROUP = "Group"
 
+    /**
+     * [location] is the absolute URL of this resource (RFC 7644 §3.1) — the caller resolves it
+     * from the request, since this mapper does no I/O and doesn't know the base URL. Passing
+     * `null` (the merge-baseline use inside `ScimPatchEngine`'s PATCH handling, or a filter-scan
+     * match check, never a client-facing response) omits `meta.location`.
+     */
     fun toResource(
         group: Group,
         memberIds: List<UserId>,
+        location: String? = null,
     ): ScimResource {
         val attributes = mutableMapOf<String, ScimValue>()
 
         group.id?.let { attributes["id"] = ScimValue.Str(it.value.toString()) }
         attributes["displayName"] = ScimValue.Str(group.name)
         group.externalId?.let { attributes["externalId"] = ScimValue.Str(it) }
-        attributes["meta"] = ScimValue.Complex(mapOf("resourceType" to ScimValue.Str("Group")))
+        attributes["meta"] =
+            ScimValue.Complex(
+                buildMap {
+                    put("resourceType", ScimValue.Str("Group"))
+                    location?.let { put("location", ScimValue.Str(it)) }
+                },
+            )
 
         // Always emitted, even when empty: an absent `members` array would be ambiguous with
         // "membership not loaded", where an empty array unambiguously means "no members".

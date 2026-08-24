@@ -76,6 +76,7 @@ fun Route.scimGroupRoutes(
         val count =
             (call.request.queryParameters["count"]?.toIntOrNull() ?: SCIM_FILTER_MAX_RESULTS)
                 .coerceIn(0, SCIM_FILTER_MAX_RESULTS)
+        val resourceBase = "${call.resolvedBaseUrl()}${call.request.path()}"
 
         if (filter == null) {
             val total = groupRepository.countByTenantId(tenantId)
@@ -92,6 +93,7 @@ fun Route.scimGroupRoutes(
                     total = total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                     startIndex = startIndex,
                     page = page,
+                    resourceBase = resourceBase,
                 ),
             )
             return@get
@@ -110,7 +112,13 @@ fun Route.scimGroupRoutes(
 
         call.respondScim(
             HttpStatusCode.OK,
-            groupListResponse(groupRepository, total = matched.size, startIndex = startIndex, page = page),
+            groupListResponse(
+                groupRepository,
+                total = matched.size,
+                startIndex = startIndex,
+                page = page,
+                resourceBase = resourceBase,
+            ),
         )
     }
 
@@ -327,7 +335,7 @@ private suspend fun ApplicationCall.respondScimGroup(
     val location = groupLocation(groupId)
     if (includeLocationHeader) response.headers.append(HttpHeaders.Location, location)
     val members = groupRepository.findUserIdsInGroup(groupId)
-    respondScim(status, ScimGroupMapper.toResource(group, members).toJson())
+    respondScim(status, ScimGroupMapper.toResource(group, members, location = location).toJson())
 }
 
 /**
@@ -429,10 +437,18 @@ private fun groupListResponse(
     total: Int,
     startIndex: Int,
     page: List<Group>,
+    resourceBase: String,
 ): JsonObject {
     val membersByGroup =
         if (page.isEmpty()) emptyMap() else groupRepository.findUserIdsForGroups(page.mapNotNull { it.id })
-    val resources = page.map { group -> ScimGroupMapper.toResource(group, membersByGroup[group.id] ?: emptyList()) }
+    val resources =
+        page.map { group ->
+            ScimGroupMapper.toResource(
+                group,
+                membersByGroup[group.id] ?: emptyList(),
+                location = "$resourceBase/${group.id!!.value}",
+            )
+        }
     return buildJsonObject {
         putJsonArray("schemas") { add(LIST_RESPONSE_SCHEMA) }
         put("totalResults", total)
