@@ -25,6 +25,10 @@ private val KNOWN_VERBS = setOf("add", "replace", "remove")
  * Reshapes the documented wire deviations of one enterprise provisioning client into the
  * canonical form, then hands the result to [RfcDialect] for the single canonical parse.
  *
+ * The one deviation it actually reshapes is `active` arriving as the strings `"True"`/`"False"`.
+ * The same client's capitalised `op` verbs need no dialect: the canonical parser matches the
+ * verb case-insensitively for every key, so a capitalised verb works under `rfc` too.
+ *
  * It normalises shape only. What an operation *means* stays with the patch engine, which is
  * deliberately vendor-blind, and a payload this dialect cannot map to a canonical shape fails
  * rather than being guessed at — a deprovision that quietly does nothing is worse than a 400.
@@ -80,12 +84,11 @@ private fun normalizeOperation(operation: JsonObject): Result<JsonObject> {
             )
         }
     }
+    // The verb itself is left as it arrived: ScimJson matches it case-insensitively for every
+    // dialect, `rfc` included, so rewriting it here would be a no-op that reads like a feature.
     return Result.success(
         buildJsonObject {
             operation.forEach { (key, value) -> put(key, value) }
-            // The verb arrives capitalised; lower-casing it here keeps the dialect independent of
-            // whatever leniency the canonical parser happens to allow.
-            put(OP_KEY, JsonPrimitive(verb))
             if (hasValue) put(VALUE_KEY, normalizeValue(path, operation.getValue(VALUE_KEY)))
         },
     )

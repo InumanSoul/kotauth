@@ -22,9 +22,12 @@ private const val DISPLAY_SUB_ATTRIBUTE = "display"
  * canonical form, then hands the result to [RfcDialect] for the single canonical parse.
  *
  * Its whole job is dropping the advisory `display` a group push carries alongside each member
- * id. `display` is a snapshot of the member's name at push time, not an authoritative field:
- * persisting it would leave a second copy of a name that drifts the moment the user is renamed,
- * and RFC 7643 §4.2 already marks it read-only. The id is the only part that identifies anyone.
+ * id. Nothing here is about persistence: no mapper reads `display` in either direction, so it is
+ * never stored under any dialect, and RFC 7643 §4.2 marks it read-only anyway. What stripping it
+ * changes is what gets *rejected* — the shape table declares `members[].display` a string, so a
+ * push sending a non-string there loses every member in the request under `rfc`, where this
+ * dialect drops the sub-attribute before the shape check sees it. The id is the only part that
+ * identifies anyone, and it is the only part that survives either way.
  *
  * Everything else passes through. A deactivation arrives as a `replace` on a proper `active`
  * path, which is already canonical, and a payload this dialect cannot map to member entries

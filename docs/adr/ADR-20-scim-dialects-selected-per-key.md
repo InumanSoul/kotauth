@@ -5,8 +5,9 @@
 ## Context
 
 RFC 7644 defines one wire format. Enterprise provisioning clients document deviations from it, and the
-deviations are not cosmetic: one sends `active` as the strings `"True"` and `"False"` and capitalises its `op`
-verbs, another attaches an advisory `display` name beside every group member id it pushes.
+deviations are not cosmetic: one sends `active` as the strings `"True"` and `"False"`, another attaches an
+advisory `display` name beside every group member id it pushes. (A third documented difference, capitalised
+`op` verbs, needs no dialect at all: the canonical parser has always matched the verb case-insensitively.)
 
 KotAuth's SCIM parser is strict on purpose. A string where the schema says boolean is a `400 invalidValue`
 naming the attribute, never a coerced value — because a deprovision that quietly does nothing is a security
@@ -73,6 +74,11 @@ client.
 A payload a dialect cannot map to a canonical shape fails rather than being guessed at. Inventing a member id
 from a bare string is not normalising — it is deciding what the caller meant, which is exactly the move this
 ADR exists to refuse.
+
+What a dialect buys is therefore narrower than it looks, and worth stating plainly: it changes what the strict
+core *rejects*, never what gets stored. Dropping the advisory `display` beside a member id persists nothing
+either way — no mapper reads it — but it means a connector sending that sub-attribute with the wrong JSON type
+loses the sub-attribute rather than the whole member push.
 
 ### Why an unrecognised id falls back instead of failing
 

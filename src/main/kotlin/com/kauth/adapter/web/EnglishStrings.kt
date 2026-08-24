@@ -877,8 +877,10 @@ object EnglishStrings {
                 "token).",
             "Enable Push New Users, Push Profile Updates, and Push Groups; deactivation arrives as a patch on " +
                 "`active`.",
-            "Its group pushes carry an advisory `display` name beside each member id; this dialect drops it and " +
-                "keeps the id, which is the only part that identifies anyone.",
+            "Its group pushes carry an advisory `display` name beside each member id. KotAuth stores none of " +
+                "it under any dialect; this dialect drops it before the request is checked, so a `display` of " +
+                "the wrong type is tolerated here instead of rejecting the whole push. The id is kept, and it " +
+                "is the only part that identifies anyone.",
         )
 
     /**

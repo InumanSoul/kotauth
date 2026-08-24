@@ -40,11 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and migration `V62` backfills every existing key to it, so nothing an
   existing client sends is interpreted any differently than before. Two
   vendor dialects ship beside it: one reads the `"True"`/`"False"` strings
-  and capitalised `op` verbs Microsoft Entra ID puts on the wire as the
-  booleans and verbs the spec requires, so a deprovision is not silently
-  ignored; the other drops the advisory `display` name Okta sends beside each
-  group member id and keeps the id, which is the only part that identifies
-  anyone. Both implement the deviations those vendors publish in their own
+  Microsoft Entra ID puts on the wire as the booleans the spec requires, so a
+  deprovision is not silently ignored; the other drops the advisory `display`
+  name Okta sends beside each group member id, which KotAuth stores under no
+  dialect, so a wrongly-typed `display` no longer costs the whole member push
+  — the id, the only part that identifies anyone, is kept either way. (A
+  capitalised `op` verb needs no dialect: every key, `rfc` included, matches
+  the verb case-insensitively.) Both implement the deviations those vendors publish in their own
   documentation; neither has yet been verified against a live tenant. The
   dialect is read from the key and never guessed from a request header — see
   `docs/adr/ADR-20-scim-dialects-selected-per-key.md`.
