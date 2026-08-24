@@ -142,9 +142,19 @@ object ScimGroupMapper {
     }
 
     private fun ScimResource.parseMembers(): Result<List<UserId>> {
+        val raw = attributes["members"]
+        // Absent, or explicitly cleared, means "no members" — the absent-clears rule in the KDoc
+        // above. Present but not an array is a caller mistake, and reading it as "no members" is
+        // how `{"members":"7"}` or `{"members":{"value":"7"}}` returns 200 and empties the group.
+        if (raw == null || raw == ScimValue.Null) return Result.success(emptyList())
         val entries =
-            (attributes["members"] as? ScimValue.MultiValued)?.values
-                ?: return Result.success(emptyList())
+            (raw as? ScimValue.MultiValued)?.values
+                ?: return Result.failure(
+                    ScimFailure(
+                        ScimErrorType.invalidValue,
+                        "members must be an array of objects, got ${raw.shapeName()}",
+                    ),
+                )
 
         val memberIds = mutableListOf<UserId>()
         for (rawEntry in entries) {

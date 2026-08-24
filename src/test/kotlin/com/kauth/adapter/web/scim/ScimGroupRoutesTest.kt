@@ -300,6 +300,12 @@ class ScimGroupRoutesTest {
 
     private fun membersArrayValue(vararg ids: Int) = "[" + ids.joinToString(",") { """{"value":"$it"}""" } + "]"
 
+    private fun scimTypeOf(body: String) =
+        jsonCodec
+            .parseToJsonElement(body)
+            .jsonObject["scimType"]!!
+            .jsonPrimitive.content
+
     // -------------------------------------------------------------------------
     // POST / GET / filtering
     // -------------------------------------------------------------------------
@@ -989,6 +995,91 @@ class ScimGroupRoutesTest {
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertEquals(setOf(u1.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH replacing members with a bare string is rejected and the group keeps its members`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(patchBody("""{"op":"replace","path":"members","value":"${u1.id!!.value}"}"""))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH with a pathless members object is rejected and the group keeps its members`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"replace","value":{"members":{"value":"${u1.id!!.value}","type":"User"}}}""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PUT with a members object instead of an array is rejected and membership survives`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],""" +
+                            """"displayName":"Eng","members":{"value":"${u1.id!!.value}"}}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+            assertEquals("Engineering", groupRepo.findById(group.id)!!.name)
+        }
+
+    @Test
+    fun `PUT omitting members entirely still clears membership`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"Eng"}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(emptySet(), groupRepo.findUserIdsInGroup(group.id!!).toSet())
         }
 
     @Test
