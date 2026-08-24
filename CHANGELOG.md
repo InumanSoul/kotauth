@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
+  `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
+  and `DELETE`, plus the `/ServiceProviderConfig`, `/ResourceTypes` and
+  `/Schemas` discovery endpoints. Authentication is an API key carrying the
+  `scim` scope; every request is scoped to the workspace in the path.
+- **`externalId` correlation keys** on users and groups (`V60`), unique per
+  workspace, so a provisioning client can find the record it created without
+  matching on a mutable attribute.
+- **Filtering and pagination** on both collections: `eq` filters combined with
+  `and`/`or` (RFC 7644 §3.4.2.2), with `startIndex`/`count` paging. Supported
+  filter attributes are scoped per resource type, so a filter naming an
+  attribute the other resource type owns is an `invalidFilter` error rather
+  than an empty result set.
+- **Strict attribute-shape validation.** A value of the wrong JSON type for a
+  known attribute — `"active": "false"`, `"externalId": 9182`,
+  `"emails": "a@example.com"` — is a `400 invalidValue` naming the attribute
+  and the shape received. It is never coerced and never silently discarded: a
+  deprovision that quietly does nothing is worse than a visible error. Unknown
+  attribute names are rejected on `PUT`/`POST` as well as `PATCH`.
+
+### Changed
+
+- **Behaviour change — deleting a group with subgroups now returns `409`.**
+  `DELETE /t/{slug}/api/v1/groups/{id}`, the same operation in the admin UI,
+  and `DELETE /t/{slug}/scim/v2/Groups/{id}` all refuse to delete a group that
+  still has at least one subgroup, naming the subgroups that block it.
+  Previously the delete succeeded and cascaded, destroying every descendant
+  group along with its memberships and role grants, with no undo and nothing in
+  the UI or API that said it would. Migration `V61` redeclares the
+  `groups.parent_group_id` foreign key `ON DELETE NO ACTION` as the backstop.
+
+  **A caller that relied on the cascade must now delete or reparent the
+  subgroups itself before deleting the parent.** Deleting a workspace still
+  removes its whole group tree in one statement and is unaffected. See
+  `docs/adr/ADR-18-group-delete-refuses-subgroups.md`.
+
+---
+
 ## [1.22.0] - 2026-08-21
 
 Machine-to-machine (M2M) onboarding release. Applications now declare an
