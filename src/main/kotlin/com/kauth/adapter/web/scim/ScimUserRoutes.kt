@@ -101,7 +101,8 @@ fun Route.scimUserRoutes(
 
         // A filter can reference any SCIM attribute (RFC 7644 §3.4.2.2), and the repository has
         // no query translation for that today, so this path still materialises the whole tenant
-        // directory to evaluate it in memory. Left as a follow-up — see the fix-wave report.
+        // directory to evaluate it in memory. A future repository-level query translation could
+        // remove this, but it's out of scope for a bug-fix pass.
         val resources = adminUserService.listUsers(tenantId).map(::toResourceWithGroups)
         val matched = resources.filter { r -> filter.matches(ScimValue.Complex(r.attributes)) }
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
