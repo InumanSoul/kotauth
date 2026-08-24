@@ -115,6 +115,21 @@ class ScimUserRoutesTest {
             securityConfig = SecurityConfig(),
         )
 
+    // SMTP-ready, unlike acme/globex — exercises the invite-email branch createUser's
+    // sendInvite=true path only takes when a tenant can actually send mail.
+    private val smtpTenant =
+        Tenant(
+            id = TenantId(3),
+            slug = "initech",
+            displayName = "Initech",
+            issuerUrl = "https://initech.kotauth.dev",
+            theme = TenantTheme.DEFAULT,
+            securityConfig = SecurityConfig(),
+            smtpEnabled = true,
+            smtpHost = "smtp.initech.example",
+            smtpFromAddress = "noreply@initech.example",
+        )
+
     private val apiKeyService = ApiKeyService(apiKeyRepository = apiKeyRepo, tenantRepository = tenantRepo)
 
     private val accountSelfService =
@@ -193,6 +208,7 @@ class ScimUserRoutesTest {
     private val jsonCodec = Json { ignoreUnknownKeys = true }
 
     private var scimKey: String = ""
+    private var smtpTenantScimKey: String = ""
 
     @BeforeTest
     fun setup() {
@@ -209,11 +225,21 @@ class ScimUserRoutesTest {
 
         tenantRepo.add(acme)
         tenantRepo.add(globex)
+        tenantRepo.add(smtpTenant)
 
         scimKey =
             (
                 apiKeyService.create(
                     tenantId = acme.id,
+                    name = "Provisioning Key",
+                    scopes = listOf(ApiScope.SCIM),
+                ) as ApiKeyResult.Success
+            ).value.rawKey
+
+        smtpTenantScimKey =
+            (
+                apiKeyService.create(
+                    tenantId = smtpTenant.id,
                     name = "Provisioning Key",
                     scopes = listOf(ApiScope.SCIM),
                 ) as ApiKeyResult.Success
@@ -429,6 +455,46 @@ class ScimUserRoutesTest {
             assertEquals(HttpStatusCode.Created, response.status)
             val stored = userRepo.findByUsername(acme.id, "invited")
             assertEquals(User.SENTINEL_PASSWORD_HASH, stored?.passwordHash)
+        }
+
+    @Test
+    fun `POST response carries a Location header pointing at the new user`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("newuser"))
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val id = body["id"]!!.jsonPrimitive.content
+            val location = response.headers["Location"]
+            assertEquals(true, location != null && location.endsWith("/t/acme/scim/v2/Users/$id"))
+        }
+
+    @Test
+    fun `a passwordless create on an SMTP-ready tenant sends an invite with an absolute link`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/initech/scim/v2/Users") {
+                    bearerAuth(smtpTenantScimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("provisioned"))
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            assertEquals(1, emailPort.sent.size)
+            val inviteUrl = emailPort.sent.single().url
+            // A bare relative path ("/t/initech/accept-invite?...") means baseUrl was never
+            // resolved and passed through — the link would 404 in any real browser.
+            assertEquals(true, inviteUrl.startsWith("http://") || inviteUrl.startsWith("https://"))
+            assertEquals(true, inviteUrl.contains("/t/initech/accept-invite?token="))
         }
 
     @Test

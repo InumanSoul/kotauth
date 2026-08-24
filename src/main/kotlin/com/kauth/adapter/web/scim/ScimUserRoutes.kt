@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.scim
 
+import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.adapter.web.api.TenantIdAttr
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
@@ -15,10 +16,12 @@ import com.kauth.domain.scim.parseFilter
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminUserService
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
 import io.ktor.server.application.log
+import io.ktor.server.request.path
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -82,6 +85,7 @@ fun Route.scimUserRoutes(
                 return@post
             }
 
+        val baseUrl = call.resolvedBaseUrl()
         val created =
             runScimTransaction(transactionRunner) {
                 val result =
@@ -92,6 +96,7 @@ fun Route.scimUserRoutes(
                         fullName = write.user.fullName,
                         password = write.plaintextPassword,
                         sendInvite = write.plaintextPassword == null,
+                        baseUrl = baseUrl,
                         externalId = write.user.externalId,
                         givenName = write.user.givenName,
                         familyName = write.user.familyName,
@@ -104,8 +109,11 @@ fun Route.scimUserRoutes(
             }
 
         when (created) {
-            is AdminResult.Success ->
-                call.respondScimUser(adminUserService, created.value.id!!, tenantId, HttpStatusCode.Created)
+            is AdminResult.Success -> {
+                val id = created.value.id!!
+                val location = "$baseUrl${call.request.path()}/${id.value}"
+                call.respondScimUser(adminUserService, id, tenantId, HttpStatusCode.Created, location)
+            }
             is AdminResult.Failure -> call.respondAdminError(created.error)
         }
     }
@@ -272,9 +280,13 @@ private suspend fun ApplicationCall.respondScimUser(
     userId: UserId,
     tenantId: TenantId,
     status: HttpStatusCode,
+    location: String? = null,
 ) {
     when (val fresh = adminUserService.getUser(userId, tenantId)) {
-        is AdminResult.Success -> respondScim(status, ScimUserMapper.toResource(fresh.value).toJson())
+        is AdminResult.Success -> {
+            location?.let { response.headers.append(HttpHeaders.Location, it) }
+            respondScim(status, ScimUserMapper.toResource(fresh.value).toJson())
+        }
         is AdminResult.Failure -> respondAdminError(fresh.error)
     }
 }
