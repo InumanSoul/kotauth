@@ -155,7 +155,7 @@ fun Route.scimGroupRoutes(
                 val saved = groupRepository.save(write.group)
                 val reconciled = scimGroupMembershipService.reconcile(saved.id!!, tenantId, write.memberIds)
                 if (reconciled.isFailure) {
-                    throw ScimGroupWriteRollback(reconciled.exceptionOrNull() as ScimFailure)
+                    throw ScimGroupWriteRollback(reconciled.reconcileFailure())
                 }
                 saved
             }
@@ -289,7 +289,7 @@ private suspend fun ApplicationCall.applyScimGroupWrite(
             val saved = groupRepository.update(write.group)
             val reconciled = scimGroupMembershipService.reconcile(groupId, tenantId, write.memberIds)
             if (reconciled.isFailure) {
-                throw ScimGroupWriteRollback(reconciled.exceptionOrNull() as ScimFailure)
+                throw ScimGroupWriteRollback(reconciled.reconcileFailure())
             }
             saved
         }
@@ -456,6 +456,15 @@ private fun groupListResponse(
         putJsonArray("Resources") { resources.forEach { add(it.toJson()) } }
     }
 }
+
+/**
+ * The reconcile leg only ever fails with a [ScimFailure] today. A hard cast would turn any future
+ * failure type into a ClassCastException raised inside the transaction — a 500 where the caller
+ * should have got the 400 that already exists — so the fallback is taken instead.
+ */
+private fun Result<Unit>.reconcileFailure(): ScimFailure =
+    exceptionOrNull() as? ScimFailure
+        ?: ScimFailure(ScimErrorType.invalidValue, "group membership could not be reconciled")
 
 /**
  * Internal-only: thrown when the membership-reconcile leg of a write fails, so the metadata
