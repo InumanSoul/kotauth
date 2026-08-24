@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.scim
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.api.ApiKeyAttr
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.scim.ScimPatchOp
@@ -19,6 +20,17 @@ interface ScimDialect {
     /** Stable identifier persisted on the API key; matched by [scimDialectFor]. */
     val id: String
 
+    /**
+     * Operator-facing name and setup notes for the admin provisioning page.
+     *
+     * They live on the dialect so the registry stays the single source: the selector and the
+     * notes are derived from it, and the admin package never needs to name a vendor to render
+     * either. The wording itself comes from [EnglishStrings], like all operator copy.
+     */
+    val label: String
+
+    val setupNotes: List<String>
+
     fun normalizeOps(body: JsonElement): Result<List<ScimPatchOp>>
 
     fun normalizeResource(body: JsonElement): Result<ScimResource>
@@ -27,6 +39,10 @@ interface ScimDialect {
 /** The canonical dialect: a pass-through straight to [ScimJson], so it is behaviour-neutral. */
 object RfcDialect : ScimDialect {
     override val id = ApiKey.DEFAULT_SCIM_DIALECT
+
+    override val label = EnglishStrings.SCIM_DIALECT_RFC_LABEL
+
+    override val setupNotes = EnglishStrings.SCIM_DIALECT_RFC_NOTES
 
     override fun normalizeOps(body: JsonElement): Result<List<ScimPatchOp>> = body.toScimPatchOps()
 
@@ -41,6 +57,12 @@ private val DIALECTS: Map<String, ScimDialect> = listOf(RfcDialect, EntraDialect
  * provisioning against the spec, not start rejecting every payload.
  */
 fun scimDialectFor(id: String?): ScimDialect = DIALECTS[id] ?: RfcDialect
+
+/**
+ * Every registered dialect, in registration order. The admin selector and the per-provider
+ * notes both read this rather than keeping a second list that could drift from [DIALECTS].
+ */
+val scimDialects: List<ScimDialect> get() = DIALECTS.values.toList()
 
 /**
  * The dialect configured on the API key authenticating this request. Selection is per key, so a

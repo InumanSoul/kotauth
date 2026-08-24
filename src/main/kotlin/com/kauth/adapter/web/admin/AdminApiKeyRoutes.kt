@@ -1,5 +1,7 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.scim.scimDialectFor
+import com.kauth.domain.model.ApiScope
 import com.kauth.domain.service.ApiKeyService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -29,9 +31,20 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
+        val preselected =
+            call.request.queryParameters
+                .getAll("scope")
+                .orEmpty()
+                .filter { it in ApiScope.ALL }
+                .toSet()
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.createApiKeyPage(workspace, wsPairs, session.username),
+            AdminView.createApiKeyPage(
+                workspace,
+                wsPairs,
+                session.username,
+                preselectedScopes = preselected,
+            ),
         )
     }
 
@@ -44,6 +57,9 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
         val params = call.receiveParameters()
         val name = params["name"]?.trim() ?: ""
         val scopes = params.getAll("scopes") ?: emptyList()
+        // Resolving through the registry means an unknown id is stored as the RFC default rather
+        // than as a value the SCIM surface would silently ignore later.
+        val scimDialect = scimDialectFor(params["scimDialect"]).id
         val expiresAt =
             params["expiresAt"]?.takeIf { it.isNotBlank() }?.let {
                 runCatching {
@@ -54,7 +70,7 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 }.getOrNull()
             }
 
-        when (val result = svc.create(workspace.id, name, scopes, expiresAt)) {
+        when (val result = svc.create(workspace.id, name, scopes, expiresAt, scimDialect)) {
             is com.kauth.domain.service.ApiKeyResult.Success -> {
                 val keys = svc.listForTenant(workspace.id)
                 call.respondHtml(
@@ -76,6 +92,8 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                         wsPairs,
                         session.username,
                         error = result.error.message,
+                        preselectedScopes = scopes.toSet(),
+                        selectedDialect = scimDialect,
                     ),
                 )
             }

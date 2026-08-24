@@ -550,6 +550,11 @@ fun Route.adminRoutes(
                     apiKeyService = apiKeyService,
                 )
 
+                adminScimRoutes(
+                    apiKeyService = apiKeyService,
+                    baseUrl = baseUrl,
+                )
+
                 adminWebhookRoutes(
                     webhookService = webhookService,
                 )

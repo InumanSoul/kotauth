@@ -396,6 +396,13 @@ internal fun DIV.renderDirectoryCtxPanel(
     ctxLink("$base/users", "users", activeSection, "Users")
     ctxLink("$base/groups", "groups", activeSection, "Groups")
     ctxLink("$base/roles", "roles", activeSection, "Roles")
+    div("sidebar__divider") {}
+    ctxLink(
+        "$base/provisioning",
+        "provisioning",
+        activeSection,
+        com.kauth.adapter.web.EnglishStrings.SCIM_NAV_LABEL,
+    )
 }
 
 internal fun DIV.renderSecurityCtxPanel(

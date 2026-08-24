@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.scim
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
 import com.kauth.domain.scim.ScimPatchOp
@@ -32,6 +33,10 @@ private const val DISPLAY_SUB_ATTRIBUTE = "display"
  */
 object OktaDialect : ScimDialect {
     override val id = "okta"
+
+    override val label = EnglishStrings.SCIM_DIALECT_OKTA_LABEL
+
+    override val setupNotes = EnglishStrings.SCIM_DIALECT_OKTA_NOTES
 
     override fun normalizeOps(body: JsonElement): Result<List<ScimPatchOp>> {
         val obj = body as? JsonObject ?: return RfcDialect.normalizeOps(body)

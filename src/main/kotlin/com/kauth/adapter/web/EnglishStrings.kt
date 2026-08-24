@@ -764,6 +764,99 @@ object EnglishStrings {
         subgroups: List<Group>,
     ) = childGroupsBlockDeleteMessage(groupName, subgroups)
 
+    // Admin — SCIM provisioning
+    const val SCIM_NAV_LABEL = "Provisioning"
+    const val SCIM_PAGE_TITLE = "Provisioning"
+    const val SCIM_PAGE_SUBTITLE =
+        "Let an identity provider create, update, and deactivate this workspace's users and groups over SCIM 2.0."
+
+    const val SCIM_ENDPOINT_HEADING = "Endpoint"
+    const val SCIM_ENDPOINT_LABEL = "Base URL"
+    const val SCIM_ENDPOINT_HINT =
+        "The same for every provisioning client in this workspace. Paste it wherever your identity provider " +
+            "asks for the SCIM base or tenant URL."
+
+    const val SCIM_TOKEN_HEADING = "Token"
+    const val SCIM_TOKEN_HINT =
+        "Provisioning authenticates with an API key holding the scim scope, sent as a bearer token. " +
+            "The key value is shown once, when you create it."
+    const val SCIM_TOKEN_MANAGE_CTA = "Manage API keys"
+    const val SCIM_TOKEN_CREATE_CTA = "Create a provisioning key"
+    const val SCIM_KEYS_EMPTY_TITLE = "No provisioning key yet"
+    const val SCIM_KEYS_EMPTY_BODY =
+        "Create an API key with the scim scope, then paste it into your identity provider as the secret token."
+    const val SCIM_KEYS_COL_NAME = "Key"
+    const val SCIM_KEYS_COL_DIALECT = "Dialect"
+    const val SCIM_KEYS_COL_LAST_USED = "Last API use"
+    const val SCIM_KEYS_COL_STATE = "State"
+    const val SCIM_KEYS_NEVER_USED = "Never"
+
+    const val SCIM_STATUS_HEADING = "Status"
+
+    /**
+     * Deliberately not a green "connected" badge. Nothing in the audit log records an individual
+     * SCIM request or the key that made it, so any timestamp shown here would be inferred rather
+     * than observed — and an operator trusting a wrong "connected" is worse off than one told
+     * plainly that the answer is not available yet.
+     */
+    const val SCIM_STATUS_UNKNOWN =
+        "Not verified. KotAuth does not yet record individual SCIM requests in the audit log, so a successful " +
+            "connection cannot be confirmed from here. Check your identity provider's own provisioning log."
+    const val SCIM_STATUS_NO_KEY =
+        "Not connected. This workspace has no API key holding the scim scope, so every provisioning request " +
+            "is rejected."
+    const val SCIM_STATUS_LAST_USE_HINT =
+        "Last API use counts any request made with the key, not only provisioning requests."
+
+    const val SCIM_BEHAVIOUR_HEADING = "What provisioning does"
+    const val SCIM_DEPROVISION_HEADING = "Deprovisioning"
+    const val SCIM_DELETE_DEACTIVATES =
+        "DELETE deactivates a user instead of deleting it. The account stays in the directory, disabled, " +
+            "so audit history and group membership survive a deprovision."
+    const val SCIM_BEHAVIOUR_GROUPS =
+        "Groups map to KotAuth groups. Member pushes carry user ids; a member the workspace does not have " +
+            "is rejected rather than created."
+
+    const val SCIM_NOTES_HEADING = "Identity provider notes"
+    const val SCIM_NOTES_INTRO =
+        "Connectors differ in what they ask for and what they put on the wire. Pick the matching dialect when " +
+            "you create the key — it is read from the key, never guessed from a request header."
+
+    const val SCIM_DIALECT_FIELD_LABEL = "SCIM dialect"
+    const val SCIM_DIALECT_FIELD_HINT =
+        "Applies only to keys holding the scim scope. Leave it on the default unless your identity provider " +
+            "is listed."
+
+    const val SCIM_DIALECT_RFC_LABEL = "Standard SCIM 2.0 (RFC 7644)"
+    const val SCIM_DIALECT_ENTRA_LABEL = "Microsoft Entra ID"
+    const val SCIM_DIALECT_OKTA_LABEL = "Okta"
+
+    val SCIM_DIALECT_RFC_NOTES =
+        listOf(
+            "The default, and a pass-through: payloads are parsed exactly as RFC 7644 defines them.",
+            "Use it for any connector that follows the spec, and as the starting point for one you are unsure about.",
+            "Configure the client with the base URL above and the API key as a bearer token.",
+        )
+
+    val SCIM_DIALECT_ENTRA_NOTES =
+        listOf(
+            "Enterprise application → Provisioning asks for two fields: Tenant URL and Secret Token.",
+            "Tenant URL is the base URL above; Secret Token is the API key.",
+            "Its patch requests send `active` as the strings \"True\" and \"False\"; this dialect reads them as " +
+                "the booleans the spec requires, so a deprovision is not silently ignored.",
+        )
+
+    val SCIM_DIALECT_OKTA_NOTES =
+        listOf(
+            "Provisioning → Integration asks for the SCIM connector base URL, the unique identifier field for " +
+                "users (use userName), and the authentication mode (HTTP Header, with the API key as the bearer " +
+                "token).",
+            "Enable Push New Users, Push Profile Updates, and Push Groups; deactivation arrives as a patch on " +
+                "`active`.",
+            "Its group pushes carry an advisory `display` name beside each member id; this dialect drops it and " +
+                "keeps the id, which is the only part that identifies anyone.",
+        )
+
     /**
      * All `const val String` declarations in this object, keyed by their field name.
      * Used by the translation infrastructure as the English source of truth for

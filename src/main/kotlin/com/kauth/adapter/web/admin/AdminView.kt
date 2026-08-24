@@ -426,7 +426,28 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
         scopes: List<String> = ApiScope.ALL,
-    ): HTML.() -> Unit = createApiKeyPageImpl(workspace, allWorkspaces, loggedInAs, error, scopes)
+        preselectedScopes: Set<String> = emptySet(),
+        selectedDialect: String = ApiKey.DEFAULT_SCIM_DIALECT,
+    ): HTML.() -> Unit =
+        createApiKeyPageImpl(
+            workspace,
+            allWorkspaces,
+            loggedInAs,
+            error,
+            scopes,
+            preselectedScopes,
+            selectedDialect,
+        )
+
+    // ── Provisioning (SCIM) ─────────────────────────────────────────────
+
+    fun scimProvisioningPage(
+        workspace: Tenant,
+        scimKeys: List<ApiKey>,
+        endpointUrl: String,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+    ): HTML.() -> Unit = scimProvisioningPageImpl(workspace, scimKeys, endpointUrl, allWorkspaces, loggedInAs)
 
     // ── Webhooks ────────────────────────────────────────────────────────
 
