@@ -551,6 +551,42 @@ class ScimUserRoutesTest {
             val id = body["id"]!!.jsonPrimitive.content
             val location = response.headers["Location"]
             assertEquals(true, location != null && location.endsWith("/t/acme/scim/v2/Users/$id"))
+            // meta.location must match the Location header, not just also exist.
+            assertEquals(
+                location,
+                body["meta"]
+                    ?.jsonObject
+                    ?.get("location")
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+            assertEquals(
+                "User",
+                body["meta"]
+                    ?.jsonObject
+                    ?.get("resourceType")
+                    ?.jsonPrimitive
+                    ?.content,
+            )
+        }
+
+    @Test
+    fun `GET Users by id includes a meta location matching the resource's own URL`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("alice")
+
+            val response = client.get("/t/acme/scim/v2/Users/${user.id!!.value}") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val location =
+                body["meta"]
+                    ?.jsonObject
+                    ?.get("location")
+                    ?.jsonPrimitive
+                    ?.content
+            assertEquals(true, location != null && location.endsWith("/t/acme/scim/v2/Users/${user.id!!.value}"))
         }
 
     @Test

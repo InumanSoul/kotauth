@@ -22,9 +22,21 @@ data class ScimUserWrite(
 
 /** Translates between the SCIM User schema (RFC 7643 §4.1) and the domain [User]. Pure mapping: no I/O. */
 object ScimUserMapper {
+    /**
+     * [location] is the absolute URL of this resource (RFC 7644 §3.1) — the caller resolves it
+     * from the request, since the mapper does no I/O and doesn't know the base URL. Passing
+     * `null` (the merge-baseline use inside `ScimPatchEngine`'s PATCH handling, never a
+     * client-facing response) omits `meta.location` but still emits `meta.resourceType`.
+     *
+     * `meta.lastModified` is deliberately never emitted: [User] has no update-tracking timestamp,
+     * only [User.createdAt] — fabricating a "last modified" value from creation time would tell a
+     * connector doing delta sync that nothing has changed since creation, which is worse than the
+     * attribute being absent (RFC 7643 marks every `meta` sub-attribute OPTIONAL).
+     */
     fun toResource(
         user: User,
         groups: List<Group> = emptyList(),
+        location: String? = null,
     ): ScimResource {
         val attributes = mutableMapOf<String, ScimValue>()
 
@@ -32,6 +44,14 @@ object ScimUserMapper {
         attributes["userName"] = ScimValue.Str(user.username)
         user.externalId?.let { attributes["externalId"] = ScimValue.Str(it) }
         attributes["active"] = ScimValue.Bool(user.enabled)
+        attributes["meta"] =
+            ScimValue.Complex(
+                buildMap {
+                    put("resourceType", ScimValue.Str("User"))
+                    location?.let { put("location", ScimValue.Str(it)) }
+                    user.createdAt?.let { put("created", ScimValue.Str(it.toString())) }
+                },
+            )
 
         // Never reverse-engineer name parts by splitting fullName: a fabricated value is
         // worse than an honest gap, and splitting on whitespace is wrong for many names.

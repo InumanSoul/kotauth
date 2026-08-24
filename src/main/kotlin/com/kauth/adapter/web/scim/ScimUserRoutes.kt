@@ -62,6 +62,8 @@ fun Route.scimUserRoutes(
             (call.request.queryParameters["count"]?.toIntOrNull() ?: SCIM_FILTER_MAX_RESULTS)
                 .coerceIn(0, SCIM_FILTER_MAX_RESULTS)
 
+        val resourceBase = "${call.resolvedBaseUrl()}${call.request.path()}"
+
         if (filter == null) {
             // No filter: the database can page directly, so this request materialises only
             // one page of ScimResource trees instead of the whole tenant directory.
@@ -72,7 +74,7 @@ fun Route.scimUserRoutes(
                 } else {
                     adminUserService
                         .listUsers(tenantId, limit = count, offset = startIndex - 1)
-                        .map { ScimUserMapper.toResource(it) }
+                        .map { ScimUserMapper.toResource(it, location = "$resourceBase/${it.id!!.value}") }
                 }
             call.respondScim(
                 HttpStatusCode.OK,
@@ -88,7 +90,11 @@ fun Route.scimUserRoutes(
         // A filter can reference any SCIM attribute (RFC 7644 §3.4.2.2), and the repository has
         // no query translation for that today, so this path still materialises the whole tenant
         // directory to evaluate it in memory. Left as a follow-up — see the fix-wave report.
-        val resources = adminUserService.listUsers(tenantId).map { ScimUserMapper.toResource(it) }
+        val resources =
+            adminUserService
+                .listUsers(
+                    tenantId,
+                ).map { ScimUserMapper.toResource(it, location = "$resourceBase/${it.id!!.value}") }
         val matched = resources.filter { r -> filter.matches(ScimValue.Complex(r.attributes)) }
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
         // no Resources returned, never the resources themselves.
@@ -140,8 +146,13 @@ fun Route.scimUserRoutes(
             is AdminResult.Success -> {
                 val id = created.value.id!!
                 adminUserService.dispatchPendingInvite(id, tenantId, baseUrl)
-                val location = "$baseUrl${call.request.path()}/${id.value}"
-                call.respondScimUser(adminUserService, id, tenantId, HttpStatusCode.Created, location)
+                call.respondScimUser(
+                    adminUserService,
+                    id,
+                    tenantId,
+                    HttpStatusCode.Created,
+                    includeLocationHeader = true,
+                )
             }
             is AdminResult.Failure -> call.respondAdminError(created.error)
         }
@@ -150,14 +161,7 @@ fun Route.scimUserRoutes(
     get("/Users/{id}") {
         val tenantId = call.attributes[TenantIdAttr]
         val userId = call.userIdParam() ?: return@get call.respondAdminError(AdminError.NotFound("User not found."))
-        when (val result = adminUserService.getUser(userId, tenantId)) {
-            is AdminResult.Success ->
-                call.respondScim(
-                    HttpStatusCode.OK,
-                    ScimUserMapper.toResource(result.value).toJson(),
-                )
-            is AdminResult.Failure -> call.respondAdminError(result.error)
-        }
+        call.respondScimUser(adminUserService, userId, tenantId, HttpStatusCode.OK)
     }
 
     put("/Users/{id}") {
@@ -316,15 +320,27 @@ private suspend fun ApplicationCall.respondScimUser(
     userId: UserId,
     tenantId: TenantId,
     status: HttpStatusCode,
-    location: String? = null,
+    includeLocationHeader: Boolean = false,
 ) {
     when (val fresh = adminUserService.getUser(userId, tenantId)) {
         is AdminResult.Success -> {
-            location?.let { response.headers.append(HttpHeaders.Location, it) }
-            respondScim(status, ScimUserMapper.toResource(fresh.value).toJson())
+            val location = userLocation(userId)
+            if (includeLocationHeader) response.headers.append(HttpHeaders.Location, location)
+            respondScim(status, ScimUserMapper.toResource(fresh.value, location = location).toJson())
         }
         is AdminResult.Failure -> respondAdminError(fresh.error)
     }
+}
+
+/**
+ * Absolute URL for a single user resource, derived from the current request path. For
+ * `/Users/{id}` routes (GET/PUT/PATCH) the path already ends in the id; for `/Users` routes
+ * (POST) it doesn't, so the id is appended. Either way this lands on the same `.../Users/{id}`.
+ */
+private fun ApplicationCall.userLocation(id: UserId): String {
+    val path = request.path()
+    val base = if (parameters["id"] != null) path.substringBeforeLast("/") else path
+    return "${resolvedBaseUrl()}$base/${id.value}"
 }
 
 private fun ApplicationCall.userIdParam(): UserId? = parameters["id"]?.toIntOrNull()?.let { UserId(it) }

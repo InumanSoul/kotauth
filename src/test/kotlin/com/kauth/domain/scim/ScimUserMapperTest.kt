@@ -43,6 +43,34 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `toResource always emits meta resourceType, even without a location`() {
+        val r = ScimUserMapper.toResource(user())
+        val meta = r.attributes["meta"] as ScimValue.Complex
+
+        assertEquals(ScimValue.Str("User"), meta.attributes["resourceType"])
+        assertNull(meta.attributes["location"])
+    }
+
+    @Test
+    fun `toResource emits meta location when given one`() {
+        val r = ScimUserMapper.toResource(user(), location = "https://kotauth.example/t/acme/scim/v2/Users/7")
+        val meta = r.attributes["meta"] as ScimValue.Complex
+
+        assertEquals(
+            ScimValue.Str("https://kotauth.example/t/acme/scim/v2/Users/7"),
+            meta.attributes["location"],
+        )
+    }
+
+    @Test
+    fun `toResource never emits meta lastModified — there is no update-tracking timestamp to source it from`() {
+        val r = ScimUserMapper.toResource(user())
+        val meta = r.attributes["meta"] as ScimValue.Complex
+
+        assertNull(meta.attributes["lastModified"])
+    }
+
+    @Test
     fun `toResource omits name entirely when both parts are null`() {
         // Never reverse-engineer name parts by splitting fullName — an honest gap
         // beats a fabricated value, and splitting is wrong for many names.
