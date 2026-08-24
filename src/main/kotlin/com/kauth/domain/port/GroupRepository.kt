@@ -60,6 +60,13 @@ interface GroupRepository {
 
     fun findGroupsForUser(userId: UserId): List<Group>
 
+    /**
+     * Batches [findGroupsForUser] across many users in a single query, grouped in memory by
+     * user id. A user with no memberships has no entry in the result map. Exists so a page of
+     * SCIM results can load groups once instead of once per user.
+     */
+    fun findGroupsForUsers(userIds: List<UserId>): Map<UserId, List<Group>>
+
     fun findUserIdsInGroup(groupId: GroupId): List<UserId>
 
     /**

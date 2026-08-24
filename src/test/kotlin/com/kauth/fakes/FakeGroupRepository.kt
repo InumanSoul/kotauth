@@ -31,6 +31,7 @@ class FakeGroupRepository : GroupRepository {
         store.clear()
         groupRoles.clear()
         groupMembers.clear()
+        findGroupsForUsersCallSizes.clear()
         nextId = 1
     }
 
@@ -107,6 +108,19 @@ class FakeGroupRepository : GroupRepository {
             .filter { it.value.contains(userId.value) }
             .keys
             .mapNotNull { store[it] }
+
+    // Records the size of every findGroupsForUsers call so tests can assert the N+1 fix:
+    // the number of ids looked up must track the page size, never the total match count.
+    val findGroupsForUsersCallSizes = mutableListOf<Int>()
+
+    override fun findGroupsForUsers(userIds: List<UserId>): Map<UserId, List<Group>> {
+        findGroupsForUsersCallSizes += userIds.size
+        return userIds
+            .mapNotNull { userId ->
+                val groups = findGroupsForUser(userId)
+                if (groups.isEmpty()) null else userId to groups
+            }.toMap()
+    }
 
     override fun findUserIdsInGroup(groupId: GroupId): List<UserId> =
         groupMembers[groupId.value]?.map { UserId(it) }?.toList() ?: emptyList()

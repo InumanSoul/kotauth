@@ -564,6 +564,24 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `groups are loaded once for the returned page, not once per match - pins the N+1 fix`() =
+        testApplication {
+            application { installTestApp() }
+            repeat(20) { addUser("user%04d".format(it)) }
+
+            // "active" has no indexed lookup, so this exercises the bounded-scan path with
+            // every one of the 20 users matching.
+            val response = client.get(usersUrl("""active eq true""") + "&count=3") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(20, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(3, body["Resources"]!!.jsonArray.size)
+            // A single batched call sized to the page (3), never one per match (20).
+            assertEquals(listOf(3), groupRepo.findGroupsForUsersCallSizes)
+        }
+
+    @Test
     fun `an unsupported filter returns 400 invalidFilter, never an unfiltered list`() =
         testApplication {
             application { installTestApp() }

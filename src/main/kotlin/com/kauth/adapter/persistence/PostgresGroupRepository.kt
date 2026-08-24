@@ -187,6 +187,18 @@ class PostgresGroupRepository : GroupRepository {
                 .map { it.toGroup() }
         }
 
+    override fun findGroupsForUsers(userIds: List<UserId>): Map<UserId, List<Group>> =
+        if (userIds.isEmpty()) {
+            emptyMap()
+        } else {
+            transaction {
+                (UserGroupsTable innerJoin GroupsTable)
+                    .selectAll()
+                    .where { UserGroupsTable.userId inList userIds.map { it.value } }
+                    .groupBy({ UserId(it[UserGroupsTable.userId]) }, { it.toGroup() })
+            }
+        }
+
     override fun findUserIdsInGroup(groupId: GroupId): List<UserId> =
         transaction {
             UserGroupsTable

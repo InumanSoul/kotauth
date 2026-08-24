@@ -76,40 +76,48 @@ fun Route.scimUserRoutes(
 
         val resourceBase = "${call.resolvedBaseUrl()}${call.request.path()}"
 
-        // One membership lookup per user, capped by the 200-row page window above — acceptable
-        // N+1 at this scale; batching would need a new GroupRepository method out of this phase's scope.
-        fun toResourceWithGroups(user: User) =
-            ScimUserMapper.toResource(
-                user,
-                groups = groupRepository.findGroupsForUser(user.id!!),
-                location = "$resourceBase/${user.id.value}",
-            )
+        // Loads groups for exactly the page being returned, in one batched query — never for
+        // the full match set. Callers must slice to the page before calling this.
+        fun buildResources(page: List<User>): List<ScimResource> {
+            if (page.isEmpty()) return emptyList()
+            val groupsByUser = groupRepository.findGroupsForUsers(page.mapNotNull { it.id })
+            return page.map { user ->
+                ScimUserMapper.toResource(
+                    user,
+                    groups = groupsByUser[user.id] ?: emptyList(),
+                    location = "$resourceBase/${user.id!!.value}",
+                )
+            }
+        }
 
         if (filter == null) {
             // No filter: the database can page directly, so this request materialises only
-            // one page of ScimResource trees instead of the whole tenant directory.
+            // one page of User rows instead of the whole tenant directory.
             val total = adminUserService.countUsers(tenantId)
             val page =
                 if (count == 0) {
                     emptyList()
                 } else {
-                    adminUserService
-                        .listUsers(tenantId, limit = count, offset = startIndex - 1)
-                        .map(::toResourceWithGroups)
+                    adminUserService.listUsers(tenantId, limit = count, offset = startIndex - 1)
                 }
             call.respondScim(
                 HttpStatusCode.OK,
                 listResponse(
                     total = total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
                     startIndex = startIndex,
-                    resources = page,
+                    resources = buildResources(page),
                 ),
             )
             return@get
         }
 
-        // A single top-level `attr eq "..."` on userName, externalId, or id goes straight to
-        // that attribute's indexed repository lookup instead of scanning the tenant.
+        // This grammar supports exactly one operator (eq) over seven attributes (see
+        // ScimFilter) — not arbitrary RFC 7644 filters — so it is enumerable rather than
+        // needing general filter-to-SQL translation. A single `attr eq "..."` on userName,
+        // externalId, or id goes straight to that attribute's indexed repository lookup.
+        // Everything else (compound filters, displayName, active) has no indexed lookup and
+        // is evaluated by scanning the tenant in bounded chunks, so totalResults always
+        // reflects a true full-tenant match count instead of a truncated sample.
         val matched: List<User> =
             filter.asFastPathEquality()?.let { (attr, literal) ->
                 listOfNotNull(lookupFastPath(adminUserService, tenantId, attr, literal))
@@ -121,7 +129,7 @@ fun Route.scimUserRoutes(
 
         call.respondScim(
             HttpStatusCode.OK,
-            listResponse(total = matched.size, startIndex = startIndex, resources = page.map(::toResourceWithGroups)),
+            listResponse(total = matched.size, startIndex = startIndex, resources = buildResources(page)),
         )
     }
 
