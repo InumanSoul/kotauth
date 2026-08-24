@@ -19,6 +19,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.PayloadTooLargeException
 import io.ktor.server.request.receiveMultipart
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
@@ -194,6 +195,10 @@ fun Route.adminBackupImportRoutes(
                 }
                 part.dispose()
             }
+        } catch (e: PayloadTooLargeException) {
+            // Must reach StatusPages for the real 413, not the generic "malformed upload" 400
+            // below — this is a size condition, not a parse failure.
+            throw e
         } catch (e: Exception) {
             return@post call.respondHtml(
                 HttpStatusCode.BadRequest,
