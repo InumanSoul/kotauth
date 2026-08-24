@@ -51,6 +51,12 @@ class FakeGroupRepository : GroupRepository {
             .drop(offset)
             .take(limit)
 
+    override fun findByTenantIdWithoutRoles(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ): List<Group> = findByTenantId(tenantId, limit, offset).map { it.copy(roleIds = emptyList()) }
+
     override fun countByTenantId(tenantId: TenantId): Long = store.values.count { it.tenantId == tenantId }.toLong()
 
     override fun findByName(

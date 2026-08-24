@@ -49,6 +49,21 @@ class PostgresGroupRepository : GroupRepository {
                 .map { it.toGroup() }
         }
 
+    override fun findByTenantIdWithoutRoles(
+        tenantId: TenantId,
+        limit: Int,
+        offset: Int,
+    ): List<Group> =
+        transaction {
+            GroupsTable
+                .selectAll()
+                .where { GroupsTable.tenantId eq tenantId.value }
+                .orderBy(GroupsTable.name)
+                .limit(limit)
+                .offset(offset.toLong())
+                .map { it.toGroup(loadRoles = false) }
+        }
+
     override fun countByTenantId(tenantId: TenantId): Long =
         transaction {
             GroupsTable
@@ -264,7 +279,7 @@ class PostgresGroupRepository : GroupRepository {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private fun ResultRow.toGroup(): Group {
+    private fun ResultRow.toGroup(loadRoles: Boolean = true): Group {
         val gid = this[GroupsTable.id]
         return Group(
             id = GroupId(gid),
@@ -275,10 +290,14 @@ class PostgresGroupRepository : GroupRepository {
             parentGroupId = this[GroupsTable.parentGroupId]?.let { GroupId(it) },
             attributes = parseAttributes(this[GroupsTable.attributes]),
             roleIds =
-                GroupRolesTable
-                    .selectAll()
-                    .where { GroupRolesTable.groupId eq gid }
-                    .map { RoleId(it[GroupRolesTable.roleId]) },
+                if (!loadRoles) {
+                    emptyList()
+                } else {
+                    GroupRolesTable
+                        .selectAll()
+                        .where { GroupRolesTable.groupId eq gid }
+                        .map { RoleId(it[GroupRolesTable.roleId]) }
+                },
             createdAt = this[GroupsTable.createdAt].toInstant(),
         )
     }

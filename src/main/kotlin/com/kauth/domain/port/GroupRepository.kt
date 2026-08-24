@@ -19,6 +19,17 @@ interface GroupRepository {
         offset: Int = 0,
     ): List<Group>
 
+    /**
+     * Same as [findByTenantId], but every returned [Group.roleIds] is empty rather than loaded —
+     * for callers, like SCIM, that never read roles and would otherwise pay one extra query per
+     * row for data they discard.
+     */
+    fun findByTenantIdWithoutRoles(
+        tenantId: TenantId,
+        limit: Int = Int.MAX_VALUE,
+        offset: Int = 0,
+    ): List<Group>
+
     /** Returns total count of groups in [tenantId]. Used for pagination. */
     fun countByTenantId(tenantId: TenantId): Long
 

@@ -83,7 +83,7 @@ fun Route.scimGroupRoutes(
                 if (count == 0) {
                     emptyList()
                 } else {
-                    groupRepository.findByTenantId(tenantId, limit = count, offset = startIndex - 1)
+                    groupRepository.findByTenantIdWithoutRoles(tenantId, limit = count, offset = startIndex - 1)
                 }
             call.respondScim(
                 HttpStatusCode.OK,
@@ -395,7 +395,12 @@ private fun scanForGroupMatches(
     val matches = mutableListOf<Group>()
     var offset = 0
     while (true) {
-        val chunk = groupRepository.findByTenantId(tenantId, limit = SCIM_GROUP_FILTER_SCAN_CHUNK_SIZE, offset = offset)
+        val chunk =
+            groupRepository.findByTenantIdWithoutRoles(
+                tenantId,
+                limit = SCIM_GROUP_FILTER_SCAN_CHUNK_SIZE,
+                offset = offset,
+            )
         chunk.forEach { group ->
             val attributes = ScimGroupMapper.toResource(group, emptyList()).attributes
             if (filter.matches(ScimValue.Complex(attributes))) matches += group
