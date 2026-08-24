@@ -928,6 +928,125 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `PATCH remove members with a one-entry value removes only that member`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val u2 = addUser("u2")
+            val u3 = addUser("u3")
+            val group = addGroup("Engineering", members = listOf(u1, u2, u3))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"remove","path":"members","value":${membersArrayValue(u2.id!!.value)}}""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(setOf(u1.id!!, u3.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH remove members with a two-entry value removes exactly those two`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val u2 = addUser("u2")
+            val u3 = addUser("u3")
+            val group = addGroup("Engineering", members = listOf(u1, u2, u3))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"remove","path":"members","value":""" +
+                                "${membersArrayValue(u1.id!!.value, u3.id!!.value)}}",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(setOf(u2.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH remove members with a value naming the last member leaves an empty collection`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"remove","path":"members","value":${membersArrayValue(u1.id!!.value)}}""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["members"]!!.jsonArray.size)
+            assertEquals(emptySet(), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH remove members with a value naming a non-member leaves the membership untouched`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val u2 = addUser("u2")
+            val outsider = addUser("outsider")
+            val group = addGroup("Engineering", members = listOf(u1, u2))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"remove","path":"members","value":${membersArrayValue(outsider.id!!.value)}}""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(setOf(u1.id!!, u2.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH remove members with a bare-string value is rejected instead of emptying the group`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val u2 = addUser("u2")
+            val group = addGroup("Engineering", members = listOf(u1, u2))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody("""{"op":"remove","path":"members","value":"${u2.id!!.value}"}"""),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals(setOf(u1.id!!, u2.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
     fun `PATCH replace members replaces the whole collection`() =
         testApplication {
             application { installTestApp() }

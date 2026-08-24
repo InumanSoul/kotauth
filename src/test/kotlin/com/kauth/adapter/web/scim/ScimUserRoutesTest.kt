@@ -1014,6 +1014,69 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `PATCH remove emails with a value naming another address keeps the stored one`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"emails","value":[""" +
+                            """{"value":"stale@corp.example","type":"work"}]}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("ada@example.com", userRepo.findById(user.id!!, acme.id)?.email)
+        }
+
+    @Test
+    fun `PATCH remove emails with a value naming the stored address answers 200`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"emails","value":[""" +
+                            """{"value":"ada@example.com","type":"work"}]}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+    @Test
+    fun `PATCH remove emails with a bare-string value is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("ada")
+
+            val response =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[""" +
+                            """{"op":"remove","path":"emails","value":"ada@example.com"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals("ada@example.com", userRepo.findById(user.id!!, acme.id)?.email)
+        }
+
+    @Test
     fun `PATCH with a scalar over the complex name is rejected and both parts survive`() =
         testApplication {
             application { installTestApp() }

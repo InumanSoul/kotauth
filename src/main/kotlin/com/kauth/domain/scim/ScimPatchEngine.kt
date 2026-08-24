@@ -142,7 +142,7 @@ class ScimPatchEngine {
         // targets one field inside it and leaves the complex wrapper in place.
         if (path.sub == null) op.value?.let { requireComplexShape(path.name, it) }
         return when (op.op) {
-            ScimPatchOpType.REMOVE -> removeAttr(resource, path)
+            ScimPatchOpType.REMOVE -> removeAttr(resource, path, op.value)
             ScimPatchOpType.ADD -> addAttr(resource, path, op.value)
             ScimPatchOpType.REPLACE -> replaceAttr(resource, path, op.value)
         }
@@ -151,12 +151,68 @@ class ScimPatchEngine {
     private fun removeAttr(
         resource: ScimResource,
         path: ScimPath.Attr,
+        value: ScimValue?,
     ): ScimResource {
-        val sub = path.sub ?: return resource.copy(attributes = resource.attributes - path.name)
+        val sub = path.sub ?: return removeWholeAttr(resource, path.name, value)
         val current = resource.attributes[path.name] as? ScimValue.Complex ?: return resource
         if (sub !in current.attributes) return resource
         val updated = current.copy(attributes = current.attributes - sub)
         return resource.copy(attributes = resource.attributes + (path.name to updated))
+    }
+
+    /**
+     * RFC 7644 §3.5.2.2 gives `remove` on a multi-valued attribute two readings, and they are not
+     * the same operation: with no `value` every element goes, with a `value` only the listed
+     * elements go. Ignoring the `value` and taking the first reading empties a whole group when
+     * the caller asked for one member — under a 200 that tells the connector it worked.
+     */
+    private fun removeWholeAttr(
+        resource: ScimResource,
+        name: String,
+        value: ScimValue?,
+    ): ScimResource {
+        val supplied = normalizeAbsent(value)
+        if (supplied == null || name !in MULTI_VALUED_ATTRIBUTES) {
+            return resource.copy(attributes = resource.attributes - name)
+        }
+        // Shape-checked before the stored value is read, so the same request earns the same
+        // answer whether or not the attribute happens to hold anything right now.
+        val listed = removalIdentities(name, supplied)
+        val current = normalizeAbsent(resource.attributes[name]) as? ScimValue.MultiValued ?: return resource
+        val kept = current.values.filterNot { it.multiValuedIdentity() in listed }
+        // Emptied to a collection rather than dropped: the mappers read an absent attribute and an
+        // empty one under different rules, and only the empty one unambiguously means "no members".
+        return resource.copy(attributes = resource.attributes + (name to ScimValue.MultiValued(kept)))
+    }
+
+    /**
+     * The entries a valued `remove` names, keyed by the `value` sub-attribute — the identity SCIM
+     * uses for a group member and for an email. A value this cannot read is a failure, never a
+     * fallback to "remove everything": guessing there is what makes a typo destructive.
+     */
+    private fun removalIdentities(
+        name: String,
+        value: ScimValue,
+    ): Set<String> {
+        val entries =
+            when (value) {
+                is ScimValue.MultiValued -> value.values
+                // RFC 7644 §3.5.2.1's single-element form, which `add` already accepts here.
+                is ScimValue.Complex -> listOf(value)
+                else ->
+                    throw PatchException(
+                        ScimErrorType.invalidValue,
+                        "'$name' remove value must be an array of objects, got ${value.shapeName()}",
+                    )
+            }
+        return entries
+            .mapIndexed { index, entry ->
+                entry.multiValuedIdentity()
+                    ?: throw PatchException(
+                        ScimErrorType.invalidValue,
+                        "'$name[$index]' remove value must be an object with a 'value' sub-attribute",
+                    )
+            }.toSet()
     }
 
     private fun addAttr(
@@ -334,6 +390,10 @@ class ScimPatchEngine {
 
     /** An explicitly cleared value is, for PATCH purposes, indistinguishable from an absent one. */
     private fun normalizeAbsent(value: ScimValue?): ScimValue? = if (value == ScimValue.Null) null else value
+
+    /** RFC 7643 §2.4: the `value` sub-attribute identifies an entry of a multi-valued attribute. */
+    private fun ScimValue.multiValuedIdentity(): String? =
+        ((this as? ScimValue.Complex)?.attributes?.get("value") as? ScimValue.Str)?.value
 }
 
 /** Internal-only: carries a typed, human-readable apply failure up to [ScimPatchEngine.apply]. */

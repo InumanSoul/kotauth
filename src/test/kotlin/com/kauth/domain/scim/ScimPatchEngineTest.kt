@@ -24,6 +24,24 @@ class ScimPatchEngineTest {
             .values
             .map { ((it as ScimValue.Complex).attributes["value"] as ScimValue.Str).value }
 
+    private fun email(address: String) =
+        ScimValue.Complex(mapOf("value" to ScimValue.Str(address), "type" to ScimValue.Str("work")))
+
+    private fun user(vararg emails: ScimValue) =
+        ScimResource(
+            schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+            attributes =
+                mapOf(
+                    "userName" to ScimValue.Str("ada"),
+                    "emails" to ScimValue.MultiValued(emails.toList()),
+                ),
+        )
+
+    private fun emailsOf(r: ScimResource): List<String> =
+        (r.attributes["emails"] as ScimValue.MultiValued)
+            .values
+            .map { ((it as ScimValue.Complex).attributes["value"] as ScimValue.Str).value }
+
     private fun apply(
         r: ScimResource,
         vararg ops: ScimPatchOp,
@@ -550,5 +568,203 @@ class ScimPatchEngineTest {
             )
 
         assertEquals(ScimErrorType.mutability, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    // -------------------------------------------------------------------------
+    // `remove` carrying a `value` (RFC 7644 section 3.5.2.2) — remove the listed
+    // entries, not the whole collection.
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `remove with a plain path and a one-entry value removes only that member`() {
+        val out =
+            apply(
+                group("1", "2", "3"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("2"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1", "3"), membersOf(out))
+    }
+
+    @Test
+    fun `remove with a plain path and a two-entry value removes both and leaves the third`() {
+        val out =
+            apply(
+                group("1", "2", "3"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("1"), member("3"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("2"), membersOf(out))
+    }
+
+    @Test
+    fun `remove with a plain path and a bare object value removes that one member`() {
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("members").getOrThrow(), member("1")),
+            ).getOrThrow()
+
+        assertEquals(listOf("2"), membersOf(out))
+    }
+
+    @Test
+    fun `remove with a plain path and a value naming every member leaves an empty collection`() {
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("1"), member("2"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(ScimValue.MultiValued(emptyList()), out.attributes["members"])
+    }
+
+    @Test
+    fun `remove with a plain path and a value naming an absent member leaves the collection alone`() {
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("99"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1", "2"), membersOf(out))
+    }
+
+    @Test
+    fun `remove with a plain path and a value naming one present and one absent member removes the present one`() {
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(member("2"), member("99"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
+    fun `remove with a plain path and no value still clears the whole collection`() {
+        // Regression guard on the reading that is already correct: no value means remove all.
+        val out =
+            apply(group("1", "2"), ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("members").getOrThrow(), null))
+                .getOrThrow()
+
+        assertTrue(out.attributes["members"] == null)
+    }
+
+    @Test
+    fun `remove with a plain path and a bare string value is rejected rather than emptying the collection`() {
+        val result =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("members").getOrThrow(), ScimValue.Str("2")),
+            )
+
+        assertEquals(ScimErrorType.invalidValue, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `remove with a plain path and a value of bare strings is rejected rather than emptying the collection`() {
+        val result =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(ScimValue.Str("2"))),
+                ),
+            )
+
+        assertEquals(ScimErrorType.invalidValue, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `remove with a plain path and an entry with no value sub-attribute is rejected`() {
+        val result =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("members").getOrThrow(),
+                    ScimValue.MultiValued(listOf(ScimValue.Complex(mapOf("display" to ScimValue.Str("u2"))))),
+                ),
+            )
+
+        assertEquals(ScimErrorType.invalidValue, (result.exceptionOrNull() as ScimFailure).type)
+    }
+
+    @Test
+    fun `remove of emails with a value removes only the listed address`() {
+        val out =
+            apply(
+                user(email("ada@example.com"), email("ada@old.example")),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("emails").getOrThrow(),
+                    ScimValue.MultiValued(listOf(email("ada@old.example"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("ada@example.com"), emailsOf(out))
+    }
+
+    @Test
+    fun `remove of emails with no value still clears the whole collection`() {
+        val out =
+            apply(
+                user(email("ada@example.com"), email("ada@old.example")),
+                ScimPatchOp(ScimPatchOpType.REMOVE, parsePath("emails").getOrThrow(), null),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["emails"] == null)
+    }
+
+    @Test
+    fun `remove of emails with a value naming the last address leaves an empty collection`() {
+        val out =
+            apply(
+                user(email("ada@example.com")),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("emails").getOrThrow(),
+                    ScimValue.MultiValued(listOf(email("ada@example.com"))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(ScimValue.MultiValued(emptyList()), out.attributes["emails"])
+    }
+
+    @Test
+    fun `remove of a singular attribute with a value still removes the attribute`() {
+        val out =
+            apply(
+                group("1"),
+                ScimPatchOp(
+                    ScimPatchOpType.REMOVE,
+                    parsePath("displayName").getOrThrow(),
+                    ScimValue.Str("eng"),
+                ),
+            ).getOrThrow()
+
+        assertTrue(out.attributes["displayName"] == null)
     }
 }
