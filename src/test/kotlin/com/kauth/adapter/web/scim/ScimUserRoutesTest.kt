@@ -1065,7 +1065,7 @@ class ScimUserRoutesTest {
         }
 
     @Test
-    fun `PATCH remove emails with a value naming the stored address answers 200`() =
+    fun `PATCH remove emails naming the stored address is rejected, not answered 200`() =
         testApplication {
             application { installTestApp() }
             val user = addUser("ada")
@@ -1081,7 +1081,12 @@ class ScimUserRoutesTest {
                     )
                 }
 
-            assertEquals(HttpStatusCode.OK, response.status)
+            // The address backs a NOT NULL column, so "remove it" has no representable outcome. A
+            // 200 here would tell the connector a deletion happened that never did.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]!!.jsonPrimitive.content)
+            assertEquals("ada@example.com", userRepo.findById(user.id!!, acme.id)?.email)
         }
 
     @Test

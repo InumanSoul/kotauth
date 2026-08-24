@@ -93,11 +93,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two readings: with no `value` every element goes, with a `value` only the
   listed elements go. The patch engine implemented only the first and ignored
   the `value`, so a connector removing one user from a group removed **every
-  member of that group** — and a `PATCH` removing one address from a user's
-  `emails` cleared the address entirely — while answering `200 OK` to say it
-  had worked. Only the listed entries are removed now, and a `value` the
-  engine cannot read as member entries is a `400 invalidValue` rather than a
-  fallback to removing everything.
+  member of that group** while answering `200 OK` to say it had worked. Only
+  the listed entries are removed now, and a `value` the engine cannot read as
+  member entries is a `400 invalidValue` rather than a fallback to removing
+  everything.
+- **A SCIM `remove` of a user's last email address is now rejected instead of
+  silently doing nothing.** KotAuth stores exactly one address, in a `NOT
+  NULL` column, so "this user has no email" is not a state it can hold. Both
+  before and after the fix above, a `PATCH` that emptied `emails` fell back to
+  the stored address and answered `200 OK` echoing it — a deletion request
+  answered with the thing it asked to delete. An `emails` that arrives emptied
+  (a `PATCH remove` naming the stored address, or a `PUT` sending `[]`) is now
+  a `400 invalidValue` saying the address is required; `replace` is how a
+  connector changes it.
 
 ---
 

@@ -549,6 +549,27 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `an emptied emails is rejected instead of echoing the stored address back under a 200`() {
+        // The address backs a NOT NULL column, so "this user has no email" is not a state the
+        // server can hold. Falling back to the stored one here answers a deletion request with
+        // the thing it asked to delete.
+        val existing = user()
+        val failure = shapeFailureOf(userResourceWith("emails" to ScimValue.MultiValued(emptyList())), existing)
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+        assertTrue(failure.detail.contains("emails"), failure.detail)
+    }
+
+    @Test
+    fun `an absent emails still falls back to the stored address`() {
+        // The mirror of the case above, and the reason it is scoped to a *present* empty
+        // collection: PUT's absent-clears rule cannot apply to a NOT NULL column.
+        val write = ScimUserMapper.toDomain(userResourceWith().merged(), user(), tenantId).getOrThrow()
+
+        assertEquals("ada@example.com", write.user.email)
+    }
+
+    @Test
     fun `a bare-string emails value is rejected instead of keeping the stored address`() {
         val existing = user()
         val failure = shapeFailureOf(userResourceWith("emails" to ScimValue.Str("new@example.com")), existing)

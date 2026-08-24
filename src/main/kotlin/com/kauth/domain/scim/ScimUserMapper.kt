@@ -112,6 +112,11 @@ object ScimUserMapper {
      * [existing]) an omitted email is rejected downstream by [com.kauth.domain.service.AdminUserService]
      * ("A valid email address is required."). Silently keeping a stale `externalId` across a PUT
      * that dropped it would leave a dangling correlation key the IdP believes it removed.
+     *
+     * An `emails` that is *present but empty* is a different request from an absent one, and it is
+     * refused: it says "this user has no address", which a `NOT NULL` column cannot represent, and
+     * the honest answer to an unrepresentable request is an error rather than a 200 echoing back
+     * the address the caller just asked to remove.
      */
     fun toDomain(
         merged: MergedScimResource,
@@ -157,6 +162,20 @@ object ScimUserMapper {
         // a PUT that omits it clears it (see the KDoc above): an IdP unlinking a user by dropping
         // externalId must not leave the stale correlation key in place.
         val externalId = resource.parseExternalId().getOrElse { return Result.failure(it) }
+
+        // Kotauth persists exactly one address in a NOT NULL column, so "this user has no email"
+        // is not a state it can hold. An `emails` that arrives emptied — a PATCH `remove` naming
+        // the stored address, or a PUT sending `[]` — is refused rather than answered 200 with the
+        // address silently still in place.
+        val emails = resource.attributes["emails"]
+        if (emails is ScimValue.MultiValued && emails.values.isEmpty()) {
+            return Result.failure(
+                ScimFailure(
+                    ScimErrorType.invalidValue,
+                    "'emails' cannot be emptied: an address is required. Use 'replace' to change it.",
+                ),
+            )
+        }
 
         // Same emptiness guard as displayName: a work entry with value "" must fall through
         // to the existing address rather than blank it.
