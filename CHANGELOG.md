@@ -33,6 +33,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"name": {"givenName": 123}` and `"emails": [{"value": 123}]` are rejected
   rather than writing a null over the stored value under a `200 OK`. Unknown
   attribute names are rejected on `PUT`/`POST` as well as `PATCH`.
+- **Per-connector SCIM dialects.** An API key carrying the `scim` scope now
+  declares which wire dialect its client speaks, chosen by the operator when
+  the key is created and correctable afterwards. `rfc` is the default and a
+  pure pass-through — payloads are parsed exactly as RFC 7644 defines them —
+  and migration `V62` backfills every existing key to it, so nothing an
+  existing client sends is interpreted any differently than before. Two
+  vendor dialects ship beside it: one reads the `"True"`/`"False"` strings
+  and capitalised `op` verbs Microsoft Entra ID puts on the wire as the
+  booleans and verbs the spec requires, so a deprovision is not silently
+  ignored; the other drops the advisory `display` name Okta sends beside each
+  group member id and keeps the id, which is the only part that identifies
+  anyone. Both implement the deviations those vendors publish in their own
+  documentation; neither has yet been verified against a live tenant. The
+  dialect is read from the key and never guessed from a request header — see
+  `docs/adr/ADR-20-scim-dialects-selected-per-key.md`.
+- **Workspace provisioning page** in the admin UI, under Provisioning in the
+  workspace navigation: the SCIM base URL to paste into an identity provider,
+  every API key in the workspace holding the `scim` scope with the dialect it
+  uses, per-provider setup notes, and what a deprovision actually does. The
+  dialect selector here is the one field of an existing key an operator can
+  correct in place — a key provisioned through `KAUTH_BOOTSTRAP_API_KEYS`
+  keeps the dialect the environment sets. The page does not claim a
+  connection is healthy: KotAuth does not yet record individual SCIM requests
+  in the audit log, so it says so plainly rather than showing a green badge.
+- **IdP-managed badges** on user and group detail wherever an `externalId` is
+  set, warning that the identity provider may overwrite a local edit on its
+  next sync. KotAuth stores that a record is externally provisioned, never
+  which provider provisioned it, so the badge names no vendor.
+- **`name.givenName` and `name.familyName` are editable in the admin UI**, on
+  both the create-user and edit-user forms, so the parts a provisioning
+  client reads and writes are no longer visible only over SCIM. Clearing
+  either writes a null rather than an empty string, so a cleared name part
+  does not round-trip back out as a real value.
 
 ### Changed
 
@@ -49,6 +82,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subgroups itself before deleting the parent.** Deleting a workspace still
   removes its whole group tree in one statement and is unaffected. See
   `docs/adr/ADR-18-group-delete-refuses-subgroups.md`.
+
+### Fixed
+
+- **A SCIM `remove` naming specific entries no longer empties the whole
+  collection.** RFC 7644 §3.5.2.2 gives `remove` on a multi-valued attribute
+  two readings: with no `value` every element goes, with a `value` only the
+  listed elements go. The patch engine implemented only the first and ignored
+  the `value`, so a connector removing one user from a group removed **every
+  member of that group** — and a `PATCH` removing one address from a user's
+  `emails` cleared the address entirely — while answering `200 OK` to say it
+  had worked. Only the listed entries are removed now, and a `value` the
+  engine cannot read as member entries is a `400 invalidValue` rather than a
+  fallback to removing everything.
 
 ---
 
