@@ -60,6 +60,20 @@ class RequestBodySizeLimitPluginTest {
             }
         }
 
+    /** Declares [declaredLength] via `Content-Length` while actually writing [text] — simulates a
+     * request that lies about (understates) its size. */
+    private fun lyingBody(
+        text: String,
+        declaredLength: Long,
+    ): OutgoingContent.WriteChannelContent =
+        object : OutgoingContent.WriteChannelContent() {
+            override val contentLength: Long = declaredLength
+
+            override suspend fun writeTo(channel: ByteWriteChannel) {
+                channel.writeStringUtf8(text)
+            }
+        }
+
     @Test
     fun `a request body under the limit succeeds`() =
         setup(maxBytes = 1_000) { client ->
@@ -93,5 +107,47 @@ class RequestBodySizeLimitPluginTest {
                 }
             assertEquals(HttpStatusCode.OK, response.status)
             assertEquals("500", response.bodyAsText())
+        }
+
+    @Test
+    fun `a body exactly at the limit succeeds`() =
+        setup(maxBytes = 1_000) { client ->
+            val response = client.post("/echo") { setBody("a".repeat(1_000)) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("1000", response.bodyAsText())
+        }
+
+    @Test
+    fun `a body exactly one byte over the limit is rejected`() =
+        setup(maxBytes = 1_000) { client ->
+            val response = client.post("/echo") { setBody("a".repeat(1_001)) }
+            assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        }
+
+    @Test
+    fun `a chunked body exactly at the limit succeeds`() =
+        setup(maxBytes = 1_000) { client ->
+            val response = client.post("/echo") { setBody(streamedBody("a".repeat(1_000))) }
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("1000", response.bodyAsText())
+        }
+
+    @Test
+    fun `a chunked body exactly one byte over the limit is rejected`() =
+        setup(maxBytes = 1_000) { client ->
+            val response = client.post("/echo") { setBody(streamedBody("a".repeat(1_001))) }
+            assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        }
+
+    @Test
+    fun `a request declaring a small Content-Length while sending a large body is still rejected`() =
+        setup(maxBytes = 1_000) { client ->
+            // Declares 10 bytes but actually writes 2000 — the cheap Content-Length check would
+            // wave this through; only the actual-bytes-read cap catches it.
+            val response =
+                client.post("/echo") {
+                    setBody(lyingBody("a".repeat(2_000), declaredLength = 10))
+                }
+            assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
         }
 }
