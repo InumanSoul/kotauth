@@ -11,7 +11,9 @@ import com.kauth.domain.port.GroupRepository
  * In-memory GroupRepository for unit tests.
  * Supports hierarchy, role assignments, and user membership.
  */
-class FakeGroupRepository : GroupRepository {
+class FakeGroupRepository :
+    GroupRepository,
+    SnapshotableFake {
     private val store = mutableMapOf<Int, Group>()
     private var nextId = 1
 
@@ -22,6 +24,24 @@ class FakeGroupRepository : GroupRepository {
     private val groupMembers = mutableMapOf<Int, MutableSet<Int>>()
 
     fun add(group: Group): Group = save(group)
+
+    /**
+     * [nextId] is deliberately not captured: a database sequence does not give back the ids a
+     * rolled-back insert consumed, so neither does this.
+     */
+    override fun snapshot(): FakeRestore {
+        val storeCopy = store.toMap()
+        val rolesCopy = groupRoles.mapValues { (_, roles) -> roles.toMutableSet() }
+        val membersCopy = groupMembers.mapValues { (_, members) -> members.toMutableSet() }
+        return FakeRestore {
+            store.clear()
+            store.putAll(storeCopy)
+            groupRoles.clear()
+            groupRoles.putAll(rolesCopy)
+            groupMembers.clear()
+            groupMembers.putAll(membersCopy)
+        }
+    }
 
     fun clear() {
         store.clear()

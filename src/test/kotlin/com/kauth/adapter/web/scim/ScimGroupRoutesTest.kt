@@ -96,7 +96,10 @@ class ScimGroupRoutesTest {
     private val claimMapperRepo = FakeTenantClaimMapperRepository()
     private val mfaRepo = FakeMfaRepository()
     private val hasher = FakePasswordHasher()
-    private val transactionRunner = FakeTransactionRunner()
+
+    // groupRepo is registered so the write transactions in ScimGroupRoutes actually roll back:
+    // a rejected member has to take the metadata write with it, and nothing else asserts that.
+    private val transactionRunner = FakeTransactionRunner(groupRepo)
 
     private val acme =
         Tenant(
@@ -394,6 +397,9 @@ class ScimGroupRoutesTest {
             assertEquals(HttpStatusCode.BadRequest, response.status)
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
             assertEquals("invalidValue", body["scimType"]!!.jsonPrimitive.content)
+            // The route saves the group and only then reconciles membership, so the 400 is only
+            // honest if the save went away with it. Without a rolling-back runner this fails.
+            assertEquals(0L, groupRepo.countByTenantId(acme.id))
         }
 
     @Test
@@ -1218,6 +1224,58 @@ class ScimGroupRoutesTest {
             )
             assertNull(groupRepo.findById(parent.id))
             assertNotNull(groupRepo.findById(child.id!!))
+        }
+
+    // -------------------------------------------------------------------------
+    // Transaction boundary — a rejected member takes the metadata write with it
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `PUT that renames the group and supplies a bad member rolls the rename back`() =
+        testApplication {
+            application { installTestApp() }
+            val alice = addUser("alice")
+            val foreign = addUser("mallory", tenantId = globex.id)
+            val group = addGroup("Engineering", members = listOf(alice))
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("Platform", memberIds = listOf(foreign.id!!.value)))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("Engineering", groupRepo.findById(group.id)!!.name)
+            assertEquals(setOf(alice.id), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
+    fun `PATCH that renames the group and supplies a bad member rolls the rename back`() =
+        testApplication {
+            application { installTestApp() }
+            val alice = addUser("alice")
+            val foreign = addUser("mallory", tenantId = globex.id)
+            val group = addGroup("Engineering", members = listOf(alice))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"replace","path":"displayName","value":"Platform"}""",
+                            """{"op":"replace","path":"members","value":""" +
+                                membersArrayValue(foreign.id!!.value) + "}",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals("invalidValue", scimTypeOf(response.bodyAsText()))
+            assertEquals("Engineering", groupRepo.findById(group.id)!!.name)
+            assertEquals(setOf(alice.id), groupRepo.findUserIdsInGroup(group.id).toSet())
         }
 
     // -------------------------------------------------------------------------
