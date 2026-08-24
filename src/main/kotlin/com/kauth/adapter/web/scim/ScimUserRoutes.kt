@@ -83,7 +83,7 @@ fun Route.scimUserRoutes(
             }
 
         val created =
-            transactionRunner.runInTransaction {
+            runScimTransaction(transactionRunner) {
                 val result =
                     adminUserService.createUser(
                         tenantId = tenantId,
@@ -97,7 +97,8 @@ fun Route.scimUserRoutes(
                         familyName = write.user.familyName,
                     )
                 if (result is AdminResult.Success && !write.user.enabled) {
-                    adminUserService.setUserEnabled(result.value.id!!, tenantId, false)
+                    val disabled = adminUserService.setUserEnabled(result.value.id!!, tenantId, false)
+                    if (disabled is AdminResult.Failure) throw ScimWriteRollback(disabled.error)
                 }
                 result
             }
@@ -202,7 +203,7 @@ private suspend fun ApplicationCall.applyScimWrite(
     write: ScimUserWrite,
 ) {
     val result =
-        transactionRunner.runInTransaction {
+        runScimTransaction(transactionRunner) {
             val profile =
                 adminUserService.replaceUserProfile(
                     userId = userId,
@@ -214,7 +215,8 @@ private suspend fun ApplicationCall.applyScimWrite(
                     familyName = write.user.familyName,
                 )
             if (profile is AdminResult.Success && profile.value.enabled != write.user.enabled) {
-                adminUserService.setUserEnabled(userId, tenantId, write.user.enabled)
+                val disabled = adminUserService.setUserEnabled(userId, tenantId, write.user.enabled)
+                if (disabled is AdminResult.Failure) throw ScimWriteRollback(disabled.error)
             }
             profile
         }
@@ -224,6 +226,27 @@ private suspend fun ApplicationCall.applyScimWrite(
         is AdminResult.Failure -> respondAdminError(result.error)
     }
 }
+
+/**
+ * Internal-only: thrown when a combined write's second leg (e.g. the enable/disable toggle
+ * following a create or profile replace) fails, so [TransactionRunner.runInTransaction] rolls
+ * back the whole write instead of committing a half-applied one. Never crosses the route boundary
+ * — [runScimTransaction] always catches it and converts it back to an [AdminResult.Failure].
+ */
+private class ScimWriteRollback(
+    val error: AdminError,
+) : RuntimeException()
+
+/** Runs [block] in a transaction, folding a [ScimWriteRollback] back into a typed failure. */
+private fun <T> runScimTransaction(
+    transactionRunner: TransactionRunner,
+    block: () -> AdminResult<T>,
+): AdminResult<T> =
+    try {
+        transactionRunner.runInTransaction(block)
+    } catch (e: ScimWriteRollback) {
+        AdminResult.Failure(e.error)
+    }
 
 /**
  * AdminUserService has no method that applies an admin-supplied plaintext password to an
