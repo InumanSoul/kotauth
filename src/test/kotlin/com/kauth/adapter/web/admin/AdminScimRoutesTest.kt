@@ -399,6 +399,64 @@ class AdminScimRoutesTest {
         }
 
     @Test
+    fun `an empty submitted dialect is refused instead of silently resetting the key`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val stored =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+            val created = apiKeyService.create(TenantId(2), "Provisioning", listOf(ApiScope.SCIM), scimDialect = stored)
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                    formParameters = Parameters.build { append("scimDialect", "") },
+                )
+
+            // "" is a stale or tampered form, not a request for the default; treating it as one
+            // downgrades a key to the pass-through under a saved toast.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(stored, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
+        }
+
+    @Test
+    fun `a submission with no dialect field at all is refused the same way`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val stored =
+                com.kauth.adapter.web.scim.scimDialects
+                    .last()
+                    .id
+            val created = apiKeyService.create(TenantId(2), "Provisioning", listOf(ApiScope.SCIM), scimDialect = stored)
+            val key = (created as com.kauth.domain.service.ApiKeyResult.Success).value.apiKey
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/api-keys/${key.id}/scim-dialect",
+                    formParameters = Parameters.Empty,
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertEquals(stored, apiKeyRepo.findById(key.id!!, TenantId(2))!!.scimDialect)
+        }
+
+    @Test
     fun `a bootstrapped key gets the dialect its environment names, and the form cannot change it`() =
         testApplication {
             application { installTestApp() }

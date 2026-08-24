@@ -131,11 +131,16 @@ fun Route.adminApiKeyRoutes(apiKeyService: ApiKeyService?) {
                 EnglishStrings.SCIM_DIALECT_ENV_MANAGED_REFUSAL,
             )
         }
+        // This form always overwrites a stored value, so an absent or blank field is a stale or
+        // tampered submission rather than a request for the default — folding it into `rfc` would
+        // silently downgrade a key that is already on a vendor dialect. The unregistered-id refusal
+        // is the same threat model; reads are the opposite question and keep scimDialectFor's
+        // fallback, so a key configured for a retired dialect keeps provisioning.
         val submittedDialect = call.receiveParameters()["scimDialect"]?.takeIf { it.isNotBlank() }
-        if (submittedDialect != null && scimDialects.none { it.id == submittedDialect }) {
+        if (submittedDialect == null || scimDialects.none { it.id == submittedDialect }) {
             return@post call.respond(HttpStatusCode.BadRequest, EnglishStrings.SCIM_DIALECT_UNKNOWN_REFUSAL)
         }
-        val dialect = scimDialectFor(submittedDialect).id
+        val dialect = submittedDialect
         // The lookup above makes a failure here rare — the key would have to vanish between the two
         // reads — but the saved toast is only honest when the write actually happened.
         when (val result = svc.updateScimDialect(keyId, workspace.id, dialect)) {
