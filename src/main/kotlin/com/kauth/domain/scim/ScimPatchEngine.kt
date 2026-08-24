@@ -98,7 +98,23 @@ class ScimPatchEngine {
             op.value as? ScimValue.Complex
                 ?: throw PatchException(ScimErrorType.invalidValue, "a null path requires a complex value")
         partial.attributes.keys.forEach(::requireWritableAttribute)
-        return resource.copy(attributes = resource.attributes + partial.attributes)
+        if (op.op != ScimPatchOpType.ADD) {
+            return resource.copy(attributes = resource.attributes + partial.attributes)
+        }
+        // RFC 7644 §3.5.2.1: for `add`, a multi-valued attribute inside a pathless partial is
+        // appended to, not replaced — the same append semantics as a targeted-path `add`. A
+        // plain overwrite (REPLACE, or ADD on a non-multi-valued key) stays a plain merge.
+        val merged =
+            partial.attributes.mapValues { (name, value) ->
+                if (name !in MULTI_VALUED_ATTRIBUTES) {
+                    value
+                } else {
+                    val existing = (normalizeAbsent(resource.attributes[name]) as? ScimValue.MultiValued)?.values
+                    val incoming = if (value is ScimValue.MultiValued) value.values else listOf(value)
+                    ScimValue.MultiValued((existing ?: emptyList()) + incoming)
+                }
+            }
+        return resource.copy(attributes = resource.attributes + merged)
     }
 
     private fun applyAttr(

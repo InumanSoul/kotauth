@@ -689,6 +689,32 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `PATCH a pathless add of members appends and every existing member survives`() =
+        testApplication {
+            application { installTestApp() }
+            // Deliberately many members: replacing instead of appending would leave the group
+            // with just the one member the connector sent, losing every role it granted.
+            val existingMembers = (1..400).map { addUser("u$it") }
+            val group = addGroup("Engineering", members = existingMembers)
+            val newMember = addUser("newHire")
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody(
+                            """{"op":"add","value":{"members":${membersArrayValue(newMember.id!!.value)}}}""",
+                        ),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val expected = (existingMembers.map { it.id!! } + newMember.id!!).toSet()
+            assertEquals(expected, groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
     fun `PATCH remove members filter removes exactly the matched member`() =
         testApplication {
             application { installTestApp() }

@@ -115,7 +115,7 @@ class ScimPatchEngineTest {
 
     @Test
     fun `a null path merges the value as a partial resource`() {
-        // Entra sends this shape; it is legal per RFC 7644 for add and replace.
+        // Some connectors send this shape; it is legal per RFC 7644 for add and replace.
         val out =
             apply(
                 group("1"),
@@ -124,6 +124,73 @@ class ScimPatchEngineTest {
 
         assertEquals(ScimValue.Bool(false), out.attributes["active"])
         assertEquals(listOf("1"), membersOf(out))
+    }
+
+    @Test
+    fun `a pathless add of members appends and every existing member survives`() {
+        // RFC 7644 section 3.5.2.1: for `add`, a multi-valued attribute inside a pathless
+        // partial gets a new value added, not the whole collection replaced. A connector
+        // sending {"op":"add","value":{"members":[...]}} against a 400-member group must
+        // not come back with just the one member it sent.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    null,
+                    ScimValue.Complex(mapOf("members" to ScimValue.MultiValued(listOf(member("3"))))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("1", "2", "3"), membersOf(out))
+    }
+
+    @Test
+    fun `a pathless replace of members still replaces the whole collection`() {
+        // REPLACE under a pathless op is a full-replace merge, unlike ADD — this is the
+        // correct behaviour and must not regress alongside the ADD fix above.
+        val out =
+            apply(
+                group("1", "2"),
+                ScimPatchOp(
+                    ScimPatchOpType.REPLACE,
+                    null,
+                    ScimValue.Complex(mapOf("members" to ScimValue.MultiValued(listOf(member("9"))))),
+                ),
+            ).getOrThrow()
+
+        assertEquals(listOf("9"), membersOf(out))
+    }
+
+    @Test
+    fun `a pathless add of emails on a User appends rather than replaces`() {
+        // The same pathless-add bug applies to /Users: {"op":"add","value":{"emails":[...]}}
+        // must not drop every email the user already had.
+        fun email(addr: String) = ScimValue.Complex(mapOf("value" to ScimValue.Str(addr)))
+        val user =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes =
+                    mapOf(
+                        "userName" to ScimValue.Str("ada"),
+                        "emails" to ScimValue.MultiValued(listOf(email("ada@old.example"))),
+                    ),
+            )
+        val out =
+            apply(
+                user,
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    null,
+                    ScimValue.Complex(mapOf("emails" to ScimValue.MultiValued(listOf(email("ada@new.example"))))),
+                ),
+            ).getOrThrow()
+
+        val addresses =
+            (out.attributes["emails"] as ScimValue.MultiValued)
+                .values
+                .map { ((it as ScimValue.Complex).attributes["value"] as ScimValue.Str).value }
+        assertEquals(listOf("ada@old.example", "ada@new.example"), addresses)
     }
 
     @Test
