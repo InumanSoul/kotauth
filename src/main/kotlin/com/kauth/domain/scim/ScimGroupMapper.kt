@@ -130,13 +130,22 @@ object ScimGroupMapper {
 
     private fun ScimResource.parseMembers(): Result<List<UserId>> {
         val entries =
-            (attributes["members"] as? ScimValue.MultiValued)
-                ?.values
-                ?.filterIsInstance<ScimValue.Complex>()
+            (attributes["members"] as? ScimValue.MultiValued)?.values
                 ?: return Result.success(emptyList())
 
         val memberIds = mutableListOf<UserId>()
-        for (entry in entries) {
+        for (rawEntry in entries) {
+            // RFC 7643 §4.2 defines "members" as multi-valued *complex*, with "value" as a
+            // sub-attribute — a bare string id is not a legal member entry. Dropping it
+            // silently is how a `replace` of plain ids has emptied a group; reject instead.
+            val entry =
+                rawEntry as? ScimValue.Complex
+                    ?: return Result.failure(
+                        ScimFailure(
+                            ScimErrorType.invalidValue,
+                            "members[] entries must be complex objects with a 'value' sub-attribute, got $rawEntry",
+                        ),
+                    )
             // Case-insensitive: this guards a security decision (reject nesting rather than
             // flatten it), and RFC 7643's examples use "Group" but do not guarantee a connector
             // sends that exact casing. A lowercase "group" must not slip past it.

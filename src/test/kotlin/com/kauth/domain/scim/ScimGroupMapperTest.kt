@@ -166,6 +166,25 @@ class ScimGroupMapperTest {
     }
 
     @Test
+    fun `toDomain rejects a plain-string member entry instead of dropping it`() {
+        // RFC 7643 section 4.2: "members" entries are complex, with "value" as a sub-attribute.
+        // A bare string is not a legal entry — filtering it out silently is how a `replace` of
+        // plain ids has emptied a group with a 200 response; reject instead.
+        val r =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:Group"),
+                attributes =
+                    mapOf(
+                        "displayName" to ScimValue.Str("Eng"),
+                        "members" to ScimValue.MultiValued(listOf(ScimValue.Str("7"), ScimValue.Str("8"))),
+                    ),
+            )
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+    }
+
+    @Test
     fun `toDomain rejects a member id that is not numeric`() {
         val r = resourceWith(members = listOf("not-an-id"))
         val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure

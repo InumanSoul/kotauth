@@ -715,6 +715,29 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `PATCH replace with plain-string member values is rejected and membership is unchanged`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val u2 = addUser("u2")
+            val group = addGroup("Engineering", members = listOf(u1, u2))
+
+            val response =
+                client.patch(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        patchBody("""{"op":"replace","path":"members","value":["7","8"]}"""),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]!!.jsonPrimitive.content)
+            assertEquals(setOf(u1.id!!, u2.id!!), groupRepo.findUserIdsInGroup(group.id).toSet())
+        }
+
+    @Test
     fun `PATCH remove members filter removes exactly the matched member`() =
         testApplication {
             application { installTestApp() }
