@@ -6,6 +6,10 @@ import com.kauth.domain.model.UserId
 
 private const val GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group"
 
+// groups.name is VARCHAR(100) NOT NULL; a check here turns an overlong name into a clean
+// invalidValue response instead of a raw DB error at insert time.
+private const val GROUP_NAME_MAX_LENGTH = 100
+
 /**
  * The result of mapping an inbound SCIM group resource onto the domain. [memberIds] is carried
  * separately from [group] — membership lives in a join table (`user_groups`), not a [Group]
@@ -93,6 +97,11 @@ object ScimGroupMapper {
         val name =
             explicitName ?: existing?.name
                 ?: return Result.failure(ScimFailure(ScimErrorType.invalidValue, "displayName is required"))
+        if (name.length > GROUP_NAME_MAX_LENGTH) {
+            return Result.failure(
+                ScimFailure(ScimErrorType.invalidValue, "displayName exceeds $GROUP_NAME_MAX_LENGTH characters"),
+            )
+        }
 
         // externalId is an opaque IdP key: trimmed because surrounding whitespace is never
         // meaningful, but never lower-cased because case may be significant to the IdP.

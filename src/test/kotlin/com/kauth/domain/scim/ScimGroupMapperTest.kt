@@ -134,6 +134,22 @@ class ScimGroupMapperTest {
     }
 
     @Test
+    fun `toDomain rejects a displayName that exceeds the column`() {
+        // groups.name is varchar(100); ScimUserMapper set the precedent of catching this here
+        // rather than letting it fail at DB insert with a raw error.
+        val r =
+            resourceWith(members = emptyList()).let {
+                it.copy(
+                    attributes =
+                        it.attributes + ("displayName" to ScimValue.Str("g".repeat(101))),
+                )
+            }
+        val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
+
+        assertEquals(ScimErrorType.invalidValue, failure.type)
+    }
+
+    @Test
     fun `toDomain rejects a member id that is not numeric`() {
         val r = resourceWith(members = listOf("not-an-id"))
         val failure = ScimGroupMapper.toDomain(r.merged(), null, tenantId).exceptionOrNull() as ScimFailure
