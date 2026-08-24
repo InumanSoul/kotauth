@@ -15,6 +15,13 @@ internal fun envOrFile(
     return getenv(name)
 }
 
+/**
+ * A configured body-size limit must be positive (0 or negative would reject every non-empty
+ * request body) and must not exceed `Int.MAX_VALUE` — the limiter counts bytes in a `Long` but
+ * downstream JVM byte arrays and buffers are `Int`-indexed.
+ */
+internal fun isValidBodySizeLimit(bytes: Long): Boolean = bytes in 1..Int.MAX_VALUE.toLong()
+
 /** Database connection config — loadable independently for CLI commands that don't need the full server config. */
 data class DbConfig(
     val dbUrl: String,
@@ -97,6 +104,13 @@ data class EnvironmentConfig(
                 envOrFile("KAUTH_BOOTSTRAP_ADMIN_PASSWORD")?.takeIf { it.isNotBlank() }
             bootstrapAdminPassword?.let(::validateBootstrapAdminPassword)
 
+            val maxRequestBodyBytes =
+                System.getenv("KAUTH_MAX_REQUEST_BODY_BYTES")?.toLongOrNull() ?: DEFAULT_MAX_REQUEST_BODY_BYTES
+            val maxBackupImportBodyBytes =
+                System.getenv("KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES")?.toLongOrNull()
+                    ?: DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES
+            validateBodySizeLimits(maxRequestBodyBytes, maxBackupImportBodyBytes)
+
             return EnvironmentConfig(
                 baseUrl = baseUrl,
                 env = env,
@@ -128,19 +142,40 @@ data class EnvironmentConfig(
                 bootstrapApiKeysJson = envOrFile("KAUTH_BOOTSTRAP_API_KEYS")?.takeIf { it.isNotBlank() },
                 bootstrapAdminPassword = bootstrapAdminPassword,
                 trustedProxy = System.getenv("KAUTH_TRUSTED_PROXY")?.lowercase() == "true",
-                maxRequestBodyBytes =
-                    System.getenv("KAUTH_MAX_REQUEST_BODY_BYTES")?.toLongOrNull() ?: DEFAULT_MAX_REQUEST_BODY_BYTES,
-                maxBackupImportBodyBytes =
-                    System.getenv("KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES")?.toLongOrNull()
-                        ?: DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES,
+                maxRequestBodyBytes = maxRequestBodyBytes,
+                maxBackupImportBodyBytes = maxBackupImportBodyBytes,
             )
         }
 
         /** 2 MiB — comfortably above the largest legitimate JSON body (SCIM PATCH, bulk role/group ops). */
-        private const val DEFAULT_MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024L
+        internal const val DEFAULT_MAX_REQUEST_BODY_BYTES = 2 * 1024 * 1024L
 
         /** 100 MiB — a full tenant export is base64 + JSON, larger than any regular API payload. */
-        private const val DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES = 100 * 1024 * 1024L
+        internal const val DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES = 100 * 1024 * 1024L
+
+        private fun validateBodySizeLimits(
+            maxRequestBodyBytes: Long,
+            maxBackupImportBodyBytes: Long,
+        ) {
+            if (!isValidBodySizeLimit(maxRequestBodyBytes) || !isValidBodySizeLimit(maxBackupImportBodyBytes)) {
+                System.err.println(
+                    """
+                    ┌──────────────────────────────────────────────────────────────┐
+                    │  FATAL: invalid request body size limit configuration.       │
+                    │                                                              │
+                    │  KAUTH_MAX_REQUEST_BODY_BYTES and                            │
+                    │  KAUTH_MAX_BACKUP_IMPORT_BODY_BYTES must be positive and     │
+                    │  not exceed Int.MAX_VALUE (${Int.MAX_VALUE}) bytes. A zero or
+                    │  negative value would reject every non-empty request body    │
+                    │  across the entire product.                                 │
+                    │                                                              │
+                    │  Current: maxRequestBodyBytes=$maxRequestBodyBytes, maxBackupImportBodyBytes=$maxBackupImportBodyBytes
+                    └──────────────────────────────────────────────────────────────┘
+                    """.trimIndent(),
+                )
+                exitProcess(1)
+            }
+        }
 
         private fun validateSsoTtls(
             ttl: Long,
