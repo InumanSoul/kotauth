@@ -102,16 +102,22 @@ class ScimPatchEngine {
             return resource.copy(attributes = resource.attributes + partial.attributes)
         }
         // RFC 7644 §3.5.2.1: for `add`, a multi-valued attribute inside a pathless partial is
-        // appended to, not replaced — the same append semantics as a targeted-path `add`. A
-        // plain overwrite (REPLACE, or ADD on a non-multi-valued key) stays a plain merge.
+        // appended to, not replaced, and a complex attribute has its named sub-attributes added
+        // without disturbing siblings that weren't named — the same semantics a targeted-path
+        // `add` already has. A plain overwrite (REPLACE, or ADD where neither shape applies)
+        // stays a plain merge.
         val merged =
             partial.attributes.mapValues { (name, value) ->
-                if (name !in MULTI_VALUED_ATTRIBUTES) {
-                    value
-                } else {
-                    val existing = (normalizeAbsent(resource.attributes[name]) as? ScimValue.MultiValued)?.values
-                    val incoming = if (value is ScimValue.MultiValued) value.values else listOf(value)
-                    ScimValue.MultiValued((existing ?: emptyList()) + incoming)
+                val existing = normalizeAbsent(resource.attributes[name])
+                when {
+                    name in MULTI_VALUED_ATTRIBUTES -> {
+                        val existingValues = (existing as? ScimValue.MultiValued)?.values
+                        val incoming = if (value is ScimValue.MultiValued) value.values else listOf(value)
+                        ScimValue.MultiValued((existingValues ?: emptyList()) + incoming)
+                    }
+                    value is ScimValue.Complex && existing is ScimValue.Complex ->
+                        existing.copy(attributes = existing.attributes + value.attributes)
+                    else -> value
                 }
             }
         return resource.copy(attributes = resource.attributes + merged)

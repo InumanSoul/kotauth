@@ -911,6 +911,33 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `PATCH pathless add of one name sub-attribute preserves the other`() =
+        testApplication {
+            application { installTestApp() }
+            val user = addUser("adalovelace", givenName = "Ada", familyName = "Lovelace")
+
+            val patchResponse =
+                client.patch("/t/acme/scim/v2/Users/${user.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],""" +
+                            """"Operations":[{"op":"add","value":{"name":{"givenName":"Ada B."}}}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, patchResponse.status)
+
+            val getResponse =
+                client.get("/t/acme/scim/v2/Users/${user.id!!.value}") { bearerAuth(scimKey) }
+            val body = jsonCodec.parseToJsonElement(getResponse.bodyAsText()).jsonObject
+            assertEquals("Ada B.", body["name"]!!.jsonObject["givenName"]!!.jsonPrimitive.content)
+            assertEquals("Lovelace", body["name"]!!.jsonObject["familyName"]!!.jsonPrimitive.content)
+            val stored = userRepo.findById(user.id!!, acme.id)
+            assertEquals("Lovelace", stored?.familyName)
+        }
+
+    @Test
     fun `PUT on another workspace's user is 404`() =
         testApplication {
             application { installTestApp() }

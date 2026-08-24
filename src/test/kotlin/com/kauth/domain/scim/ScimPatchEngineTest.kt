@@ -193,6 +193,93 @@ class ScimPatchEngineTest {
         assertEquals(listOf("ada@old.example", "ada@new.example"), addresses)
     }
 
+    private fun userWithName(
+        givenName: String,
+        familyName: String,
+    ) = ScimResource(
+        schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+        attributes =
+            mapOf(
+                "userName" to ScimValue.Str("ada"),
+                "name" to
+                    ScimValue.Complex(
+                        mapOf(
+                            "givenName" to ScimValue.Str(givenName),
+                            "familyName" to ScimValue.Str(familyName),
+                        ),
+                    ),
+            ),
+    )
+
+    @Test
+    fun `a pathless add of one sub-attribute of a complex attribute preserves its siblings`() {
+        // Same family of bug as the multi-valued append fix above, one attribute shape over:
+        // {"op":"add","value":{"name":{"givenName":"Ada B."}}} must not wipe familyName.
+        val out =
+            apply(
+                userWithName("Ada", "Lovelace"),
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    null,
+                    ScimValue.Complex(
+                        mapOf("name" to ScimValue.Complex(mapOf("givenName" to ScimValue.Str("Ada B.")))),
+                    ),
+                ),
+            ).getOrThrow()
+
+        val name = out.attributes["name"] as ScimValue.Complex
+        assertEquals(ScimValue.Str("Ada B."), name.attributes["givenName"])
+        assertEquals(ScimValue.Str("Lovelace"), name.attributes["familyName"])
+    }
+
+    @Test
+    fun `a pathless add naming both sub-attributes of a complex attribute overwrites both`() {
+        val out =
+            apply(
+                userWithName("Ada", "Lovelace"),
+                ScimPatchOp(
+                    ScimPatchOpType.ADD,
+                    null,
+                    ScimValue.Complex(
+                        mapOf(
+                            "name" to
+                                ScimValue.Complex(
+                                    mapOf(
+                                        "givenName" to ScimValue.Str("Augusta"),
+                                        "familyName" to ScimValue.Str("King"),
+                                    ),
+                                ),
+                        ),
+                    ),
+                ),
+            ).getOrThrow()
+
+        val name = out.attributes["name"] as ScimValue.Complex
+        assertEquals(ScimValue.Str("Augusta"), name.attributes["givenName"])
+        assertEquals(ScimValue.Str("King"), name.attributes["familyName"])
+    }
+
+    @Test
+    fun `a pathless replace of one sub-attribute of a complex attribute still clears its siblings`() {
+        // REPLACE is a full-attribute overwrite, not a sub-attribute merge like ADD — this
+        // must not regress alongside the ADD fix above.
+        val out =
+            apply(
+                userWithName("Ada", "Lovelace"),
+                ScimPatchOp(
+                    ScimPatchOpType.REPLACE,
+                    null,
+                    ScimValue.Complex(
+                        mapOf("name" to ScimValue.Complex(mapOf("givenName" to ScimValue.Str("Ada B.")))),
+                    ),
+                ),
+            ).getOrThrow()
+
+        val name = out.attributes["name"] as ScimValue.Complex
+        assertEquals(ScimValue.Str("Ada B."), name.attributes["givenName"])
+        assertEquals(null, name.attributes["familyName"])
+    }
+
     @Test
     fun `operations apply in order`() {
         val out =
