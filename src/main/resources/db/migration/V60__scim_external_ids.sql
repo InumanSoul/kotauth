@@ -8,8 +8,8 @@ ALTER TABLE users
 ALTER TABLE users
     ALTER COLUMN full_name TYPE VARCHAR(255);
 
--- SCIM userName from Entra ID / Okta is a UPN or email address; widen to match email
--- so provisioned usernames aren't truncated.
+-- A SCIM userName is typically a UPN or email address; widen to match email so
+-- provisioned usernames aren't truncated.
 ALTER TABLE users
     ALTER COLUMN username TYPE VARCHAR(255);
 
