@@ -240,6 +240,18 @@ class AdminUserService(
         offset: Int = 0,
     ): List<User> = userRepository.findByTenantId(tenantId, search, limit, offset)
 
+    /** Tenant-scoped username lookup — the indexed fast path for SCIM's `userName eq` filter. */
+    fun findByUsername(
+        tenantId: TenantId,
+        username: String,
+    ): User? = userRepository.findByUsername(tenantId, username)
+
+    /** Tenant-scoped external-id lookup — the indexed fast path for SCIM's `externalId eq` filter. */
+    fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? = userRepository.findByExternalId(tenantId, externalId)
+
     fun countUsers(
         tenantId: TenantId,
         search: String? = null,

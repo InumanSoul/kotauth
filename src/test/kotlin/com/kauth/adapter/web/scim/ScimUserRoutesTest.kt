@@ -447,6 +447,83 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `filter by id returns only the matching user`() =
+        testApplication {
+            application { installTestApp() }
+            val alice = addUser("alice")
+            addUser("bob")
+
+            val response =
+                client.get(usersUrl("""id eq "${alice.id!!.value}"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            val resources = body["Resources"]!!.jsonArray
+            assertEquals(1, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(1, resources.size)
+            assertEquals("alice", resources[0].jsonObject["userName"]!!.jsonPrimitive.content)
+        }
+
+    @Test
+    fun `filter by id with no match returns an empty Resources array with totalResults 0`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+
+            val response = client.get(usersUrl("""id eq "999999"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
+    fun `filter by id never returns a user from another tenant`() =
+        testApplication {
+            application { installTestApp() }
+            val foreignUser = addUser("eve", tenantId = globex.id)
+
+            val response =
+                client.get(usersUrl("""id eq "${foreignUser.id!!.value}"""")) { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(0, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
+    fun `startIndex 2 against a single fast-path match yields an empty page with totalResults 1`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+
+            val response =
+                client.get(usersUrl("""userName eq "alice"""") + "&startIndex=2") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(1, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
+    fun `a filtered request with count=0 returns the true totalResults with an empty Resources array`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+            addUser("bob")
+
+            val response = client.get(usersUrl("""userName eq "alice"""") + "&count=0") { bearerAuth(scimKey) }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals(1, body["totalResults"]!!.jsonPrimitive.int)
+            assertEquals(0, body["Resources"]!!.jsonArray.size)
+        }
+
+    @Test
     fun `an unsupported filter returns 400 invalidFilter, never an unfiltered list`() =
         testApplication {
             application { installTestApp() }

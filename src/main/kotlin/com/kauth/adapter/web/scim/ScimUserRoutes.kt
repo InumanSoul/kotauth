@@ -9,6 +9,7 @@ import com.kauth.domain.port.GroupRepository
 import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
+import com.kauth.domain.scim.ScimFilter
 import com.kauth.domain.scim.ScimPatchEngine
 import com.kauth.domain.scim.ScimResource
 import com.kauth.domain.scim.ScimUserMapper
@@ -42,6 +43,10 @@ private const val LIST_RESPONSE_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:
 private const val PASSWORD_UPDATE_UNSUPPORTED =
     "password updates for existing users are not supported over SCIM; " +
         "use the admin API or a password-reset invite instead"
+
+// Attributes with an existing indexed repository lookup: a single top-level `attr eq "..."`
+// filter on one of these goes straight to that lookup instead of scanning the tenant.
+private val SCIM_FAST_PATH_ATTRIBUTES = setOf("userName", "externalId", "id")
 
 /** `/Users` — RFC 7644 §3.2-3.6. Every write goes through [AdminUserService], never the repository directly. */
 fun Route.scimUserRoutes(
@@ -99,19 +104,20 @@ fun Route.scimUserRoutes(
             return@get
         }
 
-        // A filter can reference any SCIM attribute (RFC 7644 §3.4.2.2), and the repository has
-        // no query translation for that today, so this path still materialises the whole tenant
-        // directory to evaluate it in memory. A future repository-level query translation could
-        // remove this, but it's out of scope for a bug-fix pass.
-        val resources = adminUserService.listUsers(tenantId).map(::toResourceWithGroups)
-        val matched = resources.filter { r -> filter.matches(ScimValue.Complex(r.attributes)) }
+        // A single top-level `attr eq "..."` on userName, externalId, or id goes straight to
+        // that attribute's indexed repository lookup instead of scanning the tenant.
+        val matched: List<User> =
+            filter.asFastPathEquality()?.let { (attr, literal) ->
+                listOfNotNull(lookupFastPath(adminUserService, tenantId, attr, literal))
+            } ?: unindexedFilterScan(adminUserService, tenantId, filter)
+
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
         // no Resources returned, never the resources themselves.
         val page = if (count == 0) emptyList() else matched.drop(startIndex - 1).take(count)
 
         call.respondScim(
             HttpStatusCode.OK,
-            listResponse(total = matched.size, startIndex = startIndex, resources = page),
+            listResponse(total = matched.size, startIndex = startIndex, resources = page.map(::toResourceWithGroups)),
         )
     }
 
@@ -242,6 +248,54 @@ fun Route.scimUserRoutes(
         }
     }
 }
+
+/** A single top-level `attr eq literal` filter on a fast-path attribute, as (attr, literal text). */
+private fun ScimFilter.asFastPathEquality(): Pair<String, String>? {
+    val eq = this as? ScimFilter.Eq ?: return null
+    if (eq.attr !in SCIM_FAST_PATH_ATTRIBUTES) return null
+    val literal =
+        when (val v = eq.value) {
+            is ScimValue.Str -> v.value
+            is ScimValue.Num -> v.value.toString()
+            else -> return null
+        }
+    return eq.attr to literal
+}
+
+/**
+ * Resolves a fast-path attribute/literal pair to its indexed repository lookup. The `id` case is
+ * tenant-scoped by [AdminUserService.getUser] itself (its query filters by tenantId), so a global
+ * id belonging to another tenant is structurally unreachable here — never surfaced as a 403 that
+ * would confirm the row exists, just an absent result like any other non-match.
+ */
+private fun lookupFastPath(
+    adminUserService: AdminUserService,
+    tenantId: TenantId,
+    attr: String,
+    literal: String,
+): User? =
+    when (attr) {
+        "userName" -> adminUserService.findByUsername(tenantId, literal)
+        "externalId" -> adminUserService.findByExternalId(tenantId, literal)
+        "id" ->
+            literal.toIntOrNull()?.let { idValue ->
+                (adminUserService.getUser(UserId(idValue), tenantId) as? AdminResult.Success)?.value
+            }
+        else -> null
+    }
+
+/**
+ * Evaluates [filter] against every user in [tenantId] for the filter shapes with no indexed
+ * lookup (compound and/or, or a single eq on displayName/active).
+ */
+private fun unindexedFilterScan(
+    adminUserService: AdminUserService,
+    tenantId: TenantId,
+    filter: ScimFilter,
+): List<User> =
+    adminUserService.listUsers(tenantId).filter { user ->
+        filter.matches(ScimValue.Complex(ScimUserMapper.toResource(user).attributes))
+    }
 
 /** Applies a resolved [ScimUserWrite] to an existing user and responds with the fresh resource. */
 private suspend fun ApplicationCall.applyScimWrite(
