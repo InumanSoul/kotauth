@@ -1083,6 +1083,36 @@ class ScimGroupRoutesTest {
         }
 
     @Test
+    fun `a bad members entry is named by index and shape, never echoed back`() =
+        testApplication {
+            application { installTestApp() }
+            val u1 = addUser("u1")
+            val group = addGroup("Engineering", members = listOf(u1))
+            val huge = "x".repeat(4096)
+
+            val response =
+                client.put(groupUrl(group.id!!.value)) {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"displayName":"Eng",""" +
+                            """"members":[{"value":"${u1.id!!.value}"},"$huge"]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val detail =
+                jsonCodec
+                    .parseToJsonElement(response.bodyAsText())
+                    .jsonObject["detail"]!!
+                    .jsonPrimitive.content
+            assertEquals(true, detail.contains("members[1]"), detail)
+            assertEquals(true, detail.contains("a string"), detail)
+            assertEquals(false, detail.contains(huge))
+            assertEquals(true, detail.length < 200, "detail must stay bounded, was ${detail.length}")
+        }
+
+    @Test
     fun `PATCH can rename displayName without touching membership`() =
         testApplication {
             application { installTestApp() }

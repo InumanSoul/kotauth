@@ -157,7 +157,10 @@ object ScimGroupMapper {
                 )
 
         val memberIds = mutableListOf<UserId>()
-        for (rawEntry in entries) {
+        // Error details name the offending index and its shape, never the value itself: an entry
+        // can be a megabyte-long string or nested to the parser's depth cap, and echoing it puts
+        // unbounded caller input into the 400 body and into anything that logs responses.
+        for ((index, rawEntry) in entries.withIndex()) {
             // RFC 7643 §4.2 defines "members" as multi-valued *complex*, with "value" as a
             // sub-attribute — a bare string id is not a legal member entry. Dropping it
             // silently is how a `replace` of plain ids has emptied a group; reject instead.
@@ -166,7 +169,8 @@ object ScimGroupMapper {
                     ?: return Result.failure(
                         ScimFailure(
                             ScimErrorType.invalidValue,
-                            "members[] entries must be complex objects with a 'value' sub-attribute, got $rawEntry",
+                            "members[$index] is ${rawEntry.shapeName()}, " +
+                                "expected an object with a 'value' sub-attribute",
                         ),
                     )
             // Case-insensitive: this guards a security decision (reject nesting rather than
@@ -177,8 +181,8 @@ object ScimGroupMapper {
                 return Result.failure(
                     ScimFailure(
                         ScimErrorType.invalidValue,
-                        "nested group members are not supported; Kotauth models group nesting " +
-                            "via parentGroupId, not direct membership",
+                        "members[$index] is a nested group member, which is not supported; Kotauth " +
+                            "models group nesting via parentGroupId, not direct membership",
                     ),
                 )
             }
@@ -187,7 +191,7 @@ object ScimGroupMapper {
             val id =
                 rawValue?.toIntOrNull()
                     ?: return Result.failure(
-                        ScimFailure(ScimErrorType.invalidValue, "members[].value must be a numeric user id"),
+                        ScimFailure(ScimErrorType.invalidValue, "members[$index].value must be a numeric user id"),
                     )
             memberIds += UserId(id)
         }
