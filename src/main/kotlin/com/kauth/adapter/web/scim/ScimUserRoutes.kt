@@ -61,9 +61,34 @@ fun Route.scimUserRoutes(
             (call.request.queryParameters["count"]?.toIntOrNull() ?: SCIM_FILTER_MAX_RESULTS)
                 .coerceIn(0, SCIM_FILTER_MAX_RESULTS)
 
+        if (filter == null) {
+            // No filter: the database can page directly, so this request materialises only
+            // one page of ScimResource trees instead of the whole tenant directory.
+            val total = adminUserService.countUsers(tenantId)
+            val page =
+                if (count == 0) {
+                    emptyList()
+                } else {
+                    adminUserService
+                        .listUsers(tenantId, limit = count, offset = startIndex - 1)
+                        .map { ScimUserMapper.toResource(it) }
+                }
+            call.respondScim(
+                HttpStatusCode.OK,
+                listResponse(
+                    total = total.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                    startIndex = startIndex,
+                    resources = page,
+                ),
+            )
+            return@get
+        }
+
+        // A filter can reference any SCIM attribute (RFC 7644 §3.4.2.2), and the repository has
+        // no query translation for that today, so this path still materialises the whole tenant
+        // directory to evaluate it in memory. Left as a follow-up — see the fix-wave report.
         val resources = adminUserService.listUsers(tenantId).map { ScimUserMapper.toResource(it) }
-        val matched =
-            filter?.let { f -> resources.filter { r -> f.matches(ScimValue.Complex(r.attributes)) } } ?: resources
+        val matched = resources.filter { r -> filter.matches(ScimValue.Complex(r.attributes)) }
         // count=0 is a directory-sizing probe: totalResults must reflect the match count with
         // no Resources returned, never the resources themselves.
         val page = if (count == 0) emptyList() else matched.drop(startIndex - 1).take(count)

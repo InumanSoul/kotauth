@@ -126,6 +126,24 @@ fun Route.apiRoutes(
             }
         }
 
+    // Shared with the SCIM /Users write path below — both trees write through the same API
+    // keys and must share the same abuse-prevention budget, not just the REST one.
+    val writeRateLimitPlugin =
+        createRouteScopedPlugin("ApiWriteRateLimitPlugin") {
+            on(AuthenticationChecked) { call ->
+                val method = call.request.httpMethod
+                if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
+                    return@on
+                }
+                val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+                val slug = call.parameters["tenantSlug"] ?: return@on
+                val bucketKey = "api_write:${key.keyPrefix}:$slug"
+                if (!apiWriteRateLimiter.isAllowed(bucketKey)) {
+                    call.respondRateLimited(retryAfterSeconds = apiWriteRateLimiter.windowSeconds)
+                }
+            }
+        }
+
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
             if (corsService != null) {
@@ -136,22 +154,6 @@ fun Route.apiRoutes(
             }
 
             install(apiContextPlugin)
-
-            val writeRateLimitPlugin =
-                createRouteScopedPlugin("ApiWriteRateLimitPlugin") {
-                    on(AuthenticationChecked) { call ->
-                        val method = call.request.httpMethod
-                        if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
-                            return@on
-                        }
-                        val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
-                        val slug = call.parameters["tenantSlug"] ?: return@on
-                        val bucketKey = "api_write:${key.keyPrefix}:$slug"
-                        if (!apiWriteRateLimiter.isAllowed(bucketKey)) {
-                            call.respondRateLimited(retryAfterSeconds = apiWriteRateLimiter.windowSeconds)
-                        }
-                    }
-                }
             install(writeRateLimitPlugin)
 
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
@@ -170,6 +172,7 @@ fun Route.apiRoutes(
 
         route("/t/{tenantSlug}/scim/v2") {
             install(apiContextPlugin)
+            install(writeRateLimitPlugin)
             scimDiscoveryRoutes()
             scimUserRoutes(adminUserService, transactionRunner)
         }
