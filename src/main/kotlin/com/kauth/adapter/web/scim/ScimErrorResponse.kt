@@ -3,6 +3,7 @@ package com.kauth.adapter.web.scim
 import com.kauth.domain.scim.ScimErrorType
 import com.kauth.domain.scim.ScimFailure
 import com.kauth.domain.service.AdminError
+import com.kauth.domain.service.ConflictKind
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import kotlinx.serialization.json.JsonObject
@@ -50,6 +51,15 @@ fun ScimFailure.toResponse(): Pair<HttpStatusCode, JsonObject> {
 }
 
 /**
+ * Renders a failure that has no RFC 7644 scimType. §3.12 permits omitting the field, and omitting
+ * it beats inventing one: a wrong scimType names a remediation the caller cannot carry out.
+ */
+internal fun scimUntypedError(
+    status: HttpStatusCode,
+    detail: String,
+): Pair<HttpStatusCode, JsonObject> = status to errorEnvelope(status, detail)
+
+/**
  * Renders an authentication/authorization failure as the SCIM error envelope. Used for gates
  * that run before any [ScimErrorType]-shaped domain failure is possible — e.g. a missing or
  * under-scoped API key — so callers get the SCIM shape without inventing a fake scimType.
@@ -57,7 +67,7 @@ fun ScimFailure.toResponse(): Pair<HttpStatusCode, JsonObject> {
 fun scimAuthError(
     status: HttpStatusCode,
     detail: String,
-): Pair<HttpStatusCode, JsonObject> = status to errorEnvelope(status, detail)
+): Pair<HttpStatusCode, JsonObject> = scimUntypedError(status, detail)
 
 /**
  * Renders an [AdminError] from a domain service as the SCIM error envelope. Tenant-scoped
@@ -65,8 +75,16 @@ fun scimAuthError(
  */
 internal fun AdminError.toScimResponse(): Pair<HttpStatusCode, JsonObject> =
     when (this) {
-        is AdminError.NotFound -> scimAuthError(HttpStatusCode.NotFound, message)
-        is AdminError.Conflict -> ScimFailure(ScimErrorType.uniqueness, message).toResponse()
+        is AdminError.NotFound -> scimUntypedError(HttpStatusCode.NotFound, message)
+        is AdminError.Conflict ->
+            when (kind) {
+                ConflictKind.DUPLICATE_VALUE -> ScimFailure(ScimErrorType.uniqueness, message).toResponse()
+                // RFC 7644 §3.12 permits omitting scimType, and omitting it is the honest answer
+                // here: `uniqueness` tells the client a value is already taken, whose standard
+                // remediation — retry with a different displayName — can never clear a subgroup
+                // block. A bare 409 plus the detail sends them to the actual cause.
+                ConflictKind.DEPENDENT_RESOURCES -> scimUntypedError(HttpStatusCode.Conflict, message)
+            }
         is AdminError.Validation -> ScimFailure(ScimErrorType.invalidValue, message).toResponse()
         AdminError.SmtpRequired, AdminError.NoMethodsEnabled ->
             ScimFailure(

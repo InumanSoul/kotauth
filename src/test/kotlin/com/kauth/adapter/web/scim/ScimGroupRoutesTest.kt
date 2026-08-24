@@ -1201,7 +1201,10 @@ class ScimGroupRoutesTest {
             assertNotNull(groupRepo.findById(parent.id))
             assertNotNull(groupRepo.findById(child.id!!))
             val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals("uniqueness", body["scimType"]!!.jsonPrimitive.content)
+            // No scimType, which RFC 7644 §3.12 permits. `uniqueness` would tell the client the
+            // value is already taken, and its remediation — retry with a different displayName —
+            // can never clear a subgroup block; the detail names the subgroups instead.
+            assertNull(body["scimType"])
             assertEquals(true, body["detail"]!!.jsonPrimitive.content.contains("Backend"))
         }
 
@@ -1224,6 +1227,23 @@ class ScimGroupRoutesTest {
             )
             assertNull(groupRepo.findById(parent.id))
             assertNotNull(groupRepo.findById(child.id!!))
+        }
+
+    @Test
+    fun `a duplicate displayName still reports uniqueness, so the two conflicts stay distinguishable`() =
+        testApplication {
+            application { installTestApp() }
+            addGroup("Engineering")
+
+            val response =
+                client.post("/t/acme/scim/v2/Groups") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("Engineering"))
+                }
+
+            assertEquals(HttpStatusCode.Conflict, response.status)
+            assertEquals("uniqueness", scimTypeOf(response.bodyAsText()))
         }
 
     @Test

@@ -546,7 +546,12 @@ class RoleGroupService(
         // operator nothing about which subgroups are in the way.
         val children = groupRepository.findChildren(groupId)
         if (children.isNotEmpty()) {
-            return AdminResult.Failure(AdminError.Conflict(childGroupsBlockDeleteMessage(group.name, children)))
+            return AdminResult.Failure(
+                AdminError.Conflict(
+                    childGroupsBlockDeleteMessage(group.name, children),
+                    kind = ConflictKind.DEPENDENT_RESOURCES,
+                ),
+            )
         }
 
         groupRepository.delete(groupId)
