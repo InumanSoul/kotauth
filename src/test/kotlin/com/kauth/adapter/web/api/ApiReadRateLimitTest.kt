@@ -27,6 +27,7 @@ import com.kauth.fakes.FakeRoleRepository
 import com.kauth.fakes.FakeSessionRepository
 import com.kauth.fakes.FakeTenantClaimMapperRepository
 import com.kauth.fakes.FakeTenantRepository
+import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
 import com.kauth.fakes.FakeWebAuthnCredentialRepository
@@ -36,11 +37,9 @@ import com.kauth.infrastructure.ApiKeyPrincipal
 import com.kauth.infrastructure.CachingClaimMapperService
 import com.kauth.infrastructure.InMemoryRateLimiter
 import io.ktor.client.request.bearerAuth
-import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
@@ -53,27 +52,18 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Integration tests for the API write rate limiter (v1.21.0) — every
- * POST/PUT/PATCH/DELETE under `/t/{tenantSlug}/api/v1` (any subpath) is gated by a
- * per-(API key x tenant) [InMemoryRateLimiter]. GET is always exempt.
- *
- * Uses a deliberately low `maxRequests = 2` limiter so the third write in a
- * test trips the 429 without slow real-time waiting. Because each test gets a
- * freshly generated API key (and therefore a fresh `keyPrefix`) from
- * [ApiKeyService.create] in [setup], the buckets in the shared limiter never
- * collide across tests.
+ * Reads under `/t/{tenantSlug}/api/v1` (and `/scim/v2`) used to be entirely unthrottled — the
+ * write limiter in [ApiRoutes] returns early for GET/HEAD/OPTIONS, and until now nothing filled
+ * that gap. This exercises the new read limiter: its own budget, its own bucket prefix
+ * (`api_read`, independent of `api_write`), and 429 once exhausted.
  */
-class ApiRateLimitTest {
+class ApiReadRateLimitTest {
     private val tenantRepo = FakeTenantRepository()
     private val userRepo = FakeUserRepository()
     private val appRepo = FakeApplicationRepository()
@@ -167,10 +157,11 @@ class ApiRateLimitTest {
 
     private val claimMapperService = CachingClaimMapperService(mapperRepository = claimMapperRepo)
 
-    private val jsonCodec = Json { ignoreUnknownKeys = true }
-
     /** Very-low-limit limiter shared across tests; safe because each test's API key gets a fresh prefix. */
-    private val apiWriteRateLimiter = InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60)
+    private val apiReadRateLimiter = InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60)
+
+    /** Also low, so the "exhausting writes doesn't block reads" test doesn't need dozens of calls. */
+    private val apiWriteRateLimiter = InMemoryRateLimiter(maxRequests = 3, windowSeconds = 60)
 
     private var rawApiKey: String = ""
 
@@ -188,223 +179,80 @@ class ApiRateLimitTest {
 
         tenantRepo.add(tenant)
 
-        rawApiKey = createKeyFor(TenantId(1))
+        rawApiKey =
+            (
+                apiKeyService.create(
+                    tenantId = TenantId(1),
+                    name = "Test Key",
+                    scopes = listOf(ApiScope.USERS_WRITE, ApiScope.USERS_READ),
+                ) as ApiKeyResult.Success
+            ).value.rawKey
     }
 
-    private fun createKeyFor(tenantId: TenantId): String =
-        (
-            apiKeyService.create(
-                tenantId = tenantId,
-                name = "Test Key",
-                scopes = listOf(ApiScope.USERS_WRITE, ApiScope.USERS_READ),
-            ) as ApiKeyResult.Success
-        ).value.rawKey
-
-    private fun createUserBody(username: String) =
-        """{"username":"$username","email":"$username@acme.com","fullName":"$username","password":"Password123!"}"""
-
-    // =========================================================================
-    // 1-3: basic allow / block / shape
-    // =========================================================================
-
     @Test
-    fun `first two POST users write requests succeed`() =
+    fun `first two GET requests succeed`() =
         testApplication {
             application { installTestApp() }
 
-            val first =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("alice"))
-                }
-            val second =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("bob"))
-                }
-
-            assertEquals(HttpStatusCode.Created, first.status)
-            assertEquals(HttpStatusCode.Created, second.status)
+            repeat(2) {
+                val response = client.get("/t/acme/api/v1/users") { bearerAuth(rawApiKey) }
+                assertEquals(HttpStatusCode.OK, response.status)
+            }
         }
 
     @Test
-    fun `third POST users write request returns 429 with Retry-After header`() =
+    fun `third GET request returns 429 with Retry-After header`() =
         testApplication {
             application { installTestApp() }
 
-            repeat(2) { i ->
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("user$i"))
-                }
-            }
+            repeat(2) { client.get("/t/acme/api/v1/users") { bearerAuth(rawApiKey) } }
 
-            val third =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("user2"))
-                }
+            val third = client.get("/t/acme/api/v1/users") { bearerAuth(rawApiKey) }
 
             assertEquals(HttpStatusCode.TooManyRequests, third.status)
             assertTrue(third.headers.contains("Retry-After"))
         }
 
     @Test
-    fun `429 response is application problem+json with clear detail message`() =
+    fun `exhausting the read budget does not block writes`() =
         testApplication {
             application { installTestApp() }
 
-            repeat(2) { i ->
+            repeat(3) { client.get("/t/acme/api/v1/users") { bearerAuth(rawApiKey) } }
+
+            val write =
                 client.post("/t/acme/api/v1/users") {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
-                    setBody(createUserBody("dup$i"))
-                }
-            }
-
-            val response =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("dup2"))
+                    setBody(
+                        """{"username":"newwrite","email":"newwrite@acme.com",""" +
+                            """"fullName":"New Write","password":"Password123!"}""",
+                    )
                 }
 
-            assertEquals("application/problem+json", response.headers["Content-Type"])
-            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
-            assertEquals(429, body["status"]!!.jsonPrimitive.int)
-            assertEquals("Rate limit exceeded", body["title"]!!.jsonPrimitive.content)
-            assertTrue(body["detail"]!!.jsonPrimitive.content.contains("rate limit", ignoreCase = true))
+            assertEquals(HttpStatusCode.Created, write.status)
         }
-
-    // =========================================================================
-    // 4: GET is exempt
-    // =========================================================================
 
     @Test
-    fun `GET requests never trigger the rate limiter — 100 GETs succeed`() =
+    fun `exhausting the write budget does not block reads`() =
         testApplication {
             application { installTestApp() }
 
-            repeat(100) {
-                val response =
-                    client.get("/t/acme/api/v1/users") {
-                        bearerAuth(rawApiKey)
-                    }
-                assertEquals(HttpStatusCode.OK, response.status)
-            }
-        }
-
-    // =========================================================================
-    // 5: scoped per API key
-    // =========================================================================
-
-    @Test
-    fun `rate limit is scoped per API key — a second key hitting the same tenant is not rate-limited`() =
-        testApplication {
-            application { installTestApp() }
-
-            // Exhaust the first key's bucket.
-            repeat(2) { i ->
+            repeat(4) {
                 client.post("/t/acme/api/v1/users") {
                     bearerAuth(rawApiKey)
                     contentType(ContentType.Application.Json)
-                    setBody(createUserBody("first$i"))
+                    setBody(
+                        """{"username":"user$it","email":"user$it@acme.com",""" +
+                            """"fullName":"User $it","password":"Password123!"}""",
+                    )
                 }
             }
-            val blocked =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("first2"))
-                }
-            assertEquals(HttpStatusCode.TooManyRequests, blocked.status)
 
-            // A second, distinct key (different keyPrefix) for the same tenant is unaffected.
-            val secondKey = createKeyFor(TenantId(1))
-            val allowed =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(secondKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("second0"))
-                }
-            assertEquals(HttpStatusCode.Created, allowed.status)
+            val read = client.get("/t/acme/api/v1/users") { bearerAuth(rawApiKey) }
+
+            assertEquals(HttpStatusCode.OK, read.status)
         }
-
-    // Note: a "scoped per tenant" test (#6 in the brief) is skipped — ApiKeyService.validate()
-    // binds every key to exactly one tenantId (validate() returns null on a tenant mismatch), so
-    // the same raw key can never authenticate against a second tenant's slug. There is no way to
-    // exercise "same key, different tenant" without it being identical in effect to the per-key
-    // test above (a distinct key is always required for a distinct tenant).
-
-    // =========================================================================
-    // 7: DELETE counts too
-    // =========================================================================
-
-    @Test
-    fun `DELETE also counts against the write limit`() =
-        testApplication {
-            application { installTestApp() }
-            val user =
-                userRepo.add(
-                    com.kauth.domain.model.User(
-                        tenantId = TenantId(1),
-                        username = "target",
-                        email = "target@acme.com",
-                        fullName = "Target",
-                        passwordHash = hasher.hash("pass"),
-                    ),
-                )
-            val userId = user.id!!.value
-
-            repeat(2) {
-                client.delete("/t/acme/api/v1/users/$userId/mfa/reset") {
-                    bearerAuth(rawApiKey)
-                }
-            }
-            val third =
-                client.delete("/t/acme/api/v1/users/$userId/mfa/reset") {
-                    bearerAuth(rawApiKey)
-                }
-
-            assertEquals(HttpStatusCode.TooManyRequests, third.status)
-        }
-
-    // Note: #8 (PATCH also counts) is skipped — grep confirms no PATCH route exists anywhere
-    // under src/main/kotlin/com/kauth/adapter/web/api/ in v1.21.0.
-
-    // =========================================================================
-    // 9: Retry-After matches windowSeconds
-    // =========================================================================
-
-    @Test
-    fun `Retry-After header matches the limiter's windowSeconds`() =
-        testApplication {
-            application { installTestApp() }
-
-            repeat(2) { i ->
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("ra$i"))
-                }
-            }
-            val blocked =
-                client.post("/t/acme/api/v1/users") {
-                    bearerAuth(rawApiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(createUserBody("ra2"))
-                }
-
-            assertEquals(apiWriteRateLimiter.windowSeconds.toString(), blocked.headers["Retry-After"])
-        }
-
-    // -------------------------------------------------------------------------
-    // Test wiring
-    // -------------------------------------------------------------------------
 
     private fun io.ktor.server.application.Application.installTestApp() {
         install(ContentNegotiation) { json() }
@@ -436,7 +284,7 @@ class ApiRateLimitTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = apiWriteRateLimiter,
-                apiReadRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = apiReadRateLimiter,
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -448,7 +296,7 @@ class ApiRateLimitTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
-                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
+                transactionRunner = FakeTransactionRunner(),
             )
         }
     }

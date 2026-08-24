@@ -57,6 +57,7 @@ fun Route.apiRoutes(
     otpEmailRateLimiter: RateLimiterPort,
     otpIpRateLimiter: RateLimiterPort,
     apiWriteRateLimiter: RateLimiterPort,
+    apiReadRateLimiter: RateLimiterPort,
     webhookService: WebhookService,
     resourceServerService: ResourceServerService,
     webAuthnService: WebAuthnService,
@@ -145,6 +146,26 @@ fun Route.apiRoutes(
             }
         }
 
+    // Reads were previously unthrottled entirely (the write limiter above returns early for
+    // GET/HEAD/OPTIONS) — including SCIM list endpoints, which can scan a whole directory in
+    // chunks. Uses its own bucket prefix ("api_read" vs "api_write") so exhausting one budget
+    // never blocks the other.
+    val readRateLimitPlugin =
+        createRouteScopedPlugin("ApiReadRateLimitPlugin") {
+            on(AuthenticationChecked) { call ->
+                val method = call.request.httpMethod
+                if (method != HttpMethod.Get && method != HttpMethod.Head && method != HttpMethod.Options) {
+                    return@on
+                }
+                val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+                val slug = call.parameters["tenantSlug"] ?: return@on
+                val bucketKey = "api_read:${key.keyPrefix}:$slug"
+                if (!apiReadRateLimiter.isAllowed(bucketKey)) {
+                    call.respondReadRateLimited(retryAfterSeconds = apiReadRateLimiter.windowSeconds)
+                }
+            }
+        }
+
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
             if (corsService != null) {
@@ -156,6 +177,7 @@ fun Route.apiRoutes(
 
             install(apiContextPlugin)
             install(writeRateLimitPlugin)
+            install(readRateLimitPlugin)
 
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
@@ -175,6 +197,7 @@ fun Route.apiRoutes(
             install(apiContextPlugin)
             install(ScimScopePlugin)
             install(writeRateLimitPlugin)
+            install(readRateLimitPlugin)
             scimDiscoveryRoutes()
             scimUserRoutes(adminUserService, groupRepository, transactionRunner)
         }

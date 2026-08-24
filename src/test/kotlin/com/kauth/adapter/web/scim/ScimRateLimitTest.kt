@@ -295,6 +295,7 @@ class ScimRateLimitTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = apiWriteRateLimiter,
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =

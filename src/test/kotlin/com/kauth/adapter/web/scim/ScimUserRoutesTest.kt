@@ -1231,6 +1231,7 @@ class ScimUserRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
