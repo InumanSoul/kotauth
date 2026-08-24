@@ -130,11 +130,7 @@ object ScimUserMapper {
         // Same emptiness guard as displayName: a work entry with value "" must fall through
         // to the existing address rather than blank it.
         val email =
-            (resource.attributes["emails"] as? ScimValue.MultiValued)
-                ?.values
-                ?.filterIsInstance<ScimValue.Complex>()
-                ?.firstOrNull { (it.attributes["type"] as? ScimValue.Str)?.value == "work" }
-                ?.let { (it.attributes["value"] as? ScimValue.Str)?.value }
+            resource.selectEmail()
                 ?.trim()
                 ?.takeIf { it.isNotEmpty() }
                 ?: existing?.email
@@ -171,5 +167,22 @@ object ScimUserMapper {
             )
 
         return Result.success(ScimUserWrite(user, plaintextPassword))
+    }
+
+    /**
+     * Picks the address to use from a SCIM `emails` array (RFC 7643 §4.1.2): the entry marked
+     * `type: "work"`, then the one marked `primary: true`, then the first entry — in that order.
+     * Many connectors send a single email with neither `type` nor `primary` set; requiring an
+     * exact `type == "work"` match silently drops that address on create (blank email, wrong
+     * validation error) and on update (address ignored, stale one kept).
+     */
+    private fun ScimResource.selectEmail(): String? {
+        val entries = (attributes["emails"] as? ScimValue.MultiValued)?.values?.filterIsInstance<ScimValue.Complex>()
+        val chosen =
+            entries
+                ?.firstOrNull { (it.attributes["type"] as? ScimValue.Str)?.value == "work" }
+                ?: entries?.firstOrNull { (it.attributes["primary"] as? ScimValue.Bool)?.value == true }
+                ?: entries?.firstOrNull()
+        return (chosen?.attributes?.get("value") as? ScimValue.Str)?.value
     }
 }

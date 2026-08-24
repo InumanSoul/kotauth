@@ -227,6 +227,130 @@ class ScimUserMapperTest {
     }
 
     @Test
+    fun `toDomain falls back to primary when no email is typed work`() {
+        val r =
+            resourceWithName("A", "B").let {
+                it.copy(
+                    attributes =
+                        it.attributes +
+                            (
+                                "emails" to
+                                    ScimValue.MultiValued(
+                                        listOf(
+                                            ScimValue.Complex(mapOf("value" to ScimValue.Str("alt@example.com"))),
+                                            ScimValue.Complex(
+                                                mapOf(
+                                                    "value" to ScimValue.Str("primary@example.com"),
+                                                    "primary" to ScimValue.Bool(true),
+                                                ),
+                                            ),
+                                        ),
+                                    )
+                            ),
+                )
+            }
+
+        assertEquals("primary@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+    }
+
+    @Test
+    fun `toDomain falls back to the first email when neither work nor primary is present`() {
+        // The common connector shape: a single email with no type and no primary flag.
+        // Requiring an exact type == "work" match used to blank this out entirely.
+        val r =
+            resourceWithName("A", "B").let {
+                it.copy(
+                    attributes =
+                        it.attributes +
+                            (
+                                "emails" to
+                                    ScimValue.MultiValued(
+                                        listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("only@example.com")))),
+                                    )
+                            ),
+                )
+            }
+
+        assertEquals("only@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+    }
+
+    @Test
+    fun `toDomain create with an untyped email does not misreport a missing email`() {
+        // Regression: before the fallback chain, this shape produced email = "" and the
+        // service rejected with "A valid email address is required.", pointing the
+        // integrator at the wrong field.
+        val r =
+            ScimResource(
+                schemas = listOf("urn:ietf:params:scim:schemas:core:2.0:User"),
+                attributes =
+                    mapOf(
+                        "userName" to ScimValue.Str("noType@example.com"),
+                        "emails" to
+                            ScimValue.MultiValued(
+                                listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("noType@example.com")))),
+                            ),
+                    ),
+            )
+
+        val write = ScimUserMapper.toDomain(r, existing = null, tenantId = tenantId).getOrThrow()
+        assertEquals("noType@example.com", write.user.email)
+    }
+
+    @Test
+    fun `toDomain work email wins even when it is not the first entry`() {
+        val r =
+            resourceWithName("A", "B").let {
+                it.copy(
+                    attributes =
+                        it.attributes +
+                            (
+                                "emails" to
+                                    ScimValue.MultiValued(
+                                        listOf(
+                                            ScimValue.Complex(
+                                                mapOf(
+                                                    "value" to ScimValue.Str("home@example.com"),
+                                                    "type" to ScimValue.Str("home"),
+                                                    "primary" to ScimValue.Bool(true),
+                                                ),
+                                            ),
+                                            ScimValue.Complex(
+                                                mapOf(
+                                                    "value" to ScimValue.Str("work@example.com"),
+                                                    "type" to ScimValue.Str("work"),
+                                                ),
+                                            ),
+                                        ),
+                                    )
+                            ),
+                )
+            }
+
+        assertEquals("work@example.com", ScimUserMapper.toDomain(r, null, tenantId).getOrThrow().user.email)
+    }
+
+    @Test
+    fun `toDomain on update with untyped emails still updates the address, not silently keeps the old one`() {
+        val existing = user()
+        val r =
+            resourceWithName(given = "A", family = "B").let {
+                it.copy(
+                    attributes =
+                        it.attributes +
+                            (
+                                "emails" to
+                                    ScimValue.MultiValued(
+                                        listOf(ScimValue.Complex(mapOf("value" to ScimValue.Str("new@example.com")))),
+                                    )
+                            ),
+                )
+            }
+
+        val write = ScimUserMapper.toDomain(r, existing, tenantId).getOrThrow()
+        assertEquals("new@example.com", write.user.email)
+    }
+
+    @Test
     fun `toDomain rejects a composed fullName that exceeds the column`() {
         // full_name is varchar(255); two long parts can exceed it even though each fits.
         val r = resourceWithName(given = "g".repeat(200), family = "f".repeat(200))
