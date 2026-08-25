@@ -5,7 +5,7 @@ import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.AuthMethodRow
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.Requirement
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import kotlinx.html.*
 
@@ -35,7 +35,7 @@ object AuthMethodsGridView {
         }
 
         val socialRowCount = rows.count { it.key == MethodKey.SOCIAL_GOOGLE || it.key == MethodKey.SOCIAL_GITHUB }
-        if (socialRowCount < SocialProvider.entries.size) {
+        if (socialRowCount < ProviderKey.RESERVED.size) {
             p("methods-idp-hint") {
                 a("/admin/workspaces/${tenant.slug}/settings/identity-providers") {
                     +EnglishStrings.ADMIN_METHODS_MORE_SIGN_IN_OPTIONS

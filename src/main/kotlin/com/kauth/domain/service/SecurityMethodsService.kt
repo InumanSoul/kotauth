@@ -2,8 +2,8 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuthMethodRow
 import com.kauth.domain.model.MethodKey
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Requirement
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.IdentityProviderRepository
@@ -65,21 +65,24 @@ class SecurityMethodsService(
 
         // Only emit rows for providers that have credentials configured.
         // Unconfigured providers are noise for the operator; they can add them via Identity Providers.
-        SocialProvider.entries.forEach { socialProvider ->
-            val hasCredentials = allIdps.any { it.provider == socialProvider }
+        ProviderKey.RESERVED.forEach { providerKey ->
+            val hasCredentials = allIdps.any { it.provider == providerKey }
             if (!hasCredentials) return@forEach
 
+            // A provider key is open, so the compiler cannot prove this covers every case;
+            // RESERVED holds exactly the two keys that have a MethodKey row.
             val key =
-                when (socialProvider) {
-                    SocialProvider.GOOGLE -> MethodKey.SOCIAL_GOOGLE
-                    SocialProvider.GITHUB -> MethodKey.SOCIAL_GITHUB
+                when (providerKey) {
+                    ProviderKey.GOOGLE -> MethodKey.SOCIAL_GOOGLE
+                    ProviderKey.GITHUB -> MethodKey.SOCIAL_GITHUB
+                    else -> return@forEach
                 }
             rows +=
                 AuthMethodRow(
                     key = key,
                     labelKey = "AUTH_METHOD_${key.name}_LABEL",
                     descriptionKey = null,
-                    enabled = socialProvider in enabledProviders,
+                    enabled = providerKey in enabledProviders,
                     requirements = emptyList(),
                     toggleable = true,
                 )

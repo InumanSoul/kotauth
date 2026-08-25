@@ -1,7 +1,7 @@
 package com.kauth.adapter.persistence
 
 import com.kauth.domain.model.IdentityProvider
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.EncryptionPort
 import com.kauth.domain.port.IdentityProviderRepository
@@ -42,7 +42,7 @@ class PostgresIdentityProviderRepository(
 
     override fun findByTenantAndProvider(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ): IdentityProvider? =
         transaction {
             IdentityProvidersTable
@@ -94,7 +94,7 @@ class PostgresIdentityProviderRepository(
 
     override fun delete(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ) = transaction {
         IdentityProvidersTable.deleteWhere {
             (IdentityProvidersTable.tenantId eq tenantId.value) and
@@ -108,8 +108,8 @@ class PostgresIdentityProviderRepository(
     // ------------------------------------------------------------------
 
     private fun ResultRow.toIdentityProvider(): IdentityProvider? {
-        val providerEnum =
-            SocialProvider.fromValueOrNull(this[IdentityProvidersTable.provider])
+        val providerKey =
+            ProviderKey.of(this[IdentityProvidersTable.provider])
                 ?: return null
         val decryptedSecret =
             encryptionService.decrypt(this[IdentityProvidersTable.clientSecret])
@@ -117,7 +117,7 @@ class PostgresIdentityProviderRepository(
         return IdentityProvider(
             id = this[IdentityProvidersTable.id],
             tenantId = TenantId(this[IdentityProvidersTable.tenantId]),
-            provider = providerEnum,
+            provider = providerKey,
             clientId = this[IdentityProvidersTable.clientId],
             clientSecret = decryptedSecret,
             enabled = this[IdentityProvidersTable.enabled],

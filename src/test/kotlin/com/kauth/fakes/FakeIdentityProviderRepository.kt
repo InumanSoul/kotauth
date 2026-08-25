@@ -1,7 +1,7 @@
 package com.kauth.fakes
 
 import com.kauth.domain.model.IdentityProvider
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.IdentityProviderRepository
 
@@ -17,11 +17,11 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
         provider: String,
         enabled: Boolean = true,
     ) {
-        val socialProvider = SocialProvider.fromValue(provider)
+        val providerKey = requireNotNull(ProviderKey.of(provider)) { "Not a provider key: $provider" }
         add(
             IdentityProvider(
                 tenantId = tenantId,
-                provider = socialProvider,
+                provider = providerKey,
                 clientId = "client-$provider",
                 clientSecret = "secret-$provider",
                 enabled = enabled,
@@ -48,7 +48,7 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
 
     override fun findByTenantAndProvider(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ): IdentityProvider? = store.values.find { it.tenantId == tenantId && it.provider == provider }
 
     override fun save(provider: IdentityProvider): IdentityProvider {
@@ -64,7 +64,7 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
 
     override fun delete(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ) {
         store.entries.removeIf { it.value.tenantId == tenantId && it.value.provider == provider }
     }

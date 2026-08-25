@@ -5,7 +5,7 @@ import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
 import com.kauth.domain.model.IdentityProvider
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import kotlinx.html.*
@@ -243,9 +243,10 @@ internal fun identityProvidersPageImpl(
             // ── Provider cards ───────────────────────────────────────
             val providerMap = providers.associateBy { it.provider }
 
-            for (prov in SocialProvider.entries) {
+            for (prov in ProviderKey.RESERVED) {
                 val existing = providerMap[prov]
                 val isConfigured = existing != null
+                val providerName = EnglishStrings.providerDisplayName(prov)
                 val callbackUrl = "$baseUrl/t/$slug/auth/social/${prov.value}/callback"
 
                 div("ov-card") {
@@ -257,7 +258,7 @@ internal fun identityProvidersPageImpl(
                         // ── Header: name + badge + toggle ────────────
                         div("provider-header") {
                             div("provider-header__name") {
-                                +prov.displayName
+                                +providerName
                                 if (isConfigured) {
                                     val badgeCls = if (existing.enabled) "badge badge--active" else "badge badge--inactive"
                                     span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
@@ -278,8 +279,10 @@ internal fun identityProvidersPageImpl(
                         // ── Setup instructions + callback URL ────────
                         div("setup-row") {
                             div("setup-row__text") {
+                                // A provider key is open, so no exhaustive branch exists; the
+                                // fallback is unreachable while this loop walks RESERVED only.
                                 when (prov) {
-                                    SocialProvider.GOOGLE -> {
+                                    ProviderKey.GOOGLE -> {
                                         +"Create credentials in "
                                         a(
                                             href = "https://console.cloud.google.com/apis/credentials",
@@ -287,13 +290,16 @@ internal fun identityProvidersPageImpl(
                                         ) { +"Google Cloud Console" }
                                         +". Set the authorized redirect URI to:"
                                     }
-                                    SocialProvider.GITHUB -> {
+                                    ProviderKey.GITHUB -> {
                                         +"Register an OAuth App in "
                                         a(
                                             href = "https://github.com/settings/developers",
                                             target = "_blank",
                                         ) { +"GitHub Developer Settings" }
                                         +". Set the callback URL to:"
+                                    }
+                                    else -> {
+                                        +"Register this workspace with $providerName. Set the callback URL to:"
                                     }
                                 }
                             }
@@ -313,7 +319,7 @@ internal fun identityProvidersPageImpl(
                             span("edit-row__label") { +"Client ID" }
                             input(type = InputType.text, name = "clientId") {
                                 classes = setOf("edit-row__field")
-                                placeholder = "Enter ${prov.displayName} client ID"
+                                placeholder = "Enter $providerName client ID"
                                 required = true
                                 value = existing?.clientId ?: ""
                                 attributes["autocomplete"] = "off"
@@ -341,7 +347,7 @@ internal fun identityProvidersPageImpl(
                         div("edit-actions") {
                             button(type = ButtonType.submit) {
                                 classes = setOf("btn", "btn--primary", "btn--sm")
-                                +"Save ${prov.displayName}"
+                                +"Save $providerName"
                             }
                         }
                     }

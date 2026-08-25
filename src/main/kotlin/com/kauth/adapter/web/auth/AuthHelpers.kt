@@ -380,7 +380,7 @@ internal fun SocialLoginError.toMessage(): String =
 // -- Social pending registration cookie -----------------------------------
 
 internal data class SocialPendingData(
-    val provider: com.kauth.domain.model.SocialProvider,
+    val provider: com.kauth.domain.model.ProviderKey,
     val slug: String,
     val providerUserId: String,
     val email: String,
@@ -432,8 +432,8 @@ internal fun parseSocialPendingCookie(
         fun decode(s: String) = String(dec.decode(s), Charsets.UTF_8)
 
         val provider =
-            com.kauth.domain.model.SocialProvider
-                .fromValueOrNull(parts[0]) ?: return null
+            com.kauth.domain.model.ProviderKey
+                .of(parts[0]) ?: return null
         val slug = parts[1]
         val providerUserId = decode(parts[2])
         val email = decode(parts[3])

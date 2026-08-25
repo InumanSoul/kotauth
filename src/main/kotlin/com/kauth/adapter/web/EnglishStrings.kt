@@ -1,6 +1,7 @@
 package com.kauth.adapter.web
 
 import com.kauth.domain.model.Group
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.service.childGroupsBlockDeleteMessage
 import java.lang.reflect.Modifier
 
@@ -536,6 +537,7 @@ object EnglishStrings {
     const val LOGIN_CONTINUE_GITHUB = "Continue with GitHub"
     const val LOGIN_PROVIDER_GOOGLE = "Google"
     const val LOGIN_PROVIDER_GITHUB = "GitHub"
+    const val LOGIN_CONTINUE_GENERIC = "Continue with {provider}"
     const val AUTH_LOGIN_PASSKEY_BUTTON = "Sign in with a passkey"
     const val AUTH_LOGIN_MAGIC_LINK_BUTTON = "Sign in with a magic link"
 
@@ -932,6 +934,21 @@ object EnglishStrings {
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
         "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
             "sync never changes them."
+
+    /**
+     * Human-readable name for a provider key. The two reserved keys keep their brand casing;
+     * any other key is title-cased from its own value so a provider always has a label.
+     */
+    fun providerDisplayName(key: ProviderKey): String =
+        when (key) {
+            ProviderKey.GOOGLE -> LOGIN_PROVIDER_GOOGLE
+            ProviderKey.GITHUB -> LOGIN_PROVIDER_GITHUB
+            else ->
+                key.value
+                    .split("-")
+                    .filter { it.isNotBlank() }
+                    .joinToString(" ") { part -> part.replaceFirstChar { c -> c.uppercaseChar() } }
+        }
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

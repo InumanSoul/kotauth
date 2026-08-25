@@ -270,12 +270,12 @@ object PortalView {
                                             span(classes = "social-accounts-list__icon") {
                                                 inlineSvgIcon(
                                                     iconName = "${account.provider.value}-logo",
-                                                    ariaLabel = account.provider.displayName,
+                                                    ariaLabel = EnglishStrings.providerDisplayName(account.provider),
                                                 )
                                             }
                                             div(classes = "social-accounts-list__info") {
                                                 span(classes = "social-accounts-list__name") {
-                                                    +account.provider.displayName
+                                                    +EnglishStrings.providerDisplayName(account.provider)
                                                 }
                                                 if (!account.providerEmail.isNullOrBlank()) {
                                                     span(classes = "social-accounts-list__email") {

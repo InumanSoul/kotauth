@@ -11,11 +11,11 @@ import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
@@ -257,7 +257,7 @@ class BackupExportImportTest {
             IdentityProvider(
                 id = null,
                 tenantId = tenant.id,
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 clientId = "google-real-client-id",
                 clientSecret = "PLAINTEXT-SECRET-MUST-NEVER-LEAK",
                 enabled = true,

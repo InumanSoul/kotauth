@@ -36,7 +36,7 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
 import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
@@ -456,10 +456,12 @@ data class ServiceGraph(
                     tokenPort = tokenAdapter,
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
-                    providerAdapters =
-                        mapOf(
-                            SocialProvider.GOOGLE to GoogleOAuthAdapter(),
-                            SocialProvider.GITHUB to GitHubOAuthAdapter(),
+                    providerResolver =
+                        StaticSocialProviderResolver(
+                            mapOf(
+                                ProviderKey.GOOGLE to GoogleOAuthAdapter(),
+                                ProviderKey.GITHUB to GitHubOAuthAdapter(),
+                            ),
                         ),
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,

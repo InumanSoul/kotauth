@@ -2,9 +2,9 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
@@ -16,7 +16,7 @@ import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.SocialAccountRepository
-import com.kauth.domain.port.SocialProviderPort
+import com.kauth.domain.port.SocialProviderResolver
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
@@ -56,7 +56,7 @@ class SocialLoginService(
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val providerAdapters: Map<SocialProvider, SocialProviderPort>,
+    private val providerResolver: SocialProviderResolver,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
 ) {
@@ -65,7 +65,7 @@ class SocialLoginService(
      */
     fun buildRedirectUrl(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         state: String,
         baseUrl: String,
     ): SocialLoginResult<String> {
@@ -79,7 +79,7 @@ class SocialLoginService(
         }
 
         val adapter =
-            providerAdapters[provider]
+            providerResolver.resolve(tenant.id, provider)
                 ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
         val url =
@@ -102,7 +102,7 @@ class SocialLoginService(
      */
     fun handleCallback(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         code: String,
         baseUrl: String,
         ipAddress: String? = null,
@@ -118,7 +118,7 @@ class SocialLoginService(
         }
 
         val adapter =
-            providerAdapters[provider]
+            providerResolver.resolve(tenant.id, provider)
                 ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
         val profile =
@@ -168,7 +168,7 @@ class SocialLoginService(
      */
     fun completeSocialRegistration(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         providerUserId: String,
         email: String,
         providerName: String?,
@@ -298,7 +298,7 @@ class SocialLoginService(
     // could claim any KotAuth account that shares that address.
     private fun resolveExistingUser(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
         profile: SocialUserProfile,
     ): ExistingUserMatch {
         val linked =
@@ -337,7 +337,7 @@ class SocialLoginService(
     private fun issueTokens(
         user: User,
         tenant: Tenant,
-        provider: SocialProvider,
+        provider: ProviderKey,
         isNewUser: Boolean,
         ipAddress: String?,
         userAgent: String?,
@@ -409,7 +409,7 @@ class SocialLoginService(
     private fun callbackUri(
         baseUrl: String,
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
 }
 
@@ -424,7 +424,7 @@ data class SocialLoginSuccess(
 )
 
 data class SocialLoginNeedsRegistration(
-    val provider: SocialProvider,
+    val provider: ProviderKey,
     val providerUserId: String,
     val email: String,
     val name: String?,

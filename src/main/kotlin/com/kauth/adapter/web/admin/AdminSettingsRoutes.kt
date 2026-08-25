@@ -5,7 +5,7 @@ import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
@@ -197,8 +197,10 @@ fun Route.adminSettingsRoutes(
     post("/settings/identity-providers/{provider}") {
         val session = call.sessions.get<AdminSession>()!!
         val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        // Phase 1 configures only the compiled-in adapters; RESERVED is that set, so an
+        // otherwise well-formed key is still rejected until Phase 2 adds OIDC providers.
         val provider =
-            SocialProvider.fromValueOrNull(provName)
+            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
                 ?: return@post call.respond(HttpStatusCode.BadRequest, "Unsupported provider: $provName")
 
         val workspace = call.attributes[WorkspaceAttr]
@@ -271,7 +273,7 @@ fun Route.adminSettingsRoutes(
     post("/settings/identity-providers/{provider}/delete") {
         val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         val provider =
-            SocialProvider.fromValueOrNull(provName)
+            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         val workspace = call.attributes[WorkspaceAttr]
         val slug = workspace.slug

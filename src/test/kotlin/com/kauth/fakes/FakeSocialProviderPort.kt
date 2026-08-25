@@ -1,6 +1,6 @@
 package com.kauth.fakes
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.SocialProviderPort
 import com.kauth.domain.port.SocialUserProfile
 
@@ -9,7 +9,7 @@ import com.kauth.domain.port.SocialUserProfile
  * Returns a configurable profile or throws to simulate provider failures.
  */
 class FakeSocialProviderPort(
-    override val provider: SocialProvider,
+    override val provider: ProviderKey,
 ) : SocialProviderPort {
     var profileToReturn: SocialUserProfile? = null
     var shouldFail: Boolean = false

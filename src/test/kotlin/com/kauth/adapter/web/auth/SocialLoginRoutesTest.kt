@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.config.StaticSocialProviderResolver
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -64,7 +65,7 @@ class SocialLoginRoutesTest {
 
     private val credentialFlowService = mockk<CredentialFlowService>(relaxed = true)
 
-    private val googleAdapter = FakeSocialProviderPort(SocialProvider.GOOGLE)
+    private val googleAdapter = FakeSocialProviderPort(ProviderKey.GOOGLE)
 
     private val encryptionService = EncryptionService("test-secret-key")
 
@@ -109,7 +110,7 @@ class SocialLoginRoutesTest {
             tokenPort = tokenPort,
             passwordHasher = hasher,
             auditLog = auditLog,
-            providerAdapters = mapOf(SocialProvider.GOOGLE to googleAdapter),
+            providerResolver = StaticSocialProviderResolver(mapOf(ProviderKey.GOOGLE to googleAdapter)),
         )
 
     private fun resetFixtures() {

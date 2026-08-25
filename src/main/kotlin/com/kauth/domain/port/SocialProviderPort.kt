@@ -1,6 +1,6 @@
 package com.kauth.domain.port
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 
 /**
  * Port — outbound HTTP calls to a social OAuth2 provider.
@@ -11,7 +11,7 @@ import com.kauth.domain.model.SocialProvider
  */
 interface SocialProviderPort {
     /** Which provider this adapter handles. */
-    val provider: SocialProvider
+    val provider: ProviderKey
 
     /**
      * Exchanges an authorization [code] for a token set, then fetches the

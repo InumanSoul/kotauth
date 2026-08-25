@@ -7,7 +7,7 @@ import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantTheme
 import kotlinx.html.*
 
@@ -119,7 +119,7 @@ object AuthView {
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
-        enabledProviders: List<SocialProvider> = emptyList(),
+        enabledProviders: List<ProviderKey> = emptyList(),
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
@@ -288,26 +288,7 @@ object AuthView {
                                         href = "/t/$tenantSlug/auth/social/${prov.value}/redirect$qs",
                                         classes = "btn-social",
                                     ) {
-                                        when (prov) {
-                                            SocialProvider.GOOGLE -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "google-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
-                                            }
-                                            SocialProvider.GITHUB -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "github-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
-                                            }
-                                        }
+                                        socialProviderButton(prov, ctx)
                                     }
                                 }
                             }
@@ -348,7 +329,7 @@ object AuthView {
         ctx: ViewContext,
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
-        enabledProviders: List<SocialProvider> = emptyList(),
+        enabledProviders: List<ProviderKey> = emptyList(),
         passwordPolicy: SecurityConfig = SecurityConfig(),
         passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
@@ -495,26 +476,7 @@ object AuthView {
                                         href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
                                         classes = "btn-social",
                                     ) {
-                                        when (prov) {
-                                            SocialProvider.GOOGLE -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "google-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
-                                            }
-                                            SocialProvider.GITHUB -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "github-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
-                                            }
-                                        }
+                                        socialProviderButton(prov, ctx)
                                     }
                                 }
                             }
@@ -1517,6 +1479,36 @@ object AuthView {
                 }
             }
         }
+
+    /**
+     * The contents of one social sign-in button. A provider key is an open string, so the
+     * compiler cannot check this for exhaustiveness; the fallback is unreachable while only
+     * the two reserved keys are configurable, and is where a brokered OIDC provider lands.
+     */
+    private fun FlowContent.socialProviderButton(
+        key: ProviderKey,
+        ctx: ViewContext,
+    ) {
+        when (key) {
+            ProviderKey.GOOGLE -> {
+                span("social-icon") {
+                    inlineSvgIcon(iconName = "google-logo", ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"))
+                }
+                +ctx.t("LOGIN_CONTINUE_GOOGLE")
+            }
+            ProviderKey.GITHUB -> {
+                span("social-icon") {
+                    inlineSvgIcon(iconName = "github-logo", ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"))
+                }
+                +ctx.t("LOGIN_CONTINUE_GITHUB")
+            }
+            else -> {
+                val displayName = EnglishStrings.providerDisplayName(key)
+                span("social-icon") { inlineSvgIcon(iconName = "globe", ariaLabel = displayName) }
+                +ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", displayName)
+            }
+        }
+    }
 }
 
 /**

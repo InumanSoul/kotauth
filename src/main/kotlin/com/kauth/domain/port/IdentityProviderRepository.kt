@@ -1,7 +1,7 @@
 package com.kauth.domain.port
 
 import com.kauth.domain.model.IdentityProvider
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantId
 
 /**
@@ -18,7 +18,7 @@ interface IdentityProviderRepository {
     /** Finds a specific provider config, or null if not configured. */
     fun findByTenantAndProvider(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     ): IdentityProvider?
 
     /** Persists a new provider configuration and returns it with the generated id. */
@@ -30,6 +30,6 @@ interface IdentityProviderRepository {
     /** Deletes a provider configuration. */
     fun delete(
         tenantId: TenantId,
-        provider: SocialProvider,
+        provider: ProviderKey,
     )
 }

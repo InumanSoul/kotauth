@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginResult
@@ -31,8 +32,10 @@ internal fun Route.socialLoginRoutes(
         val slug = ctx.slug
         val tenant = ctx.tenant
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        // Phase 1 serves only the compiled-in adapters; RESERVED is that set, so an
+        // otherwise well-formed key still gets today's 400 until Phase 2 adds OIDC.
         val provider =
-            SocialProvider.fromValueOrNull(provName)
+            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
                 ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
         if (socialLoginService == null) {
@@ -84,8 +87,10 @@ internal fun Route.socialLoginRoutes(
         val slug = ctx.slug
         val tenant = ctx.tenant
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        // Phase 1 serves only the compiled-in adapters; RESERVED is that set, so an
+        // otherwise well-formed key still gets today's 400 until Phase 2 adds OIDC.
         val provider =
-            SocialProvider.fromValueOrNull(provName)
+            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
                 ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
         val enabledProviders =
@@ -109,7 +114,7 @@ internal fun Route.socialLoginRoutes(
                 AuthView.loginPage(
                     tenantSlug = slug,
                     ctx = ctx.viewContext,
-                    error = "Login with ${provider.displayName} was cancelled or failed.",
+                    error = "Login with ${EnglishStrings.providerDisplayName(provider)} was cancelled or failed.",
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
@@ -284,7 +289,7 @@ internal fun Route.socialLoginRoutes(
             AuthView.socialRegistrationPage(
                 tenantSlug = slug,
                 ctx = ctx.viewContext,
-                providerName = pending.provider.displayName,
+                providerName = EnglishStrings.providerDisplayName(pending.provider),
                 email = pending.email,
                 prefillUsername = suggestedUsername,
                 prefillFullName = pending.name ?: "",
@@ -342,7 +347,7 @@ internal fun Route.socialLoginRoutes(
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
                         ctx = ctx.viewContext,
-                        providerName = pending.provider.displayName,
+                        providerName = EnglishStrings.providerDisplayName(pending.provider),
                         email = pending.email,
                         prefillUsername = chosenUsername,
                         prefillFullName = chosenFullName ?: pending.name ?: "",
@@ -356,7 +361,7 @@ internal fun Route.socialLoginRoutes(
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
                         ctx = ctx.viewContext,
-                        providerName = pending.provider.displayName,
+                        providerName = EnglishStrings.providerDisplayName(pending.provider),
                         email = pending.email,
                         error = "An unexpected error occurred. Please try again.",
                     ),
@@ -392,7 +397,7 @@ internal fun Route.socialLoginRoutes(
                                 AuthView.socialRegistrationPage(
                                     tenantSlug = slug,
                                     ctx = ctx.viewContext,
-                                    providerName = pending.provider.displayName,
+                                    providerName = EnglishStrings.providerDisplayName(pending.provider),
                                     email = pending.email,
                                     error = message,
                                 ),

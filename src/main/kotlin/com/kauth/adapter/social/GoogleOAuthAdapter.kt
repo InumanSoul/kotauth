@@ -1,6 +1,6 @@
 package com.kauth.adapter.social
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.SocialProviderPort
 import com.kauth.domain.port.SocialUserProfile
 import kotlinx.serialization.json.Json
@@ -32,7 +32,7 @@ import java.time.Duration
  *   - Follows RFC 6749 authorization code grant with PKCE-ready redirect URI handling.
  */
 class GoogleOAuthAdapter : SocialProviderPort {
-    override val provider = SocialProvider.GOOGLE
+    override val provider = ProviderKey.GOOGLE
 
     private val log = LoggerFactory.getLogger(javaClass)
 
