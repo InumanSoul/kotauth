@@ -468,6 +468,101 @@ class BackupExportImportTest {
     }
 
     @Test
+    fun `SCIM external id and name fields survive an export and import round trip`() {
+        val tenantId = sourceTenants.findBySlug("acme")!!.id
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenantId,
+                username = "carol",
+                email = "carol@acme.example.com",
+                fullName = "Carol Chen",
+                passwordHash = "\$2a\$10\$CCCCCCCCCCCCCCCCCCCCCC",
+                externalId = "idp-user-42",
+                givenName = "Carol",
+                familyName = "Chen",
+            ),
+        )
+        sourceGroups.add(
+            Group(id = null, tenantId = tenantId, name = "support", externalId = "idp-group-7"),
+        )
+
+        val export = exportSuccessful(ExportOptions())
+        val carolBackup = export.users.first { it.username == "carol" }
+        assertEquals("idp-user-42", carolBackup.externalId)
+        assertEquals("Carol", carolBackup.givenName)
+        assertEquals("Chen", carolBackup.familyName)
+        val supportBackup = export.groups.first { it.name == "support" }
+        assertEquals("idp-group-7", supportBackup.externalId)
+
+        val r = importer().import(export, newSlug = "acme-scim", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+
+        val restoredCarol = destUsers.findByExternalId(newTenantId, "idp-user-42")
+        assertNotNull(restoredCarol)
+        assertEquals("carol", restoredCarol.username)
+        assertEquals("Carol", restoredCarol.givenName)
+        assertEquals("Chen", restoredCarol.familyName)
+
+        val restoredSupport = destGroups.findByExternalId(newTenantId, "idp-group-7")
+        assertNotNull(restoredSupport)
+        assertEquals("support", restoredSupport.name)
+    }
+
+    @Test
+    fun `a backup lacking the SCIM external id and name fields still imports with them null`() {
+        val tenantId = sourceTenants.findBySlug("acme")!!.id
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenantId,
+                username = "carol",
+                email = "carol@acme.example.com",
+                fullName = "Carol Chen",
+                passwordHash = "\$2a\$10\$CCCCCCCCCCCCCCCCCCCCCC",
+                externalId = "idp-user-42",
+                givenName = "Carol",
+                familyName = "Chen",
+            ),
+        )
+        sourceGroups.add(
+            Group(id = null, tenantId = tenantId, name = "support", externalId = "idp-group-7"),
+        )
+
+        // Simulates a pre-SCIM backup: the exporter never wrote these keys, so decoding
+        // falls back to the field defaults exactly as it would for a real legacy payload.
+        val export = exportSuccessful(ExportOptions())
+        val legacyExport =
+            export.copy(
+                users =
+                    export.users.map {
+                        if (it.username == "carol") {
+                            it.copy(externalId = null, givenName = null, familyName = null)
+                        } else {
+                            it
+                        }
+                    },
+                groups = export.groups.map { if (it.name == "support") it.copy(externalId = null) else it },
+            )
+
+        val r = importer().import(legacyExport, newSlug = "acme-legacy-scim", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val newTenantId = destTenants.findBySlug(summary.newTenantSlug)!!.id
+
+        val restoredCarol =
+            destUsers
+                .findByTenantId(newTenantId, search = null, limit = 100, offset = 0)
+                .first { it.username == "carol" }
+        assertNull(restoredCarol.externalId)
+        assertNull(restoredCarol.givenName)
+        assertNull(restoredCarol.familyName)
+
+        val restoredSupport = destGroups.findByTenantId(newTenantId).first { it.name == "support" }
+        assertNull(restoredSupport.externalId)
+    }
+
+    @Test
     fun `import preserves OTP security config fields and email branding`() {
         val export = exportSuccessful(ExportOptions())
         importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)

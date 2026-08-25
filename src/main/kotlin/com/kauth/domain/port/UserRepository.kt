@@ -25,6 +25,12 @@ interface UserRepository {
         email: String,
     ): User?
 
+    /** Finds a user by the identity provider's key. Null when unprovisioned or unknown. */
+    fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User?
+
     /** Returns all users matching [ids] scoped to [tenantId] in a single batch query. */
     fun findByIds(
         ids: Collection<UserId>,

@@ -54,6 +54,7 @@ import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantEmailBrandingRepository
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.ThemeRepository
+import com.kauth.domain.port.TransactionRunner
 import com.kauth.domain.port.TranslationPort
 import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
@@ -161,6 +162,7 @@ data class ServiceGraph(
     val otpEmailRateLimiter: RateLimiterPort,
     val otpIpRateLimiter: RateLimiterPort,
     val apiWriteRateLimiter: RateLimiterPort,
+    val apiReadRateLimiter: RateLimiterPort,
     val portalSessionKey: ByteArray,
     val encryptionService: EncryptionService,
     val socialAccountRepository: PostgresSocialAccountRepository,
@@ -181,6 +183,7 @@ data class ServiceGraph(
     val passkeyRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
+    val transactionRunner: TransactionRunner,
 ) {
     companion object {
         fun create(config: EnvironmentConfig): ServiceGraph {
@@ -523,6 +526,7 @@ data class ServiceGraph(
                 max: Int,
                 windowSecs: Long,
                 prefix: String,
+                failOpen: Boolean = false,
             ): RateLimiterPort =
                 redisClientHolder?.let {
                     RedisRateLimiter(
@@ -530,6 +534,7 @@ data class ServiceGraph(
                         maxRequests = max,
                         windowSeconds = windowSecs,
                         keyPrefix = prefix,
+                        failOpen = failOpen,
                     )
                 } ?: InMemoryRateLimiter(maxRequests = max, windowSeconds = windowSecs)
 
@@ -541,6 +546,13 @@ data class ServiceGraph(
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
             val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
+            // Reads are throttled far more generously than writes (300/min vs 60/min) and, unlike
+            // every other limiter here, fail OPEN on a Redis outage: a rate limiter guards against
+            // abuse, not correctness, so an unthrottled read window is recoverable, while failing
+            // closed would 429 every read across the admin UI, portal, and SCIM the instant Redis
+            // is unreachable — coupling total read availability to a cache dependency. Do not copy
+            // this default to any other limiter; every one of the above deliberately fails closed.
+            val apiReadLimiter = buildRateLimiter(max = 300, windowSecs = 60, prefix = "api_read", failOpen = true)
 
             // -- Session keys (derived from KAUTH_SECRET_KEY) --------------------
             val portalSessionKey: ByteArray =
@@ -643,6 +655,7 @@ data class ServiceGraph(
                 otpEmailRateLimiter = otpEmailLimiter,
                 otpIpRateLimiter = otpIpLimiter,
                 apiWriteRateLimiter = apiWriteLimiter,
+                apiReadRateLimiter = apiReadLimiter,
                 portalSessionKey = portalSessionKey,
                 encryptionService = encryptionService,
                 socialAccountRepository = socialAccountRepository,
@@ -666,6 +679,7 @@ data class ServiceGraph(
                     ),
                 passkeyRateLimiter = passkeyAuthLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
+                transactionRunner = backupTransactionRunner,
             )
         }
     }

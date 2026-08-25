@@ -86,6 +86,7 @@ fun Route.adminRoutes(
     backupImporterService: BackupImporterService? = null,
     backupEncryptionPort: BackupEncryptionPort? = null,
     flywaySchemaVersion: Int = 0,
+    maxImportBodyBytes: Long = com.kauth.config.EnvironmentConfig.DEFAULT_MAX_BACKUP_IMPORT_BODY_BYTES,
     corsPort: CorsPort? = null,
     baseUrl: String = "",
     translationPort: TranslationPort = com.kauth.infrastructure.EnglishOnlyTranslation(),
@@ -385,6 +386,7 @@ fun Route.adminRoutes(
                     backupImporterService = backupImporterService,
                     backupEncryptionPort = backupEncryptionPort,
                     currentSchemaVersion = flywaySchemaVersion,
+                    maxImportBodyBytes = maxImportBodyBytes,
                 )
             }
 
@@ -546,6 +548,11 @@ fun Route.adminRoutes(
 
                 adminApiKeyRoutes(
                     apiKeyService = apiKeyService,
+                )
+
+                adminScimRoutes(
+                    apiKeyService = apiKeyService,
+                    baseUrl = baseUrl,
                 )
 
                 adminWebhookRoutes(

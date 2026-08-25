@@ -1,0 +1,26 @@
+ALTER TABLE users
+    ADD COLUMN external_id  VARCHAR(255),
+    ADD COLUMN given_name   VARCHAR(255),
+    ADD COLUMN family_name  VARCHAR(255);
+
+-- A later phase composes full_name from given_name + family_name when SCIM sends no
+-- explicit display name; widen it to match so two long parts don't overflow the column.
+ALTER TABLE users
+    ALTER COLUMN full_name TYPE VARCHAR(255);
+
+-- A SCIM userName is typically a UPN or email address; widen to match email so
+-- provisioned usernames aren't truncated.
+ALTER TABLE users
+    ALTER COLUMN username TYPE VARCHAR(255);
+
+ALTER TABLE groups
+    ADD COLUMN external_id VARCHAR(255);
+
+-- The correlation key must be unique per tenant: a duplicate means two local
+-- accounts silently claiming the same identity-provider identity. Partial,
+-- because only provisioned rows carry one and NULLs must stay unconstrained.
+CREATE UNIQUE INDEX users_external_id_per_tenant
+    ON users(tenant_id, external_id) WHERE external_id IS NOT NULL;
+
+CREATE UNIQUE INDEX groups_external_id_per_tenant
+    ON groups(tenant_id, external_id) WHERE external_id IS NOT NULL;

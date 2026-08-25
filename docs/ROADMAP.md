@@ -161,6 +161,23 @@ Phase 3 was the largest phase, delivered in four increments (3a–3d).
 
 ---
 
+### SCIM 2.0 Provisioning ✅ Shipped
+*Goal: Automated user and group provisioning from an external identity source*
+
+- SCIM 2.0 service provider at `/t/{slug}/scim/v2` — `/Users`, `/Groups`, `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`, implementing the RFC 7644 protocol over the RFC 7643 core schema
+- API key authentication — a key carrying the `scim` scope; every request is scoped to the workspace in the path
+- `externalId` correlation on users and groups — unique per workspace, so a provisioning client finds the record it created without matching on a mutable attribute
+- Filtering and pagination — `eq` filters combined with `and`/`or`, `startIndex`/`count` paging, filter attributes scoped per resource type
+- Deprovisioning a user deactivates rather than deletes — the account stays fetchable and its audit history is intact
+- Deleting a group removes the group and its memberships — the member accounts themselves are untouched
+- A group that still has subgroups is refused rather than cascaded, so a delete cannot silently destroy a subtree
+- Per-key wire dialects — chosen explicitly by the operator on the API key, never sniffed from a request header; the non-default dialects normalise the wire-format deviations the major identity providers document, leaving the spec-compliant path untouched
+- Admin provisioning page — endpoint URL, SCIM-scoped keys, in-place dialect correction, and a marker on every record a provisioning client owns
+
+Conformance target is RFC 7644 and RFC 7643. No verification against, or certification for, any particular identity product is claimed.
+
+---
+
 ## Post-V1 Roadmap
 
 The following phases are planned but not yet scheduled. Priority order reflects market demand and dependency on existing foundations.
@@ -207,7 +224,6 @@ The enterprise market requires LDAP and SAML. Without these, Kotauth cannot be a
 - **SDK layer** — typed TypeScript/JavaScript client library wrapping the REST API and OIDC flows
 - **Email template customization** — per-tenant HTML email templates with variable substitution
 - **Audit log export** — scheduled export to S3-compatible object storage or a SIEM webhook
-- **SCIM 2.0** — automated user provisioning and deprovisioning from external HR systems
 
 ---
 

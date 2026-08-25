@@ -390,6 +390,7 @@ class ApiClaimMapperRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -401,6 +402,8 @@ class ApiClaimMapperRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

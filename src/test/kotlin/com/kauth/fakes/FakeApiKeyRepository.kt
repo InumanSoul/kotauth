@@ -47,6 +47,16 @@ class FakeApiKeyRepository : ApiKeyRepository {
         }
     }
 
+    override fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    ) {
+        store[id]?.takeIf { it.tenantId == tenantId }?.let {
+            store[id] = it.copy(scimDialect = scimDialect)
+        }
+    }
+
     override fun touchLastUsed(
         id: Int,
         at: Instant,
@@ -73,6 +83,7 @@ class FakeApiKeyRepository : ApiKeyRepository {
         keyHash: String,
         scopes: List<String>,
         bootstrapName: String,
+        scimDialect: String,
     ) {
         store[id]?.let {
             store[id] =
@@ -81,6 +92,7 @@ class FakeApiKeyRepository : ApiKeyRepository {
                     scopes = scopes,
                     enabled = true,
                     bootstrapName = bootstrapName,
+                    scimDialect = scimDialect,
                 )
         }
     }

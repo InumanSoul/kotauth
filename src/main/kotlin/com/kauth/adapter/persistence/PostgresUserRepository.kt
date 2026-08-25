@@ -55,6 +55,20 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where {
+                    (UsersTable.tenantId eq tenantId.value) and
+                        (UsersTable.externalId eq externalId)
+                }.singleOrNull()
+                ?.toUser()
+        }
+
     override fun findByIds(
         ids: Collection<UserId>,
         tenantId: TenantId,
@@ -123,6 +137,9 @@ class PostgresUserRepository : UserRepository {
             UsersTable.update({ UsersTable.id eq user.id!!.value }) {
                 it[email] = user.email.lowercase()
                 it[fullName] = user.fullName
+                it[externalId] = user.externalId
+                it[givenName] = user.givenName
+                it[familyName] = user.familyName
                 it[emailVerified] = user.emailVerified
                 it[enabled] = user.enabled
                 it[mfaEnabled] = user.mfaEnabled
@@ -158,6 +175,9 @@ class PostgresUserRepository : UserRepository {
                     it[email] = user.email.lowercase()
                     it[passwordHash] = user.passwordHash
                     it[fullName] = user.fullName
+                    it[externalId] = user.externalId
+                    it[givenName] = user.givenName
+                    it[familyName] = user.familyName
                     it[emailVerified] = user.emailVerified
                     it[enabled] = user.enabled
                     it[requiredActions] = user.requiredActions.map { a -> a.name }
@@ -239,6 +259,9 @@ class PostgresUserRepository : UserRepository {
             email = this[UsersTable.email],
             passwordHash = this[UsersTable.passwordHash],
             fullName = this[UsersTable.fullName],
+            externalId = this[UsersTable.externalId],
+            givenName = this[UsersTable.givenName],
+            familyName = this[UsersTable.familyName],
             emailVerified = this[UsersTable.emailVerified],
             enabled = this[UsersTable.enabled],
             requiredActions =

@@ -559,6 +559,7 @@ class ApiUserStateTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -570,6 +571,8 @@ class ApiUserStateTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = userRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

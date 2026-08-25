@@ -1,6 +1,10 @@
 package com.kauth.adapter.web.api
 
 import com.kauth.adapter.web.plugin.TenantCorsPlugin
+import com.kauth.adapter.web.scim.ScimScopePlugin
+import com.kauth.adapter.web.scim.scimDiscoveryRoutes
+import com.kauth.adapter.web.scim.scimGroupRoutes
+import com.kauth.adapter.web.scim.scimUserRoutes
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.GroupRepository
@@ -8,6 +12,8 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.TenantRepository
+import com.kauth.domain.port.TransactionRunner
+import com.kauth.domain.port.UserRepository
 import com.kauth.domain.port.WebAuthnCredentialRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
@@ -15,6 +21,7 @@ import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
+import com.kauth.domain.service.ScimGroupMembershipService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
@@ -53,11 +60,19 @@ fun Route.apiRoutes(
     otpEmailRateLimiter: RateLimiterPort,
     otpIpRateLimiter: RateLimiterPort,
     apiWriteRateLimiter: RateLimiterPort,
+    apiReadRateLimiter: RateLimiterPort,
     webhookService: WebhookService,
     resourceServerService: ResourceServerService,
     webAuthnService: WebAuthnService,
     webAuthnCredentialRepository: WebAuthnCredentialRepository,
     corsService: CorsService? = null,
+    // Only the SCIM /Users and /Groups write paths need this, but it's required rather than
+    // defaulted to a no-op — a future wiring regression should fail to compile, not silently drop
+    // the rollback boundary.
+    transactionRunner: TransactionRunner,
+    // Only SCIM group membership reconciliation needs this directly (everything else goes through
+    // a domain service) — required for the same reason transactionRunner is.
+    userRepository: UserRepository,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -75,6 +90,88 @@ fun Route.apiRoutes(
         call.respondText(spec, ContentType.parse("application/yaml"), HttpStatusCode.OK)
     }
 
+    // Resolves {tenantSlug} and the API key against it, then stamps ApiKeyAttr/TenantIdAttr.
+    // Shared by the REST API and SCIM route trees below — both need the same tenant/key
+    // resolution, and defining it once keeps that resolution identical for both.
+    val apiContextPlugin =
+        createRouteScopedPlugin("ApiContextPlugin") {
+            on(AuthenticationChecked) { call ->
+                val slug =
+                    call.parameters["tenantSlug"]
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.BadRequest,
+                            title = "Missing tenant slug",
+                            detail = "The tenantSlug path parameter is required.",
+                        )
+
+                val tenant =
+                    tenantRepository.findBySlug(slug)
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.NotFound,
+                            title = "Tenant not found",
+                            detail = "No workspace with slug '$slug' exists.",
+                        )
+
+                val principal =
+                    call.principal<ApiKeyPrincipal>()
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.Unauthorized,
+                            title = "Unauthorized",
+                            detail =
+                                "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
+                        )
+
+                val resolvedKey =
+                    apiKeyService.validate(principal.rawToken, tenant.id)
+                        ?: return@on call.respondProblem(
+                            status = HttpStatusCode.Unauthorized,
+                            title = "Invalid API key",
+                            detail = "The provided API key is invalid, expired, or has been revoked.",
+                        )
+
+                call.attributes.put(ApiKeyAttr, resolvedKey)
+                call.attributes.put(TenantIdAttr, tenant.id)
+            }
+        }
+
+    // Shared with the SCIM /Users write path below — both trees write through the same API
+    // keys and must share the same abuse-prevention budget, not just the REST one.
+    val writeRateLimitPlugin =
+        createRouteScopedPlugin("ApiWriteRateLimitPlugin") {
+            on(AuthenticationChecked) { call ->
+                val method = call.request.httpMethod
+                if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
+                    return@on
+                }
+                val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+                val slug = call.parameters["tenantSlug"] ?: return@on
+                val bucketKey = "api_write:${key.keyPrefix}:$slug"
+                if (!apiWriteRateLimiter.isAllowed(bucketKey)) {
+                    call.respondRateLimited(retryAfterSeconds = apiWriteRateLimiter.windowSeconds)
+                }
+            }
+        }
+
+    // Reads were previously unthrottled entirely (the write limiter above returns early for
+    // GET/HEAD/OPTIONS) — including SCIM list endpoints, which can scan a whole directory in
+    // chunks. Uses its own bucket prefix ("api_read" vs "api_write") so exhausting one budget
+    // never blocks the other.
+    val readRateLimitPlugin =
+        createRouteScopedPlugin("ApiReadRateLimitPlugin") {
+            on(AuthenticationChecked) { call ->
+                val method = call.request.httpMethod
+                if (method != HttpMethod.Get && method != HttpMethod.Head && method != HttpMethod.Options) {
+                    return@on
+                }
+                val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
+                val slug = call.parameters["tenantSlug"] ?: return@on
+                val bucketKey = "api_read:${key.keyPrefix}:$slug"
+                if (!apiReadRateLimiter.isAllowed(bucketKey)) {
+                    call.respondReadRateLimited(retryAfterSeconds = apiReadRateLimiter.windowSeconds)
+                }
+            }
+        }
+
     authenticate("api-key") {
         route("/t/{tenantSlug}/api/v1") {
             if (corsService != null) {
@@ -84,64 +181,9 @@ fun Route.apiRoutes(
                 }
             }
 
-            val apiContextPlugin =
-                createRouteScopedPlugin("ApiContextPlugin") {
-                    on(AuthenticationChecked) { call ->
-                        val slug =
-                            call.parameters["tenantSlug"]
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.BadRequest,
-                                    title = "Missing tenant slug",
-                                    detail = "The tenantSlug path parameter is required.",
-                                )
-
-                        val tenant =
-                            tenantRepository.findBySlug(slug)
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.NotFound,
-                                    title = "Tenant not found",
-                                    detail = "No workspace with slug '$slug' exists.",
-                                )
-
-                        val principal =
-                            call.principal<ApiKeyPrincipal>()
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.Unauthorized,
-                                    title = "Unauthorized",
-                                    detail =
-                                        "A valid API key is required. Include it as: Authorization: Bearer kauth_...",
-                                )
-
-                        val resolvedKey =
-                            apiKeyService.validate(principal.rawToken, tenant.id)
-                                ?: return@on call.respondProblem(
-                                    status = HttpStatusCode.Unauthorized,
-                                    title = "Invalid API key",
-                                    detail = "The provided API key is invalid, expired, or has been revoked.",
-                                )
-
-                        call.attributes.put(ApiKeyAttr, resolvedKey)
-                        call.attributes.put(TenantIdAttr, tenant.id)
-                    }
-                }
             install(apiContextPlugin)
-
-            val writeRateLimitPlugin =
-                createRouteScopedPlugin("ApiWriteRateLimitPlugin") {
-                    on(AuthenticationChecked) { call ->
-                        val method = call.request.httpMethod
-                        if (method == HttpMethod.Get || method == HttpMethod.Head || method == HttpMethod.Options) {
-                            return@on
-                        }
-                        val key = call.attributes.getOrNull(ApiKeyAttr) ?: return@on
-                        val slug = call.parameters["tenantSlug"] ?: return@on
-                        val bucketKey = "api_write:${key.keyPrefix}:$slug"
-                        if (!apiWriteRateLimiter.isAllowed(bucketKey)) {
-                            call.respondRateLimited(retryAfterSeconds = apiWriteRateLimiter.windowSeconds)
-                        }
-                    }
-                }
             install(writeRateLimitPlugin)
+            install(readRateLimitPlugin)
 
             apiUserRoutes(accountService, adminUserService, roleGroupService, mfaService, sessionRepository)
             apiRbacRoutes(roleRepository, groupRepository, roleGroupService)
@@ -155,6 +197,18 @@ fun Route.apiRoutes(
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
             apiKeyManagementRoutes(apiKeyService)
             apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)
+        }
+
+        route("/t/{tenantSlug}/scim/v2") {
+            install(apiContextPlugin)
+            install(ScimScopePlugin)
+            install(writeRateLimitPlugin)
+            install(readRateLimitPlugin)
+            val scimGroupMembershipService =
+                ScimGroupMembershipService(groupRepository, userRepository, transactionRunner)
+            scimDiscoveryRoutes()
+            scimUserRoutes(adminUserService, groupRepository, transactionRunner)
+            scimGroupRoutes(groupRepository, roleGroupService, scimGroupMembershipService, transactionRunner)
         }
     }
 }

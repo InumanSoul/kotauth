@@ -1,0 +1,17 @@
+{
+  "_source": "Vendor documentation, NOT captured from a live tenant.",
+  "_replace_during": "the end-to-end verification pass against a real tenant",
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "add",
+      "path": "members",
+      "value": [
+        {
+          "value": "42",
+          "display": "ada@example.com"
+        }
+      ]
+    }
+  ]
+}

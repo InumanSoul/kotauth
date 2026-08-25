@@ -77,6 +77,23 @@ internal suspend fun ApplicationCall.respondRateLimited(retryAfterSeconds: Long)
     )
 }
 
+/** Responds 429 for a GET/HEAD/OPTIONS request that exceeded the per-key/per-tenant read rate limit. */
+internal suspend fun ApplicationCall.respondReadRateLimited(retryAfterSeconds: Long) {
+    response.headers.append(HttpHeaders.ContentType, "application/problem+json")
+    response.headers.append("Retry-After", retryAfterSeconds.toString())
+    respond(
+        HttpStatusCode.TooManyRequests,
+        ProblemDetail(
+            type = "https://kotauth.dev/errors/429",
+            title = "Rate limit exceeded",
+            status = HttpStatusCode.TooManyRequests.value,
+            detail =
+                "API read rate limit exceeded for this key in this workspace. " +
+                    "Retry after $retryAfterSeconds seconds.",
+        ),
+    )
+}
+
 /** Parses the `{userId}` path parameter, or replies 400 and invokes [bail] if it's missing/invalid. */
 internal suspend inline fun ApplicationCall.parseUserIdOr(bail: () -> Nothing): UserId? {
     val raw = parameters["userId"]?.toIntOrNull()

@@ -24,12 +24,16 @@ interface ApiKeyRepository {
         name: String,
     ): ApiKey?
 
-    /** Updates an existing key's hash + scopes + enabled flag. Used by the bootstrap upsert path. */
+    /**
+     * Updates an existing key's hash + scopes + enabled flag + SCIM dialect. Used by the bootstrap
+     * upsert path, where the environment is authoritative for each of them.
+     */
     fun updateBootstrap(
         id: Int,
         keyHash: String,
         scopes: List<String>,
         bootstrapName: String,
+        scimDialect: String,
     )
 
     /** Finds a specific key by id, scoped to tenant. */
@@ -37,6 +41,13 @@ interface ApiKeyRepository {
         id: Int,
         tenantId: TenantId,
     ): ApiKey?
+
+    /** Corrects the SCIM wire dialect on an existing key. Nothing else about the key is touched. */
+    fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    )
 
     /** Soft-revokes a key (sets enabled = false). */
     fun revoke(

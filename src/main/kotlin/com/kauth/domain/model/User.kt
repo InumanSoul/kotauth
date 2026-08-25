@@ -36,6 +36,12 @@ data class User(
     val email: String,
     val fullName: String,
     val passwordHash: String,
+    /** The identity provider's own key for this user. Null for locally-created users. */
+    val externalId: String? = null,
+    /** SCIM `name.givenName`. Null when unknown — never reverse-engineered from fullName. */
+    val givenName: String? = null,
+    /** SCIM `name.familyName`. Null when unknown. */
+    val familyName: String? = null,
     val emailVerified: Boolean = false,
     val enabled: Boolean = true,
     val requiredActions: Set<RequiredAction> = emptySet(),

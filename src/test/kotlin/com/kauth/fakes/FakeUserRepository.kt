@@ -10,9 +10,23 @@ import java.time.Instant
  * In-memory UserRepository for unit tests.
  * Users are stored in a flat map keyed by id. All lookups are tenant-scoped.
  */
-class FakeUserRepository : UserRepository {
+class FakeUserRepository :
+    UserRepository,
+    SnapshotableFake {
     private val store = mutableMapOf<Int, User>()
     private var nextId = 1
+
+    /**
+     * [nextId] is deliberately not captured: a database sequence does not give back the ids a
+     * rolled-back insert consumed, so neither does this.
+     */
+    override fun snapshot(): FakeRestore {
+        val storeCopy = store.toMap()
+        return FakeRestore {
+            store.clear()
+            store.putAll(storeCopy)
+        }
+    }
 
     fun add(user: User): User {
         val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
@@ -44,6 +58,11 @@ class FakeUserRepository : UserRepository {
         tenantId: TenantId,
         email: String,
     ) = store.values.find { it.tenantId == tenantId && it.email == email }
+
+    override fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? = store.values.find { it.tenantId == tenantId && it.externalId == externalId }
 
     override fun findByTenantId(
         tenantId: TenantId,

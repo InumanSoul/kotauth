@@ -7,6 +7,118 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
+  `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
+  and `DELETE`, plus the `/ServiceProviderConfig`, `/ResourceTypes` and
+  `/Schemas` discovery endpoints. Authentication is an API key carrying the
+  `scim` scope; every request is scoped to the workspace in the path.
+- **`externalId` correlation keys** on users and groups (`V60`), unique per
+  workspace, so a provisioning client can find the record it created without
+  matching on a mutable attribute.
+- **Filtering and pagination** on both collections: `eq` filters combined with
+  `and`/`or` (RFC 7644 §3.4.2.2), with `startIndex`/`count` paging. Supported
+  filter attributes are scoped per resource type, so a filter naming an
+  attribute the other resource type owns is an `invalidFilter` error rather
+  than an empty result set.
+- **Strict attribute-shape validation.** A value of the wrong JSON type for a
+  known attribute — `"active": "false"`, `"externalId": 9182`,
+  `"emails": "a@example.com"` — is a `400 invalidValue` naming the attribute
+  and the shape received. It is never coerced and never silently discarded: a
+  deprovision that quietly does nothing is worse than a visible error. The
+  check reaches sub-attributes too, naming the offending array index:
+  `"name": {"givenName": 123}` and `"emails": [{"value": 123}]` are rejected
+  rather than writing a null over the stored value under a `200 OK`. Unknown
+  attribute names are rejected on `PUT`/`POST` as well as `PATCH`.
+- **Per-connector SCIM dialects.** An API key carrying the `scim` scope now
+  declares which wire dialect its client speaks, chosen by the operator when
+  the key is created and correctable afterwards. `rfc` is the default and a
+  pure pass-through — payloads are parsed exactly as RFC 7644 defines them —
+  and migration `V62` backfills every existing key to it, so nothing an
+  existing client sends is interpreted any differently than before. Two
+  vendor dialects ship beside it: one reads the `"True"`/`"False"` strings
+  Microsoft Entra ID puts on the wire as the booleans the spec requires, so a
+  deprovision is not silently ignored; the other drops the advisory `display`
+  name Okta sends beside each group member id, which KotAuth stores under no
+  dialect, so a wrongly-typed `display` no longer costs the whole member push
+  — the id, the only part that identifies anyone, is kept either way. (A
+  capitalised `op` verb needs no dialect: every key, `rfc` included, matches
+  the verb case-insensitively.) Both implement the deviations those vendors publish in their own
+  documentation; neither has yet been verified against a live tenant. The
+  dialect is read from the key and never guessed from a request header — see
+  `docs/adr/ADR-20-scim-dialects-selected-per-key.md`.
+- **Workspace provisioning page** in the admin UI, under Provisioning in the
+  workspace navigation: the SCIM base URL to paste into an identity provider,
+  every API key in the workspace holding the `scim` scope with the dialect it
+  uses, per-provider setup notes, and what a deprovision actually does. The
+  dialect selector here is the one field of an existing key an operator can
+  correct in place — a key provisioned through `KAUTH_BOOTSTRAP_API_KEYS`
+  keeps the dialect the environment sets, as the entry's new optional
+  `scimDialect` field. An unregistered id there is fatal at startup rather
+  than silently falling back to `rfc`, and an entry that omits the field
+  stays on `rfc`. The page does not claim a
+  connection is healthy: KotAuth does not yet record individual SCIM requests
+  in the audit log, so it says so plainly rather than showing a green badge.
+- **IdP-managed badges** on user and group detail wherever an `externalId` is
+  set, warning that the identity provider may overwrite a local edit on its
+  next sync. KotAuth stores that a record is externally provisioned, never
+  which provider provisioned it, so the badge names no vendor.
+- **`name.givenName` and `name.familyName` are editable in the admin UI**, on
+  both the create-user and edit-user forms, so the parts a provisioning
+  client reads and writes are no longer visible only over SCIM. Clearing
+  either writes a null rather than an empty string, so a cleared name part
+  does not round-trip back out as a real value.
+
+### Changed
+
+- **Behaviour change — deleting a group with subgroups now returns `409`.**
+  `DELETE /t/{slug}/api/v1/groups/{id}`, the same operation in the admin UI,
+  and `DELETE /t/{slug}/scim/v2/Groups/{id}` all refuse to delete a group that
+  still has at least one subgroup, naming the subgroups that block it.
+  Previously the delete succeeded and cascaded, destroying every descendant
+  group along with its memberships and role grants, with no undo and nothing in
+  the UI or API that said it would. Migration `V61` redeclares the
+  `groups.parent_group_id` foreign key `ON DELETE NO ACTION` as the backstop.
+
+  **A caller that relied on the cascade must now delete or reparent the
+  subgroups itself before deleting the parent.** Deleting a workspace still
+  removes its whole group tree in one statement and is unaffected. See
+  `docs/adr/ADR-18-group-delete-refuses-subgroups.md`.
+
+### Fixed
+
+- **A SCIM `remove` naming specific entries no longer empties the whole
+  collection.** RFC 7644 §3.5.2.2 gives `remove` on a multi-valued attribute
+  two readings: with no `value` every element goes, with a `value` only the
+  listed elements go. The patch engine implemented only the first and ignored
+  the `value`, so a connector removing one user from a group removed **every
+  member of that group** while answering `200 OK` to say it had worked. Only
+  the listed entries are removed now, and a `value` the engine cannot read as
+  member entries is a `400 invalidValue` rather than a fallback to removing
+  everything. On that same plain-path form, an explicit `"value": null` is
+  refused for the same reason: RFC 7644's "no value" reading means an *absent*
+  `value`, and treating a null as one gave the least informative payload the
+  most destructive outcome. Omitting `value` entirely is still how a caller
+  clears a collection, a `remove` on a valued path or a singular attribute
+  never reads its `value` at all, and `replace` with a null still clears.
+- **A SCIM `remove` of a user's last email address is now rejected instead of
+  silently doing nothing.** KotAuth stores exactly one address, in a `NOT
+  NULL` column, so "this user has no email" is not a state it can hold. Both
+  before and after the fix above, a `PATCH` that emptied `emails` fell back to
+  the stored address and answered `200 OK` echoing it — a deletion request
+  answered with the thing it asked to delete. An `emails` that reaches the
+  mapper as a present-but-empty collection — a plain-path `PATCH remove`
+  naming the stored address, or a `PUT` sending `[]` — is now a
+  `400 invalidValue` saying the address is required. The forms that drop the
+  attribute outright rather than emptying it (a `remove` with no `value`, or
+  one on a valued path) still fall through to the stored address, which is the
+  same absent-attribute rule a `PUT` omitting `emails` follows.
+
+---
+
 ## [1.22.0] - 2026-08-21
 
 Machine-to-machine (M2M) onboarding release. Applications now declare an

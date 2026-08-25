@@ -26,6 +26,7 @@ object ApiKeysTable : Table("api_keys") {
     val lastUsedAt = timestampWithTimeZone("last_used_at").nullable()
     val enabled = bool("enabled").default(true)
     val bootstrapName = varchar("bootstrap_name", 128).nullable()
+    val scimDialect = varchar("scim_dialect", 16).default(ApiKey.DEFAULT_SCIM_DIALECT)
     val createdAt = timestampWithTimeZone("created_at")
 
     override val primaryKey = PrimaryKey(id)
@@ -48,6 +49,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
                     it[expiresAt] = apiKey.expiresAt?.toOffsetDateTime()
                     it[enabled] = apiKey.enabled
                     it[bootstrapName] = apiKey.bootstrapName
+                    it[scimDialect] = apiKey.scimDialect
                     it[createdAt] = apiKey.createdAt.toOffsetDateTime()
                 } get ApiKeysTable.id
 
@@ -96,6 +98,19 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         Unit
     }
 
+    override fun updateScimDialect(
+        id: Int,
+        tenantId: TenantId,
+        scimDialect: String,
+    ) = transaction {
+        ApiKeysTable.update({
+            (ApiKeysTable.id eq id) and (ApiKeysTable.tenantId eq tenantId.value)
+        }) {
+            it[ApiKeysTable.scimDialect] = scimDialect
+        }
+        Unit
+    }
+
     override fun touchLastUsed(
         id: Int,
         at: Instant,
@@ -134,12 +149,14 @@ class PostgresApiKeyRepository : ApiKeyRepository {
         keyHash: String,
         scopes: List<String>,
         bootstrapName: String,
+        scimDialect: String,
     ) = transaction {
         ApiKeysTable.update({ ApiKeysTable.id eq id }) {
             it[ApiKeysTable.keyHash] = keyHash
             it[ApiKeysTable.scopes] = scopes.joinToString(",")
             it[ApiKeysTable.enabled] = true
             it[ApiKeysTable.bootstrapName] = bootstrapName
+            it[ApiKeysTable.scimDialect] = scimDialect
         }
         Unit
     }
@@ -163,6 +180,7 @@ class PostgresApiKeyRepository : ApiKeyRepository {
             lastUsedAt = lastUsed?.toInstant(),
             enabled = this[ApiKeysTable.enabled],
             bootstrapName = this[ApiKeysTable.bootstrapName],
+            scimDialect = this[ApiKeysTable.scimDialect],
             createdAt = created.toInstant(),
         )
     }

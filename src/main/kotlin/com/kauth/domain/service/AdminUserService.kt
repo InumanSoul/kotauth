@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
@@ -32,6 +33,13 @@ class AdminUserService(
         password: String? = null,
         sendInvite: Boolean = false,
         baseUrl: String = "",
+        externalId: String? = null,
+        givenName: String? = null,
+        familyName: String? = null,
+        // False lets a caller that holds this create inside its own DB transaction (SCIM's
+        // create-then-enable/disable pair) defer the SMTP round-trip until after it commits,
+        // via dispatchPendingInvite. Every other caller keeps the send-inline default.
+        dispatchInvite: Boolean = true,
     ): AdminResult<User> {
         val tenant =
             tenantRepository.findById(tenantId)
@@ -40,9 +48,11 @@ class AdminUserService(
         if (username.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
         }
-        if (!username.matches(Regex("[a-zA-Z0-9._-]+"))) {
+        if (!username.matches(Regex("[a-zA-Z0-9._@+-]+"))) {
             return AdminResult.Failure(
-                AdminError.Validation("Username may only contain letters, digits, dots, underscores, and hyphens."),
+                AdminError.Validation(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
             )
         }
         if (email.isBlank() || !email.contains('@')) {
@@ -98,6 +108,9 @@ class AdminUserService(
                     emailVerified = !sendInvite,
                     enabled = true,
                     requiredActions = resolvedRequiredActions,
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
                 ),
             )
 
@@ -117,25 +130,59 @@ class AdminUserService(
             ),
         )
 
-        if (sendInvite && tenant.isSmtpReady) {
-            when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
-                is SelfServiceResult.Success ->
-                    auditLog.record(
-                        AuditEvent(
-                            tenantId = tenantId,
-                            userId = user.id,
-                            clientId = null,
-                            eventType = AuditEventType.USER_INVITE_SENT,
-                            ipAddress = null,
-                            userAgent = null,
-                            details = mapOf("username" to username),
-                        ),
-                    )
-                is SelfServiceResult.Failure -> Unit
-            }
+        if (sendInvite && dispatchInvite && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
         }
 
         return AdminResult.Success(user)
+    }
+
+    /**
+     * Sends the invite email [createUser] would otherwise send inline, for a user created with
+     * `dispatchInvite = false`. Exists so a caller holding a DB transaction across create — e.g.
+     * SCIM provisioning, which must also roll back an enable/disable failure — can commit first
+     * and only then pay for the SMTP round-trip, instead of holding a pool connection across it.
+     * A no-op (not a failure) when there's no pending invite or SMTP isn't configured, mirroring
+     * [createUser]'s own silent skip in those cases.
+     */
+    fun dispatchPendingInvite(
+        userId: UserId,
+        tenantId: TenantId,
+        baseUrl: String,
+    ): AdminResult<Unit> {
+        val tenant =
+            tenantRepository.findById(tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        if (RequiredAction.SET_PASSWORD in user.requiredActions && tenant.isSmtpReady) {
+            dispatchInviteEmail(user, tenant, baseUrl)
+        }
+        return AdminResult.Success(Unit)
+    }
+
+    private fun dispatchInviteEmail(
+        user: User,
+        tenant: Tenant,
+        baseUrl: String,
+    ) {
+        when (credentialFlowService.initiateInvite(user, tenant, baseUrl)) {
+            is SelfServiceResult.Success ->
+                auditLog.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = user.id,
+                        clientId = null,
+                        eventType = AuditEventType.USER_INVITE_SENT,
+                        ipAddress = null,
+                        userAgent = null,
+                        details = mapOf("username" to user.username),
+                    ),
+                )
+            is SelfServiceResult.Failure -> Unit
+        }
     }
 
     fun resendInvite(
@@ -192,6 +239,18 @@ class AdminUserService(
         limit: Int = Int.MAX_VALUE,
         offset: Int = 0,
     ): List<User> = userRepository.findByTenantId(tenantId, search, limit, offset)
+
+    /** Tenant-scoped username lookup — the indexed fast path for SCIM's `userName eq` filter. */
+    fun findByUsername(
+        tenantId: TenantId,
+        username: String,
+    ): User? = userRepository.findByUsername(tenantId, username)
+
+    /** Tenant-scoped external-id lookup — the indexed fast path for SCIM's `externalId eq` filter. */
+    fun findByExternalId(
+        tenantId: TenantId,
+        externalId: String,
+    ): User? = userRepository.findByExternalId(tenantId, externalId)
 
     fun countUsers(
         tenantId: TenantId,
@@ -282,6 +341,58 @@ class AdminUserService(
         }
 
         val updated = userRepository.update(user.copy(email = resolvedEmail, fullName = resolvedFullName))
+
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = userId,
+                clientId = null,
+                eventType = AuditEventType.ADMIN_USER_UPDATED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("username" to user.username),
+            ),
+        )
+
+        return AdminResult.Success(updated)
+    }
+
+    /**
+     * Replaces the full mutable profile in one write. Unlike [updateUser], every parameter here
+     * is authoritative — a null clears the field. Used by the SCIM PUT/PATCH flow and by the admin
+     * profile form, both of which supply a fully resolved desired state rather than a partial edit.
+     */
+    fun replaceUserProfile(
+        userId: UserId,
+        tenantId: TenantId,
+        email: String,
+        fullName: String,
+        externalId: String?,
+        givenName: String?,
+        familyName: String?,
+    ): AdminResult<User> {
+        val user =
+            userRepository.findById(userId, tenantId)
+                ?: return AdminResult.Failure(AdminError.NotFound("User ${userId.value} not found."))
+
+        val resolvedEmail = email.trim().lowercase()
+        if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
+            return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
+        }
+        if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
+        }
+
+        val updated =
+            userRepository.update(
+                user.copy(
+                    email = resolvedEmail,
+                    fullName = fullName.trim(),
+                    externalId = externalId,
+                    givenName = givenName,
+                    familyName = familyName,
+                ),
+            )
 
         auditLog.record(
             AuditEvent(

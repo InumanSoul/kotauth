@@ -250,6 +250,46 @@ class AdminServicesTest {
     }
 
     @Test
+    fun `createUser - email-shaped username is accepted`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "ada.lovelace@example.com",
+                email = "ada@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - plus-addressed username is accepted`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "ada+scim@example.com",
+                email = "ada2@x.com",
+                fullName = "Ada",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `createUser - username with slash is rejected`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob/smith",
+                email = "bob@x.com",
+                fullName = "Bob",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `createUser - invalid email`() {
         val result =
             userSvc.createUser(
@@ -391,6 +431,85 @@ class AdminServicesTest {
         assertIs<AdminResult.Success<User>>(result)
         assertEquals(0, emailPort.sent.size, "No email should be sent when SMTP is not configured")
         assertTrue(!auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `createUser invite - dispatchInvite=false suppresses the inline send`() {
+        // Used by SCIM provisioning, which must not hold a DB transaction open across the
+        // SMTP round-trip — see dispatchPendingInvite below.
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertTrue(RequiredAction.SET_PASSWORD in result.value.requiredActions, "still an invite-style user")
+        assertEquals(0, emailPort.sent.size)
+        assertTrue(!auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `dispatchPendingInvite - sends the invite a suppressed createUser deferred`() {
+        val created =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(created)
+
+        val result = userSvc.dispatchPendingInvite(created.value.id!!, TenantId(1), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(1, emailPort.sent.size)
+        assertEquals("invite", emailPort.sent[0].type)
+        assertTrue(auditLog.hasEvent(AuditEventType.USER_INVITE_SENT))
+    }
+
+    @Test
+    fun `dispatchPendingInvite - no-op when the user has no pending invite`() {
+        val result = userSvc.dispatchPendingInvite(alice.id!!, TenantId(1), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(0, emailPort.sent.size)
+    }
+
+    @Test
+    fun `dispatchPendingInvite - no-op when SMTP is not configured`() {
+        val noSmtpTenant = tenant.copy(id = TenantId(2), slug = "no-smtp", smtpHost = null, smtpEnabled = false)
+        tenants.add(noSmtpTenant)
+        val created =
+            userSvc.createUser(
+                tenantId = TenantId(2),
+                username = "bob",
+                email = "bob@example.com",
+                fullName = "Bob Test",
+                sendInvite = true,
+                baseUrl = "http://localhost:8080",
+                dispatchInvite = false,
+            )
+        assertIs<AdminResult.Success<User>>(created)
+
+        val result = userSvc.dispatchPendingInvite(created.value.id!!, TenantId(2), "http://localhost:8080")
+
+        assertIs<AdminResult.Success<Unit>>(result)
+        assertEquals(0, emailPort.sent.size)
+    }
+
+    @Test
+    fun `dispatchPendingInvite - not found for a user in another tenant`() {
+        val result = userSvc.dispatchPendingInvite(alice.id!!, TenantId(2), "http://localhost:8080")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.NotFound>(result.error)
     }
 
     @Test

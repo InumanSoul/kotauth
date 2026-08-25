@@ -546,6 +546,8 @@ internal fun createApiKeyPageImpl(
     loggedInAs: String,
     error: String? = null,
     scopes: List<String> = ApiScope.ALL,
+    preselectedScopes: Set<String> = emptySet(),
+    selectedDialect: String = com.kauth.domain.model.ApiKey.DEFAULT_SCIM_DIALECT,
 ): HTML.() -> Unit = {
     val slug = workspace.slug
     val totalScopes = scopes.size
@@ -657,6 +659,7 @@ internal fun createApiKeyPageImpl(
                         label("scope-chip") {
                             input(type = InputType.checkBox, name = "scopes") {
                                 value = scope
+                                checked = scope in preselectedScopes
                                 attributes["form"] = "create-api-key-form"
                             }
                             span("scope-chip__label") { +scope }
@@ -664,6 +667,12 @@ internal fun createApiKeyPageImpl(
                     }
                 }
             }
+        }
+
+        // ── Provisioning dialect ─────────────────────────────────
+        div("ov-card") {
+            ovSectionLabel(com.kauth.adapter.web.EnglishStrings.SCIM_DIALECT_FIELD_LABEL)
+            scimDialectSelector(selectedDialect)
         }
                 }
 }

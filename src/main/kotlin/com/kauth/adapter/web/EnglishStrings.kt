@@ -1,5 +1,7 @@
 package com.kauth.adapter.web
 
+import com.kauth.domain.model.Group
+import com.kauth.domain.service.childGroupsBlockDeleteMessage
 import java.lang.reflect.Modifier
 
 @Suppress("unused")
@@ -745,6 +747,191 @@ object EnglishStrings {
     const val POST_MAGIC_LINK_ENROLL_CTA = "Enroll a passkey on this device"
     const val POST_MAGIC_LINK_SKIP_CTA = "Continue without a passkey"
     const val POST_MAGIC_LINK_PASSKEY_DEFAULT_NAME = "This device"
+
+    // Admin — groups
+    const val GROUP_DELETE = "Delete"
+    const val GROUP_DELETE_BLOCKED_TITLE = "Subgroups must be resolved first"
+
+    fun groupDeleteConfirm(groupName: String) = "Delete group $groupName?"
+
+    /**
+     * One wording for one rule. The service's copy is the one that reaches API and SCIM clients,
+     * so it is the source; this re-export keeps a view author finding the string here rather than
+     * writing a second, subtly different sentence for the same refusal.
+     */
+    fun groupDeleteBlockedBySubgroups(
+        groupName: String,
+        subgroups: List<Group>,
+    ) = childGroupsBlockDeleteMessage(groupName, subgroups)
+
+    // Admin — SCIM provisioning
+    const val SCIM_NAV_LABEL = "Provisioning"
+    const val SCIM_PAGE_TITLE = "Provisioning"
+    const val SCIM_PAGE_SUBTITLE =
+        "Let an identity provider create, update, and deactivate this workspace's users and groups over SCIM 2.0."
+
+    const val SCIM_ENDPOINT_HEADING = "Endpoint"
+    const val SCIM_ENDPOINT_LABEL = "Base URL"
+    const val SCIM_ENDPOINT_HINT =
+        "The same for every provisioning client in this workspace. Paste it wherever your identity provider " +
+            "asks for the SCIM base or tenant URL."
+
+    const val SCIM_TOKEN_HEADING = "Token"
+    const val SCIM_TOKEN_HINT =
+        "Provisioning authenticates with an API key holding the scim scope, sent as a bearer token. " +
+            "The key value is shown once, when you create it."
+    const val SCIM_TOKEN_MANAGE_CTA = "Manage API keys"
+    const val SCIM_TOKEN_CREATE_CTA = "Create a provisioning key"
+    const val SCIM_KEYS_EMPTY_TITLE = "No provisioning key yet"
+    const val SCIM_KEYS_EMPTY_BODY =
+        "Create an API key with the scim scope, then paste it into your identity provider as the secret token."
+    const val SCIM_KEYS_COL_NAME = "Key"
+    const val SCIM_KEYS_COL_DIALECT = "Dialect"
+    const val SCIM_KEYS_COL_LAST_USED = "Last API use"
+    const val SCIM_KEYS_COL_STATE = "State"
+    const val SCIM_KEYS_NEVER_USED = "Never"
+
+    const val SCIM_STATUS_HEADING = "Status"
+
+    /**
+     * Deliberately not a green "connected" badge. Nothing in the audit log records an individual
+     * SCIM request or the key that made it, so any timestamp shown here would be inferred rather
+     * than observed — and an operator trusting a wrong "connected" is worse off than one told
+     * plainly that the answer is not available yet.
+     */
+    const val SCIM_STATUS_UNKNOWN =
+        "Not verified. KotAuth does not yet record individual SCIM requests in the audit log, so a successful " +
+            "connection cannot be confirmed from here. Check your identity provider's own provisioning log."
+    const val SCIM_STATUS_NO_KEY =
+        "Not connected. This workspace has no API key holding the scim scope, so every provisioning request " +
+            "is rejected."
+
+    /**
+     * Distinct from [SCIM_STATUS_NO_KEY]: the table right below this row lists the revoked keys
+     * with their badge, so telling the operator there is no such key contradicts the screen.
+     */
+    const val SCIM_STATUS_KEYS_REVOKED =
+        "Not connected. Every API key holding the scim scope in this workspace is revoked, so every " +
+            "provisioning request is rejected. Create a new key to reconnect."
+    const val SCIM_STATUS_LAST_USE_HINT =
+        "Last API use counts any request made with the key, not only provisioning requests."
+
+    const val SCIM_BEHAVIOUR_HEADING = "What provisioning does"
+    const val SCIM_DEPROVISION_HEADING = "Deprovisioning"
+    const val SCIM_DELETE_DEACTIVATES =
+        "DELETE deactivates a user instead of deleting it. The account stays in the directory, disabled, " +
+            "so audit history and group membership survive a deprovision."
+    const val SCIM_BEHAVIOUR_GROUPS =
+        "Groups map to KotAuth groups. Member pushes carry user ids; a member the workspace does not have " +
+            "is rejected rather than created."
+
+    /**
+     * The counterpart to [SCIM_DELETE_DEACTIVATES], and the reason it is spelled out: the notice
+     * above it explains that deleting a user is reversible, which reads as a promise about DELETE
+     * in general unless the group case says otherwise.
+     */
+    const val SCIM_DELETE_GROUP_PERMANENT =
+        "DELETE on a group is permanent \u2014 unlike a user, it is removed outright, along with its " +
+            "memberships and role grants. A group that still has subgroups is refused rather than deleted."
+
+    const val SCIM_NOTES_HEADING = "Identity provider notes"
+    const val SCIM_NOTES_INTRO =
+        "Connectors differ in what they ask for and what they put on the wire. Pick the matching dialect when " +
+            "you create the key — it is read from the key, never guessed from a request header."
+
+    const val SCIM_DIALECT_FIELD_LABEL = "SCIM dialect"
+    const val SCIM_DIALECT_FIELD_HINT =
+        "Applies only to keys holding the scim scope. Leave it on the default unless your identity provider " +
+            "is listed."
+
+    const val SCIM_DIALECT_SAVE_CTA = "Save"
+    const val SCIM_DIALECT_SAVED_TOAST = "Dialect updated. The next provisioning request uses it."
+
+    /**
+     * A bootstrapped key's dialect is the entry's optional `scimDialect` field, re-asserted on every
+     * restart, so editing it here would last only until the next one. The row points at the field
+     * that does own it rather than leaving the operator without a way to change it.
+     */
+    const val SCIM_DIALECT_ENV_MANAGED = "Env-managed"
+    const val SCIM_DIALECT_ENV_MANAGED_HINT =
+        "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 set the entry's \"scimDialect\" field there; every " +
+            "restart re-applies it."
+    const val SCIM_DIALECT_ENV_MANAGED_REFUSAL =
+        "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS. Set the entry's " +
+            "\"scimDialect\" field there instead."
+
+    /**
+     * A submitted id outside the registry means a stale or tampered form, not a new provider: the
+     * selector only ever offers registered ids, so the submission is refused rather than quietly
+     * saved as something else.
+     */
+    const val SCIM_DIALECT_UNKNOWN_REFUSAL =
+        "That SCIM dialect is not one this version offers. Reload the page and pick a dialect from the list."
+
+    const val SCIM_DIALECT_RFC_LABEL = "Standard SCIM 2.0 (RFC 7644)"
+    const val SCIM_DIALECT_ENTRA_LABEL = "Microsoft Entra ID"
+    const val SCIM_DIALECT_OKTA_LABEL = "Okta"
+
+    val SCIM_DIALECT_RFC_NOTES =
+        listOf(
+            "The default, and a pass-through: payloads are parsed exactly as RFC 7644 defines them.",
+            "Use it for any connector that follows the spec, and as the starting point for one you are unsure about.",
+            "Configure the client with the base URL above and the API key as a bearer token.",
+        )
+
+    val SCIM_DIALECT_ENTRA_NOTES =
+        listOf(
+            "Enterprise application → Provisioning asks for two fields: Tenant URL and Secret Token.",
+            "Tenant URL is the base URL above; Secret Token is the API key.",
+            "Its patch requests send `active` as the strings \"True\" and \"False\"; this dialect reads them as " +
+                "the booleans the spec requires, so a deprovision is not silently ignored.",
+        )
+
+    val SCIM_DIALECT_OKTA_NOTES =
+        listOf(
+            "Provisioning → Integration asks for the SCIM connector base URL, the unique identifier field for " +
+                "users (use userName), and the authentication mode (HTTP Header, with the API key as the bearer " +
+                "token).",
+            "Enable Push New Users, Push Profile Updates, and Push Groups; deactivation arrives as a patch on " +
+                "`active`.",
+            "Its group pushes carry an advisory `display` name beside each member id. KotAuth stores none of " +
+                "it under any dialect; this dialect drops it before the request is checked, so a `display` of " +
+                "the wrong type is tolerated here instead of rejecting the whole push. The id is kept, and it " +
+                "is the only part that identifies anyone.",
+        )
+
+    /**
+     * Markers for a record an identity provider owns via SCIM.
+     *
+     * KotAuth stores that an `externalId` was set, never which provider set it, so the copy names
+     * no vendor. The overwrite warning is the reason the badge exists: without it an operator edits
+     * a name here, the next sync reverts it, and nothing on screen explains why.
+     */
+    const val SCIM_IDP_MANAGED_HEADING = "Identity provider"
+    const val SCIM_IDP_MANAGED_BADGE = "IdP-managed"
+    const val SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN =
+        "This record is provisioned by an identity provider. Changes made here may be overwritten by the " +
+            "identity provider on its next sync \u2014 edit it there instead."
+    const val SCIM_IDP_EXTERNAL_ID_LABEL = "External ID"
+    const val SCIM_IDP_EXTERNAL_ID_HINT =
+        "The identifier the identity provider uses for this record. It is how a sync finds the record again."
+
+    /**
+     * The SCIM name parts on the user create and edit forms.
+     *
+     * They are stored beside the display name, never derived from it: the SCIM mapper keeps
+     * `name.givenName` and `name.familyName` independent of `fullName`, so the hint has to stop an
+     * operator expecting one to rewrite the other.
+     */
+    const val USER_GIVEN_NAME_LABEL = "Given name"
+    const val USER_FAMILY_NAME_LABEL = "Family name"
+    const val USER_NAME_PARTS_HINT =
+        "Optional. Stored separately from the display name \u2014 filling these in never rewrites Full Name."
+
+    /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
+    const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
+        "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
+            "sync never changes them."
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.

@@ -414,6 +414,7 @@ class ApiOtpRoutesTest {
                 otpEmailRateLimiter = emailLimiter,
                 otpIpRateLimiter = ipLimiter,
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = WebhookService(FakeWebhookEndpointRepository(), FakeWebhookDeliveryRepository()),
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService =
@@ -425,6 +426,8 @@ class ApiOtpRoutesTest {
                         userRepository = FakeUserRepository(),
                     ),
                 webAuthnCredentialRepository = FakeWebAuthnCredentialRepository(),
+                userRepository = users,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

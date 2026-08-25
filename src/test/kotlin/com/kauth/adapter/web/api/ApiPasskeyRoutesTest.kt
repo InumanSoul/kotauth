@@ -457,10 +457,13 @@ class ApiPasskeyRoutesTest {
                 otpEmailRateLimiter = AlwaysAllowLimiter(),
                 otpIpRateLimiter = AlwaysAllowLimiter(),
                 apiWriteRateLimiter = AlwaysAllowLimiter(),
+                apiReadRateLimiter = AlwaysAllowLimiter(),
                 webhookService = webhookService,
                 resourceServerService = ResourceServerService(FakeResourceServerRepository()),
                 webAuthnService = webAuthnService,
                 webAuthnCredentialRepository = credentialRepo,
+                userRepository = userRepo,
+                transactionRunner = com.kauth.fakes.FakeTransactionRunner(),
             )
         }
     }

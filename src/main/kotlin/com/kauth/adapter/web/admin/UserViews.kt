@@ -107,6 +107,9 @@ internal fun userDetailPageImpl(
                                     +EnglishStrings.BADGE_INVITE_PENDING
                                 }
                             }
+                            if (user.externalId != null) {
+                                idpManagedBadge()
+                            }
                         }
                     }
                 }
@@ -210,6 +213,10 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
+
+            // ── Identity provider ────────────────────────────────────
+            // Above the profile card, because the profile is what a sync overwrites.
+            user.externalId?.let { idpManagedCard(it) }
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
@@ -495,6 +502,8 @@ internal fun DIV.userProfileReadFragment(
                 copyBtn(user.email)
             }
             ovRowText("Full Name", user.fullName.ifBlank { "—" })
+            ovRowText(EnglishStrings.USER_GIVEN_NAME_LABEL, user.givenName ?: "—")
+            ovRowText(EnglishStrings.USER_FAMILY_NAME_LABEL, user.familyName ?: "—")
 
             val memberSince = user.createdAt
                 ?.atOffset(ZoneOffset.UTC)
@@ -582,6 +591,7 @@ internal fun DIV.userProfileEditFragment(
                         value = user.fullName
                     }
                 }
+                namePartRows(givenName = user.givenName ?: "", familyName = user.familyName ?: "")
                 readOnlyBadgesRow(
                     label = "Roles",
                     items = roles.map { it.name },
@@ -606,6 +616,39 @@ internal fun DIV.userProfileEditFragment(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * The SCIM name parts, rendered identically on the create and edit forms.
+ *
+ * They sit under Full Name rather than replacing it: the display name is the source of truth and
+ * these never rewrite it, which the shared hint says out loud.
+ */
+private fun FlowContent.namePartRows(
+    givenName: String,
+    familyName: String,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.USER_GIVEN_NAME_LABEL }
+        div {
+            input(classes = "edit-row__field") {
+                type = InputType.text
+                name = "givenName"
+                value = givenName
+                placeholder = "John"
+            }
+            div("edit-row__hint") { +EnglishStrings.USER_NAME_PARTS_HINT }
+        }
+    }
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.USER_FAMILY_NAME_LABEL }
+        input(classes = "edit-row__field") {
+            type = InputType.text
+            name = "familyName"
+            value = familyName
+            placeholder = "Doe"
         }
     }
 }
@@ -657,6 +700,8 @@ data class UserPrefill(
     val username: String = "",
     val email: String = "",
     val fullName: String = "",
+    val givenName: String = "",
+    val familyName: String = "",
 )
 
 // User list page.
@@ -907,10 +952,10 @@ internal fun createUserPageImpl(
                                 placeholder = "johndoe"
                                 autoComplete = "off"
                                 attributes["spellcheck"] = "false"
-                                attributes["pattern"] = "[a-zA-Z0-9._-]+"
+                                attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                             }
                             div("edit-row__hint") {
-                                +"Letters, digits, dots, underscores, hyphens. Immutable after creation."
+                                +"Letters, digits, dots, underscores, hyphens, @, and +. Immutable after creation."
                             }
                         }
                     }
@@ -934,6 +979,7 @@ internal fun createUserPageImpl(
                             placeholder = "John Doe"
                         }
                     }
+                    namePartRows(givenName = prefill.givenName, familyName = prefill.familyName)
                     // ── Credential setup radio ──────────────────
                     div("edit-row") {
                         span("edit-row__label") { +"Credential setup" }
