@@ -411,7 +411,9 @@ class BackupImporterService(
         }
 
         export.socialProviders.forEach { sp ->
-            val provider = ProviderKey.of(sp.provider) ?: return@forEach
+            // Only the compiled-in adapters can be imported. A key with no adapter would persist a
+            // row that no admin page lists and no delete route accepts — an orphan re-exported forever.
+            val provider = ProviderKey.of(sp.provider)?.takeIf { it in ProviderKey.RESERVED } ?: return@forEach
             identityProviderRepository.save(
                 IdentityProvider(
                     id = null,
