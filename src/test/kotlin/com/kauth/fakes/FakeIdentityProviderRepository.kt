@@ -46,6 +46,11 @@ class FakeIdentityProviderRepository : IdentityProviderRepository {
     override fun findAllByTenant(tenantId: TenantId): List<IdentityProvider> =
         store.values.filter { it.tenantId == tenantId }
 
+    override fun findById(
+        tenantId: TenantId,
+        id: Int,
+    ): IdentityProvider? = store[id]?.takeIf { it.tenantId == tenantId }
+
     override fun findByTenantAndProvider(
         tenantId: TenantId,
         provider: ProviderKey,

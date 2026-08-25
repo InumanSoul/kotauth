@@ -15,6 +15,12 @@ interface IdentityProviderRepository {
     /** Returns all providers for the given tenant (including disabled). */
     fun findAllByTenant(tenantId: TenantId): List<IdentityProvider>
 
+    /** Finds a provider config by its surrogate id within the tenant, or null. */
+    fun findById(
+        tenantId: TenantId,
+        id: Int,
+    ): IdentityProvider?
+
     /** Finds a specific provider config, or null if not configured. */
     fun findByTenantAndProvider(
         tenantId: TenantId,
