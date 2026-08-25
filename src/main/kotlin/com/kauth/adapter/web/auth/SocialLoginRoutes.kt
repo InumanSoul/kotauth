@@ -15,6 +15,9 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+// Matches AdminRoutes and PortalRoutes, the two flows that already bound their signed state.
+private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
+
 internal fun Route.socialLoginRoutes(
     oauthService: OAuthService,
     socialLoginService: SocialLoginService?,
@@ -38,7 +41,7 @@ internal fun Route.socialLoginRoutes(
 
         val oauthParams = call.request.queryParameters.toOAuthParams()
 
-        val nonce =
+        val csrfNonce =
             java.util.UUID
                 .randomUUID()
                 .toString()
@@ -47,7 +50,7 @@ internal fun Route.socialLoginRoutes(
                 .getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
-        val statePayload = "${provider.value}|$slug|$nonce|$oauthParamsB64"
+        val statePayload = "${provider.value}|$slug|$csrfNonce|${System.currentTimeMillis()}|$oauthParamsB64"
         val signedState = encryptionService.signCookie(statePayload)
 
         when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
@@ -137,7 +140,13 @@ internal fun Route.socialLoginRoutes(
         }
 
         val parts = verifiedPayload.split("|")
-        if (parts.size < 4 || parts[0] != provider.value || parts[1] != slug) {
+        val stateAgeMs = parts.getOrNull(3)?.toLongOrNull()?.let { System.currentTimeMillis() - it }
+        if (parts.size < 5 ||
+            parts[0] != provider.value ||
+            parts[1] != slug ||
+            stateAgeMs == null ||
+            stateAgeMs > SOCIAL_STATE_MAX_AGE_MS
+        ) {
             call.respondHtml(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
@@ -157,7 +166,7 @@ internal fun Route.socialLoginRoutes(
                 String(
                     java.util.Base64
                         .getUrlDecoder()
-                        .decode(parts[3]),
+                        .decode(parts[4]),
                     Charsets.UTF_8,
                 )
             } catch (_: Exception) {
