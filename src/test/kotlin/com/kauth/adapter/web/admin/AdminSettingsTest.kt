@@ -746,6 +746,88 @@ class AdminSettingsTest {
         }
 
     // =========================================================================
+    // Identity provider key guard
+    // =========================================================================
+
+    @Test
+    fun `saving an identity provider for a well-formed key with no adapter is refused and writes nothing`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            // "okta" parses as a ProviderKey; only the RESERVED check refuses it. Drop that check
+            // and this request writes a row that no page lists and no delete route will accept.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "okta-client-id")
+                            append("clientSecret", "okta-secret")
+                            append("enabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertContains(
+                response.bodyAsText(),
+                "Unsupported provider: okta",
+                message = "Must be refused by the provider guard — a missing client id also returns a non-200",
+            )
+            assertTrue(
+                idpRepo.findAllByTenant(workspace.id).isEmpty(),
+                "No identity provider row may be written for a key that has no compiled-in adapter",
+            )
+        }
+
+    @Test
+    fun `deleting an identity provider for a well-formed key with no adapter is refused`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta/delete",
+                    formParameters = Parameters.build { },
+                )
+
+            // A reserved key redirects (302) here even when nothing is configured, so the status
+            // alone separates the guard from the success path rather than from another failure.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+    @Test
+    fun `deleting an identity provider for a reserved key is accepted`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            idpRepo.seed(workspace.id, "google")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/google/delete",
+                    formParameters = Parameters.build { },
+                )
+
+            // The companion to the test above: proves the 400 there comes from the key being
+            // unreserved, not from something both requests share.
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(idpRepo.findAllByTenant(workspace.id).isEmpty())
+        }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 
@@ -760,8 +842,13 @@ class AdminSettingsTest {
         installTestApp(securityMethodsService = buildSecurityMethodsService())
     }
 
+    private fun io.ktor.server.application.Application.installTestAppWithIdpRepo() {
+        installTestApp(identityProviderRepository = idpRepo)
+    }
+
     private fun io.ktor.server.application.Application.installTestApp(
         securityMethodsService: SecurityMethodsService? = null,
+        identityProviderRepository: com.kauth.domain.port.IdentityProviderRepository? = null,
     ) {
         install(ContentNegotiation) { json() }
         install(Sessions) {
@@ -806,6 +893,7 @@ class AdminSettingsTest {
                         mapperRepository = com.kauth.fakes.FakeTenantClaimMapperRepository(),
                     ),
                 securityMethodsService = securityMethodsService,
+                identityProviderRepository = identityProviderRepository,
             )
         }
     }

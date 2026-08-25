@@ -207,6 +207,43 @@ class SocialLoginRoutesTest {
         }
 
     @Test
+    fun `a redirect for a well-formed key with no compiled-in adapter is rejected as unsupported`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // "okta" satisfies ^[a-z0-9-]{1,32}$, so ProviderKey.of parses it. Only the RESERVED
+            // membership check stops it. Without that check the request reaches buildRedirectUrl,
+            // finds no configured provider and renders the login page — also a 400, different cause.
+            val response = client.get("/t/acme/auth/social/okta/redirect")
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(
+                response.bodyAsText().contains("unsupported_provider"),
+                "A key with no adapter must be refused by the provider guard, not by a downstream lookup",
+            )
+        }
+
+    @Test
+    fun `a callback for a well-formed key with no compiled-in adapter is rejected as unsupported`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // Signed state that agrees with the URL segment, so nothing downstream of the provider
+            // guard has a reason to reject: drop the guard and this reaches ProviderNotConfigured.
+            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}")
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(
+                response.bodyAsText().contains("unsupported_provider"),
+                "A key with no adapter must be refused by the provider guard, not by a downstream lookup",
+            )
+        }
+
+    @Test
     fun `a callback whose state names a different provider is rejected`() =
         testApplication {
             resetFixtures()
