@@ -7,6 +7,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.fakes.FakeIdentityProviderRepository
 import kotlin.test.BeforeTest
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -41,7 +42,8 @@ class IdentityProviderServiceTest {
                 kind = ProviderKind.OIDC,
                 issuer = null,
             )
-        assertTrue(result is AdminResult.Failure)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "requires an issuer URL")
     }
 
     @Test
@@ -84,7 +86,8 @@ class IdentityProviderServiceTest {
                 kind = ProviderKind.OIDC,
                 issuer = "https://issuer.example",
             )
-        assertIs<AdminResult.Failure>(renamed)
+        val renameError = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(renamed).error)
+        assertContains(renameError.message, "fixed once saved")
         // the stored row keeps its original key
         assertNotNull(service.get(tenantId, acme))
         assertNull(service.get(tenantId, ProviderKey.of("acme-idp-2")!!))
@@ -123,7 +126,8 @@ class IdentityProviderServiceTest {
                 kind = ProviderKind.OIDC,
                 issuer = "issuer.example",
             )
-        assertIs<AdminResult.Failure>(result)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "The issuer must be an http or https URL")
     }
 
     @Test
@@ -138,7 +142,8 @@ class IdentityProviderServiceTest {
                 issuer = "https://issuer.example",
                 scopes = "email profile",
             )
-        assertIs<AdminResult.Failure>(result)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "must request the 'openid' scope")
     }
 
     @Test
@@ -152,7 +157,8 @@ class IdentityProviderServiceTest {
                 kind = ProviderKind.OIDC,
                 issuer = "https://accounts.google.com",
             )
-        assertIs<AdminResult.Failure>(asOidc)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(asOidc).error)
+        assertContains(error.message, "must stay an OAuth2 provider")
 
         val asOauth2 = service.save(tenantId, key = ProviderKey.GOOGLE, clientId = "c", clientSecret = "s")
         assertIs<AdminResult.Success<*>>(asOauth2)
@@ -161,13 +167,15 @@ class IdentityProviderServiceTest {
     @Test
     fun `a key with no compiled-in adapter cannot be saved as oauth2`() {
         val result = service.save(tenantId, key = acme, clientId = "c", clientSecret = "s")
-        assertIs<AdminResult.Failure>(result)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "has no built-in adapter")
     }
 
     @Test
     fun `a client secret is required when creating but optional when updating`() {
         val missing = service.save(tenantId, key = ProviderKey.GITHUB, clientId = "c", clientSecret = null)
-        assertIs<AdminResult.Failure>(missing)
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(missing).error)
+        assertContains(error.message, "A client secret is required")
 
         val created = service.save(tenantId, key = ProviderKey.GITHUB, clientId = "c", clientSecret = "s")
         assertIs<AdminResult.Success<*>>(created)
@@ -192,7 +200,9 @@ class IdentityProviderServiceTest {
 
         val crossTenant =
             service.save(tenantId, key = ProviderKey.GITHUB, clientId = "c", clientSecret = "s", id = id)
-        assertIs<AdminResult.Failure>(crossTenant)
+        // NotFound, not Validation: the row is invisible to this tenant rather than invalid
+        val error = assertIs<AdminError.NotFound>(assertIs<AdminResult.Failure>(crossTenant).error)
+        assertContains(error.message, "No identity provider with id $id")
     }
 
     @Test
@@ -207,8 +217,8 @@ class IdentityProviderServiceTest {
     @Test
     fun `deleting an unconfigured provider reports not found`() {
         val result = service.delete(tenantId, acme)
-        assertIs<AdminResult.Failure>(result)
-        assertIs<AdminError.NotFound>(result.error)
+        val error = assertIs<AdminError.NotFound>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "No identity provider 'acme-idp'")
     }
 
     @Test

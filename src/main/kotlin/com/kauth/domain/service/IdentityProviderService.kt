@@ -20,8 +20,8 @@ private val WHITESPACE = Regex("\\s+")
 private val URL_SCHEMES = setOf("http", "https")
 
 private const val KEY_IMMUTABLE =
-    "The provider key cannot be changed once saved — linked accounts would be orphaned. " +
-        "Delete the provider and add a new one instead."
+    "The provider key is fixed once saved — accounts already linked to this provider point at it. " +
+        "Moving them to a different key is a migration in its own right."
 
 /**
  * The single validation point for per-tenant identity provider configuration: the admin UI
