@@ -218,5 +218,9 @@ class SocialLoginRoutesTest {
                 )
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
+            // Naming the guard, not just the status: the provider comes from the URL segment,
+            // not from the state, so a dropped mismatch check would still 400 downstream at the
+            // provider exchange — the same code by a different cause.
+            assertTrue(response.bodyAsText().contains("State mismatch"))
         }
 }
