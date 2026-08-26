@@ -99,6 +99,36 @@ class MagicLinkRoutesTest {
             emailVerified = false,
         )
 
+    /** A second workspace on the same instance, with its own magic-link user. */
+    private val globex =
+        Tenant(
+            id = TenantId(2),
+            slug = "globex",
+            displayName = "Globex",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+            smtpEnabled = true,
+            smtpHost = "smtp.example.com",
+            smtpPort = 587,
+            smtpUsername = "noreply@globex.com",
+            smtpPassword = "secret",
+            smtpFromAddress = "noreply@globex.com",
+            smtpFromName = "Globex",
+            securityConfig = SecurityConfig(magicLinkEnabled = true),
+        )
+
+    private val bob =
+        User(
+            id = UserId(20),
+            tenantId = TenantId(2),
+            username = "bob",
+            email = "bob@globex.com",
+            fullName = "Bob",
+            passwordHash = hasher.hash("doesnt-matter"),
+            enabled = true,
+            emailVerified = false,
+        )
+
     private val spaApp =
         Application(
             id = ApplicationId(1),
@@ -205,6 +235,43 @@ class MagicLinkRoutesTest {
                     translationPort = EnglishOnlyTranslation(),
                 )
             }
+        }
+
+    @Test
+    fun `a magic-link token from another workspace issues no code at this one`() =
+        testApplication {
+            tenants.add(globex)
+            users.add(bob)
+            application(appBlock())
+
+            // The consume route looks the token up with no tenant, so a token minted at globex
+            // resolves to a globex user while the URL — and the auth context — say acme.
+            credentialFlowService().initiateMagicLink(
+                email = "bob@globex.com",
+                tenantSlug = "globex",
+                baseUrl = "http://localhost",
+                ipAddress = null,
+            )
+            val rawToken = extractToken(emails.sent.single { it.type == "magic_link" }.url)
+
+            val response =
+                createClient { followRedirects = false }
+                    .get("/t/acme/magic-link/consume?token=$rawToken") {
+                        header("Cookie", "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}")
+                    }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(
+                authCodes.all().isEmpty(),
+                "No authorization code may be written for a user of another workspace",
+            )
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_SSO=") },
+                "No SSO witness may be written either: ${response.headers.getAll("Set-Cookie")}",
+            )
         }
 
     // =========================================================================

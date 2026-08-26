@@ -42,6 +42,10 @@ object EnglishStrings {
     const val TOAST_PASSKEYS_RESET = "All passkeys reset for this user."
     const val TOAST_MFA_RESET = "MFA reset for this user."
 
+    // Sign-in errors
+    const val SIGN_IN_WRONG_WORKSPACE =
+        "This sign-in does not belong to this workspace. Please sign in again."
+
     // Portal — navigation and shell
     const val PORTAL_SIGN_OUT = "Sign out"
     const val PORTAL_MY_ACCOUNT = "My Account"

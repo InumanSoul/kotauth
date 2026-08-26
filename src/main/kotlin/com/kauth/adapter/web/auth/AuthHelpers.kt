@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -490,6 +491,14 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
 ): String? {
+    // The user id comes from whichever login leg completed and the tenant from the URL. Refusing
+    // the pair here is what keeps a code row and an SSO witness from being written for a tenant
+    // the user is not in — the exchange only refuses it afterwards.
+    if (!oauthService.userBelongsToTenant(userId, tenantId)) {
+        renderError(EnglishStrings.SIGN_IN_WRONG_WORKSPACE)
+        return null
+    }
+
     val clientId =
         oauthParams.clientId
             ?: run {

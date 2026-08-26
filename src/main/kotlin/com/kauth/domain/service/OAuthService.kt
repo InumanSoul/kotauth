@@ -130,6 +130,19 @@ class OAuthService(
     }
 
     /**
+     * Whether [userId] is a user of [tenantId].
+     *
+     * The authorization-code flow is handed a user id by whichever login leg completed and a
+     * tenant by the URL, and not every leg proves the two belong together — a magic-link token is
+     * consumed without one. Asked before [issueAuthorizationCode] so a mismatched pair writes no
+     * code row and no SSO witness; the token exchange would refuse it later either way.
+     */
+    fun userBelongsToTenant(
+        userId: UserId,
+        tenantId: TenantId,
+    ): Boolean = userRepository.findById(userId, tenantId) != null
+
+    /**
      * Validates an authorization request and issues a short-lived code.
      * Called after the user has authenticated successfully.
      *
