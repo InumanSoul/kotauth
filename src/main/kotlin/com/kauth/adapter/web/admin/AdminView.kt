@@ -402,6 +402,7 @@ object AdminView {
             notEnrolledUserList,
         )
 
+    @Suppress("LongParameterList")
     fun identityProvidersPage(
         workspace: Tenant,
         providers: List<IdentityProvider>,
@@ -410,8 +411,22 @@ object AdminView {
         error: String? = null,
         saved: Boolean = false,
         failures: Map<com.kauth.domain.model.ProviderKey, List<SignInFailureRow>> = emptyMap(),
+        baseUrl: String = "",
+        probed: com.kauth.domain.model.ProviderKey? = null,
+        probe: com.kauth.domain.service.AdminResult<com.kauth.domain.service.DiscoveryProbe>? = null,
     ): HTML.() -> Unit =
-        identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, error, saved, failures)
+        identityProvidersPageImpl(
+            workspace,
+            providers,
+            allWorkspaces,
+            loggedInAs,
+            error,
+            saved,
+            failures,
+            baseUrl,
+            probed,
+            probe,
+        )
 
     fun apiKeysListPage(
         workspace: Tenant,

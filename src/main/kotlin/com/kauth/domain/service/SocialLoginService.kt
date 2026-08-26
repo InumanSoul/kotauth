@@ -9,6 +9,7 @@ import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.socialCallbackUrl
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.IdentityProviderRepository
@@ -449,7 +450,7 @@ class SocialLoginService(
         baseUrl: String,
         tenantSlug: String,
         provider: ProviderKey,
-    ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
+    ): String = socialCallbackUrl(baseUrl, tenantSlug, provider)
 }
 
 // ---------------------------------------------------------------------------

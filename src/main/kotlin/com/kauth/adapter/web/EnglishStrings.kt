@@ -1016,6 +1016,43 @@ object EnglishStrings {
     const val IDP_ENDPOINT_OVERRIDE_HINT =
         "Optional. Leave blank to use the value from the issuer's discovery document."
 
+    // Just-in-time provisioning — the two columns that decide whether a brokered sign-in
+    // may create a local account.
+    const val IDP_JIT_TITLE = "Create accounts on first sign-in"
+    const val IDP_JIT_ENABLE_LABEL = "Create accounts automatically"
+    const val IDP_JIT_HINT =
+        "When on, someone signing in through this provider for the first time gets an account " +
+            "here — but only if the provider says their email is verified and its domain is " +
+            "on the list below."
+    const val IDP_JIT_DOMAINS_LABEL = "Allowed email domains"
+    const val IDP_JIT_DOMAINS_EMPTY =
+        "No domains listed — no account is created automatically, even with the toggle on. " +
+            "An empty list is the feature switched off, never a wildcard."
+    const val IDP_JIT_DOMAINS_HINT =
+        "Untick a domain and save to remove it. Domains are stored lower-case; duplicates are " +
+            "ignored."
+    const val IDP_JIT_DOMAIN_ADD_LABEL = "Add a domain"
+    const val IDP_JIT_DOMAIN_ADD_PLACEHOLDER = "example.com"
+    const val IDP_JIT_DOMAIN_ADD_HINT = "A bare domain, one per save. It is added when you save the provider."
+
+    // Test discovery — the setup aid, and the half of setup it cannot see.
+    const val IDP_DISCOVERY_BUTTON = "Test discovery"
+    const val IDP_DISCOVERY_TITLE = "Discovery test"
+    const val IDP_DISCOVERY_VERIFIED_TITLE = "What this test verified"
+    const val IDP_DISCOVERY_KEYS_LABEL = "Signing keys published"
+    const val IDP_DISCOVERY_KEYS_UNREAD = "The key set could not be read"
+    const val IDP_DISCOVERY_NOT_VERIFIED_TITLE = "What this test did not verify"
+    const val IDP_DISCOVERY_NOT_VERIFIED_REDIRECT =
+        "Your redirect URI. Discovery reads what the issuer publishes; nothing here asks the " +
+            "provider whether it will accept the callback URL below. A URL the provider does not " +
+            "recognise is refused at the provider, after this page has said the endpoints resolve, " +
+            "and shows up only under Recent sign-in failures."
+    const val IDP_DISCOVERY_NOT_VERIFIED_CREDENTIALS =
+        "Your client ID and client secret. Nothing in this test authenticates as this client — " +
+            "the first request that does is a real sign-in."
+    const val IDP_DISCOVERY_CALLBACK_LABEL = "Register this exact callback URL at the provider:"
+    const val IDP_DISCOVERY_FAILED_TITLE = "Discovery did not resolve"
+
     /**
      * Human-readable name for a provider key. The two reserved keys keep their brand casing;
      * any other key is title-cased from its own value so a provider always has a label.

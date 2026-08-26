@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
@@ -12,6 +13,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.WorkspaceSettingsService
@@ -22,6 +24,8 @@ import com.kauth.fakes.FakeEmailPort
 import com.kauth.fakes.FakeEmailVerificationTokenRepository
 import com.kauth.fakes.FakeGroupRepository
 import com.kauth.fakes.FakeIdentityProviderRepository
+import com.kauth.fakes.FakeOidcDiscoveryPort
+import com.kauth.fakes.FakeOidcIssuer
 import com.kauth.fakes.FakePasswordHasher
 import com.kauth.fakes.FakePasswordResetTokenRepository
 import com.kauth.fakes.FakeRoleRepository
@@ -176,6 +180,16 @@ class AdminSettingsTest {
         SecurityMethodsService(
             tenantRepository = tenantRepo,
             identityProviderRepository = idpRepo,
+        )
+
+    /** Discovery answers for one issuer; the fake issuer serves the key set that issuer points at. */
+    private val fakeIssuer = FakeOidcIssuer()
+    private val discoveryPort = FakeOidcDiscoveryPort(issuer = fakeIssuer.issuer)
+
+    private fun buildProbeService() =
+        IdentityProviderProbeService(
+            discovery = discoveryPort,
+            jwks = fakeIssuer,
         )
 
     @BeforeTest
@@ -975,9 +989,15 @@ class AdminSettingsTest {
         installTestApp(identityProviderRepository = idpRepo)
     }
 
+    private fun io.ktor.server.application.Application.installTestAppWithoutProbe() {
+        installTestApp(identityProviderRepository = idpRepo, identityProviderProbeService = null)
+    }
+
     private fun io.ktor.server.application.Application.installTestApp(
         securityMethodsService: SecurityMethodsService? = null,
         identityProviderRepository: com.kauth.domain.port.IdentityProviderRepository? = null,
+        baseUrl: String = APP_BASE_URL,
+        identityProviderProbeService: IdentityProviderProbeService? = buildProbeService(),
     ) {
         install(ContentNegotiation) { json() }
         install(Sessions) {
@@ -1023,6 +1043,8 @@ class AdminSettingsTest {
                     ),
                 securityMethodsService = securityMethodsService,
                 identityProviderRepository = identityProviderRepository,
+                baseUrl = baseUrl,
+                identityProviderProbeService = identityProviderProbeService,
             )
         }
     }
@@ -1139,4 +1161,388 @@ class AdminSettingsTest {
 
             assertContains(body, "No sign-in failures recorded for this provider.")
         }
+    // =========================================================================
+    // Test discovery, the just-in-time toggle, and the allowed-domain chips
+    // =========================================================================
+
+    /** The one issuer the fake discovery port answers for. Its endpoints are derived from it. */
+    private val probeIssuer get() = fakeIssuer.issuer
+
+    private fun seedOkta(
+        jitEnabled: Boolean = false,
+        jitAllowedDomains: List<String> = emptyList(),
+        clientSecret: String = "okta-stored-secret",
+    ) = idpRepo.add(
+        IdentityProvider(
+            tenantId = workspace.id,
+            provider = ProviderKey.of("okta")!!,
+            clientId = "okta-client-id",
+            clientSecret = clientSecret,
+            kind = ProviderKind.OIDC,
+            issuer = probeIssuer,
+            jitEnabled = jitEnabled,
+            jitAllowedDomains = jitAllowedDomains,
+        ),
+    )
+
+    private fun storedOkta() = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+
+    @Test
+    fun `test discovery reports the endpoints the issuer publishes`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta()
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    formParameters = Parameters.build { },
+                )
+            val body = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(body, "$probeIssuer/authorize")
+            assertContains(body, "$probeIssuer/token")
+            assertContains(body, "$probeIssuer/jwks")
+        }
+
+    @Test
+    fun `test discovery reports how many signing keys the issuer publishes`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta()
+
+            val body =
+                authed
+                    .submitForm(
+                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        formParameters = Parameters.build { },
+                    ).bodyAsText()
+
+            // The fake issuer publishes exactly two usable verification keys. Reaching the key set
+            // is the one thing beyond the document itself that discovery genuinely proves.
+            assertContains(body, EnglishStrings.IDP_DISCOVERY_KEYS_LABEL)
+            assertContains(body, "2")
+        }
+
+    @Test
+    fun `test discovery leaves the stored provider exactly as it was`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            val before = seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    formParameters = Parameters.build { },
+                )
+
+            // Status and row together: a 404 would also leave the row alone, so the equality
+            // assertion only means something once the route is known to have run.
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(before, storedOkta(), "A discovery test is a read — it must write nothing")
+            assertEquals(1, idpRepo.findAllByTenant(workspace.id).size)
+        }
+
+    @Test
+    fun `test discovery names the redirect URI it did not verify`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta()
+
+            val body =
+                authed
+                    .submitForm(
+                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        formParameters = Parameters.build { },
+                    ).bodyAsText()
+
+            // A tick that quietly means "half of it is fine" converts uncertainty into false
+            // confidence. The panel has to name the half it could not see, and show the URL the
+            // operator must register for that half to hold.
+            assertContains(body, EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_TITLE)
+            assertContains(body, EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_REDIRECT)
+            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/okta/callback")
+        }
+
+    @Test
+    fun `test discovery never renders the stored client secret`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta(clientSecret = "s3cr3t-okta-probe-secret")
+
+            val body =
+                authed
+                    .submitForm(
+                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        formParameters = Parameters.build { },
+                    ).bodyAsText()
+
+            assertFalse("s3cr3t-okta-probe-secret" in body, "A discovery test must not echo a secret back")
+        }
+
+    @Test
+    fun `test discovery says why an issuer could not be reached`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.add(
+                IdentityProvider(
+                    tenantId = workspace.id,
+                    provider = ProviderKey.of("okta")!!,
+                    clientId = "okta-client-id",
+                    clientSecret = "okta-stored-secret",
+                    kind = ProviderKind.OIDC,
+                    issuer = "https://unreachable.example",
+                ),
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    formParameters = Parameters.build { },
+                )
+            val body = response.bodyAsText()
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(body, EnglishStrings.IDP_DISCOVERY_FAILED_TITLE)
+            assertContains(body, "https://unreachable.example")
+        }
+
+    @Test
+    fun `the callback URL on a provider card is the one the login flow sends`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            // The flow builds its redirect_uri from the deployment's base URL. A workspace whose
+            // issuerUrl says something else must not change what the operator is told to register,
+            // or setup is broken by the page that was meant to guide it.
+            tenantRepo.update(workspace.copy(issuerUrl = "https://issuer.acme.example"))
+            seedOkta()
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/okta/callback")
+            assertFalse(
+                "https://issuer.acme.example/t/acme/auth/social/okta/callback" in body,
+                "The callback URL must come from the base URL the login flow uses, not from issuerUrl",
+            )
+        }
+
+    @Test
+    fun `a provider with no allowed domains says no account is created automatically`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta(jitEnabled = true, jitAllowedDomains = emptyList())
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // Empty means the feature is off. An empty box reads as "not configured yet", which is
+            // the opposite meaning, and nothing on the page tells the two apart.
+            assertContains(body, EnglishStrings.IDP_JIT_DOMAINS_EMPTY)
+        }
+
+    @Test
+    fun `the allowed domains a provider already has are rendered as chips`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "acme.test"))
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertContains(body, "value=\"acme.example\"")
+            assertContains(body, "value=\"acme.test\"")
+            assertFalse(EnglishStrings.IDP_JIT_DOMAINS_EMPTY in body, "A populated list is not the off-state")
+        }
+
+    @Test
+    fun `a built-in provider card carries the just-in-time controls`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "google")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // The gate reads jitEnabled off the row whatever the provider kind is, so a Google
+            // workspace needs the same two controls an OIDC one does.
+            assertContains(body, "name=\"jitEnabled\"")
+            assertContains(body, "name=\"$JIT_DOMAIN_TO_ADD_FIELD\"")
+        }
+
+    @Test
+    fun `saving switches just-in-time provisioning on for the provider`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOkta()
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "okta-client-id")
+                            append("issuer", probeIssuer)
+                            append("kind", "oidc")
+                            append("enabled", "true")
+                            append("jitEnabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(storedOkta()?.jitEnabled == true, "The toggle must reach the stored row")
+        }
+
+    @Test
+    fun `a domain entered with capitals and spaces is stored normalised`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOkta(jitEnabled = true)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "okta-client-id")
+                            append("issuer", probeIssuer)
+                            append("kind", "oidc")
+                            append("enabled", "true")
+                            append("jitEnabled", "true")
+                            append(JIT_DOMAIN_TO_ADD_FIELD, "  ACME.Example  ")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            // The service already trims, lower-cases and de-duplicates. What the operator typed and
+            // what the chip shows back have to be the same string, so the form must not normalise
+            // differently — or not at all.
+            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `a domain left ticked survives a save that adds another`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                formParameters =
+                    Parameters.build {
+                        append("clientId", "okta-client-id")
+                        append("issuer", probeIssuer)
+                        append("kind", "oidc")
+                        append("enabled", "true")
+                        append("jitEnabled", "true")
+                        append(JIT_DOMAINS_FIELD, "acme.example")
+                        append(JIT_DOMAIN_TO_ADD_FIELD, "acme.test")
+                    },
+            )
+
+            assertEquals(listOf("acme.example", "acme.test"), storedOkta()?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `a domain unticked before saving is removed from the list`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "contractor.example"))
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                formParameters =
+                    Parameters.build {
+                        append("clientId", "okta-client-id")
+                        append("issuer", probeIssuer)
+                        append("kind", "oidc")
+                        append("enabled", "true")
+                        append("jitEnabled", "true")
+                        append(JIT_DOMAINS_FIELD, "acme.example")
+                    },
+            )
+
+            // An unticked chip is a removal. Preserving what the row already had would make the
+            // control unable to express the one state that matters most — the empty list.
+            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `a domain that is not a domain is refused and the stored list is unchanged`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "okta-client-id")
+                            append("issuer", probeIssuer)
+                            append("kind", "oidc")
+                            append("enabled", "true")
+                            append("jitEnabled", "true")
+                            append(JIT_DOMAIN_TO_ADD_FIELD, "someone@acme.example")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertContains(response.bodyAsText(), "someone@acme.example")
+            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+        }
+
+    private companion object {
+        /** The deployment base URL the login flow builds its redirect_uri from. */
+        const val APP_BASE_URL = "https://kotauth.example"
+        const val JIT_DOMAINS_FIELD = "jitAllowedDomains"
+        const val JIT_DOMAIN_TO_ADD_FIELD = "jitAllowedDomainToAdd"
+    }
 }

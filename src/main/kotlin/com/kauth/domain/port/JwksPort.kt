@@ -32,4 +32,12 @@ interface JwksPort {
         jwksUri: String,
         kid: String,
     ): Result<PublicKey>
+
+    /**
+     * How many keys at [jwksUri] we could actually verify a signature with, read fresh.
+     *
+     * A setup probe wants what the issuer serves now, not what a cache holds, and it must not
+     * populate that cache either — a probe is a read that changes nothing a sign-in depends on.
+     */
+    fun verificationKeyCount(jwksUri: String): Result<Int>
 }

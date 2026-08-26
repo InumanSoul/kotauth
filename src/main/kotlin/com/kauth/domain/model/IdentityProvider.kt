@@ -49,3 +49,17 @@ data class IdentityProvider(
 }
 
 const val DEFAULT_OIDC_SCOPES = "openid email profile"
+
+/**
+ * The redirect URI a brokered sign-in sends to the provider, and the one an operator has to
+ * register there.
+ *
+ * One definition on purpose: the login flow and the admin page that tells an operator what to
+ * register have to agree exactly, and a redirect URI the provider does not recognise is refused at
+ * the provider — after setup looks finished — with nothing on our side able to detect it first.
+ */
+fun socialCallbackUrl(
+    baseUrl: String,
+    tenantSlug: String,
+    provider: ProviderKey,
+): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"

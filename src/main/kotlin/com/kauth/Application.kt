@@ -578,6 +578,7 @@ fun Application.module(
             mfaService = s.mfaService,
             auditLogPort = s.auditLogPort,
             securityMethodsService = s.securityMethodsService,
+            identityProviderProbeService = s.identityProviderProbeService,
         )
     }
 }

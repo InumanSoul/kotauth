@@ -97,6 +97,7 @@ fun Route.adminRoutes(
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
     securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
+    identityProviderProbeService: com.kauth.domain.service.IdentityProviderProbeService? = null,
 ) {
     AdminView.setShellAppInfo(appInfo)
 
@@ -512,6 +513,8 @@ fun Route.adminRoutes(
                     webAuthnCredentialRepository = webAuthnCredentialRepository,
                     securityMethodsService = securityMethodsService,
                     auditLogRepository = auditLogRepository,
+                    identityProviderProbeService = identityProviderProbeService,
+                    baseUrl = baseUrl,
                 )
 
                 adminApplicationRoutes(

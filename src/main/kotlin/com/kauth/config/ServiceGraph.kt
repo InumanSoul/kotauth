@@ -74,6 +74,7 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.JitProvisioningService
@@ -155,6 +156,7 @@ data class ServiceGraph(
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
     val identityProviderService: IdentityProviderService,
+    val identityProviderProbeService: IdentityProviderProbeService,
     val portalConfigRepository: PortalConfigRepository,
     val themeRepository: ThemeRepository,
     val emailBrandingRepository: TenantEmailBrandingRepository,
@@ -457,10 +459,19 @@ data class ServiceGraph(
                 )
             // One discovery cache and one JWKS cache for every tenant's OIDC provider; the
             // adapters the resolver builds per request share them.
+            val jwksPort = HttpJwksAdapter()
+            val oidcDiscoveryPort = HttpOidcDiscoveryAdapter()
             val oidcTokenValidator =
                 OidcTokenValidator(
-                    jwks = HttpJwksAdapter(),
+                    jwks = jwksPort,
                     verifier = JavaJwtVerifierAdapter(),
+                )
+            // The admin probe shares the same two adapters the login flow resolves through, so a
+            // discovery test reports what a sign-in would actually get, not a second opinion.
+            val identityProviderProbeService =
+                IdentityProviderProbeService(
+                    discovery = oidcDiscoveryPort,
+                    jwks = jwksPort,
                 )
             val jitProvisioningService =
                 JitProvisioningService(
@@ -488,7 +499,7 @@ data class ServiceGraph(
                                     ProviderKey.GITHUB to GitHubOAuthAdapter(),
                                 ),
                             identityProviders = identityProviderRepository,
-                            discovery = HttpOidcDiscoveryAdapter(),
+                            discovery = oidcDiscoveryPort,
                             tokenValidator = oidcTokenValidator,
                             formPoster = JdkHttpFormPoster(),
                         ),
@@ -675,6 +686,7 @@ data class ServiceGraph(
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
                 identityProviderService = IdentityProviderService(identityProviderRepository),
+                identityProviderProbeService = identityProviderProbeService,
                 portalConfigRepository = portalConfigRepository,
                 themeRepository = themeRepository,
                 emailBrandingRepository = emailBrandingRepository,

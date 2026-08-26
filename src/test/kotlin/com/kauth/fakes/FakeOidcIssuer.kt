@@ -72,6 +72,14 @@ class FakeOidcIssuer(
         }
     }
 
+    /** The two keys this issuer publishes — the RSA and the EC one. The unpublished pair is not one. */
+    override fun verificationKeyCount(jwksUri: String): Result<Int> =
+        if (jwksUri == this.jwksUri) {
+            Result.success(PUBLISHED_KEYS)
+        } else {
+            Result.failure(JwksFailure(JwksFailure.Reason.FETCH_FAILED, "No key set at $jwksUri."))
+        }
+
     fun idToken(
         subject: String? = DEFAULT_SUBJECT,
         issuer: String? = this.issuer,
@@ -130,5 +138,8 @@ class FakeOidcIssuer(
         const val DEFAULT_SUBJECT = "issuer-subject-1"
         const val DEFAULT_AUDIENCE = "kotauth-client"
         const val DEFAULT_NONCE = "nonce-from-our-session"
+
+        /** The RSA and EC keys this issuer publishes. The unpublished forgery pair is not one of them. */
+        const val PUBLISHED_KEYS = 2
     }
 }

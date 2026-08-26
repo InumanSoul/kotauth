@@ -87,6 +87,14 @@ class HttpJwksAdapter(
             ?: failure(Reason.UNKNOWN_KID, "No key '$kid' in the key set at $jwksUri.")
     }
 
+    // Deliberately neither reads nor writes the cache: an operator testing a provider is asking
+    // what the issuer publishes right now, and a probe that primed the cache would let a
+    // diagnostic decide which keys a later sign-in verifies against.
+    override fun verificationKeyCount(jwksUri: String): Result<Int> {
+        OidcUrlPolicy.problemWith(jwksUri, "JWKS URI")?.let { return failure(Reason.INSECURE_URL, it) }
+        return fetchKeys(jwksUri).map { it.size }
+    }
+
     private fun refetchAllowed(
         entry: Entry,
         now: Long,

@@ -20,6 +20,7 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
+import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
@@ -46,6 +47,8 @@ fun Route.adminSettingsRoutes(
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
     securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
     auditLogRepository: AuditLogRepository? = null,
+    identityProviderProbeService: IdentityProviderProbeService? = null,
+    baseUrl: String = "",
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -204,6 +207,7 @@ fun Route.adminSettingsRoutes(
                 loggedInAs = session.username,
                 saved = call.request.queryParameters["saved"] == "true",
                 failures = auditLogRepository.recentSignInFailures(workspace.id),
+                baseUrl = baseUrl,
             ),
         )
     }
@@ -224,8 +228,9 @@ fun Route.adminSettingsRoutes(
                     service,
                     EnglishStrings.IDP_KEY_INVALID,
                     auditLogRepository,
+                    baseUrl,
                 )
-        call.saveIdentityProvider(service, provider, params, auditLogRepository)
+        call.saveIdentityProvider(service, provider, params, auditLogRepository, baseUrl)
     }
 
     post("/settings/identity-providers/{provider}") {
@@ -241,7 +246,45 @@ fun Route.adminSettingsRoutes(
                 HttpStatusCode.NotImplemented,
                 "Identity provider repository not configured",
             )
-        call.saveIdentityProvider(service, provider, call.receiveParameters(), auditLogRepository)
+        call.saveIdentityProvider(service, provider, call.receiveParameters(), auditLogRepository, baseUrl)
+    }
+
+    // A read, not a write: it resolves the issuer so an operator can see the endpoints before a
+    // person does. POST rather than GET only so a prefetch cannot fire an outbound fetch for them.
+    post("/settings/identity-providers/{provider}/test-discovery") {
+        val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provider =
+            ProviderKey.of(provName)
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val service =
+            idpService ?: return@post call.respond(
+                HttpStatusCode.NotImplemented,
+                "Identity provider repository not configured",
+            )
+        val probeService =
+            identityProviderProbeService ?: return@post call.respond(
+                HttpStatusCode.NotImplemented,
+                "OIDC discovery not configured",
+            )
+        val workspace = call.attributes[WorkspaceAttr]
+        val stored =
+            service.get(workspace.id, provider)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+
+        val session = call.sessions.get<AdminSession>()!!
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.identityProvidersPage(
+                workspace = workspace,
+                providers = service.list(workspace.id),
+                allWorkspaces = call.attributes[WsPairsAttr],
+                loggedInAs = session.username,
+                failures = auditLogRepository.recentSignInFailures(workspace.id),
+                baseUrl = baseUrl,
+                probed = provider,
+                probe = probeService.probe(stored),
+            ),
+        )
     }
 
     post("/settings/identity-providers/{provider}/delete") {
@@ -536,6 +579,7 @@ private suspend fun ApplicationCall.saveIdentityProvider(
     provider: ProviderKey,
     params: io.ktor.http.Parameters,
     auditLogRepository: AuditLogRepository?,
+    baseUrl: String,
 ) {
     val workspace = attributes[WorkspaceAttr]
     val existing = service.get(workspace.id, provider)
@@ -558,16 +602,18 @@ private suspend fun ApplicationCall.saveIdentityProvider(
             tokenEndpoint = params["tokenEndpoint"],
             jwksUri = params["jwksUri"],
             scopes = params["scopes"] ?: existing?.scopes ?: DEFAULT_OIDC_SCOPES,
-            // Phase 3 owns the JIT fields; this form does not show them, so it must not clear
-            // what a row already carries.
-            jitEnabled = existing?.jitEnabled ?: false,
-            jitAllowedDomains = existing?.jitAllowedDomains ?: emptyList(),
+            jitEnabled = params["jitEnabled"] == "true",
+            // The ticked chips are the list. An unticked chip is a removal, so falling back to
+            // what the row already held would make the empty list unreachable from the form —
+            // and the empty list is precisely how an operator switches auto-creation off.
+            jitAllowedDomains = params.allowedDomains(),
         )
 
     when (result) {
         is AdminResult.Success ->
             respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers?saved=true")
-        is AdminResult.Failure -> respondIdentityProviderError(service, result.error.message, auditLogRepository)
+        is AdminResult.Failure ->
+            respondIdentityProviderError(service, result.error.message, auditLogRepository, baseUrl)
     }
 }
 
@@ -576,6 +622,7 @@ private suspend fun ApplicationCall.respondIdentityProviderError(
     service: IdentityProviderService,
     error: String,
     auditLogRepository: AuditLogRepository?,
+    baseUrl: String,
 ) {
     val workspace = attributes[WorkspaceAttr]
     respondHtml(
@@ -587,9 +634,21 @@ private suspend fun ApplicationCall.respondIdentityProviderError(
             loggedInAs = sessions.get<AdminSession>()!!.username,
             error = error,
             failures = auditLogRepository.recentSignInFailures(workspace.id),
+            baseUrl = baseUrl,
         ),
     )
 }
+
+/**
+ * The allowed domains one submit of the provider form asks for: every chip still ticked, plus the
+ * one typed into the add field.
+ *
+ * Nothing is normalised here on purpose — [IdentityProviderService] trims, lower-cases, drops
+ * empties and de-duplicates on write, and a second normaliser in the adapter is a second set of
+ * rules to drift from the first.
+ */
+private fun io.ktor.http.Parameters.allowedDomains(): List<String> =
+    getAll("jitAllowedDomains").orEmpty() + listOfNotNull(this["jitAllowedDomainToAdd"])
 
 /**
  * The brokered sign-in failures this workspace has recorded lately, grouped by provider.

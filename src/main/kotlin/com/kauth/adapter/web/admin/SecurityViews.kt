@@ -10,6 +10,9 @@ import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
+import com.kauth.domain.model.socialCallbackUrl
+import com.kauth.domain.service.AdminResult
+import com.kauth.domain.service.DiscoveryProbe
 import kotlinx.html.*
 
 internal fun mfaSettingsPageImpl(
@@ -204,10 +207,12 @@ internal fun identityProvidersPageImpl(
     error: String? = null,
     saved: Boolean = false,
     failures: Map<ProviderKey, List<SignInFailureRow>> = emptyMap(),
+    baseUrl: String = "",
+    probed: ProviderKey? = null,
+    probe: AdminResult<DiscoveryProbe>? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
-        val baseUrl = workspace.issuerUrl ?: "https://your-domain.com"
 
         adminShell(
             pageTitle = "Identity Providers — ${workspace.displayName}",
@@ -250,7 +255,7 @@ internal fun identityProvidersPageImpl(
                 val existing = providerMap[prov]
                 val isConfigured = existing != null
                 val providerName = EnglishStrings.providerDisplayName(prov)
-                val callbackUrl = "$baseUrl/t/$slug/auth/social/${prov.value}/callback"
+                val callbackUrl = socialCallbackUrl(baseUrl, slug, prov)
 
                 div("ov-card") {
                     form(
@@ -346,6 +351,8 @@ internal fun identityProvidersPageImpl(
                             }
                         }
 
+                        jitControls(existing)
+
                         // ── Save action ──────────────────────────────
                         div("edit-actions") {
                             button(type = ButtonType.submit) {
@@ -377,6 +384,7 @@ internal fun identityProvidersPageImpl(
                     baseUrl = baseUrl,
                     existing = existing,
                     failures = failures[existing.provider].orEmpty(),
+                    probe = probe.takeIf { existing.provider == probed },
                 )
             }
             oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = null)
@@ -396,6 +404,7 @@ private fun FlowContent.oidcProviderCard(
     baseUrl: String,
     existing: IdentityProvider?,
     failures: List<SignInFailureRow> = emptyList(),
+    probe: AdminResult<DiscoveryProbe>? = null,
 ) {
     val key = existing?.provider?.value
     val action =
@@ -449,7 +458,7 @@ private fun FlowContent.oidcProviderCard(
                     }
                 }
             } else {
-                val callbackUrl = "$baseUrl/t/$slug/auth/social/$key/callback"
+                val callbackUrl = socialCallbackUrl(baseUrl, slug, existing.provider)
                 div("setup-row") {
                     div("setup-row__text") { +EnglishStrings.IDP_CALLBACK_HINT }
                     div("copy-field") {
@@ -555,6 +564,8 @@ private fun FlowContent.oidcProviderCard(
                 placeholder = "",
             )
 
+            jitControls(existing)
+
             div("edit-actions") {
                 button(type = ButtonType.submit) {
                     classes = setOf("btn", "btn--primary", "btn--sm")
@@ -564,6 +575,25 @@ private fun FlowContent.oidcProviderCard(
         }
 
         if (existing != null) {
+            // A separate form again: a discovery test writes nothing, so it must not carry the
+            // edit form's fields — least of all a client secret typed but not yet saved.
+            if (existing.issuer != null) {
+                form(
+                    action = "/admin/workspaces/$slug/settings/identity-providers/$key/test-discovery",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post,
+                ) {
+                    div("edit-actions") {
+                        button(type = ButtonType.submit) {
+                            classes = setOf("btn", "btn--ghost", "btn--sm")
+                            +EnglishStrings.IDP_DISCOVERY_BUTTON
+                        }
+                    }
+                }
+            }
+            if (probe != null) {
+                discoveryProbePanel(probe, socialCallbackUrl(baseUrl, slug, existing.provider))
+            }
             identityProviderFailuresPanel(failures)
         }
 
@@ -583,6 +613,154 @@ private fun FlowContent.oidcProviderCard(
                 }
             }
         }
+    }
+}
+
+/**
+ * The two just-in-time columns: whether a brokered sign-in may create an account here, and which
+ * email domains it may create one for.
+ *
+ * The domains are the same chip grid the API-key scopes use — one chip per domain, ticked. An
+ * unticked chip is a removal, which is what lets the control express the empty list at all. The
+ * service normalises what is posted (trimmed, lower-cased, de-duplicated), so the chip an operator
+ * sees afterwards is the string that was stored, not the string they typed.
+ */
+private fun FlowContent.jitControls(existing: IdentityProvider?) {
+    val domains = existing?.jitAllowedDomains.orEmpty()
+
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.IDP_JIT_TITLE }
+        div {
+            label("toggle") {
+                input(type = InputType.checkBox, name = "jitEnabled") {
+                    attributes["value"] = "true"
+                    if (existing?.jitEnabled == true) checked = true
+                }
+                span("toggle__track") { span("toggle__thumb") {} }
+                span("toggle__label toggle__label--muted") { +EnglishStrings.IDP_JIT_ENABLE_LABEL }
+            }
+            div("edit-row__hint") { +EnglishStrings.IDP_JIT_HINT }
+        }
+    }
+
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.IDP_JIT_DOMAINS_LABEL }
+        div {
+            if (domains.isEmpty()) {
+                // Only for a row that exists. Empty on a saved provider means auto-creation is off;
+                // empty on the add form means not configured yet, and those are opposite meanings.
+                // Saying "off" about a provider nobody has saved would state the wrong one.
+                if (existing != null) {
+                    div("notice") {
+                        div("notice__body") {
+                            div("notice__desc") { +EnglishStrings.IDP_JIT_DOMAINS_EMPTY }
+                        }
+                    }
+                }
+            } else {
+                div("chip-grid") {
+                    domains.forEach { domain ->
+                        label("scope-chip") {
+                            input(type = InputType.checkBox, name = "jitAllowedDomains") {
+                                value = domain
+                                checked = true
+                            }
+                            span("scope-chip__label") { +domain }
+                        }
+                    }
+                }
+                div("edit-row__hint") { +EnglishStrings.IDP_JIT_DOMAINS_HINT }
+            }
+        }
+    }
+
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.IDP_JIT_DOMAIN_ADD_LABEL }
+        div {
+            input(type = InputType.text, name = "jitAllowedDomainToAdd") {
+                classes = setOf("edit-row__field")
+                placeholder = EnglishStrings.IDP_JIT_DOMAIN_ADD_PLACEHOLDER
+                attributes["autocomplete"] = "off"
+            }
+            div("edit-row__hint") { +EnglishStrings.IDP_JIT_DOMAIN_ADD_HINT }
+        }
+    }
+}
+
+/**
+ * The result of a discovery test, stated as the half of setup it is.
+ *
+ * The "did not verify" half is not a caveat appended to a success — it is the part an operator has
+ * to act on, because the failure it names (a redirect URI the provider does not recognise) is
+ * invisible from this side and surfaces only when a real person is turned away at the provider.
+ * A tick that quietly covered both halves would convert an operator's uncertainty into false
+ * confidence, which is worse than no tick at all.
+ */
+private fun FlowContent.discoveryProbePanel(
+    probe: AdminResult<DiscoveryProbe>,
+    callbackUrl: String,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.IDP_DISCOVERY_TITLE }
+        div {
+            when (probe) {
+                is AdminResult.Failure -> {
+                    div("notice notice--error") {
+                        div("notice__body") {
+                            div("notice__title") { +EnglishStrings.IDP_DISCOVERY_FAILED_TITLE }
+                            div("notice__desc") { +probe.error.message }
+                        }
+                    }
+                }
+                is AdminResult.Success -> {
+                    val report = probe.value
+                    div("edit-row__hint") { +EnglishStrings.IDP_DISCOVERY_VERIFIED_TITLE }
+                    table("data-table") {
+                        tbody {
+                            probeRow(EnglishStrings.IDP_ISSUER_LABEL, report.issuer)
+                            probeRow(EnglishStrings.IDP_AUTHORIZATION_ENDPOINT_LABEL, report.authorizationEndpoint)
+                            probeRow(EnglishStrings.IDP_TOKEN_ENDPOINT_LABEL, report.tokenEndpoint)
+                            probeRow(EnglishStrings.IDP_JWKS_URI_LABEL, report.jwksUri)
+                            probeRow(
+                                EnglishStrings.IDP_DISCOVERY_KEYS_LABEL,
+                                report.verificationKeyCount?.toString()
+                                    ?: (report.keySetProblem ?: EnglishStrings.IDP_DISCOVERY_KEYS_UNREAD),
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Rendered on both outcomes: a resolved document is exactly when an operator is most
+            // likely to believe setup is finished, and a failed one still leaves this to register.
+            div("notice") {
+                div("notice__body") {
+                    div("notice__title") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_TITLE }
+                    div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_REDIRECT }
+                    div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_CREDENTIALS }
+                }
+            }
+            div("edit-row__hint") { +EnglishStrings.IDP_DISCOVERY_CALLBACK_LABEL }
+            div("copy-field") {
+                span("copy-field__value") { +callbackUrl }
+                button(type = ButtonType.button) {
+                    classes = setOf("copy-field__btn")
+                    attributes["data-copy"] = callbackUrl
+                    title = "Copy"
+                    inlineSvgIcon("copy", "Copy")
+                }
+            }
+        }
+    }
+}
+
+private fun TBODY.probeRow(
+    label: String,
+    value: String,
+) {
+    tr {
+        td { +label }
+        td { +value }
     }
 }
 
