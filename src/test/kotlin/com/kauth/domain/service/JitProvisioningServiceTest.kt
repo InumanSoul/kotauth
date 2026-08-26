@@ -184,6 +184,35 @@ class JitProvisioningServiceTest {
         assertIs<JitOutcome.Provisioned>(outcome)
     }
 
+    // Delete the single-'@' guard and `substringAfterLast` reads the tail of this address as the
+    // allowed domain, provisioning an account for a mailbox at evil.example.
+    @Test
+    fun `an address with two at-signs is refused rather than read as its tail`() {
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py")),
+                profile(email = "mallory@evil.example@oriana.com.py", verified = true),
+            )
+        assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
+        assertEquals(0, users.findByTenantId(tenant.id, null, 100, 0).size)
+        assertEquals(0, socialAccounts.all().size)
+    }
+
+    @Test
+    fun `a refused two-at-sign address leaves no email domain on the diagnostics row`() {
+        service.provision(
+            tenant,
+            provider(jit = true, domains = listOf("oriana.com.py")),
+            profile(email = "mallory@evil.example@oriana.com.py", verified = true),
+        )
+        val event = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+        assertNull(
+            event.details["email_domain"],
+            "An ambiguous address must not have its tail recorded as the domain that was refused",
+        )
+    }
+
     @Test
     fun `an unverified email is refused even on an allowed domain`() {
         val outcome =
