@@ -2,6 +2,8 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuditEvent
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.Tenant
@@ -61,9 +63,12 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * User detail's IdP-managed indicator and the editable SCIM name parts. The indicator is rendered
- * from `externalId` alone, so its assertions are about what an operator reads before editing a
- * field a sync owns; the name-part assertions pin that `fullName` stays the display name.
+ * User detail's IdP-managed indicator and the editable SCIM name parts.
+ *
+ * The indicator has two origins behind it: a SCIM `externalId` on the user row, and a just-in-time
+ * provisioning event for an account the broker created — which carries no `externalId` at all. The
+ * assertions are about what an operator reads before editing a field they may not own; the
+ * name-part assertions pin that `fullName` stays the display name.
  */
 class AdminUserRoutesTest {
     private val tenantRepo = FakeTenantRepository()
@@ -127,6 +132,7 @@ class AdminUserRoutesTest {
         groupRepo.clear()
         apiKeyRepo.clear()
         auditLogPort.clear()
+        auditLogRepo.clear()
         tenantRepo.add(masterTenant)
         tenantRepo.add(workspace)
         userRepo.add(adminUser)
@@ -171,6 +177,94 @@ class AdminUserRoutesTest {
 
             assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_BADGE))
             assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN))
+        }
+
+    @Test
+    fun `a user provisioned on first sign-in shows the IdP-managed badge`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("grace")
+            recordJitProvisioning(user)
+
+            val body = authed.get("/admin/workspaces/acme/users/${user.id!!.value}").bodyAsText()
+
+            assertTrue(body.contains(EnglishStrings.SCIM_IDP_MANAGED_BADGE))
+            assertTrue(body.contains(EnglishStrings.IDP_MANAGED_BROKERED_ORIGIN))
+            // The provider link lives in social_accounts, so there is no externalId to show and no
+            // sync that would overwrite an edit made here.
+            assertFalse(body.contains(EnglishStrings.SCIM_IDP_EXTERNAL_ID_LABEL))
+            assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN))
+        }
+
+    @Test
+    fun `a provisioning event in another workspace does not badge this user`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("grace")
+            // Same user id, another tenant's event: the read has to be scoped, not just filtered by id.
+            recordJitProvisioning(user, tenantId = masterTenant.id)
+
+            val body = authed.get("/admin/workspaces/acme/users/${user.id!!.value}").bodyAsText()
+
+            assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_BADGE))
+        }
+
+    @Test
+    fun `another user's provisioning event does not badge this one`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val provisioned = addWorkspaceUser("grace")
+            val local = addWorkspaceUser("bob")
+            recordJitProvisioning(provisioned)
+
+            val body = authed.get("/admin/workspaces/acme/users/${local.id!!.value}").bodyAsText()
+
+            assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_BADGE))
+        }
+
+    @Test
+    fun `an unrelated event for the same user does not badge them`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("bob")
+            auditLogRepo.add(
+                AuditEvent(
+                    tenantId = workspace.id,
+                    userId = user.id,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_SUCCESS,
+                    ipAddress = null,
+                    userAgent = null,
+                ),
+            )
+
+            val body = authed.get("/admin/workspaces/acme/users/${user.id!!.value}").bodyAsText()
+
+            assertFalse(body.contains(EnglishStrings.SCIM_IDP_MANAGED_BADGE))
         }
 
     @Test
@@ -318,6 +412,23 @@ class AdminUserRoutesTest {
             assertTrue(body.contains("""name="familyName""""))
             assertTrue(body.contains(EnglishStrings.USER_NAME_PARTS_HINT))
         }
+
+    private fun recordJitProvisioning(
+        user: User,
+        tenantId: TenantId = workspace.id,
+    ) {
+        auditLogRepo.add(
+            AuditEvent(
+                tenantId = tenantId,
+                userId = user.id,
+                clientId = null,
+                eventType = AuditEventType.JIT_USER_PROVISIONED,
+                ipAddress = null,
+                userAgent = null,
+                details = mapOf("provider" to "okta"),
+            ),
+        )
+    }
 
     private fun addWorkspaceUser(
         username: String,

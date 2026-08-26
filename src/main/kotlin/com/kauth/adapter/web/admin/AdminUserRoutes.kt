@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
@@ -31,6 +32,21 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+
+/**
+ * Whether the broker created this account on a first sign-in.
+ *
+ * The provisioning event is the only durable record of it: a just-in-time user carries no
+ * `externalId`, and the `social_accounts` link it does have is one a locally registered user
+ * acquires too the first time it signs in through a provider.
+ */
+private fun AuditLogRepository?.recordedJitProvisioning(
+    tenantId: TenantId,
+    userId: UserId,
+): Boolean =
+    this
+        ?.findByTenant(tenantId, AuditEventType.JIT_USER_PROVISIONED, userId = userId, limit = 1)
+        ?.isNotEmpty() ?: false
 
 fun Route.adminUserRoutes(
     accountService: AdminAccountService,
@@ -218,6 +234,7 @@ fun Route.adminUserRoutes(
                     } ?: emptyList()
                 val passkeys =
                     webAuthnService?.listForUser(userId, ctx.workspace.id) ?: emptyList()
+                val brokeredOrigin = auditLogRepository.recordedJitProvisioning(ctx.workspace.id, userId)
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
@@ -235,6 +252,7 @@ fun Route.adminUserRoutes(
                         tempPasswordLink = tempPasswordLink,
                         recentImpersonations = recentImpersonations,
                         passkeys = passkeys,
+                        brokeredOrigin = brokeredOrigin,
                     ),
                 )
             }
@@ -388,6 +406,8 @@ fun Route.adminUserRoutes(
                                     editError = result.error.message,
                                     roles = userRoles,
                                     groups = userGroups,
+                                    brokeredOrigin =
+                                        auditLogRepository.recordedJitProvisioning(ctx.workspace.id, userId),
                                 ),
                             )
                         }

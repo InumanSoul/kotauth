@@ -51,6 +51,13 @@ internal fun userDetailPageImpl(
     recentImpersonations: List<ImpersonationRecord> = emptyList(),
     recentOtpActivity: List<OtpActivityRecord> = emptyList(),
     passkeys: List<WebAuthnCredential> = emptyList(),
+    /**
+     * True when the broker created this account on a first sign-in. It is not derivable from the
+     * user row: a just-in-time account carries no `externalId` — its provider link lives in
+     * `social_accounts`, which a locally registered account acquires too the first time it signs
+     * in through a provider. The provisioning event is the only record of which one created it.
+     */
+    brokeredOrigin: Boolean = false,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -107,8 +114,9 @@ internal fun userDetailPageImpl(
                                     +EnglishStrings.BADGE_INVITE_PENDING
                                 }
                             }
-                            if (user.externalId != null) {
-                                idpManagedBadge()
+                            when {
+                                user.externalId != null -> idpManagedBadge()
+                                brokeredOrigin -> idpManagedBadge(EnglishStrings.IDP_MANAGED_BROKERED_ORIGIN)
                             }
                         }
                     }

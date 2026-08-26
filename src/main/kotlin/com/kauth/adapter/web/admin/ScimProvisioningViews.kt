@@ -246,12 +246,13 @@ internal fun DIV.scimDialectSelector(selectedId: String) {
 /**
  * The badge that marks a record an identity provider owns.
  *
- * Rendered from `externalId` alone, which is all KotAuth stores — no provider name is available,
- * so none is claimed.
+ * No provider name is available for either origin KotAuth records — a SCIM `externalId` or a
+ * brokered first sign-in — so none is claimed. [reason] is the tooltip: the default is SCIM's,
+ * and a brokered account passes its own, because no sync runs over one.
  */
-internal fun FlowContent.idpManagedBadge() {
+internal fun FlowContent.idpManagedBadge(reason: String = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN) {
     span("badge badge--info") {
-        title = EnglishStrings.SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN
+        title = reason
         +EnglishStrings.SCIM_IDP_MANAGED_BADGE
     }
 }

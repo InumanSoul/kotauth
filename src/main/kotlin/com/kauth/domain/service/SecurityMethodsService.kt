@@ -88,6 +88,22 @@ class SecurityMethodsService(
                 )
         }
 
+        // One row for everything else. The count is what an operator needs from this page; the
+        // switches live where the providers are configured.
+        val brokered = allIdps.filter { it.provider !in ProviderKey.RESERVED }
+        if (brokered.isNotEmpty()) {
+            rows +=
+                AuthMethodRow(
+                    key = MethodKey.EXTERNAL_IDP,
+                    labelKey = "AUTH_METHOD_EXTERNAL_IDP_LABEL",
+                    descriptionKey = "AUTH_METHOD_EXTERNAL_IDP_DESC",
+                    enabled = brokered.any { it.enabled },
+                    requirements = emptyList(),
+                    toggleable = false,
+                    aggregateCount = brokered.size,
+                )
+        }
+
         return rows
     }
 

@@ -131,6 +131,51 @@ class SecurityMethodsServiceTest {
     }
 
     @Test
+    fun `list adds one aggregate row standing for every external identity provider`() {
+        val tenant = tenantOf()
+        tenantRepo.save(tenant)
+        idpRepo.seed(tenantId, provider = "okta")
+        idpRepo.seed(tenantId, provider = "entra-id")
+        idpRepo.seed(tenantId, provider = "auth0")
+
+        val rows = service.list(tenant)
+        val aggregate = rows.filter { it.key == MethodKey.EXTERNAL_IDP }
+
+        assertEquals(1, aggregate.size, "three providers, one row")
+        assertEquals(3, aggregate.single().aggregateCount)
+        assertTrue(aggregate.single().enabled)
+        // Nothing on this page switches a brokered provider on or off, so the POST must not see it.
+        assertFalse(aggregate.single().toggleable)
+    }
+
+    @Test
+    fun `the aggregate row reads as off when every external provider is disabled`() {
+        val tenant = tenantOf()
+        tenantRepo.save(tenant)
+        idpRepo.seed(tenantId, provider = "okta", enabled = false)
+        idpRepo.seed(tenantId, provider = "entra-id", enabled = false)
+
+        val row = service.list(tenant).first { it.key == MethodKey.EXTERNAL_IDP }
+
+        assertEquals(2, row.aggregateCount)
+        assertFalse(row.enabled)
+    }
+
+    @Test
+    fun `the compiled-in providers get their own rows and no aggregate row`() {
+        val tenant = tenantOf()
+        tenantRepo.save(tenant)
+        idpRepo.seed(tenantId, provider = "google", enabled = true)
+        idpRepo.seed(tenantId, provider = "github", enabled = true)
+
+        val keys = service.list(tenant).map { it.key }
+
+        assertContains(keys, MethodKey.SOCIAL_GOOGLE)
+        assertContains(keys, MethodKey.SOCIAL_GITHUB)
+        assertFalse(keys.contains(MethodKey.EXTERNAL_IDP))
+    }
+
+    @Test
     fun `updateSecurityMethods persists all method flags atomically on happy path`() {
         val tenant = tenantOf(smtpEnabled = true)
         tenantRepo.save(tenant)

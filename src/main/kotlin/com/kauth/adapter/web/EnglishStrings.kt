@@ -424,6 +424,19 @@ object EnglishStrings {
     const val AUTH_METHOD_SOCIAL_GOOGLE_LABEL = "Google"
     const val AUTH_METHOD_SOCIAL_GITHUB_LABEL = "GitHub"
 
+    /**
+     * The one aggregate row that stands for every brokered identity provider.
+     *
+     * A provider key is an open string, so there is no MethodKey to give each one a row of its
+     * own — and a grid that grew a row per provider would stop being the sign-in method grid.
+     */
+    const val AUTH_METHOD_EXTERNAL_IDP_LABEL = "External identity providers"
+    const val AUTH_METHOD_EXTERNAL_IDP_DESC =
+        "OIDC providers this workspace brokers sign-in through. Each one is switched on and off " +
+            "where it is configured."
+    const val AUTH_METHODS_EXTERNAL_IDP_MANAGE = "Manage identity providers"
+    const val AUTH_METHODS_EXTERNAL_IDP_NONE_ENABLED = "None enabled"
+
     // Auth Methods grid (v1.20.1)
     const val AUTH_METHODS_TABLE_HEADING = "Sign-in methods"
     const val REQUIREMENT_SMTP_REQUIRED = "SMTP required"
@@ -940,6 +953,17 @@ object EnglishStrings {
         "The identifier the identity provider uses for this record. It is how a sync finds the record again."
 
     /**
+     * The badge on a record created by the broker on a first sign-in.
+     *
+     * The SCIM warning cannot be reused verbatim: no sync ever runs over a brokered account, so
+     * "may be overwritten on its next sync" would send an operator looking for a sync that does
+     * not exist. Same badge, different reason for it.
+     */
+    const val IDP_MANAGED_BROKERED_ORIGIN =
+        "This account was created on a first sign-in through an identity provider. The person " +
+            "signs in there — they have no password here unless they set one."
+
+    /**
      * The SCIM name parts on the user create and edit forms.
      *
      * They are stored beside the display name, never derived from it: the SCIM mapper keeps
@@ -1067,6 +1091,9 @@ object EnglishStrings {
                     .filter { it.isNotBlank() }
                     .joinToString(" ") { part -> part.replaceFirstChar { c -> c.uppercaseChar() } }
         }
+
+    /** The aggregate row's count. Reads as a status, not a total, so the singular is worth having. */
+    fun externalIdpConfiguredCount(count: Int): String = if (count == 1) "1 configured" else "$count configured"
 
     /**
      * All `const val String` declarations in this object, keyed by their field name.
