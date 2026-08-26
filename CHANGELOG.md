@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operator chooses is the label on the sign-in button. Migration `V63` adds the
   columns.
 
+  Provider settings are held per provider key, so one workspace can run several
+  brokered providers side by side, each with its own credentials, endpoints and
+  label. No identity provider has been verified against a live tenant; the
+  implementation follows the specifications the providers publish.
+
   Every issuer URL, every endpoint inside a discovery document and every JWKS
   URI must be `https` (loopback excepted for local development), and a
   discovery document that declares an issuer other than the one requested is
@@ -28,17 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   algorithm against an allowlist before any key is fetched, then the signature,
   then `iss`, `aud`, `azp`, `exp`, `iat`, `nonce` and `sub` — which is what
   refuses `alg: none` and the HS256-with-the-public-key confusion before either
-  can reach a key. Signing keys are cached for ten minutes so a key the issuer
-  withdraws stops verifying, discovery failures are remembered briefly so an
-  unreachable issuer is not refetched once per request, and the social login
-  routes are throttled per IP like every neighbouring auth route.
-
-  The signed `state` a brokered login carries is bound to the browser that
-  began the flow through a short-lived `HttpOnly` cookie, and the callback
-  refuses any state it cannot match to one. Without that binding, a signed
-  state proves only that this server minted it: an attacker could mint one at
-  their leisure, authenticate at the provider as themselves, and hand the
-  victim a callback URL that signed the victim in as the attacker.
+  can reach a key. Discovery failures are remembered briefly so an unreachable
+  issuer is not refetched once per request, and the social login routes are
+  throttled per IP like every neighbouring auth route.
 
 - **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
   `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
@@ -116,6 +113,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   subgroups itself before deleting the parent.** Deleting a workspace still
   removes its whole group tree in one statement and is unaffected. See
   `docs/adr/ADR-18-group-delete-refuses-subgroups.md`.
+
+### Security
+
+- **A brokered login's `state` is bound to the browser that began the flow.**
+  The signed `state` proves only that this server minted it. A short-lived
+  `HttpOnly` cookie now carries the nonce the redirect signed into the state,
+  and the callback refuses any state it cannot match against that cookie.
+  Without the pairing an attacker could mint a state at their leisure,
+  authenticate at the provider as themselves, and hand the victim a callback
+  URL that signed the victim in as the attacker.
+- **The social-login pending and MFA challenge cookies are scoped to the
+  workspace that minted them.** Both carry the workspace in their signed
+  payload and both are now checked against the workspace in the URL, so a
+  cookie minted at one workspace cannot be replayed at another. Whoever
+  administers any workspace on an instance can point it at an identity
+  provider they control and have it assert an address they do not own;
+  without the check, replaying the resulting cookie at that address's
+  workspace handed over its owner's account. The cookies also carry the
+  workspace in their wire names and take the `__Host-` prefix over https, so
+  a sibling subdomain cannot overwrite them and two workspaces open in one
+  browser no longer clobber each other's in-flight sign-in.
+- **Cached identity-provider signing keys now expire.** JWKS responses are
+  held for ten minutes rather than for the life of the process, so a key an
+  issuer withdraws stops verifying ID tokens.
+- **Per-IP throttles and audit-log addresses follow the forwarded client
+  address.** With `KAUTH_TRUSTED_PROXY=true`, every rate limiter and every
+  audit event now records the client address rather than the reverse-proxy
+  connection, so a limiter is a per-client budget instead of a
+  deployment-wide one and an incident review sees more than a single IP. The
+  **last** `X-Forwarded-For` entry is taken, which is the address the trusted
+  proxy itself observed; the previous reading took the first, which a client
+  controls on any front-end that appends to the header rather than replacing
+  it. The bundled Caddy configuration replaces it, so that deployment is
+  unaffected. Only one trusted hop is supported — see
+  [production deployment](docs/deploy/production.md#one-trusted-hop-only).
 
 ### Fixed
 

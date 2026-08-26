@@ -54,8 +54,16 @@ cookie is:
   XSS in any single SaaS app cannot exfiltrate it.
 - **Signed via `EncryptionService.signCookie`** — same HMAC primitive
   we already use for `KOTAUTH_AUTH_CONTEXT`, `KOTAUTH_MFA_PENDING`,
-  `KOTAUTH_PORTAL_PKCE`, `KOTAUTH_SOCIAL_PENDING`. One signing key
+  `KOTAUTH_PORTAL_PKCE`, and the social-login cookies. One signing key
   (`KAUTH_SECRET_KEY`), one verification path, no new key surface.
+  The social cookies no longer go by bare names: over https they carry
+  the `__Host-` prefix, and each is suffixed with the tenant that minted
+  it — `__Host-KOTAUTH_SOCIAL_PENDING_{slug}`,
+  `__Host-KOTAUTH_SOCIAL_PENDING_BINDING_{slug}` and, per provider,
+  `__Host-KOTAUTH_SOCIAL_STATE_{provider}_{slug}`. `__Host-` forces
+  `Path=/`, so the name is what separates tenants there. Over plain
+  http the prefix is dropped (it requires `Secure`) and the tenant
+  suffix stays.
 - **Opaque pipe-delimited payload, version-prefixed** —
   `v1|userId|tenantId|authTime|mfaCompleted|expiresAt`. Not a JWT: it
   never leaves our origin, never gets sent to a relying party, never

@@ -1144,10 +1144,10 @@ class SocialLoginRoutesTest {
             val client = createClient { followRedirects = false }
 
             // `remoteHost` takes any X-Forwarded-For value, a hostname included; `remoteAddress`
-            // takes only an IP literal and otherwise keeps the socket address. This pins that
-            // difference, which is the only part of the remoteHost/remoteAddress choice a test can
-            // observe — the reverse-DNS lookup itself happens inside Netty's connection point and
-            // the test engine has none. See the report for why it is not pinned here.
+            // takes only an IP literal and otherwise keeps the socket address. That difference is
+            // the whole of what a test can observe here: the reverse-DNS lookup this route avoids
+            // lives in Netty's connection point, and the test engine has no connection point of
+            // its own to perform one, so its absence is not pinned by anything below.
             val first = client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "one.example") }
             val second = client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "two.example") }
 
