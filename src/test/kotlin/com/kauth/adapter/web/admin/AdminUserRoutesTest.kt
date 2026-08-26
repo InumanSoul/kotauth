@@ -425,7 +425,7 @@ class AdminUserRoutesTest {
                 eventType = AuditEventType.JIT_USER_PROVISIONED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("provider" to "okta"),
+                details = mapOf("provider" to "oriana"),
             ),
         )
     }

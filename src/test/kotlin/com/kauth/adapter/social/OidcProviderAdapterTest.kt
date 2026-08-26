@@ -35,7 +35,7 @@ class OidcProviderAdapterTest {
     private val poster = RecordingFormPoster()
 
     private val clientId = FakeOidcIssuer.DEFAULT_AUDIENCE
-    private val key = requireNotNull(ProviderKey.of("okta"))
+    private val key = requireNotNull(ProviderKey.of("oriana"))
 
     private val binding =
         OidcRequestBinding(
@@ -57,7 +57,7 @@ class OidcProviderAdapterTest {
     private fun authorizationUrl(overrides: OidcEndpointOverrides = OidcEndpointOverrides()) =
         adapter(overrides).buildAuthorizationUrl(
             clientId = clientId,
-            redirectUri = "https://kotauth.example/t/acme/auth/social/okta/callback",
+            redirectUri = "https://kotauth.example/t/acme/auth/social/oriana/callback",
             state = "signed-state",
             scopes = emptyList(),
             binding = binding,
@@ -75,7 +75,7 @@ class OidcProviderAdapterTest {
     private fun exchange(idToken: String?) =
         adapter().also { poster.respondWith(tokenResponseBody(idToken)) }.exchangeCodeForProfile(
             code = "authorization-code",
-            redirectUri = "https://kotauth.example/t/acme/auth/social/okta/callback",
+            redirectUri = "https://kotauth.example/t/acme/auth/social/oriana/callback",
             clientId = clientId,
             clientSecret = "client-secret",
             binding = binding,
@@ -155,7 +155,7 @@ class OidcProviderAdapterTest {
         val profile =
             exchange(
                 issuer.idToken(
-                    subject = "okta|999",
+                    subject = "oriana|999",
                     profile =
                         mapOf(
                             "email" to "ada@example.com",
@@ -166,7 +166,7 @@ class OidcProviderAdapterTest {
                 ),
             )
 
-        assertEquals("okta|999", profile.providerUserId)
+        assertEquals("oriana|999", profile.providerUserId)
         assertEquals("ada@example.com", profile.email)
         assertEquals("Ada Lovelace", profile.name)
         assertEquals(true, profile.emailVerified)
@@ -195,7 +195,7 @@ class OidcProviderAdapterTest {
             }
 
         assertTrue(
-            failure.message!!.contains("ID token from 'okta' was rejected"),
+            failure.message!!.contains("ID token from 'oriana' was rejected"),
             "Must fail on the ID token, not on the transport: got '${failure.message}'",
         )
     }
@@ -250,7 +250,7 @@ class OidcProviderAdapterTest {
 
         val failure = assertFailsWith<ProviderExchangeException> { authorizationUrl() }
 
-        assertTrue(failure.message!!.contains("endpoints for 'okta' could not be resolved"))
+        assertTrue(failure.message!!.contains("endpoints for 'oriana' could not be resolved"))
     }
 }
 

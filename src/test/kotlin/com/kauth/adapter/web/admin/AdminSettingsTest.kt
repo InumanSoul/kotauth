@@ -778,26 +778,26 @@ class AdminSettingsTest {
                 }
             login(authed)
 
-            // "okta" has no compiled-in adapter. Phase 1 refused it here; brokering is the point
+            // "oriana" has no compiled-in adapter. Phase 1 refused it here; brokering is the point
             // of Phase 2, so the key is now accepted and the row is written. The issuer is what
             // an unreserved key always needed to broker a login — before Task 5 the form wrote
             // the repository directly and would happily store a row the resolver then refused.
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                     formParameters =
                         Parameters.build {
-                            append("clientId", "okta-client-id")
-                            append("clientSecret", "okta-secret")
-                            append("issuer", "https://example.okta.com")
+                            append("clientId", "oriana-client-id")
+                            append("clientSecret", "oriana-secret")
+                            append("issuer", "https://example.oriana.com")
                             append("enabled", "true")
                         },
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("oriana")!!)
             assertEquals(
-                "okta-client-id",
+                "oriana-client-id",
                 stored?.clientId,
                 "An unreserved key must persist its own row, not be dropped by a provider guard",
             )
@@ -813,11 +813,11 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
+            idpRepo.seed(workspace.id, "oriana")
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta/delete",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana/delete",
                     formParameters = Parameters.build { },
                 )
 
@@ -871,24 +871,24 @@ class AdminSettingsTest {
                     url = "/admin/workspaces/acme/settings/identity-providers",
                     formParameters =
                         Parameters.build {
-                            append("providerKey", "okta")
+                            append("providerKey", "oriana")
                             append("kind", "oidc")
-                            append("clientId", "okta-client-id")
-                            append("clientSecret", "okta-secret")
-                            append("displayName", "Okta")
-                            append("issuer", "https://example.okta.com")
-                            append("jwksUri", "https://example.okta.com/keys")
+                            append("clientId", "oriana-client-id")
+                            append("clientSecret", "oriana-secret")
+                            append("displayName", "Oriana")
+                            append("issuer", "https://example.oriana.com")
+                            append("jwksUri", "https://example.oriana.com/keys")
                             append("scopes", "openid email")
                             append("enabled", "true")
                         },
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("oriana")!!)
             assertEquals(ProviderKind.OIDC, stored?.kind)
-            assertEquals("https://example.okta.com", stored?.issuer)
-            assertEquals("https://example.okta.com/keys", stored?.jwksUri)
-            assertEquals("Okta", stored?.displayName)
+            assertEquals("https://example.oriana.com", stored?.issuer)
+            assertEquals("https://example.oriana.com/keys", stored?.jwksUri)
+            assertEquals("Oriana", stored?.displayName)
             assertEquals("openid email", stored?.scopes)
         }
 
@@ -907,11 +907,11 @@ class AdminSettingsTest {
             // writes through it rather than reaching for the repository.
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                     formParameters =
                         Parameters.build {
-                            append("clientId", "okta-client-id")
-                            append("clientSecret", "okta-secret")
+                            append("clientId", "oriana-client-id")
+                            append("clientSecret", "oriana-secret")
                             append("enabled", "true")
                         },
                 )
@@ -956,18 +956,18 @@ class AdminSettingsTest {
             idpRepo.add(
                 IdentityProvider(
                     tenantId = workspace.id,
-                    provider = ProviderKey.of("okta")!!,
-                    clientId = "okta-client-id",
-                    clientSecret = "s3cr3t-okta-client-secret",
+                    provider = ProviderKey.of("oriana")!!,
+                    clientId = "oriana-client-id",
+                    clientSecret = "s3cr3t-oriana-client-secret",
                     kind = ProviderKind.OIDC,
-                    issuer = "https://example.okta.com",
+                    issuer = "https://example.oriana.com",
                 ),
             )
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
-            assertFalse("s3cr3t-okta-client-secret" in body, "The admin page must never render a stored secret")
-            assertContains(body, "okta-client-id")
+            assertFalse("s3cr3t-oriana-client-secret" in body, "The admin page must never render a stored secret")
+            assertContains(body, "oriana-client-id")
         }
 
     // =========================================================================
@@ -1082,8 +1082,8 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
-            recordFailure(workspace.id, "okta", "domain_not_allowed", emailDomain = "contractor.example")
+            idpRepo.seed(workspace.id, "oriana")
+            recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "contractor.example")
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1099,8 +1099,8 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
-            recordFailure(workspace.id, "okta", "idp_returned_error", idpErrorCode = "redirect_uri_mismatch")
+            idpRepo.seed(workspace.id, "oriana")
+            recordFailure(workspace.id, "oriana", "idp_returned_error", idpErrorCode = "redirect_uri_mismatch")
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1115,16 +1115,20 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
+            idpRepo.seed(workspace.id, "oriana")
             idpRepo.seed(workspace.id, "google")
-            recordFailure(workspace.id, "okta", "domain_not_allowed", emailDomain = "okta-side.example")
+            recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "oriana-side.example")
             recordFailure(workspace.id, "google", "domain_not_allowed", emailDomain = "google-side.example")
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
             // Once each. A panel that renders every failure under every provider would show both
             // domains twice, and would still pass an assertion that each is merely present.
-            assertEquals(1, Regex("okta-side\\.example").findAll(body).count(), "okta's failure belongs to okta only")
+            assertEquals(
+                1,
+                Regex("oriana-side\\.example").findAll(body).count(),
+                "oriana's failure belongs to oriana only",
+            )
             assertEquals(
                 1,
                 Regex("google-side\\.example").findAll(body).count(),
@@ -1138,8 +1142,8 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
-            recordFailure(masterTenant.id, "okta", "domain_not_allowed", emailDomain = "other-workspace.example")
+            idpRepo.seed(workspace.id, "oriana")
+            recordFailure(masterTenant.id, "oriana", "domain_not_allowed", emailDomain = "other-workspace.example")
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1155,7 +1159,7 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(workspace.id, "okta")
+            idpRepo.seed(workspace.id, "oriana")
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1168,15 +1172,15 @@ class AdminSettingsTest {
     /** The one issuer the fake discovery port answers for. Its endpoints are derived from it. */
     private val probeIssuer get() = fakeIssuer.issuer
 
-    private fun seedOkta(
+    private fun seedOriana(
         jitEnabled: Boolean = false,
         jitAllowedDomains: List<String> = emptyList(),
-        clientSecret: String = "okta-stored-secret",
+        clientSecret: String = "oriana-stored-secret",
     ) = idpRepo.add(
         IdentityProvider(
             tenantId = workspace.id,
-            provider = ProviderKey.of("okta")!!,
-            clientId = "okta-client-id",
+            provider = ProviderKey.of("oriana")!!,
+            clientId = "oriana-client-id",
             clientSecret = clientSecret,
             kind = ProviderKind.OIDC,
             issuer = probeIssuer,
@@ -1185,7 +1189,7 @@ class AdminSettingsTest {
         ),
     )
 
-    private fun storedOkta() = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+    private fun storedOriana() = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("oriana")!!)
 
     @Test
     fun `test discovery reports the endpoints the issuer publishes`() =
@@ -1193,11 +1197,11 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta()
+            seedOriana()
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                     formParameters = Parameters.build { },
                 )
             val body = response.bodyAsText()
@@ -1214,12 +1218,12 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta()
+            seedOriana()
 
             val body =
                 authed
                     .submitForm(
-                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                         formParameters = Parameters.build { },
                     ).bodyAsText()
 
@@ -1235,18 +1239,18 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            val before = seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            val before = seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                     formParameters = Parameters.build { },
                 )
 
             // Status and row together: a 404 would also leave the row alone, so the equality
             // assertion only means something once the route is known to have run.
             assertEquals(HttpStatusCode.OK, response.status)
-            assertEquals(before, storedOkta(), "A discovery test is a read — it must write nothing")
+            assertEquals(before, storedOriana(), "A discovery test is a read — it must write nothing")
             assertEquals(1, idpRepo.findAllByTenant(workspace.id).size)
         }
 
@@ -1256,12 +1260,12 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta()
+            seedOriana()
 
             val body =
                 authed
                     .submitForm(
-                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                         formParameters = Parameters.build { },
                     ).bodyAsText()
 
@@ -1270,7 +1274,7 @@ class AdminSettingsTest {
             // operator must register for that half to hold.
             assertContains(body, EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_TITLE)
             assertContains(body, EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_REDIRECT)
-            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/okta/callback")
+            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/oriana/callback")
         }
 
     @Test
@@ -1279,16 +1283,16 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta(clientSecret = "s3cr3t-okta-probe-secret")
+            seedOriana(clientSecret = "s3cr3t-oriana-probe-secret")
 
             val body =
                 authed
                     .submitForm(
-                        url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                        url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                         formParameters = Parameters.build { },
                     ).bodyAsText()
 
-            assertFalse("s3cr3t-okta-probe-secret" in body, "A discovery test must not echo a secret back")
+            assertFalse("s3cr3t-oriana-probe-secret" in body, "A discovery test must not echo a secret back")
         }
 
     @Test
@@ -1300,9 +1304,9 @@ class AdminSettingsTest {
             idpRepo.add(
                 IdentityProvider(
                     tenantId = workspace.id,
-                    provider = ProviderKey.of("okta")!!,
-                    clientId = "okta-client-id",
-                    clientSecret = "okta-stored-secret",
+                    provider = ProviderKey.of("oriana")!!,
+                    clientId = "oriana-client-id",
+                    clientSecret = "oriana-stored-secret",
                     kind = ProviderKind.OIDC,
                     issuer = "https://unreachable.example",
                 ),
@@ -1310,7 +1314,7 @@ class AdminSettingsTest {
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta/test-discovery",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana/test-discovery",
                     formParameters = Parameters.build { },
                 )
             val body = response.bodyAsText()
@@ -1330,13 +1334,13 @@ class AdminSettingsTest {
             // issuerUrl says something else must not change what the operator is told to register,
             // or setup is broken by the page that was meant to guide it.
             tenantRepo.update(workspace.copy(issuerUrl = "https://issuer.acme.example"))
-            seedOkta()
+            seedOriana()
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
-            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/okta/callback")
+            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/oriana/callback")
             assertFalse(
-                "https://issuer.acme.example/t/acme/auth/social/okta/callback" in body,
+                "https://issuer.acme.example/t/acme/auth/social/oriana/callback" in body,
                 "The callback URL must come from the base URL the login flow uses, not from issuerUrl",
             )
         }
@@ -1347,7 +1351,7 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta(jitEnabled = true, jitAllowedDomains = emptyList())
+            seedOriana(jitEnabled = true, jitAllowedDomains = emptyList())
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1362,7 +1366,7 @@ class AdminSettingsTest {
             application { installTestAppWithIdpRepo() }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "acme.test"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "acme.test"))
 
             val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
 
@@ -1397,14 +1401,14 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            seedOkta()
+            seedOriana()
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                     formParameters =
                         Parameters.build {
-                            append("clientId", "okta-client-id")
+                            append("clientId", "oriana-client-id")
                             append("issuer", probeIssuer)
                             append("kind", "oidc")
                             append("enabled", "true")
@@ -1413,7 +1417,7 @@ class AdminSettingsTest {
                 )
 
             assertEquals(HttpStatusCode.Found, response.status)
-            assertTrue(storedOkta()?.jitEnabled == true, "The toggle must reach the stored row")
+            assertTrue(storedOriana()?.jitEnabled == true, "The toggle must reach the stored row")
         }
 
     @Test
@@ -1426,14 +1430,14 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            seedOkta(jitEnabled = true)
+            seedOriana(jitEnabled = true)
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                     formParameters =
                         Parameters.build {
-                            append("clientId", "okta-client-id")
+                            append("clientId", "oriana-client-id")
                             append("issuer", probeIssuer)
                             append("kind", "oidc")
                             append("enabled", "true")
@@ -1446,7 +1450,7 @@ class AdminSettingsTest {
             // The service already trims, lower-cases and de-duplicates. What the operator typed and
             // what the chip shows back have to be the same string, so the form must not normalise
             // differently — or not at all.
-            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+            assertEquals(listOf("acme.example"), storedOriana()?.jitAllowedDomains)
         }
 
     @Test
@@ -1459,13 +1463,13 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             authed.submitForm(
-                url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                 formParameters =
                     Parameters.build {
-                        append("clientId", "okta-client-id")
+                        append("clientId", "oriana-client-id")
                         append("issuer", probeIssuer)
                         append("kind", "oidc")
                         append("enabled", "true")
@@ -1475,7 +1479,7 @@ class AdminSettingsTest {
                     },
             )
 
-            assertEquals(listOf("acme.example", "acme.test"), storedOkta()?.jitAllowedDomains)
+            assertEquals(listOf("acme.example", "acme.test"), storedOriana()?.jitAllowedDomains)
         }
 
     @Test
@@ -1488,13 +1492,13 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "contractor.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "contractor.example"))
 
             authed.submitForm(
-                url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                 formParameters =
                     Parameters.build {
-                        append("clientId", "okta-client-id")
+                        append("clientId", "oriana-client-id")
                         append("issuer", probeIssuer)
                         append("kind", "oidc")
                         append("enabled", "true")
@@ -1505,7 +1509,7 @@ class AdminSettingsTest {
 
             // An unticked chip is a removal. Preserving what the row already had would make the
             // control unable to express the one state that matters most — the empty list.
-            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+            assertEquals(listOf("acme.example"), storedOriana()?.jitAllowedDomains)
         }
 
     @Test
@@ -1518,14 +1522,14 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val response =
                 authed.submitForm(
-                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    url = "/admin/workspaces/acme/settings/identity-providers/oriana",
                     formParameters =
                         Parameters.build {
-                            append("clientId", "okta-client-id")
+                            append("clientId", "oriana-client-id")
                             append("issuer", probeIssuer)
                             append("kind", "oidc")
                             append("enabled", "true")
@@ -1536,7 +1540,7 @@ class AdminSettingsTest {
 
             assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
             assertContains(response.bodyAsText(), "someone@acme.example")
-            assertEquals(listOf("acme.example"), storedOkta()?.jitAllowedDomains)
+            assertEquals(listOf("acme.example"), storedOriana()?.jitAllowedDomains)
         }
 
     private companion object {

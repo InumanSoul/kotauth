@@ -295,8 +295,8 @@ class AuthMethodsGridTest {
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(ws.id, provider = "okta")
-            idpRepo.seed(ws.id, provider = "entra-id")
+            idpRepo.seed(ws.id, provider = "oriana")
+            idpRepo.seed(ws.id, provider = "workforce-id")
 
             val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
@@ -353,7 +353,7 @@ class AuthMethodsGridTest {
             application { installTestApp(ws) }
             val authed = createClient { install(HttpCookies) }
             login(authed)
-            idpRepo.seed(ws.id, provider = "okta", enabled = false)
+            idpRepo.seed(ws.id, provider = "oriana", enabled = false)
 
             val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 

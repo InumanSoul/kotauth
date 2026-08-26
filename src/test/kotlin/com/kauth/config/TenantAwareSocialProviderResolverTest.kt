@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
 class TenantAwareSocialProviderResolverTest {
     private val acme = TenantId(1)
     private val other = TenantId(2)
-    private val okta = requireNotNull(ProviderKey.of("okta"))
+    private val oriana = requireNotNull(ProviderKey.of("oriana"))
 
     private val issuer = FakeOidcIssuer()
     private val idpRepo = FakeIdentityProviderRepository()
@@ -51,9 +51,9 @@ class TenantAwareSocialProviderResolverTest {
         scopes: String = "openid email",
     ) = IdentityProvider(
         tenantId = tenantId,
-        provider = okta,
-        clientId = "okta-client",
-        clientSecret = "okta-secret",
+        provider = oriana,
+        clientId = "oriana-client",
+        clientSecret = "oriana-secret",
         kind = ProviderKind.OIDC,
         issuer = issuerUrl,
         authorizationEndpoint = authorizationEndpoint,
@@ -62,7 +62,7 @@ class TenantAwareSocialProviderResolverTest {
 
     private fun authorizationUrlFrom(port: com.kauth.domain.port.SocialProviderPort) =
         port.buildAuthorizationUrl(
-            clientId = "okta-client",
+            clientId = "oriana-client",
             redirectUri = "https://kotauth.example/cb",
             state = "state",
             scopes = emptyList(),
@@ -80,21 +80,21 @@ class TenantAwareSocialProviderResolverTest {
     fun `an unreserved key with an OIDC row resolves to an adapter for that key`() {
         idpRepo.add(oidcRow())
 
-        val resolved = assertIs<OidcProviderAdapter>(resolver.resolve(acme, okta))
+        val resolved = assertIs<OidcProviderAdapter>(resolver.resolve(acme, oriana))
 
-        assertEquals(okta, resolved.provider)
+        assertEquals(oriana, resolved.provider)
     }
 
     @Test
     fun `an unreserved key with no row resolves to nothing`() {
-        assertNull(resolver.resolve(acme, okta))
+        assertNull(resolver.resolve(acme, oriana))
     }
 
     @Test
     fun `a row belonging to another tenant does not resolve`() {
         idpRepo.add(oidcRow(tenantId = other))
 
-        assertNull(resolver.resolve(acme, okta), "A provider row must never cross a tenant boundary")
+        assertNull(resolver.resolve(acme, oriana), "A provider row must never cross a tenant boundary")
     }
 
     @Test
@@ -102,21 +102,21 @@ class TenantAwareSocialProviderResolverTest {
         // No compiled-in adapter and no issuer to discover: nothing could serve this row.
         idpRepo.add(oidcRow().copy(kind = ProviderKind.OAUTH2))
 
-        assertNull(resolver.resolve(acme, okta))
+        assertNull(resolver.resolve(acme, oriana))
     }
 
     @Test
     fun `an OIDC row with no issuer resolves to nothing`() {
         idpRepo.add(oidcRow(issuerUrl = null))
 
-        assertNull(resolver.resolve(acme, okta))
+        assertNull(resolver.resolve(acme, oriana))
     }
 
     @Test
     fun `the adapter is built from the row - its issuer, its scopes and its pinned endpoints`() {
         idpRepo.add(oidcRow(authorizationEndpoint = "https://pinned.example/authorize", scopes = "openid email"))
 
-        val url = authorizationUrlFrom(resolver.resolve(acme, okta)!!)
+        val url = authorizationUrlFrom(resolver.resolve(acme, oriana)!!)
 
         assertEquals(listOf(issuer.issuer), discovery.discovered, "The row's issuer is the one resolved")
         assertTrue(url.startsWith("https://pinned.example/authorize?"), "The row's pinned endpoint must win")

@@ -113,20 +113,20 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
-                    setBody(oktaBody())
+                    setBody(orianaBody())
                 }
 
             assertEquals(HttpStatusCode.Created, response.status)
             val body = response.bodyAsText()
             assertFalse(SECRET in body, "The create response must not carry the client secret: $body")
-            assertTrue("\"key\":\"okta\"" in body)
+            assertTrue("\"key\":\"oriana\"" in body)
             assertTrue("\"kind\":\"oidc\"" in body)
 
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
-            assertEquals("okta-client", stored?.clientId)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
+            assertEquals("oriana-client", stored?.clientId)
             assertEquals(SECRET, stored?.clientSecret, "The secret must still reach the row it was sent for")
             assertEquals(ProviderKind.OIDC, stored?.kind)
         }
@@ -135,23 +135,23 @@ class ApiIdentityProviderRoutesTest {
     fun `PUT over an existing provider returns 200 and keeps the stored secret when it is omitted`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody(
                         """
-                        {"clientId":"okta-client-2","issuer":"https://example.okta.com","enabled":false}
+                        {"clientId":"oriana-client-2","issuer":"https://example.oriana.com","enabled":false}
                         """.trimIndent(),
                     )
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
             assertFalse(SECRET in response.bodyAsText())
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
-            assertEquals("okta-client-2", stored?.clientId)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
+            assertEquals("oriana-client-2", stored?.clientId)
             assertEquals(false, stored?.enabled)
             assertEquals(SECRET, stored?.clientSecret, "An omitted secret must keep the stored one, not blank it")
         }
@@ -162,10 +162,10 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
-                    setBody("""{"clientId":"okta-client","clientSecret":"$SECRET"}""")
+                    setBody("""{"clientId":"oriana-client","clientSecret":"$SECRET"}""")
                 }
 
             assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
@@ -179,11 +179,11 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody(
-                        """{"clientId":"c","clientSecret":"$SECRET","issuer":"http://example.okta.com"}""",
+                        """{"clientId":"c","clientSecret":"$SECRET","issuer":"http://example.oriana.com"}""",
                     )
                 }
 
@@ -217,10 +217,10 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/Okta%20Inc") {
+                client.put("/t/acme/api/v1/identity-providers/Oriana%20Inc") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
-                    setBody(oktaBody())
+                    setBody(orianaBody())
                 }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -233,7 +233,7 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody("""{"clientId":"c","clientSecret":"$SECRET","kind":"saml"}""")
@@ -251,28 +251,28 @@ class ApiIdentityProviderRoutesTest {
     fun `GET of one provider never carries the client secret`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
-            val response = client.get("/t/acme/api/v1/identity-providers/okta") { bearerAuth(readKey) }
+            val response = client.get("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(readKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertFalse(SECRET in body, "A single-provider read must not carry the secret: $body")
-            assertTrue("\"clientId\":\"okta-client\"" in body, "…but must still carry the rest of the row: $body")
+            assertTrue("\"clientId\":\"oriana-client\"" in body, "…but must still carry the rest of the row: $body")
         }
 
     @Test
     fun `GET of the list never carries the client secret`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
             val response = client.get("/t/acme/api/v1/identity-providers") { bearerAuth(readKey) }
 
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertFalse(SECRET in body, "A list read must not carry the secret: $body")
-            assertTrue("\"key\":\"okta\"" in body)
+            assertTrue("\"key\":\"oriana\"" in body)
         }
 
     @Test
@@ -314,22 +314,22 @@ class ApiIdentityProviderRoutesTest {
     fun `PUT sets just-in-time provisioning and its allowed domains`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody(
                         """
-                        {"clientId":"okta-client","issuer":"https://example.okta.com",
+                        {"clientId":"oriana-client","issuer":"https://example.oriana.com",
                          "jitEnabled":true,"jitAllowedDomains":["  Acme.COM  ","acme.com","partner.example"]}
                         """.trimIndent(),
                     )
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
             assertEquals(true, stored?.jitEnabled)
             // Trimmed, lower-cased and de-duplicated by IdentityProviderService, exactly as the
             // admin form's chips are. A second normaliser on this surface is a second set of rules
@@ -341,11 +341,11 @@ class ApiIdentityProviderRoutesTest {
     fun `a provider read carries its just-in-time settings`() =
         testApplication {
             application { installTestApp() }
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val body =
                 client
-                    .get("/t/acme/api/v1/identity-providers/okta") {
+                    .get("/t/acme/api/v1/identity-providers/oriana") {
                         bearerAuth(readKey)
                     }.bodyAsText()
 
@@ -358,18 +358,18 @@ class ApiIdentityProviderRoutesTest {
     fun `PUT that omits the just-in-time fields leaves them as they were`() =
         testApplication {
             application { installTestApp() }
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
-                    setBody("""{"clientId":"okta-client-2","issuer":"https://example.okta.com"}""")
+                    setBody("""{"clientId":"oriana-client-2","issuer":"https://example.oriana.com"}""")
                 }
 
             assertEquals(HttpStatusCode.OK, response.status)
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
-            assertEquals("okta-client-2", stored?.clientId, "The update the caller did ask for must land")
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
+            assertEquals("oriana-client-2", stored?.clientId, "The update the caller did ask for must land")
             // Absent is not empty. Conflating them turns renaming a client into "auto-creation is
             // now off for everyone", which no caller asked for and no response would announce.
             assertEquals(true, stored?.jitEnabled)
@@ -380,15 +380,15 @@ class ApiIdentityProviderRoutesTest {
     fun `PUT with an empty allowed-domain list clears it`() =
         testApplication {
             application { installTestApp() }
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody(
                         """
-                        {"clientId":"okta-client","issuer":"https://example.okta.com","jitAllowedDomains":[]}
+                        {"clientId":"oriana-client","issuer":"https://example.oriana.com","jitAllowedDomains":[]}
                         """.trimIndent(),
                     )
                 }
@@ -396,7 +396,7 @@ class ApiIdentityProviderRoutesTest {
             assertEquals(HttpStatusCode.OK, response.status)
             // The other half of the same distinction: an explicit empty list is how a caller says
             // "stop creating accounts automatically", and it has to stay expressible.
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
             assertEquals(emptyList(), stored?.jitAllowedDomains)
         }
 
@@ -404,15 +404,15 @@ class ApiIdentityProviderRoutesTest {
     fun `PUT with a domain that is not a domain is rejected and stores nothing`() =
         testApplication {
             application { installTestApp() }
-            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+            seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(writeKey)
                     contentType(ContentType.Application.Json)
                     setBody(
                         """
-                        {"clientId":"okta-client","issuer":"https://example.okta.com",
+                        {"clientId":"oriana-client","issuer":"https://example.oriana.com",
                          "jitAllowedDomains":["someone@acme.example"]}
                         """.trimIndent(),
                     )
@@ -420,7 +420,7 @@ class ApiIdentityProviderRoutesTest {
 
             assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
             assertTrue("someone@acme.example" in response.bodyAsText(), "The rejection must name the cause")
-            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!)
             assertEquals(listOf("acme.example"), stored?.jitAllowedDomains, "A rejected write must change nothing")
         }
 
@@ -435,15 +435,15 @@ class ApiIdentityProviderRoutesTest {
             idpRepo.add(
                 IdentityProvider(
                     tenantId = TenantId(2),
-                    provider = ProviderKey.of("okta")!!,
+                    provider = ProviderKey.of("oriana")!!,
                     clientId = "other-client",
                     clientSecret = SECRET,
                     kind = ProviderKind.OIDC,
-                    issuer = "https://other.okta.com",
+                    issuer = "https://other.oriana.com",
                 ),
             )
 
-            val response = client.get("/t/acme/api/v1/identity-providers/okta") { bearerAuth(readKey) }
+            val response = client.get("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(readKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
             assertFalse(SECRET in response.bodyAsText())
@@ -453,11 +453,11 @@ class ApiIdentityProviderRoutesTest {
     fun `the list only carries this workspace's providers`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
             idpRepo.add(
                 IdentityProvider(
                     tenantId = TenantId(2),
-                    provider = ProviderKey.of("entra")!!,
+                    provider = ProviderKey.of("workforce")!!,
                     clientId = "other-client",
                     clientSecret = SECRET,
                     kind = ProviderKind.OIDC,
@@ -467,8 +467,8 @@ class ApiIdentityProviderRoutesTest {
 
             val body = client.get("/t/acme/api/v1/identity-providers") { bearerAuth(readKey) }.bodyAsText()
 
-            assertTrue("\"key\":\"okta\"" in body)
-            assertFalse("entra" in body, "A workspace must not see another workspace's providers: $body")
+            assertTrue("\"key\":\"oriana\"" in body)
+            assertFalse("workforce" in body, "A workspace must not see another workspace's providers: $body")
         }
 
     @Test
@@ -478,15 +478,15 @@ class ApiIdentityProviderRoutesTest {
             idpRepo.add(
                 IdentityProvider(
                     tenantId = TenantId(2),
-                    provider = ProviderKey.of("okta")!!,
+                    provider = ProviderKey.of("oriana")!!,
                     clientId = "other-client",
                     clientSecret = SECRET,
                     kind = ProviderKind.OIDC,
-                    issuer = "https://other.okta.com",
+                    issuer = "https://other.oriana.com",
                 ),
             )
 
-            val response = client.delete("/t/acme/api/v1/identity-providers/okta") { bearerAuth(writeKey) }
+            val response = client.delete("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(writeKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
             assertEquals(1, idpRepo.findAllByTenant(TenantId(2)).size, "The other workspace's row must survive")
@@ -511,10 +511,10 @@ class ApiIdentityProviderRoutesTest {
     fun `GET one provider returns 403 when the read scope is missing`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
             val noScopeKey = createKey("No Scope", ApiScope.USERS_READ)
 
-            val response = client.get("/t/acme/api/v1/identity-providers/okta") { bearerAuth(noScopeKey) }
+            val response = client.get("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(noScopeKey) }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
             assertFalse(SECRET in response.bodyAsText())
@@ -526,10 +526,10 @@ class ApiIdentityProviderRoutesTest {
             application { installTestApp() }
 
             val response =
-                client.put("/t/acme/api/v1/identity-providers/okta") {
+                client.put("/t/acme/api/v1/identity-providers/oriana") {
                     bearerAuth(readKey)
                     contentType(ContentType.Application.Json)
-                    setBody(oktaBody())
+                    setBody(orianaBody())
                 }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
@@ -540,9 +540,9 @@ class ApiIdentityProviderRoutesTest {
     fun `DELETE returns 403 when only the read scope is held`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
-            val response = client.delete("/t/acme/api/v1/identity-providers/okta") { bearerAuth(readKey) }
+            val response = client.delete("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(readKey) }
 
             assertEquals(HttpStatusCode.Forbidden, response.status)
             assertEquals(1, idpRepo.findAllByTenant(TenantId(1)).size)
@@ -556,12 +556,12 @@ class ApiIdentityProviderRoutesTest {
     fun `DELETE removes the provider and returns 204`() =
         testApplication {
             application { installTestApp() }
-            seedOkta()
+            seedOriana()
 
-            val response = client.delete("/t/acme/api/v1/identity-providers/okta") { bearerAuth(writeKey) }
+            val response = client.delete("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(writeKey) }
 
             assertEquals(HttpStatusCode.NoContent, response.status)
-            assertNull(idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!))
+            assertNull(idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("oriana")!!))
         }
 
     @Test
@@ -569,7 +569,7 @@ class ApiIdentityProviderRoutesTest {
         testApplication {
             application { installTestApp() }
 
-            val response = client.delete("/t/acme/api/v1/identity-providers/okta") { bearerAuth(writeKey) }
+            val response = client.delete("/t/acme/api/v1/identity-providers/oriana") { bearerAuth(writeKey) }
 
             assertEquals(HttpStatusCode.NotFound, response.status)
         }
@@ -590,26 +590,26 @@ class ApiIdentityProviderRoutesTest {
             ) as ApiKeyResult.Success
         ).value.rawKey
 
-    private fun seedOkta(
+    private fun seedOriana(
         jitEnabled: Boolean = false,
         jitAllowedDomains: List<String> = emptyList(),
     ) {
         idpRepo.add(
             IdentityProvider(
                 tenantId = TenantId(1),
-                provider = ProviderKey.of("okta")!!,
-                clientId = "okta-client",
+                provider = ProviderKey.of("oriana")!!,
+                clientId = "oriana-client",
                 clientSecret = SECRET,
                 kind = ProviderKind.OIDC,
-                issuer = "https://example.okta.com",
+                issuer = "https://example.oriana.com",
                 jitEnabled = jitEnabled,
                 jitAllowedDomains = jitAllowedDomains,
             ),
         )
     }
 
-    private fun oktaBody() =
-        """{"clientId":"okta-client","clientSecret":"$SECRET","issuer":"https://example.okta.com"}"""
+    private fun orianaBody() =
+        """{"clientId":"oriana-client","clientSecret":"$SECRET","issuer":"https://example.oriana.com"}"""
 
     private fun buildFakeSelfService() =
         com.kauth.domain.service.CredentialFlowService(
@@ -715,6 +715,6 @@ class ApiIdentityProviderRoutesTest {
 
     private companion object {
         /** Distinctive enough that finding it anywhere in a response body is unambiguous. */
-        const val SECRET = "s3cr3t-okta-client-secret"
+        const val SECRET = "s3cr3t-oriana-client-secret"
     }
 }

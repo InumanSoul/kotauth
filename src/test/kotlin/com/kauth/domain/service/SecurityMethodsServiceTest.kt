@@ -134,8 +134,8 @@ class SecurityMethodsServiceTest {
     fun `list adds one aggregate row standing for every external identity provider`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
-        idpRepo.seed(tenantId, provider = "okta")
-        idpRepo.seed(tenantId, provider = "entra-id")
+        idpRepo.seed(tenantId, provider = "oriana")
+        idpRepo.seed(tenantId, provider = "workforce-id")
         idpRepo.seed(tenantId, provider = "auth0")
 
         val rows = service.list(tenant)
@@ -152,8 +152,8 @@ class SecurityMethodsServiceTest {
     fun `the aggregate row reads as off when every external provider is disabled`() {
         val tenant = tenantOf()
         tenantRepo.save(tenant)
-        idpRepo.seed(tenantId, provider = "okta", enabled = false)
-        idpRepo.seed(tenantId, provider = "entra-id", enabled = false)
+        idpRepo.seed(tenantId, provider = "oriana", enabled = false)
+        idpRepo.seed(tenantId, provider = "workforce-id", enabled = false)
 
         val row = service.list(tenant).first { it.key == MethodKey.EXTERNAL_IDP }
 

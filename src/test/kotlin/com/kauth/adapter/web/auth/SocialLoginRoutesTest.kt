@@ -93,8 +93,8 @@ class SocialLoginRoutesTest {
     private val credentialFlowService = mockk<CredentialFlowService>(relaxed = true)
 
     private val googleAdapter = FakeSocialProviderPort(ProviderKey.GOOGLE)
-    private val oktaKey = requireNotNull(ProviderKey.of("okta"))
-    private val oktaAdapter = FakeSocialProviderPort(oktaKey)
+    private val orianaKey = requireNotNull(ProviderKey.of("oriana"))
+    private val orianaAdapter = FakeSocialProviderPort(orianaKey)
 
     private val encryptionService = EncryptionService("test-secret-key")
 
@@ -141,7 +141,7 @@ class SocialLoginRoutesTest {
             auditLog = auditLog,
             providerResolver =
                 StaticSocialProviderResolver(
-                    mapOf(ProviderKey.GOOGLE to googleAdapter, oktaKey to oktaAdapter),
+                    mapOf(ProviderKey.GOOGLE to googleAdapter, orianaKey to orianaAdapter),
                 ),
             jitProvisioning =
                 JitProvisioningService(
@@ -226,13 +226,13 @@ class SocialLoginRoutesTest {
         auditLog.clear()
         tokenPort.reset()
         googleAdapter.clear()
-        oktaAdapter.clear()
+        orianaAdapter.clear()
         tenantRepo.add(tenant)
         idpRepo.seed(TenantId(1), "google")
         // The provider exchange fails, so a state that passes the guard still ends on
         // the login page — that is what separates "rejected by the guard" from "let through".
         googleAdapter.shouldFail = true
-        oktaAdapter.shouldFail = true
+        orianaAdapter.shouldFail = true
     }
 
     private fun statePayload(
@@ -347,12 +347,12 @@ class SocialLoginRoutesTest {
     fun `a redirect for an unreserved key with a configured provider row reaches the adapter`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
-            // "okta" has no compiled-in adapter, which is exactly what Phase 1's RESERVED guard
+            // "oriana" has no compiled-in adapter, which is exactly what Phase 1's RESERVED guard
             // refused. With a configured row it now resolves and the browser leaves for the IdP.
-            val response = createClient { followRedirects = false }.get("/t/acme/auth/social/okta/redirect")
+            val response = createClient { followRedirects = false }.get("/t/acme/auth/social/oriana/redirect")
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(
@@ -369,7 +369,7 @@ class SocialLoginRoutesTest {
 
             // Same key, no row. The refusal must name the missing configuration: dropping the
             // provider lookup would let this reach the adapter and fail somewhere downstream.
-            val response = client.get("/t/acme/auth/social/okta/redirect")
+            val response = client.get("/t/acme/auth/social/oriana/redirect")
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertTrue(
@@ -382,12 +382,12 @@ class SocialLoginRoutesTest {
     fun `a callback for an unreserved key with a configured provider row reaches the adapter`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
-            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            val payload = statePayload("oriana", "acme", System.currentTimeMillis())
             val response =
-                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}") {
+                client.get("/t/acme/auth/social/oriana/callback?code=abc&state=${signedState(payload)}") {
                     bindStateCookie(payload)
                 }
 
@@ -406,9 +406,9 @@ class SocialLoginRoutesTest {
             resetFixtures()
             installSocialRoutes()
 
-            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            val payload = statePayload("oriana", "acme", System.currentTimeMillis())
             val response =
-                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}") {
+                client.get("/t/acme/auth/social/oriana/callback?code=abc&state=${signedState(payload)}") {
                     bindStateCookie(payload)
                 }
 
@@ -423,7 +423,7 @@ class SocialLoginRoutesTest {
     fun `the nonce and verifier the redirect issued are the ones the callback replays`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
             val client =
                 createClient {
@@ -431,17 +431,17 @@ class SocialLoginRoutesTest {
                     install(HttpCookies)
                 }
 
-            val redirect = client.get("/t/acme/auth/social/okta/redirect")
-            val issued = requireNotNull(oktaAdapter.bindingAtRedirect, { "the redirect issued no binding" })
+            val redirect = client.get("/t/acme/auth/social/oriana/redirect")
+            val issued = requireNotNull(orianaAdapter.bindingAtRedirect, { "the redirect issued no binding" })
             client.get(
-                "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
             )
 
             // Both values travel only inside the signed state, so this is the whole round trip:
             // a reader on a stale index would hand the adapter a csrf nonce or a timestamp.
             assertEquals(
                 issued,
-                oktaAdapter.bindingAtExchange,
+                orianaAdapter.bindingAtExchange,
                 "The callback must replay the nonce and PKCE verifier the redirect signed into the state",
             )
             assertEquals(
@@ -459,14 +459,14 @@ class SocialLoginRoutesTest {
     fun `every redirect issues its own nonce and its own verifier`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
             val client = createClient { followRedirects = false }
 
-            client.get("/t/acme/auth/social/okta/redirect")
-            val first = requireNotNull(oktaAdapter.bindingAtRedirect)
-            client.get("/t/acme/auth/social/okta/redirect")
-            val second = requireNotNull(oktaAdapter.bindingAtRedirect)
+            client.get("/t/acme/auth/social/oriana/redirect")
+            val first = requireNotNull(orianaAdapter.bindingAtRedirect)
+            client.get("/t/acme/auth/social/oriana/redirect")
+            val second = requireNotNull(orianaAdapter.bindingAtRedirect)
 
             // Per request, not per process: a binding minted once and reused would make every
             // round-trip assertion pass while the replay defence protected nothing.
@@ -513,13 +513,13 @@ class SocialLoginRoutesTest {
     fun `the OAuth parameters the redirect carried survive the state round trip`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             userRepo.add(alice)
             appRepo.add(spaApp)
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|42",
+                    providerUserId = "oriana|42",
                     email = alice.email,
                     name = "Alice",
                     emailVerified = true,
@@ -533,13 +533,13 @@ class SocialLoginRoutesTest {
 
             val redirect =
                 client.get(
-                    "/t/acme/auth/social/okta/redirect?response_type=code&client_id=spa-app" +
+                    "/t/acme/auth/social/oriana/redirect?response_type=code&client_id=spa-app" +
                         "&redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback&state=client-state" +
                         "&code_challenge=client-challenge&code_challenge_method=S256",
                 )
             val response =
                 client.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
                 )
 
             // The params ride in the last field of the state, whose index moved when the nonce and
@@ -776,16 +776,16 @@ class SocialLoginRoutesTest {
     fun `a pending registration cookie minted at one tenant is refused at another`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             tenantRepo.add(victimTenant)
             userRepo.add(bob)
             appRepo.add(victimApp)
             // The attacker administers acme and points it at an IdP they run, which asserts an
             // address they do not own. Unknown in acme, so the callback answers NeedsRegistration.
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|attacker",
+                    providerUserId = "oriana|attacker",
                     email = bob.email,
                     name = "Bob",
                     emailVerified = true,
@@ -799,13 +799,13 @@ class SocialLoginRoutesTest {
 
             val redirect =
                 attacker.get(
-                    "/t/acme/auth/social/okta/redirect?response_type=code&client_id=victim-spa" +
+                    "/t/acme/auth/social/oriana/redirect?response_type=code&client_id=victim-spa" +
                         "&redirect_uri=https%3A%2F%2Fvictim.example.com%2Fcallback&state=attacker-state" +
                         "&code_challenge=attacker-challenge&code_challenge_method=S256",
                 )
             val callback =
                 attacker.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
                 )
             val stolen = socialCookieHeader(callback)
             assertTrue(stolen.isNotEmpty(), "The attacker's own tenant must mint a pending cookie for this to test")
@@ -845,10 +845,10 @@ class SocialLoginRoutesTest {
         slug: String,
         email: String,
     ): String {
-        oktaAdapter.shouldFail = false
-        oktaAdapter.profileToReturn =
+        orianaAdapter.shouldFail = false
+        orianaAdapter.profileToReturn =
             SocialUserProfile(
-                providerUserId = "okta|$email",
+                providerUserId = "oriana|$email",
                 email = email,
                 name = "New Comer",
                 emailVerified = true,
@@ -858,10 +858,10 @@ class SocialLoginRoutesTest {
                 followRedirects = false
                 install(HttpCookies)
             }
-        val redirect = browser.get("/t/$slug/auth/social/okta/redirect")
+        val redirect = browser.get("/t/$slug/auth/social/oriana/redirect")
         val callback =
             browser.get(
-                "/t/$slug/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                "/t/$slug/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
             )
         return socialCookieHeader(callback)
     }
@@ -870,7 +870,7 @@ class SocialLoginRoutesTest {
     fun `a pending cookie completes registration at the tenant that minted it`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
             // The guard has to let the real flow through: one that refused every replay would
@@ -896,7 +896,7 @@ class SocialLoginRoutesTest {
     fun `a pending cookie presented without its binding cookie is refused`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
             // Right tenant, our signature, freshly minted — only the binding is missing. A cookie
@@ -925,15 +925,15 @@ class SocialLoginRoutesTest {
     fun `a rejected authorization request leaves no SSO session behind`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
             // The completion names a client this tenant does not have, so code issuance fails.
             // A session cookie written before that check survives the refusal.
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|newcomer",
+                    providerUserId = "oriana|newcomer",
                     email = "newcomer@acme.com",
                     name = "New Comer",
                     emailVerified = true,
@@ -945,13 +945,13 @@ class SocialLoginRoutesTest {
                 }
             val redirect =
                 browser.get(
-                    "/t/acme/auth/social/okta/redirect?response_type=code&client_id=ghost-app" +
+                    "/t/acme/auth/social/oriana/redirect?response_type=code&client_id=ghost-app" +
                         "&redirect_uri=https%3A%2F%2Fghost.example.com%2Fcallback" +
                         "&code_challenge=c&code_challenge_method=S256",
                 )
             val callback =
                 browser.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
                 )
             val completed =
                 createClient { followRedirects = false }
@@ -975,12 +975,12 @@ class SocialLoginRoutesTest {
     fun `the pending cookies are HttpOnly path-scoped and SameSite Lax`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|newcomer",
+                    providerUserId = "oriana|newcomer",
                     email = "newcomer@acme.com",
                     name = "New Comer",
                     emailVerified = true,
@@ -991,10 +991,10 @@ class SocialLoginRoutesTest {
                     install(HttpCookies)
                 }
 
-            val redirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val redirect = browser.get("/t/acme/auth/social/oriana/redirect")
             val callback =
                 browser.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
                 )
 
             // Two halves of one flow disagreeing on cookie attributes is how the weaker half
@@ -1016,12 +1016,12 @@ class SocialLoginRoutesTest {
     fun `over https the social cookies are Host-prefixed and Secure`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes(baseUrl = "https://id.example.com")
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|newcomer",
+                    providerUserId = "oriana|newcomer",
                     email = "newcomer@acme.com",
                     name = "New Comer",
                     emailVerified = true,
@@ -1030,7 +1030,7 @@ class SocialLoginRoutesTest {
             // harness's plain http, so every cookie is replayed by hand here.
             val browser = createClient { followRedirects = false }
 
-            val redirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val redirect = browser.get("/t/acme/auth/social/oriana/redirect")
             val stateCookie =
                 redirect.headers
                     .getAll("Set-Cookie")
@@ -1040,7 +1040,7 @@ class SocialLoginRoutesTest {
             // A server cannot tell a host-only cookie from one a sibling subdomain set with
             // Domain=; __Host- forbids Domain and browsers enforce it. It costs Path=/.
             assertTrue(
-                stateCookie.startsWith("__Host-${stateCookieName("okta")}="),
+                stateCookie.startsWith("__Host-${stateCookieName("oriana")}="),
                 "Expected a __Host- name, got: $stateCookie",
             )
             assertTrue(stateCookie.contains("Secure"), "__Host- is dropped without Secure: $stateCookie")
@@ -1048,7 +1048,7 @@ class SocialLoginRoutesTest {
 
             val callback =
                 browser.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
                 ) {
                     header("Cookie", stateCookie.substringBefore(";"))
                 }
@@ -1171,13 +1171,13 @@ class SocialLoginRoutesTest {
         }
 
     /** An operator-chosen label, which the routes must prefer over the key's title case. */
-    private fun seedLabelledOkta() =
+    private fun seedLabelledOriana() =
         idpRepo.add(
             IdentityProvider(
                 tenantId = TenantId(1),
-                provider = oktaKey,
-                clientId = "client-okta",
-                clientSecret = "secret-okta",
+                provider = orianaKey,
+                clientId = "client-oriana",
+                clientSecret = "secret-oriana",
                 displayName = "Acme Workforce SSO",
             ),
         )
@@ -1186,13 +1186,13 @@ class SocialLoginRoutesTest {
     fun `the callback error page names the provider by its configured label`() =
         testApplication {
             resetFixtures()
-            seedLabelledOkta()
+            seedLabelledOriana()
             installSocialRoutes()
 
-            val response = client.get("/t/acme/auth/social/okta/callback?error=access_denied")
+            val response = client.get("/t/acme/auth/social/oriana/callback?error=access_denied")
 
             // The route looks the row up by key; the view is handed whatever it returns. Title
-            // casing the key would render "Okta" here and every assertion on the view still pass.
+            // casing the key would render "Oriana" here and every assertion on the view still pass.
             assertEquals(HttpStatusCode.BadRequest, response.status)
             // The whole sentence, not just the label: the same page lists the tenant's providers
             // by their labels, so a bare `contains` would pass on the sign-in button alone.
@@ -1206,7 +1206,7 @@ class SocialLoginRoutesTest {
     fun `the social registration page names the provider by its configured label`() =
         testApplication {
             resetFixtures()
-            seedLabelledOkta()
+            seedLabelledOriana()
             installSocialRoutes()
 
             val cookies = pendingCookieFor("acme", "newcomer@acme.com")
@@ -1225,7 +1225,7 @@ class SocialLoginRoutesTest {
     fun `two sign-ins begun in one browser keep separate bindings`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
             val browser =
                 createClient {
@@ -1234,7 +1234,7 @@ class SocialLoginRoutesTest {
                 }
 
             val google = browser.get("/t/acme/auth/social/google/redirect")
-            val okta = browser.get("/t/acme/auth/social/okta/redirect")
+            val oriana = browser.get("/t/acme/auth/social/oriana/redirect")
 
             // One name per tenant means the second sign-in overwrites the first, and the first
             // callback then fails to bind — a user with two tabs open cannot log in.
@@ -1245,10 +1245,10 @@ class SocialLoginRoutesTest {
                     .any { it.startsWith("${stateCookieName("google")}=") },
             )
             assertTrue(
-                okta.headers
+                oriana.headers
                     .getAll("Set-Cookie")
                     .orEmpty()
-                    .any { it.startsWith("${stateCookieName("okta")}=") },
+                    .any { it.startsWith("${stateCookieName("oriana")}=") },
             )
             val completed =
                 browser.get(
@@ -1275,9 +1275,9 @@ class SocialLoginRoutesTest {
     fun `over https two tenants signing in through one provider keep separate bindings`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             tenantRepo.add(victimTenant)
-            idpRepo.seed(TenantId(2), "okta")
+            idpRepo.seed(TenantId(2), "oriana")
             // https is the whole point: `__Host-` forces Path=/, so (host, name, path) is the same
             // for every tenant unless the name says which one. Over http the path still separates.
             installSocialRoutes(baseUrl = "https://id.example.com")
@@ -1285,12 +1285,12 @@ class SocialLoginRoutesTest {
             // plain http, so the jar the browser would hold is assembled by hand.
             val browser = createClient { followRedirects = false }
 
-            val acme = browser.get("/t/acme/auth/social/okta/redirect")
-            val other = browser.get("/t/victimco/auth/social/okta/redirect")
+            val acme = browser.get("/t/acme/auth/social/oriana/redirect")
+            val other = browser.get("/t/victimco/auth/social/oriana/redirect")
 
             val completed =
                 browser.get(
-                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(acme.headers["Location"]!!)}",
+                    "/t/acme/auth/social/oriana/callback?code=abc&state=${stateFrom(acme.headers["Location"]!!)}",
                 ) {
                     header("Cookie", cookieJar(acme, other))
                 }
@@ -1309,30 +1309,30 @@ class SocialLoginRoutesTest {
     fun `over https a pending registration survives one begun at another tenant`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             tenantRepo.add(victimTenant)
-            idpRepo.seed(TenantId(2), "okta")
+            idpRepo.seed(TenantId(2), "oriana")
             installSocialRoutes(baseUrl = "https://id.example.com")
-            oktaAdapter.shouldFail = false
-            oktaAdapter.profileToReturn =
+            orianaAdapter.shouldFail = false
+            orianaAdapter.profileToReturn =
                 SocialUserProfile(
-                    providerUserId = "okta|newcomer",
+                    providerUserId = "oriana|newcomer",
                     email = "newcomer@acme.com",
                     name = "New Comer",
                     emailVerified = true,
                 )
             val browser = createClient { followRedirects = false }
 
-            val acmeRedirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val acmeRedirect = browser.get("/t/acme/auth/social/oriana/redirect")
             val acmeCallback =
                 browser.get(
-                    "/t/acme/auth/social/okta/callback?code=abc" +
+                    "/t/acme/auth/social/oriana/callback?code=abc" +
                         "&state=${stateFrom(acmeRedirect.headers["Location"]!!)}",
                 ) { header("Cookie", cookieJar(acmeRedirect)) }
-            val otherRedirect = browser.get("/t/victimco/auth/social/okta/redirect")
+            val otherRedirect = browser.get("/t/victimco/auth/social/oriana/redirect")
             val otherCallback =
                 browser.get(
-                    "/t/victimco/auth/social/okta/callback?code=abc" +
+                    "/t/victimco/auth/social/oriana/callback?code=abc" +
                         "&state=${stateFrom(otherRedirect.headers["Location"]!!)}",
                 ) { header("Cookie", cookieJar(otherRedirect)) }
 
@@ -1378,7 +1378,7 @@ class SocialLoginRoutesTest {
     fun `a pending cookie carrying more fields than the format defines is refused`() =
         testApplication {
             resetFixtures()
-            idpRepo.seed(TenantId(1), "okta")
+            idpRepo.seed(TenantId(1), "oriana")
             installSocialRoutes()
 
             // Same shape as the state's own field-count guard: a payload of another shape is not
@@ -1413,13 +1413,13 @@ class SocialLoginRoutesTest {
     // =========================================================================
 
     /** A provider that provisions on first sign-in, for addresses on [domains] only. */
-    private fun seedJitOkta(domains: List<String> = listOf("allowed.example")) =
+    private fun seedJitOriana(domains: List<String> = listOf("allowed.example")) =
         idpRepo.add(
             IdentityProvider(
                 tenantId = TenantId(1),
-                provider = oktaKey,
-                clientId = "client-okta",
-                clientSecret = "secret-okta",
+                provider = orianaKey,
+                clientId = "client-oriana",
+                clientSecret = "secret-oriana",
                 displayName = "Acme Workforce SSO",
                 jitEnabled = true,
                 jitAllowedDomains = domains,
@@ -1427,14 +1427,14 @@ class SocialLoginRoutesTest {
         )
 
     /** The IdP asserts [email], and asserts whether it verified it. The sign-in itself succeeded. */
-    private fun oktaAsserts(
+    private fun orianaAsserts(
         email: String,
         emailVerified: Boolean,
     ) {
-        oktaAdapter.shouldFail = false
-        oktaAdapter.profileToReturn =
+        orianaAdapter.shouldFail = false
+        orianaAdapter.profileToReturn =
             SocialUserProfile(
-                providerUserId = "okta|carol",
+                providerUserId = "oriana|carol",
                 email = email,
                 name = "Carol",
                 emailVerified = emailVerified,
@@ -1451,10 +1451,10 @@ class SocialLoginRoutesTest {
     private fun closeSignUp() = tenantRepo.add(tenant.copy(registrationEnabled = false))
 
     /** Drives one callback that got past every state guard, so the JIT gate is what answers. */
-    private suspend fun ApplicationTestBuilder.oktaCallback(code: String = "auth-code-do-not-record"): HttpResponse {
-        val payload = statePayload("okta", "acme", System.currentTimeMillis())
+    private suspend fun ApplicationTestBuilder.orianaCallback(code: String = "auth-code-do-not-record"): HttpResponse {
+        val payload = statePayload("oriana", "acme", System.currentTimeMillis())
         return createClient { followRedirects = false }
-            .get("/t/acme/auth/social/okta/callback?code=$code&state=${signedState(payload)}") {
+            .get("/t/acme/auth/social/oriana/callback?code=$code&state=${signedState(payload)}") {
                 bindStateCookie(payload)
             }
     }
@@ -1463,12 +1463,12 @@ class SocialLoginRoutesTest {
     fun `a refused sign-in tells the person authentication succeeded`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val body = oktaCallback().bodyAsText()
+            val body = orianaCallback().bodyAsText()
 
             // The person typed nothing wrong and was bounced back rejected. A page that does not
             // say the sign-in itself worked reads as "the system is broken" or "wrong password".
@@ -1482,12 +1482,12 @@ class SocialLoginRoutesTest {
     fun `a refused sign-in is not rendered as a generic login failure`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val response = oktaCallback()
+            val response = orianaCallback()
             val body = response.bodyAsText()
 
             // The worst available outcome: a page indistinguishable from a wrong password, which
@@ -1507,14 +1507,14 @@ class SocialLoginRoutesTest {
     fun `an unverified email and a disallowed domain are told apart on the page`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
             installSocialRoutes()
 
-            oktaAsserts("carol@allowed.example", emailVerified = false)
-            val unverified = oktaCallback().bodyAsText()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
-            val blockedDomain = oktaCallback().bodyAsText()
+            orianaAsserts("carol@allowed.example", emailVerified = false)
+            val unverified = orianaCallback().bodyAsText()
+            orianaAsserts("carol@blocked.example", emailVerified = true)
+            val blockedDomain = orianaCallback().bodyAsText()
 
             assertTrue(
                 unverified.contains("email address is not verified"),
@@ -1538,12 +1538,12 @@ class SocialLoginRoutesTest {
     fun `a refused sign-in with sign-up closed leaves no pending registration`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val response = oktaCallback()
+            val response = orianaCallback()
 
             // With sign-up closed there is no other door, so the refusal is the end of the flow
             // and no pending registration may be left behind for the person to walk through.
@@ -1561,17 +1561,17 @@ class SocialLoginRoutesTest {
     fun `a refusal is recorded for the operator with the cause and the domain`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            seedJitOriana()
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            oktaCallback()
+            orianaCallback()
 
             // Sign-up is open here, so this is the fall-through branch. The operator's diagnostic
             // must not depend on which way the person was routed.
             val recorded = auditLog.events.filter { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
             assertEquals(1, recorded.size, "One refusal must leave one diagnostic row, got: $recorded")
-            assertEquals("okta", recorded.single().details["provider"])
+            assertEquals("oriana", recorded.single().details["provider"])
             assertEquals("domain_not_allowed", recorded.single().details["reason"])
             assertEquals("blocked.example", recorded.single().details["email_domain"])
         }
@@ -1580,11 +1580,11 @@ class SocialLoginRoutesTest {
     fun `a refusal record carries neither the address nor the authorization code`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            seedJitOriana()
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            oktaCallback(code = "auth-code-do-not-record")
+            orianaCallback(code = "auth-code-do-not-record")
 
             val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
             // The domain is what an operator fixes an allowlist with; the local part is what turns
@@ -1607,12 +1607,12 @@ class SocialLoginRoutesTest {
     fun `the page hands the person the reference the operator will see`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val body = oktaCallback().bodyAsText()
+            val body = orianaCallback().bodyAsText()
 
             val reference =
                 auditLog.events
@@ -1629,11 +1629,11 @@ class SocialLoginRoutesTest {
     fun `a refused gate with sign-up open still reaches the registration page`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            seedJitOriana()
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val response = oktaCallback()
+            val response = orianaCallback()
 
             // The gate governs auto-creation, not all account creation. A tenant that left sign-up
             // open said people may create accounts; switching on a convenience feature must not
@@ -1647,11 +1647,11 @@ class SocialLoginRoutesTest {
     fun `a refused gate with sign-up open does not tell the person they are not permitted`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            seedJitOriana()
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            val body = oktaCallback().bodyAsText()
+            val body = orianaCallback().bodyAsText()
 
             // Showing "you are not permitted here" and then offering a sign-up form is incoherent,
             // so the refusal copy belongs only where sign-up is actually closed.
@@ -1665,12 +1665,12 @@ class SocialLoginRoutesTest {
     fun `a refusal is recorded whichever way the person was routed`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             closeSignUp()
-            oktaAsserts("carol@blocked.example", emailVerified = true)
+            orianaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
-            oktaCallback()
+            orianaCallback()
 
             // The mirror of the fall-through case above. An allowlist quietly doing nothing is
             // worth seeing from both branches, so neither may be the only one that records.
@@ -1683,16 +1683,16 @@ class SocialLoginRoutesTest {
     fun `an error the provider returned on a state we minted is recorded with its code`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             installSocialRoutes()
 
             // A redirect URI the IdP does not recognise surfaces here and nowhere else — the
             // discovery test fetches the issuer's document and cannot see it.
-            val payload = statePayload("okta", "acme", System.currentTimeMillis())
-            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
+            val payload = statePayload("oriana", "acme", System.currentTimeMillis())
+            client.get("/t/acme/auth/social/oriana/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
 
             val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
-            assertEquals("okta", recorded.details["provider"])
+            assertEquals("oriana", recorded.details["provider"])
             assertEquals("idp_returned_error", recorded.details["reason"])
             assertEquals("redirect_uri_mismatch", recorded.details["idp_error_code"])
         }
@@ -1701,12 +1701,12 @@ class SocialLoginRoutesTest {
     fun `an error arriving without a state we minted is not recorded`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             installSocialRoutes()
 
             // The callback is unauthenticated. Without this, anyone could fill an operator's
             // diagnostics panel with whatever reason they liked.
-            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch")
+            client.get("/t/acme/auth/social/oriana/callback?error=redirect_uri_mismatch")
 
             assertTrue(
                 auditLog.events.none { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED },
@@ -1718,13 +1718,13 @@ class SocialLoginRoutesTest {
     fun `an error on a state older than the window is not recorded`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             installSocialRoutes()
 
             // A signature never expires. Without the age bound the same held state writes a row on
             // every request, pushing genuine refusals out of the operator's window.
-            val payload = statePayload("okta", "acme", System.currentTimeMillis() - 360_000)
-            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
+            val payload = statePayload("oriana", "acme", System.currentTimeMillis() - 360_000)
+            client.get("/t/acme/auth/social/oriana/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
 
             assertTrue(
                 auditLog.events.none { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED },
@@ -1736,12 +1736,12 @@ class SocialLoginRoutesTest {
     fun `an error code the provider did not shape is not echoed into the record`() =
         testApplication {
             resetFixtures()
-            seedJitOkta()
+            seedJitOriana()
             installSocialRoutes()
 
-            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            val payload = statePayload("oriana", "acme", System.currentTimeMillis())
             val forged = "<script>alert(1)</script>".encodeURLParameter()
-            client.get("/t/acme/auth/social/okta/callback?error=$forged&state=${signedState(payload)}")
+            client.get("/t/acme/auth/social/oriana/callback?error=$forged&state=${signedState(payload)}")
 
             val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
             assertEquals(

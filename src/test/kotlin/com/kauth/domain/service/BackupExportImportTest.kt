@@ -598,8 +598,8 @@ class BackupExportImportTest {
                 socialProviders =
                     listOf(
                         com.kauth.domain.model.SocialProviderBackup(
-                            provider = "okta",
-                            clientId = "okta-client-id",
+                            provider = "oriana",
+                            clientId = "oriana-client-id",
                             enabled = true,
                         ),
                         com.kauth.domain.model.SocialProviderBackup(
@@ -615,11 +615,11 @@ class BackupExportImportTest {
         val newTenantId = destTenants.findBySlug("acme-staging")!!.id
         val imported = destIdps.findAllByTenant(newTenantId).map { it.provider }
         // Naming the cause: asserting only the row count would also pass if the importer had
-        // dropped github instead. A persisted "okta" row is invisible in the admin UI, rejected by
+        // dropped github instead. A persisted "oriana" row is invisible in the admin UI, rejected by
         // the delete route, and re-emitted on every later export — a permanent orphan.
         assertEquals(listOf(ProviderKey.GITHUB), imported)
         assertFalse(
-            imported.any { it.value == "okta" },
+            imported.any { it.value == "oriana" },
             "A provider key with no compiled-in adapter must not survive an import",
         )
     }
