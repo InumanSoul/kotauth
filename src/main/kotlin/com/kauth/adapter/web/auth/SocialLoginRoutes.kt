@@ -15,6 +15,7 @@ import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
@@ -228,7 +229,9 @@ private suspend fun ApplicationCall.allowSocialRequest(
     tenant: Tenant?,
     identityProviderRepository: IdentityProviderRepository?,
 ): Boolean {
-    if (limiter.isAllowed("social:${request.local.remoteAddress}:$slug")) return true
+    // `local` is the raw connection point, which behind the shipped Caddy topology is the proxy
+    // for every request — one deployment-wide budget. `origin` is the form XForwardedHeaders feeds.
+    if (limiter.isAllowed("social:${request.origin.remoteHost}:$slug")) return true
     val enabledProviders =
         if (tenant != null && identityProviderRepository != null) {
             identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()

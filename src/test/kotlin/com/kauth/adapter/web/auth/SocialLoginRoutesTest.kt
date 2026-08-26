@@ -47,6 +47,7 @@ import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
@@ -248,9 +249,11 @@ class SocialLoginRoutesTest {
     private fun ApplicationTestBuilder.installSocialRoutes(
         socialLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60),
         baseUrl: String = "",
+        trustedProxy: Boolean = false,
     ) {
         application {
             install(ContentNegotiation) { json() }
+            if (trustedProxy) install(XForwardedHeaders)
             routing {
                 authRoutes(
                     authService = buildAuthService(),
@@ -1036,6 +1039,28 @@ class SocialLoginRoutesTest {
             // dropped by the browser and every callback would fail to bind on `make run`.
             assertTrue(stateCookie.startsWith("$STATE_COOKIE="), "Expected the bare name, got: $stateCookie")
             assertFalse(stateCookie.contains("Secure"), "Nothing may set Secure over http: $stateCookie")
+        }
+
+    @Test
+    fun `the throttle keys on the forwarded client address, not the proxy connection`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60), trustedProxy = true)
+            val client = createClient { followRedirects = false }
+
+            val first =
+                client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "203.0.113.1") }
+            val second =
+                client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "203.0.113.2") }
+
+            // Every request behind the shipped Caddy topology shares one connection address, so
+            // keying on it makes this limiter a deployment-wide cap of a few sign-ins a minute.
+            assertEquals(HttpStatusCode.Found, first.status)
+            assertEquals(
+                HttpStatusCode.Found,
+                second.status,
+                "A second client behind the same proxy must have its own budget",
+            )
         }
 
     companion object {
