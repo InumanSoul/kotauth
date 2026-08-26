@@ -265,6 +265,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one on a valued path) still fall through to the stored address, which is the
   same absent-attribute rule a `PUT` omitting `emails` follows.
 
+### Migrations
+
+- `V60__scim_external_ids.sql` — adds `external_id` to `users` and `groups`,
+  unique per workspace where present, plus `given_name` and `family_name` on
+  `users`; widens `users.username` and `users.full_name` to `VARCHAR(255)`.
+- `V61__group_parent_no_cascade.sql` — `groups.parent_group_id` becomes
+  `ON DELETE NO ACTION`, so deleting a parent group can no longer destroy its
+  descendants and their memberships and role grants.
+- `V62__api_key_scim_dialect.sql` — adds `api_keys.scim_dialect`, defaulting to
+  `rfc`, so every existing key keeps its current behaviour.
+- `V63__identity_provider_oidc.sql` — adds the OIDC brokering columns to
+  `identity_providers` (`kind`, `display_name`, `issuer`, the three endpoint
+  pins, `scopes`) and the two just-in-time columns (`jit_enabled` defaulting
+  false, `jit_allowed_domains`). Additive only: every existing row stays a
+  valid `oauth2` provider with automatic creation off.
+
 ---
 
 ## [1.22.0] - 2026-08-21
