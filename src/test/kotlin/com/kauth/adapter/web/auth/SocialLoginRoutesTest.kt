@@ -31,7 +31,10 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
+import io.ktor.client.plugins.cookies.HttpCookies
+import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.encodeURLParameter
@@ -46,6 +49,7 @@ import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -192,6 +196,14 @@ class SocialLoginRoutesTest {
 
     private fun signedState(payload: String) = encryptionService.signCookie(payload).encodeURLParameter()
 
+    /**
+     * The browser-binding cookie the redirect would have set for [payload]: its csrfNonce, signed.
+     * A forged state needs it because the callback refuses any state not bound to this browser.
+     */
+    private fun HttpRequestBuilder.bindStateCookie(payload: String) {
+        header("Cookie", "$STATE_COOKIE=${encryptionService.signCookie(payload.split("|")[2])}")
+    }
+
     private fun ApplicationTestBuilder.installSocialRoutes() {
         application {
             install(ContentNegotiation) { json() }
@@ -296,7 +308,9 @@ class SocialLoginRoutesTest {
 
             val payload = statePayload("okta", "acme", System.currentTimeMillis())
             val response =
-                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}")
+                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
 
             // The adapter is configured to fail its exchange, so reaching it produces the provider
             // error rather than the guard's "unsupported_provider" — that is what separates them.
@@ -315,7 +329,9 @@ class SocialLoginRoutesTest {
 
             val payload = statePayload("okta", "acme", System.currentTimeMillis())
             val response =
-                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}")
+                client.get("/t/acme/auth/social/okta/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
             assertTrue(
@@ -330,7 +346,11 @@ class SocialLoginRoutesTest {
             resetFixtures()
             idpRepo.seed(TenantId(1), "okta")
             installSocialRoutes()
-            val client = createClient { followRedirects = false }
+            val client =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
 
             val redirect = client.get("/t/acme/auth/social/okta/redirect")
             val issued = requireNotNull(oktaAdapter.bindingAtRedirect, { "the redirect issued no binding" })
@@ -408,7 +428,11 @@ class SocialLoginRoutesTest {
                     emailVerified = true,
                 )
             installSocialRoutes()
-            val client = createClient { followRedirects = false }
+            val client =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
 
             val redirect =
                 client.get(
@@ -456,4 +480,135 @@ class SocialLoginRoutesTest {
             // provider exchange — the same code by a different cause.
             assertTrue(response.bodyAsText().contains("State mismatch"))
         }
+
+    @Test
+    fun `a callback presenting a validly signed state with no cookie is refused`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // The login-CSRF attack: the state is ours, freshly minted, and names the right
+            // provider and slug — an attacker gets one by driving /redirect themselves. Only the
+            // absent cookie separates it from a real flow, and it must be enough to stop it.
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}")
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            // Naming the guard: the provider exchange 400s too, so the status alone proves nothing.
+            assertTrue(
+                response.bodyAsText().contains("did not start in this browser"),
+                "An unbound state must be stopped by the browser-binding guard, not somewhere downstream",
+            )
+        }
+
+    @Test
+    fun `a callback whose cookie holds a different nonce is refused`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // A cookie from some other flow of the victim's own: signed by us, and still not the
+            // nonce this state carries. Presence of a cookie may not stand in for a match.
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    header("Cookie", "$STATE_COOKIE=${encryptionService.signCookie(UUID.randomUUID().toString())}")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(
+                response.bodyAsText().contains("did not start in this browser"),
+                "A cookie naming a different nonce must be refused, not merely counted as present",
+            )
+        }
+
+    @Test
+    fun `a callback whose cookie is not signed by us is refused`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // The cookie is HttpOnly, but a subdomain can still write one. An unsigned value
+            // carrying the right nonce must not satisfy the guard.
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    header("Cookie", "$STATE_COOKIE=${payload.split("|")[2]}")
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("did not start in this browser"))
+        }
+
+    @Test
+    fun `a callback whose cookie matches the state nonce is let through`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
+
+            // The guard passes and the flow fails further on at the provider exchange — a guard
+            // that refused everything would satisfy the three tests above and break login.
+            assertFalse(response.bodyAsText().contains("did not start in this browser"))
+            assertTrue(
+                response.bodyAsText().contains("error occurred communicating with the identity provider"),
+                "A bound state must reach the provider exchange",
+            )
+        }
+
+    @Test
+    fun `the redirect sets the binding cookie HttpOnly path-scoped and SameSite Lax`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            val response = createClient { followRedirects = false }.get("/t/acme/auth/social/google/redirect")
+
+            val cookie =
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .firstOrNull { it.startsWith("$STATE_COOKIE=") }
+            assertNotNull(cookie, "The redirect must set the binding cookie; without it no callback can bind")
+            assertTrue(cookie.contains("HttpOnly"), "Script must not be able to read the binding: $cookie")
+            // Lax, not Strict: the callback arrives as a top-level navigation from the IdP, which
+            // Strict would strip — the guard would then refuse every real login.
+            assertTrue(cookie.contains("SameSite=Lax"), "Expected SameSite=Lax, got: $cookie")
+            assertTrue(cookie.contains("Path=/t/acme/auth/social"), "Expected a tenant-scoped path, got: $cookie")
+        }
+
+    @Test
+    fun `the callback clears the binding cookie once the state is consumed`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
+
+            val cleared =
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .firstOrNull { it.startsWith("$STATE_COOKIE=") }
+            assertNotNull(cleared, "The consumed binding must be cleared, not left for a second callback")
+            assertTrue(
+                cleared.contains("Max-Age=0"),
+                "Expected the binding cookie to be expired, got: $cleared",
+            )
+        }
+
+    companion object {
+        /** The wire name of the cookie that binds a social-login state to the browser that began it. */
+        private const val STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
+    }
 }

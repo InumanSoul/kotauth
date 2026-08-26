@@ -11,6 +11,7 @@ import com.kauth.domain.util.Pkce
 import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -21,6 +22,10 @@ import io.ktor.server.routing.post
 
 // Matches AdminRoutes and PortalRoutes, the two flows that already bound their signed state.
 private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
+
+// Holds the csrfNonce of the state the redirect signed, so the callback can prove the browser
+// presenting that state is the one the flow began in. Same idiom as KOTAUTH_ADMIN_PKCE.
+private const val SOCIAL_STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
 
 /**
  * The signed social-login state: `provider|slug|csrfNonce|timestampMillis|oidcNonce|
@@ -33,10 +38,18 @@ private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
  * [oauthParamsB64] is base64url without padding and both binding values are base64url too, so no
  * field can contain the separator.
  *
- * The payload is deliberately not single-use: it is age-bounded, the authorization code is
- * one-time at the issuer, PKCE binds the exchange to whoever began it and the nonce binds the ID
- * token to this request. A server-side store would cost the property that any replica can
- * complete any callback.
+ * [csrfNonce] is what binds the state to a user agent, and it only does that because /redirect
+ * writes it to [SOCIAL_STATE_COOKIE] and /callback requires an exact match. Without that pairing
+ * the signature proves only that *we* minted the state, not that this browser began the flow, and
+ * an attacker who mints one at their leisure and feeds the victim the resulting callback URL gets
+ * the victim signed in as them. The one-time authorization code, the PKCE verifier and the ID
+ * token nonce do not close that: all three travel inside the state, so they bind the flow to
+ * whoever holds it — which, since `signCookie` authenticates without encrypting, is anyone who
+ * reads the callback URL, the IdP included.
+ *
+ * The payload is deliberately not single-use: it is age-bounded and the cookie is cleared on
+ * completion. A server-side store would cost the property that any replica can complete any
+ * callback.
  */
 private class SocialState(
     val provider: String,
@@ -62,7 +75,7 @@ private class SocialState(
 
         fun parse(payload: String): SocialState? {
             val parts = payload.split("|")
-            if (parts.size < FIELD_COUNT) return null
+            if (parts.size != FIELD_COUNT) return null
             val timestampMillis = parts[3].toLongOrNull() ?: return null
             return SocialState(
                 provider = parts[0],
@@ -75,6 +88,45 @@ private class SocialState(
         }
     }
 }
+
+/**
+ * The cookie half of the state binding: `SameSite=Lax` because the callback arrives as a
+ * top-level navigation from the IdP, which `Strict` would strip; host-scoped and path-scoped so
+ * it reaches nothing but this tenant's social routes.
+ */
+private fun ApplicationCall.setSocialStateCookie(
+    slug: String,
+    value: String,
+    secure: Boolean,
+) = response.cookies.append(
+    name = SOCIAL_STATE_COOKIE,
+    value = value,
+    maxAge = SOCIAL_STATE_MAX_AGE_MS / 1000,
+    httpOnly = true,
+    secure = secure,
+    path = "/t/$slug/auth/social",
+    extensions = mapOf("SameSite" to "Lax"),
+)
+
+private fun ApplicationCall.clearSocialStateCookie(
+    slug: String,
+    secure: Boolean,
+) = response.cookies.append(
+    name = SOCIAL_STATE_COOKIE,
+    value = "",
+    maxAge = 0L,
+    httpOnly = true,
+    secure = secure,
+    path = "/t/$slug/auth/social",
+    extensions = mapOf("SameSite" to "Lax"),
+)
+
+private fun constantTimeEquals(
+    a: String,
+    b: String,
+): Boolean =
+    java.security.MessageDigest
+        .isEqual(a.toByteArray(Charsets.UTF_8), b.toByteArray(Charsets.UTF_8))
 
 internal fun Route.socialLoginRoutes(
     oauthService: OAuthService,
@@ -128,8 +180,13 @@ internal fun Route.socialLoginRoutes(
             ).toPayload()
         val signedState = encryptionService.signCookie(statePayload)
 
+        val secure = baseUrl.startsWith("https://", ignoreCase = true)
+
         when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl, binding)) {
-            is SocialLoginResult.Success -> call.respondRedirect(result.value)
+            is SocialLoginResult.Success -> {
+                call.setSocialStateCookie(slug, encryptionService.signCookie(csrfNonce), secure)
+                call.respondRedirect(result.value)
+            }
             is SocialLoginResult.Failure -> {
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
@@ -237,6 +294,29 @@ internal fun Route.socialLoginRoutes(
             )
             return@get
         }
+
+        val secure = baseUrl.startsWith("https://", ignoreCase = true)
+
+        // The signature says we minted this state; only the cookie says this browser began the
+        // flow. Without it a state minted by an attacker, replayed at the victim, signs the victim
+        // in as the attacker — every other guard on this path passes on an attacker-minted state.
+        val boundNonce = call.request.cookies[SOCIAL_STATE_COOKIE]?.let { encryptionService.verifyCookie(it) }
+        if (boundNonce == null || !constantTimeEquals(boundNonce, socialState.csrfNonce)) {
+            call.clearSocialStateCookie(slug, secure)
+            call.respondHtml(
+                HttpStatusCode.BadRequest,
+                AuthView.loginPage(
+                    tenantSlug = slug,
+                    ctx = ctx.viewContext,
+                    error = "This sign-in did not start in this browser. Please try signing in again.",
+                    enabledProviders = enabledProviders,
+                    passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+                    passkeysEnabled = tenant?.passkeysEnabled == true,
+                ),
+            )
+            return@get
+        }
+        call.clearSocialStateCookie(slug, secure)
 
         val oauthParamsRaw =
             try {
