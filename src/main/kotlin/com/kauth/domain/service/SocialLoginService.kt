@@ -12,6 +12,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
@@ -62,12 +63,17 @@ class SocialLoginService(
 ) {
     /**
      * Builds the provider authorization URL that the browser should be redirected to.
+     *
+     * [binding] carries the nonce and PKCE verifier the caller generated for this request and
+     * signed into its state; an OIDC provider sends the nonce and the derived challenge with the
+     * authorization request, and the compiled-in OAuth2 adapters ignore it.
      */
     fun buildRedirectUrl(
         tenantSlug: String,
         provider: ProviderKey,
         state: String,
         baseUrl: String,
+        binding: OidcRequestBinding? = null,
     ): SocialLoginResult<String> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -82,12 +88,22 @@ class SocialLoginService(
             providerResolver.resolve(tenant.id, provider)
                 ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
+        // An OIDC adapter resolves its endpoints here, so this call reaches the network and can
+        // fail on a misconfigured issuer — an operator error, not a 500.
         val url =
-            adapter.buildAuthorizationUrl(
-                clientId = idp.clientId,
-                redirectUri = callbackUri(baseUrl, tenantSlug, provider),
-                state = state,
-            )
+            try {
+                adapter.buildAuthorizationUrl(
+                    clientId = idp.clientId,
+                    redirectUri = callbackUri(baseUrl, tenantSlug, provider),
+                    state = state,
+                    scopes = emptyList(),
+                    binding = binding,
+                )
+            } catch (e: Exception) {
+                return SocialLoginResult.Failure(
+                    SocialLoginError.ProviderError("Failed to build the authorization URL: ${e.message}"),
+                )
+            }
         return SocialLoginResult.Success(url)
     }
 
@@ -107,6 +123,7 @@ class SocialLoginService(
         baseUrl: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        binding: OidcRequestBinding? = null,
     ): SocialLoginResult<SocialLoginSuccess> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -128,6 +145,7 @@ class SocialLoginService(
                     redirectUri = callbackUri(baseUrl, tenantSlug, provider),
                     clientId = idp.clientId,
                     clientSecret = idp.clientSecret,
+                    binding = binding,
                 )
             } catch (e: Exception) {
                 return SocialLoginResult.Failure(

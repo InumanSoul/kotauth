@@ -1484,11 +1484,9 @@ object AuthView {
      * The contents of one social sign-in button. A provider key is an open string, so the
      * compiler cannot check this for exhaustiveness.
      *
-     * This fallback is not structurally dead the way the other non-exhaustive branches in this
-     * phase are: [enabledProviders] is read from identityProviderRepository, which parses whatever
-     * the provider column holds. It is unreachable because every *write* into that column is
-     * filtered to RESERVED — the admin save route and the backup importer — so no row with an
-     * unreserved key can exist to be read back. Phase 2 lands the brokered OIDC provider here.
+     * This fallback is live as of Phase 2: [enabledProviders] is read from
+     * identityProviderRepository, and the admin save route now writes any well-formed key, so a
+     * brokered OIDC provider reaches this branch and is rendered from its own key.
      */
     private fun FlowContent.socialProviderButton(
         key: ProviderKey,

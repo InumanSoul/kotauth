@@ -1,6 +1,7 @@
 package com.kauth.adapter.social
 
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.SocialProviderPort
 import com.kauth.domain.port.SocialUserProfile
 import kotlinx.serialization.json.Json
@@ -62,6 +63,7 @@ class GitHubOAuthAdapter : SocialProviderPort {
         redirectUri: String,
         state: String,
         scopes: List<String>,
+        binding: OidcRequestBinding?,
     ): String {
         val effectiveScopes = if (scopes.isEmpty()) DEFAULT_SCOPES else scopes
         val params =
@@ -79,6 +81,7 @@ class GitHubOAuthAdapter : SocialProviderPort {
         redirectUri: String,
         clientId: String,
         clientSecret: String,
+        binding: OidcRequestBinding?,
     ): SocialUserProfile {
         val accessToken = exchangeCode(code, redirectUri, clientId, clientSecret)
         return fetchProfile(accessToken)

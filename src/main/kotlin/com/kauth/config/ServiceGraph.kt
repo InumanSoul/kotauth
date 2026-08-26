@@ -31,7 +31,11 @@ import com.kauth.adapter.persistence.PostgresWebhookDeliveryRepository
 import com.kauth.adapter.persistence.PostgresWebhookEndpointRepository
 import com.kauth.adapter.social.GitHubOAuthAdapter
 import com.kauth.adapter.social.GoogleOAuthAdapter
+import com.kauth.adapter.social.HttpJwksAdapter
+import com.kauth.adapter.social.HttpOidcDiscoveryAdapter
+import com.kauth.adapter.social.JdkHttpFormPoster
 import com.kauth.adapter.token.BcryptPasswordHasher
+import com.kauth.adapter.token.JavaJwtVerifierAdapter
 import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
@@ -75,6 +79,7 @@ import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.OidcTokenValidator
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SecurityMethodsService
@@ -446,6 +451,13 @@ data class ServiceGraph(
                     apiKeyRepository = apiKeyRepository,
                     tenantRepository = tenantRepository,
                 )
+            // One discovery cache and one JWKS cache for every tenant's OIDC provider; the
+            // adapters the resolver builds per request share them.
+            val oidcTokenValidator =
+                OidcTokenValidator(
+                    jwks = HttpJwksAdapter(),
+                    verifier = JavaJwtVerifierAdapter(),
+                )
             val socialLoginService =
                 SocialLoginService(
                     identityProviderRepository = identityProviderRepository,
@@ -457,11 +469,16 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     providerResolver =
-                        StaticSocialProviderResolver(
-                            mapOf(
-                                ProviderKey.GOOGLE to GoogleOAuthAdapter(),
-                                ProviderKey.GITHUB to GitHubOAuthAdapter(),
-                            ),
+                        TenantAwareSocialProviderResolver(
+                            compiledIn =
+                                mapOf(
+                                    ProviderKey.GOOGLE to GoogleOAuthAdapter(),
+                                    ProviderKey.GITHUB to GitHubOAuthAdapter(),
+                                ),
+                            identityProviders = identityProviderRepository,
+                            discovery = HttpOidcDiscoveryAdapter(),
+                            tokenValidator = oidcTokenValidator,
+                            formPoster = JdkHttpFormPoster(),
                         ),
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,

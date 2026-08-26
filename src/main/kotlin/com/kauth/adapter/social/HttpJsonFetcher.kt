@@ -2,6 +2,7 @@ package com.kauth.adapter.social
 
 import java.io.InputStream
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -63,6 +64,54 @@ class JdkHttpJsonFetcher(
 
     companion object {
         const val DEFAULT_MAX_BODY_BYTES: Long = 256L * 1024L
+    }
+}
+
+/**
+ * The single outbound-form-POST seam, so the token exchange can be driven in a test without a
+ * network. The form carries an authorization code, a client secret and a PKCE verifier, and the
+ * response carries an ID token: nothing here, sent or received, may be logged.
+ */
+fun interface HttpFormPoster {
+    fun post(
+        url: String,
+        form: Map<String, String>,
+    ): HttpJsonResponse
+}
+
+/** Default poster over java.net.http.HttpClient, with the same body ceiling as the fetcher. */
+class JdkHttpFormPoster(
+    private val timeout: Duration = Duration.ofSeconds(15),
+    private val maxBodyBytes: Long = JdkHttpJsonFetcher.DEFAULT_MAX_BODY_BYTES,
+) : HttpFormPoster {
+    private val httpClient: HttpClient =
+        HttpClient
+            .newBuilder()
+            .connectTimeout(timeout)
+            // A token endpoint answers directly; a redirect here would replay the credentials.
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build()
+
+    override fun post(
+        url: String,
+        form: Map<String, String>,
+    ): HttpJsonResponse {
+        val body =
+            form.entries.joinToString("&") { (name, value) ->
+                "${URLEncoder.encode(name, StandardCharsets.UTF_8)}=${URLEncoder.encode(value, StandardCharsets.UTF_8)}"
+            }
+        val request =
+            HttpRequest
+                .newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+                .timeout(timeout)
+                .build()
+        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
+        val responseBody = response.body().use { readBounded(it, maxBodyBytes, url) }
+        return HttpJsonResponse(response.statusCode(), responseBody)
     }
 }
 

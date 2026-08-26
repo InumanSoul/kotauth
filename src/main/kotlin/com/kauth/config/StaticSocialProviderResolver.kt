@@ -6,9 +6,11 @@ import com.kauth.domain.port.SocialProviderPort
 import com.kauth.domain.port.SocialProviderResolver
 
 /**
- * Phase 1 resolver: the two compiled-in adapters, keyed by their reserved keys. [tenantId] is
- * unused here and present because Phase 2 resolves an OIDC adapter from that tenant's provider
- * row — taking it now keeps Phase 2 from being a signature change.
+ * The compiled-in adapters, keyed by their reserved keys, and nothing else. [tenantId] is unused:
+ * this resolver cannot reach a tenant's provider row, which is why the running graph now wires
+ * [TenantAwareSocialProviderResolver] instead and passes this same map to it as its reserved half.
+ *
+ * Kept as the composition for tests that want the compiled-in adapters and no OIDC machinery.
  */
 class StaticSocialProviderResolver(
     private val adapters: Map<ProviderKey, SocialProviderPort>,

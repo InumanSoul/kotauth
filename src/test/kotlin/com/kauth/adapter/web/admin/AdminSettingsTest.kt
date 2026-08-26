@@ -2,6 +2,7 @@ package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -750,14 +751,18 @@ class AdminSettingsTest {
     // =========================================================================
 
     @Test
-    fun `saving an identity provider for a well-formed key with no adapter is refused and writes nothing`() =
+    fun `saving an identity provider for an unreserved key is accepted and writes the row`() =
         testApplication {
             application { installTestAppWithIdpRepo() }
-            val authed = createClient { install(HttpCookies) }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
             login(authed)
 
-            // "okta" parses as a ProviderKey; only the RESERVED check refuses it. Drop that check
-            // and this request writes a row that no page lists and no delete route will accept.
+            // "okta" has no compiled-in adapter. Phase 1 refused it here; brokering is the point
+            // of Phase 2, so the key is now accepted and the row is written.
             val response =
                 authed.submitForm(
                     url = "/admin/workspaces/acme/settings/identity-providers/okta",
@@ -769,20 +774,17 @@ class AdminSettingsTest {
                         },
                 )
 
-            assertEquals(HttpStatusCode.BadRequest, response.status)
-            assertContains(
-                response.bodyAsText(),
-                "Unsupported provider: okta",
-                message = "Must be refused by the provider guard — a missing client id also returns a non-200",
-            )
-            assertTrue(
-                idpRepo.findAllByTenant(workspace.id).isEmpty(),
-                "No identity provider row may be written for a key that has no compiled-in adapter",
+            assertEquals(HttpStatusCode.Found, response.status)
+            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+            assertEquals(
+                "okta-client-id",
+                stored?.clientId,
+                "An unreserved key must persist its own row, not be dropped by a provider guard",
             )
         }
 
     @Test
-    fun `deleting an identity provider for a well-formed key with no adapter is refused`() =
+    fun `deleting an identity provider for an unreserved key removes its row`() =
         testApplication {
             application { installTestAppWithIdpRepo() }
             val authed =
@@ -791,6 +793,7 @@ class AdminSettingsTest {
                     followRedirects = false
                 }
             login(authed)
+            idpRepo.seed(workspace.id, "okta")
 
             val response =
                 authed.submitForm(
@@ -798,9 +801,10 @@ class AdminSettingsTest {
                     formParameters = Parameters.build { },
                 )
 
-            // A reserved key redirects (302) here even when nothing is configured, so the status
-            // alone separates the guard from the success path rather than from another failure.
-            assertEquals(HttpStatusCode.BadRequest, response.status)
+            // Seeding first is what makes this more than a status check: a guard that refused the
+            // key would 400 AND leave the row, so the empty repository is the discriminating half.
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(idpRepo.findAllByTenant(workspace.id).isEmpty())
         }
 
     @Test

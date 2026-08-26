@@ -3,6 +3,19 @@ package com.kauth.domain.port
 import com.kauth.domain.model.ProviderKey
 
 /**
+ * The two per-request values an OIDC round-trip is bound by: the nonce that ties the ID token to
+ * this request, and the PKCE verifier that ties the token exchange to whoever began it.
+ *
+ * The verifier travels rather than the challenge so only one place ever derives one from the
+ * other — a challenge sent at the redirect and a verifier replayed at the exchange cannot drift.
+ * Neither value may be logged.
+ */
+data class OidcRequestBinding(
+    val nonce: String,
+    val codeVerifier: String,
+)
+
+/**
  * Port — outbound HTTP calls to a social OAuth2 provider.
  *
  * Each concrete adapter (GoogleOAuthAdapter, GitHubOAuthAdapter) handles
@@ -22,12 +35,15 @@ interface SocialProviderPort {
      *                    (must match exactly — required by OAuth2 spec).
      * @param clientId    Provider OAuth2 client ID.
      * @param clientSecret Provider OAuth2 client secret.
+     * @param binding     The nonce and PKCE verifier this request began with. The compiled-in
+     *                    OAuth2 adapters ignore it; an OIDC provider requires it.
      */
     fun exchangeCodeForProfile(
         code: String,
         redirectUri: String,
         clientId: String,
         clientSecret: String,
+        binding: OidcRequestBinding? = null,
     ): SocialUserProfile
 
     /**
@@ -37,12 +53,15 @@ interface SocialProviderPort {
      * @param redirectUri Registered callback URI.
      * @param state       CSRF-protection state token (signed by EncryptionService).
      * @param scopes      OAuth2 scopes to request (defaults are set per provider).
+     * @param binding     The nonce and PKCE verifier this request begins with. The compiled-in
+     *                    OAuth2 adapters ignore it; an OIDC provider sends both.
      */
     fun buildAuthorizationUrl(
         clientId: String,
         redirectUri: String,
         state: String,
         scopes: List<String> = emptyList(),
+        binding: OidcRequestBinding? = null,
     ): String
 }
 

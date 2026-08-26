@@ -3,9 +3,12 @@ package com.kauth.adapter.web.auth
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.util.Pkce
+import com.kauth.domain.util.SecureTokens
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
@@ -18,6 +21,60 @@ import io.ktor.server.routing.post
 
 // Matches AdminRoutes and PortalRoutes, the two flows that already bound their signed state.
 private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
+
+/**
+ * The signed social-login state: `provider|slug|csrfNonce|timestampMillis|oidcNonce|
+ * pkceVerifier|oauthParamsB64`.
+ *
+ * Written in one place and read in one place, both through here, because the field order has
+ * grown twice and a reader left on an old index is a silent failure — the OAuth parameters would
+ * simply come back empty and the login would still complete, just not as an OAuth flow.
+ *
+ * [oauthParamsB64] is base64url without padding and both binding values are base64url too, so no
+ * field can contain the separator.
+ *
+ * The payload is deliberately not single-use: it is age-bounded, the authorization code is
+ * one-time at the issuer, PKCE binds the exchange to whoever began it and the nonce binds the ID
+ * token to this request. A server-side store would cost the property that any replica can
+ * complete any callback.
+ */
+private class SocialState(
+    val provider: String,
+    val slug: String,
+    val csrfNonce: String,
+    val timestampMillis: Long,
+    val binding: OidcRequestBinding,
+    val oauthParamsB64: String,
+) {
+    fun toPayload(): String =
+        listOf(
+            provider,
+            slug,
+            csrfNonce,
+            timestampMillis.toString(),
+            binding.nonce,
+            binding.codeVerifier,
+            oauthParamsB64,
+        ).joinToString("|")
+
+    companion object {
+        private const val FIELD_COUNT = 7
+
+        fun parse(payload: String): SocialState? {
+            val parts = payload.split("|")
+            if (parts.size < FIELD_COUNT) return null
+            val timestampMillis = parts[3].toLongOrNull() ?: return null
+            return SocialState(
+                provider = parts[0],
+                slug = parts[1],
+                csrfNonce = parts[2],
+                timestampMillis = timestampMillis,
+                binding = OidcRequestBinding(nonce = parts[4], codeVerifier = parts[5]),
+                oauthParamsB64 = parts[6],
+            )
+        }
+    }
+}
 
 internal fun Route.socialLoginRoutes(
     oauthService: OAuthService,
@@ -32,10 +89,10 @@ internal fun Route.socialLoginRoutes(
         val slug = ctx.slug
         val tenant = ctx.tenant
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        // Phase 1 serves only the compiled-in adapters; RESERVED is that set, so an
-        // otherwise well-formed key still gets today's 400 until Phase 2 adds OIDC.
+        // Any key the pattern accepts may be a configured OIDC provider. Whether this tenant has
+        // one is the provider lookup's answer, not this guard's.
         val provider =
-            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
+            ProviderKey.of(provName)
                 ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
         if (socialLoginService == null) {
@@ -48,15 +105,30 @@ internal fun Route.socialLoginRoutes(
             java.util.UUID
                 .randomUUID()
                 .toString()
+        // Generated per request, carried in the signed state, and read back in the callback: the
+        // nonce binds the ID token to this request and the verifier binds the token exchange to it.
+        val binding =
+            OidcRequestBinding(
+                nonce = SecureTokens.randomBase64Url(),
+                codeVerifier = Pkce.newVerifier(),
+            )
         val oauthParamsB64 =
             java.util.Base64
                 .getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(oauthParams.toQueryString().toByteArray(Charsets.UTF_8))
-        val statePayload = "${provider.value}|$slug|$csrfNonce|${System.currentTimeMillis()}|$oauthParamsB64"
+        val statePayload =
+            SocialState(
+                provider = provider.value,
+                slug = slug,
+                csrfNonce = csrfNonce,
+                timestampMillis = System.currentTimeMillis(),
+                binding = binding,
+                oauthParamsB64 = oauthParamsB64,
+            ).toPayload()
         val signedState = encryptionService.signCookie(statePayload)
 
-        when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl)) {
+        when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl, binding)) {
             is SocialLoginResult.Success -> call.respondRedirect(result.value)
             is SocialLoginResult.Failure -> {
                 val enabledProviders =
@@ -87,10 +159,10 @@ internal fun Route.socialLoginRoutes(
         val slug = ctx.slug
         val tenant = ctx.tenant
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
-        // Phase 1 serves only the compiled-in adapters; RESERVED is that set, so an
-        // otherwise well-formed key still gets today's 400 until Phase 2 adds OIDC.
+        // Any key the pattern accepts may be a configured OIDC provider. Whether this tenant has
+        // one is the provider lookup's answer, not this guard's.
         val provider =
-            ProviderKey.of(provName)?.takeIf { it in ProviderKey.RESERVED }
+            ProviderKey.of(provName)
                 ?: return@get call.respond(HttpStatusCode.BadRequest, mapOf("error" to "unsupported_provider"))
 
         val enabledProviders =
@@ -144,11 +216,11 @@ internal fun Route.socialLoginRoutes(
             return@get
         }
 
-        val parts = verifiedPayload.split("|")
-        val stateAgeMs = parts.getOrNull(3)?.toLongOrNull()?.let { System.currentTimeMillis() - it }
-        if (parts.size < 5 ||
-            parts[0] != provider.value ||
-            parts[1] != slug ||
+        val socialState = SocialState.parse(verifiedPayload)
+        val stateAgeMs = socialState?.let { System.currentTimeMillis() - it.timestampMillis }
+        if (socialState == null ||
+            socialState.provider != provider.value ||
+            socialState.slug != slug ||
             stateAgeMs == null ||
             stateAgeMs > SOCIAL_STATE_MAX_AGE_MS
         ) {
@@ -171,7 +243,7 @@ internal fun Route.socialLoginRoutes(
                 String(
                     java.util.Base64
                         .getUrlDecoder()
-                        .decode(parts[4]),
+                        .decode(socialState.oauthParamsB64),
                     Charsets.UTF_8,
                 )
             } catch (_: Exception) {
@@ -191,6 +263,7 @@ internal fun Route.socialLoginRoutes(
                     baseUrl = baseUrl,
                     ipAddress = ipAddress,
                     userAgent = userAgent,
+                    binding = socialState.binding,
                 )
         ) {
             is SocialLoginResult.Failure -> {
