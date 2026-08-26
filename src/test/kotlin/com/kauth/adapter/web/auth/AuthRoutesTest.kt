@@ -899,6 +899,41 @@ class AuthRoutesTest {
         }
 
     @Test
+    fun `GET mfa-challenge refuses a pending cookie minted for another tenant`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // Our signature, our format, another tenant's slug — the challenge page must not
+            // render for a cookie this tenant never minted.
+            val cookieValue = encryptionService.signCookie("10|otherco|${System.currentTimeMillis()}")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
     fun `GET mfa-challenge shows challenge form when valid signed cookie is present`() =
         testApplication {
             resetFixtures()

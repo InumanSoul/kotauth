@@ -16,6 +16,10 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+// The pending MFA challenge: `userId|slug|timestampMillis`.
+private const val MFA_PENDING_FIELD_COUNT = 3
+private const val MFA_PENDING_SLUG = 1
+
 internal fun Route.mfaRoutes(
     oauthService: OAuthService,
     mfaService: MfaService?,
@@ -29,7 +33,10 @@ internal fun Route.mfaRoutes(
         val slug = ctx.slug
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
-        if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
+        val pendingGet = rawPendingGet?.takeIf { it.isNotBlank() }?.let { encryptionService.verifyCookie(it) }
+        // The slug travels in the payload; comparing it is what makes the cookie this tenant's.
+        // A signature proves only that we minted it, not that it belongs here.
+        if (pendingGet == null || pendingGet.split("|").getOrNull(MFA_PENDING_SLUG) != slug) {
             return@get call.respondRedirect("/t/$slug/authorize")
         }
 
@@ -70,7 +77,7 @@ internal fun Route.mfaRoutes(
             return@post call.respondRedirect("/t/$slug/authorize")
         }
         val parts = pending.split("|")
-        if (parts.size != 3) {
+        if (parts.size != MFA_PENDING_FIELD_COUNT || parts[MFA_PENDING_SLUG] != slug) {
             return@post call.respondRedirect("/t/$slug/authorize")
         }
         val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
