@@ -655,7 +655,7 @@ fun Route.adminUserRoutes(
                                     userId = actorId,
                                     clientId = null,
                                     eventType = AuditEventType.PASSKEY_ADMIN_REVOKED,
-                                    ipAddress = call.request.origin.remoteHost,
+                                    ipAddress = call.request.origin.remoteAddress,
                                     userAgent = null,
                                     details =
                                         mapOf(
@@ -715,7 +715,7 @@ fun Route.adminUserRoutes(
                     mfaService.disableMfa(
                         userId = userId,
                         tenantId = ctx.workspace.id,
-                        ipAddress = call.request.origin.remoteHost,
+                        ipAddress = call.request.origin.remoteAddress,
                     )
                     auditLogPort.record(
                         AuditEvent(
@@ -723,7 +723,7 @@ fun Route.adminUserRoutes(
                             userId = actorId,
                             clientId = null,
                             eventType = AuditEventType.MFA_ADMIN_RESET,
-                            ipAddress = call.request.origin.remoteHost,
+                            ipAddress = call.request.origin.remoteAddress,
                             userAgent = null,
                             details = mapOf("targetUser" to userId.value.toString()),
                         ),

@@ -19,7 +19,6 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.util.Pkce
-import com.kauth.installTrustedProxyHeaders
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -34,6 +33,7 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.installTrustedProxyHeaders
 import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get

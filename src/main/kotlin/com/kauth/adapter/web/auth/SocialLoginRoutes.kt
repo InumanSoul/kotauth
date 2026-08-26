@@ -510,7 +510,7 @@ internal fun Route.socialLoginRoutes(
             }
         val restoredParams = parseQueryStringToOAuthParams(oauthParamsRaw)
 
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
 
         when (
@@ -654,7 +654,7 @@ internal fun Route.socialLoginRoutes(
         val params = call.receiveParameters()
         val chosenUsername = params["username"]?.trim() ?: ""
         val chosenFullName = params["full_name"]?.trim()
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
         val originatingClientId =
             parseQueryStringToOAuthParams(pending.oauthParamsRaw).clientId

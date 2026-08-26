@@ -41,6 +41,7 @@ import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.createRouteScopedPlugin
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.request.uri
 import io.ktor.server.response.respond
@@ -220,7 +221,7 @@ fun Route.adminRoutes(
             }
 
             val redirectUri = "$baseUrl/admin/callback"
-            val ipAddress = call.request.local.remoteAddress
+            val ipAddress = call.request.origin.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
             val tokenResult =
                 oauthService?.exchangeAuthorizationCode(

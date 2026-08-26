@@ -8,6 +8,7 @@ import com.kauth.domain.service.SelfServiceResult
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -64,7 +65,7 @@ internal fun Route.magicLinkRoutes(
             return@post call.respondRedirect("/t/${ctx.slug}/magic-link?sent=true")
         }
 
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val rateLimitKey = "magic-link:$ipAddress:${ctx.slug}"
         // Even on rate-limit hit, respond with the success state — no timing oracle
         if (!rateLimiter.isAllowed(rateLimitKey)) {
@@ -139,7 +140,7 @@ internal fun Route.magicLinkRoutes(
                 val user = result.value
                 // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
                 val tenant = ctx.tenant
-                val ipAddress = call.request.local.remoteAddress
+                val ipAddress = call.request.origin.remoteAddress
                 call.completeAuthorizationCodeFlow(
                     slug = ctx.slug,
                     userId = user.id!!,

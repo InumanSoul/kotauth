@@ -60,7 +60,7 @@ fun Route.adminUserImpersonationRoute(
                 adminSessionId = adminSessionId,
                 targetTenantId = ctx.workspace.id,
                 targetUserId = userId,
-                ipAddress = call.request.origin.remoteHost,
+                ipAddress = call.request.origin.remoteAddress,
                 userAgent = call.request.userAgent(),
             )
 
@@ -136,7 +136,7 @@ fun Route.portalImpersonationStopRoute(impersonationService: ImpersonationServic
             adminUserId = UserId(portal.impersonatorAdminUserId!!),
             adminSessionId = adminSessionId,
             impersonationSessionId = impersonationSessionId,
-            ipAddress = call.request.origin.remoteHost,
+            ipAddress = call.request.origin.remoteAddress,
             userAgent = call.request.userAgent(),
         )
 

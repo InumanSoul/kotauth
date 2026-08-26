@@ -8,6 +8,7 @@ import com.kauth.domain.service.OtpSendResult
 import com.kauth.domain.service.OtpVerifyResult
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -45,7 +46,7 @@ internal fun Route.apiOtpRoutes(
                     "A non-empty email address is required.",
                 )
             }
-            val ip = call.request.local.remoteHost
+            val ip = call.request.origin.remoteAddress
 
             if (!perEmailLimiter.isAllowed("$PER_EMAIL_RATE_PREFIX:$tenantSlug:$normalizedEmail") ||
                 !perIpLimiter.isAllowed("$PER_IP_RATE_PREFIX:$ip")
@@ -91,7 +92,7 @@ internal fun Route.apiOtpRoutes(
                         "tenantSlug path parameter is required.",
                     )
             val body = call.receive<VerifyOtpRequest>()
-            val ip = call.request.local.remoteHost
+            val ip = call.request.origin.remoteAddress
 
             when (
                 val result =

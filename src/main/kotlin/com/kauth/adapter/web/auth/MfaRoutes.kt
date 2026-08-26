@@ -9,6 +9,7 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
@@ -51,7 +52,7 @@ internal fun Route.mfaRoutes(
         val slug = ctx.slug
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
 
         val rateLimitKey = "mfa:$ipAddress:$slug"
         if (!mfaRateLimiter.isAllowed(rateLimitKey)) {
