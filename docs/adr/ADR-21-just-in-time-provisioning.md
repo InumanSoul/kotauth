@@ -47,6 +47,15 @@ read as the allowed domain.
 established that no `social_accounts` row and no local email match this identity. It has no update
 path, no link path, and no way to reach a user that already exists.
 
+**JIT is not limited to registered OIDC issuers.** `provision` turns on `jit_enabled` alone, and the
+admin form renders the same controls on the built-in `google` and `github` cards, so it works there
+exactly as it does for an issuer an operator registered. The trust condition is the same one, but it
+reads very differently on a consumer provider: allowlisting `gmail.com` on `google` auto-creates an
+account for anybody at all with a Google account, because the allowlist is the whole of the
+restriction and that domain is one anyone can hold an address at. The rule to carry away is that the
+allowlist has to name a domain whose *addresses* the workspace controls, not merely a domain it
+recognises.
+
 **What runs before the gate is a link, and it is older than this phase.** `resolveExistingUser` runs
 on every brokered callback, whether or not JIT is switched on. It looks for a `social_accounts` row
 for `(tenant, provider, subject)` first; failing that, it looks the asserted address up with
