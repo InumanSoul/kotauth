@@ -1,4 +1,4 @@
-# ADR-21 — Just-in-time provisioning creates accounts and never adopts them
+# ADR-21 — Just-in-time provisioning only creates; linking happens before the gate
 
 **Status:** Accepted
 
@@ -47,6 +47,16 @@ read as the allowed domain.
 established that no `social_accounts` row and no local email match this identity. It has no update
 path, no link path, and no way to reach a user that already exists.
 
+**What runs before the gate is a link, and it is older than this phase.** `resolveExistingUser` runs
+on every brokered callback, whether or not JIT is switched on. It looks for a `social_accounts` row
+for `(tenant, provider, subject)` first; failing that, it looks the asserted address up with
+`userRepository.findByEmail(tenantId, email)`. If a local user **in that workspace** holds the
+address and the provider asserts it verified, the identity is linked to that user and that user is
+signed in. If the provider does not assert it verified, the sign-in ends in
+`LinkRequiresEmailVerification` — no link, no account, no fall-through. So the gate is not what
+stands between an asserted address and an existing account; the `email_verified` check in
+`resolveExistingUser` is. The rationale below states what that costs a deployment.
+
 What a provisioned account looks like:
 
 - **`username` is the email address.** SCIM's `userName` is the email too, so a provisioning client
@@ -87,30 +97,40 @@ operator chose independently.
 
 The gate governs **auto-creation**, not all account creation. Two doors, two switches.
 
-### Why JIT never adopts an existing account, and what that costs
+### Why the callback links a verified email, and what that costs
 
-The tempting behaviour is the one the market ships: an asserted verified email that matches an existing
-local user gets linked to it, and the person signs in to the account they already had. Keycloak, Zitadel
-and Okta all offer some form of verified auto-link. This implementation does not, and the reason is that
-the link is the takeover.
+The behaviour here is the one the market ships. An asserted verified address that matches an existing
+local user is linked to that user, and the person signs in to the account they already had — the same
+shape Keycloak, Zitadel and Okta offer. `resolveExistingUser` does it, it predates this phase, and it
+stays.
 
-A provider willing to assert `verified: true` for an address it does not own is, under an auto-link
-rule, a way to sign in as the owner of that address. On a single-tenant install with one trusted
-corporate IdP that is a manageable assumption. On a multi-tenant instance where administering one
-workspace is enough to register an issuer, it is a privilege-escalation primitive, and the earlier
-fixes in this phase — binding `state` to the browser, scoping the social cookies to their workspace —
-were all closing variants of exactly that shape.
+What bounds it is that the lookup is tenant-scoped. `findByEmail(tenantId, email)` cannot see a user
+in another workspace, so the link an assertion can cause is always *within* the workspace whose
+administrator registered that provider. An administrator of a workspace already holds direct power
+over the users in it — changing an address, resetting a credential, creating an account and signing in
+as it — so an identity linked to one of those users is not more than they already have. This is not a
+cross-tenant escalation and is not written up as one.
 
-**The consequence has to be written down rather than discovered from a support ticket.** A person who
-already has a local account and later arrives with the same verified email from an identity provider
-gets a refusal or a registration page, never their existing account. **There is no self-service path
-out of that state.** An administrator reconciles the two records — deleting or renaming one, or linking
-the identity deliberately. Anyone planning a migration where existing local users will start arriving
-through an IdP should plan that reconciliation as part of the rollout, not meet it afterwards.
+**The residual surface, stated plainly.** An operator who can register an issuer for a workspace can
+point it at an issuer they control, and that issuer can assert any address with `email_verified: true`.
+So *the set of people who can configure an identity provider for a workspace is the set of people who
+can reach any account in that workspace by email address.* Where those are the same people — a
+single-tenant install with one corporate IdP, or a workspace whose administrators already administer
+its users — nothing follows from it. Where provider configuration is delegated more widely than user
+administration, it does: the two have to be held at the same level of trust, because they are
+equivalent. That is a deployment decision rather than a defect, but it is one to make knowingly rather
+than discover from a support ticket.
 
-This is a deliberate asymmetry: creation is automatic, adoption is manual. Automatic creation of a
-brand-new record risks a duplicate account, which is annoying and reversible. Automatic adoption of an
-existing record risks handing over an account, which is neither.
+**An unverified address does not link.** A provider that will not stand behind the claim gets
+`LinkRequiresEmailVerification` and the flow ends. There is no self-service path out of *that* state:
+an administrator reconciles the two records — verifying the address at the provider, renaming the local
+one, or linking the identity deliberately. A migration where existing local users start arriving through
+an IdP that does not assert `email_verified` should plan that reconciliation as part of the rollout.
+
+**`JitProvisioningService` itself only ever creates**, and that is what keeps the two decisions apart.
+The gate has no update path and no link path, and it is reached only where nothing matched — so
+switching JIT on adds automatic *creation* for the domains an operator named and adds nothing to the
+linking rule, which was already there and turns on the provider's `email_verified` claim alone.
 
 ### Why the empty allowlist is off rather than open
 
@@ -165,10 +185,11 @@ plumbing invites a reader to assume evidence that does not exist.
   UI badges the record accordingly, with its own wording rather than the SCIM badge's, because no sync
   ever runs over a brokered account and "may be overwritten on its next sync" would send an operator
   looking for a sync that does not exist.
-- **A first sign-in and a duplicate are the same event to an operator until they look.** Someone whose
-  local account predates the provider will appear as a refusal or a second registration, not as a
-  link. The diagnostics panel is where that shows up, and it shows the email domain and a reference,
-  never the address — deliberately, so the panel does not become a list of everyone who was turned away.
+- **An existing local account is reached by a verified address, not by the gate.** Someone whose local
+  account predates the provider signs in to that account, linked on first arrival; an unverified
+  address is refused instead, and only an address matching nobody reaches the gate at all. The
+  diagnostics panel shows the refusals, carrying the email domain and a reference, never the address —
+  deliberately, so the panel does not become a list of everyone who was turned away.
 - Group and role claim mapping is **not** part of this. A provisioned user gets the originating
   client's default roles and nothing derived from the token's claims. Mapping needs its own design pass
   for claim shapes and precedence, and guessing at it here would set a shape that is hard to change.

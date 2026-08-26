@@ -46,18 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `evil-example.com` — and **an empty list is the feature switched off, never a
   wildcard**, so the toggle alone provisions nobody.
 
-  **Provisioning only ever creates.** The gate runs after existing-user
-  resolution, so an address a provider asserts can never take over a local
-  account that already has it. That is stricter than comparable products,
-  which offer some verified auto-link path, and it has a consequence worth
-  knowing before a rollout: someone who already has a local account and later
-  arrives with the same verified address from an identity provider has **no
-  self-service path** — an administrator reconciles the two records. A created
-  account takes the email address as its username, so a SCIM connector later
-  wired to the same directory finds it rather than creating a duplicate;
-  `externalId` is left for SCIM to set, the provider identity is linked in
-  `social_accounts`, the originating client's default roles are granted, and
-  every creation is audited. See
+  **The gate only ever creates.** It has no link path and no update path, and
+  it is reached only once nothing matched the identity — so switching automatic
+  creation on cannot widen what a provider's assertion may reach. Linking is a
+  separate, older rule that runs on every brokered callback whether or not
+  automatic creation is on: a verified address matching a local user **in the
+  same workspace** links the identity to that user and signs them in, and an
+  unverified one ends the sign-in rather than linking. That refusal has **no
+  self-service path** — an administrator reconciles the two records. The
+  consequence worth knowing before a rollout is a configuration one: an
+  operator who can register an issuer for a workspace can have it assert any
+  address, so configuring an identity provider needs to be held at the same
+  level of trust as administering that workspace's users.
+
+  A created account takes the email address as its username, so a SCIM
+  connector later wired to the same directory finds it rather than creating a
+  duplicate; `externalId` is left for SCIM to set, the provider identity is
+  linked in `social_accounts`, the originating client's default roles are
+  granted, and every creation is audited. See
   `docs/adr/ADR-21-just-in-time-provisioning.md`.
 
   A refused sign-in is explained rather than dressed up as a failed login: the
