@@ -159,4 +159,109 @@ class HttpOidcDiscoveryAdapterTest {
         val failure = assertIs<OidcDiscoveryFailure>(adapter.discover(issuer).exceptionOrNull())
         assertEquals(OidcDiscoveryFailure.Reason.FETCH_FAILED, failure.reason)
     }
+
+    // -- scheme enforcement -------------------------------------------------
+
+    @Test
+    fun `an http issuer is refused before any fetch is made`() {
+        val insecure = "http://issuer.example"
+        fetcher.respondWith("$insecure/.well-known/openid-configuration", document(declaredIssuer = insecure))
+
+        val result = adapter.discover(insecure)
+
+        val failure = assertIs<OidcDiscoveryFailure>(result.exceptionOrNull())
+        assertEquals(OidcDiscoveryFailure.Reason.INSECURE_URL, failure.reason)
+        // Over plaintext the issuer check compares the attacker's value with itself, so the
+        // document must never be fetched at all.
+        assertEquals(0, fetcher.requestedUrls.size)
+    }
+
+    @Test
+    fun `a document publishing an http endpoint is refused and never cached`() {
+        fetcher.respondWith(wellKnown, endpointDocument(jwksUri = "http://issuer.example/jwks"))
+
+        val failure = assertIs<OidcDiscoveryFailure>(adapter.discover(issuer).exceptionOrNull())
+        assertEquals(OidcDiscoveryFailure.Reason.INSECURE_URL, failure.reason)
+
+        fetcher.respondWith(wellKnown, document())
+        assertEquals("$issuer/jwks", adapter.discover(issuer).getOrThrow().jwksUri)
+    }
+
+    @Test
+    fun `a pinned http endpoint is refused`() {
+        val overrides =
+            OidcEndpointOverrides(
+                authorizationEndpoint = "https://pinned.example/authorize",
+                tokenEndpoint = "http://pinned.example/token",
+                jwksUri = "https://pinned.example/jwks",
+            )
+
+        val result = adapter.discover(issuer, overrides)
+
+        assertEquals(
+            OidcDiscoveryFailure.Reason.INSECURE_URL,
+            assertIs<OidcDiscoveryFailure>(result.exceptionOrNull()).reason,
+        )
+        assertEquals(0, fetcher.requestedUrls.size)
+    }
+
+    @Test
+    fun `a loopback issuer may use http for local development`() {
+        val local = "http://localhost:8080/realms/kotauth"
+        val localWellKnown = "$local/.well-known/openid-configuration"
+        fetcher.respondWith(
+            localWellKnown,
+            endpointDocument(
+                declaredIssuer = local,
+                authorizationEndpoint = "http://localhost:8080/authorize",
+                tokenEndpoint = "http://127.0.0.1:8080/token",
+                jwksUri = "http://localhost:8080/jwks",
+            ),
+        )
+
+        val discovery = adapter.discover(local).getOrThrow()
+
+        assertEquals(local, discovery.issuer)
+        assertEquals("http://127.0.0.1:8080/token", discovery.tokenEndpoint)
+    }
+
+    @Test
+    fun `a host that merely looks like loopback is refused`() {
+        val lookalike = "http://localhost.attacker.example"
+
+        val failure = assertIs<OidcDiscoveryFailure>(adapter.discover(lookalike).exceptionOrNull())
+
+        assertEquals(OidcDiscoveryFailure.Reason.INSECURE_URL, failure.reason)
+        assertEquals(0, fetcher.requestedUrls.size)
+    }
+
+    // -- response size ------------------------------------------------------
+
+    @Test
+    fun `an oversized document is refused with its own reason`() {
+        fetcher.failWith = ResponseTooLargeException(1_024L, wellKnown)
+
+        val result = adapter.discover(issuer)
+
+        val failure = assertIs<OidcDiscoveryFailure>(result.exceptionOrNull())
+        // Distinct from FETCH_FAILED on purpose: a dead IdP and an issuer URL pointing at
+        // something enormous are different operator problems with different fixes.
+        assertEquals(OidcDiscoveryFailure.Reason.RESPONSE_TOO_LARGE, failure.reason)
+        assertNull(result.getOrNull())
+    }
+
+    private fun endpointDocument(
+        declaredIssuer: String = issuer,
+        authorizationEndpoint: String = "$issuer/authorize",
+        tokenEndpoint: String = "$issuer/token",
+        jwksUri: String = "$issuer/jwks",
+    ): String =
+        """
+        {
+          "issuer": "$declaredIssuer",
+          "authorization_endpoint": "$authorizationEndpoint",
+          "token_endpoint": "$tokenEndpoint",
+          "jwks_uri": "$jwksUri"
+        }
+        """.trimIndent()
 }

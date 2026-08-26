@@ -1,5 +1,6 @@
 package com.kauth.adapter.social
 
+import com.kauth.domain.model.OidcUrlPolicy
 import com.kauth.domain.port.JwksFailure
 import com.kauth.domain.port.JwksFailure.Reason
 import com.kauth.domain.port.JwksPort
@@ -48,6 +49,10 @@ class HttpJwksAdapter(
         jwksUri: String,
         kid: String,
     ): Result<PublicKey> {
+        // Third gate on the same rule, after config time and discovery: no path reaches a signing
+        // key over plaintext, including a jwks_uri written straight into the database.
+        OidcUrlPolicy.problemWith(jwksUri, "JWKS URI")?.let { return failure(Reason.INSECURE_URL, it) }
+
         val now = clock()
         val cached = cache[jwksUri]
         if (cached != null) {
@@ -74,6 +79,9 @@ class HttpJwksAdapter(
         val response =
             try {
                 fetcher.get(jwksUri)
+            } catch (e: ResponseTooLargeException) {
+                log.warn("JWKS fetch at {} exceeded the {} byte limit", jwksUri, e.maxBytes)
+                return failure(Reason.RESPONSE_TOO_LARGE, e.message ?: "Key set at $jwksUri is too large.")
             } catch (e: Exception) {
                 log.warn("JWKS fetch failed for {}: {}", jwksUri, e.javaClass.simpleName)
                 return failure(Reason.FETCH_FAILED, "Could not reach the key set at $jwksUri.")

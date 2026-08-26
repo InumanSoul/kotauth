@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.OidcUrlPolicy
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.TenantId
@@ -189,9 +190,11 @@ class IdentityProviderService(
         if (value == null) return null
         if (value.length > maxLength) return "The $field must be $maxLength characters or fewer."
         val uri = runCatching { URI(value) }.getOrNull() ?: return "The $field must be a valid absolute URL."
-        if (uri.scheme?.lowercase() !in URL_SCHEMES) return "The $field must be an http or https URL."
+        if (uri.scheme?.lowercase() !in URL_SCHEMES) return OidcUrlPolicy.problemWith(value, field)
         if (uri.host.isNullOrBlank()) return "The $field must include a host."
-        return null
+        // https, or http on loopback only. The discovery adapter refuses the same URLs at fetch
+        // time; this one exists so an operator hears it at the point of the mistake.
+        return OidcUrlPolicy.problemWith(value, field)
     }
 
     private fun String?.trimToNull(): String? = this?.trim()?.ifEmpty { null }

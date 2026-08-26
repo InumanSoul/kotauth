@@ -1,5 +1,6 @@
 package com.kauth.adapter.social
 
+import com.kauth.domain.model.OidcUrlPolicy
 import com.kauth.domain.port.OidcDiscovery
 import com.kauth.domain.port.OidcDiscoveryFailure
 import com.kauth.domain.port.OidcDiscoveryFailure.Reason
@@ -37,24 +38,44 @@ class HttpOidcDiscoveryAdapter(
         issuer: String,
         overrides: OidcEndpointOverrides,
     ): Result<OidcDiscovery> {
-        pinnedDiscovery(issuer, overrides)?.let { return Result.success(it) }
+        // Defence in depth behind IdentityProviderService: a stored row can predate that check or
+        // be written straight into the database. Over plaintext the issuer check below is worthless,
+        // because an on-path attacker rewrites the document and its issuer field together.
+        OidcUrlPolicy.problemWith(issuer, "issuer")?.let { return failure(Reason.INSECURE_URL, it) }
+
+        pinnedDiscovery(issuer, overrides)?.let { return secured(it) }
 
         val now = clock()
         val cached = cache[issuer]
         if (cached != null && now - cached.loadedAt < ttlMillis) {
-            return Result.success(cached.discovery.withOverrides(overrides))
+            return secured(cached.discovery.withOverrides(overrides))
         }
 
         val fetched = fetch(issuer).getOrElse { return Result.failure(it) }
         cache[issuer] = Entry(fetched, now)
-        return Result.success(fetched.withOverrides(overrides))
+        return secured(fetched.withOverrides(overrides))
     }
+
+    /** Every endpoint we are about to hand out, pinned or discovered, must survive the URL policy. */
+    private fun secured(discovery: OidcDiscovery): Result<OidcDiscovery> {
+        endpointProblem(discovery)?.let { return failure(Reason.INSECURE_URL, it) }
+        return Result.success(discovery)
+    }
+
+    // An http endpoint inside an https document is a downgrade nothing downstream can see.
+    private fun endpointProblem(discovery: OidcDiscovery): String? =
+        OidcUrlPolicy.problemWith(discovery.authorizationEndpoint, "authorization_endpoint")
+            ?: OidcUrlPolicy.problemWith(discovery.tokenEndpoint, "token_endpoint")
+            ?: OidcUrlPolicy.problemWith(discovery.jwksUri, "jwks_uri")
 
     private fun fetch(issuer: String): Result<OidcDiscovery> {
         val url = wellKnownUrl(issuer)
         val response =
             try {
                 fetcher.get(url)
+            } catch (e: ResponseTooLargeException) {
+                log.warn("OIDC discovery fetch at {} exceeded the {} byte limit", url, e.maxBytes)
+                return failure(Reason.RESPONSE_TOO_LARGE, e.message ?: "Discovery document at $url is too large.")
             } catch (e: Exception) {
                 log.warn("OIDC discovery fetch failed for {}: {}", url, e.javaClass.simpleName)
                 return failure(Reason.FETCH_FAILED, "Could not reach the discovery document at $url.")
@@ -100,15 +121,21 @@ class HttpOidcDiscoveryAdapter(
             field("jwks_uri")
                 ?: return failure(Reason.MALFORMED, "Discovery document at $url declares no jwks_uri.")
 
-        return Result.success(
+        val discovery =
             OidcDiscovery(
                 issuer = declaredIssuer,
                 authorizationEndpoint = authorizationEndpoint,
                 tokenEndpoint = tokenEndpoint,
                 jwksUri = jwksUri,
                 endSessionEndpoint = field("end_session_endpoint"),
-            ),
-        )
+            )
+        // Checked here as well as in secured(), so a document publishing an http endpoint is
+        // never the thing sitting in the cache for the next hour.
+        endpointProblem(discovery)?.let {
+            log.warn("OIDC discovery document at {} publishes a non-https endpoint", url)
+            return failure(Reason.INSECURE_URL, it)
+        }
+        return Result.success(discovery)
     }
 
     /** A complete set of pinned endpoints needs no document at all. */

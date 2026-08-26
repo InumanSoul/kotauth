@@ -32,6 +32,12 @@ class OidcDiscoveryFailure(
         /** The document could not be retrieved. */
         FETCH_FAILED,
 
+        /** The far end sent more than a discovery document's worth of bytes. */
+        RESPONSE_TOO_LARGE,
+
+        /** The issuer, or an endpoint it published, is not an https URL. */
+        INSECURE_URL,
+
         /** The document parsed but is missing an endpoint we require. */
         MALFORMED,
 
@@ -45,7 +51,9 @@ interface OidcDiscoveryPort {
     /**
      * Resolves [issuer] to its endpoints, honouring any [overrides] the operator pinned.
      *
-     * The returned document is only ever one whose own `issuer` matched [issuer] exactly.
+     * The returned document is only ever one whose own `issuer` matched [issuer] exactly, over
+     * a connection the [com.kauth.domain.model.OidcUrlPolicy] accepts, publishing endpoints the
+     * same policy accepts.
      */
     fun discover(
         issuer: String,

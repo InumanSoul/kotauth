@@ -116,7 +116,7 @@ class IdentityProviderServiceTest {
     }
 
     @Test
-    fun `an oidc issuer must be an absolute http url`() {
+    fun `an oidc issuer must be an absolute https url`() {
         val result =
             service.save(
                 tenantId,
@@ -127,7 +127,7 @@ class IdentityProviderServiceTest {
                 issuer = "issuer.example",
             )
         val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
-        assertContains(error.message, "The issuer must be an http or https URL")
+        assertContains(error.message, "The issuer must be an https URL")
     }
 
     @Test
@@ -226,5 +226,69 @@ class IdentityProviderServiceTest {
         service.save(tenantId, key = ProviderKey.GITHUB, clientId = "c", clientSecret = "s")
         assertIs<AdminResult.Success<*>>(service.delete(tenantId, ProviderKey.GITHUB))
         assertTrue(service.list(tenantId).isEmpty())
+    }
+
+    @Test
+    fun `an http issuer is rejected`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s",
+                kind = ProviderKind.OIDC,
+                issuer = "http://issuer.example",
+            )
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        // OIDC Core section 2. Over plaintext the discovery document and the issuer inside it are
+        // rewritten together, so the adapter's issuer check compares the attacker's value with itself.
+        assertContains(error.message, "The issuer must be an https URL")
+    }
+
+    @Test
+    fun `an http issuer is accepted on loopback for local development`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s",
+                kind = ProviderKind.OIDC,
+                issuer = "http://localhost:8080/realms/kotauth",
+                jwksUri = "http://127.0.0.1:8080/realms/kotauth/protocol/openid-connect/certs",
+            )
+        val saved = assertIs<AdminResult.Success<IdentityProvider>>(result).value
+        assertEquals("http://localhost:8080/realms/kotauth", saved.issuer)
+    }
+
+    @Test
+    fun `a host that merely looks like loopback is rejected`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s",
+                kind = ProviderKind.OIDC,
+                issuer = "http://localhost.attacker.example",
+            )
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "The issuer must be an https URL")
+    }
+
+    @Test
+    fun `an http endpoint override is rejected even under an https issuer`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s",
+                kind = ProviderKind.OIDC,
+                issuer = "https://issuer.example",
+                jwksUri = "http://issuer.example/jwks",
+            )
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "The JWKS URI must be an https URL")
     }
 }

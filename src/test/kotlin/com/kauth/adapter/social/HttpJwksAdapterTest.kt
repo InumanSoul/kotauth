@@ -179,6 +179,49 @@ class HttpJwksAdapterTest {
         assertEquals(secondKey, adapter.signingKey(jwksUri, "k2").getOrThrow())
     }
 
+    // -- scheme enforcement and response size -------------------------------
+
+    @Test
+    fun `an http jwks uri is refused before any fetch is made`() {
+        val insecure = "http://issuer.example/jwks"
+        fetcher.respondWith(insecure, keySet("k1" to firstKey))
+
+        val result = adapter.signingKey(insecure, "k1")
+
+        assertEquals(JwksFailure.Reason.INSECURE_URL, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+        assertEquals(0, fetcher.requestedUrls.size)
+    }
+
+    @Test
+    fun `a loopback jwks uri may use http for local development`() {
+        val local = "http://localhost:8080/jwks"
+        fetcher.respondWith(local, keySet("k1" to firstKey))
+
+        assertEquals(firstKey, adapter.signingKey(local, "k1").getOrThrow())
+    }
+
+    @Test
+    fun `a host that merely looks like loopback is refused`() {
+        val lookalike = "http://127.0.0.1.attacker.example/jwks"
+        fetcher.respondWith(lookalike, keySet("k1" to firstKey))
+
+        val result = adapter.signingKey(lookalike, "k1")
+
+        assertEquals(JwksFailure.Reason.INSECURE_URL, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertEquals(0, fetcher.requestedUrls.size)
+    }
+
+    @Test
+    fun `an oversized key set is refused with its own reason`() {
+        fetcher.failWith = ResponseTooLargeException(1_024L, jwksUri)
+
+        val result = adapter.signingKey(jwksUri, "k1")
+
+        assertEquals(JwksFailure.Reason.RESPONSE_TOO_LARGE, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
     // -- helpers ------------------------------------------------------------
 
     private fun rsaKeyPair(): RSAPublicKey =

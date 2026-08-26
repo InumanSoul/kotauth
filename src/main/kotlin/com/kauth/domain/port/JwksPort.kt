@@ -11,6 +11,12 @@ class JwksFailure(
         /** The key set could not be retrieved. */
         FETCH_FAILED,
 
+        /** The far end sent more than a key set's worth of bytes. */
+        RESPONSE_TOO_LARGE,
+
+        /** The JWKS URI is not an https URL. */
+        INSECURE_URL,
+
         /** The key set parsed but carries no usable signing key. */
         MALFORMED,
 

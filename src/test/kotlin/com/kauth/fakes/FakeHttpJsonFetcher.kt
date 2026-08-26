@@ -17,10 +17,14 @@ class FakeHttpJsonFetcher : HttpJsonFetcher {
     /** When set, every request throws — a transport failure, not an HTTP status. */
     var shouldFail: Boolean = false
 
+    /** When set, every request throws this instead — for failures other than a dead transport. */
+    var failWith: Exception? = null
+
     fun clear() {
         responses.clear()
         requestedUrls.clear()
         shouldFail = false
+        failWith = null
     }
 
     fun respondWith(
@@ -35,6 +39,7 @@ class FakeHttpJsonFetcher : HttpJsonFetcher {
 
     override fun get(url: String): HttpJsonResponse {
         requestedUrls += url
+        failWith?.let { throw it }
         if (shouldFail) throw IOException("Simulated transport failure for $url")
         return responses[url] ?: HttpJsonResponse(404, "")
     }
