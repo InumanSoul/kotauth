@@ -417,6 +417,24 @@ class SocialLoginRoutesTest {
         }
 
     @Test
+    fun `a state carrying more fields than the format defines is rejected`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // An eighth field means the payload is not the format this reader was written for.
+            // Truncating to the first seven would accept it and read every field as if it were.
+            val payload = "${statePayload("google", "acme", System.currentTimeMillis())}|extra"
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            assertTrue(response.bodyAsText().contains("State mismatch"))
+        }
+
+    @Test
     fun `the OAuth parameters the redirect carried survive the state round trip`() =
         testApplication {
             resetFixtures()

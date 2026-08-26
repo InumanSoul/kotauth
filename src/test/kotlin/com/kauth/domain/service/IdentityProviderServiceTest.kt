@@ -9,6 +9,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -44,6 +45,52 @@ class IdentityProviderServiceTest {
             )
         val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
         assertContains(error.message, "requires an issuer URL")
+    }
+
+    @Test
+    fun `an over-long client secret is refused like every other bounded field`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s".repeat(513),
+                kind = ProviderKind.OIDC,
+                issuer = "https://issuer.example",
+            )
+        val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+        assertContains(error.message, "client secret must be 512 characters or fewer")
+    }
+
+    @Test
+    fun `a client secret at the bound is accepted`() {
+        val result =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s".repeat(512),
+                kind = ProviderKind.OIDC,
+                issuer = "https://issuer.example",
+            )
+        assertIs<AdminResult.Success<IdentityProvider>>(result)
+    }
+
+    @Test
+    fun `the model never prints its client secret`() {
+        val row =
+            IdentityProvider(
+                id = 1,
+                tenantId = tenantId,
+                provider = acme,
+                clientId = "c",
+                clientSecret = "super-secret-value",
+                kind = ProviderKind.OIDC,
+            )
+
+        // Nothing logs a whole row today; a data class toString() is one interpolation away
+        // from a secret in a log file, and that is not a property to leave to convention.
+        assertFalse(row.toString().contains("super-secret-value"), "toString() leaked the secret: $row")
     }
 
     @Test

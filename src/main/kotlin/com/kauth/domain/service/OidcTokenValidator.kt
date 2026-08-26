@@ -45,6 +45,14 @@ class OidcTokenFailure(
         /** The signature did not verify against the issuer's key. */
         SIGNATURE_INVALID,
 
+        /**
+         * The issuer's key cannot check this token's algorithm at all — an EC key for `RS256`,
+         * or an algorithm the verifier does not implement. Kept apart from [SIGNATURE_INVALID]
+         * because it is a configuration fault, and an operator reading the log needs to tell it
+         * from someone forging tokens at them.
+         */
+        KEY_UNUSABLE,
+
         /** `iss` is not the issuer we asked for. */
         ISSUER_MISMATCH,
 
@@ -129,9 +137,17 @@ class OidcTokenValidator(
             val reason =
                 when ((cause as? TokenVerifierFailure)?.reason) {
                     TokenVerifierFailure.Reason.MALFORMED -> Reason.MALFORMED
+                    TokenVerifierFailure.Reason.KEY_MISMATCH -> Reason.KEY_UNUSABLE
+                    TokenVerifierFailure.Reason.UNSUPPORTED_ALGORITHM -> Reason.KEY_UNUSABLE
                     else -> Reason.SIGNATURE_INVALID
                 }
-            throw OidcTokenFailure(reason, "The ID token signature could not be verified.")
+            val message =
+                if (reason == Reason.KEY_UNUSABLE) {
+                    "The issuer's signing key cannot verify this token's algorithm."
+                } else {
+                    "The ID token signature could not be verified."
+                }
+            throw OidcTokenFailure(reason, message)
         }
 
     private fun claimPolicy(

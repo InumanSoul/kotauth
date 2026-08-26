@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Generic OIDC identity brokering.** A workspace can now sign users in
+  through any OpenID Connect provider, not just the two built-in adapters.
+  Operators configure a provider from the admin UI or over
+  `/t/{slug}/api/v1/identity-providers`, giving an issuer URL and client
+  credentials; endpoints are read from the issuer's discovery document, with
+  optional per-endpoint pins for issuers that publish none. The display name an
+  operator chooses is the label on the sign-in button. Migration `V63` adds the
+  columns.
+
+  Every issuer URL, every endpoint inside a discovery document and every JWKS
+  URI must be `https` (loopback excepted for local development), and a
+  discovery document that declares an issuer other than the one requested is
+  refused, so nothing able to redirect that fetch can choose the endpoints or
+  the signing keys. ID tokens are checked in a fixed order — the header's
+  algorithm against an allowlist before any key is fetched, then the signature,
+  then `iss`, `aud`, `azp`, `exp`, `iat`, `nonce` and `sub` — which is what
+  refuses `alg: none` and the HS256-with-the-public-key confusion before either
+  can reach a key. Signing keys are cached for ten minutes so a key the issuer
+  withdraws stops verifying, discovery failures are remembered briefly so an
+  unreachable issuer is not refetched once per request, and the social login
+  routes are throttled per IP like every neighbouring auth route.
+
+  The signed `state` a brokered login carries is bound to the browser that
+  began the flow through a short-lived `HttpOnly` cookie, and the callback
+  refuses any state it cannot match to one. Without that binding, a signed
+  state proves only that this server minted it: an attacker could mint one at
+  their leisure, authenticate at the provider as themselves, and hand the
+  victim a callback URL that signed the victim in as the attacker.
+
 - **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
   `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
   and `DELETE`, plus the `/ServiceProviderConfig`, `/ResourceTypes` and

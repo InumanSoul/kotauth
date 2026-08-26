@@ -32,9 +32,10 @@ import java.util.concurrent.ConcurrentHashMap
  * known, so refetch-on-unknown-kid alone would serve the withdrawn key forever and every forgery
  * made with it would verify.
  *
- * The refetch budget is keyed by JWKS URI, so it is spent per provider: one issuer sending
- * unknown kids cannot starve refetches for another tenant's provider, and a rotation elsewhere
- * still recovers on the next request.
+ * The refetch budget is keyed by JWKS URI, so it is spent per key set, not globally: one issuer
+ * sending unknown kids cannot starve refetches for a *different* issuer, and a rotation there
+ * still recovers on the next request. Two tenants pointed at the same issuer share one budget —
+ * per URI is not per tenant, and either of them can spend it for both.
  *
  * The cache is in-memory per replica, deliberately: any replica can refetch in one request, so
  * sharing it would buy a write path and a staleness question for nothing. The effective refetch

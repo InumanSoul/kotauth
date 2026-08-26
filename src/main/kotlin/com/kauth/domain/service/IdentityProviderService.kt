@@ -11,6 +11,7 @@ import java.net.URI
 import java.time.Instant
 
 private const val MAX_CLIENT_ID = 255
+private const val MAX_CLIENT_SECRET = 512
 private const val MAX_DISPLAY_NAME = 64
 private const val MAX_ISSUER = 255
 private const val MAX_ENDPOINT = 512
@@ -141,6 +142,8 @@ class IdentityProviderService(
             draft.clientId.isEmpty() -> "A client ID is required."
             draft.clientId.length > MAX_CLIENT_ID -> "The client ID must be $MAX_CLIENT_ID characters or fewer."
             draft.clientSecret.isEmpty() -> "A client secret is required."
+            draft.clientSecret.length > MAX_CLIENT_SECRET ->
+                "The client secret must be $MAX_CLIENT_SECRET characters or fewer."
             (draft.displayName?.length ?: 0) > MAX_DISPLAY_NAME ->
                 "The display name must be $MAX_DISPLAY_NAME characters or fewer."
             draft.scopes.length > MAX_SCOPES -> "The scope list must be $MAX_SCOPES characters or fewer."

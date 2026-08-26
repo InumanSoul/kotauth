@@ -146,6 +146,16 @@ class OidcTokenValidatorTest {
     }
 
     @Test
+    fun `a key of the wrong type for the token's algorithm is named apart from a forgery`() {
+        // RS256 in the header, but the kid names the issuer's EC key. Folding this into
+        // SIGNATURE_INVALID leaves a misconfigured provider and someone forging tokens at us
+        // looking identical in the operator's log.
+        val token = issuer.idToken(signedWith = Signing.OWN_RSA_KEY, keyId = issuer.ecKeyId)
+
+        assertEquals(Reason.KEY_UNUSABLE, reasonOf(validate(token)))
+    }
+
+    @Test
     fun `a token whose payload was edited after signing is refused`() {
         val parts = issuer.idToken().split(".")
         val forgedPayload =

@@ -42,6 +42,10 @@ data class IdentityProvider(
     val jitAllowedDomains: List<String> = emptyList(),
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
-)
+) {
+    // The generated toString() of a data class prints every field, this one's plaintext secret
+    // included, and one interpolation of a whole row into a log line would be enough.
+    override fun toString(): String = "IdentityProvider(id=$id, tenantId=$tenantId, provider=$provider, kind=$kind)"
+}
 
 const val DEFAULT_OIDC_SCOPES = "openid email profile"
