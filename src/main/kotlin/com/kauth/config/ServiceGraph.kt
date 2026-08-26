@@ -74,6 +74,7 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
@@ -152,6 +153,7 @@ data class ServiceGraph(
     val roleRepository: RoleRepository,
     val groupRepository: GroupRepository,
     val identityProviderRepository: IdentityProviderRepository,
+    val identityProviderService: IdentityProviderService,
     val portalConfigRepository: PortalConfigRepository,
     val themeRepository: ThemeRepository,
     val emailBrandingRepository: TenantEmailBrandingRepository,
@@ -659,6 +661,7 @@ data class ServiceGraph(
                 roleRepository = roleRepository,
                 groupRepository = groupRepository,
                 identityProviderRepository = identityProviderRepository,
+                identityProviderService = IdentityProviderService(identityProviderRepository),
                 portalConfigRepository = portalConfigRepository,
                 themeRepository = themeRepository,
                 emailBrandingRepository = emailBrandingRepository,

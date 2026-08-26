@@ -501,6 +501,7 @@ fun Application.module(
             corsService = s.corsService,
             transactionRunner = s.transactionRunner,
             userRepository = s.userRepository,
+            identityProviderService = s.identityProviderService,
         )
 
         adminBackupRoutes(
@@ -531,6 +532,7 @@ fun Application.module(
             mfaRepository = s.mfaRepository,
             portalClientProvisioning = s.portalClientProvisioning,
             identityProviderRepository = s.identityProviderRepository,
+            identityProviderService = s.identityProviderService,
             apiKeyService = s.apiKeyService,
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,

@@ -935,6 +935,49 @@ object EnglishStrings {
         "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
             "sync never changes them."
 
+    // ── Identity providers ──────────────────────────────────────────────────
+
+    const val IDP_OIDC_SECTION_TITLE = "OIDC providers"
+    const val IDP_OIDC_SECTION_SUB =
+        "Any issuer that publishes an OpenID Connect discovery document can be added here. " +
+            "Endpoints are read from the issuer unless you override them."
+    const val IDP_NO_OIDC_PROVIDERS = "No OIDC providers configured yet."
+    const val IDP_ADD_TITLE = "Add an OIDC provider"
+    const val IDP_ADD_BUTTON = "Add provider"
+    const val IDP_SAVE_BUTTON = "Save provider"
+    const val IDP_DELETE_BUTTON = "Delete provider"
+    const val IDP_ENABLE_LABEL = "Enable"
+    const val IDP_CALLBACK_HINT = "Register this callback URL with the issuer:"
+    const val IDP_KEY_LABEL = "Provider key"
+    const val IDP_KEY_HINT =
+        "Lower-case letters, digits and hyphens. It appears in the callback URL and cannot be " +
+            "changed once saved \u2014 accounts already linked to this provider point at it."
+    const val IDP_KEY_INVALID =
+        "That is not a provider key \u2014 use 1\u201332 characters of a\u2013z, 0\u20139 and '-'."
+    const val IDP_KIND_LABEL = "Protocol"
+    const val IDP_KIND_OIDC = "OpenID Connect"
+    const val IDP_KIND_OAUTH2 = "OAuth2 (built-in)"
+    const val IDP_KIND_HINT =
+        "Google and GitHub use their built-in OAuth2 adapters. Every other key is brokered over OIDC."
+    const val IDP_DISPLAY_NAME_LABEL = "Display name"
+    const val IDP_DISPLAY_NAME_HINT = "Shown on the sign-in button. Defaults to the provider key."
+    const val IDP_ISSUER_LABEL = "Issuer URL"
+    const val IDP_ISSUER_HINT =
+        "Required for OIDC. Must match the 'iss' claim of the issuer's ID tokens; discovery is " +
+            "read from {issuer}/.well-known/openid-configuration."
+    const val IDP_CLIENT_ID_LABEL = "Client ID"
+    const val IDP_CLIENT_ID_PLACEHOLDER = "Client ID issued by the provider"
+    const val IDP_CLIENT_SECRET_LABEL = "Client Secret"
+    const val IDP_SECRET_NEW_HINT = "Stored encrypted."
+    const val IDP_SECRET_STORED_HINT = "Stored encrypted. Leave blank to keep existing secret."
+    const val IDP_SCOPES_LABEL = "Scopes"
+    const val IDP_SCOPES_HINT = "Space-separated. An OIDC provider must request 'openid'."
+    const val IDP_AUTHORIZATION_ENDPOINT_LABEL = "Authorization endpoint"
+    const val IDP_TOKEN_ENDPOINT_LABEL = "Token endpoint"
+    const val IDP_JWKS_URI_LABEL = "JWKS URI"
+    const val IDP_ENDPOINT_OVERRIDE_HINT =
+        "Optional. Leave blank to use the value from the issuer's discovery document."
+
     /**
      * Human-readable name for a provider key. The two reserved keys keep their brand casing;
      * any other key is title-cased from its own value so a provider always has a label.

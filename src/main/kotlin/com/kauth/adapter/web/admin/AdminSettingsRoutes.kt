@@ -1,11 +1,12 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
-import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
@@ -17,8 +18,10 @@ import com.kauth.domain.port.UserRepository
 import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
+import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.WorkspaceSettingsService
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -35,6 +38,7 @@ fun Route.adminSettingsRoutes(
     adminUserService: com.kauth.domain.service.AdminUserService,
     userRepository: UserRepository,
     identityProviderRepository: IdentityProviderRepository?,
+    identityProviderService: IdentityProviderService?,
     mfaRepository: MfaRepository?,
     translationPort: TranslationPort,
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
@@ -178,11 +182,16 @@ fun Route.adminSettingsRoutes(
     // Identity Providers
     // -------------------------------------------------------------------
 
+    // One validation point for both surfaces. The form used to write the repository directly,
+    // so the REST API's rules (issuer required for OIDC, https-only URLs, an immutable key)
+    // did not apply here; every write below now goes through the same service.
+    val idpService = identityProviderService ?: identityProviderRepository?.let { IdentityProviderService(it) }
+
     get("/settings/identity-providers") {
         val session = call.sessions.get<AdminSession>()!!
         val workspace = call.attributes[WorkspaceAttr]
         val wsPairs = call.attributes[WsPairsAttr]
-        val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
+        val providers = idpService?.list(workspace.id) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
             AdminView.identityProvidersPage(
@@ -190,12 +199,28 @@ fun Route.adminSettingsRoutes(
                 providers = providers,
                 allWorkspaces = wsPairs,
                 loggedInAs = session.username,
+                saved = call.request.queryParameters["saved"] == "true",
             ),
         )
     }
 
+    // Two entry points, one handler: the add form has no key in its URL yet, so it posts the
+    // collection and names the key in the body.
+    post("/settings/identity-providers") {
+        val service =
+            idpService ?: return@post call.respond(
+                HttpStatusCode.NotImplemented,
+                "Identity provider repository not configured",
+            )
+        val params = call.receiveParameters()
+        val provName = params["providerKey"]?.trim() ?: ""
+        val provider =
+            ProviderKey.of(provName)
+                ?: return@post call.respondIdentityProviderError(service, EnglishStrings.IDP_KEY_INVALID)
+        call.saveIdentityProvider(service, provider, params)
+    }
+
     post("/settings/identity-providers/{provider}") {
-        val session = call.sessions.get<AdminSession>()!!
         val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
         // Any key the pattern accepts is configurable: the reserved two reach a compiled-in
         // adapter, everything else is brokered over OIDC.
@@ -203,71 +228,12 @@ fun Route.adminSettingsRoutes(
             ProviderKey.of(provName)
                 ?: return@post call.respond(HttpStatusCode.BadRequest, "Unsupported provider: $provName")
 
-        val workspace = call.attributes[WorkspaceAttr]
-        val wsPairs = call.attributes[WsPairsAttr]
-        val params = call.receiveParameters()
-
-        val newClientId = params["clientId"]?.trim() ?: ""
-        val newSecret = params["clientSecret"]?.takeIf { it.isNotBlank() }
-        val enabled = params["enabled"] == "true"
-
-        if (newClientId.isBlank()) {
-            val providers = identityProviderRepository?.findAllByTenant(workspace.id) ?: emptyList()
-            return@post call.respondHtml(
-                HttpStatusCode.UnprocessableEntity,
-                AdminView.identityProvidersPage(
-                    workspace = workspace,
-                    providers = providers,
-                    allWorkspaces = wsPairs,
-                    loggedInAs = session.username,
-                    error = "Client ID is required.",
-                ),
-            )
-        }
-
-        val idpRepo =
-            identityProviderRepository ?: return@post call.respond(
+        val service =
+            idpService ?: return@post call.respond(
                 HttpStatusCode.NotImplemented,
                 "Identity provider repository not configured",
             )
-
-        val existing = idpRepo.findByTenantAndProvider(workspace.id, provider)
-        if (existing == null) {
-            if (newSecret.isNullOrBlank()) {
-                val providers = idpRepo.findAllByTenant(workspace.id)
-                return@post call.respondHtml(
-                    HttpStatusCode.UnprocessableEntity,
-                    AdminView.identityProvidersPage(
-                        workspace = workspace,
-                        providers = providers,
-                        allWorkspaces = wsPairs,
-                        loggedInAs = session.username,
-                        error = "Client Secret is required when adding a new provider.",
-                    ),
-                )
-            }
-            idpRepo.save(
-                IdentityProvider(
-                    tenantId = workspace.id,
-                    provider = provider,
-                    clientId = newClientId,
-                    clientSecret = newSecret,
-                    enabled = enabled,
-                ),
-            )
-        } else {
-            val secretToUse = newSecret ?: existing.clientSecret
-            idpRepo.update(
-                existing.copy(
-                    clientId = newClientId,
-                    clientSecret = secretToUse,
-                    enabled = enabled,
-                ),
-            )
-        }
-
-        val slug = workspace.slug
-        call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers?saved=true")
+        call.saveIdentityProvider(service, provider, call.receiveParameters())
     }
 
     post("/settings/identity-providers/{provider}/delete") {
@@ -276,9 +242,10 @@ fun Route.adminSettingsRoutes(
             ProviderKey.of(provName)
                 ?: return@post call.respond(HttpStatusCode.BadRequest)
         val workspace = call.attributes[WorkspaceAttr]
-        val slug = workspace.slug
-        identityProviderRepository?.delete(workspace.id, provider)
-        call.respondRedirect("/admin/workspaces/$slug/settings/identity-providers")
+        // A delete of a row that is already gone is what the operator asked for, so the
+        // service's NotFound is not worth a page of its own.
+        idpService?.delete(workspace.id, provider)
+        call.respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers")
     }
 
     // -------------------------------------------------------------------
@@ -550,4 +517,65 @@ fun Route.adminSettingsRoutes(
             ),
         )
     }
+}
+
+/**
+ * The one identity-provider write the admin UI performs. Both the add form and a provider's
+ * own edit form land here, so the service's rules reach every write from this surface.
+ */
+private suspend fun ApplicationCall.saveIdentityProvider(
+    service: IdentityProviderService,
+    provider: ProviderKey,
+    params: io.ktor.http.Parameters,
+) {
+    val workspace = attributes[WorkspaceAttr]
+    val existing = service.get(workspace.id, provider)
+    val kind =
+        params["kind"]?.trim()?.lowercase()?.let { ProviderKind.of(it) }
+            ?: existing?.kind
+            ?: if (provider in ProviderKey.RESERVED) ProviderKind.OAUTH2 else ProviderKind.OIDC
+
+    val result =
+        service.save(
+            tenantId = workspace.id,
+            key = provider,
+            clientId = params["clientId"] ?: "",
+            clientSecret = params["clientSecret"],
+            kind = kind,
+            enabled = params["enabled"] == "true",
+            displayName = params["displayName"],
+            issuer = params["issuer"],
+            authorizationEndpoint = params["authorizationEndpoint"],
+            tokenEndpoint = params["tokenEndpoint"],
+            jwksUri = params["jwksUri"],
+            scopes = params["scopes"] ?: existing?.scopes ?: DEFAULT_OIDC_SCOPES,
+            // Phase 3 owns the JIT fields; this form does not show them, so it must not clear
+            // what a row already carries.
+            jitEnabled = existing?.jitEnabled ?: false,
+            jitAllowedDomains = existing?.jitAllowedDomains ?: emptyList(),
+        )
+
+    when (result) {
+        is AdminResult.Success ->
+            respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers?saved=true")
+        is AdminResult.Failure -> respondIdentityProviderError(service, result.error.message)
+    }
+}
+
+/** Re-renders the identity provider page with [error] at 422. */
+private suspend fun ApplicationCall.respondIdentityProviderError(
+    service: IdentityProviderService,
+    error: String,
+) {
+    val workspace = attributes[WorkspaceAttr]
+    respondHtml(
+        HttpStatusCode.UnprocessableEntity,
+        AdminView.identityProvidersPage(
+            workspace = workspace,
+            providers = service.list(workspace.id),
+            allWorkspaces = attributes[WsPairsAttr],
+            loggedInAs = sessions.get<AdminSession>()!!.username,
+            error = error,
+        ),
+    )
 }

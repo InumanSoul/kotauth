@@ -4,8 +4,10 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.ApiKey
 import com.kauth.domain.model.ApiScope
+import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import kotlinx.html.*
@@ -316,7 +318,7 @@ internal fun identityProvidersPageImpl(
 
                         // ── Credentials ──────────────────────────────
                         div("edit-row") {
-                            span("edit-row__label") { +"Client ID" }
+                            span("edit-row__label") { +EnglishStrings.IDP_CLIENT_ID_LABEL }
                             input(type = InputType.text, name = "clientId") {
                                 classes = setOf("edit-row__field")
                                 placeholder = "Enter $providerName client ID"
@@ -326,7 +328,7 @@ internal fun identityProvidersPageImpl(
                             }
                         }
                         div("edit-row") {
-                            span("edit-row__label") { +"Client Secret" }
+                            span("edit-row__label") { +EnglishStrings.IDP_CLIENT_SECRET_LABEL }
                             div {
                                 input(type = InputType.password, name = "clientSecret") {
                                     classes = setOf("edit-row__field")
@@ -335,9 +337,9 @@ internal fun identityProvidersPageImpl(
                                 }
                                 div("edit-row__hint") {
                                     if (isConfigured) {
-                                        +"Stored encrypted. Leave blank to keep existing secret."
+                                        +EnglishStrings.IDP_SECRET_STORED_HINT
                                     } else {
-                                        +"Stored encrypted."
+                                        +EnglishStrings.IDP_SECRET_NEW_HINT
                                     }
                                 }
                             }
@@ -353,9 +355,248 @@ internal fun identityProvidersPageImpl(
                     }
                 }
             }
+
+            // ── OIDC providers ───────────────────────────────────────
+            h2 { +EnglishStrings.IDP_OIDC_SECTION_TITLE }
+            p("page-header__sub") { +EnglishStrings.IDP_OIDC_SECTION_SUB }
+
+            val oidcProviders =
+                providers
+                    .filter { it.provider !in ProviderKey.RESERVED }
+                    .sortedBy { it.provider.value }
+
+            if (oidcProviders.isEmpty()) {
+                div("ov-card") { p { +EnglishStrings.IDP_NO_OIDC_PROVIDERS } }
+            }
+            for (existing in oidcProviders) {
+                oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = existing)
+            }
+            oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = null)
                     }
 }
     }
+
+/**
+ * One OIDC provider — the edit form for a configured row, or the add form when [existing] is null.
+ *
+ * The client secret is a write-only field on both surfaces: this form posts one and never
+ * renders one back, so a configured row shows an empty box and a hint that blank keeps what
+ * is stored.
+ */
+private fun FlowContent.oidcProviderCard(
+    slug: String,
+    baseUrl: String,
+    existing: IdentityProvider?,
+) {
+    val key = existing?.provider?.value
+    val action =
+        if (key == null) {
+            "/admin/workspaces/$slug/settings/identity-providers"
+        } else {
+            "/admin/workspaces/$slug/settings/identity-providers/$key"
+        }
+
+    div("ov-card") {
+        form(
+            action = action,
+            encType = FormEncType.applicationXWwwFormUrlEncoded,
+            method = FormMethod.post,
+        ) {
+            val heading =
+                if (existing == null) {
+                    EnglishStrings.IDP_ADD_TITLE
+                } else {
+                    existing.displayName ?: EnglishStrings.providerDisplayName(existing.provider)
+                }
+            div("provider-header") {
+                div("provider-header__name") {
+                    +heading
+                    if (existing != null) {
+                        val badgeCls = if (existing.enabled) "badge badge--active" else "badge badge--inactive"
+                        span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
+                    }
+                }
+                label("toggle") {
+                    input(type = InputType.checkBox, name = "enabled") {
+                        attributes["value"] = "true"
+                        if (existing == null || existing.enabled) checked = true
+                    }
+                    span("toggle__track") { span("toggle__thumb") {} }
+                    span("toggle__label toggle__label--muted") { +EnglishStrings.IDP_ENABLE_LABEL }
+                }
+            }
+
+            if (existing == null) {
+                div("edit-row") {
+                    span("edit-row__label") { +EnglishStrings.IDP_KEY_LABEL }
+                    div {
+                        input(type = InputType.text, name = "providerKey") {
+                            classes = setOf("edit-row__field")
+                            placeholder = "okta"
+                            required = true
+                            attributes["autocomplete"] = "off"
+                        }
+                        div("edit-row__hint") { +EnglishStrings.IDP_KEY_HINT }
+                    }
+                }
+            } else {
+                val callbackUrl = "$baseUrl/t/$slug/auth/social/$key/callback"
+                div("setup-row") {
+                    div("setup-row__text") { +EnglishStrings.IDP_CALLBACK_HINT }
+                    div("copy-field") {
+                        span("copy-field__value") { +callbackUrl }
+                        button(type = ButtonType.button) {
+                            classes = setOf("copy-field__btn")
+                            attributes["data-copy"] = callbackUrl
+                            title = "Copy"
+                            inlineSvgIcon("copy", "Copy")
+                        }
+                    }
+                }
+            }
+
+            div("edit-row") {
+                span("edit-row__label") { +EnglishStrings.IDP_KIND_LABEL }
+                div {
+                    select {
+                        classes = setOf("edit-row__field")
+                        name = "kind"
+                        for (kind in ProviderKind.entries) {
+                            option {
+                                value = kind.value
+                                if ((existing?.kind ?: ProviderKind.OIDC) == kind) selected = true
+                                +when (kind) {
+                                    ProviderKind.OIDC -> EnglishStrings.IDP_KIND_OIDC
+                                    ProviderKind.OAUTH2 -> EnglishStrings.IDP_KIND_OAUTH2
+                                }
+                            }
+                        }
+                    }
+                    div("edit-row__hint") { +EnglishStrings.IDP_KIND_HINT }
+                }
+            }
+
+            idpTextRow(
+                label = EnglishStrings.IDP_DISPLAY_NAME_LABEL,
+                fieldName = "displayName",
+                value = existing?.displayName,
+                hint = EnglishStrings.IDP_DISPLAY_NAME_HINT,
+                placeholder = "Okta",
+            )
+            idpTextRow(
+                label = EnglishStrings.IDP_ISSUER_LABEL,
+                fieldName = "issuer",
+                value = existing?.issuer,
+                hint = EnglishStrings.IDP_ISSUER_HINT,
+                placeholder = "https://example.okta.com",
+            )
+            idpTextRow(
+                label = EnglishStrings.IDP_CLIENT_ID_LABEL,
+                fieldName = "clientId",
+                value = existing?.clientId,
+                hint = null,
+                placeholder = EnglishStrings.IDP_CLIENT_ID_PLACEHOLDER,
+                required = true,
+            )
+
+            div("edit-row") {
+                span("edit-row__label") { +EnglishStrings.IDP_CLIENT_SECRET_LABEL }
+                div {
+                    input(type = InputType.password, name = "clientSecret") {
+                        classes = setOf("edit-row__field")
+                        placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                        attributes["autocomplete"] = "new-password"
+                    }
+                    div("edit-row__hint") {
+                        if (existing == null) {
+                            +EnglishStrings.IDP_SECRET_NEW_HINT
+                        } else {
+                            +EnglishStrings.IDP_SECRET_STORED_HINT
+                        }
+                    }
+                }
+            }
+
+            idpTextRow(
+                label = EnglishStrings.IDP_SCOPES_LABEL,
+                fieldName = "scopes",
+                value = existing?.scopes ?: DEFAULT_OIDC_SCOPES,
+                hint = EnglishStrings.IDP_SCOPES_HINT,
+                placeholder = DEFAULT_OIDC_SCOPES,
+            )
+            idpTextRow(
+                label = EnglishStrings.IDP_AUTHORIZATION_ENDPOINT_LABEL,
+                fieldName = "authorizationEndpoint",
+                value = existing?.authorizationEndpoint,
+                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                placeholder = "",
+            )
+            idpTextRow(
+                label = EnglishStrings.IDP_TOKEN_ENDPOINT_LABEL,
+                fieldName = "tokenEndpoint",
+                value = existing?.tokenEndpoint,
+                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                placeholder = "",
+            )
+            idpTextRow(
+                label = EnglishStrings.IDP_JWKS_URI_LABEL,
+                fieldName = "jwksUri",
+                value = existing?.jwksUri,
+                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                placeholder = "",
+            )
+
+            div("edit-actions") {
+                button(type = ButtonType.submit) {
+                    classes = setOf("btn", "btn--primary", "btn--sm")
+                    +(if (existing == null) EnglishStrings.IDP_ADD_BUTTON else EnglishStrings.IDP_SAVE_BUTTON)
+                }
+            }
+        }
+
+        // A separate form: the delete POST must not carry the edit form's fields, and HTML
+        // forbids nesting one inside the other.
+        if (key != null) {
+            form(
+                action = "/admin/workspaces/$slug/settings/identity-providers/$key/delete",
+                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                method = FormMethod.post,
+            ) {
+                div("edit-actions") {
+                    button(type = ButtonType.submit) {
+                        classes = setOf("btn", "btn--danger", "btn--sm")
+                        +EnglishStrings.IDP_DELETE_BUTTON
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun FlowContent.idpTextRow(
+    label: String,
+    fieldName: String,
+    value: String?,
+    hint: String?,
+    placeholder: String,
+    required: Boolean = false,
+) {
+    div("edit-row") {
+        span("edit-row__label") { +label }
+        div {
+            input(type = InputType.text, name = fieldName) {
+                classes = setOf("edit-row__field")
+                this.placeholder = placeholder
+                this.required = required
+                this.value = value ?: ""
+                attributes["autocomplete"] = "off"
+            }
+            if (hint != null) {
+                div("edit-row__hint") { +hint }
+            }
+        }
+    }
+}
 
 // ─── API Keys ───────────────────────────────────────────────────────────────
 

@@ -1,8 +1,10 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
@@ -762,7 +764,9 @@ class AdminSettingsTest {
             login(authed)
 
             // "okta" has no compiled-in adapter. Phase 1 refused it here; brokering is the point
-            // of Phase 2, so the key is now accepted and the row is written.
+            // of Phase 2, so the key is now accepted and the row is written. The issuer is what
+            // an unreserved key always needed to broker a login — before Task 5 the form wrote
+            // the repository directly and would happily store a row the resolver then refused.
             val response =
                 authed.submitForm(
                     url = "/admin/workspaces/acme/settings/identity-providers/okta",
@@ -770,6 +774,7 @@ class AdminSettingsTest {
                         Parameters.build {
                             append("clientId", "okta-client-id")
                             append("clientSecret", "okta-secret")
+                            append("issuer", "https://example.okta.com")
                             append("enabled", "true")
                         },
                 )
@@ -829,6 +834,125 @@ class AdminSettingsTest {
             // unreserved, not from something both requests share.
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(idpRepo.findAllByTenant(workspace.id).isEmpty())
+        }
+
+    // =========================================================================
+    // Identity providers go through IdentityProviderService
+    // =========================================================================
+
+    @Test
+    fun `the add form creates an OIDC provider with its issuer and endpoint overrides`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers",
+                    formParameters =
+                        Parameters.build {
+                            append("providerKey", "okta")
+                            append("kind", "oidc")
+                            append("clientId", "okta-client-id")
+                            append("clientSecret", "okta-secret")
+                            append("displayName", "Okta")
+                            append("issuer", "https://example.okta.com")
+                            append("jwksUri", "https://example.okta.com/keys")
+                            append("scopes", "openid email")
+                            append("enabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            val stored = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("okta")!!)
+            assertEquals(ProviderKind.OIDC, stored?.kind)
+            assertEquals("https://example.okta.com", stored?.issuer)
+            assertEquals("https://example.okta.com/keys", stored?.jwksUri)
+            assertEquals("Okta", stored?.displayName)
+            assertEquals("openid email", stored?.scopes)
+        }
+
+    @Test
+    fun `the admin form refuses an OIDC provider with no issuer and writes nothing`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            // The rule lives in IdentityProviderService, so this only holds while the form
+            // writes through it rather than reaching for the repository.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/okta",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "okta-client-id")
+                            append("clientSecret", "okta-secret")
+                            append("enabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertContains(response.bodyAsText(), "issuer")
+            assertTrue(idpRepo.findAllByTenant(workspace.id).isEmpty())
+        }
+
+    @Test
+    fun `the admin form refuses a client id it would otherwise have written blank`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/identity-providers/google",
+                    formParameters =
+                        Parameters.build {
+                            append("clientId", "  ")
+                            append("clientSecret", "google-secret")
+                            append("enabled", "true")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue(idpRepo.findAllByTenant(workspace.id).isEmpty())
+        }
+
+    @Test
+    fun `the identity providers page never renders a stored client secret`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.add(
+                IdentityProvider(
+                    tenantId = workspace.id,
+                    provider = ProviderKey.of("okta")!!,
+                    clientId = "okta-client-id",
+                    clientSecret = "s3cr3t-okta-client-secret",
+                    kind = ProviderKind.OIDC,
+                    issuer = "https://example.okta.com",
+                ),
+            )
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertFalse("s3cr3t-okta-client-secret" in body, "The admin page must never render a stored secret")
+            assertContains(body, "okta-client-id")
         }
 
     // =========================================================================
