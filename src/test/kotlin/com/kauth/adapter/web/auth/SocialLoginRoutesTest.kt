@@ -1432,6 +1432,15 @@ class SocialLoginRoutesTest {
             )
     }
 
+    /**
+     * Closes self-service sign-up for acme.
+     *
+     * The two switches are separate doors: `jitAllowedDomains` says who is created automatically,
+     * `registrationEnabled` says who may sign up at all. Only with this one closed is "not
+     * permitted here" the whole truth, so only then does the refusal page belong.
+     */
+    private fun closeSignUp() = tenantRepo.add(tenant.copy(registrationEnabled = false))
+
     /** Drives one callback that got past every state guard, so the JIT gate is what answers. */
     private suspend fun ApplicationTestBuilder.oktaCallback(code: String = "auth-code-do-not-record"): HttpResponse {
         val payload = statePayload("okta", "acme", System.currentTimeMillis())
@@ -1446,6 +1455,7 @@ class SocialLoginRoutesTest {
         testApplication {
             resetFixtures()
             seedJitOkta()
+            closeSignUp()
             oktaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
@@ -1464,6 +1474,7 @@ class SocialLoginRoutesTest {
         testApplication {
             resetFixtures()
             seedJitOkta()
+            closeSignUp()
             oktaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
@@ -1488,6 +1499,7 @@ class SocialLoginRoutesTest {
         testApplication {
             resetFixtures()
             seedJitOkta()
+            closeSignUp()
             installSocialRoutes()
 
             oktaAsserts("carol@allowed.example", emailVerified = false)
@@ -1514,17 +1526,18 @@ class SocialLoginRoutesTest {
         }
 
     @Test
-    fun `a refused sign-in leaves no pending registration to walk through`() =
+    fun `a refused sign-in with sign-up closed leaves no pending registration`() =
         testApplication {
             resetFixtures()
             seedJitOkta()
+            closeSignUp()
             oktaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
             val response = oktaCallback()
 
-            // The tenant declared which identities it trusts. Handing the refused person the
-            // ordinary registration form would let them create the account the gate just refused.
+            // With sign-up closed there is no other door, so the refusal is the end of the flow
+            // and no pending registration may be left behind for the person to walk through.
             assertTrue(
                 response.headers
                     .getAll("Set-Cookie")
@@ -1545,6 +1558,8 @@ class SocialLoginRoutesTest {
 
             oktaCallback()
 
+            // Sign-up is open here, so this is the fall-through branch. The operator's diagnostic
+            // must not depend on which way the person was routed.
             val recorded = auditLog.events.filter { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
             assertEquals(1, recorded.size, "One refusal must leave one diagnostic row, got: $recorded")
             assertEquals("okta", recorded.single().details["provider"])
@@ -1584,6 +1599,7 @@ class SocialLoginRoutesTest {
         testApplication {
             resetFixtures()
             seedJitOkta()
+            closeSignUp()
             oktaAsserts("carol@blocked.example", emailVerified = true)
             installSocialRoutes()
 
@@ -1598,6 +1614,60 @@ class SocialLoginRoutesTest {
                 body.contains(reference),
                 "The reference on the page must be the one recorded, got: $body",
             )
+        }
+
+    @Test
+    fun `a refused gate with sign-up open still reaches the registration page`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val response = oktaCallback()
+
+            // The gate governs auto-creation, not all account creation. A tenant that left sign-up
+            // open said people may create accounts; switching on a convenience feature must not
+            // quietly close a door that was configured open. The person may still have an account
+            // here — just not an automatic one, which is what the completion page is for.
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/auth/social/complete-registration", response.headers["Location"])
+        }
+
+    @Test
+    fun `a refused gate with sign-up open does not tell the person they are not permitted`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val body = oktaCallback().bodyAsText()
+
+            // Showing "you are not permitted here" and then offering a sign-up form is incoherent,
+            // so the refusal copy belongs only where sign-up is actually closed.
+            assertFalse(
+                body.contains("email domain is not on the allowed list"),
+                "A person who may still sign up must not be told they are refused, got: $body",
+            )
+        }
+
+    @Test
+    fun `a refusal is recorded whichever way the person was routed`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            closeSignUp()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            oktaCallback()
+
+            // The mirror of the fall-through case above. An allowlist quietly doing nothing is
+            // worth seeing from both branches, so neither may be the only one that records.
+            val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+            assertEquals("domain_not_allowed", recorded.details["reason"])
+            assertEquals("blocked.example", recorded.details["email_domain"])
         }
 
     @Test

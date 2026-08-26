@@ -589,11 +589,17 @@ internal fun Route.socialLoginRoutes(
             is SocialLoginResult.NeedsRegistration -> {
                 val pending = result.data
                 val refusal = pending.jitRefusal
-                if (refusal != null) {
-                    // The tenant declared, per provider and per domain, which identities it trusts.
-                    // Falling through to the ordinary registration form would hand the refused
-                    // person the account the gate just refused, so no pending cookie is minted.
-                    val refusedTenant = tenant ?: return@get call.respond(HttpStatusCode.NotFound)
+                // The gate governs auto-creation, not all account creation: `jitAllowedDomains`
+                // says who is created automatically, `registrationEnabled` says who may sign up at
+                // all. They are separate doors with separate switches, so a refusal here must not
+                // close one the operator configured open — switching on a convenience feature
+                // would otherwise silently narrow a setting chosen independently of it. Where
+                // sign-up is open the person falls through to the completion page, which is the
+                // truthful outcome: an account is still available, just not an automatic one.
+                // Only where sign-up is closed is "not permitted here" the whole truth, and
+                // offering a sign-up form to someone just told they are refused is incoherent.
+                // The refusal is recorded by the gate either way, below this decision.
+                if (refusal != null && tenant != null && !tenant.registrationEnabled) {
                     call.respondHtml(
                         HttpStatusCode.Forbidden,
                         AuthView.jitRefusedPage(
@@ -603,7 +609,7 @@ internal fun Route.socialLoginRoutes(
                             refusal = refusal,
                             reference =
                                 BrokeredSignInFailure.reference(
-                                    refusedTenant.id,
+                                    tenant.id,
                                     provider,
                                     pending.providerUserId,
                                 ),
