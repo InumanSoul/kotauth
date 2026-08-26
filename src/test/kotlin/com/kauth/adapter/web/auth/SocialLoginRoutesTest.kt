@@ -1078,6 +1078,29 @@ class SocialLoginRoutesTest {
             )
         }
 
+    @Test
+    fun `a non-IP forwarded value does not open a fresh throttle bucket`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60), trustedProxy = true)
+            val client = createClient { followRedirects = false }
+
+            // `remoteHost` takes any X-Forwarded-For value, a hostname included; `remoteAddress`
+            // takes only an IP literal and otherwise keeps the socket address. This pins that
+            // difference, which is the only part of the remoteHost/remoteAddress choice a test can
+            // observe — the reverse-DNS lookup itself happens inside Netty's connection point and
+            // the test engine has none. See the report for why it is not pinned here.
+            val first = client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "one.example") }
+            val second = client.get("/t/acme/auth/social/google/redirect") { header("X-Forwarded-For", "two.example") }
+
+            assertEquals(HttpStatusCode.Found, first.status)
+            assertEquals(
+                HttpStatusCode.TooManyRequests,
+                second.status,
+                "A name in X-Forwarded-For must not be trusted to key the throttle",
+            )
+        }
+
     /** An operator-chosen label, which the routes must prefer over the key's title case. */
     private fun seedLabelledOkta() =
         idpRepo.add(

@@ -241,7 +241,11 @@ private suspend fun ApplicationCall.allowSocialRequest(
 ): Boolean {
     // `local` is the raw connection point, which behind the shipped Caddy topology is the proxy
     // for every request — one deployment-wide budget. `origin` is the form XForwardedHeaders feeds.
-    if (limiter.isAllowed("social:${request.origin.remoteHost}:$slug")) return true
+    // `remoteAddress`, never `remoteHost`: Netty's `remoteHost` getter calls
+    // InetSocketAddress.getHostName(), an uncached blocking reverse-DNS lookup on the event loop, so
+    // an unauthenticated endpoint would resolve a PTR record before deciding whether to shed the
+    // request — the limiter cannot shed the flood it exists for. XForwardedHeaders feeds both.
+    if (limiter.isAllowed("social:${request.origin.remoteAddress}:$slug")) return true
     val enabledProviders =
         if (tenant != null && identityProviderRepository != null) {
             identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
