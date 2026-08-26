@@ -109,9 +109,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with their own wording rather than the SCIM one: no sync runs over a brokered
   account, so it says the person signs in at the provider and has no password
   here unless they set one. The sign-in methods grid gained a single aggregate
-  row for brokered providers, showing how many are configured and how many are
-  enabled — one row, not one per provider, since a provider key is an open
-  string and a row each would stop it being the sign-in method grid.
+  row for brokered providers, showing how many are configured and flagging when
+  none of them is enabled — one row, not one per provider, since a provider key
+  is an open string and a row each would stop it being the sign-in method
+  grid.
 
 - **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
   `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
