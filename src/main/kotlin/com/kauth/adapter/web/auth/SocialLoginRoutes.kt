@@ -29,8 +29,9 @@ private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
 // Holds the csrfNonce of the state the redirect signed, so the callback can prove the browser
 // presenting that state is the one the flow began in. Same idiom as KOTAUTH_ADMIN_PKCE.
 //
-// The name carries the provider because one name per tenant means the second of two sign-ins
-// begun in one browser overwrites the first, and the first callback then fails to bind.
+// The name carries both the provider and the tenant slug because one name shared by two flows
+// means the second of them begun in one browser overwrites the first, and the first callback then
+// fails to bind. Since `__Host-` forces `Path=/`, the name is all that separates them.
 private const val SOCIAL_STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
 
 // The registration leg's half of the flow: the pending profile, and the nonce that binds it to
@@ -102,24 +103,31 @@ private class SocialState(
 }
 
 /**
- * The cookie name over this connection: `__Host-` prefixed on https, bare over plain http.
+ * The wire name of a social cookie for [slug]: `__Host-` prefixed on https, bare over plain http,
+ * and suffixed with the tenant either way.
  *
  * `__Host-` forbids `Domain`, which is exactly the property a sibling subdomain needs to overwrite
  * a host-only cookie — a server cannot tell the two apart, and browsers enforce the prefix where
- * it cannot. The prefix also forces `Path=/`, so path scoping is what it costs; cookie-write
- * integrity is worth more than a path, and the tenant these cookies belong to is checked in the
- * signed payload rather than by the browser's path match. Over plain http the prefix requires
- * `Secure` and would be dropped silently, so `make run` on localhost keeps the bare name.
+ * it cannot. The prefix also forces `Path=/`, so path scoping is what it costs: without the slug
+ * in the name, (host, name, path) would be identical for every tenant and one tenant's in-flight
+ * flow would clobber another's. The name now carries what the path used to. Over plain http the
+ * prefix requires `Secure` and would be dropped silently, so `make run` on localhost keeps the
+ * bare name; the slug stays there too so both connections have one cookie shape.
+ *
+ * A slug is `[a-z0-9-]+` and a provider key `[a-z0-9-]{1,32}`, so neither can contain the `_`
+ * that joins them and no two (tenant, provider) pairs can collide on one name.
  */
 private fun socialCookieName(
     base: String,
+    slug: String,
     secure: Boolean,
-) = if (secure) "__Host-$base" else base
+) = if (secure) "__Host-${base}_$slug" else "${base}_$slug"
 
 private fun socialStateCookieName(
     provider: ProviderKey,
+    slug: String,
     secure: Boolean,
-) = socialCookieName("${SOCIAL_STATE_COOKIE}_${provider.value}", secure)
+) = socialCookieName("${SOCIAL_STATE_COOKIE}_${provider.value}", slug, secure)
 
 private fun socialCookiePath(
     slug: String,
@@ -137,7 +145,7 @@ private fun ApplicationCall.setSocialStateCookie(
     value: String,
     secure: Boolean,
 ) = response.cookies.append(
-    name = socialStateCookieName(provider, secure),
+    name = socialStateCookieName(provider, slug, secure),
     value = value,
     maxAge = SOCIAL_STATE_MAX_AGE_MS / 1000,
     httpOnly = true,
@@ -151,7 +159,7 @@ private fun ApplicationCall.clearSocialStateCookie(
     provider: ProviderKey,
     secure: Boolean,
 ) = response.cookies.append(
-    name = socialStateCookieName(provider, secure),
+    name = socialStateCookieName(provider, slug, secure),
     value = "",
     maxAge = 0L,
     httpOnly = true,
@@ -176,7 +184,7 @@ private fun ApplicationCall.setSocialPendingCookies(
         SOCIAL_PENDING_BINDING_COOKIE to signedNonce,
     ).forEach { (name, value) ->
         response.cookies.append(
-            name = socialCookieName(name, secure),
+            name = socialCookieName(name, slug, secure),
             value = value,
             maxAge = SOCIAL_PENDING_MAX_AGE_MS / 1000,
             httpOnly = true,
@@ -193,7 +201,7 @@ private fun ApplicationCall.clearSocialPendingCookies(
 ) {
     listOf(SOCIAL_PENDING_COOKIE, SOCIAL_PENDING_BINDING_COOKIE).forEach { name ->
         response.cookies.append(
-            name = socialCookieName(name, secure),
+            name = socialCookieName(name, slug, secure),
             value = "",
             maxAge = 0L,
             httpOnly = true,
@@ -219,11 +227,11 @@ private fun ApplicationCall.readSocialPending(
     secure: Boolean,
     encryptionService: EncryptionService,
 ): SocialPendingData? {
-    val rawPending = request.cookies[socialCookieName(SOCIAL_PENDING_COOKIE, secure)]
+    val rawPending = request.cookies[socialCookieName(SOCIAL_PENDING_COOKIE, slug, secure)]
     val pending = parseSocialPendingCookie(rawPending, encryptionService) ?: return null
     if (!constantTimeEquals(pending.slug, slug)) return null
     val boundNonce =
-        request.cookies[socialCookieName(SOCIAL_PENDING_BINDING_COOKIE, secure)]
+        request.cookies[socialCookieName(SOCIAL_PENDING_BINDING_COOKIE, slug, secure)]
             ?.let { encryptionService.verifyCookie(it) } ?: return null
     return pending.takeIf { constantTimeEquals(boundNonce, it.csrfNonce) }
 }
@@ -469,7 +477,7 @@ internal fun Route.socialLoginRoutes(
         // flow. Without it a state minted by an attacker, replayed at the victim, signs the victim
         // in as the attacker — every other guard on this path passes on an attacker-minted state.
         val boundNonce =
-            call.request.cookies[socialStateCookieName(provider, secure)]
+            call.request.cookies[socialStateCookieName(provider, slug, secure)]
                 ?.let { encryptionService.verifyCookie(it) }
         if (boundNonce == null || !constantTimeEquals(boundNonce, socialState.csrfNonce)) {
             // Deliberately left in place: clearing here lets anyone holding a signed state cancel

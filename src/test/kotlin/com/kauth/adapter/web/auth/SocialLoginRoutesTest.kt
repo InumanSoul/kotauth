@@ -240,8 +240,19 @@ class SocialLoginRoutesTest {
 
     private fun signedState(payload: String) = encryptionService.signCookie(payload).encodeURLParameter()
 
-    /** The binding cookie's wire name for [provider]: one name per provider, not per tenant. */
-    private fun stateCookieName(provider: String) = "${STATE_COOKIE}_$provider"
+    /**
+     * The binding cookie's wire name: one per (tenant, provider) pair. `__Host-` forces `Path=/`,
+     * so the name is the only thing that keeps two in-flight sign-ins in one browser apart.
+     */
+    private fun stateCookieName(
+        provider: String,
+        slug: String = "acme",
+    ) = "${STATE_COOKIE}_${provider}_$slug"
+
+    /** The pending-registration pair's wire names, likewise suffixed with the tenant. */
+    private fun pendingCookieName(slug: String = "acme") = "${PENDING_COOKIE}_$slug"
+
+    private fun pendingBindingCookieName(slug: String = "acme") = "${PENDING_COOKIE}_BINDING_$slug"
 
     /**
      * The browser-binding cookie the redirect would have set for [payload]: its csrfNonce, signed.
@@ -249,7 +260,7 @@ class SocialLoginRoutesTest {
      */
     private fun HttpRequestBuilder.bindStateCookie(payload: String) {
         val parts = payload.split("|")
-        header("Cookie", "${stateCookieName(parts[0])}=${encryptionService.signCookie(parts[2])}")
+        header("Cookie", "${stateCookieName(parts[0], parts[1])}=${encryptionService.signCookie(parts[2])}")
     }
 
     private fun ApplicationTestBuilder.installSocialRoutes(
@@ -729,8 +740,24 @@ class SocialLoginRoutesTest {
         response.headers
             .getAll("Set-Cookie")
             .orEmpty()
-            .filter { it.contains("KOTAUTH_SOCIAL_PENDING") }
+            .filter { it.contains(PENDING_COOKIE) }
             .joinToString("; ") { it.substringBefore(";") }
+
+    /**
+     * The same cookies under another tenant's wire names.
+     *
+     * The tenant suffix is browser-side separation only: a replay is not made from a browser, so
+     * it renames the cookies before sending them. Without this the payload's own slug check —
+     * the guard that actually stops the takeover — would never be reached by the replay tests.
+     */
+    private fun renamedForTenant(
+        header: String,
+        slug: String,
+    ) = header
+        .split("; ")
+        .joinToString("; ") { cookie ->
+            "${cookie.substringBefore("=").substringBeforeLast("_")}_$slug=${cookie.substringAfter("=")}"
+        }
 
     @Test
     fun `a pending registration cookie minted at one tenant is refused at another`() =
@@ -771,11 +798,12 @@ class SocialLoginRoutesTest {
             assertTrue(stolen.isNotEmpty(), "The attacker's own tenant must mint a pending cookie for this to test")
 
             // Replayed at a tenant that configured no provider and never took part. Cookie path
-            // scoping is browser-side only, so a non-browser client sends it wherever it likes.
+            // and name scoping is browser-side only, so a non-browser client sends it wherever it
+            // likes, under whatever name that tenant reads.
             val replay =
                 createClient { followRedirects = false }
                     .post("/t/victimco/auth/social/complete-registration") {
-                        header("Cookie", stolen)
+                        header("Cookie", renamedForTenant(stolen, "victimco"))
                         contentType(ContentType.Application.FormUrlEncoded)
                         setBody("username=bobtakeover")
                     }
@@ -863,7 +891,7 @@ class SocialLoginRoutesTest {
             val pendingOnly =
                 pendingCookieFor("acme", "newcomer@acme.com")
                     .split("; ")
-                    .first { it.startsWith("KOTAUTH_SOCIAL_PENDING=") }
+                    .first { it.startsWith("${pendingCookieName()}=") }
             val response =
                 createClient { followRedirects = false }
                     .post("/t/acme/auth/social/complete-registration") {
@@ -1191,6 +1219,98 @@ class SocialLoginRoutesTest {
             )
         }
 
+    /**
+     * What a browser would still be holding after [responses]: one value per cookie name, the
+     * later write winning — which is exactly the overwrite two tenants sharing a name would suffer.
+     */
+    private fun cookieJar(vararg responses: HttpResponse): String =
+        responses
+            .flatMap { it.headers.getAll("Set-Cookie").orEmpty() }
+            .associate { it.substringBefore("=") to it.substringAfter("=").substringBefore(";") }
+            .entries
+            .joinToString("; ") { "${it.key}=${it.value}" }
+
+    @Test
+    fun `over https two tenants signing in through one provider keep separate bindings`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            tenantRepo.add(victimTenant)
+            idpRepo.seed(TenantId(2), "okta")
+            // https is the whole point: `__Host-` forces Path=/, so (host, name, path) is the same
+            // for every tenant unless the name says which one. Over http the path still separates.
+            installSocialRoutes(baseUrl = "https://id.example.com")
+            // No cookie storage — a test client will not send a Secure cookie over the harness's
+            // plain http, so the jar the browser would hold is assembled by hand.
+            val browser = createClient { followRedirects = false }
+
+            val acme = browser.get("/t/acme/auth/social/okta/redirect")
+            val other = browser.get("/t/victimco/auth/social/okta/redirect")
+
+            val completed =
+                browser.get(
+                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(acme.headers["Location"]!!)}",
+                ) {
+                    header("Cookie", cookieJar(acme, other))
+                }
+
+            assertFalse(
+                completed.bodyAsText().contains("did not start in this browser"),
+                "A sign-in begun at another tenant must not clobber this tenant's binding",
+            )
+            assertTrue(
+                completed.bodyAsText().contains("error occurred communicating with the identity provider"),
+                "The surviving binding must carry the flow through to the provider exchange",
+            )
+        }
+
+    @Test
+    fun `over https a pending registration survives one begun at another tenant`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            tenantRepo.add(victimTenant)
+            idpRepo.seed(TenantId(2), "okta")
+            installSocialRoutes(baseUrl = "https://id.example.com")
+            oktaAdapter.shouldFail = false
+            oktaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "okta|newcomer",
+                    email = "newcomer@acme.com",
+                    name = "New Comer",
+                    emailVerified = true,
+                )
+            val browser = createClient { followRedirects = false }
+
+            val acmeRedirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val acmeCallback =
+                browser.get(
+                    "/t/acme/auth/social/okta/callback?code=abc" +
+                        "&state=${stateFrom(acmeRedirect.headers["Location"]!!)}",
+                ) { header("Cookie", cookieJar(acmeRedirect)) }
+            val otherRedirect = browser.get("/t/victimco/auth/social/okta/redirect")
+            val otherCallback =
+                browser.get(
+                    "/t/victimco/auth/social/okta/callback?code=abc" +
+                        "&state=${stateFrom(otherRedirect.headers["Location"]!!)}",
+                ) { header("Cookie", cookieJar(otherRedirect)) }
+
+            // The pending pair is on Path=/ too, so without the tenant in the name the second
+            // registration would overwrite the first and the first would read as another tenant's.
+            val completed =
+                browser.post("/t/acme/auth/social/complete-registration") {
+                    header("Cookie", cookieJar(acmeCallback, otherCallback))
+                    contentType(ContentType.Application.FormUrlEncoded)
+                    setBody("username=newcomer")
+                }
+
+            assertEquals("/t/acme/account/login", completed.headers["Location"])
+            assertNotNull(
+                userRepo.findByEmail(TenantId(1), "newcomer@acme.com"),
+                "A registration begun at another tenant must not strand this one",
+            )
+        }
+
     @Test
     fun `a refused callback leaves the in-flight binding in place`() =
         testApplication {
@@ -1225,17 +1345,17 @@ class SocialLoginRoutesTest {
             val cookies = pendingCookieFor("acme", "newcomer@acme.com")
             val signed =
                 URLDecoder.decode(
-                    cookies.substringAfter("KOTAUTH_SOCIAL_PENDING=").substringBefore(";"),
+                    cookies.substringAfter("${pendingCookieName()}=").substringBefore(";"),
                     Charsets.UTF_8,
                 )
             val forged = encryptionService.signCookie(signed.substringBeforeLast(".") + "|extra")
             // The real binding cookie rides along, so the field count is the only thing left to
             // refuse it — otherwise the browser-binding guard would answer for this test.
-            val binding = cookies.split("; ").first { it.startsWith("KOTAUTH_SOCIAL_PENDING_BINDING=") }
+            val binding = cookies.split("; ").first { it.startsWith("${pendingBindingCookieName()}=") }
             val response =
                 createClient { followRedirects = false }
                     .post("/t/acme/auth/social/complete-registration") {
-                        header("Cookie", "KOTAUTH_SOCIAL_PENDING=${forged.encodeURLParameter()}; $binding")
+                        header("Cookie", "${pendingCookieName()}=${forged.encodeURLParameter()}; $binding")
                         contentType(ContentType.Application.FormUrlEncoded)
                         setBody("username=newcomer")
                     }
@@ -1250,5 +1370,8 @@ class SocialLoginRoutesTest {
     companion object {
         /** The wire name of the cookie that binds a social-login state to the browser that began it. */
         private const val STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
+
+        /** The stem both pending cookies share; each is suffixed with the tenant that minted it. */
+        private const val PENDING_COOKIE = "KOTAUTH_SOCIAL_PENDING"
     }
 }
