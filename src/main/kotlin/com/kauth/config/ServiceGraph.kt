@@ -188,6 +188,7 @@ data class ServiceGraph(
     val webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository,
     val securityMethodsService: SecurityMethodsService,
     val passkeyRateLimiter: RateLimiterPort,
+    val socialRateLimiter: RateLimiterPort,
     /** Flyway head V-number captured at startup; embedded in backup exports. */
     val flywaySchemaVersion: Int,
     val transactionRunner: TransactionRunner,
@@ -566,6 +567,8 @@ data class ServiceGraph(
             val otpEmailLimiter = buildRateLimiter(max = 3, windowSecs = 900, prefix = "otp_email")
             val otpIpLimiter = buildRateLimiter(max = 10, windowSecs = 900, prefix = "otp_ip")
             val passkeyAuthLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "passkey_auth")
+            // Two requests per sign-in attempt, both of which reach an issuer over the network.
+            val socialLoginLimiter = buildRateLimiter(max = 10, windowSecs = 60, prefix = "social_login")
             val apiWriteLimiter = buildRateLimiter(max = 60, windowSecs = 60, prefix = "api_write")
             // Reads are throttled far more generously than writes (300/min vs 60/min) and, unlike
             // every other limiter here, fail OPEN on a Redis outage: a rate limiter guards against
@@ -700,6 +703,7 @@ data class ServiceGraph(
                         identityProviderRepository = identityProviderRepository,
                     ),
                 passkeyRateLimiter = passkeyAuthLimiter,
+                socialRateLimiter = socialLoginLimiter,
                 flywaySchemaVersion = flywaySchemaVersion,
                 transactionRunner = backupTransactionRunner,
             )

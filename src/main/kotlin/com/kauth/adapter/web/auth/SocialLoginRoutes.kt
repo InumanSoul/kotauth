@@ -2,8 +2,10 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.OidcRequestBinding
+import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginResult
 import com.kauth.domain.service.SocialLoginService
@@ -121,6 +123,39 @@ private fun ApplicationCall.clearSocialStateCookie(
     extensions = mapOf("SameSite" to "Lax"),
 )
 
+/**
+ * Throttles one social-login request per IP and tenant, answering with the login page so a
+ * throttled browser sees a page rather than a JSON body. Returns false once it has responded.
+ */
+private suspend fun ApplicationCall.allowSocialRequest(
+    limiter: RateLimiterPort,
+    slug: String,
+    ctx: AuthTenantContext,
+    tenant: Tenant?,
+    identityProviderRepository: IdentityProviderRepository?,
+): Boolean {
+    if (limiter.isAllowed("social:${request.local.remoteAddress}:$slug")) return true
+    val enabledProviders =
+        if (tenant != null && identityProviderRepository != null) {
+            identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+        } else {
+            emptyList()
+        }
+    response.headers.append("Retry-After", "60")
+    respondHtml(
+        HttpStatusCode.TooManyRequests,
+        AuthView.loginPage(
+            tenantSlug = slug,
+            ctx = ctx.viewContext,
+            error = "Too many sign-in attempts. Please wait a moment and try again.",
+            enabledProviders = enabledProviders,
+            passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
+            passkeysEnabled = tenant?.passkeysEnabled == true,
+        ),
+    )
+    return false
+}
+
 private fun constantTimeEquals(
     a: String,
     b: String,
@@ -135,11 +170,15 @@ internal fun Route.socialLoginRoutes(
     encryptionService: EncryptionService,
     baseUrl: String,
     ssoTtlSeconds: Long,
+    socialRateLimiter: RateLimiterPort,
 ) {
     get("/auth/social/{provider}/redirect") {
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
+        // Both halves of the flow reach an issuer over the network without any authentication
+        // behind them, so an unthrottled loop here is an outbound-fetch amplifier.
+        if (!call.allowSocialRequest(socialRateLimiter, slug, ctx, tenant, identityProviderRepository)) return@get
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         // Any key the pattern accepts may be a configured OIDC provider. Whether this tenant has
         // one is the provider lookup's answer, not this guard's.
@@ -215,6 +254,7 @@ internal fun Route.socialLoginRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
+        if (!call.allowSocialRequest(socialRateLimiter, slug, ctx, tenant, identityProviderRepository)) return@get
         val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
         // Any key the pattern accepts may be a configured OIDC provider. Whether this tenant has
         // one is the provider lookup's answer, not this guard's.

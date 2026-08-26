@@ -15,6 +15,11 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Fetches an issuer's OIDC discovery document, proves it belongs to that issuer, and caches it.
  *
+ * An unreachable issuer is remembered too, for [failureTtlMillis]. Without that, every request to
+ * a route that discovers — `/redirect` among them, unauthenticated — fires its own outbound GET
+ * and waits out the fetch timeout, so one issuer being slow or down turns this server into an
+ * amplifier pointed at it.
+ *
  * The cache is in-memory per replica, deliberately: any replica can refetch in one request, so
  * sharing it would buy a write path and a staleness question for nothing. The effective refetch
  * rate against an issuer therefore scales with replica count — accepted.
@@ -22,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap
 class HttpOidcDiscoveryAdapter(
     private val fetcher: HttpJsonFetcher = JdkHttpJsonFetcher(),
     private val ttlMillis: Long = DEFAULT_TTL_MILLIS,
+    private val failureTtlMillis: Long = DEFAULT_FAILURE_TTL_MILLIS,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : OidcDiscoveryPort {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -32,7 +38,13 @@ class HttpOidcDiscoveryAdapter(
         val loadedAt: Long,
     )
 
+    private data class Unreachable(
+        val failure: OidcDiscoveryFailure,
+        val at: Long,
+    )
+
     private val cache = ConcurrentHashMap<String, Entry>()
+    private val unreachable = ConcurrentHashMap<String, Unreachable>()
 
     override fun discover(
         issuer: String,
@@ -51,9 +63,32 @@ class HttpOidcDiscoveryAdapter(
             return secured(cached.discovery.withOverrides(overrides))
         }
 
-        val fetched = fetch(issuer).getOrElse { return Result.failure(it) }
+        unreachable[issuer]
+            ?.takeIf { now - it.at < failureTtlMillis }
+            ?.let { return Result.failure(it.failure) }
+
+        val fetched =
+            fetch(issuer).getOrElse { cause ->
+                rememberIfUnreachable(issuer, cause, now)
+                return Result.failure(cause)
+            }
+        unreachable.remove(issuer)
         cache[issuer] = Entry(fetched, now)
         return secured(fetched.withOverrides(overrides))
+    }
+
+    /**
+     * Only "could not be reached" is remembered. A document we did reach and rejected is a
+     * configuration problem the operator fixes and retries at once, and holding it against them
+     * for half a minute buys nothing — the answer already came back fast.
+     */
+    private fun rememberIfUnreachable(
+        issuer: String,
+        cause: Throwable,
+        now: Long,
+    ) {
+        val failure = cause as? OidcDiscoveryFailure ?: return
+        if (failure.reason in UNREACHABLE_REASONS) unreachable[issuer] = Unreachable(failure, now)
     }
 
     /** Every endpoint we are about to hand out, pinned or discovered, must survive the URL policy. */
@@ -167,6 +202,12 @@ class HttpOidcDiscoveryAdapter(
 
     companion object {
         const val DEFAULT_TTL_MILLIS: Long = 3_600_000L
+
+        // Thirty seconds: long enough to collapse a flood into one outbound fetch, short enough
+        // that a recovering issuer is usable again before an operator finishes reading the error.
+        const val DEFAULT_FAILURE_TTL_MILLIS: Long = 30_000L
+
         private const val WELL_KNOWN_PATH = "/.well-known/openid-configuration"
+        private val UNREACHABLE_REASONS = setOf(Reason.FETCH_FAILED, Reason.RESPONSE_TOO_LARGE)
     }
 }

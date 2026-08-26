@@ -18,7 +18,14 @@ class HttpOidcDiscoveryAdapterTest {
     private val fetcher = FakeHttpJsonFetcher()
     private var now = 0L
     private val ttlMillis = 3_600_000L
-    private val adapter = HttpOidcDiscoveryAdapter(fetcher, ttlMillis = ttlMillis, clock = { now })
+    private val failureTtlMillis = 30_000L
+    private val adapter =
+        HttpOidcDiscoveryAdapter(
+            fetcher,
+            ttlMillis = ttlMillis,
+            failureTtlMillis = failureTtlMillis,
+            clock = { now },
+        )
 
     private val issuer = "https://issuer.example"
     private val wellKnown = "$issuer/.well-known/openid-configuration"
@@ -102,6 +109,56 @@ class HttpOidcDiscoveryAdapterTest {
         adapter.discover(issuer).getOrThrow()
         assertEquals(2, fetcher.callCount(wellKnown))
     }
+
+    @Test
+    fun `an unreachable issuer is fetched once, not once per request`() {
+        fetcher.shouldFail = true
+
+        repeat(5) { assertTrue(adapter.discover(issuer).isFailure) }
+
+        // /redirect is unauthenticated and reaches here. One outbound GET per inbound request,
+        // each waiting out the fetch timeout, is the amplifier the negative cache exists to close.
+        assertEquals(1, fetcher.callCount(wellKnown))
+    }
+
+    @Test
+    fun `an issuer returning a non-200 is also remembered as unreachable`() {
+        fetcher.respondWith(wellKnown, "nope", statusCode = 503)
+
+        repeat(3) { assertTrue(adapter.discover(issuer).isFailure) }
+
+        assertEquals(1, fetcher.callCount(wellKnown))
+    }
+
+    @Test
+    fun `a recovered issuer is reachable again once the negative window elapses`() {
+        fetcher.shouldFail = true
+        assertTrue(adapter.discover(issuer).isFailure)
+
+        fetcher.shouldFail = false
+        fetcher.respondWith(wellKnown, document())
+        now += failureTtlMillis - 1
+        assertTrue(adapter.discover(issuer).isFailure, "Inside the window the remembered failure still answers")
+        assertEquals(1, fetcher.callCount(wellKnown))
+
+        now += 1
+        assertEquals("$issuer/jwks", adapter.discover(issuer).getOrThrow().jwksUri)
+        assertEquals(2, fetcher.callCount(wellKnown))
+    }
+
+    @Test
+    fun `a document that was reached and rejected is not remembered as unreachable`() {
+        // Reaching the issuer and refusing its answer is a configuration problem, not an
+        // availability one: the operator fixes the document and the very next request must work.
+        fetcher.respondWith(wellKnown, document(jwksUri = null))
+        assertEquals(OidcDiscoveryFailure.Reason.MALFORMED, reasonOf(adapter.discover(issuer)))
+
+        fetcher.respondWith(wellKnown, document())
+        assertEquals("$issuer/jwks", adapter.discover(issuer).getOrThrow().jwksUri)
+        assertEquals(2, fetcher.callCount(wellKnown))
+    }
+
+    private fun reasonOf(result: Result<*>) = assertIs<OidcDiscoveryFailure>(result.exceptionOrNull()).reason
 
     @Test
     fun `a complete set of pinned endpoints answers without any fetch`() {

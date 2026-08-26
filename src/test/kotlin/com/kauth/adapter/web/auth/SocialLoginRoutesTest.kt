@@ -11,6 +11,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
@@ -204,7 +205,9 @@ class SocialLoginRoutesTest {
         header("Cookie", "$STATE_COOKIE=${encryptionService.signCookie(payload.split("|")[2])}")
     }
 
-    private fun ApplicationTestBuilder.installSocialRoutes() {
+    private fun ApplicationTestBuilder.installSocialRoutes(
+        socialLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60),
+    ) {
         application {
             install(ContentNegotiation) { json() }
             routing {
@@ -220,6 +223,7 @@ class SocialLoginRoutesTest {
                     identityProviderRepository = idpRepo,
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),
+                    socialRateLimiter = socialLimiter,
                 )
             }
         }
@@ -606,6 +610,43 @@ class SocialLoginRoutesTest {
                 "Expected the binding cookie to be expired, got: $cleared",
             )
         }
+
+    @Test
+    fun `a redirect flood is refused once the per-IP limit is spent`() {
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60))
+            val client = createClient { followRedirects = false }
+
+            repeat(2) { assertEquals(HttpStatusCode.Found, client.get("/t/acme/auth/social/google/redirect").status) }
+            val throttled = client.get("/t/acme/auth/social/google/redirect")
+
+            // /redirect performs a blocking outbound fetch for an OIDC row and needs no
+            // authentication, so an unbounded loop here amplifies traffic at the issuer.
+            assertEquals(HttpStatusCode.TooManyRequests, throttled.status)
+            assertEquals("60", throttled.headers["Retry-After"])
+        }
+    }
+
+    @Test
+    fun `the callback spends the same per-IP budget as the redirect`() {
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(InMemoryRateLimiter(maxRequests = 2, windowSeconds = 60))
+            val client = createClient { followRedirects = false }
+
+            repeat(2) { client.get("/t/acme/auth/social/google/redirect") }
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val throttled =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
+                    bindStateCookie(payload)
+                }
+
+            // The callback exchanges a code at the issuer, so leaving it outside the budget would
+            // leave half of the outbound path unthrottled.
+            assertEquals(HttpStatusCode.TooManyRequests, throttled.status)
+        }
+    }
 
     companion object {
         /** The wire name of the cookie that binds a social-login state to the browser that began it. */

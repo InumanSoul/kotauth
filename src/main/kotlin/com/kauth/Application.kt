@@ -442,6 +442,7 @@ fun Application.module(
             otpIpRateLimiter = s.otpIpRateLimiter,
             webAuthnService = s.webAuthnService,
             passkeyRateLimiter = s.passkeyRateLimiter,
+            socialRateLimiter = s.socialRateLimiter,
         )
 
         portalRoutes(
