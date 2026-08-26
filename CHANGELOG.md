@@ -43,8 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toggle on, the provider itself asserts the email address is verified, and the
   address's domain is on that provider's allowed list. Domains are matched
   exactly, never by suffix — a suffix test for `example.com` would also accept
-  `evil-example.com` — and **an empty list is the feature switched off, never a
-  wildcard**, so the toggle alone provisions nobody.
+  `evil-example.com` — and the comparison is over the ASCII (punycode) spelling
+  of both sides, so a lookalike domain cannot pass as an allowed one. An entry
+  that could never match exactly, such as a wildcard or a bare label, is
+  refused when the provider is saved. **An empty list is the feature switched
+  off, never a wildcard**, so the toggle alone provisions nobody.
 
   **The gate only ever creates.** It has no link path and no update path, and
   it is reached only once nothing matched the identity — so switching automatic
