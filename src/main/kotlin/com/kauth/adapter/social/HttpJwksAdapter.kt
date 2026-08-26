@@ -5,14 +5,20 @@ import com.kauth.domain.port.JwksFailure
 import com.kauth.domain.port.JwksFailure.Reason
 import com.kauth.domain.port.JwksPort
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
 import java.math.BigInteger
+import java.security.AlgorithmParameters
 import java.security.KeyFactory
 import java.security.PublicKey
+import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECParameterSpec
+import java.security.spec.ECPoint
+import java.security.spec.ECPublicKeySpec
 import java.security.spec.RSAPublicKeySpec
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
@@ -99,40 +105,88 @@ class HttpJwksAdapter(
                 return failure(Reason.MALFORMED, "Key set at $jwksUri is not a JWK Set.")
             }
         if (keys.isEmpty()) {
-            log.warn("JWKS at {} carries no usable RSA signing key", jwksUri)
-            return failure(Reason.MALFORMED, "Key set at $jwksUri carries no usable RSA signing key.")
+            log.warn("JWKS at {} carries no usable signing key", jwksUri)
+            return failure(Reason.MALFORMED, "Key set at $jwksUri carries no usable signing key.")
         }
         return Result.success(keys)
     }
 
-    /** Unusable entries are skipped rather than failing the set — issuers publish EC and enc keys too. */
+    /**
+     * Unusable entries are skipped rather than failing the set — issuers publish encryption keys,
+     * unsupported curves and key types we cannot verify with, alongside the ones we can.
+     */
     private fun parseKeys(body: String): Map<String, PublicKey> =
         json
             .parseToJsonElement(body)
             .jsonObject["keys"]
             ?.jsonArray
             .orEmpty()
-            .mapNotNull { element -> rsaSigningKey(element.jsonObject) }
+            .mapNotNull { element -> signingKeyOf(element.jsonObject) }
             .toMap()
 
-    private fun rsaSigningKey(jwk: JsonObject): Pair<String, PublicKey>? {
-        fun field(name: String): String? =
-            (jwk[name] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+    private fun signingKeyOf(jwk: JsonObject): Pair<String, PublicKey>? {
+        if (!jwk.usableForVerification()) return null
+        val kid = jwk.string("kid") ?: return null
+        val key =
+            when (jwk.string("kty")) {
+                "RSA" -> rsaKey(jwk)
+                "EC" -> ecKey(jwk)
+                else -> null
+            }
+        return key?.let { kid to it }
+    }
 
-        if (field("kty") != "RSA") return null
-        val use = field("use")
-        if (use != null && use != "sig") return null
-        val kid = field("kid") ?: return null
-        val modulus = field("n") ?: return null
-        val exponent = field("e") ?: return null
+    // RFC 7517 4.2 and 4.3 — a key published for encryption is not a signing key, whatever its type.
+    private fun JsonObject.usableForVerification(): Boolean {
+        val use = string("use")
+        if (use != null && use != "sig") return false
+        val keyOps =
+            (this["key_ops"] as? JsonArray)
+                ?.mapNotNull { (it as? JsonPrimitive)?.takeIf { primitive -> primitive.isString }?.content }
+        return keyOps == null || "verify" in keyOps
+    }
 
+    private fun rsaKey(jwk: JsonObject): PublicKey? {
+        val modulus = jwk.string("n") ?: return null
+        val exponent = jwk.string("e") ?: return null
         return runCatching {
             val spec = RSAPublicKeySpec(decodeUnsigned(modulus), decodeUnsigned(exponent))
-            kid to KeyFactory.getInstance("RSA").generatePublic(spec)
+            KeyFactory.getInstance("RSA").generatePublic(spec)
         }.getOrNull()
     }
 
+    // P-256 only. P-384 and P-521 pair with ES384 and ES512, which OidcTokenValidator does not
+    // allow, so accepting them here would rebuild the same allowlist mismatch one curve over.
+    private fun ecKey(jwk: JsonObject): PublicKey? {
+        if (jwk.string("crv") != P256_CURVE) return null
+        val x = jwk.string("x") ?: return null
+        val y = jwk.string("y") ?: return null
+        return runCatching {
+            val point = ECPoint(decodeCoordinate(x), decodeCoordinate(y))
+            KeyFactory.getInstance("EC").generatePublic(ECPublicKeySpec(point, p256Parameters))
+        }.getOrNull()
+    }
+
+    private fun JsonObject.string(name: String): String? =
+        (this[name] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf { it.isNotBlank() }
+
     private fun decodeUnsigned(base64Url: String): BigInteger = BigInteger(1, Base64.getUrlDecoder().decode(base64Url))
+
+    // RFC 7518 6.2.1.2 — a P-256 coordinate is 32 octets. The JDK's EC KeyFactory rejects an
+    // out-of-field coordinate on its own, so this guard is an explicit, provider-independent
+    // restatement rather than the only thing refusing one; verified by mutation, which it survives.
+    private fun decodeCoordinate(base64Url: String): BigInteger {
+        val bytes = Base64.getUrlDecoder().decode(base64Url)
+        require(bytes.size <= P256_COORDINATE_BYTES) { "not a P-256 coordinate" }
+        return BigInteger(1, bytes)
+    }
+
+    private val p256Parameters: ECParameterSpec by lazy {
+        AlgorithmParameters
+            .getInstance("EC")
+            .apply { init(ECGenParameterSpec(P256_STANDARD_NAME)) }
+            .getParameterSpec(ECParameterSpec::class.java)
+    }
 
     private fun <T> failure(
         reason: Reason,
@@ -141,5 +195,8 @@ class HttpJwksAdapter(
 
     companion object {
         const val DEFAULT_REFETCH_WINDOW_MILLIS: Long = 60_000L
+        private const val P256_CURVE = "P-256"
+        private const val P256_STANDARD_NAME = "secp256r1"
+        private const val P256_COORDINATE_BYTES = 32
     }
 }

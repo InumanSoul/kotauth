@@ -4,7 +4,9 @@ import com.kauth.domain.port.JwksFailure
 import com.kauth.fakes.FakeHttpJsonFetcher
 import java.math.BigInteger
 import java.security.KeyPairGenerator
+import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
+import java.security.spec.ECGenParameterSpec
 import java.util.Base64
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -28,6 +30,9 @@ class HttpJwksAdapterTest {
 
     private val firstKey = rsaKeyPair()
     private val secondKey = rsaKeyPair()
+    private val p256Key = ecKeyPair("secp256r1")
+    private val otherP256Key = ecKeyPair("secp256r1")
+    private val p384Key = ecKeyPair("secp384r1")
 
     @BeforeTest
     fun setUp() {
@@ -159,10 +164,10 @@ class HttpJwksAdapterTest {
     }
 
     @Test
-    fun `a key set with no usable rsa signing key is rejected`() {
-        fetcher.respondWith(jwksUri, """{"keys":[{"kty":"EC","kid":"ec-1","crv":"P-256","x":"a","y":"b"}]}""")
+    fun `a key set of only unsupported key types is rejected`() {
+        fetcher.respondWith(jwksUri, """{"keys":[{"kty":"oct","kid":"sym-1","k":"c2VjcmV0"}]}""")
 
-        val result = adapter.signingKey(jwksUri, "ec-1")
+        val result = adapter.signingKey(jwksUri, "sym-1")
 
         assertEquals(JwksFailure.Reason.MALFORMED, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
         assertNull(result.getOrNull())
@@ -222,6 +227,106 @@ class HttpJwksAdapterTest {
         assertNull(result.getOrNull())
     }
 
+    // -- key types ----------------------------------------------------------
+
+    @Test
+    fun `an ec p-256 key resolves to its signing key`() {
+        fetcher.respondWith(jwksUri, keySetOf(ecJwk("ec-1", p256Key)))
+
+        val key = adapter.signingKey(jwksUri, "ec-1").getOrThrow()
+
+        assertEquals(p256Key, key)
+        // The verifier casts to ECPublicKey for ES256; a key of any other type would be a mismatch.
+        assertIs<ECPublicKey>(key)
+    }
+
+    @Test
+    fun `an rsa key and an ec key live in the same set`() {
+        fetcher.respondWith(jwksUri, keySetOf(jwk("k1", firstKey), ecJwk("ec-1", p256Key)))
+
+        assertEquals(firstKey, adapter.signingKey(jwksUri, "k1").getOrThrow())
+        assertEquals(p256Key, adapter.signingKey(jwksUri, "ec-1").getOrThrow())
+        assertEquals(1, fetcher.callCount(jwksUri))
+    }
+
+    @Test
+    fun `an ec key on an unsupported curve is skipped rather than failing the set`() {
+        fetcher.respondWith(jwksUri, keySetOf(jwk("k1", firstKey), ecJwk("ec-384", p384Key, curve = "P-384")))
+
+        // The RSA key beside it still resolves — an entry we cannot use is skipped, not fatal.
+        assertEquals(firstKey, adapter.signingKey(jwksUri, "k1").getOrThrow())
+
+        val result = adapter.signingKey(jwksUri, "ec-384")
+        assertEquals(JwksFailure.Reason.UNKNOWN_KID, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `a set of only an unsupported curve is unusable`() {
+        // P-384 pairs with ES384, which the validator does not allow. Accepting it here would hand
+        // the verifier a key for an algorithm it will refuse.
+        fetcher.respondWith(jwksUri, keySetOf(ecJwk("ec-384", p384Key, curve = "P-384")))
+
+        val result = adapter.signingKey(jwksUri, "ec-384")
+
+        assertEquals(JwksFailure.Reason.MALFORMED, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `a key claiming an unsupported curve is refused even when its coordinates would parse`() {
+        // The crv label is the only thing separating this from a usable P-256 key: the coordinates
+        // are P-256 sized, so the octet-length guard never sees it. An issuer that mislabels — or a
+        // document that lies — must not get a key built for a curve the validator will not accept.
+        val lying = ecJwk("ec-lying", p256Key, curve = "P-384", octets = P256_OCTETS)
+        fetcher.respondWith(jwksUri, keySetOf(lying))
+
+        val result = adapter.signingKey(jwksUri, "ec-lying")
+
+        assertEquals(JwksFailure.Reason.MALFORMED, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `a key claiming p-256 with oversized coordinates is refused`() {
+        val oversized = ecJwk("ec-fat", p384Key, curve = "P-256", octets = P384_OCTETS)
+        fetcher.respondWith(jwksUri, keySetOf(oversized))
+
+        val result = adapter.signingKey(jwksUri, "ec-fat")
+
+        assertEquals(JwksFailure.Reason.MALFORMED, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `an encryption-only ec key is not offered as a signing key`() {
+        fetcher.respondWith(
+            jwksUri,
+            keySetOf(ecJwk("ec-enc", p256Key, use = "enc"), ecJwk("ec-sig", otherP256Key)),
+        )
+
+        val result = adapter.signingKey(jwksUri, "ec-enc")
+
+        assertEquals(JwksFailure.Reason.UNKNOWN_KID, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertEquals(otherP256Key, adapter.signingKey(jwksUri, "ec-sig").getOrThrow())
+    }
+
+    @Test
+    fun `a key whose key_ops exclude verify is not offered as a signing key`() {
+        fetcher.respondWith(
+            jwksUri,
+            keySetOf(
+                jwk("k-encrypt", firstKey, keyOps = listOf("encrypt", "wrapKey")),
+                jwk("k-verify", secondKey, keyOps = listOf("verify")),
+            ),
+        )
+
+        val result = adapter.signingKey(jwksUri, "k-encrypt")
+
+        assertEquals(JwksFailure.Reason.UNKNOWN_KID, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertEquals(secondKey, adapter.signingKey(jwksUri, "k-verify").getOrThrow())
+    }
+
     // -- helpers ------------------------------------------------------------
 
     private fun rsaKeyPair(): RSAPublicKey =
@@ -231,20 +336,61 @@ class HttpJwksAdapterTest {
             .generateKeyPair()
             .public as RSAPublicKey
 
+    private fun ecKeyPair(curve: String): ECPublicKey =
+        KeyPairGenerator
+            .getInstance("EC")
+            .apply { initialize(ECGenParameterSpec(curve)) }
+            .generateKeyPair()
+            .public as ECPublicKey
+
     private fun keySet(vararg keys: Pair<String, RSAPublicKey>): String =
-        """{"keys":[${keys.joinToString(",") { (kid, key) -> jwk(kid, key) }}]}"""
+        keySetOf(*keys.map { (kid, key) -> jwk(kid, key) }.toTypedArray())
+
+    private fun keySetOf(vararg entries: String): String = """{"keys":[${entries.joinToString(",")}]}"""
 
     private fun jwk(
         kid: String,
         key: RSAPublicKey,
         use: String = "sig",
+        keyOps: List<String>? = null,
     ): String =
-        """{"kty":"RSA","use":"$use","alg":"RS256","kid":"$kid",""" +
+        """{"kty":"RSA","use":"$use","alg":"RS256","kid":"$kid"${keyOpsField(keyOps)},""" +
             """"n":"${base64Url(key.modulus)}","e":"${base64Url(key.publicExponent)}"}"""
 
-    private fun base64Url(value: BigInteger): String {
+    private fun ecJwk(
+        kid: String,
+        key: ECPublicKey,
+        curve: String = "P-256",
+        use: String = "sig",
+        octets: Int = if (curve == "P-256") P256_OCTETS else P384_OCTETS,
+    ): String =
+        """{"kty":"EC","use":"$use","crv":"$curve","kid":"$kid",""" +
+            """"x":"${base64UrlFixed(key.w.affineX, octets)}","y":"${base64UrlFixed(key.w.affineY, octets)}"}"""
+
+    private fun keyOpsField(keyOps: List<String>?): String =
+        keyOps?.joinToString(",") { """"$it"""" }?.let { ""","key_ops":[$it]""" } ?: ""
+
+    /** RFC 7518 6.2.1.2 — coordinates are left-padded to the curve's fixed octet length. */
+    private fun base64UrlFixed(
+        value: BigInteger,
+        octets: Int,
+    ): String {
+        val raw = unsigned(value)
+        val padded = ByteArray(octets)
+        raw.copyInto(padded, octets - raw.size)
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(padded)
+    }
+
+    private fun base64Url(value: BigInteger): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(unsigned(value))
+
+    private fun unsigned(value: BigInteger): ByteArray {
         val raw = value.toByteArray()
-        val bytes = if (raw.size > 1 && raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
+        return if (raw.size > 1 && raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
+    }
+
+    private companion object {
+        const val P256_OCTETS = 32
+        const val P384_OCTETS = 48
     }
 }
