@@ -35,6 +35,7 @@ For configuration knobs — set your own `KAUTH_SECRET_KEY`, point at an externa
 - **RBAC** — Roles, groups, composite role inheritance, JWT `realm_access` / `resource_access` claims
 - **MFA** — TOTP (RFC 6238), recovery codes, per-tenant policy (optional / required / required for admins)
 - **Social login** — Google and GitHub OAuth2, with automatic account linking
+- **OIDC identity brokering** — sign users in through any OpenID Connect provider, configured per workspace; endpoints read from the issuer's discovery document, with optional per-endpoint pins. Optional just-in-time account creation, off by default and gated on a provider-asserted verified email plus an exact-match allowed-domain list. No identity provider has been verified against a live tenant; the implementation follows the specifications the providers publish
 - **User self-service** — Email verification, password reset, session management, MFA enrollment
 - **Admin console** — Web UI for workspaces, users, applications, audit logs, webhooks, branding
 - **REST API v1** — 30+ endpoints, API key authentication, OpenAPI 3.1 spec with Swagger UI

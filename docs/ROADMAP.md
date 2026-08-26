@@ -178,6 +178,21 @@ Conformance target is RFC 7644 and RFC 7643. No verification against, or certifi
 
 ---
 
+### OIDC Identity Brokering ✅ Shipped
+*Goal: Sign people in through an identity provider the workspace already runs*
+
+- Generic OpenID Connect brokering per workspace — issuer URL and client credentials, with the endpoints read from the issuer's discovery document and optional per-endpoint pins for issuers that publish none
+- Several brokered providers side by side in one workspace, each with its own credentials, endpoints and sign-in button label
+- ID token validation in a fixed order — the header's algorithm against an allowlist before any key is fetched, then the signature, `iss`, `aud`, `azp`, `exp`, `iat`, `nonce` and `sub`
+- `https` required for every issuer URL, every endpoint inside a discovery document and every JWKS URI (loopback excepted for local development); a discovery document declaring an issuer other than the one requested is refused
+- Just-in-time provisioning — off by default, gated on the provider asserting a verified email and on the address's domain being on that provider's exact-match allowed list; an empty list is the feature switched off, never a wildcard
+- A refused sign-in is explained to the person and recorded for the operator, with a Recent sign-in failures panel per provider carrying the reason, the email domain and a stable reference — never the address
+- Test discovery on the provider form — resolves the endpoints and counts the signing keys, and says what it did not verify: the redirect URI and the client credentials
+
+Conformance target is OpenID Connect Core and Discovery. No identity provider has been verified against a live tenant, and no verification against, or certification for, any particular identity product is claimed.
+
+---
+
 ## Post-V1 Roadmap
 
 The following phases are planned but not yet scheduled. Priority order reflects market demand and dependency on existing foundations.
@@ -191,7 +206,6 @@ The enterprise market requires LDAP and SAML. Without these, Kotauth cannot be a
 
 - **LDAP / Active Directory sync** — read users and groups from a corporate directory, configurable sync interval, attribute mapping
 - **SAML 2.0** — SP-initiated and IdP-initiated flows, assertion parsing, attribute mapping to Kotauth user model
-- **External OIDC broker** — Kotauth acting as a relay to an upstream OIDC provider (Azure AD, Okta, etc.)
 - **Cross-tenant federation** — allow users from one workspace to authenticate in another via configured trust
 
 ---
