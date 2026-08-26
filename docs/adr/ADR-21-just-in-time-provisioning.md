@@ -34,13 +34,22 @@ The three conditions, checked in `JitProvisioningService.provision`:
    address is refused; the provider is being asked to stand behind the claim, and one that will not is
    not a basis for creating anything.
 3. **The email's domain is on that provider's allowlist** — `identity_providers.jit_allowed_domains`,
-   matched **exactly** and case-insensitively against the whole domain. **An empty list is the feature
-   off, never a wildcard**, so the toggle alone provisions nobody.
+   matched **exactly** against the whole domain, both sides first reduced to their ASCII (punycode)
+   spelling. **An empty list is the feature off, never a wildcard**, so the toggle alone provisions
+   nobody.
 
 The domain test is deliberately not a suffix test. `endsWith("oriana.com.py")` also accepts
-`evil-oriana.com.py`, a domain anyone can register for the price of a registration. The address is
-also rejected outright unless it contains exactly one `@`, so `a@evil.example@oriana.com.py` cannot
-read as the allowed domain.
+`evil-oriana.com.py`, a domain anyone can register for the price of a registration. It is not a
+case-insensitive test either: the JDK folds characters that are not case variants of each other, so
+`"oriana.com.py".equalsIgnoreCase("orıana.com.py")` with a dotless i is true. Comparing A-labels with
+`==` is what makes it exact, and it also stops a punycode spelling reading as a domain nobody listed.
+The address is rejected outright unless it contains exactly one `@`, so
+`a@evil.example@oriana.com.py` cannot read as the allowed domain. An entry that could never match
+exactly — a wildcard, a bare label — is refused when the provider is saved rather than stored to
+match nothing.
+
+The allowed list is validated in the same ASCII form the gate compares over, so an operator's
+unicode domain and the punycode an assertion arrives as are held to one rule.
 
 **The gate sits after existing-user resolution and only ever calls `save`.** It is reached from the
 `ExistingUserMatch.None` branch of `SocialLoginService.handleCallback` — the branch that has already
