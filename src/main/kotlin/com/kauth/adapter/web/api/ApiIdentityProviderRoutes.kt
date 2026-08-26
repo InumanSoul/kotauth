@@ -73,8 +73,7 @@ internal fun Route.apiIdentityProviderRoutes(identityProviderService: IdentityPr
                 }
 
             // The row is read first for two reasons: PUT reports 201 only when it created
-            // something, and the JIT fields this surface does not expose must survive a write
-            // that says nothing about them.
+            // something, and a field the body says nothing about must survive the write.
             val existing = identityProviderService.get(tenantId, key)
 
             val result =
@@ -91,8 +90,11 @@ internal fun Route.apiIdentityProviderRoutes(identityProviderService: IdentityPr
                     tokenEndpoint = body.tokenEndpoint,
                     jwksUri = body.jwksUri,
                     scopes = body.scopes ?: existing?.scopes ?: DEFAULT_OIDC_SCOPES,
-                    jitEnabled = existing?.jitEnabled ?: false,
-                    jitAllowedDomains = existing?.jitAllowedDomains ?: emptyList(),
+                    // Null is "the body did not mention this", not "set it to the empty value".
+                    // Conflating the two would let an unrelated update — renaming a client, say —
+                    // silently switch off automatic account creation for a whole domain list.
+                    jitEnabled = body.jitEnabled ?: existing?.jitEnabled ?: false,
+                    jitAllowedDomains = body.jitAllowedDomains ?: existing?.jitAllowedDomains ?: emptyList(),
                 )
 
             when (result) {
@@ -156,6 +158,8 @@ private fun publish(provider: IdentityProvider): IdentityProviderDto =
         tokenEndpoint = provider.tokenEndpoint,
         jwksUri = provider.jwksUri,
         scopes = provider.scopes,
+        jitEnabled = provider.jitEnabled,
+        jitAllowedDomains = provider.jitAllowedDomains,
         createdAt = isoFormatter.format(provider.createdAt),
         updatedAt = isoFormatter.format(provider.updatedAt),
     )
@@ -166,6 +170,11 @@ private fun publish(provider: IdentityProvider): IdentityProviderDto =
  * `kind` defaults to what the key implies. A null or blank `clientSecret` keeps the stored
  * secret on update and is rejected on create — there is no way to read a secret back, so a
  * caller that only wants to flip `enabled` must be able to omit it.
+ *
+ * The two JIT fields are nullable so that *absent* and *empty* stay different answers: absent
+ * keeps what is stored, `"jitAllowedDomains": []` is the explicit "stop creating accounts
+ * automatically". `enabled` is deliberately not like them — its documented default is `true`,
+ * which is a stated contract rather than a silent one.
  */
 @Serializable
 data class UpsertIdentityProviderRequest(
@@ -179,6 +188,8 @@ data class UpsertIdentityProviderRequest(
     val tokenEndpoint: String? = null,
     val jwksUri: String? = null,
     val scopes: String? = null,
+    val jitEnabled: Boolean? = null,
+    val jitAllowedDomains: List<String>? = null,
 )
 
 /**
@@ -186,7 +197,7 @@ data class UpsertIdentityProviderRequest(
  *
  * This is not [IdentityProvider] and not a redaction of it: the type has no field capable of
  * holding a client secret, so no serialiser setting, no added mapping line and no `copy()`
- * can put one on the wire. It is deliberately not a `data class` for the same reason — there
+ * can put one on the wire. Every field added here has to keep that true of itself. It is deliberately not a `data class` for the same reason — there
  * is no `copy()` to carry an extra field through. `ApiIdentityProviderRoutesTest` pins the
  * serial descriptor's element names, so adding a field here fails the build rather than the
  * next security review.
@@ -203,6 +214,10 @@ class IdentityProviderDto(
     val tokenEndpoint: String?,
     val jwksUri: String?,
     val scopes: String,
+    // Readable, and safe to be: a boolean and a list of domains. Neither is capable of holding a
+    // secret, which is the property the descriptor test exists to keep true of every element here.
+    val jitEnabled: Boolean,
+    val jitAllowedDomains: List<String>,
     val createdAt: String,
     val updatedAt: String,
 )

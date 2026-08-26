@@ -648,7 +648,8 @@ components:
       description: |
         A configured identity provider. There is deliberately no `clientSecret` property:
         the secret is write-only and is never returned by any read.
-      required: [key, kind, clientId, enabled, scopes, createdAt, updatedAt]
+      required:
+        [key, kind, clientId, enabled, scopes, jitEnabled, jitAllowedDomains, createdAt, updatedAt]
       properties:
         key:
           type: string
@@ -665,6 +666,19 @@ components:
         tokenEndpoint:         { type: string, nullable: true, maxLength: 512 }
         jwksUri:               { type: string, nullable: true, maxLength: 512 }
         scopes:    { type: string, maxLength: 255 }
+        jitEnabled:
+          type: boolean
+          description: |
+            Whether a first sign-in through this provider may create a local account.
+            Auto-creation additionally requires the provider to assert a verified email whose
+            domain appears in `jitAllowedDomains`.
+        jitAllowedDomains:
+          type: array
+          description: |
+            Email domains a first sign-in may create an account for. Stored trimmed,
+            lower-cased and de-duplicated. **An empty list is the feature switched off, never a
+            wildcard** — no account is created automatically, even when `jitEnabled` is true.
+          items: { type: string, maxLength: 253 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -705,6 +719,22 @@ components:
           type: string
           maxLength: 255
           description: Space-separated. An `oidc` provider must request `openid`.
+        jitEnabled:
+          type: boolean
+          description: |
+            Whether a first sign-in through this provider may create a local account.
+            **Omit to leave the stored value unchanged** — there is no default, because an
+            update that says nothing about it must not switch it either way.
+        jitAllowedDomains:
+          type: array
+          description: |
+            Email domains a first sign-in may create an account for. Values are trimmed,
+            lower-cased and de-duplicated server-side; each must be a bare domain (no `@`, no
+            scheme, no path).
+
+            **Omit to leave the stored list unchanged. Send `[]` to clear it** — an empty list
+            is the feature switched off, and that is a different request from not mentioning it.
+          items: { type: string, maxLength: 253 }
 
     SendOtpRequest:
       type: object
@@ -2280,8 +2310,13 @@ paths:
         to a provider point at it.
 
         Validation is shared with the admin UI: an `oidc` provider requires an `issuer` and
-        the `openid` scope, every URL must be https (http on loopback only), and the built-in
-        `google`/`github` keys must stay `oauth2`.
+        the `openid` scope, every URL must be https (http on loopback only), the built-in
+        `google`/`github` keys must stay `oauth2`, and every entry in `jitAllowedDomains` must
+        be a bare domain.
+
+        `jitEnabled` and `jitAllowedDomains` are omit-to-keep: a body that does not mention
+        them leaves the stored values alone, so an unrelated update cannot silently change
+        whether accounts are created automatically.
       tags: [Identity Providers]
       security: [{ bearerAuth: [identity_providers:write] }]
       parameters:

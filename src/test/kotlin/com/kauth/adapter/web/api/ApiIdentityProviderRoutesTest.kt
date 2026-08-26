@@ -294,12 +294,135 @@ class ApiIdentityProviderRoutesTest {
                 "tokenEndpoint",
                 "jwksUri",
                 "scopes",
+                // The two JIT columns are readable on purpose: an operator configuring this
+                // resource from Terraform has to be able to see whether auto-creation is on and
+                // for which domains. Neither can hold a secret — one is a flag, one a domain list.
+                "jitEnabled",
+                "jitAllowedDomains",
                 "createdAt",
                 "updatedAt",
             ),
             elements,
         )
     }
+
+    // =========================================================================
+    // Just-in-time provisioning over the API
+    // =========================================================================
+
+    @Test
+    fun `PUT sets just-in-time provisioning and its allowed domains`() =
+        testApplication {
+            application { installTestApp() }
+            seedOkta()
+
+            val response =
+                client.put("/t/acme/api/v1/identity-providers/okta") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"clientId":"okta-client","issuer":"https://example.okta.com",
+                         "jitEnabled":true,"jitAllowedDomains":["  Acme.COM  ","acme.com","partner.example"]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            assertEquals(true, stored?.jitEnabled)
+            // Trimmed, lower-cased and de-duplicated by IdentityProviderService, exactly as the
+            // admin form's chips are. A second normaliser on this surface is a second set of rules
+            // for the two surfaces to disagree about.
+            assertEquals(listOf("acme.com", "partner.example"), stored?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `a provider read carries its just-in-time settings`() =
+        testApplication {
+            application { installTestApp() }
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val body =
+                client
+                    .get("/t/acme/api/v1/identity-providers/okta") {
+                        bearerAuth(readKey)
+                    }.bodyAsText()
+
+            assertTrue("\"jitEnabled\":true" in body, "A read must show whether auto-creation is on: $body")
+            assertTrue("acme.example" in body, "A read must show which domains it is on for: $body")
+            assertFalse(SECRET in body, "Adding readable fields must not make the secret readable")
+        }
+
+    @Test
+    fun `PUT that omits the just-in-time fields leaves them as they were`() =
+        testApplication {
+            application { installTestApp() }
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val response =
+                client.put("/t/acme/api/v1/identity-providers/okta") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"clientId":"okta-client-2","issuer":"https://example.okta.com"}""")
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            assertEquals("okta-client-2", stored?.clientId, "The update the caller did ask for must land")
+            // Absent is not empty. Conflating them turns renaming a client into "auto-creation is
+            // now off for everyone", which no caller asked for and no response would announce.
+            assertEquals(true, stored?.jitEnabled)
+            assertEquals(listOf("acme.example"), stored?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `PUT with an empty allowed-domain list clears it`() =
+        testApplication {
+            application { installTestApp() }
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val response =
+                client.put("/t/acme/api/v1/identity-providers/okta") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"clientId":"okta-client","issuer":"https://example.okta.com","jitAllowedDomains":[]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            // The other half of the same distinction: an explicit empty list is how a caller says
+            // "stop creating accounts automatically", and it has to stay expressible.
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            assertEquals(emptyList(), stored?.jitAllowedDomains)
+        }
+
+    @Test
+    fun `PUT with a domain that is not a domain is rejected and stores nothing`() =
+        testApplication {
+            application { installTestApp() }
+            seedOkta(jitEnabled = true, jitAllowedDomains = listOf("acme.example"))
+
+            val response =
+                client.put("/t/acme/api/v1/identity-providers/okta") {
+                    bearerAuth(writeKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """
+                        {"clientId":"okta-client","issuer":"https://example.okta.com",
+                         "jitAllowedDomains":["someone@acme.example"]}
+                        """.trimIndent(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertTrue("someone@acme.example" in response.bodyAsText(), "The rejection must name the cause")
+            val stored = idpRepo.findByTenantAndProvider(TenantId(1), ProviderKey.of("okta")!!)
+            assertEquals(listOf("acme.example"), stored?.jitAllowedDomains, "A rejected write must change nothing")
+        }
 
     // =========================================================================
     // Tenant scoping
@@ -467,7 +590,10 @@ class ApiIdentityProviderRoutesTest {
             ) as ApiKeyResult.Success
         ).value.rawKey
 
-    private fun seedOkta() {
+    private fun seedOkta(
+        jitEnabled: Boolean = false,
+        jitAllowedDomains: List<String> = emptyList(),
+    ) {
         idpRepo.add(
             IdentityProvider(
                 tenantId = TenantId(1),
@@ -476,6 +602,8 @@ class ApiIdentityProviderRoutesTest {
                 clientSecret = SECRET,
                 kind = ProviderKind.OIDC,
                 issuer = "https://example.okta.com",
+                jitEnabled = jitEnabled,
+                jitAllowedDomains = jitAllowedDomains,
             ),
         )
     }
