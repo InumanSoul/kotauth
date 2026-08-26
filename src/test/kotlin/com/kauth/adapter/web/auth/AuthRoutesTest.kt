@@ -996,6 +996,42 @@ class AuthRoutesTest {
         }
 
     @Test
+    fun `GET mfa-challenge refuses a pending cookie of another shape`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // A fourth field means this is not the format this reader was written for. The POST
+            // refuses it on the field count; the GET must agree, or the next field added to the
+            // payload is read as something else by one of the two.
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|extra")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
     fun `GET mfa-challenge shows challenge form when valid signed cookie is present`() =
         testApplication {
             resetFixtures()

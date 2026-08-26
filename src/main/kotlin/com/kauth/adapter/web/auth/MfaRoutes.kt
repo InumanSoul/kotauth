@@ -35,9 +35,14 @@ internal fun Route.mfaRoutes(
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
         val pendingGet = rawPendingGet?.takeIf { it.isNotBlank() }?.let { encryptionService.verifyCookie(it) }
+        val partsGet = pendingGet?.split("|")
         // The slug travels in the payload; comparing it is what makes the cookie this tenant's.
-        // A signature proves only that we minted it, not that it belongs here.
-        if (pendingGet == null || pendingGet.split("|").getOrNull(MFA_PENDING_SLUG) != slug) {
+        // A signature proves only that we minted it, not that it belongs here. The field count is
+        // pinned exactly as the POST pins it: two readers of one format must not disagree on it.
+        if (partsGet == null ||
+            partsGet.size != MFA_PENDING_FIELD_COUNT ||
+            partsGet[MFA_PENDING_SLUG] != slug
+        ) {
             return@get call.respondRedirect("/t/$slug/authorize")
         }
 
