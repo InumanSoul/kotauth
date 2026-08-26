@@ -1715,6 +1715,24 @@ class SocialLoginRoutesTest {
         }
 
     @Test
+    fun `an error on a state older than the window is not recorded`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            installSocialRoutes()
+
+            // A signature never expires. Without the age bound the same held state writes a row on
+            // every request, pushing genuine refusals out of the operator's window.
+            val payload = statePayload("okta", "acme", System.currentTimeMillis() - 360_000)
+            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
+
+            assertTrue(
+                auditLog.events.none { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED },
+                "A state past its max age must not write a diagnostic row, got: ${auditLog.events}",
+            )
+        }
+
+    @Test
     fun `an error code the provider did not shape is not echoed into the record`() =
         testApplication {
             resetFixtures()

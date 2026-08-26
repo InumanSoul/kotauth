@@ -295,10 +295,12 @@ private fun providerLabel(
         ?: EnglishStrings.providerDisplayName(key)
 
 /**
- * Whether [state] is one this instance signed for this tenant and provider.
+ * Whether [state] is one this instance signed for this tenant and provider, recently.
  *
  * Used only to decide whether an error the provider returned is worth recording — the browser
- * binding is checked where a sign-in is actually completed, never here.
+ * binding is checked where a sign-in is actually completed, never here. The age bound is the same
+ * one the completing callback enforces, and it is what keeps a single held state from writing
+ * attacker-chosen rows indefinitely and pushing genuine refusals out of the panel's window.
  */
 private fun stateWeMinted(
     state: String?,
@@ -308,6 +310,7 @@ private fun stateWeMinted(
 ): Boolean {
     val payload = state?.let { encryptionService.verifyCookie(it) } ?: return false
     val parsed = SocialState.parse(payload) ?: return false
+    if (System.currentTimeMillis() - parsed.timestampMillis > SOCIAL_STATE_MAX_AGE_MS) return false
     return parsed.provider == provider.value && parsed.slug == slug
 }
 
