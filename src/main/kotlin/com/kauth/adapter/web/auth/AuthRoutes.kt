@@ -51,6 +51,7 @@ fun Route.authRoutes(
     webAuthnService: WebAuthnService? = null,
     passkeyRateLimiter: RateLimiterPort? = null,
     socialRateLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 10, windowSeconds = 60),
+    auditLogPort: com.kauth.domain.port.AuditLogPort? = null,
 ) {
     route("/t/{slug}") {
         if (corsService != null) {
@@ -167,6 +168,7 @@ fun Route.authRoutes(
             baseUrl = baseUrl,
             ssoTtlSeconds = ssoTtlSeconds,
             socialRateLimiter = socialRateLimiter,
+            auditLogPort = auditLogPort,
         )
 
         oauthProtocolRoutes(

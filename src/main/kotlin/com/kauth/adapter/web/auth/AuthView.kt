@@ -10,6 +10,7 @@ import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.service.JitRefusal
 import kotlinx.html.*
 
 /**
@@ -1112,6 +1113,71 @@ object AuthView {
                         div("footer-link") {
                             a(href = "/t/$tenantSlug/magic-link") { +ctx.t("MAGIC_LINK_REQUEST_NEW") }
                         }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
+                        }
+                    }
+                    p("copyright") {
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+            }
+        }
+
+    /**
+     * Shown when a provider signed the person in and the workspace refused to create an account.
+     *
+     * The sequence is what the copy has to survive: the person typed nothing wrong, authenticated
+     * somewhere else, and came back rejected — so the page says the sign-in worked, says the
+     * workspace is what refused, and names which of the two rules applied. It renders no password
+     * field and offers no credential reset, because a page that looks like a wrong-password page
+     * sends someone to change a credential that was never involved.
+     */
+    fun jitRefusedPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        providerName: String,
+        refusal: JitRefusal,
+        reference: String,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_ACCESS_REFUSED", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        h1("card-title") { +ctx.t("JIT_REFUSED_TITLE") }
+                        p("card-subtitle") {
+                            +ctx.t("JIT_REFUSED_AUTHENTICATED", providerName, ctx.workspaceName)
+                        }
+                        div("alert alert-error") {
+                            p {
+                                strong {
+                                    +ctx.t(
+                                        when (refusal) {
+                                            JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_HEADING"
+                                            JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_HEADING"
+                                        },
+                                    )
+                                }
+                            }
+                            p {
+                                +ctx.t(
+                                    when (refusal) {
+                                        JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_BODY"
+                                        JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_BODY"
+                                    },
+                                    providerName,
+                                    ctx.workspaceName,
+                                )
+                            }
+                        }
+                        p("card-subtitle") { +ctx.t("JIT_REFUSED_REFERENCE", reference) }
                         div("footer-link") {
                             a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
                         }

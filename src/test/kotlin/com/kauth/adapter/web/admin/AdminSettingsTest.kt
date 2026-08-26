@@ -185,6 +185,7 @@ class AdminSettingsTest {
         roleRepo.clear()
         idpRepo.clear()
         auditLogPort.clear()
+        auditLogRepo.clear()
         themeRepo.clear()
         emailBrandingRepo.clear()
         tokenPort.reset()
@@ -1025,4 +1026,117 @@ class AdminSettingsTest {
             )
         }
     }
+    // =========================================================================
+    // Identity provider diagnostics — recent sign-in failures
+    // =========================================================================
+
+    private fun recordFailure(
+        tenantId: TenantId,
+        provider: String,
+        reason: String,
+        emailDomain: String? = null,
+        idpErrorCode: String? = null,
+    ) = auditLogRepo.add(
+        com.kauth.domain.model.AuditEvent(
+            tenantId = tenantId,
+            userId = null,
+            clientId = null,
+            eventType = com.kauth.domain.model.AuditEventType.SOCIAL_LOGIN_FAILED,
+            ipAddress = "203.0.113.9",
+            userAgent = null,
+            details =
+                buildMap {
+                    put("provider", provider)
+                    put("reason", reason)
+                    emailDomain?.let { put("email_domain", it) }
+                    idpErrorCode?.let { put("idp_error_code", it) }
+                },
+        ),
+    )
+
+    @Test
+    fun `the identity providers page names the reason a sign-in failed`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "okta")
+            recordFailure(workspace.id, "okta", "domain_not_allowed", emailDomain = "contractor.example")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // A count of failures is not a diagnosis: the operator fixes an allowlist from the
+            // domain and the reason, and nothing else on the page shows either.
+            assertContains(body, "Email domain not on the allowed list")
+            assertContains(body, "contractor.example")
+        }
+
+    @Test
+    fun `a redirect URI the provider rejected is visible with its error code`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "okta")
+            recordFailure(workspace.id, "okta", "idp_returned_error", idpErrorCode = "redirect_uri_mismatch")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // Discovery fetches the issuer's document and cannot see a redirect-URI mismatch.
+            // Without this row the operator's experience of that mistake is silence.
+            assertContains(body, "redirect_uri_mismatch")
+        }
+
+    @Test
+    fun `a failure is listed under the provider it happened on and no other`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "okta")
+            idpRepo.seed(workspace.id, "google")
+            recordFailure(workspace.id, "okta", "domain_not_allowed", emailDomain = "okta-side.example")
+            recordFailure(workspace.id, "google", "domain_not_allowed", emailDomain = "google-side.example")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // Once each. A panel that renders every failure under every provider would show both
+            // domains twice, and would still pass an assertion that each is merely present.
+            assertEquals(1, Regex("okta-side\\.example").findAll(body).count(), "okta's failure belongs to okta only")
+            assertEquals(
+                1,
+                Regex("google-side\\.example").findAll(body).count(),
+                "google's failure belongs to google only",
+            )
+        }
+
+    @Test
+    fun `a failure recorded in another workspace is not listed`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "okta")
+            recordFailure(masterTenant.id, "okta", "domain_not_allowed", emailDomain = "other-workspace.example")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertFalse(
+                body.contains("other-workspace.example"),
+                "Diagnostics are tenant-scoped like every other query, got: $body",
+            )
+        }
+
+    @Test
+    fun `a provider with no recorded failures says so rather than showing nothing`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "okta")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertContains(body, "No sign-in failures recorded for this provider.")
+        }
 }

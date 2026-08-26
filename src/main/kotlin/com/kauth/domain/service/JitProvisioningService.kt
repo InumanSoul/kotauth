@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.BrokeredSignInFailure
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.Tenant
@@ -60,7 +61,9 @@ class JitProvisioningService(
         userAgent: String? = null,
     ): JitOutcome {
         if (!provider.jitEnabled) return JitOutcome.NotEnabled
-        if (!profile.emailVerified) return JitOutcome.Refused(JitRefusal.EMAIL_NOT_VERIFIED)
+        if (!profile.emailVerified) {
+            return refuse(tenant, provider, profile, JitRefusal.EMAIL_NOT_VERIFIED, ipAddress, userAgent)
+        }
 
         val email =
             profile.email
@@ -68,7 +71,7 @@ class JitProvisioningService(
                 ?.lowercase()
                 ?.ifBlank { null }
         if (email == null || !isDomainAllowed(email, provider.jitAllowedDomains)) {
-            return JitOutcome.Refused(JitRefusal.DOMAIN_NOT_ALLOWED)
+            return refuse(tenant, provider, profile, JitRefusal.DOMAIN_NOT_ALLOWED, ipAddress, userAgent)
         }
 
         val user =
@@ -129,6 +132,52 @@ class JitProvisioningService(
         )
 
         return JitOutcome.Provisioned(user)
+    }
+
+    /**
+     * Refuses, and leaves the operator a row to diagnose from.
+     *
+     * The refusal is the whole record: no address, no provider subject, no code — see
+     * [BrokeredSignInFailure] for why each is left out and what stands in for them.
+     */
+    private fun refuse(
+        tenant: Tenant,
+        provider: IdentityProvider,
+        profile: SocialUserProfile,
+        reason: JitRefusal,
+        ipAddress: String?,
+        userAgent: String?,
+    ): JitOutcome.Refused {
+        val details =
+            buildMap {
+                put(BrokeredSignInFailure.PROVIDER, provider.provider.value)
+                put(
+                    BrokeredSignInFailure.REASON,
+                    when (reason) {
+                        JitRefusal.EMAIL_NOT_VERIFIED -> BrokeredSignInFailure.EMAIL_NOT_VERIFIED
+                        JitRefusal.DOMAIN_NOT_ALLOWED -> BrokeredSignInFailure.DOMAIN_NOT_ALLOWED
+                    },
+                )
+                put(
+                    BrokeredSignInFailure.REFERENCE,
+                    BrokeredSignInFailure.reference(tenant.id, provider.provider, profile.providerUserId),
+                )
+                BrokeredSignInFailure.emailDomainOf(profile.email)?.let {
+                    put(BrokeredSignInFailure.EMAIL_DOMAIN, it)
+                }
+            }
+        auditLog.record(
+            AuditEvent(
+                tenantId = tenant.id,
+                userId = null,
+                clientId = null,
+                eventType = AuditEventType.SOCIAL_LOGIN_FAILED,
+                ipAddress = ipAddress,
+                userAgent = userAgent,
+                details = details,
+            ),
+        )
+        return JitOutcome.Refused(reason)
     }
 
     /**

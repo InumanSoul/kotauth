@@ -203,6 +203,7 @@ internal fun identityProvidersPageImpl(
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
+    failures: Map<ProviderKey, List<SignInFailureRow>> = emptyMap(),
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
@@ -353,6 +354,8 @@ internal fun identityProvidersPageImpl(
                             }
                         }
                     }
+
+                    identityProviderFailuresPanel(failures[prov].orEmpty())
                 }
             }
 
@@ -369,7 +372,12 @@ internal fun identityProvidersPageImpl(
                 div("ov-card") { p { +EnglishStrings.IDP_NO_OIDC_PROVIDERS } }
             }
             for (existing in oidcProviders) {
-                oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = existing)
+                oidcProviderCard(
+                    slug = slug,
+                    baseUrl = baseUrl,
+                    existing = existing,
+                    failures = failures[existing.provider].orEmpty(),
+                )
             }
             oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = null)
                     }
@@ -387,6 +395,7 @@ private fun FlowContent.oidcProviderCard(
     slug: String,
     baseUrl: String,
     existing: IdentityProvider?,
+    failures: List<SignInFailureRow> = emptyList(),
 ) {
     val key = existing?.provider?.value
     val action =
@@ -552,6 +561,10 @@ private fun FlowContent.oidcProviderCard(
                     +(if (existing == null) EnglishStrings.IDP_ADD_BUTTON else EnglishStrings.IDP_SAVE_BUTTON)
                 }
             }
+        }
+
+        if (existing != null) {
+            identityProviderFailuresPanel(failures)
         }
 
         // A separate form: the delete POST must not carry the edit form's fields, and HTML

@@ -1,8 +1,12 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuditEvent
+import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.BrokeredSignInFailure
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
+import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.RateLimiterPort
@@ -290,6 +294,23 @@ private fun providerLabel(
         ?.takeIf { it.isNotBlank() }
         ?: EnglishStrings.providerDisplayName(key)
 
+/**
+ * Whether [state] is one this instance signed for this tenant and provider.
+ *
+ * Used only to decide whether an error the provider returned is worth recording — the browser
+ * binding is checked where a sign-in is actually completed, never here.
+ */
+private fun stateWeMinted(
+    state: String?,
+    encryptionService: EncryptionService,
+    provider: ProviderKey,
+    slug: String,
+): Boolean {
+    val payload = state?.let { encryptionService.verifyCookie(it) } ?: return false
+    val parsed = SocialState.parse(payload) ?: return false
+    return parsed.provider == provider.value && parsed.slug == slug
+}
+
 private fun constantTimeEquals(
     a: String,
     b: String,
@@ -305,6 +326,7 @@ internal fun Route.socialLoginRoutes(
     baseUrl: String,
     ssoTtlSeconds: Long,
     socialRateLimiter: RateLimiterPort,
+    auditLogPort: AuditLogPort? = null,
 ) {
     get("/auth/social/{provider}/redirect") {
         val ctx = call.attributes[AuthTenantAttr]
@@ -412,6 +434,31 @@ internal fun Route.socialLoginRoutes(
         val error = call.request.queryParameters["error"]
 
         if (!error.isNullOrBlank()) {
+            // Only for a state we signed for this tenant and provider. The callback is
+            // unauthenticated, so without that check anyone could fill an operator's diagnostics
+            // panel with whatever reason they liked. A real IdP echoes the state back with the
+            // error (RFC 6749 4.1.2.1); the browser-binding cookie is not required, since a state
+            // that expired in the browser is still a failure the operator needs to see.
+            if (tenant != null && auditLogPort != null && stateWeMinted(state, encryptionService, provider, slug)) {
+                auditLogPort.record(
+                    AuditEvent(
+                        tenantId = tenant.id,
+                        userId = null,
+                        clientId = null,
+                        eventType = AuditEventType.SOCIAL_LOGIN_FAILED,
+                        ipAddress = call.request.origin.remoteAddress,
+                        userAgent = call.request.headers["User-Agent"],
+                        details =
+                            buildMap {
+                                put(BrokeredSignInFailure.PROVIDER, provider.value)
+                                put(BrokeredSignInFailure.REASON, BrokeredSignInFailure.IDP_RETURNED_ERROR)
+                                BrokeredSignInFailure.idpErrorCode(error)?.let {
+                                    put(BrokeredSignInFailure.IDP_ERROR_CODE, it)
+                                }
+                            },
+                    ),
+                )
+            }
             call.respondHtml(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
@@ -541,6 +588,29 @@ internal fun Route.socialLoginRoutes(
             }
             is SocialLoginResult.NeedsRegistration -> {
                 val pending = result.data
+                val refusal = pending.jitRefusal
+                if (refusal != null) {
+                    // The tenant declared, per provider and per domain, which identities it trusts.
+                    // Falling through to the ordinary registration form would hand the refused
+                    // person the account the gate just refused, so no pending cookie is minted.
+                    val refusedTenant = tenant ?: return@get call.respond(HttpStatusCode.NotFound)
+                    call.respondHtml(
+                        HttpStatusCode.Forbidden,
+                        AuthView.jitRefusedPage(
+                            tenantSlug = slug,
+                            ctx = ctx.viewContext,
+                            providerName = providerLabel(identityProviderRepository, tenant, provider),
+                            refusal = refusal,
+                            reference =
+                                BrokeredSignInFailure.reference(
+                                    refusedTenant.id,
+                                    provider,
+                                    pending.providerUserId,
+                                ),
+                        ),
+                    )
+                    return@get
+                }
                 val pendingNonce =
                     java.util.UUID
                         .randomUUID()

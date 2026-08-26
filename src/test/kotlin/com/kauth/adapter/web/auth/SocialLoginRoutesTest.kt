@@ -4,6 +4,7 @@ import com.kauth.config.StaticSocialProviderResolver
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
@@ -288,6 +289,7 @@ class SocialLoginRoutesTest {
                     translationPort = EnglishOnlyTranslation(),
                     socialRateLimiter = socialLimiter,
                     baseUrl = baseUrl,
+                    auditLogPort = auditLog,
                 )
             }
         }
@@ -1395,6 +1397,261 @@ class SocialLoginRoutesTest {
                 "A payload of another shape must be refused, got: ${response.headers["Location"]}",
             )
             assertTrue(userRepo.findByEmail(TenantId(1), "newcomer@acme.com") == null, "No user may be created")
+        }
+
+    // =========================================================================
+    // A refused just-in-time sign-in — what the person sees, what is recorded
+    // =========================================================================
+
+    /** A provider that provisions on first sign-in, for addresses on [domains] only. */
+    private fun seedJitOkta(domains: List<String> = listOf("allowed.example")) =
+        idpRepo.add(
+            IdentityProvider(
+                tenantId = TenantId(1),
+                provider = oktaKey,
+                clientId = "client-okta",
+                clientSecret = "secret-okta",
+                displayName = "Acme Workforce SSO",
+                jitEnabled = true,
+                jitAllowedDomains = domains,
+            ),
+        )
+
+    /** The IdP asserts [email], and asserts whether it verified it. The sign-in itself succeeded. */
+    private fun oktaAsserts(
+        email: String,
+        emailVerified: Boolean,
+    ) {
+        oktaAdapter.shouldFail = false
+        oktaAdapter.profileToReturn =
+            SocialUserProfile(
+                providerUserId = "okta|carol",
+                email = email,
+                name = "Carol",
+                emailVerified = emailVerified,
+            )
+    }
+
+    /** Drives one callback that got past every state guard, so the JIT gate is what answers. */
+    private suspend fun ApplicationTestBuilder.oktaCallback(code: String = "auth-code-do-not-record"): HttpResponse {
+        val payload = statePayload("okta", "acme", System.currentTimeMillis())
+        return createClient { followRedirects = false }
+            .get("/t/acme/auth/social/okta/callback?code=$code&state=${signedState(payload)}") {
+                bindStateCookie(payload)
+            }
+    }
+
+    @Test
+    fun `a refused sign-in tells the person authentication succeeded`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val body = oktaCallback().bodyAsText()
+
+            // The person typed nothing wrong and was bounced back rejected. A page that does not
+            // say the sign-in itself worked reads as "the system is broken" or "wrong password".
+            assertTrue(
+                body.contains("signed you in successfully"),
+                "A refusal must say authentication succeeded, got: $body",
+            )
+        }
+
+    @Test
+    fun `a refused sign-in is not rendered as a generic login failure`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val response = oktaCallback()
+            val body = response.bodyAsText()
+
+            // The worst available outcome: a page indistinguishable from a wrong password, which
+            // sends someone to reset a credential that was never the problem.
+            assertEquals(HttpStatusCode.Forbidden, response.status)
+            assertFalse(
+                body.contains("""name="password""""),
+                "A refusal must not offer a password form, got: $body",
+            )
+            assertFalse(
+                body.contains("/forgot-password"),
+                "A refusal must not send the person to reset a credential that worked, got: $body",
+            )
+        }
+
+    @Test
+    fun `an unverified email and a disallowed domain are told apart on the page`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            installSocialRoutes()
+
+            oktaAsserts("carol@allowed.example", emailVerified = false)
+            val unverified = oktaCallback().bodyAsText()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            val blockedDomain = oktaCallback().bodyAsText()
+
+            assertTrue(
+                unverified.contains("email address is not verified"),
+                "An unverified email must be named as the cause, got: $unverified",
+            )
+            assertFalse(
+                unverified.contains("email domain is not on the allowed list"),
+                "An unverified email must not be explained as a domain rule, got: $unverified",
+            )
+            assertTrue(
+                blockedDomain.contains("email domain is not on the allowed list"),
+                "A disallowed domain must be named as the cause, got: $blockedDomain",
+            )
+            assertFalse(
+                blockedDomain.contains("email address is not verified"),
+                "A disallowed domain must not be explained as a verification failure, got: $blockedDomain",
+            )
+        }
+
+    @Test
+    fun `a refused sign-in leaves no pending registration to walk through`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val response = oktaCallback()
+
+            // The tenant declared which identities it trusts. Handing the refused person the
+            // ordinary registration form would let them create the account the gate just refused.
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.startsWith("${pendingCookieName()}=") && !it.contains("Max-Age=0") },
+                "A refusal must not mint a pending registration: ${response.headers.getAll("Set-Cookie")}",
+            )
+            assertTrue(userRepo.findByEmail(TenantId(1), "carol@blocked.example") == null, "No user may be created")
+        }
+
+    @Test
+    fun `a refusal is recorded for the operator with the cause and the domain`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            oktaCallback()
+
+            val recorded = auditLog.events.filter { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+            assertEquals(1, recorded.size, "One refusal must leave one diagnostic row, got: $recorded")
+            assertEquals("okta", recorded.single().details["provider"])
+            assertEquals("domain_not_allowed", recorded.single().details["reason"])
+            assertEquals("blocked.example", recorded.single().details["email_domain"])
+        }
+
+    @Test
+    fun `a refusal record carries neither the address nor the authorization code`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            oktaCallback(code = "auth-code-do-not-record")
+
+            val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+            // The domain is what an operator fixes an allowlist with; the local part is what turns
+            // a diagnostics panel into a list of everyone who was turned away.
+            assertTrue(
+                recorded.details.values.none { it.contains("carol") },
+                "A refusal record must not carry the refused address, got: ${recorded.details}",
+            )
+            assertTrue(
+                recorded.details.values.none { it.contains("auth-code-do-not-record") },
+                "A refusal record must not carry the authorization code, got: ${recorded.details}",
+            )
+            assertTrue(
+                recorded.details["provider_user_id"] == null,
+                "A refusal record must not carry the provider's identifier for the person",
+            )
+        }
+
+    @Test
+    fun `the page hands the person the reference the operator will see`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            oktaAsserts("carol@blocked.example", emailVerified = true)
+            installSocialRoutes()
+
+            val body = oktaCallback().bodyAsText()
+
+            val reference =
+                auditLog.events
+                    .single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+                    .details["reference"]
+            assertNotNull(reference, "A refusal must be given a reference the operator can match")
+            assertTrue(
+                body.contains(reference),
+                "The reference on the page must be the one recorded, got: $body",
+            )
+        }
+
+    @Test
+    fun `an error the provider returned on a state we minted is recorded with its code`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            installSocialRoutes()
+
+            // A redirect URI the IdP does not recognise surfaces here and nowhere else — the
+            // discovery test fetches the issuer's document and cannot see it.
+            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch&state=${signedState(payload)}")
+
+            val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+            assertEquals("okta", recorded.details["provider"])
+            assertEquals("idp_returned_error", recorded.details["reason"])
+            assertEquals("redirect_uri_mismatch", recorded.details["idp_error_code"])
+        }
+
+    @Test
+    fun `an error arriving without a state we minted is not recorded`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            installSocialRoutes()
+
+            // The callback is unauthenticated. Without this, anyone could fill an operator's
+            // diagnostics panel with whatever reason they liked.
+            client.get("/t/acme/auth/social/okta/callback?error=redirect_uri_mismatch")
+
+            assertTrue(
+                auditLog.events.none { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED },
+                "An unsigned callback must not write a diagnostic row, got: ${auditLog.events}",
+            )
+        }
+
+    @Test
+    fun `an error code the provider did not shape is not echoed into the record`() =
+        testApplication {
+            resetFixtures()
+            seedJitOkta()
+            installSocialRoutes()
+
+            val payload = statePayload("okta", "acme", System.currentTimeMillis())
+            val forged = "<script>alert(1)</script>".encodeURLParameter()
+            client.get("/t/acme/auth/social/okta/callback?error=$forged&state=${signedState(payload)}")
+
+            val recorded = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+            assertEquals(
+                null,
+                recorded.details["idp_error_code"],
+                "An error code outside the OAuth2 shape must be dropped, not stored",
+            )
         }
 
     companion object {

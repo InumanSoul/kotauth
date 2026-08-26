@@ -350,6 +350,7 @@ private fun AuditEventType.badgeModifier(): String =
         AuditEventType.USER_ACCOUNT_DISABLED_SELF,
         AuditEventType.EMAIL_OTP_REJECTED,
         AuditEventType.EMAIL_OTP_LOCKOUT,
+        AuditEventType.SOCIAL_LOGIN_FAILED,
         -> "badge--danger"
 
         AuditEventType.LOGIN_RATE_LIMITED,

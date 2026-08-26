@@ -461,6 +461,7 @@ fun Application.module(
             webAuthnService = s.webAuthnService,
             passkeyRateLimiter = s.passkeyRateLimiter,
             socialRateLimiter = s.socialRateLimiter,
+            auditLogPort = s.auditLogPort,
         )
 
         portalRoutes(

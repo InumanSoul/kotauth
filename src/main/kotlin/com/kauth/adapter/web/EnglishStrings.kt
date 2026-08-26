@@ -618,6 +618,23 @@ object EnglishStrings {
     const val EMAIL_OTP_USE_DIFFERENT_EMAIL = "Use a different email"
     const val EMAIL_OTP_ERROR_TITLE = "Sign-in code unavailable"
 
+    // A brokered sign-in the workspace refused after the provider had already signed the person in
+    const val AUTH_PAGE_TITLE_ACCESS_REFUSED = "{0} | Access not granted"
+    const val JIT_REFUSED_TITLE = "Signed in, but not allowed in"
+    const val JIT_REFUSED_AUTHENTICATED =
+        "{0} signed you in successfully. Nothing is wrong with your password or your {0} account — " +
+            "{1} has not granted this account access."
+    const val JIT_REFUSED_EMAIL_NOT_VERIFIED_HEADING = "Your email address is not verified"
+    const val JIT_REFUSED_EMAIL_NOT_VERIFIED_BODY =
+        "{1} only creates accounts for addresses the provider has confirmed, and {0} has not " +
+            "confirmed yours. Verify your email address with {0}, then sign in again."
+    const val JIT_REFUSED_DOMAIN_NOT_ALLOWED_HEADING = "Your email domain is not on the allowed list"
+    const val JIT_REFUSED_DOMAIN_NOT_ALLOWED_BODY =
+        "{1} creates accounts only for people whose email address is on its list of approved " +
+            "domains, and yours is not on it. Signing in again will not change this — ask an " +
+            "administrator of {1} to add your domain."
+    const val JIT_REFUSED_REFERENCE = "Quote this reference to an administrator: {0}"
+
     // Force change password page
     const val FORCE_CHANGE_TITLE = "Change your password"
     const val FORCE_CHANGE_SUBTITLE_LINE1 = "An administrator has required you to change your password. "
@@ -945,6 +962,23 @@ object EnglishStrings {
     const val IDP_OIDC_SECTION_SUB =
         "Any issuer that publishes an OpenID Connect discovery document can be added here. " +
             "Endpoints are read from the issuer unless you override them."
+
+    // Identity provider diagnostics — the sign-in failures only a real sign-in can reveal
+    const val IDP_FAILURES_TITLE = "Recent sign-in failures"
+    const val IDP_FAILURES_HINT =
+        "Sign-ins that reached this provider and did not end in a session. A callback URL the " +
+            "provider does not recognise appears here and nowhere else — testing the issuer's " +
+            "discovery document cannot see it."
+    const val IDP_FAILURES_EMPTY = "No sign-in failures recorded for this provider."
+    const val IDP_FAILURES_COL_WHEN = "When (UTC)"
+    const val IDP_FAILURES_COL_REASON = "Reason"
+    const val IDP_FAILURES_COL_DOMAIN = "Email domain"
+    const val IDP_FAILURES_COL_REFERENCE = "Reference"
+    const val IDP_FAILURE_EMAIL_NOT_VERIFIED = "Provider did not verify the email address"
+    const val IDP_FAILURE_DOMAIN_NOT_ALLOWED = "Email domain not on the allowed list"
+    const val IDP_FAILURE_IDP_RETURNED_ERROR = "Rejected at the provider"
+    const val IDP_FAILURE_UNRECOGNISED = "Unrecognised failure"
+
     const val IDP_NO_OIDC_PROVIDERS = "No OIDC providers configured yet."
     const val IDP_ADD_TITLE = "Add an OIDC provider"
     const val IDP_ADD_BUTTON = "Add provider"

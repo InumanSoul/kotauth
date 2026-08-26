@@ -511,6 +511,7 @@ fun Route.adminRoutes(
                     translationPort = translationPort,
                     webAuthnCredentialRepository = webAuthnCredentialRepository,
                     securityMethodsService = securityMethodsService,
+                    auditLogRepository = auditLogRepository,
                 )
 
                 adminApplicationRoutes(

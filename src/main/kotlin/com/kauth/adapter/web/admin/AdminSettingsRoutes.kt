@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.EnglishStrings
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
@@ -11,6 +12,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TenantTheme
 import com.kauth.domain.model.UserId
 import com.kauth.domain.model.WorkspaceSettingsUpdate
+import com.kauth.domain.port.AuditLogRepository
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.MfaRepository
 import com.kauth.domain.port.TranslationPort
@@ -43,6 +45,7 @@ fun Route.adminSettingsRoutes(
     translationPort: TranslationPort,
     webAuthnCredentialRepository: com.kauth.domain.port.WebAuthnCredentialRepository? = null,
     securityMethodsService: com.kauth.domain.service.SecurityMethodsService? = null,
+    auditLogRepository: AuditLogRepository? = null,
 ) {
     // -------------------------------------------------------------------
     // General workspace settings
@@ -200,6 +203,7 @@ fun Route.adminSettingsRoutes(
                 allWorkspaces = wsPairs,
                 loggedInAs = session.username,
                 saved = call.request.queryParameters["saved"] == "true",
+                failures = auditLogRepository.recentSignInFailures(workspace.id),
             ),
         )
     }
@@ -216,8 +220,12 @@ fun Route.adminSettingsRoutes(
         val provName = params["providerKey"]?.trim() ?: ""
         val provider =
             ProviderKey.of(provName)
-                ?: return@post call.respondIdentityProviderError(service, EnglishStrings.IDP_KEY_INVALID)
-        call.saveIdentityProvider(service, provider, params)
+                ?: return@post call.respondIdentityProviderError(
+                    service,
+                    EnglishStrings.IDP_KEY_INVALID,
+                    auditLogRepository,
+                )
+        call.saveIdentityProvider(service, provider, params, auditLogRepository)
     }
 
     post("/settings/identity-providers/{provider}") {
@@ -233,7 +241,7 @@ fun Route.adminSettingsRoutes(
                 HttpStatusCode.NotImplemented,
                 "Identity provider repository not configured",
             )
-        call.saveIdentityProvider(service, provider, call.receiveParameters())
+        call.saveIdentityProvider(service, provider, call.receiveParameters(), auditLogRepository)
     }
 
     post("/settings/identity-providers/{provider}/delete") {
@@ -527,6 +535,7 @@ private suspend fun ApplicationCall.saveIdentityProvider(
     service: IdentityProviderService,
     provider: ProviderKey,
     params: io.ktor.http.Parameters,
+    auditLogRepository: AuditLogRepository?,
 ) {
     val workspace = attributes[WorkspaceAttr]
     val existing = service.get(workspace.id, provider)
@@ -558,7 +567,7 @@ private suspend fun ApplicationCall.saveIdentityProvider(
     when (result) {
         is AdminResult.Success ->
             respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers?saved=true")
-        is AdminResult.Failure -> respondIdentityProviderError(service, result.error.message)
+        is AdminResult.Failure -> respondIdentityProviderError(service, result.error.message, auditLogRepository)
     }
 }
 
@@ -566,6 +575,7 @@ private suspend fun ApplicationCall.saveIdentityProvider(
 private suspend fun ApplicationCall.respondIdentityProviderError(
     service: IdentityProviderService,
     error: String,
+    auditLogRepository: AuditLogRepository?,
 ) {
     val workspace = attributes[WorkspaceAttr]
     respondHtml(
@@ -576,6 +586,25 @@ private suspend fun ApplicationCall.respondIdentityProviderError(
             allWorkspaces = attributes[WsPairsAttr],
             loggedInAs = sessions.get<AdminSession>()!!.username,
             error = error,
+            failures = auditLogRepository.recentSignInFailures(workspace.id),
         ),
     )
 }
+
+/**
+ * The brokered sign-in failures this workspace has recorded lately, grouped by provider.
+ *
+ * One tenant-scoped read for the whole page: a per-card query would be one round trip per provider
+ * for a panel that is usually empty.
+ */
+private fun AuditLogRepository?.recentSignInFailures(tenantId: TenantId) =
+    this
+        ?.findByTenant(
+            tenantId = tenantId,
+            eventType = AuditEventType.SOCIAL_LOGIN_FAILED,
+            limit = RECENT_SIGN_IN_FAILURES,
+        )?.groupSignInFailuresByProvider()
+        .orEmpty()
+
+/** Read across every provider, then trimmed per provider by the view. */
+private const val RECENT_SIGN_IN_FAILURES = 200

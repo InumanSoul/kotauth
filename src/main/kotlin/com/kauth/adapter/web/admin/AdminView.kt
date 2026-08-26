@@ -409,7 +409,9 @@ object AdminView {
         loggedInAs: String,
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, error, saved)
+        failures: Map<com.kauth.domain.model.ProviderKey, List<SignInFailureRow>> = emptyMap(),
+    ): HTML.() -> Unit =
+        identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, error, saved, failures)
 
     fun apiKeysListPage(
         workspace: Tenant,
