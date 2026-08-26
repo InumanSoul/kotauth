@@ -19,6 +19,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.util.Pkce
+import com.kauth.installTrustedProxyHeaders
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -48,7 +49,6 @@ import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
-import io.ktor.server.plugins.forwardedheaders.XForwardedHeaders
 import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
@@ -270,7 +270,9 @@ class SocialLoginRoutesTest {
     ) {
         application {
             install(ContentNegotiation) { json() }
-            if (trustedProxy) install(XForwardedHeaders)
+            // The deployed configuration itself, not a copy of it: `useLastProxy` is the whole
+            // point and a harness that installed the plugin with its defaults would hide that.
+            if (trustedProxy) installTrustedProxyHeaders()
             routing {
                 authRoutes(
                     authService = buildAuthService(),
@@ -1103,6 +1105,34 @@ class SocialLoginRoutesTest {
                 HttpStatusCode.Found,
                 second.status,
                 "A second client behind the same proxy must have its own budget",
+            )
+        }
+
+    @Test
+    fun `a client-supplied X-Forwarded-For entry does not open a fresh throttle bucket`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes(InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60), trustedProxy = true)
+            val client = createClient { followRedirects = false }
+
+            // What an appending front-end (nginx's $proxy_add_x_forwarded_for, most ALBs,
+            // Cloudflare) produces: the client's own value first, the address the proxy observed
+            // last. Ktor's default takes the first, so rotating one header would buy a fresh
+            // budget every request.
+            val first =
+                client.get("/t/acme/auth/social/google/redirect") {
+                    header("X-Forwarded-For", "198.51.100.7, 203.0.113.9")
+                }
+            val second =
+                client.get("/t/acme/auth/social/google/redirect") {
+                    header("X-Forwarded-For", "198.51.100.8, 203.0.113.9")
+                }
+
+            assertEquals(HttpStatusCode.Found, first.status)
+            assertEquals(
+                HttpStatusCode.TooManyRequests,
+                second.status,
+                "Only the last X-Forwarded-For entry is the trusted proxy's own observation",
             )
         }
 

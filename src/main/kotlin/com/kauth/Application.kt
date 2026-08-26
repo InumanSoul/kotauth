@@ -208,6 +208,24 @@ fun main(args: Array<String> = emptyArray()) {
 // Ktor module — plugins + route registration
 // ---------------------------------------------------------------------------
 
+/**
+ * Honors `X-Forwarded-*` from the one hop in front of us, taking the **last** entry.
+ *
+ * Ktor defaults to `useFirstProxy()`, which is the client's own value on any front-end that
+ * *appends* rather than replaces — nginx's `$proxy_add_x_forwarded_for`, most ALBs, Cloudflare —
+ * so every per-IP throttle becomes bypassable by rotating a header. The last entry is the address
+ * the trusted proxy itself observed, which a client cannot forge. Where the proxy replaces the
+ * header instead (the bundled `docker/Caddyfile`) first and last are the same single entry, so
+ * this changes nothing there.
+ *
+ * A chain of more than one trusted hop needs a different offset; see docs/deploy/production.md.
+ *
+ * Shared with the route tests so they exercise the deployed configuration rather than a copy.
+ */
+internal fun Application.installTrustedProxyHeaders() {
+    install(XForwardedHeaders) { useLastProxy() }
+}
+
 fun Application.module(
     s: ServiceGraph,
     appInfo: AppInfo,
@@ -220,7 +238,7 @@ fun Application.module(
     // clients spoof X-Forwarded-For and bypass every per-IP rate limit.
     // Only enable behind a proxy that overwrites these headers (see ENV_REFERENCE).
     if (config.trustedProxy) {
-        install(XForwardedHeaders)
+        installTrustedProxyHeaders()
         startupLog.info("KAUTH_TRUSTED_PROXY=true — honoring X-Forwarded-* headers for client IPs")
     } else {
         startupLog.info("Forwarded headers ignored (KAUTH_TRUSTED_PROXY not set) — using socket peer IPs")
