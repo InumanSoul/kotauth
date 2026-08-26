@@ -247,6 +247,7 @@ class SocialLoginRoutesTest {
 
     private fun ApplicationTestBuilder.installSocialRoutes(
         socialLimiter: RateLimiterPort = InMemoryRateLimiter(maxRequests = 1000, windowSeconds = 60),
+        baseUrl: String = "",
     ) {
         application {
             install(ContentNegotiation) { json() }
@@ -264,6 +265,7 @@ class SocialLoginRoutesTest {
                     encryptionService = encryptionService,
                     translationPort = EnglishOnlyTranslation(),
                     socialRateLimiter = socialLimiter,
+                    baseUrl = baseUrl,
                 )
             }
         }
@@ -955,6 +957,85 @@ class SocialLoginRoutesTest {
                 assertTrue(it.contains("SameSite=Lax"), "Expected SameSite=Lax, got: $it")
                 assertTrue(it.contains("Path=/t/acme/auth/social"), "Expected a tenant-scoped path, got: $it")
             }
+        }
+
+    @Test
+    fun `over https the social cookies are Host-prefixed and Secure`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes(baseUrl = "https://id.example.com")
+            oktaAdapter.shouldFail = false
+            oktaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "okta|newcomer",
+                    email = "newcomer@acme.com",
+                    name = "New Comer",
+                    emailVerified = true,
+                )
+            // No cookie storage: a test client will not send a Secure cookie over the test
+            // harness's plain http, so every cookie is replayed by hand here.
+            val browser = createClient { followRedirects = false }
+
+            val redirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val stateCookie =
+                redirect.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .single { it.contains(STATE_COOKIE) }
+
+            // A server cannot tell a host-only cookie from one a sibling subdomain set with
+            // Domain=; __Host- forbids Domain and browsers enforce it. It costs Path=/.
+            assertTrue(stateCookie.startsWith("__Host-$STATE_COOKIE="), "Expected a __Host- name, got: $stateCookie")
+            assertTrue(stateCookie.contains("Secure"), "__Host- is dropped without Secure: $stateCookie")
+            assertTrue(stateCookie.contains("Path=/;"), "__Host- requires Path=/, got: $stateCookie")
+
+            val callback =
+                browser.get(
+                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                ) {
+                    header("Cookie", stateCookie.substringBefore(";"))
+                }
+            val pendingCookies =
+                callback.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .filter { it.contains("KOTAUTH_SOCIAL_PENDING") }
+            assertEquals(2, pendingCookies.size, "Expected the pending cookie and its binding, got: $pendingCookies")
+            pendingCookies.forEach {
+                assertTrue(it.startsWith("__Host-"), "Expected a __Host- name, got: $it")
+                assertTrue(it.contains("Secure"), "__Host- is dropped without Secure: $it")
+                assertTrue(it.contains("Path=/;"), "__Host- requires Path=/, got: $it")
+            }
+
+            // And the prefixed names are the ones read back: the flow must still complete.
+            val completed =
+                createClient { followRedirects = false }
+                    .post("/t/acme/auth/social/complete-registration") {
+                        header("Cookie", socialCookieHeader(callback))
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=newcomer")
+                    }
+            assertEquals("/t/acme/account/login", completed.headers["Location"])
+        }
+
+    @Test
+    fun `over plain http the state cookie keeps its unprefixed path-scoped name`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            val redirect = createClient { followRedirects = false }.get("/t/acme/auth/social/google/redirect")
+            val stateCookie =
+                redirect.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .single { it.contains(STATE_COOKIE) }
+
+            // __Host- requires Secure, which http cannot set — a prefixed name here would be
+            // dropped by the browser and every callback would fail to bind on `make run`.
+            assertTrue(stateCookie.startsWith("$STATE_COOKIE="), "Expected the bare name, got: $stateCookie")
+            assertFalse(stateCookie.contains("Secure"), "Nothing may set Secure over http: $stateCookie")
         }
 
     companion object {

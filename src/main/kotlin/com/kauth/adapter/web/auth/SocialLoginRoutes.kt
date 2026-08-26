@@ -98,6 +98,26 @@ private class SocialState(
 }
 
 /**
+ * The cookie name over this connection: `__Host-` prefixed on https, bare over plain http.
+ *
+ * `__Host-` forbids `Domain`, which is exactly the property a sibling subdomain needs to overwrite
+ * a host-only cookie — a server cannot tell the two apart, and browsers enforce the prefix where
+ * it cannot. The prefix also forces `Path=/`, so path scoping is what it costs; cookie-write
+ * integrity is worth more than a path, and the tenant these cookies belong to is checked in the
+ * signed payload rather than by the browser's path match. Over plain http the prefix requires
+ * `Secure` and would be dropped silently, so `make run` on localhost keeps the bare name.
+ */
+private fun socialCookieName(
+    base: String,
+    secure: Boolean,
+) = if (secure) "__Host-$base" else base
+
+private fun socialCookiePath(
+    slug: String,
+    secure: Boolean,
+) = if (secure) "/" else "/t/$slug/auth/social"
+
+/**
  * The cookie half of the state binding: `SameSite=Lax` because the callback arrives as a
  * top-level navigation from the IdP, which `Strict` would strip; host-scoped and path-scoped so
  * it reaches nothing but this tenant's social routes.
@@ -107,12 +127,12 @@ private fun ApplicationCall.setSocialStateCookie(
     value: String,
     secure: Boolean,
 ) = response.cookies.append(
-    name = SOCIAL_STATE_COOKIE,
+    name = socialCookieName(SOCIAL_STATE_COOKIE, secure),
     value = value,
     maxAge = SOCIAL_STATE_MAX_AGE_MS / 1000,
     httpOnly = true,
     secure = secure,
-    path = "/t/$slug/auth/social",
+    path = socialCookiePath(slug, secure),
     extensions = mapOf("SameSite" to "Lax"),
 )
 
@@ -120,12 +140,12 @@ private fun ApplicationCall.clearSocialStateCookie(
     slug: String,
     secure: Boolean,
 ) = response.cookies.append(
-    name = SOCIAL_STATE_COOKIE,
+    name = socialCookieName(SOCIAL_STATE_COOKIE, secure),
     value = "",
     maxAge = 0L,
     httpOnly = true,
     secure = secure,
-    path = "/t/$slug/auth/social",
+    path = socialCookiePath(slug, secure),
     extensions = mapOf("SameSite" to "Lax"),
 )
 
@@ -145,12 +165,12 @@ private fun ApplicationCall.setSocialPendingCookies(
         SOCIAL_PENDING_BINDING_COOKIE to signedNonce,
     ).forEach { (name, value) ->
         response.cookies.append(
-            name = name,
+            name = socialCookieName(name, secure),
             value = value,
             maxAge = SOCIAL_PENDING_MAX_AGE_MS / 1000,
             httpOnly = true,
             secure = secure,
-            path = "/t/$slug/auth/social",
+            path = socialCookiePath(slug, secure),
             extensions = mapOf("SameSite" to "Lax"),
         )
     }
@@ -162,12 +182,12 @@ private fun ApplicationCall.clearSocialPendingCookies(
 ) {
     listOf(SOCIAL_PENDING_COOKIE, SOCIAL_PENDING_BINDING_COOKIE).forEach { name ->
         response.cookies.append(
-            name = name,
+            name = socialCookieName(name, secure),
             value = "",
             maxAge = 0L,
             httpOnly = true,
             secure = secure,
-            path = "/t/$slug/auth/social",
+            path = socialCookiePath(slug, secure),
             extensions = mapOf("SameSite" to "Lax"),
         )
     }
@@ -185,13 +205,15 @@ private fun ApplicationCall.clearSocialPendingCookies(
  */
 private fun ApplicationCall.readSocialPending(
     slug: String,
+    secure: Boolean,
     encryptionService: EncryptionService,
 ): SocialPendingData? {
-    val pending =
-        parseSocialPendingCookie(request.cookies[SOCIAL_PENDING_COOKIE], encryptionService) ?: return null
+    val rawPending = request.cookies[socialCookieName(SOCIAL_PENDING_COOKIE, secure)]
+    val pending = parseSocialPendingCookie(rawPending, encryptionService) ?: return null
     if (!constantTimeEquals(pending.slug, slug)) return null
     val boundNonce =
-        request.cookies[SOCIAL_PENDING_BINDING_COOKIE]?.let { encryptionService.verifyCookie(it) } ?: return null
+        request.cookies[socialCookieName(SOCIAL_PENDING_BINDING_COOKIE, secure)]
+            ?.let { encryptionService.verifyCookie(it) } ?: return null
     return pending.takeIf { constantTimeEquals(boundNonce, it.csrfNonce) }
 }
 
@@ -429,7 +451,9 @@ internal fun Route.socialLoginRoutes(
         // The signature says we minted this state; only the cookie says this browser began the
         // flow. Without it a state minted by an attacker, replayed at the victim, signs the victim
         // in as the attacker — every other guard on this path passes on an attacker-minted state.
-        val boundNonce = call.request.cookies[SOCIAL_STATE_COOKIE]?.let { encryptionService.verifyCookie(it) }
+        val boundNonce =
+            call.request.cookies[socialCookieName(SOCIAL_STATE_COOKIE, secure)]
+                ?.let { encryptionService.verifyCookie(it) }
         if (boundNonce == null || !constantTimeEquals(boundNonce, socialState.csrfNonce)) {
             call.clearSocialStateCookie(slug, secure)
             call.respondHtml(
@@ -551,7 +575,8 @@ internal fun Route.socialLoginRoutes(
         val theme = tenant.theme
         val workspaceName = tenant.displayName
 
-        val pending = call.readSocialPending(slug, encryptionService)
+        val secure = baseUrl.startsWith("https://", ignoreCase = true)
+        val pending = call.readSocialPending(slug, secure, encryptionService)
 
         if (pending == null) {
             return@get call.respondRedirect(
@@ -588,7 +613,7 @@ internal fun Route.socialLoginRoutes(
         val workspaceName = tenant.displayName
 
         val secure = baseUrl.startsWith("https://", ignoreCase = true)
-        val pending = call.readSocialPending(slug, encryptionService)
+        val pending = call.readSocialPending(slug, secure, encryptionService)
 
         if (pending == null) {
             return@post call.respondRedirect(
