@@ -109,6 +109,49 @@ class IdentityProviderServiceTest {
         assertEquals(listOf("oriana.com.py"), (saved as AdminResult.Success<IdentityProvider>).value.jitAllowedDomains)
     }
 
+    // The gate matches a domain exactly. Anything that cannot be one exactly would save cleanly and
+    // then match no address ever, and the operator would be told nothing.
+    @Test
+    fun `a domain that cannot ever match exactly is refused at the point of the mistake`() {
+        for (bad in listOf("*", "*.corp.com", "corp", "corp..com", "-corp.com", "corp.com-", "co rp.com")) {
+            val result =
+                service.save(
+                    tenantId,
+                    key = acme,
+                    clientId = "c",
+                    clientSecret = "s",
+                    kind = ProviderKind.OIDC,
+                    issuer = "https://issuer.example",
+                    jitEnabled = true,
+                    jitAllowedDomains = listOf(bad),
+                )
+            val error = assertIs<AdminError.Validation>(assertIs<AdminResult.Failure>(result).error)
+            assertTrue(
+                error.message.contains("is not a valid domain"),
+                "'$bad' should have been refused, got: ${error.message}",
+            )
+        }
+    }
+
+    @Test
+    fun `an ordinary domain, a hyphenated one and a unicode one are all accepted`() {
+        val saved =
+            service.save(
+                tenantId,
+                key = acme,
+                clientId = "c",
+                clientSecret = "s",
+                kind = ProviderKind.OIDC,
+                issuer = "https://issuer.example",
+                jitEnabled = true,
+                jitAllowedDomains = listOf("oriana.com.py", "my-corp.example", "or\u0131ana.com.py"),
+            )
+        assertEquals(
+            listOf("oriana.com.py", "my-corp.example", "or\u0131ana.com.py"),
+            assertIs<AdminResult.Success<IdentityProvider>>(saved).value.jitAllowedDomains,
+        )
+    }
+
     @Test
     fun `a provider key cannot be changed once saved`() {
         val created =

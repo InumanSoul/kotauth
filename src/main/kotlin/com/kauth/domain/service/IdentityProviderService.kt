@@ -7,6 +7,7 @@ import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.port.IdentityProviderRepository
+import java.net.IDN
 import java.net.URI
 import java.time.Instant
 
@@ -19,6 +20,10 @@ private const val MAX_SCOPES = 255
 private const val MAX_DOMAIN = 253
 
 private val WHITESPACE = Regex("\\s+")
+
+// Dot-separated LDH labels and nothing else. The gate matches a domain exactly, so a wildcard or a
+// bare label would save cleanly and then match no address ever, with nothing telling the operator.
+private val DOMAIN = Regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")
 private val URL_SCHEMES = setOf("http", "https")
 
 private const val KEY_IMMUTABLE =
@@ -165,11 +170,13 @@ class IdentityProviderService(
             .filter { it.isNotEmpty() }
             .distinct()
 
-    private fun String.isDomainLike(): Boolean =
-        length <= MAX_DOMAIN &&
-            none { it.isWhitespace() || it == '@' || it == '/' || it == ':' } &&
-            !startsWith(".") &&
-            !endsWith(".")
+    // Validated in the A-label form the gate compares over, so an operator's unicode domain and
+    // the punycode an assertion arrives as are held to one rule.
+    private fun String.isDomainLike(): Boolean {
+        if (length > MAX_DOMAIN) return false
+        val ascii = runCatching { IDN.toASCII(this) }.getOrNull() ?: return false
+        return ascii.length <= MAX_DOMAIN && DOMAIN.matches(ascii)
+    }
 
     // 'google' and 'github' resolve to compiled-in OAuth2 adapters; every other key is brokered
     // over generic OIDC. Letting the two cross would persist a row no adapter can serve.
