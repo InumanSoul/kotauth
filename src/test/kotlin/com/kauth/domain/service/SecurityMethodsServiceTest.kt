@@ -136,7 +136,7 @@ class SecurityMethodsServiceTest {
         tenantRepo.save(tenant)
         idpRepo.seed(tenantId, provider = "oriana")
         idpRepo.seed(tenantId, provider = "workforce-id")
-        idpRepo.seed(tenantId, provider = "auth0")
+        idpRepo.seed(tenantId, provider = "partner-id")
 
         val rows = service.list(tenant)
         val aggregate = rows.filter { it.key == MethodKey.EXTERNAL_IDP }

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.23.0] - 2026-08-26
 
 ### Added
 
@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address's domain is on that provider's allowed list. Domains are matched
   exactly, never by suffix — a suffix test for `example.com` would also accept
   `evil-example.com` — and the comparison is over the ASCII (punycode) spelling
-  of both sides, so a lookalike domain cannot pass as an allowed one. An entry
+  of both sides, which closes the confusable spellings that differ only by case
+  folding. An entry
   that could never match exactly, such as a wildcard or a bare label, is
   refused when the provider is saved. **An empty list is the feature switched
   off, never a wildcard**, so the toggle alone provisions nobody.

@@ -43,6 +43,16 @@ The domain test is deliberately not a suffix test. `endsWith("oriana.com.py")` a
 case-insensitive test either: the JDK folds characters that are not case variants of each other, so
 `"oriana.com.py".equalsIgnoreCase("orıana.com.py")` with a dotless i is true. Comparing A-labels with
 `==` is what makes it exact, and it also stops a punycode spelling reading as a domain nobody listed.
+
+**Residual, named rather than implied.** Java's `IDN.toASCII` implements IDNA2003, and the four
+IDNA2008 deviation characters — `ß`, final sigma `ς`, ZWJ and ZWNJ — map away under it. So
+`straße.de` normalises to `strasse.de`, and under IDNA2008 and UTS-46 those are two separately
+registrable domains. An operator who allowlists one therefore also admits the other, in either
+direction. Closing this properly needs a UTS-46 non-transitional implementation, which means ICU;
+that dependency is not worth carrying for this, so the residual is recorded here instead. It is
+narrow — it needs an allowlisted domain that has a deviation-equivalent, and it needs the provider
+to assert the U-label, since the A-label does not match. Note also that the admin form displays the
+entry as typed while the gate matches its normalised form, so the two can differ on screen.
 The address is rejected outright unless it contains exactly one `@`, so
 `a@evil.example@oriana.com.py` cannot read as the allowed domain. An entry that could never match
 exactly — a wildcard, a bare label — is refused when the provider is saved rather than stored to
@@ -81,6 +91,15 @@ which is what `resolveExistingUser` looked for. `provision` checks `existsByUser
 writes. Without that check the insert violates `UNIQUE (tenant_id, username)` and the exception
 leaves the domain as a 500 on every attempt, with nothing on the diagnostics panel to explain it:
 exactly the silence this phase built the panel to end. It is a refusal with its own reason instead.
+
+**One case the pre-check does not remove, accepted deliberately.** Two callbacks for the same new
+identity in flight together — two tabs, a prefetch, a retry — both pass the check and the second
+insert violates the unique constraint. It is a check-then-act race, so the exception still escapes
+and the person sees a generic error with no diagnostics row. It is transient rather than permanent:
+the next attempt finds the row that was created and links to it. Closing it properly means either a
+transaction around read-and-write or catching the constraint violation and re-resolving, and neither
+is worth the shape it would give the domain service for a self-healing race. Recorded so the "on
+every attempt" framing above is not read as a claim that 500s are gone.
 
 What a provisioned account looks like:
 
