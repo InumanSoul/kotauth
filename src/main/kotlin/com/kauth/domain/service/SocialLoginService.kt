@@ -40,13 +40,17 @@ import java.time.Instant
  * Account resolution in handleCallback (existing users only):
  *   a) Existing social_account row matches (tenant, provider, providerUserId) -> reuse user.
  *   b) Local user with same email exists in same tenant -> auto-link + reuse user.
- *   c) No match -> NeedsRegistration (NO silent user creation).
+ *   c) No match -> the JIT gate ([JitProvisioningService]) may create the user, otherwise
+ *      NeedsRegistration.
  *
- * New user creation is ONLY done in [completeSocialRegistration], after the user has
+ * Without JIT, new user creation is ONLY done in [completeSocialRegistration], after the user has
  * confirmed their chosen username on the registration completion page. This ensures:
  *   - Tenant registrationEnabled policy is respected.
  *   - Users know their username before it is set.
  *   - Existing users are never modified.
+ *
+ * With JIT the tenant has already declared, per provider and per email domain, which identities it
+ * trusts; the gate still only ever creates, and only where no local user matched.
  */
 class SocialLoginService(
     private val identityProviderRepository: IdentityProviderRepository,
@@ -60,6 +64,14 @@ class SocialLoginService(
     private val providerResolver: SocialProviderResolver,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
+    private val jitProvisioning: JitProvisioningService =
+        JitProvisioningService(
+            userRepository,
+            socialAccountRepository,
+            auditLog,
+            applicationRepository,
+            roleRepository,
+        ),
 ) {
     /**
      * Builds the provider authorization URL that the browser should be redirected to.
@@ -124,6 +136,8 @@ class SocialLoginService(
         ipAddress: String? = null,
         userAgent: String? = null,
         binding: OidcRequestBinding? = null,
+        /** The `client_id` this login began at, so a JIT-provisioned user gets its default roles. */
+        originatingClientId: String? = null,
     ): SocialLoginResult<SocialLoginSuccess> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -161,7 +175,12 @@ class SocialLoginService(
             is ExistingUserMatch.Linked -> return issueTokens(match.user, tenant, provider, false, ipAddress, userAgent)
             is ExistingUserMatch.EmailCollisionUnverified ->
                 return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
-            ExistingUserMatch.None ->
+            ExistingUserMatch.None -> {
+                // Reached only once no local user matches: JIT creates, it never claims.
+                val jit = jitProvisioning.provision(tenant, idp, profile, originatingClientId, ipAddress, userAgent)
+                if (jit is JitOutcome.Provisioned) {
+                    return issueTokens(jit.user, tenant, provider, isNewUser = true, ipAddress, userAgent)
+                }
                 return SocialLoginResult.NeedsRegistration(
                     SocialLoginNeedsRegistration(
                         provider = provider,
@@ -170,8 +189,10 @@ class SocialLoginService(
                         name = profile.name,
                         avatarUrl = profile.avatarUrl,
                         emailVerified = profile.emailVerified,
+                        jitRefusal = (jit as? JitOutcome.Refused)?.reason,
                     ),
                 )
+            }
         }
     }
 
@@ -448,6 +469,8 @@ data class SocialLoginNeedsRegistration(
     val name: String?,
     val avatarUrl: String?,
     val emailVerified: Boolean,
+    /** Why the JIT gate refused, when it was on and refused. Null when JIT is off or absent. */
+    val jitRefusal: JitRefusal? = null,
 )
 
 sealed class SocialLoginResult<out T> {

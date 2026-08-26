@@ -76,6 +76,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
 import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
+import com.kauth.domain.service.JitProvisioningService
 import com.kauth.domain.service.KeyRotationService
 import com.kauth.domain.service.LauncherService
 import com.kauth.domain.service.MfaService
@@ -461,6 +462,14 @@ data class ServiceGraph(
                     jwks = HttpJwksAdapter(),
                     verifier = JavaJwtVerifierAdapter(),
                 )
+            val jitProvisioningService =
+                JitProvisioningService(
+                    userRepository = userRepository,
+                    socialAccountRepository = socialAccountRepository,
+                    auditLog = auditLogAdapter,
+                    applicationRepository = applicationRepository,
+                    roleRepository = roleRepository,
+                )
             val socialLoginService =
                 SocialLoginService(
                     identityProviderRepository = identityProviderRepository,
@@ -485,6 +494,7 @@ data class ServiceGraph(
                         ),
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
+                    jitProvisioning = jitProvisioningService,
                 )
 
             // -- WebAuthn (passkeys) ------------------------------------------

@@ -91,4 +91,8 @@ data class SocialUserProfile(
     val emailVerified: Boolean = false,
     /** Profile picture URL from the provider (optional). */
     val avatarUrl: String? = null,
+    /** OIDC `given_name`. Null when the provider did not assert it. */
+    val givenName: String? = null,
+    /** OIDC `family_name`. Null when the provider did not assert it. */
+    val familyName: String? = null,
 )

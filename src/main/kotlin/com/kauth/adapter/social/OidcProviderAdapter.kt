@@ -149,6 +149,8 @@ class OidcProviderAdapter(
             name = name ?: listOfNotNull(givenName, familyName).joinToString(" ").ifBlank { null },
             emailVerified = emailVerified,
             avatarUrl = picture,
+            givenName = givenName,
+            familyName = familyName,
         )
 
     private companion object {

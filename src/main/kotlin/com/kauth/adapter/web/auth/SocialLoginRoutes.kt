@@ -523,6 +523,7 @@ internal fun Route.socialLoginRoutes(
                     ipAddress = ipAddress,
                     userAgent = userAgent,
                     binding = socialState.binding,
+                    originatingClientId = restoredParams.clientId,
                 )
         ) {
             is SocialLoginResult.Failure -> {
