@@ -646,6 +646,11 @@ object EnglishStrings {
         "{1} creates accounts only for people whose email address is on its list of approved " +
             "domains, and yours is not on it. Signing in again will not change this — ask an " +
             "administrator of {1} to add your domain."
+    const val JIT_REFUSED_USERNAME_CONFLICT_HEADING = "An account here already uses your email address"
+    const val JIT_REFUSED_USERNAME_CONFLICT_BODY =
+        "{1} already has an account whose sign-in name is your email address, and it is not this " +
+            "one. Signing in again will not change this — ask an administrator of {1} to sort the " +
+            "two records out."
     const val JIT_REFUSED_REFERENCE = "Quote this reference to an administrator: {0}"
 
     // Force change password page
@@ -1000,6 +1005,7 @@ object EnglishStrings {
     const val IDP_FAILURES_COL_REFERENCE = "Reference"
     const val IDP_FAILURE_EMAIL_NOT_VERIFIED = "Provider did not verify the email address"
     const val IDP_FAILURE_DOMAIN_NOT_ALLOWED = "Email domain not on the allowed list"
+    const val IDP_FAILURE_USERNAME_CONFLICT = "A local account already uses that email as its username"
     const val IDP_FAILURE_IDP_RETURNED_ERROR = "Rejected at the provider"
     const val IDP_FAILURE_UNRECOGNISED = "Unrecognised failure"
 

@@ -68,8 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   A refused sign-in is explained rather than dressed up as a failed login: the
   page says authentication succeeded, that the workspace has not granted the
-  account access, and which of the two conditions failed — one the person can
-  fix at their provider, the other only an administrator can. Where the
+  account access, and which rule turned it away — an unverified address is one
+  the person can fix at their provider; a domain that is not on the list, or an
+  address a local account already holds as its sign-in name, only an
+  administrator can. That last one is a refusal rather than a failed insert:
+  a created account takes the address as its username, and a name already taken
+  would otherwise be a 500 on every attempt with nothing recorded. Where the
   workspace has self-registration open, a refusal falls through to the ordinary
   registration page instead of ending the flow; the allowed-domain list governs
   automatic creation, not whether anyone may sign up at all. The refusal is

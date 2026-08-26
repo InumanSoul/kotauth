@@ -95,6 +95,7 @@ private fun reasonLabel(reason: String): String =
     when (reason) {
         BrokeredSignInFailure.EMAIL_NOT_VERIFIED -> EnglishStrings.IDP_FAILURE_EMAIL_NOT_VERIFIED
         BrokeredSignInFailure.DOMAIN_NOT_ALLOWED -> EnglishStrings.IDP_FAILURE_DOMAIN_NOT_ALLOWED
+        BrokeredSignInFailure.USERNAME_CONFLICT -> EnglishStrings.IDP_FAILURE_USERNAME_CONFLICT
         BrokeredSignInFailure.IDP_RETURNED_ERROR -> EnglishStrings.IDP_FAILURE_IDP_RETURNED_ERROR
         else -> EnglishStrings.IDP_FAILURE_UNRECOGNISED
     }

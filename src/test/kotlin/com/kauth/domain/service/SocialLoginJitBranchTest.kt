@@ -228,6 +228,34 @@ class SocialLoginJitBranchTest {
         assertEquals(0, users.findByTenantId(tenant.id, null, 100, 0).size)
     }
 
+    // `findByEmail` misses because the local account's *email* differs; its *username* is the
+    // asserted address. The gate must turn that into a refusal the operator can see rather than
+    // an exception that escapes the domain.
+    @Test
+    fun `an address held as another account's username falls through instead of throwing`() {
+        idpRepo.add(idp(jitEnabled = true))
+        users.add(
+            User(
+                id = UserId(11),
+                tenantId = tenant.id,
+                username = "grace@oriana.com.py",
+                email = "grace.hopper@oriana.com.py",
+                fullName = "Grace The Local",
+                passwordHash = "hashed:pass",
+                emailVerified = true,
+                enabled = true,
+            ),
+        )
+        adapter.profileToReturn = profile(email = "grace@oriana.com.py")
+
+        val result = svc.handleCallback("acme", oriana, "code", "http://localhost")
+
+        val needs = assertIs<SocialLoginResult.NeedsRegistration>(result)
+        assertEquals(JitRefusal.USERNAME_CONFLICT, needs.data.jitRefusal)
+        assertEquals(1, users.findByTenantId(tenant.id, null, 100, 0).size)
+        assertEquals(0, auditLog.countOf(AuditEventType.JIT_USER_PROVISIONED))
+    }
+
     @Test
     fun `a provider without JIT behaves exactly as before`() {
         idpRepo.add(idp(jitEnabled = false))

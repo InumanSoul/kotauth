@@ -15,6 +15,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -211,6 +212,77 @@ class JitProvisioningServiceTest {
             event.details["email_domain"],
             "An ambiguous address must not have its tail recorded as the domain that was refused",
         )
+    }
+
+    // The username is the address, and an admin-created username may contain '@'. Without the
+    // pre-check this insert violates UNIQUE (tenant_id, username): an exception, not a result, on
+    // every retry, and no diagnostics row at all.
+    @Test
+    fun `an email already held as another account's username is a refusal, not an exception`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "ada@oriana.com.py",
+                email = "ada.lovelace@oriana.com.py",
+                fullName = "Ada The Local",
+                passwordHash = "hashed:pass",
+                emailVerified = true,
+            ),
+        )
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py")),
+                profile(email = "ada@oriana.com.py", verified = true),
+            )
+        assertEquals(JitRefusal.USERNAME_CONFLICT, (outcome as JitOutcome.Refused).reason)
+        assertEquals(1, users.findByTenantId(tenant.id, null, 100, 0).size)
+        assertEquals(0, socialAccounts.all().size)
+        assertEquals(0, auditLog.countOf(AuditEventType.JIT_USER_PROVISIONED))
+    }
+
+    @Test
+    fun `a username conflict reaches the diagnostics panel with its own reason`() {
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "ada@oriana.com.py",
+                email = "ada.lovelace@oriana.com.py",
+                fullName = "Ada The Local",
+                passwordHash = "hashed:pass",
+                emailVerified = true,
+            ),
+        )
+        service.provision(
+            tenant,
+            provider(jit = true, domains = listOf("oriana.com.py")),
+            profile(email = "ada@oriana.com.py", verified = true),
+        )
+        val event = auditLog.events.single { it.eventType == AuditEventType.SOCIAL_LOGIN_FAILED }
+        assertEquals("username_conflict", event.details["reason"])
+        assertEquals("oriana.com.py", event.details["email_domain"])
+        assertNotNull(event.details["reference"])
+    }
+
+    @Test
+    fun `a username taken in another workspace does not refuse this one`() {
+        users.add(
+            User(
+                tenantId = TenantId(2),
+                username = "ada@oriana.com.py",
+                email = "ada@oriana.com.py",
+                fullName = "Ada Elsewhere",
+                passwordHash = "hashed:pass",
+                emailVerified = true,
+            ),
+        )
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py")),
+                profile(email = "ada@oriana.com.py", verified = true),
+            )
+        assertIs<JitOutcome.Provisioned>(outcome)
     }
 
     @Test

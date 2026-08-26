@@ -24,6 +24,7 @@ object BrokeredSignInFailure {
 
     const val EMAIL_NOT_VERIFIED = "email_not_verified"
     const val DOMAIN_NOT_ALLOWED = "domain_not_allowed"
+    const val USERNAME_CONFLICT = "username_conflict"
     const val IDP_RETURNED_ERROR = "idp_returned_error"
 
     /** OAuth2 error codes are short ASCII tokens (RFC 6749 §4.1.2.1); the query is anyone's to write. */

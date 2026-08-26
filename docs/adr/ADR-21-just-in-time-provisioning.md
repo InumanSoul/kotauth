@@ -57,6 +57,13 @@ signed in. If the provider does not assert it verified, the sign-in ends in
 stands between an asserted address and an existing account; the `email_verified` check in
 `resolveExistingUser` is. The rationale below states what that costs a deployment.
 
+**The address must also be free as a username.** `username` is the address, and an admin-created
+username may contain `@`, so a local account can already hold one without holding it as an *email* —
+which is what `resolveExistingUser` looked for. `provision` checks `existsByUsername` before it
+writes. Without that check the insert violates `UNIQUE (tenant_id, username)` and the exception
+leaves the domain as a 500 on every attempt, with nothing on the diagnostics panel to explain it:
+exactly the silence this phase built the panel to end. It is a refusal with its own reason instead.
+
 What a provisioned account looks like:
 
 - **`username` is the email address.** SCIM's `userName` is the email too, so a provisioning client
@@ -70,9 +77,9 @@ What a provisioned account looks like:
 - Every creation writes a `JIT_USER_PROVISIONED` audit event.
 
 **A refusal is explained to the person and recorded for the operator.** The page says authentication
-succeeded, that the workspace has not granted the account access, and which of the two conditions
-failed — because "not verified" is something the person can fix at their provider and "domain not
-allowed" is something only an administrator can. The audit row carries the provider, the reason, the
+succeeded, that the workspace has not granted the account access, and which rule turned them away —
+because "not verified" is something the person can fix at their provider while "domain not allowed"
+and "username already taken" are things only an administrator can. The audit row carries the provider, the reason, the
 email's **domain**, and a `reference`: a truncated digest over `(tenant, provider, subject)`, stable so
 six retries read as one person, reversible to nothing. No address, no provider subject, no token, no
 authorization code, no client secret, no PKCE verifier. `BrokeredSignInFailure` is the single
@@ -196,8 +203,8 @@ plumbing invites a reader to assume evidence that does not exist.
 - The Auth Methods grid gained **one aggregate row** for brokered providers rather than a row each. A
   provider key is an open string, so there is no `MethodKey` per provider, and a grid that grew a row
   per configured issuer would stop being the sign-in method grid.
-- Adding a further trust condition later means adding it to `provision` and to the two audit reason
-  codes. The refusal shape is a closed set in `BrokeredSignInFailure` precisely so a new reason cannot
+- Adding a further trust condition later means adding it to `provision` and to the set of audit
+  reason codes. The refusal shape is a closed set in `BrokeredSignInFailure` precisely so a new reason cannot
   be invented at a call site and leave the diagnostics panel rendering an unrecognised string.
 
 ## Related

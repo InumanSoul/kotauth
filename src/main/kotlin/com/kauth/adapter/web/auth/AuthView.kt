@@ -1162,6 +1162,7 @@ object AuthView {
                                         when (refusal) {
                                             JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_HEADING"
                                             JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_HEADING"
+                                            JitRefusal.USERNAME_CONFLICT -> "JIT_REFUSED_USERNAME_CONFLICT_HEADING"
                                         },
                                     )
                                 }
@@ -1171,6 +1172,7 @@ object AuthView {
                                     when (refusal) {
                                         JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_BODY"
                                         JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_BODY"
+                                        JitRefusal.USERNAME_CONFLICT -> "JIT_REFUSED_USERNAME_CONFLICT_BODY"
                                     },
                                     providerName,
                                     ctx.workspaceName,

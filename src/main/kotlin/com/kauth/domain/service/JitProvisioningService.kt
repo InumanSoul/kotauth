@@ -21,7 +21,7 @@ sealed interface JitOutcome {
         val user: User,
     ) : JitOutcome
 
-    /** The gate refused. [reason] is operator-facing and distinguishes the three refusals. */
+    /** The gate refused. [reason] is operator-facing and says which rule turned this sign-in away. */
     data class Refused(
         val reason: JitRefusal,
     ) : JitOutcome
@@ -33,6 +33,9 @@ sealed interface JitOutcome {
 enum class JitRefusal {
     EMAIL_NOT_VERIFIED,
     DOMAIN_NOT_ALLOWED,
+
+    /** A local account already holds the username this would take — the address itself. */
+    USERNAME_CONFLICT,
 }
 
 /**
@@ -73,6 +76,15 @@ class JitProvisioningService(
                 ?.ifBlank { null }
         if (email == null || !isDomainAllowed(email, provider.jitAllowedDomains)) {
             return refuse(tenant, provider, profile, JitRefusal.DOMAIN_NOT_ALLOWED, ipAddress, userAgent)
+        }
+
+        // The username is the address, and an admin-created username may contain '@'. Without this
+        // check the insert violates UNIQUE (tenant_id, username) and the exception leaves the
+        // domain as a 500 on every retry, with nothing on the diagnostics panel to explain it.
+        // The caller has already established that no user holds this address as an email, so this
+        // can only be a different person whose username happens to be it.
+        if (userRepository.existsByUsername(tenant.id, email)) {
+            return refuse(tenant, provider, profile, JitRefusal.USERNAME_CONFLICT, ipAddress, userAgent)
         }
 
         val user =
@@ -157,6 +169,7 @@ class JitProvisioningService(
                     when (reason) {
                         JitRefusal.EMAIL_NOT_VERIFIED -> BrokeredSignInFailure.EMAIL_NOT_VERIFIED
                         JitRefusal.DOMAIN_NOT_ALLOWED -> BrokeredSignInFailure.DOMAIN_NOT_ALLOWED
+                        JitRefusal.USERNAME_CONFLICT -> BrokeredSignInFailure.USERNAME_CONFLICT
                     },
                 )
                 put(
