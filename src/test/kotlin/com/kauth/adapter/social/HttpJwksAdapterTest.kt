@@ -23,7 +23,14 @@ class HttpJwksAdapterTest {
     private val fetcher = FakeHttpJsonFetcher()
     private var now = 0L
     private val windowMillis = 60_000L
-    private val adapter = HttpJwksAdapter(fetcher, refetchWindowMillis = windowMillis, clock = { now })
+    private val ttlMillis = 600_000L
+    private val adapter =
+        HttpJwksAdapter(
+            fetcher,
+            refetchWindowMillis = windowMillis,
+            ttlMillis = ttlMillis,
+            clock = { now },
+        )
 
     private val jwksUri = "https://issuer.example/jwks"
     private val otherJwksUri = "https://other-issuer.example/jwks"
@@ -97,6 +104,74 @@ class HttpJwksAdapterTest {
         adapter.signingKey(jwksUri, "unknown-2")
 
         assertEquals(3, fetcher.callCount(jwksUri))
+    }
+
+    @Test
+    fun `a known kid is served from cache within the ttl and refetched after it`() {
+        fetcher.respondWith(jwksUri, keySet("k1" to firstKey))
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+
+        now += ttlMillis - 1
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+        assertEquals(1, fetcher.callCount(jwksUri))
+
+        now += 1
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+        assertEquals(2, fetcher.callCount(jwksUri))
+    }
+
+    @Test
+    fun `a withdrawn key stops verifying once the ttl elapses`() {
+        // The kid stays known, so nothing about it ever triggers the unknown-kid refetch. Only the
+        // TTL sends us back to the issuer, and only then does the withdrawal take effect.
+        fetcher.respondWith(jwksUri, keySet("k1" to firstKey))
+        assertEquals(firstKey, adapter.signingKey(jwksUri, "k1").getOrThrow())
+
+        fetcher.respondWith(jwksUri, keySet("k2" to secondKey))
+        now += ttlMillis - 1
+        assertEquals(
+            firstKey,
+            adapter.signingKey(jwksUri, "k1").getOrThrow(),
+            "Inside the TTL the cached key is still served — that is the window the TTL bounds",
+        )
+
+        now += 1
+        val result = adapter.signingKey(jwksUri, "k1")
+
+        assertEquals(JwksFailure.Reason.UNKNOWN_KID, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull(), "A key the issuer no longer publishes must not verify anything")
+    }
+
+    @Test
+    fun `an expired entry that fails to refetch is not served from the stale cache`() {
+        fetcher.respondWith(jwksUri, keySet("k1" to firstKey))
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+
+        fetcher.shouldFail = true
+        now += ttlMillis
+
+        val result = adapter.signingKey(jwksUri, "k1")
+
+        // Fail closed: falling back to the stale entry would hand out exactly the key the TTL
+        // exists to stop handing out, and an unreachable issuer is the easy way to arrange that.
+        assertEquals(JwksFailure.Reason.FETCH_FAILED, assertIs<JwksFailure>(result.exceptionOrNull()).reason)
+        assertNull(result.getOrNull())
+    }
+
+    @Test
+    fun `an expired entry comes back with a fresh refetch budget`() {
+        fetcher.respondWith(jwksUri, keySet("k1" to firstKey))
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+        adapter.signingKey(jwksUri, "unknown-1")
+        adapter.signingKey(jwksUri, "unknown-2")
+        assertEquals(2, fetcher.callCount(jwksUri))
+
+        // Past the TTL the entry is gone, so this is an initial load, not a budgeted refetch.
+        now += ttlMillis
+        adapter.signingKey(jwksUri, "k1").getOrThrow()
+        adapter.signingKey(jwksUri, "unknown-3")
+
+        assertEquals(4, fetcher.callCount(jwksUri))
     }
 
     @Test

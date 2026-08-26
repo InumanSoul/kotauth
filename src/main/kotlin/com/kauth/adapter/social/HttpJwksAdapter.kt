@@ -24,8 +24,13 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Fetches an issuer's JWKS, caches its keys by kid, and bounds how often an unknown kid can
- * force a refetch.
+ * Fetches an issuer's JWKS, caches its keys by kid for [ttlMillis], and bounds how often an
+ * unknown kid can force a refetch.
+ *
+ * The TTL is what bounds a *revoked* key. An unknown kid is not the only thing that should send
+ * us back to the issuer: when a key is compromised and withdrawn, its kid stays perfectly well
+ * known, so refetch-on-unknown-kid alone would serve the withdrawn key forever and every forgery
+ * made with it would verify.
  *
  * The refetch budget is keyed by JWKS URI, so it is spent per provider: one issuer sending
  * unknown kids cannot starve refetches for another tenant's provider, and a rotation elsewhere
@@ -38,6 +43,7 @@ import java.util.concurrent.ConcurrentHashMap
 class HttpJwksAdapter(
     private val fetcher: HttpJsonFetcher = JdkHttpJsonFetcher(),
     private val refetchWindowMillis: Long = DEFAULT_REFETCH_WINDOW_MILLIS,
+    private val ttlMillis: Long = DEFAULT_TTL_MILLIS,
     private val clock: () -> Long = System::currentTimeMillis,
 ) : JwksPort {
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,6 +51,8 @@ class HttpJwksAdapter(
 
     private data class Entry(
         val keys: Map<String, PublicKey>,
+        /** When these keys came off the wire. Past [ttlMillis] the entry is not served at all. */
+        val loadedAt: Long,
         /** When this URI last spent its refetch budget; null while only the initial load has run. */
         val refetchedAt: Long?,
     )
@@ -60,7 +68,9 @@ class HttpJwksAdapter(
         OidcUrlPolicy.problemWith(jwksUri, "JWKS URI")?.let { return failure(Reason.INSECURE_URL, it) }
 
         val now = clock()
-        val cached = cache[jwksUri]
+        // An expired entry is treated as absent rather than refreshed in place: a fresh load is a
+        // fresh budget, and until it lands nothing stale is handed out.
+        val cached = cache[jwksUri]?.takeIf { now - it.loadedAt < ttlMillis }
         if (cached != null) {
             cached.keys[kid]?.let { return Result.success(it) }
             if (!refetchAllowed(cached, now)) {
@@ -71,7 +81,7 @@ class HttpJwksAdapter(
         }
 
         val fetched = fetchKeys(jwksUri).getOrElse { return Result.failure(it) }
-        cache[jwksUri] = Entry(fetched, cached?.let { now })
+        cache[jwksUri] = Entry(fetched, loadedAt = now, refetchedAt = cached?.let { now })
         return fetched[kid]?.let { Result.success(it) }
             ?: failure(Reason.UNKNOWN_KID, "No key '$kid' in the key set at $jwksUri.")
     }
@@ -195,6 +205,11 @@ class HttpJwksAdapter(
 
     companion object {
         const val DEFAULT_REFETCH_WINDOW_MILLIS: Long = 60_000L
+
+        // Ten minutes: the midpoint of what mainstream JWKS clients use, and the window a
+        // withdrawn key stays forgeable for. Shorter multiplies outbound fetches per replica for
+        // little more safety; longer leaves a compromised key live for a quarter of an hour.
+        const val DEFAULT_TTL_MILLIS: Long = 600_000L
         private const val P256_CURVE = "P-256"
         private const val P256_STANDARD_NAME = "secp256r1"
         private const val P256_COORDINATE_BYTES = 32
