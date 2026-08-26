@@ -5,6 +5,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -1060,6 +1061,57 @@ class SocialLoginRoutesTest {
                 HttpStatusCode.Found,
                 second.status,
                 "A second client behind the same proxy must have its own budget",
+            )
+        }
+
+    /** An operator-chosen label, which the routes must prefer over the key's title case. */
+    private fun seedLabelledOkta() =
+        idpRepo.add(
+            IdentityProvider(
+                tenantId = TenantId(1),
+                provider = oktaKey,
+                clientId = "client-okta",
+                clientSecret = "secret-okta",
+                displayName = "Acme Workforce SSO",
+            ),
+        )
+
+    @Test
+    fun `the callback error page names the provider by its configured label`() =
+        testApplication {
+            resetFixtures()
+            seedLabelledOkta()
+            installSocialRoutes()
+
+            val response = client.get("/t/acme/auth/social/okta/callback?error=access_denied")
+
+            // The route looks the row up by key; the view is handed whatever it returns. Title
+            // casing the key would render "Okta" here and every assertion on the view still pass.
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            // The whole sentence, not just the label: the same page lists the tenant's providers
+            // by their labels, so a bare `contains` would pass on the sign-in button alone.
+            assertTrue(
+                response.bodyAsText().contains("Login with Acme Workforce SSO was cancelled or failed."),
+                "The cancelled-login page must name the operator's label, got: ${response.bodyAsText()}",
+            )
+        }
+
+    @Test
+    fun `the social registration page names the provider by its configured label`() =
+        testApplication {
+            resetFixtures()
+            seedLabelledOkta()
+            installSocialRoutes()
+
+            val cookies = pendingCookieFor("acme", "newcomer@acme.com")
+            val page =
+                createClient { followRedirects = false }
+                    .get("/t/acme/auth/social/complete-registration") { header("Cookie", cookies) }
+
+            assertEquals(HttpStatusCode.OK, page.status)
+            assertTrue(
+                page.bodyAsText().contains("You're signing in with Acme Workforce SSO."),
+                "The registration page must name the operator's label, got: ${page.bodyAsText()}",
             )
         }
 
