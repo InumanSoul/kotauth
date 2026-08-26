@@ -6,6 +6,7 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantTheme
@@ -119,7 +120,7 @@ object AuthView {
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
-        enabledProviders: List<ProviderKey> = emptyList(),
+        enabledProviders: List<LoginProvider> = emptyList(),
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
@@ -285,7 +286,7 @@ object AuthView {
                                 for (prov in enabledProviders) {
                                     val qs = oauthParams.toQueryString()
                                     a(
-                                        href = "/t/$tenantSlug/auth/social/${prov.value}/redirect$qs",
+                                        href = "/t/$tenantSlug/auth/social/${prov.key.value}/redirect$qs",
                                         classes = "btn-social",
                                     ) {
                                         socialProviderButton(prov, ctx)
@@ -329,7 +330,7 @@ object AuthView {
         ctx: ViewContext,
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
-        enabledProviders: List<ProviderKey> = emptyList(),
+        enabledProviders: List<LoginProvider> = emptyList(),
         passwordPolicy: SecurityConfig = SecurityConfig(),
         passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
@@ -473,7 +474,7 @@ object AuthView {
                             div("social-buttons") {
                                 for (prov in enabledProviders) {
                                     a(
-                                        href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
+                                        href = "/t/$tenantSlug/auth/social/${prov.key.value}/redirect",
                                         classes = "btn-social",
                                     ) {
                                         socialProviderButton(prov, ctx)
@@ -1486,33 +1487,51 @@ object AuthView {
      *
      * This fallback is live as of Phase 2: [enabledProviders] is read from
      * identityProviderRepository, and the admin save route now writes any well-formed key, so a
-     * brokered OIDC provider reaches this branch and is rendered from its own key.
+     * brokered OIDC provider reaches this branch and is rendered from the operator's display
+     * name, or from its own key when they set none.
      */
     private fun FlowContent.socialProviderButton(
-        key: ProviderKey,
+        provider: LoginProvider,
         ctx: ViewContext,
     ) {
-        when (key) {
-            ProviderKey.GOOGLE -> {
-                span("social-icon") {
-                    inlineSvgIcon(iconName = "google-logo", ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"))
-                }
-                +ctx.t("LOGIN_CONTINUE_GOOGLE")
+        val chosen = provider.displayName?.takeIf { it.isNotBlank() }
+        val icon =
+            when (provider.key) {
+                ProviderKey.GOOGLE -> "google-logo"
+                ProviderKey.GITHUB -> "github-logo"
+                else -> "globe"
             }
-            ProviderKey.GITHUB -> {
-                span("social-icon") {
-                    inlineSvgIcon(iconName = "github-logo", ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"))
-                }
-                +ctx.t("LOGIN_CONTINUE_GITHUB")
+        val fallbackName =
+            when (provider.key) {
+                ProviderKey.GOOGLE -> ctx.t("LOGIN_PROVIDER_GOOGLE")
+                ProviderKey.GITHUB -> ctx.t("LOGIN_PROVIDER_GITHUB")
+                else -> EnglishStrings.providerDisplayName(provider.key)
             }
-            else -> {
-                val displayName = EnglishStrings.providerDisplayName(key)
-                span("social-icon") { inlineSvgIcon(iconName = "globe", ariaLabel = displayName) }
-                +ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", displayName)
+        val label =
+            when {
+                chosen != null -> ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", chosen)
+                provider.key == ProviderKey.GOOGLE -> ctx.t("LOGIN_CONTINUE_GOOGLE")
+                provider.key == ProviderKey.GITHUB -> ctx.t("LOGIN_CONTINUE_GITHUB")
+                else -> ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", fallbackName)
             }
-        }
+        span("social-icon") { inlineSvgIcon(iconName = icon, ariaLabel = chosen ?: fallbackName) }
+        +label
     }
 }
+
+/**
+ * One provider as the sign-in page needs it: the key that builds the URL, and the label the
+ * operator chose for it. Narrowing to [ProviderKey] at the call sites is what left
+ * `IDP_DISPLAY_NAME_HINT` promising a label the button never showed.
+ */
+data class LoginProvider(
+    val key: ProviderKey,
+    val displayName: String? = null,
+)
+
+/** The enabled rows of a tenant, as the sign-in and registration pages want them. */
+internal fun List<IdentityProvider>.asLoginProviders(): List<LoginProvider> =
+    map { LoginProvider(it.provider, it.displayName) }
 
 /**
  * Holds form values to re-populate the registration form after a failed submission.

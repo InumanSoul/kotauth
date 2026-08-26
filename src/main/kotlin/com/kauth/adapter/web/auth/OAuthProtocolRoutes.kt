@@ -235,7 +235,7 @@ internal fun Route.oauthProtocolRoutes(
                 val registered = q["registered"] == "true"
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
-                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                        identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
                     } else {
                         emptyList()
                     }
@@ -465,7 +465,7 @@ internal fun Route.oauthProtocolRoutes(
         val enabledProviders =
             identityProviderRepository
                 ?.findEnabledByTenant(tenant.id)
-                ?.map { it.provider } ?: emptyList()
+                ?.asLoginProviders() ?: emptyList()
 
         call.respondHtml(
             HttpStatusCode.OK,
@@ -492,7 +492,7 @@ internal fun Route.oauthProtocolRoutes(
 
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }

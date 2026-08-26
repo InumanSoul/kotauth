@@ -30,7 +30,7 @@ internal fun Route.registerRoutes(
         val tenant = ctx.tenant
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
@@ -53,7 +53,7 @@ internal fun Route.registerRoutes(
         val passwordlessTenant = tenant?.securityConfig?.passwordLoginEnabled == false
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }

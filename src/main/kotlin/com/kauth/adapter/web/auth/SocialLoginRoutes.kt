@@ -137,7 +137,7 @@ private suspend fun ApplicationCall.allowSocialRequest(
     if (limiter.isAllowed("social:${request.local.remoteAddress}:$slug")) return true
     val enabledProviders =
         if (tenant != null && identityProviderRepository != null) {
-            identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+            identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
         } else {
             emptyList()
         }
@@ -155,6 +155,21 @@ private suspend fun ApplicationCall.allowSocialRequest(
     )
     return false
 }
+
+/**
+ * The label an operator chose for this provider, or the built-in name. The pending-registration
+ * cookie carries only the key, so the row has to be read back to honour the display name here.
+ */
+private fun providerLabel(
+    identityProviderRepository: IdentityProviderRepository?,
+    tenant: Tenant?,
+    key: ProviderKey,
+): String =
+    tenant
+        ?.let { identityProviderRepository?.findByTenantAndProvider(it.id, key) }
+        ?.displayName
+        ?.takeIf { it.isNotBlank() }
+        ?: EnglishStrings.providerDisplayName(key)
 
 private fun constantTimeEquals(
     a: String,
@@ -229,7 +244,7 @@ internal fun Route.socialLoginRoutes(
             is SocialLoginResult.Failure -> {
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
-                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                        identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
                     } else {
                         emptyList()
                     }
@@ -264,7 +279,7 @@ internal fun Route.socialLoginRoutes(
 
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
@@ -283,7 +298,9 @@ internal fun Route.socialLoginRoutes(
                 AuthView.loginPage(
                     tenantSlug = slug,
                     ctx = ctx.viewContext,
-                    error = "Login with ${EnglishStrings.providerDisplayName(provider)} was cancelled or failed.",
+                    error =
+                        "Login with ${providerLabel(identityProviderRepository, tenant, provider)} " +
+                            "was cancelled or failed.",
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
@@ -482,7 +499,7 @@ internal fun Route.socialLoginRoutes(
             AuthView.socialRegistrationPage(
                 tenantSlug = slug,
                 ctx = ctx.viewContext,
-                providerName = EnglishStrings.providerDisplayName(pending.provider),
+                providerName = providerLabel(identityProviderRepository, tenant, pending.provider),
                 email = pending.email,
                 prefillUsername = suggestedUsername,
                 prefillFullName = pending.name ?: "",
@@ -540,7 +557,7 @@ internal fun Route.socialLoginRoutes(
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
                         ctx = ctx.viewContext,
-                        providerName = EnglishStrings.providerDisplayName(pending.provider),
+                        providerName = providerLabel(identityProviderRepository, tenant, pending.provider),
                         email = pending.email,
                         prefillUsername = chosenUsername,
                         prefillFullName = chosenFullName ?: pending.name ?: "",
@@ -554,7 +571,7 @@ internal fun Route.socialLoginRoutes(
                     AuthView.socialRegistrationPage(
                         tenantSlug = slug,
                         ctx = ctx.viewContext,
-                        providerName = EnglishStrings.providerDisplayName(pending.provider),
+                        providerName = providerLabel(identityProviderRepository, tenant, pending.provider),
                         email = pending.email,
                         error = "An unexpected error occurred. Please try again.",
                     ),
@@ -590,7 +607,7 @@ internal fun Route.socialLoginRoutes(
                                 AuthView.socialRegistrationPage(
                                     tenantSlug = slug,
                                     ctx = ctx.viewContext,
-                                    providerName = EnglishStrings.providerDisplayName(pending.provider),
+                                    providerName = providerLabel(identityProviderRepository, tenant, pending.provider),
                                     email = pending.email,
                                     error = message,
                                 ),
