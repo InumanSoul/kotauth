@@ -450,7 +450,7 @@ private fun FlowContent.oidcProviderCard(
                     div {
                         input(type = InputType.text, name = "providerKey") {
                             classes = setOf("edit-row__field")
-                            placeholder = "okta"
+                            placeholder = EnglishStrings.IDP_KEY_PLACEHOLDER
                             required = true
                             attributes["autocomplete"] = "off"
                         }
@@ -499,14 +499,14 @@ private fun FlowContent.oidcProviderCard(
                 fieldName = "displayName",
                 value = existing?.displayName,
                 hint = EnglishStrings.IDP_DISPLAY_NAME_HINT,
-                placeholder = "Okta",
+                placeholder = EnglishStrings.IDP_DISPLAY_NAME_PLACEHOLDER,
             )
             idpTextRow(
                 label = EnglishStrings.IDP_ISSUER_LABEL,
                 fieldName = "issuer",
                 value = existing?.issuer,
                 hint = EnglishStrings.IDP_ISSUER_HINT,
-                placeholder = "https://example.okta.com",
+                placeholder = EnglishStrings.IDP_ISSUER_PLACEHOLDER,
             )
             idpTextRow(
                 label = EnglishStrings.IDP_CLIENT_ID_LABEL,

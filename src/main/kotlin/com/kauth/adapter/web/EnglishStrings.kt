@@ -1017,6 +1017,10 @@ object EnglishStrings {
     const val IDP_ENABLE_LABEL = "Enable"
     const val IDP_CALLBACK_HINT = "Register this callback URL with the issuer:"
     const val IDP_KEY_LABEL = "Provider key"
+
+    // Deliberately not a real vendor: a named one in a form field reads as a provider this
+    // implementation has been run against, and none has.
+    const val IDP_KEY_PLACEHOLDER = "workforce-sso"
     const val IDP_KEY_HINT =
         "Lower-case letters, digits and hyphens. It appears in the callback URL and cannot be " +
             "changed once saved \u2014 accounts already linked to this provider point at it."
@@ -1028,8 +1032,10 @@ object EnglishStrings {
     const val IDP_KIND_HINT =
         "Google and GitHub use their built-in OAuth2 adapters. Every other key is brokered over OIDC."
     const val IDP_DISPLAY_NAME_LABEL = "Display name"
+    const val IDP_DISPLAY_NAME_PLACEHOLDER = "Workforce SSO"
     const val IDP_DISPLAY_NAME_HINT = "Shown on the sign-in button. Defaults to the provider key."
     const val IDP_ISSUER_LABEL = "Issuer URL"
+    const val IDP_ISSUER_PLACEHOLDER = "https://idp.example.com"
     const val IDP_ISSUER_HINT =
         "Required for OIDC. Must match the 'iss' claim of the issuer's ID tokens; discovery is " +
             "read from {issuer}/.well-known/openid-configuration."
