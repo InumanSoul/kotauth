@@ -30,7 +30,9 @@ import io.ktor.server.routing.post
  *   `/authorize` request. If absent (different browser, cookie expired after
  *   5 minutes), the user sees a friendly error asking them to open the link in
  *   the same browser. The OAuth-context check runs **before** `consumeMagicLink`,
- *   so the token is preserved and a same-device retry still works.
+ *   so the token is preserved and a same-device retry still works. `consumeMagicLink`
+ *   is given the tenant from the URL for the same reason: a link tapped at the wrong
+ *   tenant is refused before the token is marked used, not after.
  *
  * Gated on `tenant.securityConfig.magicLinkEnabled` — off by default per tenant.
  */
@@ -125,7 +127,9 @@ internal fun Route.magicLinkRoutes(
             return@get
         }
 
-        when (val result = credentialFlowService.consumeMagicLink(token)) {
+        // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
+        val tenant = ctx.tenant
+        when (val result = credentialFlowService.consumeMagicLink(token, tenant.id)) {
             is SelfServiceResult.Failure -> {
                 call.respondHtml(
                     HttpStatusCode.Unauthorized,
@@ -138,8 +142,6 @@ internal fun Route.magicLinkRoutes(
             }
             is SelfServiceResult.Success -> {
                 val user = result.value
-                // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
-                val tenant = ctx.tenant
                 val ipAddress = call.request.origin.remoteAddress
                 call.completeAuthorizationCodeFlow(
                     slug = ctx.slug,
