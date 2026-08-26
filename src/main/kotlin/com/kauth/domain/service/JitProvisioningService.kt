@@ -13,6 +13,7 @@ import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SocialAccountRepository
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.UserRepository
+import java.net.IDN
 
 /** The outcome of the just-in-time trust gate for one brokered sign-in. */
 sealed interface JitOutcome {
@@ -181,8 +182,13 @@ class JitProvisioningService(
     }
 
     /**
-     * Exact, case-insensitive, on the whole domain. A suffix test for `oriana.com.py` would also
-     * accept `evil-oriana.com.py`, which is a domain anyone can register.
+     * Exact, on the whole domain, with both sides first reduced to their ASCII (punycode) form.
+     *
+     * A suffix test for `oriana.com.py` would also accept `evil-oriana.com.py`, a domain anyone can
+     * register. `equals(ignoreCase = true)` was not exactness either: the JDK folds characters that
+     * are not case variants of each other, so `"oriana.com.py".equalsIgnoreCase("orıana.com.py")`
+     * with a dotless i is true while `==` is false. Reducing to one canonical spelling first is
+     * what also stops an A-label standing in for a domain nobody listed.
      */
     private fun isDomainAllowed(
         email: String,
@@ -190,9 +196,18 @@ class JitProvisioningService(
     ): Boolean {
         // Exactly one '@': "a@evil.example@oriana.com.py" must not read as the allowed domain.
         if (email.count { it == '@' } != 1) return false
-        val domain = email.substringAfterLast('@', "")
-        if (domain.isEmpty()) return false
-        return allowed.any { it.trim().equals(domain, ignoreCase = true) }
+        val domain = asciiDomain(email.substringAfterLast('@', "")) ?: return false
+        return allowed.any { asciiDomain(it) == domain }
+    }
+
+    /** The A-label spelling, so a U-label and its punycode cannot be two different domains. */
+    private fun asciiDomain(value: String): String? {
+        val trimmed = value.trim().lowercase()
+        if (trimmed.isEmpty()) return null
+        return runCatching { IDN.toASCII(trimmed) }
+            .getOrNull()
+            ?.lowercase()
+            ?.ifBlank { null }
     }
 
     private fun fullNameOf(

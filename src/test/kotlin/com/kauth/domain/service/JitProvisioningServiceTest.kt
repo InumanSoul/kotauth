@@ -132,6 +132,58 @@ class JitProvisioningServiceTest {
         assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
     }
 
+    // U+0131 LATIN SMALL LETTER DOTLESS I. `equalsIgnoreCase` calls this the allowed domain; an
+    // exact comparison over the A-label does not.
+    @Test
+    fun `a dotless-i lookalike domain is refused where ignoring case would have matched`() {
+        assertTrue(
+            "oriana.com.py".equals("or\u0131ana.com.py", ignoreCase = true),
+            "The premise of this test is that the JDK folds these two together",
+        )
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py")),
+                profile(email = "mallory@or\u0131ana.com.py", verified = true),
+            )
+        assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
+    }
+
+    @Test
+    fun `an allowed domain spelled with a dotless i does not admit the ASCII one`() {
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("or\u0131ana.com.py")),
+                profile(email = "mallory@oriana.com.py", verified = true),
+            )
+        assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
+    }
+
+    // U+212A KELVIN SIGN lower-cases to 'k', so it spells the allowed domain rather than looking
+    // like it — dropping `ignoreCase` must not start refusing it.
+    @Test
+    fun `a Kelvin sign in the asserted domain still matches the allowed one`() {
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("kelvin.example")),
+                profile(email = "ada@\u212Aelvin.example", verified = true),
+            )
+        assertIs<JitOutcome.Provisioned>(outcome)
+    }
+
+    @Test
+    fun `an allowed unicode domain matches the same domain asserted as punycode`() {
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("or\u0131ana.com.py")),
+                profile(email = "ada@xn--orana-o4a.com.py", verified = true),
+            )
+        assertIs<JitOutcome.Provisioned>(outcome)
+    }
+
     @Test
     fun `an unverified email is refused even on an allowed domain`() {
         val outcome =
