@@ -40,6 +40,7 @@ import com.kauth.adapter.token.JwtTokenAdapter
 import com.kauth.adapter.web.plugin.CorsOriginCache
 import com.kauth.adapter.webauthn.YubicoCredentialRepositoryBridge
 import com.kauth.adapter.webauthn.YubicoRelyingPartyAdapter
+import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
@@ -478,6 +479,7 @@ data class ServiceGraph(
                     userRepository = userRepository,
                     socialAccountRepository = socialAccountRepository,
                     auditLog = auditLogAdapter,
+                    references = BrokeredReferenceHasher(config.secretKey),
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
                 )

@@ -65,14 +65,8 @@ class SocialLoginService(
     private val providerResolver: SocialProviderResolver,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
-    private val jitProvisioning: JitProvisioningService =
-        JitProvisioningService(
-            userRepository,
-            socialAccountRepository,
-            auditLog,
-            applicationRepository,
-            roleRepository,
-        ),
+    /** Null wires no gate at all, which is JIT switched off for every provider. */
+    private val jitProvisioning: JitProvisioningService? = null,
 ) {
     /**
      * Builds the provider authorization URL that the browser should be redirected to.
@@ -178,10 +172,12 @@ class SocialLoginService(
                 return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
             ExistingUserMatch.None -> {
                 // Reached only once no local user matches: JIT creates, it never claims.
-                val jit = jitProvisioning.provision(tenant, idp, profile, originatingClientId, ipAddress, userAgent)
+                val jit =
+                    jitProvisioning?.provision(tenant, idp, profile, originatingClientId, ipAddress, userAgent)
                 if (jit is JitOutcome.Provisioned) {
                     return issueTokens(jit.user, tenant, provider, isNewUser = true, ipAddress, userAgent)
                 }
+                val refused = jit as? JitOutcome.Refused
                 return SocialLoginResult.NeedsRegistration(
                     SocialLoginNeedsRegistration(
                         provider = provider,
@@ -190,7 +186,8 @@ class SocialLoginService(
                         name = profile.name,
                         avatarUrl = profile.avatarUrl,
                         emailVerified = profile.emailVerified,
-                        jitRefusal = (jit as? JitOutcome.Refused)?.reason,
+                        jitRefusal = refused?.reason,
+                        jitReference = refused?.reference,
                     ),
                 )
             }
@@ -472,6 +469,8 @@ data class SocialLoginNeedsRegistration(
     val emailVerified: Boolean,
     /** Why the JIT gate refused, when it was on and refused. Null when JIT is off or absent. */
     val jitRefusal: JitRefusal? = null,
+    /** The reference the gate recorded for that refusal, so the page shows the recorded one. */
+    val jitReference: String? = null,
 )
 
 sealed class SocialLoginResult<out T> {

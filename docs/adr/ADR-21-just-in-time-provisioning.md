@@ -80,8 +80,11 @@ What a provisioned account looks like:
 succeeded, that the workspace has not granted the account access, and which rule turned them away —
 because "not verified" is something the person can fix at their provider while "domain not allowed"
 and "username already taken" are things only an administrator can. The audit row carries the provider, the reason, the
-email's **domain**, and a `reference`: a truncated digest over `(tenant, provider, subject)`, stable so
-six retries read as one person, reversible to nothing. No address, no provider subject, no token, no
+email's **domain**, and a `reference`: an HMAC over `(tenant, provider, subject)` under a key derived
+from `KAUTH_SECRET_KEY`, truncated to eight hex characters, so six retries read as one person. The key
+is what makes it more than a confirmation oracle — eight hex is 32 bits over inputs that are small and
+public (GitHub's subject is a numeric account id), so an unkeyed digest would be recoverable offline by
+anyone shown a reference. No address, no provider subject, no token, no
 authorization code, no client secret, no PKCE verifier. `BrokeredSignInFailure` is the single
 definition of those keys, written by the gate and by the callback route, read by the diagnostics panel.
 

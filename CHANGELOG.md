@@ -83,9 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carries the reason, the email address's **domain**, and a short stable
   reference the person is shown and can quote to an administrator. No address,
   no provider subject and no credential of any kind is recorded — the domain is
-  what an operator repairs an allowlist with, and the reference is derived from
-  the identity, stable enough that one person retrying six times reads as one
-  person, and reversible to nothing. Errors the provider itself returns appear
+  what an operator repairs an allowlist with, and the reference is an HMAC over
+  the identity under a key derived from `KAUTH_SECRET_KEY`, stable enough that
+  one person retrying six times reads as one person, and not recomputable by
+  anyone without that key. Errors the provider itself returns appear
   here too, but only for a `state` this instance signed for that workspace and
   provider, so the panel cannot be filled by anyone who can reach the callback.
 

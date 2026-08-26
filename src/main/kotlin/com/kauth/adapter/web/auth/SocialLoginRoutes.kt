@@ -599,7 +599,8 @@ internal fun Route.socialLoginRoutes(
                 // Only where sign-up is closed is "not permitted here" the whole truth, and
                 // offering a sign-up form to someone just told they are refused is incoherent.
                 // The refusal is recorded by the gate either way, below this decision.
-                if (refusal != null && tenant != null && !tenant.registrationEnabled) {
+                val refusalReference = pending.jitReference
+                if (refusal != null && refusalReference != null && tenant != null && !tenant.registrationEnabled) {
                     call.respondHtml(
                         HttpStatusCode.Forbidden,
                         AuthView.jitRefusedPage(
@@ -607,12 +608,8 @@ internal fun Route.socialLoginRoutes(
                             ctx = ctx.viewContext,
                             providerName = providerLabel(identityProviderRepository, tenant, provider),
                             refusal = refusal,
-                            reference =
-                                BrokeredSignInFailure.reference(
-                                    tenant.id,
-                                    provider,
-                                    pending.providerUserId,
-                                ),
+                            // The gate's own reference, not a second computation of it.
+                            reference = refusalReference,
                         ),
                     )
                     return@get

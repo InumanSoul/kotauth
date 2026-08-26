@@ -5,6 +5,7 @@ import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
@@ -17,6 +18,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.JitProvisioningService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.util.Pkce
@@ -140,6 +142,13 @@ class SocialLoginRoutesTest {
             providerResolver =
                 StaticSocialProviderResolver(
                     mapOf(ProviderKey.GOOGLE to googleAdapter, oktaKey to oktaAdapter),
+                ),
+            jitProvisioning =
+                JitProvisioningService(
+                    userRepository = userRepo,
+                    socialAccountRepository = socialAccountRepo,
+                    auditLog = auditLog,
+                    references = BrokeredReferenceHasher("test-secret-key"),
                 ),
         )
 

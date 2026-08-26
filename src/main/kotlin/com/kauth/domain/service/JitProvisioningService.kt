@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.BrokeredSignInFailure
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SocialAccount
@@ -21,9 +22,14 @@ sealed interface JitOutcome {
         val user: User,
     ) : JitOutcome
 
-    /** The gate refused. [reason] is operator-facing and says which rule turned this sign-in away. */
+    /**
+     * The gate refused. [reason] is operator-facing and says which rule turned this sign-in away;
+     * [reference] is the same handle the audit row carries, computed once here so the page the
+     * person is shown and the row the operator reads cannot disagree.
+     */
     data class Refused(
         val reason: JitRefusal,
+        val reference: String,
     ) : JitOutcome
 
     /** JIT is off for this provider — fall through to the existing registration flow. */
@@ -53,6 +59,7 @@ class JitProvisioningService(
     private val userRepository: UserRepository,
     private val socialAccountRepository: SocialAccountRepository,
     private val auditLog: AuditLogPort,
+    private val references: BrokeredReferenceHasher,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
 ) {
@@ -161,6 +168,7 @@ class JitProvisioningService(
         ipAddress: String?,
         userAgent: String?,
     ): JitOutcome.Refused {
+        val reference = references.of(tenant.id, provider.provider, profile.providerUserId)
         val details =
             buildMap {
                 put(BrokeredSignInFailure.PROVIDER, provider.provider.value)
@@ -172,10 +180,7 @@ class JitProvisioningService(
                         JitRefusal.USERNAME_CONFLICT -> BrokeredSignInFailure.USERNAME_CONFLICT
                     },
                 )
-                put(
-                    BrokeredSignInFailure.REFERENCE,
-                    BrokeredSignInFailure.reference(tenant.id, provider.provider, profile.providerUserId),
-                )
+                put(BrokeredSignInFailure.REFERENCE, reference)
                 BrokeredSignInFailure.emailDomainOf(profile.email)?.let {
                     put(BrokeredSignInFailure.EMAIL_DOMAIN, it)
                 }
@@ -191,7 +196,7 @@ class JitProvisioningService(
                 details = details,
             ),
         )
-        return JitOutcome.Refused(reason)
+        return JitOutcome.Refused(reason, reference)
     }
 
     /**

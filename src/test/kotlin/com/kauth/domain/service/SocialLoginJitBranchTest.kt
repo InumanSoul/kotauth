@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.config.StaticSocialProviderResolver
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
@@ -52,6 +53,7 @@ class SocialLoginJitBranchTest {
             userRepository = users,
             socialAccountRepository = socialAccounts,
             auditLog = auditLog,
+            references = BrokeredReferenceHasher("test-instance-secret-key-0123456789"),
         )
 
     private val svc =
