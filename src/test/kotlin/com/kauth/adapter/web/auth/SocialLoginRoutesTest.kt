@@ -36,8 +36,13 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
 import io.ktor.http.encodeURLParameter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -156,6 +161,41 @@ class SocialLoginRoutesTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+        )
+
+    /** A second tenant on the same instance. It configures no identity provider of its own. */
+    private val victimTenant =
+        Tenant(
+            id = TenantId(2),
+            slug = "victimco",
+            displayName = "Victim Co",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+        )
+
+    private val bob =
+        User(
+            id = UserId(99),
+            tenantId = TenantId(2),
+            username = "bob",
+            email = "bob@victimco.example",
+            fullName = "Bob",
+            passwordHash = hasher.hash("bob-pass"),
+            enabled = true,
+            emailVerified = true,
+        )
+
+    private val victimApp =
+        Application(
+            id = ApplicationId(2),
+            tenantId = TenantId(2),
+            clientId = "victim-spa",
+            name = "Victim SPA",
+            description = null,
+            accessType = AccessType.PUBLIC,
+            enabled = true,
+            redirectUris = listOf("https://victim.example.com/callback"),
             grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
@@ -665,6 +705,257 @@ class SocialLoginRoutesTest {
             assertEquals(HttpStatusCode.TooManyRequests, throttled.status)
         }
     }
+
+    /**
+     * Every social cookie the response set, as one `Cookie` header — the whole set the browser
+     * that drove the flow would hold, so a replay is tested against the cookies the attacker
+     * really has rather than against a hand-picked one.
+     */
+    private fun socialCookieHeader(response: HttpResponse): String =
+        response.headers
+            .getAll("Set-Cookie")
+            .orEmpty()
+            .filter { it.contains("KOTAUTH_SOCIAL_PENDING") }
+            .joinToString("; ") { it.substringBefore(";") }
+
+    @Test
+    fun `a pending registration cookie minted at one tenant is refused at another`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            tenantRepo.add(victimTenant)
+            userRepo.add(bob)
+            appRepo.add(victimApp)
+            // The attacker administers acme and points it at an IdP they run, which asserts an
+            // address they do not own. Unknown in acme, so the callback answers NeedsRegistration.
+            oktaAdapter.shouldFail = false
+            oktaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "okta|attacker",
+                    email = bob.email,
+                    name = "Bob",
+                    emailVerified = true,
+                )
+            installSocialRoutes()
+            val attacker =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+
+            val redirect =
+                attacker.get(
+                    "/t/acme/auth/social/okta/redirect?response_type=code&client_id=victim-spa" +
+                        "&redirect_uri=https%3A%2F%2Fvictim.example.com%2Fcallback&state=attacker-state" +
+                        "&code_challenge=attacker-challenge&code_challenge_method=S256",
+                )
+            val callback =
+                attacker.get(
+                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                )
+            val stolen = socialCookieHeader(callback)
+            assertTrue(stolen.isNotEmpty(), "The attacker's own tenant must mint a pending cookie for this to test")
+
+            // Replayed at a tenant that configured no provider and never took part. Cookie path
+            // scoping is browser-side only, so a non-browser client sends it wherever it likes.
+            val replay =
+                createClient { followRedirects = false }
+                    .post("/t/victimco/auth/social/complete-registration") {
+                        header("Cookie", stolen)
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=bobtakeover")
+                    }
+
+            assertTrue(
+                replay.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_SSO=") },
+                "A cross-tenant replay must leave no session behind: ${replay.headers.getAll("Set-Cookie")}",
+            )
+            assertFalse(
+                replay.headers["Location"].orEmpty().startsWith("https://victim.example.com/callback"),
+                "The victim's client must not be handed an authorization code for this replay",
+            )
+            assertTrue(
+                socialAccountRepo.all().none { it.tenantId == TenantId(2) },
+                "No provider identity may be linked into the victim's tenant",
+            )
+            assertTrue(authCodeRepo.all().isEmpty(), "No authorization code may be issued for the victim's tenant")
+            assertTrue(sessionRepo.findByUserId(UserId(99)).isEmpty(), "The victim must not be signed in")
+        }
+
+    /** Drives redirect + callback at [slug] until the pending cookie exists, and returns it. */
+    private suspend fun ApplicationTestBuilder.pendingCookieFor(
+        slug: String,
+        email: String,
+    ): String {
+        oktaAdapter.shouldFail = false
+        oktaAdapter.profileToReturn =
+            SocialUserProfile(
+                providerUserId = "okta|$email",
+                email = email,
+                name = "New Comer",
+                emailVerified = true,
+            )
+        val browser =
+            createClient {
+                followRedirects = false
+                install(HttpCookies)
+            }
+        val redirect = browser.get("/t/$slug/auth/social/okta/redirect")
+        val callback =
+            browser.get(
+                "/t/$slug/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+            )
+        return socialCookieHeader(callback)
+    }
+
+    @Test
+    fun `a pending cookie completes registration at the tenant that minted it`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+
+            // The guard has to let the real flow through: one that refused every replay would
+            // satisfy the cross-tenant test above and break social registration outright.
+            val cookies = pendingCookieFor("acme", "newcomer@acme.com")
+            val completed =
+                createClient { followRedirects = false }
+                    .post("/t/acme/auth/social/complete-registration") {
+                        header("Cookie", cookies)
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=newcomer")
+                    }
+
+            assertEquals(HttpStatusCode.Found, completed.status)
+            assertEquals("/t/acme/account/login", completed.headers["Location"])
+            assertNotNull(
+                userRepo.findByEmail(TenantId(1), "newcomer@acme.com"),
+                "A pending cookie presented at its own tenant must still register the user",
+            )
+        }
+
+    @Test
+    fun `a pending cookie presented without its binding cookie is refused`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+
+            // Right tenant, our signature, freshly minted — only the binding is missing. A cookie
+            // planted in someone else's browser must not complete as if they had begun the flow.
+            val pendingOnly =
+                pendingCookieFor("acme", "newcomer@acme.com")
+                    .split("; ")
+                    .first { it.startsWith("KOTAUTH_SOCIAL_PENDING=") }
+            val response =
+                createClient { followRedirects = false }
+                    .post("/t/acme/auth/social/complete-registration") {
+                        header("Cookie", pendingOnly)
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=newcomer")
+                    }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertTrue(
+                response.headers["Location"].orEmpty().startsWith("/t/acme/authorize?error="),
+                "An unbound pending cookie must be sent back to the start, got: ${response.headers["Location"]}",
+            )
+            assertTrue(userRepo.findByEmail(TenantId(1), "newcomer@acme.com") == null, "No user may be created")
+        }
+
+    @Test
+    fun `a rejected authorization request leaves no SSO session behind`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+
+            // The completion names a client this tenant does not have, so code issuance fails.
+            // A session cookie written before that check survives the refusal.
+            oktaAdapter.shouldFail = false
+            oktaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "okta|newcomer",
+                    email = "newcomer@acme.com",
+                    name = "New Comer",
+                    emailVerified = true,
+                )
+            val browser =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+            val redirect =
+                browser.get(
+                    "/t/acme/auth/social/okta/redirect?response_type=code&client_id=ghost-app" +
+                        "&redirect_uri=https%3A%2F%2Fghost.example.com%2Fcallback" +
+                        "&code_challenge=c&code_challenge_method=S256",
+                )
+            val callback =
+                browser.get(
+                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                )
+            val completed =
+                createClient { followRedirects = false }
+                    .post("/t/acme/auth/social/complete-registration") {
+                        header("Cookie", socialCookieHeader(callback))
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=newcomer")
+                    }
+
+            assertEquals(HttpStatusCode.BadRequest, completed.status)
+            assertTrue(
+                completed.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_SSO=") },
+                "A failed code issuance must not leave a session: ${completed.headers.getAll("Set-Cookie")}",
+            )
+        }
+
+    @Test
+    fun `the pending cookies are HttpOnly path-scoped and SameSite Lax`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+            oktaAdapter.shouldFail = false
+            oktaAdapter.profileToReturn =
+                SocialUserProfile(
+                    providerUserId = "okta|newcomer",
+                    email = "newcomer@acme.com",
+                    name = "New Comer",
+                    emailVerified = true,
+                )
+            val browser =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+
+            val redirect = browser.get("/t/acme/auth/social/okta/redirect")
+            val callback =
+                browser.get(
+                    "/t/acme/auth/social/okta/callback?code=abc&state=${stateFrom(redirect.headers["Location"]!!)}",
+                )
+
+            // Two halves of one flow disagreeing on cookie attributes is how the weaker half
+            // comes to look deliberate: the pending pair is hardened like the state cookie.
+            val pendingCookies =
+                callback.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .filter { it.contains("KOTAUTH_SOCIAL_PENDING") }
+            assertEquals(2, pendingCookies.size, "Expected the pending cookie and its binding, got: $pendingCookies")
+            pendingCookies.forEach {
+                assertTrue(it.contains("HttpOnly"), "Script must not read the pending pair: $it")
+                assertTrue(it.contains("SameSite=Lax"), "Expected SameSite=Lax, got: $it")
+                assertTrue(it.contains("Path=/t/acme/auth/social"), "Expected a tenant-scoped path, got: $it")
+            }
+        }
 
     companion object {
         /** The wire name of the cookie that binds a social-login state to the browser that began it. */

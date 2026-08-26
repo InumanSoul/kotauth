@@ -29,6 +29,12 @@ private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
 // presenting that state is the one the flow began in. Same idiom as KOTAUTH_ADMIN_PKCE.
 private const val SOCIAL_STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
 
+// The registration leg's half of the flow: the pending profile, and the nonce that binds it to
+// the browser the callback minted it in — the same pairing as the state and its cookie.
+private const val SOCIAL_PENDING_COOKIE = "KOTAUTH_SOCIAL_PENDING"
+private const val SOCIAL_PENDING_BINDING_COOKIE = "KOTAUTH_SOCIAL_PENDING_BINDING"
+private const val SOCIAL_PENDING_MAX_AGE_MS = 600_000L
+
 /**
  * The signed social-login state: `provider|slug|csrfNonce|timestampMillis|oidcNonce|
  * pkceVerifier|oauthParamsB64`.
@@ -122,6 +128,72 @@ private fun ApplicationCall.clearSocialStateCookie(
     path = "/t/$slug/auth/social",
     extensions = mapOf("SameSite" to "Lax"),
 )
+
+/**
+ * Writes the pending-registration pair: the signed profile, and the signed nonce that binds it to
+ * this browser. Hardened like the state cookie — the two halves of one flow disagreeing on cookie
+ * attributes is how the weaker one comes to look deliberate.
+ */
+private fun ApplicationCall.setSocialPendingCookies(
+    slug: String,
+    signedPending: String,
+    signedNonce: String,
+    secure: Boolean,
+) {
+    listOf(
+        SOCIAL_PENDING_COOKIE to signedPending,
+        SOCIAL_PENDING_BINDING_COOKIE to signedNonce,
+    ).forEach { (name, value) ->
+        response.cookies.append(
+            name = name,
+            value = value,
+            maxAge = SOCIAL_PENDING_MAX_AGE_MS / 1000,
+            httpOnly = true,
+            secure = secure,
+            path = "/t/$slug/auth/social",
+            extensions = mapOf("SameSite" to "Lax"),
+        )
+    }
+}
+
+private fun ApplicationCall.clearSocialPendingCookies(
+    slug: String,
+    secure: Boolean,
+) {
+    listOf(SOCIAL_PENDING_COOKIE, SOCIAL_PENDING_BINDING_COOKIE).forEach { name ->
+        response.cookies.append(
+            name = name,
+            value = "",
+            maxAge = 0L,
+            httpOnly = true,
+            secure = secure,
+            path = "/t/$slug/auth/social",
+            extensions = mapOf("SameSite" to "Lax"),
+        )
+    }
+}
+
+/**
+ * The pending registration this request may act on: minted for this tenant, in this browser.
+ *
+ * The signature proves only that we minted the cookie. Without the slug check, whoever administers
+ * any tenant on the instance can point it at an IdP they control, have it assert an address they
+ * do not own, and replay the resulting cookie at that address's tenant to be handed its owner's
+ * account. Cookie path scoping is browser-side only and stops no non-browser client. The nonce is
+ * the other half: a cookie planted in someone else's browser must not complete as if they had
+ * begun the flow.
+ */
+private fun ApplicationCall.readSocialPending(
+    slug: String,
+    encryptionService: EncryptionService,
+): SocialPendingData? {
+    val pending =
+        parseSocialPendingCookie(request.cookies[SOCIAL_PENDING_COOKIE], encryptionService) ?: return null
+    if (!constantTimeEquals(pending.slug, slug)) return null
+    val boundNonce =
+        request.cookies[SOCIAL_PENDING_BINDING_COOKIE]?.let { encryptionService.verifyCookie(it) } ?: return null
+    return pending.takeIf { constantTimeEquals(boundNonce, it.csrfNonce) }
+}
 
 /**
  * Throttles one social-login request per IP and tenant, answering with the login page so a
@@ -418,16 +490,18 @@ internal fun Route.socialLoginRoutes(
             }
             is SocialLoginResult.NeedsRegistration -> {
                 val pending = result.data
-                val cookieVal =
-                    encryptionService.signCookie(
-                        buildSocialPendingPayload(pending, slug, oauthParamsRaw),
-                    )
-                call.response.cookies.append(
-                    name = "KOTAUTH_SOCIAL_PENDING",
-                    value = cookieVal,
-                    maxAge = 600L,
-                    httpOnly = true,
-                    path = "/t/$slug/auth/social",
+                val pendingNonce =
+                    java.util.UUID
+                        .randomUUID()
+                        .toString()
+                call.setSocialPendingCookies(
+                    slug = slug,
+                    signedPending =
+                        encryptionService.signCookie(
+                            buildSocialPendingPayload(pending, slug, oauthParamsRaw, pendingNonce),
+                        ),
+                    signedNonce = encryptionService.signCookie(pendingNonce),
+                    secure = secure,
                 )
                 call.respondRedirect("/t/$slug/auth/social/complete-registration")
             }
@@ -477,8 +551,7 @@ internal fun Route.socialLoginRoutes(
         val theme = tenant.theme
         val workspaceName = tenant.displayName
 
-        val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-        val pending = parseSocialPendingCookie(rawCookie, encryptionService)
+        val pending = call.readSocialPending(slug, encryptionService)
 
         if (pending == null) {
             return@get call.respondRedirect(
@@ -514,8 +587,8 @@ internal fun Route.socialLoginRoutes(
         val theme = tenant.theme
         val workspaceName = tenant.displayName
 
-        val rawCookie = call.request.cookies["KOTAUTH_SOCIAL_PENDING"]
-        val pending = parseSocialPendingCookie(rawCookie, encryptionService)
+        val secure = baseUrl.startsWith("https://", ignoreCase = true)
+        val pending = call.readSocialPending(slug, encryptionService)
 
         if (pending == null) {
             return@post call.respondRedirect(
@@ -578,13 +651,7 @@ internal fun Route.socialLoginRoutes(
                 )
             }
             is SocialLoginResult.Success -> {
-                call.response.cookies.append(
-                    name = "KOTAUTH_SOCIAL_PENDING",
-                    value = "",
-                    maxAge = 0L,
-                    httpOnly = true,
-                    path = "/t/$slug/auth/social",
-                )
+                call.clearSocialPendingCookies(slug, secure)
                 val loginSuccess = result.value
                 val restoredParams = parseQueryStringToOAuthParams(pending.oauthParamsRaw)
 

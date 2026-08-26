@@ -388,12 +388,17 @@ internal data class SocialPendingData(
     val avatarUrl: String?,
     val emailVerified: Boolean,
     val oauthParamsRaw: String,
+    val csrfNonce: String,
 )
+
+/** The field count of the pending payload; a payload of any other shape is not this format. */
+private const val SOCIAL_PENDING_FIELD_COUNT = 10
 
 internal fun buildSocialPendingPayload(
     data: SocialLoginNeedsRegistration,
     slug: String,
     oauthParamsRaw: String,
+    csrfNonce: String,
 ): String {
     val enc =
         java.util.Base64
@@ -411,6 +416,7 @@ internal fun buildSocialPendingPayload(
         data.emailVerified.toString(),
         oauthParamsRaw.b64(),
         System.currentTimeMillis().toString(),
+        csrfNonce,
     ).joinToString("|")
 }
 
@@ -421,7 +427,7 @@ internal fun parseSocialPendingCookie(
     if (rawCookie.isNullOrBlank()) return null
     val payload = encryptionService.verifyCookie(rawCookie) ?: return null
     val parts = payload.split("|")
-    if (parts.size < 9) return null
+    if (parts.size != SOCIAL_PENDING_FIELD_COUNT) return null
 
     val timestamp = parts[8].toLongOrNull() ?: return null
     if (System.currentTimeMillis() - timestamp > 600_000) return null
@@ -441,8 +447,9 @@ internal fun parseSocialPendingCookie(
         val avatarUrl = decode(parts[5]).ifBlank { null }
         val emailVerified = parts[6].toBooleanStrictOrNull() ?: false
         val oauthParamsRaw = decode(parts[7])
+        val csrfNonce = parts[9]
 
-        if (email.isBlank() || providerUserId.isBlank()) return null
+        if (email.isBlank() || providerUserId.isBlank() || csrfNonce.isBlank()) return null
 
         SocialPendingData(
             provider = provider,
@@ -453,6 +460,7 @@ internal fun parseSocialPendingCookie(
             avatarUrl = avatarUrl,
             emailVerified = emailVerified,
             oauthParamsRaw = oauthParamsRaw,
+            csrfNonce = csrfNonce,
         )
     } catch (_: Exception) {
         null
@@ -495,19 +503,6 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
                 return null
             }
 
-    setSsoCookie(
-        SsoCookieData(
-            userId = userId.value,
-            tenantId = tenantId.value,
-            authTime = authTime,
-            mfaCompleted = mfaCompleted,
-            expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
-        ),
-        slug = slug,
-        encryptionService = encryptionService,
-        secure = secure,
-    )
-
     return when (
         val codeResult =
             oauthService.issueAuthorizationCode(
@@ -526,6 +521,20 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
             )
     ) {
         is OAuthResult.Success -> {
+            // Only after the client and redirect URI are validated: a session cookie written
+            // ahead of that survives a rejected authorization request.
+            setSsoCookie(
+                SsoCookieData(
+                    userId = userId.value,
+                    tenantId = tenantId.value,
+                    authTime = authTime,
+                    mfaCompleted = mfaCompleted,
+                    expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
+                ),
+                slug = slug,
+                encryptionService = encryptionService,
+                secure = secure,
+            )
             clearAuthContextCookie(slug)
             val code = codeResult.value.code
             val state = oauthParams.state
