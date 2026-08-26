@@ -53,6 +53,7 @@ import io.ktor.server.routing.routing
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
 import io.mockk.mockk
+import java.net.URLDecoder
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -1187,6 +1188,40 @@ class SocialLoginRoutesTest {
                     .none { it.startsWith("${stateCookieName("google")}=") },
                 "A refused callback must not touch the binding: ${response.headers.getAll("Set-Cookie")}",
             )
+        }
+
+    @Test
+    fun `a pending cookie carrying more fields than the format defines is refused`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+
+            // Same shape as the state's own field-count guard: a payload of another shape is not
+            // this format, and reading it field by field would take each one for something else.
+            val cookies = pendingCookieFor("acme", "newcomer@acme.com")
+            val signed =
+                URLDecoder.decode(
+                    cookies.substringAfter("KOTAUTH_SOCIAL_PENDING=").substringBefore(";"),
+                    Charsets.UTF_8,
+                )
+            val forged = encryptionService.signCookie(signed.substringBeforeLast(".") + "|extra")
+            // The real binding cookie rides along, so the field count is the only thing left to
+            // refuse it — otherwise the browser-binding guard would answer for this test.
+            val binding = cookies.split("; ").first { it.startsWith("KOTAUTH_SOCIAL_PENDING_BINDING=") }
+            val response =
+                createClient { followRedirects = false }
+                    .post("/t/acme/auth/social/complete-registration") {
+                        header("Cookie", "KOTAUTH_SOCIAL_PENDING=${forged.encodeURLParameter()}; $binding")
+                        contentType(ContentType.Application.FormUrlEncoded)
+                        setBody("username=newcomer")
+                    }
+
+            assertTrue(
+                response.headers["Location"].orEmpty().startsWith("/t/acme/authorize?error="),
+                "A payload of another shape must be refused, got: ${response.headers["Location"]}",
+            )
+            assertTrue(userRepo.findByEmail(TenantId(1), "newcomer@acme.com") == null, "No user may be created")
         }
 
     companion object {
