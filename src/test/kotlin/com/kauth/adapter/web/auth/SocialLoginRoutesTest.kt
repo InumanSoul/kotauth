@@ -239,12 +239,16 @@ class SocialLoginRoutesTest {
 
     private fun signedState(payload: String) = encryptionService.signCookie(payload).encodeURLParameter()
 
+    /** The binding cookie's wire name for [provider]: one name per provider, not per tenant. */
+    private fun stateCookieName(provider: String) = "${STATE_COOKIE}_$provider"
+
     /**
      * The browser-binding cookie the redirect would have set for [payload]: its csrfNonce, signed.
      * A forged state needs it because the callback refuses any state not bound to this browser.
      */
     private fun HttpRequestBuilder.bindStateCookie(payload: String) {
-        header("Cookie", "$STATE_COOKIE=${encryptionService.signCookie(payload.split("|")[2])}")
+        val parts = payload.split("|")
+        header("Cookie", "${stateCookieName(parts[0])}=${encryptionService.signCookie(parts[2])}")
     }
 
     private fun ApplicationTestBuilder.installSocialRoutes(
@@ -581,7 +585,10 @@ class SocialLoginRoutesTest {
             val payload = statePayload("google", "acme", System.currentTimeMillis())
             val response =
                 client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
-                    header("Cookie", "$STATE_COOKIE=${encryptionService.signCookie(UUID.randomUUID().toString())}")
+                    header(
+                        "Cookie",
+                        "${stateCookieName("google")}=${encryptionService.signCookie(UUID.randomUUID().toString())}",
+                    )
                 }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -602,7 +609,7 @@ class SocialLoginRoutesTest {
             val payload = statePayload("google", "acme", System.currentTimeMillis())
             val response =
                 client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}") {
-                    header("Cookie", "$STATE_COOKIE=${payload.split("|")[2]}")
+                    header("Cookie", "${stateCookieName("google")}=${payload.split("|")[2]}")
                 }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
@@ -642,7 +649,7 @@ class SocialLoginRoutesTest {
                 response.headers
                     .getAll("Set-Cookie")
                     .orEmpty()
-                    .firstOrNull { it.startsWith("$STATE_COOKIE=") }
+                    .firstOrNull { it.startsWith("${stateCookieName("google")}=") }
             assertNotNull(cookie, "The redirect must set the binding cookie; without it no callback can bind")
             assertTrue(cookie.contains("HttpOnly"), "Script must not be able to read the binding: $cookie")
             // Lax, not Strict: the callback arrives as a top-level navigation from the IdP, which
@@ -667,7 +674,7 @@ class SocialLoginRoutesTest {
                 response.headers
                     .getAll("Set-Cookie")
                     .orEmpty()
-                    .firstOrNull { it.startsWith("$STATE_COOKIE=") }
+                    .firstOrNull { it.startsWith("${stateCookieName("google")}=") }
             assertNotNull(cleared, "The consumed binding must be cleared, not left for a second callback")
             assertTrue(
                 cleared.contains("Max-Age=0"),
@@ -990,7 +997,10 @@ class SocialLoginRoutesTest {
 
             // A server cannot tell a host-only cookie from one a sibling subdomain set with
             // Domain=; __Host- forbids Domain and browsers enforce it. It costs Path=/.
-            assertTrue(stateCookie.startsWith("__Host-$STATE_COOKIE="), "Expected a __Host- name, got: $stateCookie")
+            assertTrue(
+                stateCookie.startsWith("__Host-${stateCookieName("okta")}="),
+                "Expected a __Host- name, got: $stateCookie",
+            )
             assertTrue(stateCookie.contains("Secure"), "__Host- is dropped without Secure: $stateCookie")
             assertTrue(stateCookie.contains("Path=/;"), "__Host- requires Path=/, got: $stateCookie")
 
@@ -1038,7 +1048,10 @@ class SocialLoginRoutesTest {
 
             // __Host- requires Secure, which http cannot set — a prefixed name here would be
             // dropped by the browser and every callback would fail to bind on `make run`.
-            assertTrue(stateCookie.startsWith("$STATE_COOKIE="), "Expected the bare name, got: $stateCookie")
+            assertTrue(
+                stateCookie.startsWith("${stateCookieName("google")}="),
+                "Expected the bare name, got: $stateCookie",
+            )
             assertFalse(stateCookie.contains("Secure"), "Nothing may set Secure over http: $stateCookie")
         }
 
@@ -1112,6 +1125,67 @@ class SocialLoginRoutesTest {
             assertTrue(
                 page.bodyAsText().contains("You're signing in with Acme Workforce SSO."),
                 "The registration page must name the operator's label, got: ${page.bodyAsText()}",
+            )
+        }
+
+    @Test
+    fun `two sign-ins begun in one browser keep separate bindings`() =
+        testApplication {
+            resetFixtures()
+            idpRepo.seed(TenantId(1), "okta")
+            installSocialRoutes()
+            val browser =
+                createClient {
+                    followRedirects = false
+                    install(HttpCookies)
+                }
+
+            val google = browser.get("/t/acme/auth/social/google/redirect")
+            val okta = browser.get("/t/acme/auth/social/okta/redirect")
+
+            // One name per tenant means the second sign-in overwrites the first, and the first
+            // callback then fails to bind — a user with two tabs open cannot log in.
+            assertTrue(
+                google.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .any { it.startsWith("${stateCookieName("google")}=") },
+            )
+            assertTrue(
+                okta.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .any { it.startsWith("${stateCookieName("okta")}=") },
+            )
+            val completed =
+                browser.get(
+                    "/t/acme/auth/social/google/callback?code=abc&state=${stateFrom(google.headers["Location"]!!)}",
+                )
+            assertFalse(
+                completed.bodyAsText().contains("did not start in this browser"),
+                "The first flow's binding must survive a second flow begun in the same browser",
+            )
+        }
+
+    @Test
+    fun `a refused callback leaves the in-flight binding in place`() =
+        testApplication {
+            resetFixtures()
+            installSocialRoutes()
+
+            // Anyone can mint a state by driving /redirect themselves and feed the resulting
+            // callback URL to a browser mid-login. Clearing on refusal would let that cancel it.
+            val payload = statePayload("google", "acme", System.currentTimeMillis())
+            val response =
+                client.get("/t/acme/auth/social/google/callback?code=abc&state=${signedState(payload)}")
+
+            assertTrue(response.bodyAsText().contains("did not start in this browser"))
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.startsWith("${stateCookieName("google")}=") },
+                "A refused callback must not touch the binding: ${response.headers.getAll("Set-Cookie")}",
             )
         }
 

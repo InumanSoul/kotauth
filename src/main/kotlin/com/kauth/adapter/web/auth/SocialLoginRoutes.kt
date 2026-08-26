@@ -28,6 +28,9 @@ private const val SOCIAL_STATE_MAX_AGE_MS = 300_000L
 
 // Holds the csrfNonce of the state the redirect signed, so the callback can prove the browser
 // presenting that state is the one the flow began in. Same idiom as KOTAUTH_ADMIN_PKCE.
+//
+// The name carries the provider because one name per tenant means the second of two sign-ins
+// begun in one browser overwrites the first, and the first callback then fails to bind.
 private const val SOCIAL_STATE_COOKIE = "KOTAUTH_SOCIAL_STATE"
 
 // The registration leg's half of the flow: the pending profile, and the nonce that binds it to
@@ -113,6 +116,11 @@ private fun socialCookieName(
     secure: Boolean,
 ) = if (secure) "__Host-$base" else base
 
+private fun socialStateCookieName(
+    provider: ProviderKey,
+    secure: Boolean,
+) = socialCookieName("${SOCIAL_STATE_COOKIE}_${provider.value}", secure)
+
 private fun socialCookiePath(
     slug: String,
     secure: Boolean,
@@ -125,10 +133,11 @@ private fun socialCookiePath(
  */
 private fun ApplicationCall.setSocialStateCookie(
     slug: String,
+    provider: ProviderKey,
     value: String,
     secure: Boolean,
 ) = response.cookies.append(
-    name = socialCookieName(SOCIAL_STATE_COOKIE, secure),
+    name = socialStateCookieName(provider, secure),
     value = value,
     maxAge = SOCIAL_STATE_MAX_AGE_MS / 1000,
     httpOnly = true,
@@ -139,9 +148,10 @@ private fun ApplicationCall.setSocialStateCookie(
 
 private fun ApplicationCall.clearSocialStateCookie(
     slug: String,
+    provider: ProviderKey,
     secure: Boolean,
 ) = response.cookies.append(
-    name = socialCookieName(SOCIAL_STATE_COOKIE, secure),
+    name = socialStateCookieName(provider, secure),
     value = "",
     maxAge = 0L,
     httpOnly = true,
@@ -335,7 +345,7 @@ internal fun Route.socialLoginRoutes(
 
         when (val result = socialLoginService.buildRedirectUrl(slug, provider, signedState, baseUrl, binding)) {
             is SocialLoginResult.Success -> {
-                call.setSocialStateCookie(slug, encryptionService.signCookie(csrfNonce), secure)
+                call.setSocialStateCookie(slug, provider, encryptionService.signCookie(csrfNonce), secure)
                 call.respondRedirect(result.value)
             }
             is SocialLoginResult.Failure -> {
@@ -455,10 +465,11 @@ internal fun Route.socialLoginRoutes(
         // flow. Without it a state minted by an attacker, replayed at the victim, signs the victim
         // in as the attacker — every other guard on this path passes on an attacker-minted state.
         val boundNonce =
-            call.request.cookies[socialCookieName(SOCIAL_STATE_COOKIE, secure)]
+            call.request.cookies[socialStateCookieName(provider, secure)]
                 ?.let { encryptionService.verifyCookie(it) }
         if (boundNonce == null || !constantTimeEquals(boundNonce, socialState.csrfNonce)) {
-            call.clearSocialStateCookie(slug, secure)
+            // Deliberately left in place: clearing here lets anyone holding a signed state cancel
+            // an in-flight login of the browser they can reach. The cookie is age-bounded anyway.
             call.respondHtml(
                 HttpStatusCode.BadRequest,
                 AuthView.loginPage(
@@ -472,7 +483,7 @@ internal fun Route.socialLoginRoutes(
             )
             return@get
         }
-        call.clearSocialStateCookie(slug, secure)
+        call.clearSocialStateCookie(slug, provider, secure)
 
         val oauthParamsRaw =
             try {
