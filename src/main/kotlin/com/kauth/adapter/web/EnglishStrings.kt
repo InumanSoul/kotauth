@@ -212,9 +212,23 @@ object EnglishStrings {
     const val IMPERSONATE_CONFIRM =
         "You will be signed into the portal as this user. " +
             "All actions are recorded in the audit log."
-    const val IMPERSONATE_REPLACE_CONFIRM =
-        "You are already impersonating another user. " +
-            "Starting a new session will end that one. Continue?"
+    const val IMPERSONATION_ACTIVE_HEADING = "Impersonation in progress"
+    const val IMPERSONATION_ACTIVE_USER = "Signed in as"
+    const val IMPERSONATION_ACTIVE_SINCE = "Started"
+    const val IMPERSONATION_STOP_BUTTON = "End impersonation"
+    const val IMPERSONATION_STOP_CONFIRM =
+        "End this impersonation session? You return to your own admin session, which was never " +
+            "signed out."
+
+    /**
+     * Names the session that is about to be ended.
+     *
+     * The route has always revoked a prior impersonation before starting a new one, so this is a
+     * description of what happens rather than a question about what should.
+     */
+    fun impersonateReplaceConfirm(currentTarget: String): String =
+        "You are already impersonating $currentTarget. Starting a new session ends that one. Continue?"
+
     const val IMPERSONATE_FAILED_DISABLED = "Cannot impersonate a disabled user."
     const val IMPERSONATE_FAILED_LOCKED = "Cannot impersonate a temporarily locked user."
     const val IMPERSONATE_FAILED_GENERIC = "Could not start impersonation."

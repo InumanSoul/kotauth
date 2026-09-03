@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.SessionId
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
@@ -22,6 +23,7 @@ import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
@@ -32,6 +34,8 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import io.ktor.server.sessions.get
+import io.ktor.server.sessions.sessions
 
 /**
  * Whether the broker created this account on a first sign-in.
@@ -256,6 +260,7 @@ fun Route.adminUserRoutes(
                         passkeys = passkeys,
                         brokeredOrigin = brokeredOrigin,
                         linkedIdentities = socialAccountRepository?.findByUserId(userId).orEmpty(),
+                        activeImpersonation = call.activeImpersonation(sessionRepository, userRepository),
                     ),
                 )
             }
@@ -772,3 +777,27 @@ private fun attributeErrorMessage(result: AttributeResult<*>): String =
         is AttributeResult.LimitReached ->
             "Mapper limit of ${result.max} reached."
     }
+
+/**
+ * The impersonation this admin session currently holds, if any.
+ *
+ * Starting a second one revokes the first, so the page that offers the button needs to know
+ * whether there is anything to revoke before it asks.
+ */
+private fun ApplicationCall.activeImpersonation(
+    sessionRepository: SessionRepository,
+    userRepository: UserRepository?,
+): ActiveImpersonation? {
+    val session = sessions.get<AdminSession>() ?: return null
+    val adminSessionId = session.adminSessionId?.let(::SessionId) ?: return null
+    val running = sessionRepository.findActiveByImpersonator(adminSessionId).firstOrNull() ?: return null
+    val targetUserId = running.userId ?: return null
+    val target = userRepository?.findById(targetUserId, running.tenantId)
+    return ActiveImpersonation(
+        targetUserId = targetUserId.value,
+        targetUsername = target?.username ?: "#${targetUserId.value}",
+        targetWorkspaceSlug = attributes[WorkspaceAttr].slug,
+        sessionId = running.id?.value ?: return null,
+        startedAt = running.createdAt,
+    )
+}

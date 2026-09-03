@@ -103,6 +103,8 @@ fun Route.adminRoutes(
     AdminView.setShellAppInfo(appInfo)
 
     route("/admin") {
+        if (impersonationService != null) adminImpersonationStopRoute(impersonationService)
+
         // ---------------------------------------------------------------
         // Login — OAuth PKCE flow
         // ---------------------------------------------------------------

@@ -14,7 +14,7 @@ object AuthMethodsGridView {
         tenant: Tenant,
     ) {
         div("ov-card") {
-            table("method-table") {
+            table("data-table method-table") {
                 thead {
                     tr {
                         th { +EnglishStrings.AUTH_METHODS_TABLE_COL_METHOD }

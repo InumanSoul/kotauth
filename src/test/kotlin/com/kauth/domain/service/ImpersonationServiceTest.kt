@@ -295,6 +295,71 @@ class ImpersonationServiceTest {
     }
 
     @Test
+    fun `an admin session's running impersonation is discoverable`() {
+        // The page that offers the button has to know whether one is already running: starting
+        // a second revokes the first, and the warning about that was never shown because
+        // nothing could tell.
+        val started =
+            service.startImpersonation(
+                adminUserId = admin.id!!,
+                adminUsername = admin.username,
+                adminSessionId = adminSession.id!!,
+                targetTenantId = customerTenant.id,
+                targetUserId = target.id!!,
+            )
+        assertTrue(started is AdminResult.Success)
+
+        val running = sessions.findActiveByImpersonator(adminSession.id!!)
+
+        assertEquals(1, running.size)
+        assertEquals(target.id, running.single().userId)
+    }
+
+    @Test
+    fun `a stopped impersonation stops being discoverable`() {
+        val started =
+            service.startImpersonation(
+                adminUserId = admin.id!!,
+                adminUsername = admin.username,
+                adminSessionId = adminSession.id!!,
+                targetTenantId = customerTenant.id,
+                targetUserId = target.id!!,
+            )
+        assertTrue(started is AdminResult.Success)
+
+        service.stopImpersonation(
+            adminUserId = admin.id!!,
+            adminSessionId = adminSession.id!!,
+            impersonationSessionId = started.value.impersonationSessionId,
+        )
+
+        assertTrue(
+            sessions.findActiveByImpersonator(adminSession.id!!).isEmpty(),
+            "A revoked impersonation must not still look like one that is running",
+        )
+    }
+
+    @Test
+    fun `another admin session sees nothing of this one's impersonation`() {
+        val otherAdminSession =
+            sessions.save(
+                adminSession.copy(id = null, accessTokenHash = "other-admin-access-token-hash"),
+            )
+        service.startImpersonation(
+            adminUserId = admin.id!!,
+            adminUsername = admin.username,
+            adminSessionId = adminSession.id!!,
+            targetTenantId = customerTenant.id,
+            targetUserId = target.id!!,
+        )
+
+        assertTrue(
+            sessions.findActiveByImpersonator(otherAdminSession.id!!).isEmpty(),
+            "An impersonation belongs to the admin session that started it",
+        )
+    }
+
+    @Test
     fun `stopImpersonation rejects another admin's session id`() {
         val started =
             (

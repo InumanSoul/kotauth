@@ -17,6 +17,22 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+/**
+ * The impersonation this admin session currently holds, if any.
+ *
+ * Starting a second impersonation revokes the first, which the route has always done and the
+ * page could never say, because nothing told it one was running. Tracking it lets the button
+ * warn before it clobbers, and gives the admin somewhere to end a session deliberately rather
+ * than by starting another.
+ */
+data class ActiveImpersonation(
+    val targetUserId: Int,
+    val targetUsername: String,
+    val targetWorkspaceSlug: String,
+    val sessionId: Int,
+    val startedAt: Instant,
+)
+
 /** One row in the user-detail "Recent impersonations" panel. */
 data class ImpersonationRecord(
     val adminUsername: String,
@@ -61,6 +77,7 @@ internal fun userDetailPageImpl(
      */
     brokeredOrigin: Boolean = false,
     linkedIdentities: List<SocialAccount> = emptyList(),
+    activeImpersonation: ActiveImpersonation? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -167,12 +184,21 @@ internal fun userDetailPageImpl(
                                 else -> null
                             }
                         if (impersonateBlockedReason == null) {
+                            val isThisUser = activeImpersonation?.targetUserId == user.id?.value
                             postButton(
                                 action =
                                     "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
                                 label = EnglishStrings.IMPERSONATE_BUTTON,
                                 btnClass = "btn btn--primary",
-                                confirmMessage = EnglishStrings.IMPERSONATE_CONFIRM,
+                                confirmMessage =
+                                    when {
+                                        activeImpersonation == null || isThisUser ->
+                                            EnglishStrings.IMPERSONATE_CONFIRM
+                                        else ->
+                                            EnglishStrings.impersonateReplaceConfirm(
+                                                activeImpersonation.targetUsername,
+                                            )
+                                    },
                             )
                         } else {
                             span("tooltip-wrap") {
@@ -304,6 +330,9 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
+
+            // ── The impersonation running right now ──────────────────
+            activeImpersonation?.let { active -> activeImpersonationCard(active) }
 
             // ── Recent impersonations ────────────────────────────────
             if (recentImpersonations.isNotEmpty()) {
@@ -1177,7 +1206,7 @@ internal fun userAttributeFormPageImpl(
         val isEdit = existingKey != null
 
         adminShell(
-            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} — ${user.username}",
+            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} · ${user.username}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -1321,6 +1350,40 @@ private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
             div("ov-card__row--stacked") {
                 span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_HINT }
             }
+        }
+    }
+}
+
+
+/**
+ * The impersonation this admin session is holding, wherever they are in the console.
+ *
+ * Without it the only way to notice one was running was to start another and watch the first
+ * disappear, which is the case the standing warning was written for and never wired to.
+ */
+private fun FlowContent.activeImpersonationCard(active: ActiveImpersonation) {
+    div("ov-card") {
+        div("ov-card__section-label") { +EnglishStrings.IMPERSONATION_ACTIVE_HEADING }
+        div("ov-card__row") {
+            span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_USER }
+            span("ov-card__value") {
+                a(
+                    href = "/admin/workspaces/${active.targetWorkspaceSlug}/users/${active.targetUserId}",
+                    classes = "data-table__id",
+                ) { +active.targetUsername }
+            }
+        }
+        div("ov-card__row") {
+            span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_SINCE }
+            span("ov-card__value ov-card__value--muted") { +active.startedAt.toDisplayString() }
+        }
+        div("ov-card__actions") {
+            postButton(
+                action = "/admin/impersonation/${active.sessionId}/stop",
+                label = EnglishStrings.IMPERSONATION_STOP_BUTTON,
+                btnClass = "btn btn--danger btn--sm",
+                confirmMessage = EnglishStrings.IMPERSONATION_STOP_CONFIRM,
+            )
         }
     }
 }

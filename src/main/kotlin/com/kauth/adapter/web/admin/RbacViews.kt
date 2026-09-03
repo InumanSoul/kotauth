@@ -403,7 +403,7 @@ internal fun roleDetailPageImpl(
                                             classes = "data-table__name",
                                         ) { +u.username }
                                     }
-                                    td { +u.email }
+                                    td { span("data-table__email") { +u.email } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/roles/${role.id?.value}/unassign-user",
@@ -842,7 +842,14 @@ internal fun groupDetailPageImpl(
                         tbody {
                             members.forEach { u ->
                                 tr {
-                                    td { span("data-table__name") { +u.username } }
+                                    // Every other table reaches the user record from the
+                                    // username; this one alone left it inert.
+                                    td {
+                                        a(
+                                            href = "/admin/workspaces/$slug/users/${u.id?.value}",
+                                            classes = "data-table__name",
+                                        ) { +u.username }
+                                    }
                                     td { span("data-table__email") { +u.email } }
                                     td {
                                         form(

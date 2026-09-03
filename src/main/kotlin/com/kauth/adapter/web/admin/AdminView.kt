@@ -204,6 +204,7 @@ object AdminView {
         passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
         brokeredOrigin: Boolean = false,
         linkedIdentities: List<com.kauth.domain.model.SocialAccount> = emptyList(),
+        activeImpersonation: ActiveImpersonation? = null,
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -224,6 +225,7 @@ object AdminView {
             passkeys,
             brokeredOrigin,
             linkedIdentities = linkedIdentities,
+            activeImpersonation = activeImpersonation,
         )
 
     fun userAttributeFormPage(
