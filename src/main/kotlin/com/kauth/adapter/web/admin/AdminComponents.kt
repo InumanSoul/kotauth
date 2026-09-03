@@ -135,8 +135,32 @@ fun DIV.ovRowMuted(
     }
 }
 
+/**
+ * A full-width prose row inside an ov-card.
+ *
+ * The label-value row is a 152px grid. Passing it an empty label to carry a sentence left that
+ * column blank on every such row, so a card of explanation read as a ragged gutter beside a
+ * column of text rather than as prose.
+ */
+fun FlowContent.ovProse(text: String) {
+    div("ov-card__row--stacked") {
+        span("ov-card__value--muted") { +text }
+    }
+}
+
+/** A prose row that keeps its lead-in, for a definition rather than a bare sentence. */
+fun FlowContent.ovProseTerm(
+    term: String,
+    text: String,
+) {
+    div("ov-card__row--stacked") {
+        span("ov-card__prose-term") { +term }
+        span("ov-card__value--muted") { +text }
+    }
+}
+
 /** Section label divider row inside an ov-card. */
-fun DIV.ovSectionLabel(label: String) {
+fun FlowContent.ovSectionLabel(label: String) {
     div("ov-card__section-label") { +label }
 }
 
@@ -170,7 +194,7 @@ fun FlowOrInteractiveOrPhrasingContent.copyBtn(textToCopy: String) {
 }
 
 /** Notice banner (amber warning by default). Pass modifier e.g. "notice--info" for semantic variants. */
-fun DIV.notice(
+fun FlowContent.notice(
     title: String,
     description: String,
     modifier: String? = null,
@@ -201,7 +225,7 @@ fun DIV.notice(
  * text. That renders without the icon slot and leaves the text unclassed, so it takes
  * the page's default colour rather than the notice's semantic one.
  */
-fun DIV.notice(
+fun FlowContent.notice(
     modifier: String? = null,
     iconName: String? = "warning",
     body: DIV.() -> Unit,
@@ -213,7 +237,7 @@ fun DIV.notice(
 }
 
 /** Single-message error banner — the shape most call sites were building by hand. */
-fun DIV.errorNotice(message: String) {
+fun FlowContent.errorNotice(message: String) {
     notice(modifier = "notice--error") {
         span("notice__title") { +message }
     }

@@ -223,6 +223,24 @@
 
 .disclosure { border-top: 0.5px solid var(--color-border); }
 
+/* When the disclosure IS the card, the card already draws the border. */
+.ov-card.disclosure { border-top: 0.5px solid var(--color-border-md); }
+
+.ov-card.disclosure > summary {
+  /* The section-label class it shares brings justify-content: space-between, which pushed
+   * the heading away from its own disclosure marker. */
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  letter-spacing: var(--tracking-tight);
+  border-bottom: 0.5px solid var(--color-border-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ov-card.disclosure:not([open]) > summary { border-bottom: none; }
+
 .disclosure > summary {
   padding: var(--space-3) var(--space-4);
   font-size: 12px;

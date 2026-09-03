@@ -147,3 +147,13 @@ form+.ov-card { margin-top: var(--space-5); }
   gap: var(--space-2);
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* The lead-in of a prose row: names what the sentence below it is about, without
+ * borrowing the label column that a value row uses. */
+.ov-card__prose-term {
+  display: block;
+  font-size: 12px;
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  margin-bottom: var(--space-1);
+}

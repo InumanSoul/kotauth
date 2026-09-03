@@ -58,14 +58,13 @@ internal fun scimProvisioningPageImpl(
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_ENDPOINT_HEADING)
                 ovRowMono(EnglishStrings.SCIM_ENDPOINT_LABEL, endpointUrl, copyable = true)
-                ovRowMuted("", EnglishStrings.SCIM_ENDPOINT_HINT)
+                ovProse(EnglishStrings.SCIM_ENDPOINT_HINT)
             }
 
             // ── Status ───────────────────────────────────────────────
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_STATUS_HEADING)
-                ovRowMuted(
-                    "",
+                ovProse(
                     when {
                         scimKeys.isEmpty() -> EnglishStrings.SCIM_STATUS_NO_KEY
                         // The table below lists these keys with a Revoked badge, so "no such key"
@@ -79,7 +78,7 @@ internal fun scimProvisioningPageImpl(
             // ── Token / keys ─────────────────────────────────────────
             ovCard {
                 ovSectionLabel(EnglishStrings.SCIM_TOKEN_HEADING)
-                ovRowMuted("", EnglishStrings.SCIM_TOKEN_HINT)
+                ovProse(EnglishStrings.SCIM_TOKEN_HINT)
                 if (scimKeys.isEmpty()) {
                     emptyState(
                         iconName = "key",
@@ -107,26 +106,27 @@ internal fun scimProvisioningPageImpl(
             }
 
             // ── Behaviour ────────────────────────────────────────────
-            ovCard {
-                ovSectionLabel(EnglishStrings.SCIM_BEHAVIOUR_HEADING)
+            details("ov-card disclosure") {
+                summary("ov-card__section-label") { +EnglishStrings.SCIM_BEHAVIOUR_HEADING }
                 notice(
                     title = EnglishStrings.SCIM_DEPROVISION_HEADING,
                     description = EnglishStrings.SCIM_DELETE_DEACTIVATES,
                     modifier = "notice--info",
                     iconName = "info",
                 )
-                ovRowMuted("", EnglishStrings.SCIM_BEHAVIOUR_GROUPS)
-                ovRowMuted("", EnglishStrings.SCIM_DELETE_GROUP_PERMANENT)
+                ovProse(EnglishStrings.SCIM_BEHAVIOUR_GROUPS)
+                ovProse(EnglishStrings.SCIM_DELETE_GROUP_PERMANENT)
             }
 
             // ── Per-provider notes ───────────────────────────────────
-            ovCard {
-                ovSectionLabel(EnglishStrings.SCIM_NOTES_HEADING)
-                ovRowMuted("", EnglishStrings.SCIM_NOTES_INTRO)
-                // Only the first note of each dialect carries the label, so the rows read as one block.
+            details("ov-card disclosure") {
+                summary("ov-card__section-label") { +EnglishStrings.SCIM_NOTES_HEADING }
+                ovProse(EnglishStrings.SCIM_NOTES_INTRO)
+                // Each dialect keeps its own name. Dropping the name from every note but the
+                // first ran the dialects together into one undifferentiated block of text.
                 scimDialects.forEach { dialect ->
                     dialect.setupNotes.forEachIndexed { index, note ->
-                        ovRowMuted(if (index == 0) dialect.label else "", note)
+                        if (index == 0) ovProseTerm(dialect.label, note) else ovProse(note)
                     }
                 }
             }
