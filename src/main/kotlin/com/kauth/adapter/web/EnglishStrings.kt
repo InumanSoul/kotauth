@@ -1014,6 +1014,9 @@ object EnglishStrings {
     const val IDP_ADD_BUTTON = "Add provider"
     const val IDP_SAVE_BUTTON = "Save provider"
     const val IDP_DELETE_BUTTON = "Delete provider"
+    const val IDP_DELETE_CONFIRM =
+        "Delete this identity provider? Anyone who signs in through it loses that route immediately, " +
+            "and accounts already linked to it keep the link but cannot use it."
     const val IDP_ENABLE_LABEL = "Enable"
     const val IDP_CALLBACK_HINT = "Register this callback URL with the issuer:"
     const val IDP_KEY_LABEL = "Provider key"
@@ -1028,7 +1031,6 @@ object EnglishStrings {
         "That is not a provider key \u2014 use 1\u201332 characters of a\u2013z, 0\u20139 and '-'."
     const val IDP_KIND_LABEL = "Protocol"
     const val IDP_KIND_OIDC = "OpenID Connect"
-    const val IDP_KIND_OAUTH2 = "OAuth2 (built-in)"
     const val IDP_KIND_HINT =
         "Google and GitHub use their built-in OAuth2 adapters. Every other key is brokered over OIDC."
     const val IDP_DISPLAY_NAME_LABEL = "Display name"

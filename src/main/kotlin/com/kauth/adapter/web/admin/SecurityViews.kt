@@ -476,20 +476,8 @@ private fun FlowContent.oidcProviderCard(
             div("edit-row") {
                 span("edit-row__label") { +EnglishStrings.IDP_KIND_LABEL }
                 div {
-                    select {
-                        classes = setOf("edit-row__field")
-                        name = "kind"
-                        for (kind in ProviderKind.entries) {
-                            option {
-                                value = kind.value
-                                if ((existing?.kind ?: ProviderKind.OIDC) == kind) selected = true
-                                +when (kind) {
-                                    ProviderKind.OIDC -> EnglishStrings.IDP_KIND_OIDC
-                                    ProviderKind.OAUTH2 -> EnglishStrings.IDP_KIND_OAUTH2
-                                }
-                            }
-                        }
-                    }
+                    hiddenInput(name = "kind") { value = ProviderKind.OIDC.value }
+                    span("ov-card__value") { +EnglishStrings.IDP_KIND_OIDC }
                     div("edit-row__hint") { +EnglishStrings.IDP_KIND_HINT }
                 }
             }
@@ -608,6 +596,7 @@ private fun FlowContent.oidcProviderCard(
                 div("edit-actions") {
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--danger", "btn--sm")
+                        attributes["data-confirm"] = EnglishStrings.IDP_DELETE_CONFIRM
                         +EnglishStrings.IDP_DELETE_BUTTON
                     }
                 }

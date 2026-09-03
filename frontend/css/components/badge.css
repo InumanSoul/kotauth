@@ -10,6 +10,7 @@
  *   .badge--public        — public access type (muted)
  *   .badge--confidential  — confidential access type (accent)
  *   .badge--id            — monospace identifier chip (accent)
+ *   .badge--muted         — neutral label chip (scopes, grant types)
  *
  * Legacy variants (kept for backward compat with AdminView.kt):
  *   .badge-green / .badge-active   — success
@@ -94,6 +95,12 @@
   background: var(--color-amber-bg);
   color: var(--color-amber);
   border-color: var(--color-amber-border);
+}
+
+.badge--muted {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-muted);
+  border-color: var(--color-border-md);
 }
 
 .badge--danger {

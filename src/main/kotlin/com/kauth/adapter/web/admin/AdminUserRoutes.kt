@@ -69,7 +69,7 @@ fun Route.adminUserRoutes(
                 call.request.queryParameters["q"]
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
-            val pageSize = 25
+            val pageSize = DEFAULT_USER_PAGE_SIZE
             val totalCount = adminUserService.countUsers(ctx.workspace.id, search)
             val totalPages = ((totalCount + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
             val page =
@@ -91,6 +91,7 @@ fun Route.adminUserRoutes(
                     page = page,
                     totalPages = totalPages,
                     totalCount = totalCount,
+                    pageSize = pageSize,
                 ),
             )
         }

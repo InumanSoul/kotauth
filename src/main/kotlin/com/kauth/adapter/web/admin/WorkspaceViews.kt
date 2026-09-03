@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -26,6 +27,7 @@ internal fun workspaceDetailPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     apps: List<Application> = emptyList(),
     loggedInAs: String,
+    identityProviders: List<IdentityProvider> = emptyList(),
 ): HTML.() -> Unit =
     {
         val appPairs = apps.map { it.clientId to it.name }
@@ -137,8 +139,29 @@ internal fun workspaceDetailPageImpl(
                     classes = "insight-item",
                 ) {
                     span("insight-item__label") { +"Identity Providers" }
-                    span("insight-item__value insight-item__value--muted") { +"None" }
-                    span("insight-item__hint") { +"Password auth only" }
+                    val enabledProviders = identityProviders.filter { it.enabled }
+                    when {
+                        identityProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--muted") { +"None" }
+                            span("insight-item__hint") { +"Password auth only" }
+                        }
+                        enabledProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--warn") {
+                                +"${identityProviders.size} configured"
+                            }
+                            span("insight-item__hint") { +"None enabled \u2014 password auth only" }
+                        }
+                        else -> {
+                            span("insight-item__value insight-item__value--ok") {
+                                +"${enabledProviders.size} enabled"
+                            }
+                            span("insight-item__hint") {
+                                +enabledProviders.joinToString(" \u00b7 ") { provider ->
+                                    provider.displayName?.takeIf { it.isNotBlank() } ?: provider.provider.value
+                                }
+                            }
+                        }
+                    }
                     span("insight-item__arrow") {
                         +"Add provider"
                         inlineSvgIcon("arrow-small", "arrow")
@@ -961,7 +984,7 @@ internal fun brandingPageImpl(
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
-                                        classes = setOf("preset-btn", "preset-btn--active")
+                                        classes = setOf("preset-btn")
                                         attributes["data-preset"] = "dark"
                                         +"Dark"
                                     }

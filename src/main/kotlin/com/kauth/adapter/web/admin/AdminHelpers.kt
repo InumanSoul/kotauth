@@ -8,6 +8,9 @@ import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
 import io.ktor.util.AttributeKey
 
+/** Rows per page in the admin user list. Shared by the route that slices and the view that labels. */
+internal const val DEFAULT_USER_PAGE_SIZE = 25
+
 /** Resolved workspace for the current `/{slug}` admin route. */
 internal val WorkspaceAttr = AttributeKey<Tenant>("Workspace")
 
@@ -68,3 +71,19 @@ fun ApplicationCall.resolvedBaseUrl(): String =
         val omitPort = (it.scheme == "https" && it.serverPort == 443) || (it.scheme == "http" && it.serverPort == 80)
         if (omitPort) "${it.scheme}://${it.serverHost}" else "${it.scheme}://${it.serverHost}:${it.serverPort}"
     }
+
+/**
+ * Escapes [literal] for use in an HTML5 `pattern` attribute.
+ *
+ * `pattern` is compiled as an ECMAScript RegExp. `java.util.regex.Pattern.quote` emits
+ * the Java-only `\Q…\E` form, which ECMAScript cannot compile — and a `pattern` that
+ * fails to compile is dropped entirely, silently removing the constraint. Escaping each
+ * metacharacter individually keeps the attribute valid in both engines.
+ */
+internal fun escapeForHtmlPattern(literal: String): String =
+    literal
+        .map { character ->
+            if (character in ECMASCRIPT_REGEX_METACHARACTERS) "\\$character" else "$character"
+        }.joinToString("")
+
+private const val ECMASCRIPT_REGEX_METACHARACTERS = "^$\\.*+?()[]{}|/-"

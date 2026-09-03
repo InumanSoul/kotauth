@@ -10,6 +10,7 @@ import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebAuthnCredential
+import io.ktor.http.encodeURLParameter
 import kotlinx.html.*
 import java.time.Instant
 import java.time.ZoneOffset
@@ -722,6 +723,7 @@ internal fun userListPageImpl(
     page: Int = 1,
     totalPages: Int = 1,
     totalCount: Long = 0,
+    pageSize: Int = DEFAULT_USER_PAGE_SIZE,
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -787,14 +789,14 @@ internal fun userListPageImpl(
                     val suffix = if (totalCount != 1L) "s" else ""
                     if (search != null) {
                         if (totalPages > 1) {
-                            val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                            val start = (page - 1) * pageSize + 1
                             val end = start + users.size - 1
                             +"Showing $start\u2013$end of $totalCount result$suffix for \u201c$search\u201d"
                         } else {
                             +"$totalCount result$suffix for \u201c$search\u201d"
                         }
                     } else if (totalPages > 1) {
-                        val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                        val start = (page - 1) * pageSize + 1
                         val end = start + users.size - 1
                         +"Showing $start\u2013$end of $totalCount user$suffix"
                     } else {
@@ -888,7 +890,7 @@ internal fun userListPageImpl(
                     currentPage = page,
                     totalPages = totalPages,
                     baseUrl = "/admin/workspaces/${workspace.slug}/users" +
-                        if (search != null) "?q=$search&" else "?",
+                        if (search != null) "?q=${search.encodeURLParameter()}&" else "?",
                     htmxTarget = "#user-list-content",
                 )
             }

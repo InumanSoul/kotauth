@@ -379,8 +379,18 @@ internal fun applicationDetailPageImpl(
                 div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
                 div("danger-zone") {
                     dangerZoneCard(
-                        title = "Disable this application",
-                        description = "All login attempts will be rejected. This can be reversed at any time.",
+                        title =
+                            if (application.enabled) {
+                                "Disable this application"
+                            } else {
+                                "Enable this application"
+                            },
+                        description =
+                            if (application.enabled) {
+                                "All login attempts will be rejected. This can be reversed at any time."
+                            } else {
+                                "Login attempts are being rejected. Enabling accepts them again."
+                            },
                     ) {
                         postButton(
                             action = "/admin/workspaces/${workspace.slug}/applications/${application.clientId}/toggle",

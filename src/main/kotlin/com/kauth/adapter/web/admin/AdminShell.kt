@@ -88,7 +88,7 @@ internal fun HTML.adminShell(
     workspaceName: String = "KotAuth",
     workspaceSlug: String? = null,
     workspaceLogoUrl: String? = null,
-    apps: List<Pair<String, String>> = emptyList(),
+    apps: List<Pair<String, String>>? = null,
     activeAppSlug: String? = null,
     activeAppSection: String = "overview",
     loggedInAs: String,
@@ -354,14 +354,19 @@ private fun DIV.ctxLink(
 
 internal fun DIV.renderAppsCtxPanel(
     workspaceSlug: String?,
-    apps: List<Pair<String, String>>,
+    apps: List<Pair<String, String>>?,
     activeAppSlug: String?,
     activeAppSection: String = "",
 ) {
     span("sidebar__heading") { +"Applications" }
-    if (apps.isEmpty()) {
+    if (apps == null) {
+        // This page did not load the application list, so it cannot say whether any exist.
+        a("/admin/workspaces/$workspaceSlug", classes = "sidebar__item") {
+            span { +"View applications" }
+        }
+    } else if (apps.isEmpty()) {
         div("ctx-empty") {
-            div("ctx-empty-icon") { +"⊡" }
+            div("ctx-empty-icon") { inlineSvgIcon("rail-apps", "Applications") }
             p("ctx-empty-text") { +"No applications yet." }
             a("/admin/workspaces/$workspaceSlug/applications/new", classes = "ctx-empty-action") {
                 +"+ Create one"

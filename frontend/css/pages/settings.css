@@ -153,6 +153,13 @@
   font-size: 11px;
 }
 
+/* Meta cell that carries a trailing .inline-help icon. */
+.key-table__meta--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 /* ── Auth Methods grid (v1.20.1) ── */
 .method-table { width: 100%; border-collapse: collapse; }
 .method-table th,

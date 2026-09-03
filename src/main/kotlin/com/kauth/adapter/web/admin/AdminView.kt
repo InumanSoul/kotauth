@@ -71,7 +71,9 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         apps: List<Application> = emptyList(),
         loggedInAs: String,
-    ): HTML.() -> Unit = workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs)
+        identityProviders: List<IdentityProvider> = emptyList(),
+    ): HTML.() -> Unit =
+        workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs, identityProviders)
 
     fun workspaceSettingsPage(
         workspace: Tenant,
@@ -171,8 +173,9 @@ object AdminView {
         page: Int = 1,
         totalPages: Int = 1,
         totalCount: Long = 0,
+        pageSize: Int = DEFAULT_USER_PAGE_SIZE,
     ): HTML.() -> Unit =
-        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount)
+        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount, pageSize)
 
     fun createUserPage(
         workspace: Tenant,

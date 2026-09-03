@@ -30,7 +30,8 @@ class PostgresIdentityProviderRepository(
                 .where {
                     (IdentityProvidersTable.tenantId eq tenantId.value) and
                         (IdentityProvidersTable.enabled eq true)
-                }.mapNotNull { it.toIdentityProvider() }
+                }.orderBy(IdentityProvidersTable.provider to SortOrder.ASC)
+                .mapNotNull { it.toIdentityProvider() }
         }
 
     override fun findAllByTenant(tenantId: TenantId): List<IdentityProvider> =
@@ -38,6 +39,7 @@ class PostgresIdentityProviderRepository(
             IdentityProvidersTable
                 .selectAll()
                 .where { IdentityProvidersTable.tenantId eq tenantId.value }
+                .orderBy(IdentityProvidersTable.provider to SortOrder.ASC)
                 .mapNotNull { it.toIdentityProvider() }
         }
 

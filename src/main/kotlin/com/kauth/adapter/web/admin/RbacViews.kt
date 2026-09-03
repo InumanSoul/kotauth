@@ -847,7 +847,7 @@ internal fun groupDetailPageImpl(
                             members.forEach { u ->
                                 tr {
                                     td { span("data-table__name") { +u.username } }
-                                    td { span("data-table__meta") { +u.email } }
+                                    td { span("data-table__email") { +u.email } }
                                     td {
                                         form(
                                             action = "/admin/workspaces/$slug/groups/${group.id?.value}/remove-member",

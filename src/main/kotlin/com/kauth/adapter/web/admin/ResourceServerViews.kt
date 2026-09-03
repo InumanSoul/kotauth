@@ -410,7 +410,7 @@ internal fun resourceServerFormPageImpl(
                                 ) {
                                     input(type = InputType.text, name = "confirmIdentifier") {
                                         classes = setOf("edit-row__field", "edit-row__field--mono")
-                                        attributes["pattern"] = java.util.regex.Pattern.quote(prefill.identifier)
+                                        attributes["pattern"] = escapeForHtmlPattern(prefill.identifier)
                                         attributes["required"] = "required"
                                         attributes["autocomplete"] = "off"
                                         attributes["data-confirm-slug"] = prefill.identifier

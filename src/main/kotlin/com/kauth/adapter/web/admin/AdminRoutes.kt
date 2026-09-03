@@ -495,9 +495,16 @@ fun Route.adminRoutes(
                     val workspace = call.attributes[WorkspaceAttr]
                     val wsPairs = call.attributes[WsPairsAttr]
                     val apps = applicationRepository.findByTenantId(workspace.id)
+                    val providers = identityProviderRepository?.findAllByTenant(workspace.id).orEmpty()
                     call.respondHtml(
                         HttpStatusCode.OK,
-                        AdminView.workspaceDetailPage(workspace, wsPairs, apps, session.username),
+                        AdminView.workspaceDetailPage(
+                            workspace,
+                            wsPairs,
+                            apps,
+                            session.username,
+                            identityProviders = providers,
+                        ),
                     )
                 }
 
