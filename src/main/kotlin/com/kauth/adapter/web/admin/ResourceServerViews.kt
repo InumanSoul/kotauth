@@ -16,7 +16,7 @@ internal fun resourceServersListPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "${EnglishStrings.API_PAGE_TITLE} — ${workspace.displayName}",
+            pageTitle = "${EnglishStrings.API_PAGE_TITLE} · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -24,7 +24,6 @@ internal fun resourceServersListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "apis",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -78,7 +77,7 @@ internal fun resourceServersListPageImpl(
                                             }
                                         }
                                         td {
-                            span("data-table__id") { +rs.identifier }
+                            span("data-table__meta") { +rs.identifier }
                             if (rs.scopes.isNotEmpty()) {
                                 div("badge-row") {
                                     rs.scopes.take(5).forEach {
@@ -88,6 +87,10 @@ internal fun resourceServersListPageImpl(
                                         span("badge badge--muted") { +"+${rs.scopes.size - 5}" }
                                     }
                                 }
+                            } else {
+                                // An empty list is not "not configured yet" here: it is narrowing
+                                // switched off, which is the permissive state and worth saying.
+                                div("data-table__meta") { +EnglishStrings.RESOURCE_SERVER_SCOPES_NONE }
                             }
                         }
                                         td {
@@ -130,7 +133,7 @@ internal fun clientAuthorizedApisPageImpl(
         val slug = workspace.slug
         val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
-            pageTitle = "${EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING} — ${application.name}",
+            pageTitle = "${EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING} · ${application.name}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -140,7 +143,6 @@ internal fun clientAuthorizedApisPageImpl(
             activeAppSlug = application.clientId,
             loggedInAs = loggedInAs,
             activeAppSection = "applications",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -266,7 +268,7 @@ internal fun resourceServerFormPageImpl(
             }
 
         adminShell(
-            pageTitle = "$title — ${workspace.displayName}",
+            pageTitle = "$title · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -274,7 +276,6 @@ internal fun resourceServerFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "apis",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(

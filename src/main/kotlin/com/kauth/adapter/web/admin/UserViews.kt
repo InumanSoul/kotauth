@@ -64,7 +64,7 @@ internal fun userDetailPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "${user.username} — ${workspace.displayName}",
+            pageTitle = "${user.username} · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -72,7 +72,6 @@ internal fun userDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = successMessage,
         ) {
             div("content-inner") {
@@ -202,7 +201,7 @@ internal fun userDetailPageImpl(
                 notice(modifier = "notice--success", iconName = "check-circle") {
                     div("notice__title") { +"Temporary change-password link generated" }
                     div("notice__desc") {
-                        +"Copy it now — it's valid for 24 hours and will be displayed only once."
+                        +"Copy it now. It is valid for 24 hours and will be displayed only once."
                     }
                     div("copy-field") {
                         span("copy-field__value") { +tempPasswordLink }
@@ -676,7 +675,7 @@ private fun FlowContent.readOnlyBadgesRow(
                 }
             }
             div("edit-row__hint") {
-                +"Managed elsewhere — "
+                +"Managed elsewhere. "
                 a(href = manageUrl) { +"manage ${label.lowercase()}" }
             }
         }
@@ -723,7 +722,7 @@ internal fun userListPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Users — ${workspace.displayName}",
+            pageTitle = "Users · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -731,7 +730,6 @@ internal fun userListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -904,7 +902,7 @@ internal fun createUserPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New User — ${workspace.displayName}",
+            pageTitle = "New User · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -912,7 +910,6 @@ internal fun createUserPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -1117,7 +1114,7 @@ private fun FlowContent.userAttributesSection(
                         .forEach { (key, value) ->
                             tr {
                                 td {
-                                    span("data-table__id") { +key }
+                                    span("data-table__meta") { +key }
                                     val claimName = mappedKeys[key]
                                     if (claimName != null) {
                                         div {
@@ -1188,7 +1185,6 @@ internal fun userAttributeFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "users",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(

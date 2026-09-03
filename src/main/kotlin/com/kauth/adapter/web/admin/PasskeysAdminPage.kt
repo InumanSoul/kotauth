@@ -20,7 +20,7 @@ internal fun HTML.passkeysAdminPage(
     val signInMethodsUrl = "/admin/workspaces/$slug/settings/sign-in-methods"
 
     adminShell(
-        pageTitle = "${EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE} — ${workspace.displayName}",
+        pageTitle = "${EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE} · ${workspace.displayName}",
         activeRail = "security",
         activeAppSection = "passkeys",
         allWorkspaces = allWorkspaces,
@@ -28,7 +28,6 @@ internal fun HTML.passkeysAdminPage(
         workspaceSlug = slug,
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
-        contentClass = "content-outer",
     ) {
         div("content-inner") {
             breadcrumb(

@@ -21,7 +21,7 @@ internal fun smtpSettingsPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "SMTP — ${workspace.displayName}",
+            pageTitle = "SMTP · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -29,7 +29,6 @@ internal fun smtpSettingsPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
-            contentClass = "content-outer",
             toastMessage = when (savedParam) {
                 "true" -> EnglishStrings.TOAST_SMTP_SAVED
                 "test_sent" -> "Test email sent successfully."

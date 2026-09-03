@@ -14,13 +14,12 @@ object AuthMethodsGridView {
         tenant: Tenant,
     ) {
         div("ov-card") {
-            div("ov-card__section-label") { +EnglishStrings.AUTH_METHODS_TABLE_HEADING }
             table("method-table") {
                 thead {
                     tr {
                         th { +EnglishStrings.AUTH_METHODS_TABLE_COL_METHOD }
                         th { +EnglishStrings.AUTH_METHODS_TABLE_COL_ENABLED }
-                        th { +EnglishStrings.AUTH_METHODS_TABLE_COL_NOTES }
+                        th { +"" }
                     }
                 }
                 tbody {
@@ -70,30 +69,31 @@ object AuthMethodsGridView {
                         checked = row.enabled
                     }
                 } else {
-                    val hasSmtpReq = row.requirements.any { it is Requirement.SmtpRequired }
-                    if (hasSmtpReq) {
+                    // One requirement, stated once, in the cell where the control would be.
+                    // It used to appear here and again as a badge in the next column.
+                    row.requirements.firstOrNull()?.let { requirement ->
                         span("row-locked") {
-                            +EnglishStrings.REQUIREMENT_SMTP_REQUIRED
-                            +" — "
-                            a(href = "/admin/workspaces/$tenantSlug/settings/smtp") {
-                                +EnglishStrings.REQUIREMENT_SMTP_LINK
+                            when (requirement) {
+                                is Requirement.SmtpRequired -> {
+                                    +EnglishStrings.REQUIREMENT_SMTP_REQUIRED
+                                    +". "
+                                    a(href = "/admin/workspaces/$tenantSlug/settings/smtp") {
+                                        +EnglishStrings.REQUIREMENT_SMTP_LINK
+                                    }
+                                }
+                                is Requirement.OAuthCredentialsRequired -> {
+                                    +EnglishStrings.REQUIREMENT_OAUTH_CREDENTIALS_REQUIRED
+                                    +". "
+                                    a(href = identityProvidersHref(tenantSlug)) {
+                                        +EnglishStrings.REQUIREMENT_OAUTH_LINK
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-            td("method-table__notes") {
-                row.requirements.forEach { req ->
-                    span("badge badge--info") {
-                        when (req) {
-                            is Requirement.SmtpRequired ->
-                                +EnglishStrings.REQUIREMENT_SMTP_REQUIRED
-                            is Requirement.OAuthCredentialsRequired ->
-                                +EnglishStrings.REQUIREMENT_OAUTH_CREDENTIALS_REQUIRED
-                        }
-                    }
-                }
-            }
+            td("method-table__notes") {}
         }
     }
 

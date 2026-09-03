@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.AccessType
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
 
@@ -215,6 +216,32 @@ fun DIV.notice(
 fun DIV.errorNotice(message: String) {
     notice(modifier = "notice--error") {
         span("notice__title") { +message }
+    }
+}
+
+/**
+ * An application's access type, as plain text.
+ *
+ * It was a badge on three surfaces, two of which hardcoded the "public" modifier, so a
+ * confidential application rendered the confidential word in the public colour. A type does not
+ * vary per row the way a state does, and badging it spent the reader's attention on the column
+ * that never changes.
+ */
+fun FlowContent.accessTypeLabel(accessType: AccessType) {
+    span("data-table__meta") { +accessType.label }
+}
+
+/**
+ * An application's enabled state.
+ *
+ * Only the exception is badged. A table where every row shouted ACTIVE in green spent its
+ * loudest treatment on its least surprising fact.
+ */
+fun FlowContent.applicationStatus(enabled: Boolean) {
+    if (enabled) {
+        span("data-table__meta") { +"Active" }
+    } else {
+        span("badge badge--warn") { +"Disabled" }
     }
 }
 

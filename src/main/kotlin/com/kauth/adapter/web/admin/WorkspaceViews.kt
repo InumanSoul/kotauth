@@ -40,7 +40,6 @@ internal fun workspaceDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -229,24 +228,8 @@ internal fun workspaceDetailPageImpl(
                                         ) { +app.clientId }
                                     }
                                     td { span("data-table__name") { +app.name } }
-                                    td {
-                                        span("badge badge--public") {
-                                            +app.accessType.label.uppercase()
-                                        }
-                                    }
-                                    td {
-                                        if (app.enabled) {
-                                            span("badge badge--active") {
-                                                span("badge__dot") {}
-                                                +"ACTIVE"
-                                            }
-                                        } else {
-                                            span("badge badge--inactive") {
-                                                span("badge__dot") {}
-                                                +"DISABLED"
-                                            }
-                                        }
-                                    }
+                                    td { accessTypeLabel(app.accessType) }
+                                    td { applicationStatus(app.enabled) }
                                     td {
                                         div("data-table__actions") {
                                             a(
@@ -307,7 +290,6 @@ internal fun createWorkspacePageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner content-inner--wide") {
             breadcrumb(
@@ -440,7 +422,7 @@ internal fun workspaceSettingsPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "General Settings — ${workspace.displayName}",
+            pageTitle = "General Settings · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "general",
             allWorkspaces = allWorkspaces,
@@ -448,7 +430,6 @@ internal fun workspaceSettingsPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
         ) {
             div("content-inner") {
@@ -608,7 +589,7 @@ internal fun securityPolicyPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Security Policy — ${workspace.displayName}",
+            pageTitle = "Security Policy · ${workspace.displayName}",
             activeRail = "security",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
@@ -616,7 +597,6 @@ internal fun securityPolicyPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
         ) {
             div("content-inner") {
@@ -842,7 +822,7 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") {
                                 +"Checks new passwords against the Have I Been Pwned breach corpus "
                                 +"using k-Anonymity (only the first 5 chars of the SHA-1 hash leave "
-                                +"the server). Fails open if HIBP is unreachable — registrations "
+                                +"the server). Fails open if HIBP is unreachable, so registrations "
                                 +"will not be blocked by outages."
                             }
                         }
@@ -865,7 +845,7 @@ internal fun brandingPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Branding — ${workspace.displayName}",
+            pageTitle = "Branding · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "branding",
             allWorkspaces = allWorkspaces,
@@ -873,7 +853,6 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,
         ) {
             div("content-inner content-inner--wide") {

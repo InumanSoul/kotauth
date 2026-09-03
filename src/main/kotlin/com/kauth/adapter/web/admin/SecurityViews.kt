@@ -39,7 +39,7 @@ internal fun mfaSettingsPageImpl(
         val securityPolicyUrl = "/admin/workspaces/${workspace.slug}/settings/security"
 
         adminShell(
-            pageTitle = "MFA — ${workspace.displayName}",
+            pageTitle = "MFA · ${workspace.displayName}",
             activeRail = "security",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -47,7 +47,6 @@ internal fun mfaSettingsPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "mfa",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 // Breadcrumb
@@ -219,7 +218,7 @@ internal fun identityProvidersIndexPageImpl(
         val base = "/admin/workspaces/$slug/settings/identity-providers"
 
         adminShell(
-            pageTitle = "Identity Providers — ${workspace.displayName}",
+            pageTitle = "Identity Providers · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -227,7 +226,6 @@ internal fun identityProvidersIndexPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
-            contentClass = "content-outer",
             toastMessage =
                 when {
                     saved -> EnglishStrings.TOAST_IDP_SAVED
@@ -429,7 +427,7 @@ internal fun identityProviderDetailPageImpl(
         val formId = "idp-form"
 
         adminShell(
-            pageTitle = "$heading — ${workspace.displayName}",
+            pageTitle = "$heading · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -437,7 +435,6 @@ internal fun identityProviderDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
-            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_IDP_SAVED else null,
         ) {
             div("content-inner") {
@@ -897,7 +894,7 @@ internal fun apiKeysListPageImpl(
     val slug = workspace.slug
 
     adminShell(
-        pageTitle = "API Keys — ${workspace.displayName}",
+        pageTitle = "API Keys · ${workspace.displayName}",
         activeRail = "settings",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
@@ -905,7 +902,6 @@ internal fun apiKeysListPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-        contentClass = "content-outer",
     ) {
             div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────
@@ -938,7 +934,7 @@ internal fun apiKeysListPageImpl(
         // ── One-time key reveal ──────────────────────────────────
         if (newKeyRaw != null) {
             notice(modifier = "notice--success", iconName = "check-circle") {
-                p { +"API key created — copy it now. You will not see it again." }
+                p { +"API key created. Copy it now, because you will not see it again." }
                 div("copy-field") {
                     span("copy-field__value") { +newKeyRaw }
                     button(type = ButtonType.button) {
@@ -990,7 +986,7 @@ internal fun apiKeysListPageImpl(
                             td {
                                 span("data-table__name") { +key.name }
                                 if (key.bootstrapName != null) {
-                                    span("badge badge--neutral badge--inline") { +"Bootstrapped" }
+                                    span("badge badge--muted badge--inline") { +"Bootstrapped" }
                                 }
                             }
                             td { span("data-table__meta") { +"${key.keyPrefix}\u2026" } }
@@ -1086,7 +1082,7 @@ internal fun createApiKeyPageImpl(
     val totalScopes = scopes.size
 
     adminShell(
-        pageTitle = "New API Key — ${workspace.displayName}",
+        pageTitle = "New API Key · ${workspace.displayName}",
         activeRail = "settings",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
@@ -1094,7 +1090,6 @@ internal fun createApiKeyPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-        contentClass = "content-outer",
     ) {
             div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────

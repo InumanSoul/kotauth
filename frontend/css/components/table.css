@@ -3,7 +3,9 @@
  * Data tables for listing resources (users, apps, sessions, etc.).
  *
  * New BEM block: .data-table (used by new page designs)
- *   .data-table__id      — monospace accent link (client IDs, usernames)
+ *   .data-table__id      — monospace accent LINK. Only ever on an <a>: it is coloured and
+ *                          underlines on hover, so on inert text it promises a click that
+ *                          does not exist. A technical value that is not a link is __meta.
  *   .data-table__name    — primary text cell
  *   .data-table__email   — monospace muted email cell
  *   .data-table__meta    — monospace muted secondary cell (URLs, counts, timestamps)

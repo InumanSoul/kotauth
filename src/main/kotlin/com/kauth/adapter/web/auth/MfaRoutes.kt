@@ -115,7 +115,7 @@ internal fun Route.mfaRoutes(
             is MfaResult.Failure -> {
                 val message =
                     if (mfaResult.error is MfaError.TotpLocked) {
-                        "Too many failed attempts. MFA is temporarily locked — try again later or use a recovery code."
+                        "Too many failed attempts. MFA is temporarily locked. Try again later or use a recovery code."
                     } else {
                         "Invalid code. Please try again."
                     }

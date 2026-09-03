@@ -18,7 +18,7 @@ internal fun rolesListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Roles — ${workspace.displayName}",
+            pageTitle = "Roles · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -26,7 +26,6 @@ internal fun rolesListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -115,7 +114,7 @@ internal fun createRolePageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Role — ${workspace.displayName}",
+            pageTitle = "New Role · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -123,7 +122,6 @@ internal fun createRolePageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -245,7 +243,7 @@ internal fun roleDetailPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "${role.name} — Roles",
+            pageTitle = "${role.name} · Roles",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -253,7 +251,6 @@ internal fun roleDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -450,7 +447,7 @@ internal fun groupsListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Groups — ${workspace.displayName}",
+            pageTitle = "Groups · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -458,7 +455,6 @@ internal fun groupsListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -547,7 +543,7 @@ internal fun createGroupPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "New Group — ${workspace.displayName}",
+            pageTitle = "New Group · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -555,7 +551,6 @@ internal fun createGroupPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             breadcrumb(
@@ -651,7 +646,7 @@ internal fun groupDetailPageImpl(
         val childGroups = allGroups.filter { it.parentGroupId == group.id }
 
         adminShell(
-            pageTitle = "${group.name} — Groups",
+            pageTitle = "${group.name} · Groups",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -659,7 +654,6 @@ internal fun groupDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {

@@ -27,7 +27,7 @@ internal fun HEAD.adminHead(
     pageTitle: String,
     theme: TenantTheme = TenantTheme.DEFAULT,
 ) {
-    title { +"KotAuth — $pageTitle" }
+    title { +"KotAuth · $pageTitle" }
     meta(charset = "UTF-8")
     meta(name = "viewport", content = "width=device-width, initial-scale=1.0")
     link(rel = "icon", type = "image/x-icon", href = "/static/favicon/favicon.ico")
@@ -75,9 +75,6 @@ internal fun HEAD.adminHead(
  * @param loggedInAs  Username for the profile avatar
  * @param showSidebar Whether to render the context sidebar (default true).
  *                    Set to false for single-page sections like Audit Log.
- * @param contentClass CSS class for the scrollable content wrapper.
- *                     Defaults to "content" (legacy). Use "content-outer"
- *                     for new BEM pages (wider padding, no sidebar).
  * @param content     Page content lambda
  */
 internal fun HTML.adminShell(
@@ -93,7 +90,6 @@ internal fun HTML.adminShell(
     activeAppSection: String = "overview",
     loggedInAs: String,
     showSidebar: Boolean = true,
-    contentClass: String = "content",
     toastMessage: String? = null,
     content: DIV.() -> Unit,
 ) {
@@ -255,7 +251,7 @@ internal fun HTML.adminShell(
                 }
 
                 div("main") {
-                    div(contentClass) {
+                    div("content-outer") {
                         content()
                     }
                 }
@@ -331,7 +327,7 @@ private fun DIV.railItem(
         }
     } else {
         span("rail__item rail__item--ghost") {
-            attributes["title"] = "$label — select a workspace first"
+            attributes["title"] = "$label. Select a workspace first"
             inlineSvgIcon(iconName, label)
             span("rail__label") { +label }
         }

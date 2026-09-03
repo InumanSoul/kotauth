@@ -75,7 +75,7 @@ fun Route.adminBackupExportRoutes(
                 passphrase.length < 16 -> "Passphrase must be at least 16 characters."
                 passphrase != confirmPassphrase -> "Passphrases do not match."
                 confirmSlug != workspace.slug ->
-                    "Type the workspace slug exactly to confirm — entered '${confirmSlug ?: ""}'."
+                    "Type the workspace slug exactly to confirm. You entered '${confirmSlug ?: ""}'."
                 else -> null
             }
         if (validationError != null) {
@@ -293,7 +293,7 @@ fun Route.adminBackupImportRoutes(
 private fun decryptErrorMessage(error: BackupDecryptionError): String =
     when (error) {
         is BackupDecryptionError.WrongPassphrase ->
-            "Wrong passphrase or corrupt envelope — cannot decrypt this backup."
+            "This backup cannot be decrypted. The passphrase is wrong or the envelope is corrupt."
         is BackupDecryptionError.MalformedEnvelope ->
             "Backup file is malformed. The file may be truncated or not a Kotauth backup."
         is BackupDecryptionError.UnsupportedVersion ->

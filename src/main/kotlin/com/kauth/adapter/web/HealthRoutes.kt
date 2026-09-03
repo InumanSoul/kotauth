@@ -148,7 +148,9 @@ internal fun checkConfig(baseUrl: String): ConfigCheckResult {
     val warnings =
         buildList {
             if (!isHttps && !isLocalhost) {
-                add("KAUTH_BASE_URL is not HTTPS on a non-localhost host — OAuth2 providers will reject redirect URIs")
+                add(
+                    "KAUTH_BASE_URL is not HTTPS on a non-localhost host, so OAuth2 providers will reject redirect URIs",
+                )
             }
         }
 

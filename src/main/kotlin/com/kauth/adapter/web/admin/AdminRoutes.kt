@@ -450,7 +450,7 @@ fun Route.adminRoutes(
                         roleGroupService.createRole(
                             newTenant.id,
                             "user",
-                            "Standard authenticated user — default role for self-registrations",
+                            "Standard authenticated user. The default role for self-registrations",
                             RoleScope.TENANT,
                             null,
                         )

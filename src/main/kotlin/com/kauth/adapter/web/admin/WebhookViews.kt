@@ -24,7 +24,7 @@ internal fun webhooksListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Webhooks — ${workspace.displayName}",
+            pageTitle = "Webhooks · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -32,7 +32,6 @@ internal fun webhooksListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
@@ -65,7 +64,7 @@ internal fun webhooksListPageImpl(
             // ── One-time secret reveal ───────────────────────────────
             if (newSecret != null) {
                 notice(modifier = "notice--success", iconName = "check-circle") {
-                    p { +"Webhook created — copy the signing secret now. You will not see it again." }
+                    p { +"Webhook created. Copy the signing secret now, because you will not see it again." }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {
@@ -243,7 +242,7 @@ internal fun createWebhookPageImpl(
         val totalEvents = WebhookEventType.entries.size
 
         adminShell(
-            pageTitle = "New Endpoint — ${workspace.displayName}",
+            pageTitle = "New Endpoint · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -251,7 +250,6 @@ internal fun createWebhookPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────

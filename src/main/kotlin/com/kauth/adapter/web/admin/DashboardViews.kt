@@ -22,7 +22,6 @@ internal fun workspaceListPageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner content-inner--wide") {
             div("page-header") {

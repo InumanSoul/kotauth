@@ -146,7 +146,7 @@ object EnglishStrings {
         "If you ever lose access to your authenticator app, use one of these codes to sign in. " +
             "Each code works only once."
     const val PORTAL_MFA_SAVE_CODES =
-        "Save these codes now — they won't be shown again after you leave this page."
+        "Save these codes now. They won't be shown again after you leave this page."
     const val PORTAL_MFA_COPY_CODES = "Copy codes"
     const val PORTAL_MFA_VERIFY_INSTRUCTION =
         "Enter the 6-digit code shown in your authenticator app to confirm everything is working."
@@ -291,9 +291,16 @@ object EnglishStrings {
     const val TOAST_API_DELETED = "API deleted."
     const val TOAST_AUTHORIZED_APIS_UPDATED = "Authorized APIs updated."
     const val RESOURCE_SERVER_SCOPES_LABEL = "Scopes (one per line)"
+
+    // The empty case here is permissive, and the allowed-domain list on an identity provider is
+    // restrictive. Two empty lists, opposite meanings: both have to say which one they are, and
+    // neither should be softened into the other's voice.
     const val RESOURCE_SERVER_SCOPES_HINT =
-        "Tokens issued for this API will be narrowed to scopes in this list. " +
-            "Leave empty to disable narrowing."
+        "Tokens issued for this API are narrowed to the scopes in this list. An empty list " +
+            "applies no narrowing: a token keeps every scope the client asked for."
+    const val RESOURCE_SERVER_SCOPES_NONE =
+        "No scopes listed, so tokens for this API are not narrowed. Every scope a client asks " +
+            "for is issued."
 
     // Grant types
     const val GRANT_TYPES_LABEL = "Grant Types"
@@ -327,7 +334,7 @@ object EnglishStrings {
     const val BACKUP_PASSPHRASE_LABEL = "Backup passphrase"
     const val BACKUP_PASSPHRASE_HINT =
         "16+ characters. The exported file is unreadable without it. " +
-            "Kotauth never stores this passphrase — keep it somewhere safe."
+            "Kotauth never stores this passphrase, so keep it somewhere safe."
     const val BACKUP_CONFIRM_PASSPHRASE_LABEL = "Confirm passphrase"
     const val BACKUP_INCLUDE_SIGNING_KEYS_LABEL = "Include RSA signing keys"
     const val BACKUP_INCLUDE_SIGNING_KEYS_DESC =
@@ -354,13 +361,13 @@ object EnglishStrings {
         "These items are not in the backup file and must be reconfigured before the imported workspace " +
             "is fully functional:"
     const val IMPORT_RECOVERY_OAUTH_SECRETS =
-        "OAuth client secrets — regenerate per application after import."
+        "OAuth client secrets: regenerate per application after import."
     const val IMPORT_RECOVERY_SOCIAL_SECRETS =
-        "Social provider client secrets — re-enter in Settings › Identity Providers."
+        "Social provider client secrets: re-enter in Settings › Identity Providers."
     const val IMPORT_RECOVERY_SMTP_PASSWORD =
-        "SMTP password — reconfigure in Settings › SMTP."
+        "SMTP password: reconfigure in Settings › SMTP."
     const val IMPORT_RECOVERY_MFA_SEEDS =
-        "MFA TOTP seeds and recovery codes — users must re-enroll after import."
+        "MFA TOTP seeds and recovery codes: users must re-enroll after import."
     const val IMPORT_RECOVERY_SESSIONS =
         "Active sessions, authorization codes, and magic-link tokens were never exported."
 
@@ -370,58 +377,31 @@ object EnglishStrings {
     const val IMPORT_FILE_LABEL = "Backup file (.json.enc)"
     const val IMPORT_NEW_SLUG_LABEL = "New workspace slug"
     const val IMPORT_NEW_SLUG_HINT =
-        "Lowercase letters, digits, and dashes; 2–50 characters. Must not match an existing workspace."
+        "Lowercase letters, digits, and hyphens. 2 to 50 characters. Must not match an existing workspace."
     const val IMPORT_PASSPHRASE_LABEL = "Backup passphrase"
     const val IMPORT_PASSPHRASE_HINT = "The passphrase used at export time."
     const val IMPORT_SUBMIT_BUTTON = "Import workspace"
     const val IMPORT_LINK_FROM_LIST = "Import from backup"
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
-    // Authentication methods card (workspace security settings — v1.10)
-    const val AUTH_METHODS_GROUP_SIGN_IN = "Sign-in methods"
+    // Sign-in methods table columns.
     const val AUTH_METHODS_TABLE_COL_METHOD = "Method"
     const val AUTH_METHODS_TABLE_COL_ENABLED = "Enabled"
-    const val AUTH_METHODS_TABLE_COL_NOTES = "Notes"
-    const val AUTH_METHODS_GROUP_LIMITS = "Limits"
-    const val AUTH_METHODS_MAGIC_LINK_LABEL = "Allow sign-in via email magic link"
-    const val AUTH_METHODS_MAGIC_LINK_DESC =
-        "Users can request a one-time sign-in link delivered to their email. " +
-            "Links are single-use and expire after the window set below. MFA still " +
-            "required when enrolled. Requires SMTP to be configured."
-    const val AUTH_METHODS_MAGIC_LINK_TTL_LABEL = "Magic link expiry"
-    const val AUTH_METHODS_MAGIC_LINK_TTL_HINT =
-        "Minutes before a magic link expires. 1 to 1440 (default 15). " +
-            "Raise it for slow corporate mail relays; lower it for high-assurance tenants."
-    const val AUTH_METHODS_EMAIL_OTP_LOGIN_LABEL =
-        "Allow sign-in via Email OTP code"
-    const val AUTH_METHODS_EMAIL_OTP_LOGIN_DESC =
-        "Adds a \"Sign in with email code\" option to the hosted login page. The user " +
-            "enters their email, receives a 6-digit code, and types it in. Independent " +
-            "of the magic link toggle above. Requires SMTP."
-    const val AUTH_METHODS_EMAIL_OTP_SIGNUP_LABEL =
-        "Allow sign-up via Email OTP admin API"
-    const val AUTH_METHODS_EMAIL_OTP_SIGNUP_DESC =
-        "When enabled, the OTP admin API creates a passwordless account if the email " +
-            "does not exist yet. Leave off unless an external onboarding flow controls " +
-            "user creation. Enabling this opens a new account-creation channel."
-    const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_LABEL =
-        "OTP lockout after failed attempts"
-    const val AUTH_METHODS_EMAIL_OTP_LOCKOUT_HINT =
-        "Locks the account after this many failed OTP attempts across all active challenges. " +
-            "0 disables this guard. Each individual challenge still allows up to 5 attempts."
+
     const val AUTH_METHODS_EMAIL_OTP_SMTP_WARN =
         "SMTP is not configured for this workspace. OTP emails will fail silently until " +
             "you configure SMTP under workspace settings."
 
     // Sign-in Methods grid rows (v1.20.1 — SecurityMethodsService)
+    const val SIGN_IN_METHODS_PAGE_SUB =
+        "Which methods this workspace supports. Anyone enrolled in MFA is still challenged, " +
+            "whichever method they use."
     const val AUTH_METHOD_PASSWORD_LABEL = "Password"
     const val AUTH_METHOD_PASSKEY_LABEL = "Passkey"
     const val AUTH_METHOD_MAGIC_LINK_LABEL = "Magic link"
-    const val AUTH_METHOD_MAGIC_LINK_DESC =
-        "One-time sign-in link delivered by email. Single-use, expires after the configured window."
+    const val AUTH_METHOD_MAGIC_LINK_DESC = "A sign-in link sent by email. It works once."
     const val AUTH_METHOD_EMAIL_OTP_LABEL = "Email code"
-    const val AUTH_METHOD_EMAIL_OTP_DESC =
-        "6-digit code delivered by email. The user enters it after their email address."
+    const val AUTH_METHOD_EMAIL_OTP_DESC = "A 6-digit code sent by email, entered after the address."
     const val AUTH_METHOD_SOCIAL_GOOGLE_LABEL = "Google"
     const val AUTH_METHOD_SOCIAL_GITHUB_LABEL = "GitHub"
 
@@ -433,16 +413,15 @@ object EnglishStrings {
      */
     const val AUTH_METHOD_EXTERNAL_IDP_LABEL = "External identity providers"
     const val AUTH_METHOD_EXTERNAL_IDP_DESC =
-        "OIDC providers this workspace brokers sign-in through. Each one is switched on and off " +
-            "where it is configured."
+        "Each provider is switched on and off where it is configured."
     const val AUTH_METHODS_EXTERNAL_IDP_MANAGE = "Manage identity providers"
     const val AUTH_METHODS_EXTERNAL_IDP_NONE_ENABLED = "None enabled"
 
     // Auth Methods grid (v1.20.1)
-    const val AUTH_METHODS_TABLE_HEADING = "Sign-in methods"
     const val REQUIREMENT_SMTP_REQUIRED = "SMTP required"
     const val REQUIREMENT_SMTP_LINK = "Set up SMTP"
     const val REQUIREMENT_OAUTH_CREDENTIALS_REQUIRED = "OAuth credentials required"
+    const val REQUIREMENT_OAUTH_LINK = "Set up credentials"
     const val AUTH_METHODS_PASSWORD_OFF_WARNING =
         "Disabling passwords requires ≥1 other method and configured SMTP for magic-link recovery."
 
@@ -500,7 +479,7 @@ object EnglishStrings {
     const val ADMIN_MFA_ALERT_REQUIRED_DESC_SUFFIX =
         ". Users who have not enrolled cannot complete sign-in."
     const val ADMIN_MFA_ALERT_OPTIONAL_DESC =
-        "MFA policy is Optional — no sign-in impact. Share the enrollment URL below to encourage " +
+        "MFA policy is Optional, so there is no sign-in impact. Share the enrollment URL below to " +
             "users to set up two-factor authentication."
     const val ADMIN_MFA_ALERT_REQUIRED_LINK = "Review policy"
     const val ADMIN_MFA_ALERT_OPTIONAL_LINK = "Change policy"
@@ -540,7 +519,7 @@ object EnglishStrings {
     // Login page
     const val LOGIN_WELCOME_BACK = "Welcome back"
     const val LOGIN_SUBTITLE = "Sign in to your account"
-    const val LOGIN_REGISTRATION_SUCCESS = "Account created successfully — please sign in."
+    const val LOGIN_REGISTRATION_SUCCESS = "Account created successfully. Please sign in."
     const val LOGIN_USERNAME = "Username"
     const val LOGIN_USERNAME_PLACEHOLDER = "Enter your username"
     const val LOGIN_PASSWORD_PLACEHOLDER = "Enter your password"
@@ -568,7 +547,7 @@ object EnglishStrings {
     // Registration page
     const val REGISTER_TITLE = "Create account"
     const val REGISTER_SUBTITLE = "Fill in your details to get started"
-    const val REGISTER_PASSWORDLESS_SUBTITLE = "Fill in your details — we'll email you a sign-in link to finish."
+    const val REGISTER_PASSWORDLESS_SUBTITLE = "Fill in your details and we'll email you a sign-in link to finish."
     const val REGISTER_FULL_NAME = "Full Name"
     const val REGISTER_FULL_NAME_PLACEHOLDER = "Your full name"
     const val REGISTER_EMAIL = "Email Address"
@@ -636,7 +615,7 @@ object EnglishStrings {
     const val AUTH_PAGE_TITLE_ACCESS_REFUSED = "{0} | Access not granted"
     const val JIT_REFUSED_TITLE = "Signed in, but not allowed in"
     const val JIT_REFUSED_AUTHENTICATED =
-        "{0} signed you in successfully. Nothing is wrong with your password or your {0} account — " +
+        "{0} signed you in successfully. Nothing is wrong with your password or your {0} account. " +
             "{1} has not granted this account access."
     const val JIT_REFUSED_EMAIL_NOT_VERIFIED_HEADING = "Your email address is not verified"
     const val JIT_REFUSED_EMAIL_NOT_VERIFIED_BODY =
@@ -645,12 +624,12 @@ object EnglishStrings {
     const val JIT_REFUSED_DOMAIN_NOT_ALLOWED_HEADING = "Your email domain is not on the allowed list"
     const val JIT_REFUSED_DOMAIN_NOT_ALLOWED_BODY =
         "{1} creates accounts only for people whose email address is on its list of approved " +
-            "domains, and yours is not on it. Signing in again will not change this — ask an " +
+            "domains, and yours is not on it. Signing in again will not change this. Ask an " +
             "administrator of {1} to add your domain."
     const val JIT_REFUSED_USERNAME_CONFLICT_HEADING = "An account here already uses your email address"
     const val JIT_REFUSED_USERNAME_CONFLICT_BODY =
         "{1} already has an account whose sign-in name is your email address, and it is not this " +
-            "one. Signing in again will not change this — ask an administrator of {1} to sort the " +
+            "one. Signing in again will not change this. Ask an administrator of {1} to sort the " +
             "two records out."
     const val JIT_REFUSED_REFERENCE = "Quote this reference to an administrator: {0}"
 
@@ -686,11 +665,11 @@ object EnglishStrings {
 
     // Transactional emails — see SmtpEmailAdapter. {0} is workspace name unless otherwise noted.
     // Subjects
-    const val EMAIL_SUBJECT_VERIFY = "Verify your email address — {0}"
-    const val EMAIL_SUBJECT_PASSWORD_RESET = "Reset your password — {0}"
-    const val EMAIL_SUBJECT_ACCOUNT_LOCKED = "Your account has been locked — {0}"
-    const val EMAIL_SUBJECT_PASSWORD_CHANGED = "Your password has been changed — {0}"
-    const val EMAIL_SUBJECT_TEST = "KotAuth SMTP Test — {0}"
+    const val EMAIL_SUBJECT_VERIFY = "Verify your email address ({0})"
+    const val EMAIL_SUBJECT_PASSWORD_RESET = "Reset your password ({0})"
+    const val EMAIL_SUBJECT_ACCOUNT_LOCKED = "Your account has been locked ({0})"
+    const val EMAIL_SUBJECT_PASSWORD_CHANGED = "Your password has been changed ({0})"
+    const val EMAIL_SUBJECT_TEST = "KotAuth SMTP Test ({0})"
     const val EMAIL_SUBJECT_INVITE = "You've been invited to join {0}"
     const val EMAIL_SUBJECT_MAGIC_LINK = "Your sign-in link for {0}"
     const val EMAIL_SUBJECT_OTP = "Your sign-in code for {0}"
@@ -761,7 +740,7 @@ object EnglishStrings {
     const val EMAIL_FOOTER_PASSWORD_CHANGED =
         "For security, all active sessions were signed out when your password was changed."
     const val EMAIL_FOOTER_ACCOUNT_LOCKED =
-        "If you made these sign-in attempts, you can safely ignore this email — your account will unlock automatically."
+        "If you made these sign-in attempts, you can safely ignore this email. Your account will unlock automatically."
     const val EMAIL_FOOTER_TEST = "Sent by KotAuth to verify SMTP configuration."
     const val EMAIL_FOOTER_INVITE =
         "If you weren’t expecting this, you can safely ignore this email. " +
@@ -873,13 +852,13 @@ object EnglishStrings {
      * in general unless the group case says otherwise.
      */
     const val SCIM_DELETE_GROUP_PERMANENT =
-        "DELETE on a group is permanent \u2014 unlike a user, it is removed outright, along with its " +
+        "DELETE on a group is permanent. Unlike a user, it is removed outright, along with its " +
             "memberships and role grants. A group that still has subgroups is refused rather than deleted."
 
     const val SCIM_NOTES_HEADING = "Identity provider notes"
     const val SCIM_NOTES_INTRO =
         "Connectors differ in what they ask for and what they put on the wire. Pick the matching dialect when " +
-            "you create the key — it is read from the key, never guessed from a request header."
+            "you create the key. It is read from the key, never guessed from a request header."
 
     const val SCIM_DIALECT_FIELD_LABEL = "SCIM dialect"
     const val SCIM_DIALECT_FIELD_HINT =
@@ -896,7 +875,7 @@ object EnglishStrings {
      */
     const val SCIM_DIALECT_ENV_MANAGED = "Env-managed"
     const val SCIM_DIALECT_ENV_MANAGED_HINT =
-        "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 set the entry's \"scimDialect\" field there; every " +
+        "Managed via KAUTH_BOOTSTRAP_API_KEYS. Set the entry's \"scimDialect\" field there; every " +
             "restart re-applies it."
     const val SCIM_DIALECT_ENV_MANAGED_REFUSAL =
         "Bootstrapped keys keep the dialect set by KAUTH_BOOTSTRAP_API_KEYS. Set the entry's " +
@@ -953,7 +932,7 @@ object EnglishStrings {
     const val SCIM_IDP_MANAGED_BADGE = "IdP-managed"
     const val SCIM_IDP_MANAGED_MAY_BE_OVERWRITTEN =
         "This record is provisioned by an identity provider. Changes made here may be overwritten by the " +
-            "identity provider on its next sync \u2014 edit it there instead."
+            "identity provider on its next sync. Edit it there instead."
     const val SCIM_IDP_EXTERNAL_ID_LABEL = "External ID"
     const val SCIM_IDP_EXTERNAL_ID_HINT =
         "The identifier the identity provider uses for this record. It is how a sync finds the record again."
@@ -967,7 +946,7 @@ object EnglishStrings {
      */
     const val IDP_MANAGED_BROKERED_ORIGIN =
         "This account was created on a first sign-in through an identity provider. The person " +
-            "signs in there — they have no password here unless they set one."
+            "signs in there and has no password here unless they set one."
 
     /**
      * The SCIM name parts on the user create and edit forms.
@@ -979,7 +958,7 @@ object EnglishStrings {
     const val USER_GIVEN_NAME_LABEL = "Given name"
     const val USER_FAMILY_NAME_LABEL = "Family name"
     const val USER_NAME_PARTS_HINT =
-        "Optional. Stored separately from the display name \u2014 filling these in never rewrites Full Name."
+        "Optional. Stored separately from the display name, so filling these in never rewrites Full Name."
 
     /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
@@ -1034,7 +1013,7 @@ object EnglishStrings {
     // Identity provider diagnostics — the sign-in failures only a real sign-in can reveal
     const val IDP_FAILURES_HINT =
         "Sign-ins that reached this provider and did not end in a session. A callback URL the " +
-            "provider does not recognise appears here and nowhere else — testing the issuer's " +
+            "provider does not recognise appears here and nowhere else. Testing the issuer's " +
             "discovery document cannot see it."
     const val IDP_FAILURES_EMPTY = "No sign-in failures recorded for this provider."
     const val IDP_FAILURES_COL_WHEN = "When (UTC)"
@@ -1064,9 +1043,9 @@ object EnglishStrings {
     const val IDP_KEY_PLACEHOLDER = "workforce-sso"
     const val IDP_KEY_HINT =
         "Lower-case letters, digits and hyphens. It appears in the callback URL and cannot be " +
-            "changed once saved \u2014 accounts already linked to this provider point at it."
+            "changed once saved, because accounts already linked to this provider point at it."
     const val IDP_KEY_INVALID =
-        "That is not a provider key \u2014 use 1\u201332 characters of a\u2013z, 0\u20139 and '-'."
+        "That is not a provider key. Use 1 to 32 lower-case letters, digits or hyphens."
     const val IDP_KIND_OIDC = "OpenID Connect"
     const val IDP_DISPLAY_NAME_LABEL = "Display name"
     const val IDP_DISPLAY_NAME_PLACEHOLDER = "Workforce SSO"
@@ -1095,19 +1074,19 @@ object EnglishStrings {
     const val IDP_JIT_ENABLE_LABEL = "Create accounts automatically"
     const val IDP_JIT_HINT =
         "When on, someone signing in through this provider for the first time gets an account " +
-            "here — but only if the provider says their email is verified and its domain is " +
+            "here, but only if the provider says their email is verified and its domain is " +
             "on the list below."
     const val IDP_TRUST_EMAIL_LABEL = "Trust this provider's email claim"
     const val IDP_TRUST_EMAIL_TOGGLE = "Treat the address as verified"
     const val IDP_TRUST_EMAIL_HINT =
         "Off by default: an account is created or matched only when the provider states the address " +
-            "is verified. Some issuers never send that statement at all — Microsoft Entra ID among " +
-            "them — so sign-in through them is refused until this is on. Turning it on also lets a " +
+            "is verified. Some issuers never send that statement at all (Microsoft Entra ID among " +
+            "them), so sign-in through them is refused until this is on. Turning it on also lets a " +
             "sign-in claim an existing account with the same address, and no domain list narrows " +
             "that. Turn it on only for an issuer whose addresses you control."
     const val IDP_JIT_DOMAINS_LABEL = "Allowed email domains"
     const val IDP_JIT_DOMAINS_EMPTY =
-        "No domains listed — no account is created automatically, even with the toggle on. " +
+        "No domains listed, so no account is created automatically even with the toggle on. " +
             "An empty list is the feature switched off, never a wildcard."
     const val IDP_JIT_DOMAINS_HINT =
         "Untick a domain and save to remove it. Domains are stored lower-case; duplicates are " +
@@ -1120,7 +1099,7 @@ object EnglishStrings {
     const val IDP_DISCOVERY_BUTTON = "Test discovery"
     const val IDP_CONNECTION_HEADING = "Connection"
     const val IDP_FAILURES_HEADING = "Recent sign-in failures"
-    const val IDP_ADVANCED_SUMMARY = "Advanced \u2014 endpoint overrides"
+    const val IDP_ADVANCED_SUMMARY = "Advanced endpoint overrides"
     const val IDP_ENABLE_ACTION = "Enable"
     const val IDP_DISABLE_ACTION = "Disable"
     const val IDP_CALLBACK_HINT_NEW =
@@ -1136,8 +1115,8 @@ object EnglishStrings {
             "recognise is refused at the provider, after this page has said the endpoints resolve, " +
             "and shows up only under Recent sign-in failures."
     const val IDP_DISCOVERY_NOT_VERIFIED_CREDENTIALS =
-        "Your client ID and client secret. Nothing in this test authenticates as this client — " +
-            "the first request that does is a real sign-in."
+        "Your client ID and client secret. Nothing in this test authenticates as this client. " +
+            "The first request that does is a real sign-in."
     const val IDP_DISCOVERY_CALLBACK_LABEL = "Register this exact callback URL at the provider:"
     const val IDP_DISCOVERY_FAILED_TITLE = "Discovery did not resolve"
 

@@ -23,7 +23,7 @@ internal fun workspaceBackupPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "${EnglishStrings.BACKUP_PAGE_TITLE} — ${workspace.displayName}",
+            pageTitle = "${EnglishStrings.BACKUP_PAGE_TITLE} · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -31,7 +31,6 @@ internal fun workspaceBackupPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "backup",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -174,7 +173,6 @@ internal fun importTenantPageImpl(
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(

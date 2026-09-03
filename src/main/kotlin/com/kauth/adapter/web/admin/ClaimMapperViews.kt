@@ -18,7 +18,7 @@ internal fun claimMappersListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Claim Mappers — ${workspace.displayName}",
+            pageTitle = "Claim Mappers · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -26,7 +26,6 @@ internal fun claimMappersListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "claim-mappers",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -83,7 +82,7 @@ internal fun claimMappersListPageImpl(
                                 mappers.forEach { mapper ->
                                     tr {
                                         td {
-                                            span("data-table__id") { +mapper.attributeKey }
+                                            span("data-table__meta") { +mapper.attributeKey }
                                         }
                                         td { +mapper.claimName }
                                         td { yesNoBadge(mapper.includeInAccess) }
@@ -134,7 +133,6 @@ internal fun claimMapperFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "claim-mappers",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(

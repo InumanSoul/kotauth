@@ -16,7 +16,7 @@ internal fun keyManagementPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Signing Keys — ${workspace.displayName}",
+            pageTitle = "Signing Keys · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -24,7 +24,6 @@ internal fun keyManagementPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "signing-keys",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -75,7 +74,7 @@ internal fun keyManagementPageImpl(
                                 keys.forEach { key ->
                                     tr {
                                         td {
-                                            span("data-table__id") { +key.keyId }
+                                            span("data-table__meta") { +key.keyId }
                                         }
                                         td {
                                             +(key.createdAt?.toDisplayString() ?: "—")

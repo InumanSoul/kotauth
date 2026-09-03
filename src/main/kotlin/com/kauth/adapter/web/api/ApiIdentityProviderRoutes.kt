@@ -68,7 +68,7 @@ internal fun Route.apiIdentityProviderRoutes(identityProviderService: IdentityPr
                         ?: return@put call.respondProblem(
                             HttpStatusCode.UnprocessableEntity,
                             "Validation Error",
-                            "'${body.kind}' is not a provider kind — use 'oauth2' or 'oidc'.",
+                            "'${body.kind}' is not a provider kind. Use 'oauth2' or 'oidc'.",
                         )
                 }
 

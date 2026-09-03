@@ -31,7 +31,7 @@ internal fun scimProvisioningPageImpl(
     val createKeyHref = "$apiKeysHref/new?scope=${ApiScope.SCIM}"
 
     adminShell(
-        pageTitle = "${EnglishStrings.SCIM_PAGE_TITLE} — ${workspace.displayName}",
+        pageTitle = "${EnglishStrings.SCIM_PAGE_TITLE} · ${workspace.displayName}",
         activeRail = "directory",
         allWorkspaces = allWorkspaces,
         workspaceName = workspace.displayName,
@@ -39,7 +39,6 @@ internal fun scimProvisioningPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "provisioning",
-        contentClass = "content-outer",
         toastMessage = toastMessage,
     ) {
         div("content-inner") {

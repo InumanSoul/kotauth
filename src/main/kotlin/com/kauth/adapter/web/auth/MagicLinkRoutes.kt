@@ -121,7 +121,7 @@ internal fun Route.magicLinkRoutes(
                     ctx = ctx.viewContext,
                     error =
                         "To finish signing in, open this link in the same browser where you " +
-                            "requested it — or go back to the sign-in page and request a new link.",
+                            "requested it, or go back to the sign-in page and request a new link.",
                 ),
             )
             return@get

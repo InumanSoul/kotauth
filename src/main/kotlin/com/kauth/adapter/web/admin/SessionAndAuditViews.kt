@@ -21,7 +21,7 @@ internal fun activeSessionsPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Sessions — ${workspace.displayName}",
+            pageTitle = "Sessions · ${workspace.displayName}",
             activeRail = "security",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -29,7 +29,6 @@ internal fun activeSessionsPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "sessions",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = when (savedParam) {
                 "revoked" -> "Session revoked."
                 "revoked_all" -> "All sessions revoked."
@@ -89,7 +88,7 @@ internal fun activeSessionsPageImpl(
                         tbody {
                             sessions.forEach { s ->
                                 tr {
-                                    td { span("data-table__id") { +"#${s.id?.value}" } }
+                                    td { span("data-table__meta") { +"#${s.id?.value}" } }
                                     td {
                                         val uid = s.userId
                                         if (uid != null) {
@@ -145,7 +144,7 @@ internal fun auditLogPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Audit Log — ${workspace.displayName}",
+            pageTitle = "Audit Log · ${workspace.displayName}",
             activeRail = "logs",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -154,7 +153,6 @@ internal fun auditLogPageImpl(
             activeAppSection = "audit",
             loggedInAs = loggedInAs,
             showSidebar = false,
-            contentClass = "content-outer",
         ) {
             div("content-inner content-inner--wide") {
                 breadcrumb(
