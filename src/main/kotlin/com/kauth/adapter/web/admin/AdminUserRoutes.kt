@@ -61,6 +61,7 @@ fun Route.adminUserRoutes(
     webAuthnService: WebAuthnService? = null,
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
+    socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
 ) {
     route("/users") {
         get {
@@ -254,6 +255,7 @@ fun Route.adminUserRoutes(
                         recentImpersonations = recentImpersonations,
                         passkeys = passkeys,
                         brokeredOrigin = brokeredOrigin,
+                        linkedIdentities = socialAccountRepository?.findByUserId(userId).orEmpty(),
                     ),
                 )
             }

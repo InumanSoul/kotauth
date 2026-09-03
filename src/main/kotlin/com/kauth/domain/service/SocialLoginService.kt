@@ -2,6 +2,7 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
@@ -166,7 +167,7 @@ class SocialLoginService(
             return SocialLoginResult.Failure(SocialLoginError.EmailNotProvided)
         }
 
-        when (val match = resolveExistingUser(tenant.id, provider, profile)) {
+        when (val match = resolveExistingUser(tenant.id, idp, profile)) {
             is ExistingUserMatch.Linked -> return issueTokens(match.user, tenant, provider, false, ipAddress, userAgent)
             is ExistingUserMatch.EmailCollisionUnverified ->
                 return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
@@ -335,9 +336,10 @@ class SocialLoginService(
     // could claim any KotAuth account that shares that address.
     private fun resolveExistingUser(
         tenantId: TenantId,
-        provider: ProviderKey,
+        idp: IdentityProvider,
         profile: SocialUserProfile,
     ): ExistingUserMatch {
+        val provider = idp.provider
         val linked =
             socialAccountRepository.findByProviderIdentity(
                 tenantId = tenantId,
@@ -351,7 +353,11 @@ class SocialLoginService(
 
         val email = profile.email?.trim()?.lowercase() ?: return ExistingUserMatch.None
         val existingByEmail = userRepository.findByEmail(tenantId, email) ?: return ExistingUserMatch.None
-        if (!profile.emailVerified) return ExistingUserMatch.EmailCollisionUnverified
+        // Adopting an account on an address the issuer has not marked verified is a takeover
+        // path, so it is refused by default. `trustEmailClaim` is the operator asserting that
+        // this particular issuer's claim can be relied on — and unlike the provisioning gate,
+        // nothing narrows this one by domain, so it is the more consequential half of the switch.
+        if (!profile.emailVerified && !idp.trustEmailClaim) return ExistingUserMatch.EmailCollisionUnverified
 
         socialAccountRepository.save(
             SocialAccount(

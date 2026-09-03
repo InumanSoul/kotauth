@@ -91,6 +91,7 @@ class PostgresIdentityProviderRepository(
                     it[scopes] = provider.scopes
                     it[jitEnabled] = provider.jitEnabled
                     it[jitAllowedDomains] = provider.jitAllowedDomains.joinToStringOrNull()
+                    it[trustEmailClaim] = provider.trustEmailClaim
                     it[createdAt] = now
                     it[updatedAt] = now
                 } get IdentityProvidersTable.id
@@ -122,6 +123,7 @@ class PostgresIdentityProviderRepository(
                 it[scopes] = provider.scopes
                 it[jitEnabled] = provider.jitEnabled
                 it[jitAllowedDomains] = provider.jitAllowedDomains.joinToStringOrNull()
+                it[trustEmailClaim] = provider.trustEmailClaim
                 it[updatedAt] = now
             }
             findByTenantAndProvider(provider.tenantId, provider.provider)!!
@@ -165,6 +167,7 @@ class PostgresIdentityProviderRepository(
             scopes = this[IdentityProvidersTable.scopes],
             jitEnabled = this[IdentityProvidersTable.jitEnabled],
             jitAllowedDomains = this[IdentityProvidersTable.jitAllowedDomains].splitDomains(),
+            trustEmailClaim = this[IdentityProvidersTable.trustEmailClaim],
             createdAt = this[IdentityProvidersTable.createdAt].toInstant(),
             updatedAt = this[IdentityProvidersTable.updatedAt].toInstant(),
         )

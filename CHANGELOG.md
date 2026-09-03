@@ -50,14 +50,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused when the provider is saved. **An empty list is the feature switched
   off, never a wildcard**, so the toggle alone provisions nobody.
 
+- **A user's linked identities are visible to the administrator.** The providers
+  an account can sign in through — with the address and subject each one
+  asserted, and when the link was made — now appear on the admin user page.
+  Previously only the end user could see this on their own portal, so the
+  administrator fielding "why can this person not sign in with SSO" had nothing
+  to read.
+
+- **Trusting an issuer's email claim.** The condition above — that the provider
+  asserts the address is verified — is read from the `email_verified` claim, and
+  an absent claim counts as false. Several major issuers never send it at all;
+  **Microsoft Entra ID is one**, so a workspace brokering to Entra found that
+  every sign-in was refused however the allowed-domain list was set. A new
+  per-provider switch, **off by default**, lets an operator take that issuer's
+  `email` claim as verified. It is deliberately not a global setting: it is an
+  assertion about one issuer.
+
+  The switch governs both gates, and they are not equally narrow. Creation is
+  still bounded by the allowed-domain list, so trusting the claim widens which
+  addresses count as verified, never which domains may be created. **Linking is
+  not bounded by anything** — with the switch on, a sign-in carrying an
+  unverified address that matches a local user adopts that account. Turn it on
+  only for an issuer whose address space you control. Off, behaviour is exactly
+  as before.
+
   **The gate only ever creates.** It has no link path and no update path, and
   it is reached only once nothing matched the identity — so switching automatic
   creation on cannot widen what a provider's assertion may reach. Linking is a
   separate, older rule that runs on every brokered callback whether or not
   automatic creation is on: a verified address matching a local user **in the
   same workspace** links the identity to that user and signs them in, and an
-  unverified one ends the sign-in rather than linking. That refusal has **no
-  self-service path** — an administrator reconciles the two records. The
+  unverified one ends the sign-in rather than linking — unless that provider's
+  email claim is trusted, below. That refusal has **no self-service path** — an
+  administrator reconciles the two records. The
   consequence worth knowing before a rollout is a configuration one: an
   operator who can register an issuer for a workspace can have it assert any
   address, so configuring an identity provider needs to be held at the same

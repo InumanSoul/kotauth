@@ -988,6 +988,17 @@ object EnglishStrings {
 
     // ── Identity providers ──────────────────────────────────────────────────
 
+    const val LINKED_IDENTITIES_HEADING = "Linked identities"
+    const val LINKED_IDENTITIES_EMPTY =
+        "This account signs in with its own credentials. Nothing is linked to an identity provider."
+    const val LINKED_IDENTITIES_COL_PROVIDER = "Provider"
+    const val LINKED_IDENTITIES_COL_ACCOUNT = "Account at the provider"
+    const val LINKED_IDENTITIES_COL_SUBJECT = "Subject"
+    const val LINKED_IDENTITIES_COL_LINKED = "Linked"
+    const val LINKED_IDENTITIES_HINT =
+        "A link is what lets this person sign in through that provider. Removing a provider leaves " +
+            "the link in place but unusable."
+
     const val IDP_PAGE_TITLE = "Identity Providers"
     const val IDP_PAGE_SUB = "Configure SSO. Users can sign in with their existing accounts."
     const val IDP_CONFIGURED_HEADING = "Configured providers"
@@ -1086,6 +1097,14 @@ object EnglishStrings {
         "When on, someone signing in through this provider for the first time gets an account " +
             "here — but only if the provider says their email is verified and its domain is " +
             "on the list below."
+    const val IDP_TRUST_EMAIL_LABEL = "Trust this provider's email claim"
+    const val IDP_TRUST_EMAIL_TOGGLE = "Treat the address as verified"
+    const val IDP_TRUST_EMAIL_HINT =
+        "Off by default: an account is created or matched only when the provider states the address " +
+            "is verified. Some issuers never send that statement at all — Microsoft Entra ID among " +
+            "them — so sign-in through them is refused until this is on. Turning it on also lets a " +
+            "sign-in claim an existing account with the same address, and no domain list narrows " +
+            "that. Turn it on only for an issuer whose addresses you control."
     const val IDP_JIT_DOMAINS_LABEL = "Allowed email domains"
     const val IDP_JIT_DOMAINS_EMPTY =
         "No domains listed — no account is created automatically, even with the toggle on. " +

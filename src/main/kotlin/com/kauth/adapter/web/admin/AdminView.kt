@@ -203,6 +203,7 @@ object AdminView {
         recentOtpActivity: List<OtpActivityRecord> = emptyList(),
         passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
         brokeredOrigin: Boolean = false,
+        linkedIdentities: List<com.kauth.domain.model.SocialAccount> = emptyList(),
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -222,6 +223,7 @@ object AdminView {
             recentOtpActivity,
             passkeys,
             brokeredOrigin,
+            linkedIdentities = linkedIdentities,
         )
 
     fun userAttributeFormPage(

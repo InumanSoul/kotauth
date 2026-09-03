@@ -730,6 +730,21 @@ private fun FlowContent.jitControls(existing: IdentityProvider?) {
     }
 
     div("edit-row") {
+        span("edit-row__label") { +EnglishStrings.IDP_TRUST_EMAIL_LABEL }
+        div {
+            label("toggle") {
+                input(type = InputType.checkBox, name = "trustEmailClaim") {
+                    attributes["value"] = "true"
+                    if (existing?.trustEmailClaim == true) checked = true
+                }
+                span("toggle__track") { span("toggle__thumb") {} }
+                span("toggle__label toggle__label--muted") { +EnglishStrings.IDP_TRUST_EMAIL_TOGGLE }
+            }
+            div("edit-row__hint") { +EnglishStrings.IDP_TRUST_EMAIL_HINT }
+        }
+    }
+
+    div("edit-row") {
         span("edit-row__label") { +EnglishStrings.IDP_JIT_DOMAINS_LABEL }
         div {
             if (domains.isEmpty()) {

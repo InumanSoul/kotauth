@@ -7,6 +7,7 @@ import com.kauth.domain.model.Group
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebAuthnCredential
@@ -59,6 +60,7 @@ internal fun userDetailPageImpl(
      * in through a provider. The provisioning event is the only record of which one created it.
      */
     brokeredOrigin: Boolean = false,
+    linkedIdentities: List<SocialAccount> = emptyList(),
 ): HTML.() -> Unit =
     {
         adminShell(
@@ -221,6 +223,9 @@ internal fun userDetailPageImpl(
             // ── Identity provider ────────────────────────────────────
             // Above the profile card, because the profile is what a sync overwrites.
             user.externalId?.let { idpManagedCard(it) }
+
+            // ── Linked identities ────────────────────────────────────
+            linkedIdentitiesCard(linkedIdentities)
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
@@ -1275,3 +1280,51 @@ internal fun userAttributeFormPageImpl(
 
 private fun encodeUriComponent(input: String): String =
     java.net.URLEncoder.encode(input, "UTF-8").replace("+", "%20")
+
+
+/**
+ * The providers this account can sign in through.
+ *
+ * The end user could already see this on their own portal; the administrator supporting them
+ * could not, so "why can this person not sign in with SSO" had no answer on this page.
+ */
+private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
+    div("ov-card") {
+        div("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }
+        if (accounts.isEmpty()) {
+            div("ov-card__row--stacked") {
+                span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_EMPTY }
+            }
+        } else {
+            table("data-table") {
+                thead {
+                    tr {
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_PROVIDER }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_ACCOUNT }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_SUBJECT }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_LINKED }
+                    }
+                }
+                tbody {
+                    accounts.sortedBy { it.provider.value }.forEach { account ->
+                        tr {
+                            td { span("data-table__name") { +EnglishStrings.providerDisplayName(account.provider) } }
+                            td {
+                                span("data-table__email") {
+                                    +(account.providerEmail?.takeIf { it.isNotBlank() } ?: "\u2014")
+                                }
+                            }
+                            // The provider's own subject claim is the identity the link is keyed
+                            // on; the email beside it can change without the link changing.
+                            td { span("data-table__meta") { +account.providerUserId } }
+                            td { span("data-table__meta") { +account.linkedAt.toDisplayString() } }
+                        }
+                    }
+                }
+            }
+            div("ov-card__row--stacked") {
+                span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_HINT }
+            }
+        }
+    }
+}

@@ -81,6 +81,7 @@ class SocialLoginJitBranchTest {
     private fun idp(
         jitEnabled: Boolean,
         domains: List<String> = listOf("oriana.com.py"),
+        trustEmail: Boolean = false,
     ) = IdentityProvider(
         tenantId = tenant.id,
         provider = oriana,
@@ -91,6 +92,7 @@ class SocialLoginJitBranchTest {
         issuer = "https://idp.oriana.com.py",
         jitEnabled = jitEnabled,
         jitAllowedDomains = domains,
+        trustEmailClaim = trustEmail,
     )
 
     private fun profile(
@@ -184,6 +186,26 @@ class SocialLoginJitBranchTest {
         assertEquals(SocialLoginError.LinkRequiresEmailVerification, failure.error)
         assertEquals(1, users.findByTenantId(tenant.id, null, 100, 0).size)
         assertEquals(0, auditLog.countOf(AuditEventType.JIT_USER_PROVISIONED))
+    }
+
+    @Test
+    fun `trusting the claim lets an unverified sign-in adopt the matching local account`() {
+        // The consequential half of the switch: no domain list narrows this path, so the
+        // operator is asserting that this issuer's address claim can be relied on.
+        idpRepo.add(idp(jitEnabled = true, trustEmail = true))
+        users.add(existingAda)
+        adapter.profileToReturn = profile(email = "ada@oriana.com.py", verified = false)
+
+        val result = svc.handleCallback("acme", oriana, "code", "http://localhost")
+
+        val success = assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
+        assertEquals(existingAda.id, success.value.user.id)
+        assertEquals(
+            1,
+            users.findByTenantId(tenant.id, null, 100, 0).size,
+            "The local account is adopted, not duplicated",
+        )
+        assertEquals(0, auditLog.countOf(AuditEventType.JIT_USER_PROVISIONED), "Adopting is not provisioning")
     }
 
     // =========================================================================

@@ -72,7 +72,10 @@ class JitProvisioningService(
         userAgent: String? = null,
     ): JitOutcome {
         if (!provider.jitEnabled) return JitOutcome.NotEnabled
-        if (!profile.emailVerified) {
+        // An absent `email_verified` claim reads as false, and some major issuers never emit it,
+        // so the strict gate refuses every sign-in from them. Trusting the claim is opt-in per
+        // provider and does not widen the domain allowlist below.
+        if (!profile.emailVerified && !provider.trustEmailClaim) {
             return refuse(tenant, provider, profile, JitRefusal.EMAIL_NOT_VERIFIED, ipAddress, userAgent)
         }
 

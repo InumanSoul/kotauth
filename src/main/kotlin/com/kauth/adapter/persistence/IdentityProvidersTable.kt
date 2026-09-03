@@ -23,6 +23,7 @@ object IdentityProvidersTable : Table("identity_providers") {
     val scopes = varchar("scopes", 255).default("openid email profile")
     val jitEnabled = bool("jit_enabled").default(false)
     val jitAllowedDomains = text("jit_allowed_domains").nullable()
+    val trustEmailClaim = bool("trust_email_claim").default(false)
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

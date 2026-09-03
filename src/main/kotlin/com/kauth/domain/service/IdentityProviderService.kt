@@ -71,6 +71,7 @@ class IdentityProviderService(
         scopes: String = DEFAULT_OIDC_SCOPES,
         jitEnabled: Boolean = false,
         jitAllowedDomains: List<String> = emptyList(),
+        trustEmailClaim: Boolean = false,
     ): AdminResult<IdentityProvider> {
         val existing =
             when (val target = resolveTarget(tenantId, key, id)) {
@@ -95,6 +96,7 @@ class IdentityProviderService(
                 scopes = scopes.trim().replace(WHITESPACE, " ").ifEmpty { DEFAULT_OIDC_SCOPES },
                 jitEnabled = jitEnabled,
                 jitAllowedDomains = normaliseDomains(jitAllowedDomains),
+                trustEmailClaim = trustEmailClaim,
                 createdAt = existing?.createdAt ?: Instant.now(),
                 updatedAt = Instant.now(),
             )

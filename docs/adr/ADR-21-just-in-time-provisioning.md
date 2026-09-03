@@ -168,11 +168,37 @@ administration, it does: the two have to be held at the same level of trust, bec
 equivalent. That is a deployment decision rather than a defect, but it is one to make knowingly rather
 than discover from a support ticket.
 
-**An unverified address does not link.** A provider that will not stand behind the claim gets
-`LinkRequiresEmailVerification` and the flow ends. There is no self-service path out of *that* state:
-an administrator reconciles the two records — verifying the address at the provider, renaming the local
-one, or linking the identity deliberately. A migration where existing local users start arriving through
-an IdP that does not assert `email_verified` should plan that reconciliation as part of the rollout.
+**An unverified address does not link, unless the issuer's claim is trusted.** A provider that will
+not stand behind the claim gets `LinkRequiresEmailVerification` and the flow ends. There is no
+self-service path out of *that* state: an administrator reconciles the two records — verifying the
+address at the provider, renaming the local one, or linking the identity deliberately. A migration
+where existing local users start arriving through an IdP that does not assert `email_verified` should
+plan that reconciliation as part of the rollout.
+
+### Why `trustEmailClaim` exists, and why it governs both gates
+
+`email_verified` is optional in OpenID Connect, and the validator reads an absent claim as false.
+Several major issuers never emit it — Microsoft Entra ID among them — so the strict reading refused
+every brokered sign-in from them, whatever the allowlist said. The feature did not have a
+misconfiguration problem; it had no path at all for a large share of the deployments it was built for.
+
+`trustEmailClaim` is a per-provider switch, default off, that lets an operator take a named issuer's
+`email` claim as verified. Per-provider rather than global because the assertion being made is about
+one issuer, not about the workspace. Keycloak ships the same control under the name *Trust Email*.
+
+It governs the provisioning gate and the linking gate together, because a switch that meant
+"verified" in one place and not the other would be two settings wearing one label. **The two are not
+equally bounded, and that asymmetry is the thing to understand before turning it on:**
+
+- *Creation* stays inside the allowed-domain list. Trusting the claim widens which addresses count as
+  verified; it never widens which domains may be created. An unlisted domain is still refused, and the
+  refusal reason still distinguishes the two causes.
+- *Linking* has no domain list behind it. With the switch on, a sign-in carrying an unverified address
+  that matches a local user adopts that account. This is the same residual surface described above,
+  reached one step more easily: the issuer no longer has to bother asserting `email_verified`.
+
+So the switch belongs to an issuer whose address space the operator controls. Off — the default, and
+what every existing row got at migration — behaviour is exactly what it was.
 
 **`JitProvisioningService` itself only ever creates**, and that is what keeps the two decisions apart.
 The gate has no update path and no link path, and it is reached only where nothing matched — so

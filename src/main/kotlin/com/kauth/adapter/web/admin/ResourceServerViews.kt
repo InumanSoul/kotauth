@@ -39,7 +39,7 @@ internal fun resourceServersListPageImpl(
                     subtitle = EnglishStrings.API_PAGE_SUBTITLE,
                     actions = {
                         primaryLink(
-                            "/admin/workspaces/$slug/settings/apis/new",
+                            "/admin/workspaces/$slug/apis/new",
                             EnglishStrings.API_ADD,
                             "plus",
                         )
@@ -73,7 +73,7 @@ internal fun resourceServersListPageImpl(
                                 resources.forEach { rs ->
                                     tr {
                                         td {
-                                            a(href = "/admin/workspaces/$slug/settings/apis/${rs.id!!.value}/edit") {
+                                            a(href = "/admin/workspaces/$slug/apis/${rs.id!!.value}/edit") {
                                                 +rs.name
                                             }
                                         }
@@ -100,7 +100,7 @@ internal fun resourceServersListPageImpl(
                                         td {
                                             a(
                                                 href =
-                                                    "/admin/workspaces/$slug/settings/apis/" +
+                                                    "/admin/workspaces/$slug/apis/" +
                                                         "${rs.id!!.value}/edit",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) { +"Edit" }
@@ -181,7 +181,7 @@ internal fun clientAuthorizedApisPageImpl(
                             description = EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_BODY,
                         ) {
                             a(
-                                href = "/admin/workspaces/$slug/settings/apis/new",
+                                href = "/admin/workspaces/$slug/apis/new",
                                 classes = "btn btn--primary",
                             ) { +EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_CTA }
                         }
@@ -260,9 +260,9 @@ internal fun resourceServerFormPageImpl(
         val title = if (isEdit) EnglishStrings.API_FORM_EDIT_TITLE else EnglishStrings.API_FORM_NEW_TITLE
         val submitUrl =
             if (existingId != null) {
-                "/admin/workspaces/$slug/settings/apis/${existingId.value}"
+                "/admin/workspaces/$slug/apis/${existingId.value}"
             } else {
-                "/admin/workspaces/$slug/settings/apis"
+                "/admin/workspaces/$slug/apis"
             }
 
         adminShell(
@@ -280,7 +280,7 @@ internal fun resourceServerFormPageImpl(
                 breadcrumb(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    EnglishStrings.API_NAV_LABEL to "/admin/workspaces/$slug/settings/apis",
+                    EnglishStrings.API_NAV_LABEL to "/admin/workspaces/$slug/apis",
                     title to null,
                 )
 
@@ -291,7 +291,7 @@ internal fun resourceServerFormPageImpl(
                     title = title,
                     actions = {
                         a(
-                            href = "/admin/workspaces/$slug/settings/apis",
+                            href = "/admin/workspaces/$slug/apis",
                             classes = "btn btn--ghost",
                         ) { +"Cancel" }
                         button(type = ButtonType.submit, classes = "btn btn--primary") {
@@ -388,7 +388,7 @@ internal fun resourceServerFormPageImpl(
                             ) {
                                 postButton(
                                     action =
-                                        "/admin/workspaces/$slug/settings/apis/" +
+                                        "/admin/workspaces/$slug/apis/" +
                                             "${existingId.value}/${if (prefill.enabled) "disable" else "enable"}",
                                     label = if (prefill.enabled) "Disable" else "Enable",
                                     btnClass = "btn btn--danger btn--sm",
@@ -404,7 +404,7 @@ internal fun resourceServerFormPageImpl(
                                 warning = true,
                             ) {
                                 form(
-                                    action = "/admin/workspaces/$slug/settings/apis/${existingId.value}/delete",
+                                    action = "/admin/workspaces/$slug/apis/${existingId.value}/delete",
                                     method = FormMethod.post,
                                     classes = "inline-form",
                                 ) {

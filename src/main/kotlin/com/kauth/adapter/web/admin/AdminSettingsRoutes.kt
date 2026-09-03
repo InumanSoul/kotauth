@@ -291,6 +291,7 @@ fun Route.adminSettingsRoutes(
             jwksUri = stored.jwksUri,
             scopes = stored.scopes,
             jitEnabled = stored.jitEnabled,
+            trustEmailClaim = stored.trustEmailClaim,
             jitAllowedDomains = stored.jitAllowedDomains,
         )
         call.respondRedirect(
@@ -694,6 +695,7 @@ private suspend fun ApplicationCall.saveIdentityProvider(
             jwksUri = params["jwksUri"],
             scopes = params["scopes"] ?: existing?.scopes ?: DEFAULT_OIDC_SCOPES,
             jitEnabled = params["jitEnabled"] == "true",
+            trustEmailClaim = params["trustEmailClaim"] == "true",
             // The ticked chips are the list. An unticked chip is a removal, so falling back to
             // what the row already held would make the empty list unreachable from the form —
             // and the empty list is precisely how an operator switches auto-creation off.

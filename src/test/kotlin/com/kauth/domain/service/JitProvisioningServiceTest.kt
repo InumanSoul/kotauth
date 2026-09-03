@@ -50,6 +50,7 @@ class JitProvisioningServiceTest {
     private fun provider(
         jit: Boolean,
         domains: List<String>,
+        trustEmail: Boolean = false,
     ) = IdentityProvider(
         tenantId = tenant.id,
         provider = oriana,
@@ -59,6 +60,7 @@ class JitProvisioningServiceTest {
         issuer = "https://idp.oriana.com.py",
         jitEnabled = jit,
         jitAllowedDomains = domains,
+        trustEmailClaim = trustEmail,
     )
 
     private fun profile(
@@ -296,6 +298,43 @@ class JitProvisioningServiceTest {
                 profile(email = "ada@oriana.com.py", verified = false),
             )
         assertEquals(JitRefusal.EMAIL_NOT_VERIFIED, (outcome as JitOutcome.Refused).reason)
+    }
+
+    @Test
+    fun `trusting the claim provisions an address the issuer never marked verified`() {
+        // Some issuers never send email_verified at all, so the strict gate refuses every
+        // sign-in through them. This is the operator opting into their own issuer's word.
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py"), trustEmail = true),
+                profile(email = "ada@oriana.com.py", verified = false),
+            )
+        assertIs<JitOutcome.Provisioned>(outcome)
+    }
+
+    @Test
+    fun `trusting the claim does not widen which domains may be created`() {
+        // The switch says which addresses count as verified. It must not become a way to
+        // provision from a domain the operator never listed.
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = listOf("oriana.com.py"), trustEmail = true),
+                profile(email = "mallory@attacker.example", verified = false),
+            )
+        assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
+    }
+
+    @Test
+    fun `trusting the claim leaves the allowed-domain list still required`() {
+        val outcome =
+            service.provision(
+                tenant,
+                provider(jit = true, domains = emptyList(), trustEmail = true),
+                profile(email = "ada@oriana.com.py", verified = false),
+            )
+        assertEquals(JitRefusal.DOMAIN_NOT_ALLOWED, (outcome as JitOutcome.Refused).reason)
     }
 
     @Test

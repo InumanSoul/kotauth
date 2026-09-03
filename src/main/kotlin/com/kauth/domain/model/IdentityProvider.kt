@@ -40,6 +40,14 @@ data class IdentityProvider(
     val scopes: String = DEFAULT_OIDC_SCOPES,
     val jitEnabled: Boolean = false,
     val jitAllowedDomains: List<String> = emptyList(),
+    /**
+     * Whether the issuer's `email` claim may be taken as verified.
+     *
+     * An absent `email_verified` claim reads as false, and some major issuers never emit it, so
+     * without this JIT could not provision from them at all. The domain allowlist still applies:
+     * this widens which addresses count as verified, never which domains are allowed.
+     */
+    val trustEmailClaim: Boolean = false,
     val createdAt: Instant = Instant.now(),
     val updatedAt: Instant = Instant.now(),
 ) {

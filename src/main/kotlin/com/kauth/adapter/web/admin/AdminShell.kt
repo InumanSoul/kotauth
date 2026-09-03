@@ -384,12 +384,7 @@ internal fun DIV.renderAppsCtxPanel(
         }
     }
     div("sidebar__divider") {}
-    val apisHref =
-        if (workspaceSlug != null) {
-            "/admin/workspaces/$workspaceSlug/settings/apis"
-        } else {
-            "/admin/settings/apis"
-        }
+    val apisHref = if (workspaceSlug != null) "/admin/workspaces/$workspaceSlug/apis" else "/admin"
     ctxLink(apisHref, "apis", activeAppSection, com.kauth.adapter.web.EnglishStrings.API_NAV_LABEL)
 }
 

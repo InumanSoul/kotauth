@@ -553,6 +553,7 @@ fun Application.module(
             portalClientProvisioning = s.portalClientProvisioning,
             identityProviderRepository = s.identityProviderRepository,
             identityProviderService = s.identityProviderService,
+            socialAccountRepository = s.socialAccountRepository,
             apiKeyService = s.apiKeyService,
             webhookService = s.webhookService,
             encryptionService = s.encryptionService,
