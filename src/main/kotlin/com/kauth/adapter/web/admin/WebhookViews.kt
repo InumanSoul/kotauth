@@ -110,10 +110,10 @@ internal fun webhooksListPageImpl(
                     thead {
                         tr {
                             th { +"URL" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { +"Events" }
-                            th { +"Status" }
-                            th { +"Created" }
+                            th { +EnglishStrings.COL_STATUS }
+                            th { +EnglishStrings.COL_CREATED }
                             th { +"" }
                         }
                     }
@@ -184,9 +184,9 @@ internal fun webhooksListPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Event" }
+                                th { +EnglishStrings.COL_EVENT }
                                 th { +"Endpoint" }
-                                th { +"Status" }
+                                th { +EnglishStrings.COL_STATUS }
                                 th { +"HTTP" }
                                 th { +"Attempts" }
                                 th { +"Last attempt" }

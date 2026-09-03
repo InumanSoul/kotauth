@@ -398,6 +398,38 @@ object EnglishStrings {
     const val IMPORT_LINK_FROM_LIST = "Import from backup"
     const val IMPORT_LINK_FROM_CREATE = "Restoring from a backup? Import instead."
 
+    /**
+     * The console's shared vocabulary: column headers, action labels and state words that appear
+     * on more than one page.
+     *
+     * Each was written out at every site, so the same word drifted between them — "Danger zone"
+     * stood at four sites and "Active" at five, each free to be edited alone. Words that merely
+     * coincide are kept apart: the registration state "Open" is not the "Open" on a row action,
+     * and collapsing them would tie two unrelated strings together.
+     */
+    const val COL_NAME = "Name"
+    const val COL_DESCRIPTION = "Description"
+    const val COL_STATUS = "Status"
+    const val COL_USERNAME = "Username"
+    const val COL_EMAIL = "Email"
+    const val COL_CREATED = "Created"
+    const val COL_EXPIRES = "Expires"
+    const val COL_EVENT = "Event"
+    const val COL_SLUG = "Slug"
+    const val COL_CLIENT_ID = "Client ID"
+    const val COL_ROLES = "Roles"
+
+    const val ACTION_OPEN = "Open"
+    const val ACTION_CANCEL = "Cancel"
+    const val ACTION_SAVE = "Save"
+    const val ACTION_DELETE = "Delete"
+    const val ACTION_REMOVE = "Remove"
+
+    const val STATE_ACTIVE = "Active"
+    const val STATE_DISABLED = "Disabled"
+
+    const val DANGER_ZONE_HEADING = "Danger zone"
+
     // Sign-in methods table columns.
     const val AUTH_METHODS_TABLE_COL_METHOD = "Method"
     const val AUTH_METHODS_TABLE_COL_ENABLED = "Enabled"

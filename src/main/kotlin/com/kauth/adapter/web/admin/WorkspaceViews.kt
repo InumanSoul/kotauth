@@ -205,7 +205,7 @@ internal fun workspaceDetailPageImpl(
                                     style = "width:210px;"
                                     +"Client ID"
                                 }
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th {
                                     style = "width:110px;"
                                     +"Type"

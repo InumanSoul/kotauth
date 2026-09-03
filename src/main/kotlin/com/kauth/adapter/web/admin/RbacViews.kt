@@ -58,9 +58,9 @@ internal fun rolesListPageImpl(
                 table("data-table") {
                     thead {
                         tr {
-                            th { +"Name" }
+                            th { +EnglishStrings.COL_NAME }
                             th { +"Scope" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { +"Composite" }
                             th { style = "width:70px;" }
                         }
@@ -389,8 +389,8 @@ internal fun roleDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Username" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_USERNAME }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:80px;" }
                             }
                         }
@@ -487,10 +487,10 @@ internal fun groupsListPageImpl(
                 table("data-table") {
                     thead {
                         tr {
-                            th { +"Name" }
+                            th { +EnglishStrings.COL_NAME }
                             th { +"Parent" }
-                            th { +"Roles" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_ROLES }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { style = "width:70px;" }
                         }
                     }
@@ -834,8 +834,8 @@ internal fun groupDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Username" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_USERNAME }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:80px;" }
                             }
                         }

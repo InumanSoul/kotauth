@@ -300,8 +300,8 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Created" }
-                                th { +"Expires" }
+                                th { +EnglishStrings.COL_CREATED }
+                                th { +EnglishStrings.COL_EXPIRES }
                                 th { +"IP Address" }
                                 th { style = "width:80px;" }
                             }
@@ -363,7 +363,7 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Event" }
+                                th { +EnglishStrings.COL_EVENT }
                                 th { +"IP" }
                                 th { +"Reason" }
                                 th { +"When" }
@@ -402,7 +402,7 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th { +"Device" }
                                 th { +"Registered" }
                                 th { style = "width:80px;" }
@@ -444,7 +444,7 @@ internal fun userDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     if (user.isLocked) {
                         dangerZoneCard(
@@ -853,7 +853,7 @@ internal fun userListPageImpl(
                             tr {
                                 th { style = "width:200px;"; +"Username" }
                                 th { +"Full Name" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:110px;"; +"Status" }
                                 th { style = "width:70px;" }
                             }

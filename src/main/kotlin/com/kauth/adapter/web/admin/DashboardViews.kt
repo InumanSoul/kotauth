@@ -56,7 +56,7 @@ internal fun workspaceListPageImpl(
                         thead {
                             tr {
                                 th { style = "width:200px;"; +"Slug" }
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th { style = "width:130px;"; +"Registration" }
                                 th { style = "width:70px;" }
                             }

@@ -374,7 +374,7 @@ internal fun resourceServerFormPageImpl(
 
                 if (prefill != null && existingId != null) {
                     div("ov-card") {
-                        div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                        div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                         div("danger-zone") {
                             dangerZoneCard(
                                 title = if (prefill.enabled) "Disable API" else "Enable API",

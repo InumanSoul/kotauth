@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantKey
 import kotlinx.html.*
@@ -65,7 +66,7 @@ internal fun keyManagementPageImpl(
                             thead {
                                 tr {
                                     th { +"Key ID" }
-                                    th { +"Created" }
+                                    th { +EnglishStrings.COL_CREATED }
                                     th { style = "width:140px;"; +"Status" }
                                     th { style = "width:80px;" }
                                 }

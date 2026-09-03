@@ -653,7 +653,7 @@ internal fun identityProviderDetailPageImpl(
 
                     div("ov-card") {
                         div("ov-card__section-label ov-card__section-label--danger") {
-                            +"Danger zone"
+                            +EnglishStrings.DANGER_ZONE_HEADING
                         }
                         div("danger-zone") {
                             dangerZoneCard(
@@ -975,12 +975,12 @@ internal fun apiKeysListPageImpl(
             table("data-table") {
                 thead {
                     tr {
-                        th { +"Name" }
+                        th { +EnglishStrings.COL_NAME }
                         th { +"Prefix" }
                         th { +"Scopes" }
                         th { +"Last used" }
-                        th { +"Expires" }
-                        th { +"Status" }
+                        th { +EnglishStrings.COL_EXPIRES }
+                        th { +EnglishStrings.COL_STATUS }
                         th { +"" }
                     }
                 }

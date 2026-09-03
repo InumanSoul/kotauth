@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
@@ -80,8 +81,8 @@ internal fun activeSessionsPageImpl(
                                 th { +"User" }
                                 th { +"Client" }
                                 th { +"IP Address" }
-                                th { +"Created" }
-                                th { +"Expires" }
+                                th { +EnglishStrings.COL_CREATED }
+                                th { +EnglishStrings.COL_EXPIRES }
                                 th { +"" }
                             }
                         }
@@ -256,7 +257,7 @@ internal fun auditLogPageImpl(
                                 thead {
                                     tr {
                                         th { +"Time" }
-                                        th { +"Event" }
+                                        th { +EnglishStrings.COL_EVENT }
                                         th { +"User" }
                                         th { +"Client" }
                                         th { +"IP" }
