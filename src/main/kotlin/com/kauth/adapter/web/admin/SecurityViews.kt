@@ -245,7 +245,7 @@ internal fun identityProvidersPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Provider cards ───────────────────────────────────────
@@ -640,10 +640,8 @@ private fun FlowContent.jitControls(existing: IdentityProvider?) {
                 // empty on the add form means not configured yet, and those are opposite meanings.
                 // Saying "off" about a provider nobody has saved would state the wrong one.
                 if (existing != null) {
-                    div("notice") {
-                        div("notice__body") {
-                            div("notice__desc") { +EnglishStrings.IDP_JIT_DOMAINS_EMPTY }
-                        }
+                    notice {
+                        div("notice__desc") { +EnglishStrings.IDP_JIT_DOMAINS_EMPTY }
                     }
                 }
             } else {
@@ -694,11 +692,9 @@ private fun FlowContent.discoveryProbePanel(
         div {
             when (probe) {
                 is AdminResult.Failure -> {
-                    div("notice notice--error") {
-                        div("notice__body") {
-                            div("notice__title") { +EnglishStrings.IDP_DISCOVERY_FAILED_TITLE }
-                            div("notice__desc") { +probe.error.message }
-                        }
+                    notice(modifier = "notice--error") {
+                        div("notice__title") { +EnglishStrings.IDP_DISCOVERY_FAILED_TITLE }
+                        div("notice__desc") { +probe.error.message }
                     }
                 }
                 is AdminResult.Success -> {
@@ -722,12 +718,10 @@ private fun FlowContent.discoveryProbePanel(
 
             // Rendered on both outcomes: a resolved document is exactly when an operator is most
             // likely to believe setup is finished, and a failed one still leaves this to register.
-            div("notice") {
-                div("notice__body") {
-                    div("notice__title") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_TITLE }
-                    div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_REDIRECT }
-                    div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_CREDENTIALS }
-                }
+            notice {
+                div("notice__title") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_TITLE }
+                div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_REDIRECT }
+                div("notice__desc") { +EnglishStrings.IDP_DISCOVERY_NOT_VERIFIED_CREDENTIALS }
             }
             div("edit-row__hint") { +EnglishStrings.IDP_DISCOVERY_CALLBACK_LABEL }
             div("copy-field") {
@@ -831,7 +825,7 @@ internal fun apiKeysListPageImpl(
 
         // ── One-time key reveal ──────────────────────────────────
         if (newKeyRaw != null) {
-            div("notice notice--success") {
+            notice(modifier = "notice--success", iconName = "check-circle") {
                 p { +"API key created — copy it now. You will not see it again." }
                 div("copy-field") {
                     span("copy-field__value") { +newKeyRaw }
@@ -846,13 +840,13 @@ internal fun apiKeysListPageImpl(
         }
 
         if (error != null) {
-            div("notice notice--error") { +error }
+            errorNotice(error)
         }
 
         // ── Keys table / empty state ─────────────────────────────
         if (apiKeys.isEmpty() && newKeyRaw == null) {
             emptyState(
-                iconName = "code",
+                iconName = "key",
                 title = "No API keys yet",
                 description = "Create a key to enable machine-to-machine access to this workspace.",
                 cta = {
@@ -866,7 +860,7 @@ internal fun apiKeysListPageImpl(
                 },
             )
         } else {
-            table("key-table") {
+            table("data-table") {
                 thead {
                     tr {
                         th { +"Name" }
@@ -882,17 +876,17 @@ internal fun apiKeysListPageImpl(
                     apiKeys.forEach { key ->
                         tr {
                             td {
-                                span("key-table__name") { +key.name }
+                                span("data-table__name") { +key.name }
                                 if (key.bootstrapName != null) {
                                     span("badge badge--neutral badge--inline") { +"Bootstrapped" }
                                 }
                             }
-                            td { span("key-table__meta") { +"${key.keyPrefix}\u2026" } }
+                            td { span("data-table__meta") { +"${key.keyPrefix}\u2026" } }
                             td {
-                                span("key-table__meta") { +key.scopes.joinToString(", ") }
+                                span("data-table__meta") { +key.scopes.joinToString(", ") }
                             }
                             td {
-                                span("key-table__meta") {
+                                span("data-table__meta") {
                                     +(
                                         key.lastUsedAt?.let {
                                             java.time.format.DateTimeFormatter
@@ -904,7 +898,7 @@ internal fun apiKeysListPageImpl(
                                 }
                             }
                             td {
-                                span("key-table__meta") {
+                                span("data-table__meta") {
                                     +(
                                         key.expiresAt?.let {
                                             java.time.format.DateTimeFormatter
@@ -924,7 +918,7 @@ internal fun apiKeysListPageImpl(
                                     key.bootstrapName != null -> {
                                         val bootstrapHint =
                                             "Managed via KAUTH_BOOTSTRAP_API_KEYS \u2014 edit the env var to rotate or revoke."
-                                        span("key-table__meta key-table__meta--with-icon") {
+                                        span("data-table__meta data-table__meta--with-icon") {
                                             attributes["aria-label"] = bootstrapHint
                                             +"Env-managed "
                                             span("inline-help") {
@@ -1019,7 +1013,7 @@ internal fun createApiKeyPageImpl(
         }
 
         if (error != null) {
-            div("notice notice--error") { +error }
+            errorNotice(error)
         }
 
         // ── Form ─────────────────────────────────────────────────

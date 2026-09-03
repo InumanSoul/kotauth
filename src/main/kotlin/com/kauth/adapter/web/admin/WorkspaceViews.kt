@@ -335,7 +335,7 @@ internal fun createWorkspacePageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -477,7 +477,7 @@ internal fun workspaceSettingsPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -644,7 +644,7 @@ internal fun securityPolicyPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form (wraps both cards) ──────────────────────────────
@@ -905,7 +905,7 @@ internal fun brandingPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Two-column layout ──────────────────────────────────

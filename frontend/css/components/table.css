@@ -6,6 +6,8 @@
  *   .data-table__id      — monospace accent link (client IDs, usernames)
  *   .data-table__name    — primary text cell
  *   .data-table__email   — monospace muted email cell
+ *   .data-table__meta    — monospace muted secondary cell (URLs, counts, timestamps)
+ *   .data-table__meta--with-icon — meta cell carrying a trailing .inline-help icon
  *   .data-table__actions — right-aligned action buttons cell
  *
  * Inline filter: .filter-bar (reusable above any data-table)
@@ -66,6 +68,18 @@
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-muted);
+}
+
+.data-table__meta {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.data-table__meta--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
 .data-table__actions {

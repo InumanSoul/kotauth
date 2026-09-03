@@ -83,7 +83,7 @@ internal fun scimProvisioningPageImpl(
                 ovRowMuted("", EnglishStrings.SCIM_TOKEN_HINT)
                 if (scimKeys.isEmpty()) {
                     emptyState(
-                        iconName = "code",
+                        iconName = "key",
                         title = EnglishStrings.SCIM_KEYS_EMPTY_TITLE,
                         description = EnglishStrings.SCIM_KEYS_EMPTY_BODY,
                         cta = {
@@ -139,7 +139,7 @@ private fun DIV.scimKeyTable(
     scimKeys: List<ApiKey>,
     slug: String,
 ) {
-    table("key-table") {
+    table("data-table") {
         thead {
             tr {
                 th { +EnglishStrings.SCIM_KEYS_COL_NAME }
@@ -152,12 +152,12 @@ private fun DIV.scimKeyTable(
             scimKeys.forEach { key ->
                 tr {
                     td {
-                        span("key-table__name") { +key.name }
-                        span("key-table__meta") { +" ${key.keyPrefix}…" }
+                        span("data-table__name") { +key.name }
+                        span("data-table__meta") { +" ${key.keyPrefix}…" }
                     }
                     td { scimDialectCell(key, slug) }
                     td {
-                        span("key-table__meta") {
+                        span("data-table__meta") {
                             +(key.lastUsedAt?.toDisplayString() ?: EnglishStrings.SCIM_KEYS_NEVER_USED)
                         }
                     }
@@ -183,8 +183,8 @@ private fun TD.scimDialectCell(
     slug: String,
 ) {
     if (key.bootstrapName != null) {
-        span("key-table__meta") { +scimDialectFor(key.scimDialect).label }
-        span("key-table__meta key-table__meta--with-icon") {
+        span("data-table__meta") { +scimDialectFor(key.scimDialect).label }
+        span("data-table__meta data-table__meta--with-icon") {
             attributes["aria-label"] = EnglishStrings.SCIM_DIALECT_ENV_MANAGED_HINT
             +" ${EnglishStrings.SCIM_DIALECT_ENV_MANAGED} "
             span("inline-help") {

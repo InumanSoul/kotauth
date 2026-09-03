@@ -192,6 +192,32 @@ fun DIV.notice(
     }
 }
 
+/**
+ * Notice with a caller-supplied body — a bare message, a list, or mixed content.
+ *
+ * The title/description overload above cannot express those, which is why most notices
+ * in the console were hand-rolled as a bare `div("notice notice--error")` holding raw
+ * text. That renders without the icon slot and leaves the text unclassed, so it takes
+ * the page's default colour rather than the notice's semantic one.
+ */
+fun DIV.notice(
+    modifier: String? = null,
+    iconName: String? = "warning",
+    body: DIV.() -> Unit,
+) {
+    div("notice${if (modifier != null) " $modifier" else ""}") {
+        if (iconName != null) span("notice__icon") { inlineSvgIcon(iconName, iconName) }
+        div("notice__body") { body() }
+    }
+}
+
+/** Single-message error banner — the shape most call sites were building by hand. */
+fun DIV.errorNotice(message: String) {
+    notice(modifier = "notice--error") {
+        span("notice__title") { +message }
+    }
+}
+
 /** BEM empty state with icon, title, description, and optional CTA. */
 fun DIV.emptyState(
     iconName: String,

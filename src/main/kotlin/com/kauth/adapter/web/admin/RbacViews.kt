@@ -150,7 +150,7 @@ internal fun createRolePageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -582,7 +582,7 @@ internal fun createGroupPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -711,12 +711,14 @@ internal fun groupDetailPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             if (childGroups.isNotEmpty()) {
-                div("notice notice--warn") {
-                    +EnglishStrings.groupDeleteBlockedBySubgroups(group.name, childGroups)
+                notice(modifier = "notice--warn") {
+                    span("notice__title") {
+                        +EnglishStrings.groupDeleteBlockedBySubgroups(group.name, childGroups)
+                    }
                 }
             }
 

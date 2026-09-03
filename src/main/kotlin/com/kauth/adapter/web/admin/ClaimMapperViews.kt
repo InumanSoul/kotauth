@@ -52,7 +52,7 @@ internal fun claimMappersListPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (mappers.isEmpty()) {
@@ -165,7 +165,7 @@ internal fun claimMapperFormPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 form(

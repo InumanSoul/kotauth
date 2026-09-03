@@ -47,7 +47,7 @@ internal fun HTML.signInMethodsAdminPage(
             )
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(

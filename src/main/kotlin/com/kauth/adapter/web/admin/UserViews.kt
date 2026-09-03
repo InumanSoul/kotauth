@@ -187,7 +187,7 @@ internal fun userDetailPageImpl(
             }
 
             if (editError != null) {
-                div("notice notice--error") { +editError }
+                errorNotice(editError)
             }
             if (user.isLocked) {
                 notice(
@@ -561,7 +561,7 @@ internal fun DIV.userProfileEditFragment(
     div {
         id = "profile-section"
         if (editError != null) {
-            div("notice notice--error") { +editError }
+            errorNotice(editError)
         }
         div("ov-card") {
             div("ov-card__section-label") { +"Edit Profile" }
@@ -941,7 +941,7 @@ internal fun createUserPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form ─────────────────────────────────────────────────
@@ -1095,7 +1095,7 @@ private fun FlowContent.userAttributesSection(
         }
 
         if (error != null) {
-            div("notice notice--error") { +error }
+            errorNotice(error)
         }
 
         if (attributes.isEmpty()) {
@@ -1224,7 +1224,7 @@ internal fun userAttributeFormPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 div("ov-card") {

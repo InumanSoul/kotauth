@@ -47,7 +47,7 @@ internal fun resourceServersListPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (resources.isEmpty()) {
@@ -170,7 +170,7 @@ internal fun clientAuthorizedApisPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (allResources.isEmpty()) {
@@ -302,7 +302,7 @@ internal fun resourceServerFormPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 form(action = submitUrl, method = FormMethod.post, classes = "edit-form") {

@@ -27,6 +27,18 @@
 form+.ov-card { margin-top: var(--space-5); }
 .ov-card + .ov-card { margin-top: var(--space-5); }
 
+/* ── Nested surfaces ───────────────────────────────────────────────────── */
+
+.ov-card > .data-table,
+.ov-card > .method-table,
+.ov-card > .notice {
+  border: none;
+  margin-bottom: 0;
+}
+
+/* A table filling the card meets its edges, so its own outer rules are redundant. */
+.ov-card > .data-table tbody tr:last-child td { border-bottom: none; }
+
 /* ── Section label (divider heading row) ───────────────────────────────── */
 
 .ov-card__section-label {

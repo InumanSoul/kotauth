@@ -69,7 +69,7 @@ internal fun smtpSettingsPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form (wraps all cards) ───────────────────────────────

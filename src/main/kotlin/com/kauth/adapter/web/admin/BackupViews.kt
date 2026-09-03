@@ -59,16 +59,15 @@ internal fun workspaceBackupPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
-                div("notice notice--info") {
-                    span("notice__icon") { inlineSvgIcon("info", "info") }
-                    div("notice__body") {
-                        span("notice__title") { +EnglishStrings.BACKUP_SCOPE_NOTICE_TITLE }
-                        span("notice__desc") { +EnglishStrings.BACKUP_SCOPE_NOTICE_BODY }
-                    }
-                }
+                notice(
+                    title = EnglishStrings.BACKUP_SCOPE_NOTICE_TITLE,
+                    description = EnglishStrings.BACKUP_SCOPE_NOTICE_BODY,
+                    modifier = "notice--info",
+                    iconName = "info",
+                )
 
                 form(
                     action = "/admin/workspaces/$slug/settings/backup",
@@ -200,21 +199,18 @@ internal fun importTenantPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
-                div("notice notice--info") {
-                    span("notice__icon") { inlineSvgIcon("info", "info") }
-                    div("notice__body") {
-                        span("notice__title") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_TITLE }
-                        span("notice__desc") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_BODY }
-                        ul {
-                            li { +EnglishStrings.IMPORT_RECOVERY_OAUTH_SECRETS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SOCIAL_SECRETS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SMTP_PASSWORD }
-                            li { +EnglishStrings.IMPORT_RECOVERY_MFA_SEEDS }
-                            li { +EnglishStrings.IMPORT_RECOVERY_SESSIONS }
-                        }
+                notice(modifier = "notice--info", iconName = "info") {
+                    span("notice__title") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_TITLE }
+                    span("notice__desc") { +EnglishStrings.IMPORT_RECOVERY_NOTICE_BODY }
+                    ul {
+                        li { +EnglishStrings.IMPORT_RECOVERY_OAUTH_SECRETS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SOCIAL_SECRETS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SMTP_PASSWORD }
+                        li { +EnglishStrings.IMPORT_RECOVERY_MFA_SEEDS }
+                        li { +EnglishStrings.IMPORT_RECOVERY_SESSIONS }
                     }
                 }
 

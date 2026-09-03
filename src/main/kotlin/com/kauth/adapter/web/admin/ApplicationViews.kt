@@ -137,7 +137,7 @@ internal fun applicationDetailPageImpl(
 
             // ── New secret banner (shown once after regeneration) ────
             if (newSecret != null) {
-                div("notice notice--success") {
+                notice(modifier = "notice--success", iconName = "check-circle") {
                     p { +"New Client Secret — copy it now. You will not see it again." }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
@@ -470,7 +470,7 @@ internal fun createApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -650,7 +650,7 @@ internal fun editApplicationPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────

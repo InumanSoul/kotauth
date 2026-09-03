@@ -29,7 +29,9 @@ object AuthMethodsGridView {
             }
             val passwordRow = rows.firstOrNull { it.key == MethodKey.PASSWORD }
             if (passwordRow != null && !passwordRow.enabled) {
-                div("notice notice--warn") { +EnglishStrings.AUTH_METHODS_PASSWORD_OFF_WARNING }
+                notice(modifier = "notice--warn") {
+                    span("notice__title") { +EnglishStrings.AUTH_METHODS_PASSWORD_OFF_WARNING }
+                }
             }
         }
 

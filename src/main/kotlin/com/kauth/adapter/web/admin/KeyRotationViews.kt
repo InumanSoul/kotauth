@@ -50,7 +50,7 @@ internal fun keyManagementPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 div("ov-card") {

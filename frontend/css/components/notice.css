@@ -80,6 +80,11 @@
 .notice--error .notice__icon,
 .notice--error .notice__title { color: var(--color-red); }
 
+/* Amber is the default, so --warn only needs to be nameable alongside its siblings. */
+.notice--warn { background: var(--color-amber-bg); border-color: var(--color-amber-border); }
+.notice--warn .notice__icon,
+.notice--warn .notice__title { color: var(--color-amber); }
+
 .notice--info { background: var(--color-accent-bg); border-color: var(--color-accent-border); }
 .notice--info .notice__icon,
 .notice--info .notice__title { color: var(--color-accent); }

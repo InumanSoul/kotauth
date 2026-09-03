@@ -64,7 +64,7 @@ internal fun webhooksListPageImpl(
 
             // ── One-time secret reveal ───────────────────────────────
             if (newSecret != null) {
-                div("notice notice--success") {
+                notice(modifier = "notice--success", iconName = "check-circle") {
                     p { +"Webhook created — copy the signing secret now. You will not see it again." }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
@@ -83,7 +83,7 @@ internal fun webhooksListPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Endpoints table / empty state ────────────────────────
@@ -103,7 +103,7 @@ internal fun webhooksListPageImpl(
                     },
                 )
             } else {
-                table("key-table") {
+                table("data-table") {
                     thead {
                         tr {
                             th { +"URL" }
@@ -117,10 +117,10 @@ internal fun webhooksListPageImpl(
                     tbody {
                         endpoints.forEach { ep ->
                             tr {
-                                td { span("key-table__meta") { +ep.url } }
-                                td { span("key-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
+                                td { span("data-table__meta") { +ep.url } }
+                                td { span("data-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
                                 td {
-                                    span("key-table__meta") {
+                                    span("data-table__meta") {
                                         +(ep.events.map { it.value }.sorted().joinToString(", ").ifBlank { "none" })
                                     }
                                 }
@@ -129,7 +129,7 @@ internal fun webhooksListPageImpl(
                                     span(badgeCls) { +(if (ep.enabled) "Enabled" else "Disabled") }
                                 }
                                 td {
-                                    span("key-table__meta") {
+                                    span("data-table__meta") {
                                         +DateTimeFormatter
                                             .ofPattern("MMM d, yyyy")
                                             .withZone(java.time.ZoneId.of("UTC"))
@@ -178,7 +178,7 @@ internal fun webhooksListPageImpl(
                         +"Recent Delivery History"
                         span("text-muted text-sm") { +" (last ${deliveries.size})" }
                     }
-                    table("key-table") {
+                    table("data-table") {
                         thead {
                             tr {
                                 th { +"Event" }
@@ -193,8 +193,8 @@ internal fun webhooksListPageImpl(
                             deliveries.forEach { d ->
                                 val ep = endpoints.firstOrNull { it.id == d.endpointId }
                                 tr {
-                                    td { span("key-table__meta") { +d.eventType.value } }
-                                    td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
+                                    td { span("data-table__meta") { +d.eventType.value } }
+                                    td { span("data-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
                                     td {
                                         span(
                                             when (d.status) {
@@ -206,10 +206,10 @@ internal fun webhooksListPageImpl(
                                             +d.status.value
                                         }
                                     }
-                                    td { span("key-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
-                                    td { span("key-table__meta") { +d.attempts.toString() } }
+                                    td { span("data-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
+                                    td { span("data-table__meta") { +d.attempts.toString() } }
                                     td {
-                                        span("key-table__meta") {
+                                        span("data-table__meta") {
                                             +(
                                                 d.lastAttemptAt?.let {
                                                     DateTimeFormatter
@@ -282,7 +282,7 @@ internal fun createWebhookPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Endpoint details ─────────────────────────────────────
