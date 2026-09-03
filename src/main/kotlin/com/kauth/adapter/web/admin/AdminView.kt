@@ -408,30 +408,52 @@ object AdminView {
         )
 
     @Suppress("LongParameterList")
-    fun identityProvidersPage(
+    fun identityProvidersIndexPage(
         workspace: Tenant,
         providers: List<IdentityProvider>,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         error: String? = null,
         saved: Boolean = false,
+        deleted: Boolean = false,
         failures: Map<com.kauth.domain.model.ProviderKey, List<SignInFailureRow>> = emptyMap(),
+    ): HTML.() -> Unit =
+        identityProvidersIndexPageImpl(
+            workspace = workspace,
+            providers = providers,
+            allWorkspaces = allWorkspaces,
+            loggedInAs = loggedInAs,
+            error = error,
+            saved = saved,
+            deleted = deleted,
+            failures = failures,
+        )
+
+    fun identityProviderDetailPage(
+        workspace: Tenant,
+        provider: com.kauth.domain.model.ProviderKey?,
+        existing: IdentityProvider?,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false,
+        failures: List<SignInFailureRow> = emptyList(),
         baseUrl: String = "",
-        probed: com.kauth.domain.model.ProviderKey? = null,
         probe: com.kauth.domain.service.AdminResult<com.kauth.domain.service.DiscoveryProbe>? = null,
     ): HTML.() -> Unit =
-        identityProvidersPageImpl(
-            workspace,
-            providers,
-            allWorkspaces,
-            loggedInAs,
-            error,
-            saved,
-            failures,
-            baseUrl,
-            probed,
-            probe,
+        identityProviderDetailPageImpl(
+            workspace = workspace,
+            provider = provider,
+            existing = existing,
+            allWorkspaces = allWorkspaces,
+            loggedInAs = loggedInAs,
+            error = error,
+            saved = saved,
+            failures = failures,
+            baseUrl = baseUrl,
+            probe = probe,
         )
+
 
     fun apiKeysListPage(
         workspace: Tenant,

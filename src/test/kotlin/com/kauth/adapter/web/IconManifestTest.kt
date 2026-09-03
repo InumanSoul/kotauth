@@ -53,11 +53,14 @@ class IconManifestTest {
 
     @Test
     fun `every shipped icon is referenced by a view`() {
-        val sources = viewSources()
+        // Matched against icon-bearing syntax only. A plain whole-file search for the quoted
+        // name reports a false negative whenever an icon shares a name with an unrelated
+        // literal — "openid" is also an OAuth scope, "code" and "user" are similarly common.
+        val referenced = iconNamesInIconContexts()
         val orphans =
             shippedIcons()
                 .map { it.nameWithoutExtension }
-                .filterNot { name -> sources.any { it.contains("\"$name\"") } }
+                .filterNot { it in referenced }
                 .sorted()
 
         assertTrue(
@@ -86,10 +89,29 @@ class IconManifestTest {
         )
     }
 
+    /**
+     * Every name that reaches [inlineSvgIcon], including the `when` branches that map a rail key
+     * or a provider to an icon file. The branch pattern also picks up unrelated strings such as
+     * CSS modifiers; that is harmless here, because this set is only ever asked whether it
+     * contains a name that is already known to be a shipped icon.
+     */
+    private fun iconNamesInIconContexts(): Set<String> =
+        viewSources()
+            .flatMap { source ->
+                ICON_CALL.findAll(source).map { it.groupValues[1] } +
+                    NAMED_ICON_ARGUMENT.findAll(source).map { it.groupValues[1] } +
+                    WHEN_BRANCH_TO_NAME.findAll(source).map { it.groupValues[1] }
+            }.toSet()
+
     private companion object {
+        /** `ProviderKey.GOOGLE -> "google-logo"`, and the rail's `"apps" -> "rail-apps" to "Apps"`. */
+        val WHEN_BRANCH_TO_NAME = Regex("""->\s*"([a-z0-9-]+)"""")
+
         val ACCEPTABLE_PAINTS = setOf("currentColor", "none")
         val PAINT_ATTRIBUTE = Regex("""\b(stroke|fill)="([^"]*)"""")
         val ICON_CALL = Regex("""inlineSvgIcon\(\s*"([a-z0-9-]+)"""")
-        val NAMED_ICON_ARGUMENT = Regex("""iconName\s*=\s*"([a-z0-9-]+)"""")
+
+        /** Both `iconName = "x"` at a call site and `iconName: String = "x"` as a default. */
+        val NAMED_ICON_ARGUMENT = Regex("""iconName(?::\s*String\??)?\s*=\s*"([a-z0-9-]+)"""")
     }
 }

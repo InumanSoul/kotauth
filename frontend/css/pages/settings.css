@@ -171,3 +171,70 @@
 }
 
 .methods-idp-hint a:hover { opacity: 0.8; }
+
+/* ── provider catalog ─────────────────────────────────────────────────── */
+/* The "add a provider" zone. Only ever a handful of tiles, so a grid of whole
+ * targets rather than a list of links — the tile is the hit area, matching how
+ * the rail and sidebar items already behave. */
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.provider-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 88px;
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 0.5px solid var(--color-border-md);
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.provider-tile:hover {
+  border-color: var(--color-accent);
+  background: rgba(31, 188, 255, 0.06);
+  text-decoration: none;
+}
+
+.provider-tile:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.provider-tile__logo {
+  color: var(--color-muted);
+  margin-bottom: var(--space-1);
+}
+
+.provider-tile__logo svg { width: 20px; height: 20px; }
+.provider-tile__name { font-size: 13px; color: var(--color-text); }
+.provider-tile__hint { font-size: 11px; color: var(--color-subtle); }
+
+/* ── advanced-field disclosure ────────────────────────────────────────── */
+/* Collapsing on redirect is correct for an advanced section, which is why the
+ * endpoint overrides can use <details> while a whole provider cannot. */
+
+.disclosure { border-top: 0.5px solid var(--color-border); }
+
+.disclosure > summary {
+  padding: var(--space-3) var(--space-4);
+  font-size: 12px;
+  color: var(--color-muted);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: "\203A"; transition: transform 0.12s; }
+.disclosure[open] > summary::before { transform: rotate(90deg); }
+.disclosure > summary:hover { color: var(--color-text); }

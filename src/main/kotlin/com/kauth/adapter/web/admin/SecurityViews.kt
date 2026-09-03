@@ -11,6 +11,7 @@ import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.socialCallbackUrl
+import com.kauth.domain.model.socialCallbackUrlTemplate
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.DiscoveryProbe
 import kotlinx.html.*
@@ -195,24 +196,27 @@ internal fun mfaSettingsPageImpl(
     }
 
 /**
- * Displays the Identity Providers configuration page for a tenant.
- * Shows a list of supported providers (Google, GitHub) with their current
- * configuration status and a form to add/update each provider.
+ * Identity Providers index — a table of what is configured, and a grid of what can be added.
+ *
+ * Configuration lives on a per-provider route rather than expanded inline. The save idiom here
+ * is POST-redirect-GET, which resets any `<details>` to collapsed and scrolls to the top, so an
+ * inline disclosure would collapse itself on every save. The columns carry the signals that make
+ * the catalog safe to scan — a recent-failure count above all, since a catalog that hides a
+ * broken provider is worse than the long form it replaces.
  */
-internal fun identityProvidersPageImpl(
+internal fun identityProvidersIndexPageImpl(
     workspace: Tenant,
     providers: List<IdentityProvider>,
     allWorkspaces: List<WorkspaceStub>,
     loggedInAs: String,
     error: String? = null,
     saved: Boolean = false,
+    deleted: Boolean = false,
     failures: Map<ProviderKey, List<SignInFailureRow>> = emptyMap(),
-    baseUrl: String = "",
-    probed: ProviderKey? = null,
-    probe: AdminResult<DiscoveryProbe>? = null,
 ): HTML.() -> Unit =
     {
         val slug = workspace.slug
+        val base = "/admin/workspaces/$slug/settings/identity-providers"
 
         adminShell(
             pageTitle = "Identity Providers — ${workspace.displayName}",
@@ -224,384 +228,477 @@ internal fun identityProvidersPageImpl(
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
             contentClass = "content-outer",
-            toastMessage = if (saved) EnglishStrings.TOAST_IDP_SAVED else null,
+            toastMessage =
+                when {
+                    saved -> EnglishStrings.TOAST_IDP_SAVED
+                    deleted -> EnglishStrings.TOAST_IDP_DELETED
+                    else -> null
+                },
         ) {
             div("content-inner") {
-            breadcrumb(
-                "Workspaces" to "/admin",
-                slug to "/admin/workspaces/$slug",
-                "Settings" to "/admin/workspaces/$slug/settings",
-                "Identity Providers" to null,
-            )
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    slug to "/admin/workspaces/$slug",
+                    "Settings" to "/admin/workspaces/$slug/settings",
+                    EnglishStrings.IDP_PAGE_TITLE to null,
+                )
 
-            div("page-header") {
-                div("page-header__left") {
-                    div("page-header__identity") {
-                        h1("page-header__title") { +"Identity Providers" }
-                        p("page-header__sub") {
-                            +"Configure SSO. Users can sign in with their existing accounts."
+                div("page-header") {
+                    div("page-header__left") {
+                        div("page-header__identity") {
+                            h1("page-header__title") { +EnglishStrings.IDP_PAGE_TITLE }
+                            p("page-header__sub") { +EnglishStrings.IDP_PAGE_SUB }
                         }
                     }
                 }
-            }
-            if (error != null) {
-                errorNotice(error)
-            }
 
-            // ── Provider cards ───────────────────────────────────────
-            val providerMap = providers.associateBy { it.provider }
+                if (error != null) errorNotice(error)
 
-            for (prov in ProviderKey.RESERVED) {
-                val existing = providerMap[prov]
-                val isConfigured = existing != null
-                val providerName = EnglishStrings.providerDisplayName(prov)
-                val callbackUrl = socialCallbackUrl(baseUrl, slug, prov)
+                val configured = providers.sortedBy { it.provider.value }
 
                 div("ov-card") {
-                    form(
-                        action = "/admin/workspaces/$slug/settings/identity-providers/${prov.value}",
-                        encType = FormEncType.applicationXWwwFormUrlEncoded,
-                        method = FormMethod.post,
-                    ) {
-                        // ── Header: name + badge + toggle ────────────
-                        div("provider-header") {
-                            div("provider-header__name") {
-                                +providerName
-                                if (isConfigured) {
-                                    val badgeCls = if (existing.enabled) "badge badge--active" else "badge badge--inactive"
-                                    span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
-                                } else {
-                                    span("badge badge--inactive") { +"Not configured" }
+                    div("ov-card__section-label") { +EnglishStrings.IDP_CONFIGURED_HEADING }
+                    if (configured.isEmpty()) {
+                        // Deliberately no call to action: the catalog below is the one.
+                        emptyState(
+                            iconName = "globe",
+                            title = EnglishStrings.IDP_NONE_TITLE,
+                            description = EnglishStrings.IDP_NONE_DESC,
+                        )
+                    } else {
+                        table("data-table") {
+                            thead {
+                                tr {
+                                    th { +EnglishStrings.IDP_COL_PROVIDER }
+                                    th { +EnglishStrings.IDP_COL_ISSUER }
+                                    th { +EnglishStrings.IDP_COL_JIT }
+                                    th { +EnglishStrings.IDP_COL_FAILURES }
+                                    th { +EnglishStrings.IDP_COL_STATUS }
+                                    th { +"" }
                                 }
                             }
-                            label("toggle") {
-                                input(type = InputType.checkBox, name = "enabled") {
-                                    attributes["value"] = "true"
-                                    if (existing?.enabled == true) checked = true
+                            tbody {
+                                configured.forEach { provider ->
+                                    providerRow(base, provider, failures[provider.provider].orEmpty())
                                 }
-                                span("toggle__track") { span("toggle__thumb") {} }
-                                span("toggle__label toggle__label--muted") { +"Enable" }
                             }
                         }
+                    }
+                }
 
-                        // ── Setup instructions + callback URL ────────
-                        div("setup-row") {
-                            div("setup-row__text") {
-                                // A provider key is open, so no exhaustive branch exists; the
-                                // fallback is unreachable while this loop walks RESERVED only.
-                                when (prov) {
-                                    ProviderKey.GOOGLE -> {
-                                        +"Create credentials in "
-                                        a(
-                                            href = "https://console.cloud.google.com/apis/credentials",
-                                            target = "_blank",
-                                        ) { +"Google Cloud Console" }
-                                        +". Set the authorized redirect URI to:"
-                                    }
-                                    ProviderKey.GITHUB -> {
-                                        +"Register an OAuth App in "
-                                        a(
-                                            href = "https://github.com/settings/developers",
-                                            target = "_blank",
-                                        ) { +"GitHub Developer Settings" }
-                                        +". Set the callback URL to:"
-                                    }
-                                    else -> {
-                                        +"Register this workspace with $providerName. Set the callback URL to:"
-                                    }
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.IDP_ADD_HEADING }
+                    div("provider-grid") {
+                        // The reserved keys are a fixed set, so their tiles go straight to the
+                        // provider's own page. Everything else needs a key named first.
+                        providerTile(
+                            href = "$base/${ProviderKey.GOOGLE.value}",
+                            iconName = "google-logo",
+                            name = EnglishStrings.providerDisplayName(ProviderKey.GOOGLE),
+                            hint = EnglishStrings.IDP_TILE_OAUTH2_HINT,
+                        )
+                        providerTile(
+                            href = "$base/${ProviderKey.GITHUB.value}",
+                            iconName = "github-logo",
+                            name = EnglishStrings.providerDisplayName(ProviderKey.GITHUB),
+                            hint = EnglishStrings.IDP_TILE_OAUTH2_HINT,
+                        )
+                        providerTile(
+                            href = "$base/new",
+                            // The same mark the sign-in page shows for every brokered provider.
+                            iconName = "globe",
+                            name = EnglishStrings.IDP_KIND_OIDC,
+                            hint = EnglishStrings.IDP_TILE_OIDC_HINT,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+/** One row of the configured-providers table. */
+private fun TBODY.providerRow(
+    base: String,
+    provider: IdentityProvider,
+    failures: List<SignInFailureRow>,
+) {
+    val href = "$base/${provider.provider.value}"
+    tr {
+        td {
+            a(href, classes = "data-table__name") {
+                +(provider.displayName?.takeIf { it.isNotBlank() } ?: EnglishStrings.providerDisplayName(provider.provider))
+            }
+        }
+        td {
+            // The one field that says which IdP this actually is; a display name is
+            // operator-chosen and can read as anything.
+            val issuerHost = provider.issuer?.let { runCatching { java.net.URI(it).host }.getOrNull() ?: it }
+            if (issuerHost != null) {
+                span("data-table__meta") { +issuerHost }
+            } else {
+                span("data-table__meta") { +EnglishStrings.IDP_BUILT_IN }
+            }
+        }
+        td {
+            span("data-table__meta") {
+                if (provider.jitEnabled) {
+                    +EnglishStrings.jitOnWithDomains(provider.jitAllowedDomains.size)
+                } else {
+                    +EnglishStrings.IDP_JIT_OFF
+                }
+            }
+        }
+        td {
+            if (failures.isEmpty()) {
+                span("data-table__meta") { +"—" }
+            } else {
+                span("badge badge--danger") { +EnglishStrings.recentFailures(failures.size) }
+            }
+        }
+        td { providerStatusBadge(provider) }
+        td("data-table__actions") {
+            a(href, classes = "btn btn--ghost btn--sm") { +EnglishStrings.IDP_CONFIGURE }
+        }
+    }
+}
+
+/**
+ * Three states, not two: a provider that exists but is switched off is not the same as one that
+ * was never set up, and reading them as one grey badge hid the difference.
+ */
+private fun FlowContent.providerStatusBadge(provider: IdentityProvider?) {
+    when {
+        provider == null -> span("badge badge--inactive") { +EnglishStrings.IDP_STATUS_NOT_CONFIGURED }
+        provider.enabled -> span("badge badge--active") { +EnglishStrings.IDP_STATUS_ENABLED }
+        else -> span("badge badge--warn") { +EnglishStrings.IDP_STATUS_DISABLED }
+    }
+}
+
+/** A whole-tile link in the "add a provider" grid. */
+private fun FlowContent.providerTile(
+    href: String,
+    iconName: String,
+    name: String,
+    hint: String,
+) {
+    a(href, classes = "provider-tile") {
+        span("provider-tile__logo") { inlineSvgIcon(iconName, name) }
+        span("provider-tile__name") { +name }
+        span("provider-tile__hint") { +hint }
+    }
+}
+
+/**
+ * One identity provider's own page — the configuration surface the index links to.
+ *
+ * Serves three cases from one function: a reserved key with a compiled-in OAuth2 adapter, a
+ * brokered OIDC provider, and the add form for a new brokered key. They differ in which fields
+ * they carry, not in how they are laid out, and splitting them produced two forms that drifted.
+ *
+ * [existing] is null for a provider that has not been configured yet, including a reserved one.
+ */
+internal fun identityProviderDetailPageImpl(
+    workspace: Tenant,
+    provider: ProviderKey?,
+    existing: IdentityProvider?,
+    allWorkspaces: List<WorkspaceStub>,
+    loggedInAs: String,
+    error: String? = null,
+    saved: Boolean = false,
+    failures: List<SignInFailureRow> = emptyList(),
+    baseUrl: String = "",
+    probe: AdminResult<DiscoveryProbe>? = null,
+): HTML.() -> Unit =
+    {
+        val slug = workspace.slug
+        val indexUrl = "/admin/workspaces/$slug/settings/identity-providers"
+        val isReserved = provider != null && provider in ProviderKey.RESERVED
+        val isNew = provider == null
+        val heading =
+            when {
+                isNew -> EnglishStrings.IDP_ADD_TITLE
+                else -> existing?.displayName?.takeIf { it.isNotBlank() }
+                    ?: EnglishStrings.providerDisplayName(provider!!)
+            }
+        // A new provider has no key yet, so its callback cannot be resolved server-side. The
+        // template carries the placeholder and the key field rewrites it as the operator types —
+        // without it they must register a throwaway redirect URI, save here, then go back and
+        // correct it at the issuer.
+        val callbackUrl = provider?.let { socialCallbackUrl(baseUrl, slug, it) }
+        val callbackTemplate = socialCallbackUrlTemplate(baseUrl, slug)
+        val formId = "idp-form"
+
+        adminShell(
+            pageTitle = "$heading — ${workspace.displayName}",
+            activeRail = "settings",
+            allWorkspaces = allWorkspaces,
+            workspaceName = workspace.displayName,
+            workspaceSlug = slug,
+            workspaceLogoUrl = workspace.theme.logoUrl,
+            loggedInAs = loggedInAs,
+            activeAppSection = "identity-providers",
+            contentClass = "content-outer",
+            toastMessage = if (saved) EnglishStrings.TOAST_IDP_SAVED else null,
+        ) {
+            div("content-inner") {
+                breadcrumb(
+                    "Workspaces" to "/admin",
+                    slug to "/admin/workspaces/$slug",
+                    "Settings" to "/admin/workspaces/$slug/settings",
+                    EnglishStrings.IDP_PAGE_TITLE to indexUrl,
+                    heading to null,
+                )
+
+                div("page-header") {
+                    div("page-header__left") {
+                        div("page-header__identity") {
+                            div("page-header__title-row") {
+                                h1("page-header__title") { +heading }
+                                providerStatusBadge(existing)
+                            }
+                        }
+                    }
+                    // Its own one-field POST, so the switch means what it looks like it means.
+                    // As a field of the edit form it did nothing until a Save far below.
+                    if (existing != null) {
+                        div("page-header__actions") {
+                            form(
+                                action = "$indexUrl/${provider!!.value}/enabled",
+                                encType = FormEncType.applicationXWwwFormUrlEncoded,
+                                method = FormMethod.post,
+                            ) {
+                                hiddenInput(name = "enabled") { value = (!existing.enabled).toString() }
+                                button(type = ButtonType.submit) {
+                                    classes = setOf("btn", "btn--ghost", "btn--sm")
+                                    +(
+                                        if (existing.enabled) {
+                                            EnglishStrings.IDP_DISABLE_ACTION
+                                        } else {
+                                            EnglishStrings.IDP_ENABLE_ACTION
+                                        }
+                                    )
                                 }
                             }
+                        }
+                    }
+                }
+
+                if (error != null) errorNotice(error)
+
+                form(
+                    action = if (isNew) indexUrl else "$indexUrl/${provider!!.value}",
+                    encType = FormEncType.applicationXWwwFormUrlEncoded,
+                    method = FormMethod.post,
+                ) {
+                    id = formId
+                    // An existing provider's enabled state is owned by the toggle above; without
+                    // this the edit form would post an unchecked box and switch it off on save.
+                    hiddenInput(name = "enabled") { value = (existing?.enabled ?: true).toString() }
+
+                    div("ov-card") {
+                        div("ov-card__section-label") { +EnglishStrings.IDP_CONNECTION_HEADING }
+
+                        div("setup-row") {
+                            div("setup-row__text") { providerSetupInstructions(provider, heading) }
                             div("copy-field") {
-                                span("copy-field__value") { +callbackUrl }
+                                span("copy-field__value") {
+                                    attributes["data-callback-template"] = callbackTemplate
+                                    +(callbackUrl ?: callbackTemplate)
+                                }
                                 button(type = ButtonType.button) {
                                     classes = setOf("copy-field__btn")
-                                    attributes["data-copy"] = callbackUrl
+                                    attributes["data-copy"] = callbackUrl ?: callbackTemplate
                                     title = "Copy"
                                     inlineSvgIcon("copy", "Copy")
                                 }
                             }
                         }
 
-                        // ── Credentials ──────────────────────────────
-                        div("edit-row") {
-                            span("edit-row__label") { +EnglishStrings.IDP_CLIENT_ID_LABEL }
-                            input(type = InputType.text, name = "clientId") {
-                                classes = setOf("edit-row__field")
-                                placeholder = "Enter $providerName client ID"
-                                required = true
-                                value = existing?.clientId ?: ""
-                                attributes["autocomplete"] = "off"
+                        if (isNew) {
+                            hiddenInput(name = "kind") { value = ProviderKind.OIDC.value }
+                            div("edit-row") {
+                                span("edit-row__label") { +EnglishStrings.IDP_KEY_LABEL }
+                                div {
+                                    input(type = InputType.text, name = "providerKey") {
+                                        classes = setOf("edit-row__field")
+                                        placeholder = EnglishStrings.IDP_KEY_PLACEHOLDER
+                                        required = true
+                                        attributes["autocomplete"] = "off"
+                                        attributes["data-callback-key-input"] = ""
+                                    }
+                                    div("edit-row__hint") { +EnglishStrings.IDP_KEY_HINT }
+                                }
                             }
                         }
+
+                        if (!isReserved) {
+                            idpTextRow(
+                                label = EnglishStrings.IDP_DISPLAY_NAME_LABEL,
+                                fieldName = "displayName",
+                                value = existing?.displayName,
+                                hint = EnglishStrings.IDP_DISPLAY_NAME_HINT,
+                                placeholder = EnglishStrings.IDP_DISPLAY_NAME_PLACEHOLDER,
+                            )
+                            idpTextRow(
+                                label = EnglishStrings.IDP_ISSUER_LABEL,
+                                fieldName = "issuer",
+                                value = existing?.issuer,
+                                hint = EnglishStrings.IDP_ISSUER_HINT,
+                                placeholder = EnglishStrings.IDP_ISSUER_PLACEHOLDER,
+                                required = true,
+                            )
+                        }
+
+                        idpTextRow(
+                            label = EnglishStrings.IDP_CLIENT_ID_LABEL,
+                            fieldName = "clientId",
+                            value = existing?.clientId,
+                            hint = null,
+                            placeholder = EnglishStrings.IDP_CLIENT_ID_PLACEHOLDER,
+                            required = true,
+                        )
+
                         div("edit-row") {
                             span("edit-row__label") { +EnglishStrings.IDP_CLIENT_SECRET_LABEL }
                             div {
                                 input(type = InputType.password, name = "clientSecret") {
                                     classes = setOf("edit-row__field")
-                                    placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                                    placeholder = "••••••••••"
                                     attributes["autocomplete"] = "new-password"
                                 }
                                 div("edit-row__hint") {
-                                    if (isConfigured) {
-                                        +EnglishStrings.IDP_SECRET_STORED_HINT
-                                    } else {
+                                    if (existing == null) {
                                         +EnglishStrings.IDP_SECRET_NEW_HINT
+                                    } else {
+                                        +EnglishStrings.IDP_SECRET_STORED_HINT
                                     }
                                 }
                             }
                         }
 
-                        jitControls(existing)
+                        // Discovery fills these in. Collapsing them on redirect is correct for an
+                        // advanced section, which is why <details> is right here and not for a
+                        // whole provider.
+                        if (!isReserved) {
+                            details("disclosure") {
+                                summary { +EnglishStrings.IDP_ADVANCED_SUMMARY }
+                                idpTextRow(
+                                    label = EnglishStrings.IDP_SCOPES_LABEL,
+                                    fieldName = "scopes",
+                                    value = existing?.scopes ?: DEFAULT_OIDC_SCOPES,
+                                    hint = EnglishStrings.IDP_SCOPES_HINT,
+                                    placeholder = DEFAULT_OIDC_SCOPES,
+                                )
+                                idpTextRow(
+                                    label = EnglishStrings.IDP_AUTHORIZATION_ENDPOINT_LABEL,
+                                    fieldName = "authorizationEndpoint",
+                                    value = existing?.authorizationEndpoint,
+                                    hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                                    placeholder = "",
+                                )
+                                idpTextRow(
+                                    label = EnglishStrings.IDP_TOKEN_ENDPOINT_LABEL,
+                                    fieldName = "tokenEndpoint",
+                                    value = existing?.tokenEndpoint,
+                                    hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                                    placeholder = "",
+                                )
+                                idpTextRow(
+                                    label = EnglishStrings.IDP_JWKS_URI_LABEL,
+                                    fieldName = "jwksUri",
+                                    value = existing?.jwksUri,
+                                    hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
+                                    placeholder = "",
+                                )
+                            }
+                        }
 
-                        // ── Save action ──────────────────────────────
-                        div("edit-actions") {
+                        div("ov-card__actions") {
                             button(type = ButtonType.submit) {
                                 classes = setOf("btn", "btn--primary", "btn--sm")
-                                +"Save $providerName"
+                                +(if (isNew) EnglishStrings.IDP_ADD_BUTTON else EnglishStrings.IDP_SAVE_BUTTON)
+                            }
+                            // Sits in the same bar but posts elsewhere: a discovery test writes
+                            // nothing and must not carry a secret typed but not yet saved.
+                            if (existing?.issuer != null) {
+                                button(type = ButtonType.submit) {
+                                    classes = setOf("btn", "btn--ghost", "btn--sm")
+                                    attributes["form"] = "idp-discovery-form"
+                                    +EnglishStrings.IDP_DISCOVERY_BUTTON
+                                }
                             }
                         }
                     }
 
-                    identityProviderFailuresPanel(failures[prov].orEmpty())
+                    div("ov-card") {
+                        div("ov-card__section-label") { +EnglishStrings.IDP_JIT_TITLE }
+                        jitControls(existing)
+                    }
+                }
+
+                if (existing?.issuer != null) {
+                    form(
+                        action = "$indexUrl/${provider!!.value}/test-discovery",
+                        encType = FormEncType.applicationXWwwFormUrlEncoded,
+                        method = FormMethod.post,
+                    ) { id = "idp-discovery-form" }
+                }
+
+                if (probe != null && callbackUrl != null) {
+                    discoveryProbePanel(probe, callbackUrl)
+                }
+
+                if (existing != null) {
+                    div("ov-card") {
+                        div("ov-card__section-label") { +EnglishStrings.IDP_FAILURES_HEADING }
+                        identityProviderFailuresPanel(failures)
+                    }
+
+                    div("ov-card") {
+                        div("ov-card__section-label ov-card__section-label--danger") {
+                            +"Danger zone"
+                        }
+                        div("danger-zone") {
+                            dangerZoneCard(
+                                title = EnglishStrings.IDP_DELETE_BUTTON,
+                                description = EnglishStrings.IDP_DELETE_DESCRIPTION,
+                            ) {
+                                postButton(
+                                    action = "$indexUrl/${provider!!.value}/delete",
+                                    label = EnglishStrings.IDP_DELETE_BUTTON,
+                                    btnClass = "btn btn--danger btn--sm",
+                                    confirmMessage = EnglishStrings.IDP_DELETE_CONFIRM,
+                                )
+                            }
+                        }
+                    }
                 }
             }
-
-            // ── OIDC providers ───────────────────────────────────────
-            h2 { +EnglishStrings.IDP_OIDC_SECTION_TITLE }
-            p("page-header__sub") { +EnglishStrings.IDP_OIDC_SECTION_SUB }
-
-            val oidcProviders =
-                providers
-                    .filter { it.provider !in ProviderKey.RESERVED }
-                    .sortedBy { it.provider.value }
-
-            if (oidcProviders.isEmpty()) {
-                div("ov-card") { p { +EnglishStrings.IDP_NO_OIDC_PROVIDERS } }
-            }
-            for (existing in oidcProviders) {
-                oidcProviderCard(
-                    slug = slug,
-                    baseUrl = baseUrl,
-                    existing = existing,
-                    failures = failures[existing.provider].orEmpty(),
-                    probe = probe.takeIf { existing.provider == probed },
-                )
-            }
-            oidcProviderCard(slug = slug, baseUrl = baseUrl, existing = null)
-                    }
-}
+        }
     }
 
-/**
- * One OIDC provider — the edit form for a configured row, or the add form when [existing] is null.
- *
- * The client secret is a write-only field on both surfaces: this form posts one and never
- * renders one back, so a configured row shows an empty box and a hint that blank keeps what
- * is stored.
- */
-private fun FlowContent.oidcProviderCard(
-    slug: String,
-    baseUrl: String,
-    existing: IdentityProvider?,
-    failures: List<SignInFailureRow> = emptyList(),
-    probe: AdminResult<DiscoveryProbe>? = null,
+/** Where to register the callback, in the issuer's own words where we know them. */
+private fun FlowContent.providerSetupInstructions(
+    provider: ProviderKey?,
+    providerName: String,
 ) {
-    val key = existing?.provider?.value
-    val action =
-        if (key == null) {
-            "/admin/workspaces/$slug/settings/identity-providers"
-        } else {
-            "/admin/workspaces/$slug/settings/identity-providers/$key"
+    when (provider) {
+        ProviderKey.GOOGLE -> {
+            +"Create credentials in "
+            a(href = "https://console.cloud.google.com/apis/credentials", target = "_blank") {
+                +"Google Cloud Console"
+            }
+            +". Set the authorized redirect URI to:"
         }
-
-    div("ov-card") {
-        form(
-            action = action,
-            encType = FormEncType.applicationXWwwFormUrlEncoded,
-            method = FormMethod.post,
-        ) {
-            val heading =
-                if (existing == null) {
-                    EnglishStrings.IDP_ADD_TITLE
-                } else {
-                    existing.displayName ?: EnglishStrings.providerDisplayName(existing.provider)
-                }
-            div("provider-header") {
-                div("provider-header__name") {
-                    +heading
-                    if (existing != null) {
-                        val badgeCls = if (existing.enabled) "badge badge--active" else "badge badge--inactive"
-                        span(badgeCls) { +(if (existing.enabled) "Enabled" else "Disabled") }
-                    }
-                }
-                label("toggle") {
-                    input(type = InputType.checkBox, name = "enabled") {
-                        attributes["value"] = "true"
-                        if (existing == null || existing.enabled) checked = true
-                    }
-                    span("toggle__track") { span("toggle__thumb") {} }
-                    span("toggle__label toggle__label--muted") { +EnglishStrings.IDP_ENABLE_LABEL }
-                }
+        ProviderKey.GITHUB -> {
+            +"Register an OAuth App in "
+            a(href = "https://github.com/settings/developers", target = "_blank") {
+                +"GitHub Developer Settings"
             }
-
-            if (existing == null) {
-                div("edit-row") {
-                    span("edit-row__label") { +EnglishStrings.IDP_KEY_LABEL }
-                    div {
-                        input(type = InputType.text, name = "providerKey") {
-                            classes = setOf("edit-row__field")
-                            placeholder = EnglishStrings.IDP_KEY_PLACEHOLDER
-                            required = true
-                            attributes["autocomplete"] = "off"
-                        }
-                        div("edit-row__hint") { +EnglishStrings.IDP_KEY_HINT }
-                    }
-                }
-            } else {
-                val callbackUrl = socialCallbackUrl(baseUrl, slug, existing.provider)
-                div("setup-row") {
-                    div("setup-row__text") { +EnglishStrings.IDP_CALLBACK_HINT }
-                    div("copy-field") {
-                        span("copy-field__value") { +callbackUrl }
-                        button(type = ButtonType.button) {
-                            classes = setOf("copy-field__btn")
-                            attributes["data-copy"] = callbackUrl
-                            title = "Copy"
-                            inlineSvgIcon("copy", "Copy")
-                        }
-                    }
-                }
-            }
-
-            div("edit-row") {
-                span("edit-row__label") { +EnglishStrings.IDP_KIND_LABEL }
-                div {
-                    hiddenInput(name = "kind") { value = ProviderKind.OIDC.value }
-                    span("ov-card__value") { +EnglishStrings.IDP_KIND_OIDC }
-                    div("edit-row__hint") { +EnglishStrings.IDP_KIND_HINT }
-                }
-            }
-
-            idpTextRow(
-                label = EnglishStrings.IDP_DISPLAY_NAME_LABEL,
-                fieldName = "displayName",
-                value = existing?.displayName,
-                hint = EnglishStrings.IDP_DISPLAY_NAME_HINT,
-                placeholder = EnglishStrings.IDP_DISPLAY_NAME_PLACEHOLDER,
-            )
-            idpTextRow(
-                label = EnglishStrings.IDP_ISSUER_LABEL,
-                fieldName = "issuer",
-                value = existing?.issuer,
-                hint = EnglishStrings.IDP_ISSUER_HINT,
-                placeholder = EnglishStrings.IDP_ISSUER_PLACEHOLDER,
-            )
-            idpTextRow(
-                label = EnglishStrings.IDP_CLIENT_ID_LABEL,
-                fieldName = "clientId",
-                value = existing?.clientId,
-                hint = null,
-                placeholder = EnglishStrings.IDP_CLIENT_ID_PLACEHOLDER,
-                required = true,
-            )
-
-            div("edit-row") {
-                span("edit-row__label") { +EnglishStrings.IDP_CLIENT_SECRET_LABEL }
-                div {
-                    input(type = InputType.password, name = "clientSecret") {
-                        classes = setOf("edit-row__field")
-                        placeholder = "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
-                        attributes["autocomplete"] = "new-password"
-                    }
-                    div("edit-row__hint") {
-                        if (existing == null) {
-                            +EnglishStrings.IDP_SECRET_NEW_HINT
-                        } else {
-                            +EnglishStrings.IDP_SECRET_STORED_HINT
-                        }
-                    }
-                }
-            }
-
-            idpTextRow(
-                label = EnglishStrings.IDP_SCOPES_LABEL,
-                fieldName = "scopes",
-                value = existing?.scopes ?: DEFAULT_OIDC_SCOPES,
-                hint = EnglishStrings.IDP_SCOPES_HINT,
-                placeholder = DEFAULT_OIDC_SCOPES,
-            )
-            idpTextRow(
-                label = EnglishStrings.IDP_AUTHORIZATION_ENDPOINT_LABEL,
-                fieldName = "authorizationEndpoint",
-                value = existing?.authorizationEndpoint,
-                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
-                placeholder = "",
-            )
-            idpTextRow(
-                label = EnglishStrings.IDP_TOKEN_ENDPOINT_LABEL,
-                fieldName = "tokenEndpoint",
-                value = existing?.tokenEndpoint,
-                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
-                placeholder = "",
-            )
-            idpTextRow(
-                label = EnglishStrings.IDP_JWKS_URI_LABEL,
-                fieldName = "jwksUri",
-                value = existing?.jwksUri,
-                hint = EnglishStrings.IDP_ENDPOINT_OVERRIDE_HINT,
-                placeholder = "",
-            )
-
-            jitControls(existing)
-
-            div("edit-actions") {
-                button(type = ButtonType.submit) {
-                    classes = setOf("btn", "btn--primary", "btn--sm")
-                    +(if (existing == null) EnglishStrings.IDP_ADD_BUTTON else EnglishStrings.IDP_SAVE_BUTTON)
-                }
-            }
+            +". Set the callback URL to:"
         }
-
-        if (existing != null) {
-            // A separate form again: a discovery test writes nothing, so it must not carry the
-            // edit form's fields — least of all a client secret typed but not yet saved.
-            if (existing.issuer != null) {
-                form(
-                    action = "/admin/workspaces/$slug/settings/identity-providers/$key/test-discovery",
-                    encType = FormEncType.applicationXWwwFormUrlEncoded,
-                    method = FormMethod.post,
-                ) {
-                    div("edit-actions") {
-                        button(type = ButtonType.submit) {
-                            classes = setOf("btn", "btn--ghost", "btn--sm")
-                            +EnglishStrings.IDP_DISCOVERY_BUTTON
-                        }
-                    }
-                }
-            }
-            if (probe != null) {
-                discoveryProbePanel(probe, socialCallbackUrl(baseUrl, slug, existing.provider))
-            }
-            identityProviderFailuresPanel(failures)
-        }
-
-        // A separate form: the delete POST must not carry the edit form's fields, and HTML
-        // forbids nesting one inside the other.
-        if (key != null) {
-            form(
-                action = "/admin/workspaces/$slug/settings/identity-providers/$key/delete",
-                encType = FormEncType.applicationXWwwFormUrlEncoded,
-                method = FormMethod.post,
-            ) {
-                div("edit-actions") {
-                    button(type = ButtonType.submit) {
-                        classes = setOf("btn", "btn--danger", "btn--sm")
-                        attributes["data-confirm"] = EnglishStrings.IDP_DELETE_CONFIRM
-                        +EnglishStrings.IDP_DELETE_BUTTON
-                    }
-                }
-            }
-        }
+        null -> +EnglishStrings.IDP_CALLBACK_HINT_NEW
+        else -> +"Register this workspace with $providerName. Set the callback URL to:"
     }
 }
 

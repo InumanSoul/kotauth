@@ -200,15 +200,101 @@ fun Route.adminSettingsRoutes(
         val providers = idpService?.list(workspace.id) ?: emptyList()
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.identityProvidersPage(
+            AdminView.identityProvidersIndexPage(
                 workspace = workspace,
                 providers = providers,
                 allWorkspaces = wsPairs,
                 loggedInAs = session.username,
                 saved = call.request.queryParameters["saved"] == "true",
+                deleted = call.request.queryParameters["deleted"] == "true",
                 failures = auditLogRepository.recentSignInFailures(workspace.id),
+            ),
+        )
+    }
+
+    // Declared before the {provider} route so the literal segment wins the match.
+    get("/settings/identity-providers/new") {
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.identityProviderDetailPage(
+                workspace = workspace,
+                provider = null,
+                existing = null,
+                allWorkspaces = call.attributes[WsPairsAttr],
+                loggedInAs = session.username,
                 baseUrl = baseUrl,
             ),
+        )
+    }
+
+    // A provider gets its own page whether or not it is configured: the reserved keys are a
+    // fixed set, so their page exists before anything is stored against it.
+    get("/settings/identity-providers/{provider}") {
+        val provName = call.parameters["provider"] ?: return@get call.respond(HttpStatusCode.BadRequest)
+        val provider =
+            ProviderKey.of(provName)
+                ?: return@get call.respond(HttpStatusCode.NotFound)
+        val session = call.sessions.get<AdminSession>()!!
+        val workspace = call.attributes[WorkspaceAttr]
+        val existing = idpService?.get(workspace.id, provider)
+        // An unconfigured key that is not one of the built-ins has no page to show.
+        if (existing == null && provider !in ProviderKey.RESERVED) {
+            return@get call.respondRedirect(
+                "/admin/workspaces/${workspace.slug}/settings/identity-providers",
+            )
+        }
+        call.respondHtml(
+            HttpStatusCode.OK,
+            AdminView.identityProviderDetailPage(
+                workspace = workspace,
+                provider = provider,
+                existing = existing,
+                allWorkspaces = call.attributes[WsPairsAttr],
+                loggedInAs = session.username,
+                saved = call.request.queryParameters["saved"] == "true",
+                failures = auditLogRepository.recentSignInFailures(workspace.id)[provider].orEmpty(),
+                baseUrl = baseUrl,
+            ),
+        )
+    }
+
+    // The enable switch is its own write. As a checkbox in the edit form it looked like it
+    // applied on click while doing nothing until a Save far below it.
+    post("/settings/identity-providers/{provider}/enabled") {
+        val provName = call.parameters["provider"] ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val provider =
+            ProviderKey.of(provName)
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+        val service =
+            idpService ?: return@post call.respond(
+                HttpStatusCode.NotImplemented,
+                "Identity provider repository not configured",
+            )
+        val workspace = call.attributes[WorkspaceAttr]
+        val stored =
+            service.get(workspace.id, provider)
+                ?: return@post call.respond(HttpStatusCode.NotFound)
+        val enabled = call.receiveParameters()["enabled"] == "true"
+        service.save(
+            tenantId = workspace.id,
+            key = provider,
+            clientId = stored.clientId,
+            clientSecret = null,
+            kind = stored.kind,
+            enabled = enabled,
+            displayName = stored.displayName,
+            issuer = stored.issuer,
+            authorizationEndpoint = stored.authorizationEndpoint,
+            tokenEndpoint = stored.tokenEndpoint,
+            jwksUri = stored.jwksUri,
+            scopes = stored.scopes,
+            jitEnabled = stored.jitEnabled,
+            jitAllowedDomains = stored.jitAllowedDomains,
+        )
+        call.respondRedirect(
+            "/admin/workspaces/${workspace.slug}/settings/identity-providers/${provider.value}",
         )
     }
 
@@ -226,6 +312,7 @@ fun Route.adminSettingsRoutes(
             ProviderKey.of(provName)
                 ?: return@post call.respondIdentityProviderError(
                     service,
+                    null,
                     EnglishStrings.IDP_KEY_INVALID,
                     auditLogRepository,
                     baseUrl,
@@ -272,16 +359,18 @@ fun Route.adminSettingsRoutes(
                 ?: return@post call.respond(HttpStatusCode.NotFound)
 
         val session = call.sessions.get<AdminSession>()!!
+        // Rendered on the provider's own page, so the result appears in the viewport the test
+        // was triggered from rather than deep inside a list of every provider.
         call.respondHtml(
             HttpStatusCode.OK,
-            AdminView.identityProvidersPage(
+            AdminView.identityProviderDetailPage(
                 workspace = workspace,
-                providers = service.list(workspace.id),
+                provider = provider,
+                existing = stored,
                 allWorkspaces = call.attributes[WsPairsAttr],
                 loggedInAs = session.username,
-                failures = auditLogRepository.recentSignInFailures(workspace.id),
+                failures = auditLogRepository.recentSignInFailures(workspace.id)[provider].orEmpty(),
                 baseUrl = baseUrl,
-                probed = provider,
                 probe = probeService.probe(stored),
             ),
         )
@@ -296,7 +385,9 @@ fun Route.adminSettingsRoutes(
         // A delete of a row that is already gone is what the operator asked for, so the
         // service's NotFound is not worth a page of its own.
         idpService?.delete(workspace.id, provider)
-        call.respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers")
+        call.respondRedirect(
+            "/admin/workspaces/${workspace.slug}/settings/identity-providers?deleted=true",
+        )
     }
 
     // -------------------------------------------------------------------
@@ -611,15 +702,24 @@ private suspend fun ApplicationCall.saveIdentityProvider(
 
     when (result) {
         is AdminResult.Success ->
-            respondRedirect("/admin/workspaces/${workspace.slug}/settings/identity-providers?saved=true")
+            respondRedirect(
+                "/admin/workspaces/${workspace.slug}/settings/identity-providers/${provider.value}?saved=true",
+            )
         is AdminResult.Failure ->
-            respondIdentityProviderError(service, result.error.message, auditLogRepository, baseUrl)
+            respondIdentityProviderError(service, provider, result.error.message, auditLogRepository, baseUrl)
     }
 }
 
-/** Re-renders the identity provider page with [error] at 422. */
+/**
+ * Re-renders the failing provider's own page with [error] at 422.
+ *
+ * [provider] is null when the key itself was rejected, which can only happen on the add form.
+ * Rendering on the provider's page is what makes the message unambiguous: it used to appear once
+ * at the top of a page listing every provider, naming none of them.
+ */
 private suspend fun ApplicationCall.respondIdentityProviderError(
     service: IdentityProviderService,
+    provider: ProviderKey?,
     error: String,
     auditLogRepository: AuditLogRepository?,
     baseUrl: String,
@@ -627,13 +727,14 @@ private suspend fun ApplicationCall.respondIdentityProviderError(
     val workspace = attributes[WorkspaceAttr]
     respondHtml(
         HttpStatusCode.UnprocessableEntity,
-        AdminView.identityProvidersPage(
+        AdminView.identityProviderDetailPage(
             workspace = workspace,
-            providers = service.list(workspace.id),
+            provider = provider,
+            existing = provider?.let { service.get(workspace.id, it) },
             allWorkspaces = attributes[WsPairsAttr],
             loggedInAs = sessions.get<AdminSession>()!!.username,
             error = error,
-            failures = auditLogRepository.recentSignInFailures(workspace.id),
+            failures = provider?.let { auditLogRepository.recentSignInFailures(workspace.id)[it] }.orEmpty(),
             baseUrl = baseUrl,
         ),
     )

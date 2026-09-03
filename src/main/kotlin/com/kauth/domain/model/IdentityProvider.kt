@@ -63,3 +63,15 @@ fun socialCallbackUrl(
     tenantSlug: String,
     provider: ProviderKey,
 ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
+
+/**
+ * The callback URL with the provider key left as a placeholder.
+ *
+ * The add form has no key until the operator types one, and a callback they cannot read there is
+ * a callback they must register twice at the issuer — once as a guess, once corrected.
+ */
+fun socialCallbackUrlTemplate(
+    baseUrl: String,
+    tenantSlug: String,
+    placeholder: String = "provider-key",
+): String = "$baseUrl/t/$tenantSlug/auth/social/$placeholder/callback"

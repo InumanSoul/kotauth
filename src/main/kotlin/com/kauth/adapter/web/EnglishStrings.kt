@@ -27,6 +27,7 @@ object EnglishStrings {
     const val TOAST_BRANDING_SAVED = "Branding saved."
     const val TOAST_SMTP_SAVED = "SMTP settings saved."
     const val TOAST_IDP_SAVED = "Identity provider settings saved."
+    const val TOAST_IDP_DELETED = "Identity provider deleted."
     const val TOAST_PROFILE_UPDATED = "Profile updated successfully."
     const val TOAST_PASSWORD_CHANGED = "Password changed successfully."
     const val TOAST_MFA_SETUP =
@@ -987,13 +988,39 @@ object EnglishStrings {
 
     // ── Identity providers ──────────────────────────────────────────────────
 
-    const val IDP_OIDC_SECTION_TITLE = "OIDC providers"
-    const val IDP_OIDC_SECTION_SUB =
-        "Any issuer that publishes an OpenID Connect discovery document can be added here. " +
-            "Endpoints are read from the issuer unless you override them."
+    const val IDP_PAGE_TITLE = "Identity Providers"
+    const val IDP_PAGE_SUB = "Configure SSO. Users can sign in with their existing accounts."
+    const val IDP_CONFIGURED_HEADING = "Configured providers"
+    const val IDP_ADD_HEADING = "Add a provider"
+    const val IDP_NONE_TITLE = "No identity providers"
+    const val IDP_NONE_DESC = "Users sign in with a password until you connect one."
+    const val IDP_COL_PROVIDER = "Provider"
+    const val IDP_COL_ISSUER = "Issuer"
+    const val IDP_COL_JIT = "Just-in-time"
+    const val IDP_COL_FAILURES = "Recent failures"
+    const val IDP_COL_STATUS = "Status"
+    const val IDP_CONFIGURE = "Configure"
+    const val IDP_BUILT_IN = "Built-in adapter"
+    const val IDP_JIT_OFF = "JIT off"
+    const val IDP_STATUS_ENABLED = "Enabled"
+    const val IDP_STATUS_DISABLED = "Disabled"
+    const val IDP_STATUS_NOT_CONFIGURED = "Not configured"
+    const val IDP_TILE_OAUTH2_HINT = "Built-in OAuth 2.0"
+
+    // No vendor named here: a name in the UI reads as a provider this implementation has been
+    // run against, and none has. See ADR-20.
+    const val IDP_TILE_OIDC_HINT = "Any issuer with a discovery document"
+
+    fun jitOnWithDomains(domainCount: Int): String =
+        when (domainCount) {
+            0 -> "JIT on \u00b7 no domains"
+            1 -> "JIT on \u00b7 1 domain"
+            else -> "JIT on \u00b7 $domainCount domains"
+        }
+
+    fun recentFailures(count: Int): String = if (count == 1) "1 recent failure" else "$count recent failures"
 
     // Identity provider diagnostics — the sign-in failures only a real sign-in can reveal
-    const val IDP_FAILURES_TITLE = "Recent sign-in failures"
     const val IDP_FAILURES_HINT =
         "Sign-ins that reached this provider and did not end in a session. A callback URL the " +
             "provider does not recognise appears here and nowhere else — testing the issuer's " +
@@ -1009,16 +1036,16 @@ object EnglishStrings {
     const val IDP_FAILURE_IDP_RETURNED_ERROR = "Rejected at the provider"
     const val IDP_FAILURE_UNRECOGNISED = "Unrecognised failure"
 
-    const val IDP_NO_OIDC_PROVIDERS = "No OIDC providers configured yet."
     const val IDP_ADD_TITLE = "Add an OIDC provider"
     const val IDP_ADD_BUTTON = "Add provider"
     const val IDP_SAVE_BUTTON = "Save provider"
     const val IDP_DELETE_BUTTON = "Delete provider"
+    const val IDP_DELETE_DESCRIPTION =
+        "Anyone who signs in through this provider loses that route immediately. Accounts already " +
+            "linked to it keep the link but cannot use it."
     const val IDP_DELETE_CONFIRM =
         "Delete this identity provider? Anyone who signs in through it loses that route immediately, " +
             "and accounts already linked to it keep the link but cannot use it."
-    const val IDP_ENABLE_LABEL = "Enable"
-    const val IDP_CALLBACK_HINT = "Register this callback URL with the issuer:"
     const val IDP_KEY_LABEL = "Provider key"
 
     // Deliberately not a real vendor: a named one in a form field reads as a provider this
@@ -1029,10 +1056,7 @@ object EnglishStrings {
             "changed once saved \u2014 accounts already linked to this provider point at it."
     const val IDP_KEY_INVALID =
         "That is not a provider key \u2014 use 1\u201332 characters of a\u2013z, 0\u20139 and '-'."
-    const val IDP_KIND_LABEL = "Protocol"
     const val IDP_KIND_OIDC = "OpenID Connect"
-    const val IDP_KIND_HINT =
-        "Google and GitHub use their built-in OAuth2 adapters. Every other key is brokered over OIDC."
     const val IDP_DISPLAY_NAME_LABEL = "Display name"
     const val IDP_DISPLAY_NAME_PLACEHOLDER = "Workforce SSO"
     const val IDP_DISPLAY_NAME_HINT = "Shown on the sign-in button. Defaults to the provider key."
@@ -1075,6 +1099,13 @@ object EnglishStrings {
 
     // Test discovery — the setup aid, and the half of setup it cannot see.
     const val IDP_DISCOVERY_BUTTON = "Test discovery"
+    const val IDP_CONNECTION_HEADING = "Connection"
+    const val IDP_FAILURES_HEADING = "Recent sign-in failures"
+    const val IDP_ADVANCED_SUMMARY = "Advanced \u2014 endpoint overrides"
+    const val IDP_ENABLE_ACTION = "Enable"
+    const val IDP_DISABLE_ACTION = "Disable"
+    const val IDP_CALLBACK_HINT_NEW =
+        "Register this callback URL with the issuer. The provider key you enter below completes it."
     const val IDP_DISCOVERY_TITLE = "Discovery test"
     const val IDP_DISCOVERY_VERIFIED_TITLE = "What this test verified"
     const val IDP_DISCOVERY_KEYS_LABEL = "Signing keys published"

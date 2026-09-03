@@ -41,6 +41,7 @@ import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
 import io.ktor.serialization.kotlinx.json.json
@@ -964,7 +965,7 @@ class AdminSettingsTest {
                 ),
             )
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             assertFalse("s3cr3t-oriana-client-secret" in body, "The admin page must never render a stored secret")
             assertContains(body, "oriana-client-id")
@@ -1085,7 +1086,7 @@ class AdminSettingsTest {
             idpRepo.seed(workspace.id, "oriana")
             recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "contractor.example")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             // A count of failures is not a diagnosis: the operator fixes an allowlist from the
             // domain and the reason, and nothing else on the page shows either.
@@ -1102,7 +1103,7 @@ class AdminSettingsTest {
             idpRepo.seed(workspace.id, "oriana")
             recordFailure(workspace.id, "oriana", "idp_returned_error", idpErrorCode = "redirect_uri_mismatch")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             // Discovery fetches the issuer's document and cannot see a redirect-URI mismatch.
             // Without this row the operator's experience of that mistake is silence.
@@ -1120,19 +1121,21 @@ class AdminSettingsTest {
             recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "oriana-side.example")
             recordFailure(workspace.id, "google", "domain_not_allowed", emailDomain = "google-side.example")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            // Each provider has its own page now, so attribution is asserted across two of them:
+            // the failure appears on the provider it happened on, and is absent from the other.
+            // Counting occurrences on one combined page no longer tests anything.
+            val oriana = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
+            val google = authed.get("/admin/workspaces/acme/settings/identity-providers/google").bodyAsText()
 
-            // Once each. A panel that renders every failure under every provider would show both
-            // domains twice, and would still pass an assertion that each is merely present.
-            assertEquals(
-                1,
-                Regex("oriana-side\\.example").findAll(body).count(),
-                "oriana's failure belongs to oriana only",
+            assertContains(oriana, "oriana-side.example")
+            assertFalse(
+                "google-side.example" in oriana,
+                "google's failure must not appear on oriana's page",
             )
-            assertEquals(
-                1,
-                Regex("google-side\\.example").findAll(body).count(),
-                "google's failure belongs to google only",
+            assertContains(google, "google-side.example")
+            assertFalse(
+                "oriana-side.example" in google,
+                "oriana's failure must not appear on google's page",
             )
         }
 
@@ -1145,7 +1148,7 @@ class AdminSettingsTest {
             idpRepo.seed(workspace.id, "oriana")
             recordFailure(masterTenant.id, "oriana", "domain_not_allowed", emailDomain = "other-workspace.example")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             assertFalse(
                 body.contains("other-workspace.example"),
@@ -1161,7 +1164,7 @@ class AdminSettingsTest {
             login(authed)
             idpRepo.seed(workspace.id, "oriana")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             assertContains(body, "No sign-in failures recorded for this provider.")
         }
@@ -1190,6 +1193,164 @@ class AdminSettingsTest {
     )
 
     private fun storedOriana() = idpRepo.findByTenantAndProvider(workspace.id, ProviderKey.of("oriana")!!)
+
+    // =========================================================================
+    // The provider catalog and the per-provider pages
+    // =========================================================================
+
+    @Test
+    fun `the catalog surfaces a broken provider's failure count without a click`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOriana()
+            recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "contractor.example")
+            recordFailure(workspace.id, "oriana", "domain_not_allowed", emailDomain = "contractor.example")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // The whole point of collapsing configuration behind a click: an index that hides
+            // whether a provider is working is worse than the long form it replaced.
+            assertContains(body, EnglishStrings.recentFailures(2))
+        }
+
+    @Test
+    fun `the catalog reads a healthy provider without a failure badge`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOriana()
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertFalse("recent failure" in body, "No failures means no alarm, got: $body")
+        }
+
+    @Test
+    fun `the catalog tells a disabled provider apart from one never configured`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(workspace.id, "oriana", enabled = false)
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            // One grey badge for both states told the operator a configured-but-off provider had
+            // never been set up, which is the opposite of the action it needs.
+            assertContains(body, EnglishStrings.IDP_STATUS_DISABLED)
+            assertFalse(
+                EnglishStrings.IDP_STATUS_NOT_CONFIGURED in body,
+                "A stored provider has been configured, whatever its switch says",
+            )
+        }
+
+    @Test
+    fun `the catalog never renders a client secret or a credential field`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            seedOriana(clientSecret = "s3cr3t-catalog-must-not-show")
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+
+            assertFalse("s3cr3t-catalog-must-not-show" in body, "A stored secret never reaches the page")
+            assertFalse("name=\"clientSecret\"" in body, "Credentials belong on the provider's own page")
+        }
+
+    @Test
+    fun `the add page carries a callback URL before a provider key exists`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/new").bodyAsText()
+
+            // Without this the operator registers a guessed redirect URI at the issuer, saves
+            // here, then goes back to correct it — the URL is only knowable after it is needed.
+            assertContains(body, "$APP_BASE_URL/t/acme/auth/social/provider-key/callback")
+            assertContains(body, "data-callback-key-input")
+        }
+
+    @Test
+    fun `a built-in provider has a page before anything is stored against it`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val response = authed.get("/admin/workspaces/acme/settings/identity-providers/google")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertContains(response.bodyAsText(), "$APP_BASE_URL/t/acme/auth/social/google/callback")
+        }
+
+    @Test
+    fun `a brokered key with nothing stored has no page of its own`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response = authed.get("/admin/workspaces/acme/settings/identity-providers/never-configured")
+
+            // Unlike the reserved keys, an arbitrary key names nothing until it is saved.
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                "/admin/workspaces/acme/settings/identity-providers",
+                response.headers[HttpHeaders.Location],
+            )
+        }
+
+    @Test
+    fun `the enable switch applies on its own without saving the form`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOriana()
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/identity-providers/oriana/enabled",
+                formParameters = Parameters.build { append("enabled", "false") },
+            )
+
+            assertEquals(false, storedOriana()?.enabled, "The switch is its own write, not a form field")
+        }
+
+    @Test
+    fun `the enable switch leaves the stored secret alone`() =
+        testApplication {
+            application { installTestAppWithIdpRepo() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            seedOriana(clientSecret = "kept-through-the-toggle")
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/identity-providers/oriana/enabled",
+                formParameters = Parameters.build { append("enabled", "false") },
+            )
+
+            // The toggle posts no credentials, so a save that treated a missing secret as an
+            // empty one would silently clear it.
+            assertEquals("kept-through-the-toggle", storedOriana()?.clientSecret)
+        }
 
     @Test
     fun `test discovery reports the endpoints the issuer publishes`() =
@@ -1336,7 +1497,7 @@ class AdminSettingsTest {
             tenantRepo.update(workspace.copy(issuerUrl = "https://issuer.acme.example"))
             seedOriana()
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             assertContains(body, "$APP_BASE_URL/t/acme/auth/social/oriana/callback")
             assertFalse(
@@ -1353,7 +1514,7 @@ class AdminSettingsTest {
             login(authed)
             seedOriana(jitEnabled = true, jitAllowedDomains = emptyList())
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             // Empty means the feature is off. An empty box reads as "not configured yet", which is
             // the opposite meaning, and nothing on the page tells the two apart.
@@ -1368,7 +1529,7 @@ class AdminSettingsTest {
             login(authed)
             seedOriana(jitEnabled = true, jitAllowedDomains = listOf("acme.example", "acme.test"))
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/oriana").bodyAsText()
 
             assertContains(body, "value=\"acme.example\"")
             assertContains(body, "value=\"acme.test\"")
@@ -1383,7 +1544,7 @@ class AdminSettingsTest {
             login(authed)
             idpRepo.seed(workspace.id, "google")
 
-            val body = authed.get("/admin/workspaces/acme/settings/identity-providers").bodyAsText()
+            val body = authed.get("/admin/workspaces/acme/settings/identity-providers/google").bodyAsText()
 
             // The gate reads jitEnabled off the row whatever the provider kind is, so a Google
             // workspace needs the same two controls an OIDC one does.

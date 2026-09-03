@@ -54,40 +54,39 @@ fun List<AuditEvent>.groupSignInFailuresByProvider(): Map<ProviderKey, List<Sign
  * away, which is a thing the operator otherwise experiences as silence.
  */
 internal fun FlowContent.identityProviderFailuresPanel(rows: List<SignInFailureRow>) {
-    div("edit-row") {
-        span("edit-row__label") { +EnglishStrings.IDP_FAILURES_TITLE }
-        div {
-            if (rows.isEmpty()) {
-                div("edit-row__hint") { +EnglishStrings.IDP_FAILURES_EMPTY }
-            } else {
-                table("data-table") {
-                    thead {
-                        tr {
-                            th { +EnglishStrings.IDP_FAILURES_COL_WHEN }
-                            th { +EnglishStrings.IDP_FAILURES_COL_REASON }
-                            th { +EnglishStrings.IDP_FAILURES_COL_DOMAIN }
-                            th { +EnglishStrings.IDP_FAILURES_COL_REFERENCE }
+    if (rows.isEmpty()) {
+        div("ov-card__row--stacked") {
+            span("ov-card__value--muted") { +EnglishStrings.IDP_FAILURES_EMPTY }
+        }
+    } else {
+        table("data-table") {
+            thead {
+                tr {
+                    th { +EnglishStrings.IDP_FAILURES_COL_WHEN }
+                    th { +EnglishStrings.IDP_FAILURES_COL_REASON }
+                    th { +EnglishStrings.IDP_FAILURES_COL_DOMAIN }
+                    th { +EnglishStrings.IDP_FAILURES_COL_REFERENCE }
+                }
+            }
+            tbody {
+                rows.forEach { row ->
+                    tr {
+                        td { +row.at.toDisplayString() }
+                        td {
+                            +reasonLabel(row.reason)
+                            // The provider's own error code, and only when it arrived in the
+                            // shape of one — the callback query is anyone's to write.
+                            row.idpErrorCode?.let { code -> +" \u2014 $code" }
                         }
-                    }
-                    tbody {
-                        rows.forEach { row ->
-                            tr {
-                                td { +row.at.toDisplayString() }
-                                td {
-                                    +reasonLabel(row.reason)
-                                    // The provider's own error code, and only when it arrived in
-                                    // the shape of one — the callback query is anyone's to write.
-                                    row.idpErrorCode?.let { code -> +" — $code" }
-                                }
-                                td { +(row.emailDomain ?: "—") }
-                                td { +(row.reference ?: "—") }
-                            }
-                        }
+                        td { +(row.emailDomain ?: "\u2014") }
+                        td { +(row.reference ?: "\u2014") }
                     }
                 }
             }
-            div("edit-row__hint") { +EnglishStrings.IDP_FAILURES_HINT }
         }
+    }
+    div("ov-card__row--stacked") {
+        span("ov-card__value--muted") { +EnglishStrings.IDP_FAILURES_HINT }
     }
 }
 
