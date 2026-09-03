@@ -29,13 +29,13 @@ internal fun smtpSettingsPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "smtp",
-                  contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = when (savedParam) {
                 "true" -> EnglishStrings.TOAST_SMTP_SAVED
                 "test_sent" -> "Test email sent successfully."
                 else -> null
             },
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",

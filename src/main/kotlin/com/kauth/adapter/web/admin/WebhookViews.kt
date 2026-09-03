@@ -32,8 +32,8 @@ internal fun webhooksListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
@@ -251,8 +251,8 @@ internal fun createWebhookPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(

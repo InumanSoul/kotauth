@@ -223,9 +223,9 @@ internal fun identityProvidersPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "identity-providers",
-                  contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_IDP_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -799,8 +799,8 @@ internal fun apiKeysListPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-    contentClass = "content-outer",
-) {
+        contentClass = "content-outer",
+    ) {
             div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────
         breadcrumb(
@@ -988,8 +988,8 @@ internal fun createApiKeyPageImpl(
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
         activeAppSection = "api-keys",
-    contentClass = "content-outer",
-) {
+        contentClass = "content-outer",
+    ) {
             div("content-inner") {
         // ── Breadcrumb ───────────────────────────────────────────
         breadcrumb(

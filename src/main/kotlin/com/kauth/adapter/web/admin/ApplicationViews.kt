@@ -86,8 +86,8 @@ internal fun applicationDetailPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -618,8 +618,8 @@ internal fun editApplicationPageImpl(
             activeAppSlug = application.clientId,
             activeAppSection = "overview",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",

@@ -40,8 +40,8 @@ internal fun workspaceDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -307,8 +307,8 @@ internal fun createWorkspacePageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner content-inner--wide") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -448,9 +448,9 @@ internal fun workspaceSettingsPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -616,9 +616,9 @@ internal fun securityPolicyPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -873,9 +873,9 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,
-) {
+        ) {
             div("content-inner content-inner--wide") {
             val t = workspace.theme
             val slug = workspace.slug

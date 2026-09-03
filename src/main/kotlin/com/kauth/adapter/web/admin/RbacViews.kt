@@ -26,8 +26,8 @@ internal fun rolesListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -123,8 +123,8 @@ internal fun createRolePageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "roles",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -458,8 +458,8 @@ internal fun groupsListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -555,8 +555,8 @@ internal fun createGroupPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "groups",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",

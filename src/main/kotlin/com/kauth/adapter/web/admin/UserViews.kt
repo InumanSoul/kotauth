@@ -70,9 +70,9 @@ internal fun userDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
+            contentClass = "content-outer",
             toastMessage = successMessage,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -735,8 +735,8 @@ internal fun userListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -916,8 +916,8 @@ internal fun createUserPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+            contentClass = "content-outer",
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
