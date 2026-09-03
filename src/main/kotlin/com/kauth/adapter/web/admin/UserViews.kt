@@ -197,28 +197,23 @@ internal fun userDetailPageImpl(
             }
 
             if (tempPasswordLink != null) {
-                div("notice notice--success") {
-                    div("notice__body") {
-                        style = "flex:1;gap:var(--space-2);"
-                        div("notice__title") { +"Temporary change-password link generated" }
-                        div("notice__desc") {
-                            +"Copy it now — it's valid for 24 hours and will be displayed only once."
+                notice(modifier = "notice--success", iconName = "check-circle") {
+                    div("notice__title") { +"Temporary change-password link generated" }
+                    div("notice__desc") {
+                        +"Copy it now — it's valid for 24 hours and will be displayed only once."
+                    }
+                    div("copy-field") {
+                        span("copy-field__value") { +tempPasswordLink }
+                        button(type = ButtonType.button) {
+                            classes = setOf("copy-field__btn")
+                            attributes["data-copy"] = tempPasswordLink
+                            title = "Copy"
+                            inlineSvgIcon("copy", "Copy")
                         }
-                        div("copy-field") {
-                            style = "margin-top:var(--space-2);"
-                            span("copy-field__value") { +tempPasswordLink }
-                            button(type = ButtonType.button) {
-                                classes = setOf("copy-field__btn")
-                                attributes["data-copy"] = tempPasswordLink
-                                title = "Copy"
-                                inlineSvgIcon("copy", "Copy")
-                            }
-                        }
-                        div("notice__desc") {
-                            style = "margin-top:var(--space-2);"
-                            +"Send this link to the user over a secure channel. "
-                            +"The next time they log in normally, they'll also be redirected here."
-                        }
+                    }
+                    div("notice__desc") {
+                        +"Send this link to the user over a secure channel. "
+                        +"The next time they log in normally, they'll also be redirected here."
                     }
                 }
             }
@@ -485,12 +480,8 @@ internal fun DIV.userProfileReadFragment(
     div {
         id = "profile-section"
         if (successMessage != null) {
-            div("notice notice--success") {
-                style = "margin-bottom:12px;"
-                span("notice__icon") { inlineSvgIcon("check-circle", "Success") }
-                div("notice__body") {
-                    span("notice__title") { +successMessage }
-                }
+            notice(modifier = "notice--success notice--tight", iconName = "check-circle") {
+                span("notice__title") { +successMessage }
             }
         }
         div("ov-card") {

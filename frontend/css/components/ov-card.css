@@ -21,7 +21,11 @@
   background: var(--color-card);
   border: 0.5px solid var(--color-border-md);
   border-radius: 0;
-  overflow: hidden;
+  /* A card holding a wide table used to clip it, so at a narrow viewport the last
+   * columns were unreachable rather than merely off-screen. The card scrolls on the
+   * one axis that can overflow; the vertical clip is unchanged. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 form+.ov-card { margin-top: var(--space-5); }
