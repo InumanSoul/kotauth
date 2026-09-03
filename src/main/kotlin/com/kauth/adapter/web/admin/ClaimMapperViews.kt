@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import kotlinx.html.*
@@ -85,8 +86,8 @@ internal fun claimMappersListPageImpl(
                                             span("data-table__meta") { +mapper.attributeKey }
                                         }
                                         td { +mapper.claimName }
-                                        td { yesNoBadge(mapper.includeInAccess) }
-                                        td { yesNoBadge(mapper.includeInId) }
+                                        td { includedMark(mapper.includeInAccess) }
+                                        td { includedMark(mapper.includeInId) }
                                         td {
                                             div {
                                                 postButton(
@@ -258,13 +259,19 @@ internal fun claimMapperFormPageImpl(
         }
     }
 
-private fun TD.yesNoBadge(value: Boolean) {
+/**
+ * Whether a mapper writes its claim into a given token.
+ *
+ * This was two badges per row, one of them green with a status dot. A boolean is not a state,
+ * and badging both halves of it made every row loud while saying nothing a mark would not.
+ */
+private fun TD.includedMark(value: Boolean) {
     if (value) {
-        span("badge badge--active") {
-            span("badge__dot") {}
-            +"Yes"
-        }
+        span("included-mark") { inlineSvgIcon("check-circle", "Included") }
     } else {
-        span("badge badge--inactive") { +"No" }
+        span("data-table__meta") {
+            attributes["aria-label"] = "Not included"
+            +"\u2014"
+        }
     }
 }

@@ -133,7 +133,10 @@ internal fun applicationDetailPageImpl(
             // ── New secret banner (shown once after regeneration) ────
             if (newSecret != null) {
                 notice(modifier = "notice--success", iconName = "check-circle") {
-                    p { +"New client secret. Copy it now, because you will not see it again." }
+                    p {
+                        +"New client secret. "
+                        +EnglishStrings.SECRET_SHOWN_ONCE
+                    }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {

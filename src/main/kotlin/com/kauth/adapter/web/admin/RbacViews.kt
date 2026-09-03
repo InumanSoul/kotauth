@@ -76,8 +76,8 @@ internal fun rolesListPageImpl(
                                 }
                                 td {
                                     val isWorkspace = role.scope.value == "tenant"
-                                    span(if (isWorkspace) "badge badge--active" else "badge badge--confidential") {
-                                        +(if (isWorkspace) "workspace" else "application")
+                                    span("data-table__meta") {
+                                        +(if (isWorkspace) "Workspace" else "Application")
                                     }
                                 }
                                 td { span("data-table__name") { +(role.description ?: "\u2014") } }
@@ -774,7 +774,7 @@ internal fun groupDetailPageImpl(
                                 tr {
                                     td { span("data-table__name") { +(r?.name ?: "#${rid.value}") } }
                                     td {
-                                        span("badge badge--active") { +(r?.scope?.value ?: "?") }
+                                        span("data-table__meta") { +(r?.scope?.value ?: "\u2014") }
                                     }
                                     td {
                                         form(

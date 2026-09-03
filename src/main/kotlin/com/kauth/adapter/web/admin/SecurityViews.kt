@@ -918,7 +918,8 @@ internal fun apiKeysListPageImpl(
                 div("page-header__identity") {
                     h1("page-header__title") { +"API Keys" }
                     p("page-header__sub") {
-                        +"Machine-to-machine authentication. Keys are shown once on creation."
+                        +"Machine-to-machine authentication. "
+                        +EnglishStrings.API_KEY_SHOWN_ONCE
                     }
                 }
             }
@@ -934,7 +935,10 @@ internal fun apiKeysListPageImpl(
         // ── One-time key reveal ──────────────────────────────────
         if (newKeyRaw != null) {
             notice(modifier = "notice--success", iconName = "check-circle") {
-                p { +"API key created. Copy it now, because you will not see it again." }
+                p {
+                    +"API key created. "
+                    +EnglishStrings.SECRET_SHOWN_ONCE
+                }
                 div("copy-field") {
                     span("copy-field__value") { +newKeyRaw }
                     button(type = ButtonType.button) {
@@ -1107,7 +1111,7 @@ internal fun createApiKeyPageImpl(
                 div("page-header__identity") {
                     h1("page-header__title") { +"Create API Key" }
                     p("page-header__sub") {
-                        +"The key value is shown once after creation. Store it securely."
+                        +EnglishStrings.API_KEY_SHOWN_ONCE
                     }
                 }
             }

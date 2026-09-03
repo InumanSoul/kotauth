@@ -797,10 +797,21 @@ object EnglishStrings {
         "The same for every provisioning client in this workspace. Paste it wherever your identity provider " +
             "asks for the SCIM base or tenant URL."
 
+    /**
+     * The one sentence that follows a freshly created secret.
+     *
+     * It was written four different ways on four surfaces, so the promise the product makes
+     * about a value it will never show again varied by page.
+     */
+    const val SECRET_SHOWN_ONCE = "Copy it now. You will not see it again."
+
+    /** The same policy stated as a standing fact rather than as a banner. */
+    const val API_KEY_SHOWN_ONCE = "A key value is shown once, when you create it."
+
     const val SCIM_TOKEN_HEADING = "Token"
     const val SCIM_TOKEN_HINT =
         "Provisioning authenticates with an API key holding the scim scope, sent as a bearer token. " +
-            "The key value is shown once, when you create it."
+            API_KEY_SHOWN_ONCE
     const val SCIM_TOKEN_MANAGE_CTA = "Manage API keys"
     const val SCIM_TOKEN_CREATE_CTA = "Create a provisioning key"
     const val SCIM_KEYS_EMPTY_TITLE = "No provisioning key yet"

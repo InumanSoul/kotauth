@@ -199,3 +199,12 @@ tr:hover td      { background: var(--color-row-hover); }
 
 .td-muted { color: var(--color-muted); font-size: 0.78rem; }
 .td-code  { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-accent); }
+
+/* A boolean cell: present or not, rather than two words dressed as states. */
+.included-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-green);
+}
+
+.included-mark svg { width: 14px; height: 14px; }

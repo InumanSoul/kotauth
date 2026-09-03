@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.WebhookDelivery
@@ -64,7 +65,10 @@ internal fun webhooksListPageImpl(
             // ── One-time secret reveal ───────────────────────────────
             if (newSecret != null) {
                 notice(modifier = "notice--success", iconName = "check-circle") {
-                    p { +"Webhook created. Copy the signing secret now, because you will not see it again." }
+                    p {
+                        +"Webhook created. "
+                        +EnglishStrings.SECRET_SHOWN_ONCE
+                    }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {

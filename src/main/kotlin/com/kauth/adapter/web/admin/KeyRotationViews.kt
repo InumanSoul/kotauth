@@ -91,7 +91,7 @@ internal fun keyManagementPageImpl(
                                                     +"Verification only"
                                                 }
                                             } else {
-                                                span("badge badge--inactive") { +"Retired" }
+                                                span("data-table__meta") { +"Retired" }
                                             }
                                         }
                                         td {

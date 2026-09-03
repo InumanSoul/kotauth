@@ -71,17 +71,13 @@ internal fun workspaceListPageImpl(
                                         ) { +ws.slug }
                                     }
                                     td { span("data-table__name") { +ws.displayName } }
+                                    // Open registration is the default, so only a closed
+                                    // workspace is worth a badge.
                                     td {
                                         if (ws.registrationEnabled) {
-                                            span("badge badge--active") {
-                                                span("badge__dot") {}
-                                                +"Enabled"
-                                            }
+                                            span("data-table__meta") { +"Open" }
                                         } else {
-                                            span("badge badge--inactive") {
-                                                span("badge__dot") {}
-                                                +"Disabled"
-                                            }
+                                            span("badge badge--warn") { +"Closed" }
                                         }
                                     }
                                     td {
