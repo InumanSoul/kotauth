@@ -340,7 +340,7 @@ internal fun OAuthError.toDescription(): String =
 
 internal fun AuthError.toMessage(): String =
     when (this) {
-        is AuthError.InvalidCredentials -> "Invalid username or password."
+        is AuthError.InvalidCredentials -> EnglishStrings.LOGIN_INVALID_CREDENTIALS
         is AuthError.TenantNotFound -> "Tenant not found."
         is AuthError.RegistrationDisabled -> "Registration is not enabled for this tenant."
         is AuthError.UserAlreadyExists -> "That username is already taken."
@@ -349,10 +349,10 @@ internal fun AuthError.toMessage(): String =
         is AuthError.ValidationError -> this.message
         // Collapsed to the generic message — these states would otherwise let an attacker
         // enumerate accounts (lockout, pending invite, expired/forced-change flags).
-        is AuthError.PasswordExpired -> "Invalid username or password."
-        is AuthError.AccountLocked -> "Invalid username or password."
-        is AuthError.PendingSetup -> "Invalid username or password."
-        is AuthError.PasswordChangeRequired -> "Invalid username or password."
+        is AuthError.PasswordExpired -> EnglishStrings.LOGIN_INVALID_CREDENTIALS
+        is AuthError.AccountLocked -> EnglishStrings.LOGIN_INVALID_CREDENTIALS
+        is AuthError.PendingSetup -> EnglishStrings.LOGIN_INVALID_CREDENTIALS
+        is AuthError.PasswordChangeRequired -> EnglishStrings.LOGIN_INVALID_CREDENTIALS
         is AuthError.PasswordLoginDisabled ->
             "Password sign-in is disabled for this workspace. " +
                 "Use the email link option or sign in with a configured social provider."

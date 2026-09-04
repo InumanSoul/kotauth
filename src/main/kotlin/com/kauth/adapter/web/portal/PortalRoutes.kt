@@ -119,7 +119,12 @@ fun Route.portalRoutes(
                 val error = call.request.queryParameters["error"]
                 return@get call.respondHtml(
                     HttpStatusCode.OK,
-                    PortalView.loginPage(slug, call.portalViewContext(tenant), error),
+                    PortalView.loginPage(
+                        slug,
+                        call.portalViewContext(tenant),
+                        error,
+                        tenant.securityConfig.loginIdentifierMode,
+                    ),
                 )
             }
 

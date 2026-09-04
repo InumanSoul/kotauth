@@ -7,6 +7,7 @@ import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ResourceServer
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.Tenant
@@ -405,7 +406,7 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.Unauthorized, response.status)
             val body = response.bodyAsText()
             assertTrue(
-                body.contains("Invalid username or password"),
+                body.contains("Invalid sign-in details"),
                 "Expired-password path must show the generic message, was: ${body.take(300)}",
             )
             assertFalse(body.contains("expired", ignoreCase = true), "Must not leak the expired state")
@@ -3602,6 +3603,192 @@ class AuthRoutesTest {
             val stored = authCodeRepo.findByCode(code)
             assertNotNull(stored, "Issued code must be persisted in the repository")
             assertEquals(listOf("https://api.example.com"), stored.resources)
+        }
+
+    // =========================================================================
+    // GET /t/{slug}/authorize — login identifier field per workspace mode (Task 9)
+    // =========================================================================
+
+    @Test
+    fun `GET authorize labels identifier field for email as email address`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Email address"), "EMAIL mode must label the field 'Email address'")
+            assertTrue(body.contains("""type="email""""), "EMAIL mode must render an email input")
+            // Tenant default has passkeys enabled, so the base "email" autocomplete value
+            // gets the " webauthn" suffix appended, per the existing passkey behaviour.
+            assertTrue(body.contains("""autocomplete="email webauthn""""), "EMAIL mode must set autocomplete=email")
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+        }
+
+    @Test
+    fun `GET authorize labels identifier field for either as username or email`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EITHER),
+                ),
+            )
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Username or email"), "EITHER mode must label the field 'Username or email'")
+            assertTrue(
+                !body.contains("""type="email""""),
+                "EITHER mode must stay type=text so a real username is not blocked by native validation",
+            )
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+        }
+
+    @Test
+    fun `GET authorize renders unchanged username label in default USERNAME mode`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val response =
+                client.get(
+                    "/t/acme/authorize" +
+                        "?response_type=code&client_id=spa-app" +
+                        "&redirect_uri=https://app.example.com/callback" +
+                        "&scope=openid",
+                )
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains(">Username<"), "USERNAME mode must keep the plain 'Username' label")
+            assertTrue(body.contains("""name="username""""), "Form field name must remain 'username'")
+            assertTrue(
+                !body.contains("""type="email""""),
+                "USERNAME mode identifier field must not be type=email",
+            )
+        }
+
+    @Test
+    fun `POST authorize with wrong password renders the shared generic message`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Invalid sign-in details."), "Must show the mode-agnostic failure message")
+            assertTrue(
+                !body.contains("Invalid username or password."),
+                "Old username-specific wording must not appear",
+            )
         }
 
     // Utility

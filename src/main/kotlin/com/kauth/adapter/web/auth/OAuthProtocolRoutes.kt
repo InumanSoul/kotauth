@@ -2,6 +2,7 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.admin.resolvedBaseUrl
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.port.IdentityProviderRepository
 import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.ResourceServerRepository
@@ -253,6 +254,8 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        loginIdentifierMode =
+                            tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                     ),
                 )
                 return@get
@@ -480,6 +483,7 @@ internal fun Route.oauthProtocolRoutes(
                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                 passkeysEnabled = tenant.passkeysEnabled,
+                loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
             ),
         )
     }
@@ -513,6 +517,8 @@ internal fun Route.oauthProtocolRoutes(
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode =
+                        tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                 ),
             )
         }
@@ -544,6 +550,8 @@ internal fun Route.oauthProtocolRoutes(
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         emailOtpLoginEnabled = tenant?.securityConfig?.emailOtpLoginEnabled == true,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        loginIdentifierMode =
+                            tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                     ),
                 )
             }
@@ -583,6 +591,7 @@ internal fun Route.oauthProtocolRoutes(
                                     passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                     emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                     passkeysEnabled = tenant.passkeysEnabled,
+                                    loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
                                 ),
                             )
                         }
@@ -630,6 +639,7 @@ internal fun Route.oauthProtocolRoutes(
                                 passwordLoginEnabled = tenant.securityConfig.passwordLoginEnabled,
                                 emailOtpLoginEnabled = tenant.securityConfig.emailOtpLoginEnabled,
                                 passkeysEnabled = tenant.passkeysEnabled,
+                                loginIdentifierMode = tenant.securityConfig.loginIdentifierMode,
                             ),
                         )
                     },

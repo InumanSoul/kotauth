@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
  * render the same generic message as a wrong-password attempt.
  */
 class AuthErrorToMessageTest {
-    private val generic = "Invalid username or password."
+    private val generic = "Invalid sign-in details."
 
     @Test
     fun `InvalidCredentials renders the generic message`() {

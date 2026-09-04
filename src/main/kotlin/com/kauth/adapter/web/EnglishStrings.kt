@@ -573,6 +573,16 @@ object EnglishStrings {
     const val LOGIN_REGISTRATION_SUCCESS = "Account created successfully. Please sign in."
     const val LOGIN_USERNAME = "Username"
     const val LOGIN_USERNAME_PLACEHOLDER = "Enter your username"
+
+    // Login page — identifier field, per workspace sign-in identifier mode
+    const val LOGIN_IDENTIFIER_EMAIL = "Email address"
+    const val LOGIN_IDENTIFIER_EMAIL_PLACEHOLDER = "Enter your email address"
+    const val LOGIN_IDENTIFIER_EITHER = "Username or email"
+    const val LOGIN_IDENTIFIER_EITHER_PLACEHOLDER = "Username or email address"
+
+    // Shared sign-in failure. Deliberately vague and mode-agnostic: it must not reveal
+    // whether an account exists, nor which identifier namespace was matched.
+    const val LOGIN_INVALID_CREDENTIALS = "Invalid sign-in details."
     const val LOGIN_PASSWORD_PLACEHOLDER = "Enter your password"
     const val LOGIN_SUBMIT = "Sign In"
     const val LOGIN_FORGOT_PASSWORD = "Forgot password?"
