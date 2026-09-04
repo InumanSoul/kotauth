@@ -91,7 +91,7 @@ internal fun rolesListPageImpl(
                                         a(
                                             href = "/admin/workspaces/$slug/roles/${role.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
-                                        ) { +"Open" }
+                                        ) { +EnglishStrings.ACTION_VIEW_DETAIL }
                                     }
                                 }
                             }
@@ -520,7 +520,7 @@ internal fun groupsListPageImpl(
                                         a(
                                             href = "/admin/workspaces/$slug/groups/${group.id?.value}",
                                             classes = "btn btn--ghost btn--sm",
-                                        ) { +"Open" }
+                                        ) { +EnglishStrings.ACTION_VIEW_DETAIL }
                                     }
                                 }
                             }

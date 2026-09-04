@@ -86,8 +86,7 @@ internal fun workspaceListPageImpl(
                                                 href = "/admin/workspaces/${ws.slug}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }

@@ -898,8 +898,7 @@ internal fun userListPageImpl(
                                                 href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }

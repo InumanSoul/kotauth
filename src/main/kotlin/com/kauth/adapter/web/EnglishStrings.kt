@@ -415,18 +415,10 @@ object EnglishStrings {
     const val COL_CREATED = "Created"
     const val COL_EXPIRES = "Expires"
     const val COL_EVENT = "Event"
-    const val COL_SLUG = "Slug"
-    const val COL_CLIENT_ID = "Client ID"
     const val COL_ROLES = "Roles"
 
-    const val ACTION_OPEN = "Open"
-    const val ACTION_CANCEL = "Cancel"
-    const val ACTION_SAVE = "Save"
-    const val ACTION_DELETE = "Delete"
-    const val ACTION_REMOVE = "Remove"
-
-    const val STATE_ACTIVE = "Active"
-    const val STATE_DISABLED = "Disabled"
+    /** The row action that opens a record. Named for what the reader gets, not for the gesture. */
+    const val ACTION_VIEW_DETAIL = "View detail"
 
     const val DANGER_ZONE_HEADING = "Danger zone"
 
