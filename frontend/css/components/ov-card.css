@@ -28,8 +28,6 @@
   overflow-y: hidden;
 }
 
-form+.ov-card { margin-top: var(--space-5); }
-.ov-card + .ov-card { margin-top: var(--space-5); }
 
 /* ── Nested surfaces ───────────────────────────────────────────────────── */
 

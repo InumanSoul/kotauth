@@ -34,6 +34,24 @@
   margin: 0 auto;
 }
 
+/* Stack spacing for the content column.
+ *
+ * This was an adjacent-sibling rule on .ov-card, which held only while every block on a page
+ * was a card. It stopped as soon as anything else sat between two of them — a bare table, an
+ * htmx swap target, a form — and those pages rendered two cards flush against each other,
+ * reading as one card with a seam. Spacing the column rather than the card does not care what
+ * the blocks are. */
+.content-inner > * + *,
+.content-inner > form > * + * { margin-top: var(--space-5); }
+
+/* Blocks that already carry their own bottom margin, each chosen for its own rhythm: the stack
+ * must not add a second gap underneath them. */
+.content-inner > .breadcrumb + *,
+.content-inner > .page-header + *,
+.content-inner > .user-header + *,
+.content-inner > .notice + *,
+.content-inner > .insight-bar + * { margin-top: 0; }
+
 /* Page-specific width overrides */
 .content-inner--narrow { max-width: 620px; }
 .content-inner--wide   { max-width: 1020px; }
