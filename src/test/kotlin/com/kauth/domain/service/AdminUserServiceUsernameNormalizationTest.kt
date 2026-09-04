@@ -89,6 +89,23 @@ class AdminUserServiceUsernameNormalizationTest {
         assertEquals(null, users.findByEmail(tenantId, "johndoe@x.com"))
     }
 
+    @Test
+    fun `createUser rejects a username longer than the column allows`() {
+        val tooLong = "a".repeat(UsernamePolicy.MAX_LENGTH + 1)
+        val result = svc.createUser(tenantId, tooLong, "toolong@x.com", "Too Long", password = "Password8!")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertEquals(null, users.findByEmail(tenantId, "toolong@x.com"))
+    }
+
+    @Test
+    fun `createUser accepts a username at exactly the column limit`() {
+        val maxLength = "a".repeat(UsernamePolicy.MAX_LENGTH)
+        val result = svc.createUser(tenantId, maxLength, "atlimit@x.com", "At Limit", password = "Password8!")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals(maxLength, result.value.username)
+    }
+
     // -------------------------------------------------------------------------
     // resolveUsername (via updateUser)
     // -------------------------------------------------------------------------
@@ -138,5 +155,15 @@ class AdminUserServiceUsernameNormalizationTest {
         val result = svc.updateUser(user.id!!, tenantId, username = "Dave")
         assertIs<AdminResult.Success<User>>(result)
         assertEquals("dave", result.value.username)
+    }
+
+    @Test
+    fun `updateUser rename rejects a username longer than the column allows`() {
+        val user = seedUser()
+        val tooLong = "a".repeat(UsernamePolicy.MAX_LENGTH + 1)
+        val result = svc.updateUser(user.id!!, tenantId, username = tooLong)
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertEquals("carol", users.findById(user.id, tenantId)!!.username)
     }
 }

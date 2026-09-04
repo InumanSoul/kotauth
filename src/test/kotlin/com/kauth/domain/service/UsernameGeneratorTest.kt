@@ -3,6 +3,7 @@ package com.kauth.domain.service
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
+import com.kauth.domain.port.UserRepository
 import com.kauth.fakes.FakeUserRepository
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -84,5 +85,54 @@ class UsernameGeneratorTest {
             val name = generator.generate(tenantId, "Ana", "ana@company-a.com")
             assertNotEquals("ana@company-a.com", name)
         }
+    }
+
+    @Test
+    fun `checks availability on the exhaustion fallback, not just the readable attempts`() {
+        // Every candidate this repository is asked about is reported as taken, forcing the
+        // generator through the readable-attempts loop AND the entropy-fallback loop. The
+        // generator must still terminate (bounded attempts) and must consult availability in
+        // both loops, not just the first — see UsernameGenerator's KDoc on the fallback.
+        var lookups = 0
+        val alwaysTaken =
+            object : UserRepository by users {
+                override fun findByUsernameIgnoreCase(
+                    tenantId: TenantId,
+                    username: String,
+                ): User? {
+                    lookups++
+                    return User(
+                        id = UserId(999),
+                        tenantId = tenantId,
+                        username = username,
+                        email = "taken@example.com",
+                        fullName = "Taken",
+                        passwordHash = "hash",
+                    )
+                }
+
+                override fun findByEmail(
+                    tenantId: TenantId,
+                    email: String,
+                ): User? {
+                    lookups++
+                    return User(
+                        id = UserId(999),
+                        tenantId = tenantId,
+                        username = "taken",
+                        email = email,
+                        fullName = "Taken",
+                        passwordHash = "hash",
+                    )
+                }
+            }
+
+        val name = UsernameGenerator(alwaysTaken).generate(tenantId, "Ana", "ana@company-a.com")
+
+        assertTrue(name.matches(allowed), "got $name")
+        // isAvailable's findByUsernameIgnoreCase check short-circuits findByEmail once it finds a
+        // hit, so each of the 10 readable attempts plus the 10 entropy-fallback attempts costs one
+        // lookup here — 20 total confirms BOTH loops actually called isAvailable.
+        assertTrue(lookups >= 20, "expected the fallback loop to also check availability, got $lookups lookups")
     }
 }

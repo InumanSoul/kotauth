@@ -26,7 +26,15 @@ class UsernameGenerator(
             val candidate = "$truncated.${randomSuffix()}"
             if (isAvailable(tenantId, candidate)) return candidate
         }
-        // Exhausting readable candidates is vanishingly unlikely; fall back to pure entropy.
+        // Exhausting readable candidates is vanishingly unlikely; fall back to pure entropy,
+        // still checked against both namespaces so this loop cannot manufacture a collision either.
+        repeat(MAX_ATTEMPTS) {
+            val candidate = "$NEUTRAL_STEM.${randomSuffix()}${randomSuffix()}"
+            if (isAvailable(tenantId, candidate)) return candidate
+        }
+        // Astronomically unlikely: every entropy candidate collided too. Return one anyway —
+        // createUser's downstream existsByUsername check turns a residual collision into a 409,
+        // not a 500, so this is a safe last resort rather than a silent gap.
         return "$NEUTRAL_STEM.${randomSuffix()}${randomSuffix()}"
     }
 

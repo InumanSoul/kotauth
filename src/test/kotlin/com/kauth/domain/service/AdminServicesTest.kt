@@ -766,6 +766,44 @@ class AdminServicesTest {
     }
 
     @Test
+    fun `updateUser allows a fullName-only change when the user's OWN stored email already collides`() {
+        // Alice's stored email happens to equal another user's username — a pre-existing,
+        // already-tolerated pair. It must not block an update that never touches the email.
+        users.add(alice.copy(id = UserId(20), username = "alice@example.com", email = "other@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Renamed", result.value.fullName)
+        assertEquals("alice@example.com", result.value.email)
+    }
+
+    @Test
+    fun `updateUser still rejects a NEWLY set email that collides with another user's username`() {
+        users.add(alice.copy(id = UserId(20), username = "newname@example.com", email = "other@example.com"))
+        val result =
+            userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "newname@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `replaceUserProfile allows a fullName-only change when the user's OWN stored email already collides`() {
+        users.add(alice.copy(id = UserId(20), username = "alice@example.com", email = "other@example.com"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Renamed",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Renamed", result.value.fullName)
+    }
+
+    @Test
     fun `updateUser - allows setting the username to the user's own email`() {
         val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice@example.com")
         assertIs<AdminResult.Success<User>>(result)

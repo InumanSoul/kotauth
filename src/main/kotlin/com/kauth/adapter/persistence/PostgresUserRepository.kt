@@ -152,6 +152,7 @@ class PostgresUserRepository : UserRepository {
     override fun update(user: User): User =
         transaction {
             UsersTable.update({ UsersTable.id eq user.id!!.value }) {
+                it[username] = user.username
                 it[email] = user.email.lowercase()
                 it[fullName] = user.fullName
                 it[externalId] = user.externalId

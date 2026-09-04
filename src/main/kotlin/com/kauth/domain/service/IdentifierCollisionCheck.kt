@@ -17,26 +17,40 @@ class IdentifierCollisionCheck(
     private val userRepository: UserRepository,
 ) {
     /**
-     * Returns a human-readable reason, or null when the pair is safe.
+     * Returns a human-readable reason, or null when the pair is safe. Checks BOTH directions:
+     * `username` cannot equal a different user's email, and `email` cannot equal a different
+     * user's username.
      *
-     * `username` is null when the caller isn't writing a username — the username→email
-     * direction is skipped in that case, since the stored username predates this check and may
-     * already legitimately (if historically) collide; only the email→username direction runs,
-     * because the email itself is always the thing being written.
+     * Use this whenever a username is actually being written (created or renamed). When the
+     * caller isn't writing a username, use [checkEmailOnly] instead — a nullable `username`
+     * parameter here would let a caller silently skip the username→email direction with no
+     * diagnostic.
      */
     fun check(
         tenantId: TenantId,
-        username: String?,
+        username: String,
         email: String,
         excludingUserId: UserId? = null,
     ): String? {
-        if (username != null) {
-            userRepository
-                .findByEmail(tenantId, username)
-                ?.takeIf { it.id != excludingUserId }
-                ?.let { return "That username is already in use as another user's email address." }
-        }
+        userRepository
+            .findByEmail(tenantId, username)
+            ?.takeIf { it.id != excludingUserId }
+            ?.let { return "That username is already in use as another user's email address." }
 
+        return checkEmailOnly(tenantId, email, excludingUserId)
+    }
+
+    /**
+     * Runs only the email→username direction: rejects `email` when it equals a different user's
+     * username. Use this when a username isn't being written — e.g. a profile update that only
+     * touches `fullName`, where re-checking the stored username against every other user's email
+     * would reject users whose username predates this check.
+     */
+    fun checkEmailOnly(
+        tenantId: TenantId,
+        email: String,
+        excludingUserId: UserId? = null,
+    ): String? {
         userRepository
             .findByUsernameIgnoreCase(tenantId, email)
             ?.takeIf { it.id != excludingUserId }

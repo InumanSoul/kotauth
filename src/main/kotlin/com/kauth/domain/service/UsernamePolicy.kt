@@ -16,6 +16,9 @@ package com.kauth.domain.service
 object UsernamePolicy {
     val USERNAME_PATTERN = Regex("[a-zA-Z0-9._@+-]+")
 
+    /** Matches the `users.username` column width (`VARCHAR(255)`, widened by V60). */
+    const val MAX_LENGTH = 255
+
     /** Trims and lowercases. Callers must still validate the result against [USERNAME_PATTERN]. */
     fun normalize(raw: String): String = raw.trim().lowercase()
 }

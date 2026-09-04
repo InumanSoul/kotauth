@@ -65,6 +65,11 @@ class AdminUserService(
                 ),
             )
         }
+        if (resolvedUsername.length > UsernamePolicy.MAX_LENGTH) {
+            return AdminResult.Failure(
+                AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+            )
+        }
 
         collisionCheck
             .check(tenantId, resolvedUsername, resolvedEmail)
@@ -449,9 +454,10 @@ class AdminUserService(
      * requested. Every write path now normalizes and validates (see [UsernamePolicy]), but a
      * stored username can still predate that guarantee on a database that has not yet run the
      * V66 normalization migration, so re-validating it on every unrelated field update would make
-     * such a user permanently un-editable until then. The email→username collision direction still
-     * runs unconditionally, because the email is written on every call regardless of whether a
-     * rename was requested.
+     * such a user permanently un-editable until then. The email→username collision direction is
+     * independent of that: it runs whenever the email is actually changing, rename or not — a
+     * user whose stored email happens to equal a different user's username must still be able to
+     * update unrelated fields, but a NEWLY set email is always checked.
      */
     private fun resolveUsername(
         tenantId: TenantId,
@@ -464,9 +470,11 @@ class AdminUserService(
         val renaming = normalized != null && normalized != user.username
 
         if (!renaming) {
-            collisionCheck
-                .check(tenantId, username = null, email = resolvedEmail, excludingUserId = userId)
-                ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+            if (resolvedEmail != user.email) {
+                collisionCheck
+                    .checkEmailOnly(tenantId, email = resolvedEmail, excludingUserId = userId)
+                    ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+            }
             return AdminResult.Success(user.username)
         }
 
@@ -480,6 +488,11 @@ class AdminUserService(
                 AdminError.Validation(
                     "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
                 ),
+            )
+        }
+        if (resolvedUsername.length > UsernamePolicy.MAX_LENGTH) {
+            return AdminResult.Failure(
+                AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
             )
         }
         if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
