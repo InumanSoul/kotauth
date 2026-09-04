@@ -337,6 +337,114 @@ class AuthServiceTest {
         assertTrue(auditLog.hasEvent(AuditEventType.REGISTER_SUCCESS))
     }
 
+    @Test
+    fun `register rejects a username equal to a different user's email`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "carol",
+                email = "taken@example.com",
+                fullName = "Carol",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        val result =
+            svc.register(
+                "acme",
+                "taken@example.com",
+                "newguy@example.com",
+                "New Guy",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        // Pins the deliberate choice: neither UserAlreadyExists nor EmailAlreadyExists fits a
+        // cross-namespace collision, so it must come back as ValidationError.
+        assertIs<AuthError.ValidationError>(result.error)
+    }
+
+    @Test
+    fun `register rejects an email equal to a different user's username`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "dave@example.com",
+                email = "dave-actual@example.com",
+                fullName = "Dave",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        val result =
+            svc.register(
+                "acme",
+                "newguy2",
+                "dave@example.com",
+                "New Guy Two",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+    }
+
+    @Test
+    fun `register allows a username equal to the registrant's own email`() {
+        // This is the legal shape integrators want; the collision check must not reject a user
+        // colliding only with themselves.
+        val result =
+            svc.register(
+                "acme",
+                "frank@example.com",
+                "frank@example.com",
+                "Frank",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("frank@example.com", result.value.username)
+        assertEquals("frank@example.com", result.value.email)
+    }
+
+    @Test
+    fun `register collision check compares the same normalised values that get persisted`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "erin",
+                email = "taken@example.com",
+                fullName = "Erin",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        // register persists username.trim() — untrimmed, differently-cased whitespace around the
+        // raw parameter must not let this slip past the check.
+        val result =
+            svc.register(
+                "acme",
+                "  TAKEN@example.com  ",
+                "newguy3@example.com",
+                "New Guy Three",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+    }
+
     // =========================================================================
     // login()
     // =========================================================================
