@@ -155,6 +155,9 @@ class PasskeyAuthRoutesTest {
                             auditLog = auditLog,
                             sessionRepository = sessions,
                             identifierResolver = UserIdentifierResolver(userRepo),
+                            collisionCheck =
+                                com.kauth.domain.service
+                                    .IdentifierCollisionCheck(userRepo),
                         ),
                     oauthService = buildOAuthService(),
                     tenantRepository = tenantRepo,

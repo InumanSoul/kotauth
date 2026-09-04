@@ -47,6 +47,7 @@ class AuthService(
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
     private val identifierResolver: UserIdentifierResolver,
+    private val collisionCheck: IdentifierCollisionCheck,
 ) {
     // Equalises latency so wrong-password vs. user-not-found / disabled / locked / pending-setup
     // are indistinguishable timing-wise — closes the bcrypt-skipped enumeration vector.
@@ -407,11 +408,21 @@ class AuthService(
             return AuthResult.Failure(AuthError.EmailAlreadyExists)
         }
 
+        val normalizedUsername = username.trim()
+        val normalizedEmail = email.trim().lowercase()
+
+        // Same-namespace duplicates are ruled out above; this catches the cross-namespace
+        // pair — this username equal to a DIFFERENT user's email, or vice versa — that the
+        // database's separate unique constraints would otherwise allow through.
+        collisionCheck
+            .check(tenant.id, normalizedUsername, normalizedEmail)
+            ?.let { return AuthResult.Failure(AuthError.ValidationError(it)) }
+
         val newUser =
             User(
                 tenantId = tenant.id,
-                username = username.trim(),
-                email = email.trim().lowercase(),
+                username = normalizedUsername,
+                email = normalizedEmail,
                 fullName = fullName.trim(),
                 passwordHash = passwordHasher.hash(effectivePassword),
             )

@@ -54,6 +54,7 @@ class ClientDefaultRolesRegistrationTest {
             applicationRepository = apps,
             roleRepository = roles,
             identifierResolver = UserIdentifierResolver(users),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private val socialService =

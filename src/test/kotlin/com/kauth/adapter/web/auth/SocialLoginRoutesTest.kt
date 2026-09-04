@@ -18,6 +18,7 @@ import com.kauth.domain.port.RateLimiterPort
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.JitProvisioningService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
@@ -117,6 +118,7 @@ class SocialLoginRoutesTest {
             auditLog = auditLog,
             sessionRepository = sessionRepo,
             identifierResolver = UserIdentifierResolver(userRepo),
+            collisionCheck = IdentifierCollisionCheck(userRepo),
         )
 
     private fun buildOAuthService() =

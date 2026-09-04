@@ -338,6 +338,7 @@ data class ServiceGraph(
                     emailScope = applicationScope,
                 )
             val identifierResolver = UserIdentifierResolver(userRepository)
+            val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
             val authService =
                 AuthService(
                     userRepository = userRepository,
@@ -351,6 +352,7 @@ data class ServiceGraph(
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
                     identifierResolver = identifierResolver,
+                    collisionCheck = identifierCollisionCheck,
                 )
             // -- User attributes + claim mapping ------------------------------
             val userAttributeService =
@@ -407,7 +409,6 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     corsPort = corsOriginCache,
                 )
-            val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
             val usernameGenerator = UsernameGenerator(userRepository)
             val adminUserService =
                 AdminUserService(

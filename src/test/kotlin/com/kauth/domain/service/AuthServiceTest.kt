@@ -50,6 +50,7 @@ class AuthServiceTest {
             auditLog = auditLog,
             sessionRepository = sessions,
             identifierResolver = UserIdentifierResolver(users),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     // -------------------------------------------------------------------------

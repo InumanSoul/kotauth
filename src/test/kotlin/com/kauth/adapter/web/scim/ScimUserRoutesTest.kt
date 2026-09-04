@@ -961,6 +961,49 @@ class ScimUserRoutesTest {
             assertEquals("uniqueness", body["scimType"]?.jsonPrimitive?.content)
         }
 
+    // Regression coverage for the cross-namespace collision check wired into AdminUserService's
+    // createUser/resolveUsername paths (Task 4/6): the two namespaces are separately unique in the
+    // schema, so without this check SCIM could still create a pair no login mode can resolve.
+    @Test
+    fun `a userName equal to a different user's email is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("alice")
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("alice@example.com"))
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            assertNull(userRepo.findByUsername(acme.id, "alice@example.com"))
+        }
+
+    @Test
+    fun `a user whose own userName equals their own email is created successfully`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
+                            """"userName":"sameident@example.com",""" +
+                            """"emails":[{"value":"sameident@example.com","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val stored = userRepo.findByUsername(acme.id, "sameident@example.com")
+            assertEquals("sameident@example.com", stored?.email)
+        }
+
     // -------------------------------------------------------------------------
     // GET /Users/{id}
     // -------------------------------------------------------------------------
@@ -1057,6 +1100,32 @@ class ScimUserRoutesTest {
             val stored = userRepo.findById(putUser.id!!, acme.id)
             assertNull(stored?.givenName)
             assertNull(stored?.familyName)
+        }
+
+    // Regression coverage for the cross-namespace collision check that runs unconditionally
+    // inside AdminUserService.resolveUsername (Task 6), reached here via PUT -> replaceUserProfile.
+    @Test
+    fun `PUT changing email to equal a different user's username is rejected`() =
+        testApplication {
+            application { installTestApp() }
+            addUser("shared@example.com")
+            val target = addUser("carol")
+
+            val response =
+                client.put("/t/acme/scim/v2/Users/${target.id!!.value}") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],""" +
+                            """"userName":"carol",""" +
+                            """"emails":[{"value":"shared@example.com","type":"work"}]}""",
+                    )
+                }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = jsonCodec.parseToJsonElement(response.bodyAsText()).jsonObject
+            assertEquals("invalidValue", body["scimType"]?.jsonPrimitive?.content)
+            assertEquals("carol@example.com", userRepo.findById(target.id!!, acme.id)?.email)
         }
 
     @Test

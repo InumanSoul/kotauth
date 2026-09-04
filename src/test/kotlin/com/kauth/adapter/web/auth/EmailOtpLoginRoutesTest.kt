@@ -12,6 +12,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
@@ -139,6 +140,7 @@ class EmailOtpLoginRoutesTest {
             auditLog = auditLog,
             sessionRepository = sessions,
             identifierResolver = UserIdentifierResolver(users),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private fun oauthService() =

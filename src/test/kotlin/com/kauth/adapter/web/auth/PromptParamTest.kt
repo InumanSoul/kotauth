@@ -12,6 +12,7 @@ import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.UserIdentifierResolver
@@ -119,6 +120,7 @@ class PromptParamTest {
             auditLog = auditLog,
             sessionRepository = sessionRepo,
             identifierResolver = UserIdentifierResolver(userRepo),
+            collisionCheck = IdentifierCollisionCheck(userRepo),
         )
 
     private fun oauthService() =
