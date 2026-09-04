@@ -520,14 +520,10 @@ internal fun DIV.userProfileReadFragment(
         div("ov-card") {
             div("ov-card__section-label") { +"Profile" }
             div("ov-card__row") {
-                span("ov-card__label") { +"Username" }
+                span("ov-card__label") { +EnglishStrings.USERNAME_LABEL }
                 span("ov-card__value") {
                     span("ov-card__value--mono") { +user.username }
                     copyBtn(user.username)
-                    span("lock-icon") {
-                        attributes["title"] = "Immutable after creation"
-                        inlineSvgIcon("lock", "Immutable")
-                    }
                 }
             }
             ovRow("Email") {
@@ -598,14 +594,17 @@ internal fun DIV.userProfileEditFragment(
                 attributes["hx-target"] = "#profile-section"
                 attributes["hx-swap"] = "outerHTML"
                 div("edit-row") {
-                    span("edit-row__label") { +"Username" }
+                    span("edit-row__label") { +EnglishStrings.USERNAME_LABEL }
                     div {
                         input(classes = "edit-row__field edit-row__field--mono") {
                             type = InputType.text
+                            name = "username"
                             value = user.username
-                            disabled = true
+                            autoComplete = "off"
+                            attributes["spellcheck"] = "false"
+                            attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                         }
-                        div("edit-row__hint") { +"Immutable after creation" }
+                        div("edit-row__hint") { +EnglishStrings.USERNAME_FORMAT_HINT }
                     }
                 }
                 div("edit-row") {
@@ -973,7 +972,7 @@ internal fun createUserPageImpl(
                     method = FormMethod.post,
                 ) {
                     div("edit-row") {
-                        span("edit-row__label") { +"Username" }
+                        span("edit-row__label") { +EnglishStrings.USERNAME_LABEL }
                         div {
                             input(classes = "edit-row__field edit-row__field--mono") {
                                 type = InputType.text
@@ -985,9 +984,7 @@ internal fun createUserPageImpl(
                                 attributes["spellcheck"] = "false"
                                 attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                             }
-                            div("edit-row__hint") {
-                                +"Letters, digits, dots, underscores, hyphens, @, and +. Immutable after creation."
-                            }
+                            div("edit-row__hint") { +EnglishStrings.USERNAME_FORMAT_HINT }
                         }
                     }
                     div("edit-row") {

@@ -275,6 +275,7 @@ data class ProblemDetail(
 @Serializable data class UpdateUserRequest(
     val email: String? = null,
     val fullName: String? = null,
+    val username: String? = null,
 )
 
 @Serializable data class CreateRoleRequest(

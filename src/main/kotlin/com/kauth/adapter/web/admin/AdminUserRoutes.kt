@@ -352,21 +352,44 @@ fun Route.adminUserRoutes(
                 val params = call.receiveParameters()
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
+                val username = params["username"]?.trim()?.ifBlank { null }
                 val givenName = params["givenName"]?.trim()?.ifBlank { null }
                 val familyName = params["familyName"]?.trim()?.ifBlank { null }
                 val isHtmx = call.request.headers["HX-Request"] == "true"
                 // The form submits the whole mutable profile, so a name part left empty means
                 // "clear it" — which updateUser's null-means-unchanged parameters cannot express.
+                // A username rename goes through updateUser instead of replaceUserProfile, since
+                // the latter treats every parameter as authoritative and has no username field of
+                // its own; skip the extra call (and audit entry) when the username is untouched.
                 val result =
-                    adminUserService.replaceUserProfile(
-                        userId = userId,
-                        tenantId = ctx.workspace.id,
-                        email = email,
-                        fullName = fullName,
-                        externalId = user.externalId,
-                        givenName = givenName,
-                        familyName = familyName,
-                    )
+                    if (username != null && username != user.username) {
+                        when (
+                            val usernameResult =
+                                adminUserService.updateUser(userId, ctx.workspace.id, username = username)
+                        ) {
+                            is AdminResult.Failure -> usernameResult
+                            is AdminResult.Success ->
+                                adminUserService.replaceUserProfile(
+                                    userId = userId,
+                                    tenantId = ctx.workspace.id,
+                                    email = email,
+                                    fullName = fullName,
+                                    externalId = user.externalId,
+                                    givenName = givenName,
+                                    familyName = familyName,
+                                )
+                        }
+                    } else {
+                        adminUserService.replaceUserProfile(
+                            userId = userId,
+                            tenantId = ctx.workspace.id,
+                            email = email,
+                            fullName = fullName,
+                            externalId = user.externalId,
+                            givenName = givenName,
+                            familyName = familyName,
+                        )
+                    }
                 when (result) {
                     is AdminResult.Success -> {
                         if (isHtmx) {

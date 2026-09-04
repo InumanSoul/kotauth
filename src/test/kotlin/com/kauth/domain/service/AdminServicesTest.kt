@@ -714,6 +714,52 @@ class AdminServicesTest {
         assertEquals("Alice Test", result.value.fullName)
     }
 
+    @Test
+    fun `updateUser - changes the username`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice.new")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice.new", result.value.username)
+        assertEquals("alice.new", users.findById(UserId(10), TenantId(1))!!.username)
+        assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_UPDATED))
+    }
+
+    @Test
+    fun `updateUser - rejects a username that is another user's email`() {
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "taken@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "taken@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateUser - rejects a username already taken as another user's username`() {
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "zoe@example.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "zoe")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Conflict>(result.error)
+    }
+
+    @Test
+    fun `updateUser - allows setting the username to the user's own email`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice@example.com")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice@example.com", result.value.username)
+    }
+
+    @Test
+    fun `updateUser - rejects an invalid username format`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "not valid!")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `updateUser - null username leaves the existing username untouched`() {
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice", result.value.username)
+    }
+
     // =========================================================================
     // setUserEnabled
     // =========================================================================

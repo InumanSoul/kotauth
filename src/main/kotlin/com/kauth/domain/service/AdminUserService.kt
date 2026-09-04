@@ -27,6 +27,11 @@ class AdminUserService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
+    private companion object {
+        /** Shared by [createUser] and [updateUser] so the two paths cannot drift apart. */
+        val USERNAME_PATTERN = Regex("[a-zA-Z0-9._@+-]+")
+    }
+
     fun createUser(
         tenantId: TenantId,
         username: String,
@@ -58,7 +63,7 @@ class AdminUserService(
             } else {
                 username.trim()
             }
-        if (!resolvedUsername.matches(Regex("[a-zA-Z0-9._@+-]+"))) {
+        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
@@ -335,6 +340,7 @@ class AdminUserService(
         tenantId: TenantId,
         email: String? = null,
         fullName: String? = null,
+        username: String? = null,
     ): AdminResult<User> {
         val user =
             userRepository.findById(userId, tenantId)
@@ -342,16 +348,38 @@ class AdminUserService(
 
         val resolvedEmail = email?.trim()?.lowercase() ?: user.email
         val resolvedFullName = fullName?.trim() ?: user.fullName
+        val resolvedUsername = username?.trim() ?: user.username
 
         if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
 
+        if (resolvedUsername.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Username is required."))
+        }
+        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
+            )
+        }
+
         if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
             return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
+        if (resolvedUsername != user.username && userRepository.existsByUsername(tenantId, resolvedUsername)) {
+            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
+        }
 
-        val updated = userRepository.update(user.copy(email = resolvedEmail, fullName = resolvedFullName))
+        collisionCheck
+            .check(tenantId, resolvedUsername, resolvedEmail, excludingUserId = userId)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+
+        val updated =
+            userRepository.update(
+                user.copy(email = resolvedEmail, fullName = resolvedFullName, username = resolvedUsername),
+            )
 
         auditLog.record(
             AuditEvent(

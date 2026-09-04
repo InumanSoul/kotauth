@@ -392,6 +392,61 @@ class AdminUserRoutesTest {
         }
 
     @Test
+    fun `renaming a user's username succeeds and redirects`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "ada.lovelace")
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("ada.lovelace", userRepo.findById(user.id!!, workspace.id)!!.username)
+        }
+
+    @Test
+    fun `renaming a user's username to one already taken does not silently succeed`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            addWorkspaceUser("bob")
+            val user = addWorkspaceUser("ada")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "bob")
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals("ada", userRepo.findById(user.id!!, workspace.id)!!.username)
+        }
+
+    @Test
     fun `the edit form offers both name parts`() =
         testApplication {
             application { installTestApp() }

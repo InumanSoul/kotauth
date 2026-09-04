@@ -1009,6 +1009,14 @@ object EnglishStrings {
     const val USER_NAME_PARTS_HINT =
         "Optional. Stored separately from the display name, so filling these in never rewrites Full Name."
 
+    /**
+     * The username field's format rule, shown on the create-user form and the user-detail edit
+     * form. Usernames used to be permanent; they are now editable so a generated handle doesn't
+     * have to stick forever.
+     */
+    const val USERNAME_LABEL = "Username"
+    const val USERNAME_FORMAT_HINT = "Letters, digits, dots, underscores, hyphens, @, and +."
+
     /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
         "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +
