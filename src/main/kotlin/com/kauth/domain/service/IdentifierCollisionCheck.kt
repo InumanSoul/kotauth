@@ -29,7 +29,7 @@ class IdentifierCollisionCheck(
             ?.let { return "That username is already in use as another user's email address." }
 
         userRepository
-            .findByUsername(tenantId, email)
+            .findByUsernameIgnoreCase(tenantId, email)
             ?.takeIf { it.id != excludingUserId }
             ?.let { return "That email address is already in use as another user's username." }
 

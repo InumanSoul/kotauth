@@ -43,6 +43,20 @@ class PostgresUserRepository : UserRepository {
                 .singleOrNull()
         }
 
+    override fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? =
+        transaction {
+            UsersTable
+                .selectAll()
+                .where {
+                    (UsersTable.tenantId eq tenantId.value) and
+                        (UsersTable.username.lowerCase() eq username.trim().lowercase())
+                }.map { it.toUser() }
+                .singleOrNull()
+        }
+
     override fun findByEmail(
         tenantId: TenantId,
         email: String,

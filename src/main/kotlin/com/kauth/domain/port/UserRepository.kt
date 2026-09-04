@@ -20,6 +20,19 @@ interface UserRepository {
         username: String,
     ): User?
 
+    /**
+     * Case-insensitive username lookup. Usernames are stored as-is and [findByUsername] is an
+     * exact match, but emails are lowercased on write — so matching a submitted email against
+     * existing usernames (as [com.kauth.domain.service.IdentifierCollisionCheck] does) must
+     * ignore case on both sides or a differently-cased pair slips through. Not for sign-in
+     * resolution: [com.kauth.domain.service.UserIdentifierResolver] intentionally keeps using the
+     * case-sensitive [findByUsername].
+     */
+    fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User?
+
     fun findByEmail(
         tenantId: TenantId,
         email: String,

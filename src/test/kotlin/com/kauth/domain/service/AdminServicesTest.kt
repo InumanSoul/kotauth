@@ -409,6 +409,49 @@ class AdminServicesTest {
         assertIs<AdminResult.Success<User>>(result)
     }
 
+    @Test
+    fun `createUser rejects an email equal to another users username in different case`() {
+        users.add(alice.copy(id = UserId(52), username = "Dave@Example.com", email = "dave-alt2@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "gail",
+                email = "dave@example.com",
+                fullName = "Gail",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser rejects a username equal to another users email in different case`() {
+        users.add(alice.copy(id = UserId(53), username = "harold", email = "Carol2@Example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "carol2@example.com",
+                email = "newperson2@example.com",
+                fullName = "New Person 2",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser allows a username equal to the same users own email in different case`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "Frank2@Example.com",
+                email = "frank2@example.com",
+                fullName = "Frank Two",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+    }
+
     // =========================================================================
     // createUser — invite mode
     // =========================================================================

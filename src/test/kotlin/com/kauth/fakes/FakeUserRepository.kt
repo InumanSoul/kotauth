@@ -82,6 +82,15 @@ class FakeUserRepository :
         return store.values.find { it.tenantId == tenantId && it.username == username }
     }
 
+    override fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? {
+        callLog += "findByUsernameIgnoreCase"
+        val needle = username.trim().lowercase()
+        return store.values.find { it.tenantId == tenantId && it.username.lowercase() == needle }
+    }
+
     override fun findByEmail(
         tenantId: TenantId,
         email: String,
