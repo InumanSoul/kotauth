@@ -977,7 +977,6 @@ internal fun createUserPageImpl(
                             input(classes = "edit-row__field edit-row__field--mono") {
                                 type = InputType.text
                                 name = "username"
-                                required = true
                                 value = prefill.username
                                 placeholder = "johndoe"
                                 autoComplete = "off"
@@ -985,6 +984,7 @@ internal fun createUserPageImpl(
                                 attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                             }
                             div("edit-row__hint") { +EnglishStrings.USERNAME_FORMAT_HINT }
+                            div("edit-row__hint") { +EnglishStrings.USERNAME_GENERATE_HINT }
                         }
                     }
                     div("edit-row") {

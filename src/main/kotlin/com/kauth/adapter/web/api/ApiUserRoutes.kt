@@ -58,7 +58,7 @@ internal fun Route.apiUserRoutes(
                 val result =
                     adminUserService.createUser(
                         tenantId = tenantId,
-                        username = body.username,
+                        username = body.username ?: "",
                         email = body.email,
                         fullName = body.fullName,
                         password = body.password,
@@ -85,7 +85,7 @@ internal fun Route.apiUserRoutes(
                 val result =
                     adminUserService.createUser(
                         tenantId = tenantId,
-                        username = body.username,
+                        username = body.username ?: "",
                         email = body.email,
                         fullName = body.fullName,
                         password = null,

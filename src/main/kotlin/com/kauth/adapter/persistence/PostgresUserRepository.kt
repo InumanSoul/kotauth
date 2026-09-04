@@ -54,7 +54,10 @@ class PostgresUserRepository : UserRepository {
                     (UsersTable.tenantId eq tenantId.value) and
                         (UsersTable.username.lowerCase() eq username.trim().lowercase())
                 }.map { it.toUser() }
-                .singleOrNull()
+                // UNIQUE (tenant_id, username) permits two rows differing only in case, so a
+                // case-differing collision is still one match — singleOrNull() would fail open
+                // here (return null) precisely on the collision this lookup exists to catch.
+                .firstOrNull()
         }
 
     override fun findByEmail(

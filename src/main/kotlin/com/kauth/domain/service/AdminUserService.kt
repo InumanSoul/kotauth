@@ -449,6 +449,13 @@ class AdminUserService(
      * Shared by [updateUser] and [replaceUserProfile]: resolves an optional username edit
      * (null means unchanged), validates format, and rejects a collision with another user's
      * username or email — the two call sites cannot drift apart on what a rename is allowed to do.
+     *
+     * Format and collision checks on the username itself only run when a rename is actually
+     * requested. A stored username can predate this feature (or any format validation at all —
+     * see `AuthService.register` and `BackupImporterService`), so re-validating it on every
+     * unrelated field update would make such a user permanently un-editable. The email→username
+     * collision direction still runs unconditionally, because the email is written on every call
+     * regardless of whether a rename was requested.
      */
     private fun resolveUsername(
         tenantId: TenantId,
@@ -457,7 +464,17 @@ class AdminUserService(
         username: String?,
         resolvedEmail: String,
     ): AdminResult<String> {
-        val resolvedUsername = username?.trim() ?: user.username
+        val trimmed = username?.trim()
+        val renaming = trimmed != null && trimmed != user.username
+
+        if (!renaming) {
+            collisionCheck
+                .check(tenantId, username = null, email = resolvedEmail, excludingUserId = userId)
+                ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+            return AdminResult.Success(user.username)
+        }
+
+        val resolvedUsername = trimmed
 
         if (resolvedUsername.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
@@ -469,7 +486,7 @@ class AdminUserService(
                 ),
             )
         }
-        if (resolvedUsername != user.username && userRepository.existsByUsername(tenantId, resolvedUsername)) {
+        if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
             return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
         }
 

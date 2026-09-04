@@ -266,7 +266,8 @@ data class ProblemDetail(
 // -- Request bodies -----------------------------------------------------------
 
 @Serializable data class CreateUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
     val password: String,
@@ -333,7 +334,8 @@ data class ProblemDetail(
  * Requires SMTP to be configured on the tenant.
  */
 @Serializable data class InviteUserRequest(
-    val username: String,
+    /** Omit or leave blank to have Kotauth generate one from the name and email. */
+    val username: String? = null,
     val email: String,
     val fullName: String,
 )

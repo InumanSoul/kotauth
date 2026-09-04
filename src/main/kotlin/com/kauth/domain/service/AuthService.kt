@@ -30,7 +30,8 @@ import java.time.Instant
  * indistinguishable from a wrong password — no slug enumeration leaks.
  *
  * Flow — login:
- *   slug → Tenant → find User by username in that tenant → verify password → tokens + session
+ *   slug → Tenant → resolve User by the workspace's identifier mode (username, email, or
+ *   either — see UserIdentifierResolver) in that tenant → verify password → tokens + session
  *
  * Flow — register:
  *   slug → Tenant → check policy → validate → hash password → save User

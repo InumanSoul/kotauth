@@ -23,12 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   workspace to `USERNAME` — **existing workspaces are unaffected until an
   admin changes the setting.** The hosted login form's identifier label,
   input type, and `autocomplete` hint adapt to the chosen mode.
-- **Auto-generated usernames.** A user provisioned without one — an
-  admin-created invite or a SCIM push supplying only a name and email — now
-  gets a readable username generated from the given name (or the email's
-  local part) plus a short random suffix, checked against both the username
-  and email namespaces so generation can never manufacture the collision
-  below.
+- **Auto-generated usernames.** A user provisioned without one through the
+  admin API or admin UI — an invite or a create call supplying only a name
+  and email — now gets a readable username generated from the given name
+  (or the email's local part) plus a short random suffix, checked against
+  both the username and email namespaces so generation can never manufacture
+  the collision below. SCIM is unaffected: `userName` is REQUIRED by RFC
+  7643, so a SCIM push that omits it is still rejected rather than
+  generated.
 - **Admin-editable usernames.** Usernames were previously immutable after
   creation. An administrator can now rename a user's username from the admin
   UI or the admin API, subject to the same collision check as creation.

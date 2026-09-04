@@ -1040,6 +1040,9 @@ object EnglishStrings {
     const val USERNAME_LABEL = "Username"
     const val USERNAME_FORMAT_HINT = "Letters, digits, dots, underscores, hyphens, @, and +."
 
+    /** Create-user form only: the username field is optional there, unlike on the edit form. */
+    const val USERNAME_GENERATE_HINT = "Leave blank to generate one from the name and email."
+
     /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =
         "Role assignment is not provisioned and stays editable. Roles are assigned here and nowhere else, so a " +

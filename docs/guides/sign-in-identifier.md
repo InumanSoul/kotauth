@@ -46,20 +46,31 @@ at write time instead — across admin user creation and update, SCIM, and
 self-registration — regardless of which mode the workspace currently uses,
 so switching to `EITHER` later never surfaces a latent collision.
 
+Social login, JIT provisioning, and backup import do not run this check —
+they provision users outside the admin/SCIM/self-registration paths and can
+still create a colliding pair. An administrator can resolve one after the
+fact by renaming the username, which is validated the same way.
+
 A user whose username **is their own** email address is unaffected and
 remains fully supported; that is the shape most integrators actually want.
 
 ## Auto-generated and admin-editable usernames
 
-When a user is provisioned without a username — an admin-created invite or a
-SCIM push that supplies only a name and email — Kotauth generates one: a
+When a user is provisioned without a username — an admin-created invite or
+API call that supplies only a name and email — Kotauth generates one: a
 readable stem from the given name (falling back to the email's local part),
 followed by a short random suffix, checked against both the username and
 email namespaces so generation can never manufacture the collision above.
+This applies to the admin API and admin UI only. SCIM's `userName` is
+REQUIRED per RFC 7643, so a SCIM push omitting it is rejected rather than
+generated.
 
 Usernames are no longer immutable. An administrator can rename a user's
 username from the admin UI or the admin API, subject to the same collision
-check.
+check. Renaming validates only the new value — a stored username that
+predates this validation (or predates any format checking at all, as with
+self-registration and backup-imported accounts) does not block unrelated
+edits to the same user, such as updating their email or name.
 
 ## Sign-in failure message
 
@@ -72,6 +83,18 @@ which was misleading for a workspace in `EMAIL` mode.
 The identifier submitted at sign-in is now trimmed of surrounding whitespace
 before lookup; previously it was passed through raw. In `USERNAME` mode this
 means a username pasted with a trailing space, which previously failed, now
-signs in. This is safe: stored usernames cannot contain leading or trailing
-whitespace, so trimming can only ever resolve the same account the untrimmed
-value would have, never a different one.
+signs in. This is safe for `createUser`, `register`, social login, JIT
+provisioning, and email-OTP sign-up, all of which trim before storing —
+trimming at lookup can only ever resolve the same account the untrimmed
+value would have, never a different one. `BackupImporterService` is the one
+exception: it writes a restored username verbatim, untrimmed, so a backup
+imported from an older instance can still carry leading or trailing
+whitespace in a stored username.
+
+## A note on rolling deploys
+
+During a rolling deploy, old and new replicas serve traffic side by side.
+Switching a workspace's mode away from `USERNAME` takes effect immediately
+in the database, but a request that happens to land on an old replica still
+resolves by username only, regardless of the new setting, until that
+replica is replaced.

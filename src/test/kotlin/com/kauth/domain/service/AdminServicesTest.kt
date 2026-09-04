@@ -809,6 +809,71 @@ class AdminServicesTest {
         assertEquals("alice.renamed", result.value.username)
     }
 
+    @Test
+    fun `updateUser - unrelated fields updatable for a stored username that predates format validation`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "newalice@example.com",
+                fullName = "Alice Updated",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("john doe", result.value.username)
+        assertEquals("newalice@example.com", result.value.email)
+        assertEquals("Alice Updated", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - renaming a stored non-conforming username to an invalid format still fails`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                username = "not valid!",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+        assertEquals("john doe", users.findById(UserId(10), TenantId(1))!!.username)
+    }
+
+    @Test
+    fun `replaceUserProfile - unrelated fields updatable for a stored username that predates format validation`() {
+        users.add(alice.copy(username = "john doe"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "newalice@example.com",
+                fullName = "Alice Updated",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("john doe", result.value.username)
+        assertEquals("newalice@example.com", result.value.email)
+        assertEquals("Alice Updated", result.value.fullName)
+    }
+
+    @Test
+    fun `updateUser - a pre-existing colliding pair can still have unrelated fields updated`() {
+        // Legal before this feature existed: user 10's username equals user 20's email.
+        users.add(alice.copy(username = "taken@example.com"))
+        users.add(alice.copy(id = UserId(20), username = "zoe", email = "taken@example.com"))
+        val result =
+            userSvc.updateUser(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                fullName = "Alice Updated",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("Alice Updated", result.value.fullName)
+        assertEquals("taken@example.com", result.value.username)
+    }
+
     // =========================================================================
     // setUserEnabled
     // =========================================================================

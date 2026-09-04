@@ -19,9 +19,10 @@ class UserIdentifierResolverTest {
         id: Int,
         username: String,
         email: String,
+        forTenant: TenantId = tenantId,
     ) = User(
         id = UserId(id),
-        tenantId = tenantId,
+        tenantId = forTenant,
         username = username,
         email = email,
         fullName = "Test User",
@@ -114,6 +115,12 @@ class UserIdentifierResolverTest {
 
     @Test
     fun `does not cross tenant boundaries`() {
+        // A same-named user genuinely exists — under a different tenant. If the lookup weren't
+        // actually tenant-scoped (e.g. it silently ignored tenantId), this would incorrectly
+        // resolve. A tenant with no users at all wouldn't distinguish "scoped correctly" from
+        // "scoping is broken but there was nothing to find anyway".
+        users.add(user(2, "alice", "alice2@example.com", forTenant = TenantId(2)))
+
         val result = resolver.resolve(TenantId(99), LoginIdentifierMode.EITHER, "alice")
         assertIs<IdentifierResolution.NotFound>(result)
     }

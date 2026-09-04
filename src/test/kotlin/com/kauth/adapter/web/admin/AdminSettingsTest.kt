@@ -359,6 +359,36 @@ class AdminSettingsTest {
             assertTrue(response.headers["Location"]?.contains("saved=true") == true)
         }
 
+    @Test
+    fun `POST security settings omitting mfaPolicy preserves a required tenant`() =
+        testApplication {
+            // mfaPolicy is absent from a partial/programmatic POST here. It must fall back to
+            // the tenant's persisted value (not to "optional") so an operator saving unrelated
+            // fields on this form can never silently downgrade a required-MFA policy.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters = Parameters.build { append("mfaPolicy", "required") },
+            )
+            assertEquals("required", tenantRepo.findBySlug("acme")!!.securityConfig.mfaPolicy)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("required", tenantRepo.findBySlug("acme")!!.securityConfig.mfaPolicy)
+        }
+
     // =========================================================================
     // Security policy settings — sign-in identifier mode
     // =========================================================================

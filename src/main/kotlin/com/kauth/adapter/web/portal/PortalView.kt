@@ -90,7 +90,7 @@ object PortalView {
         slug: String,
         ctx: ViewContext,
         error: String?,
-        loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
+        loginIdentifierMode: LoginIdentifierMode,
     ): HTML.() -> Unit =
         {
             head { authPageHead("${ctx.workspaceName} | ${ctx.t("PORTAL_LOGIN_SUBMIT")}", ctx.theme) }

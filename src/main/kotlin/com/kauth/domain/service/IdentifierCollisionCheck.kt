@@ -16,17 +16,26 @@ import com.kauth.domain.port.UserRepository
 class IdentifierCollisionCheck(
     private val userRepository: UserRepository,
 ) {
-    /** Returns a human-readable reason, or null when the pair is safe. */
+    /**
+     * Returns a human-readable reason, or null when the pair is safe.
+     *
+     * `username` is null when the caller isn't writing a username — the username→email
+     * direction is skipped in that case, since the stored username predates this check and may
+     * already legitimately (if historically) collide; only the email→username direction runs,
+     * because the email itself is always the thing being written.
+     */
     fun check(
         tenantId: TenantId,
-        username: String,
+        username: String?,
         email: String,
         excludingUserId: UserId? = null,
     ): String? {
-        userRepository
-            .findByEmail(tenantId, username)
-            ?.takeIf { it.id != excludingUserId }
-            ?.let { return "That username is already in use as another user's email address." }
+        if (username != null) {
+            userRepository
+                .findByEmail(tenantId, username)
+                ?.takeIf { it.id != excludingUserId }
+                ?.let { return "That username is already in use as another user's email address." }
+        }
 
         userRepository
             .findByUsernameIgnoreCase(tenantId, email)
