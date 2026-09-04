@@ -72,6 +72,68 @@ predates this validation (or predates any format checking at all, as with
 self-registration and backup-imported accounts) does not block unrelated
 edits to the same user, such as updating their email or name.
 
+## Username normalization
+
+Every path that can create or rename a username — admin create, admin
+rename, self-registration, social login, JIT provisioning, email-OTP
+sign-up, and backup import — now normalizes it the same way before writing:
+trimmed of surrounding whitespace, lowercased, then required to match
+`[a-zA-Z0-9._@+-]+`. A value that fails to normalize into something valid
+is rejected rather than stored as-is. Self-registration previously ran no
+username validation at all; it is now covered by the same rule as every
+other path.
+
+One consequence: sign-in matches usernames **case-insensitively**. Storage
+is always lowercase, and the identifier submitted at sign-in is lowercased
+before lookup, so a user who originally signed up or was created as `Dave`
+still signs in as `Dave`, `DAVE`, or `dave` — their stored username is
+`dave`.
+
+## Upgrading to v1.24.0
+
+Migration `V66` normalizes every username already in the database to the
+rule above, then adds a unique index on `(tenant_id, lower(username))` so
+two usernames differing only by case (or by punctuation collapsed to `.`)
+can no longer coexist. This has two consequences an operator must plan for
+before upgrading:
+
+- **Existing sign-in identifiers can change.** A user stored as `"John
+  Doe"` becomes `john.doe`; a user stored as `Dave` becomes `dave`. Anyone
+  whose stored username was not already trimmed, lowercase, and
+  pattern-valid needs to be told their new sign-in identifier before or
+  right after the upgrade.
+- **The migration aborts the upgrade if it would have to merge two
+  identities.** If two usernames in the same tenant would normalize to the
+  same value — e.g. `Dave` and `dave`, or `john.doe` and `John_Doe` — `V66`
+  raises an exception and the migration (and therefore the upgrade) does
+  not complete. This is deliberate: silently merging or dropping one of the
+  two accounts would be worse than a blocked upgrade. The operator must
+  rename one of the colliding accounts by hand and re-run the migration.
+
+Run this query against the target database **before** upgrading to find
+every tenant/username group that would collide. It mirrors `V66`'s own
+normalization exactly — lowercase, trim, collapse forbidden-character runs
+to `.`, then strip leading/trailing `.`/`_`/`-`:
+
+```sql
+SELECT tenant_id,
+       regexp_replace(
+         regexp_replace(
+           regexp_replace(lower(btrim(username)), '[^a-z0-9._@+-]+', '.', 'g'),
+           '^[._-]+', ''
+         ),
+         '[._-]+$', ''
+       ) AS normalized,
+       count(*)
+FROM users
+GROUP BY 1, 2
+HAVING count(*) > 1;
+```
+
+Any row this returns is an upgrade blocker: rename one of the colliding
+usernames (through the admin UI or API, on the pre-upgrade version) until
+the query returns nothing, then upgrade.
+
 ## Sign-in failure message
 
 The generic sign-in failure changed from "Invalid username or password." to
@@ -83,13 +145,15 @@ which was misleading for a workspace in `EMAIL` mode.
 The identifier submitted at sign-in is now trimmed of surrounding whitespace
 before lookup; previously it was passed through raw. In `USERNAME` mode this
 means a username pasted with a trailing space, which previously failed, now
-signs in. This is safe for `createUser`, `register`, social login, JIT
-provisioning, and email-OTP sign-up, all of which trim before storing —
-trimming at lookup can only ever resolve the same account the untrimmed
-value would have, never a different one. `BackupImporterService` is the one
-exception: it writes a restored username verbatim, untrimmed, so a backup
-imported from an older instance can still carry leading or trailing
-whitespace in a stored username.
+signs in. This is safe because every write path — `createUser`, `register`,
+social login, JIT provisioning, email-OTP sign-up, and backup import —
+normalizes (trims and lowercases) before storing, so a stored username can
+no longer carry leading or trailing whitespace at all; trimming at lookup
+can only ever resolve the same account the untrimmed value would have,
+never a different one. Backup import used to be the one exception, writing
+a restored username verbatim; it now normalizes and rejects the record
+instead if the result isn't valid (see Upgrading, below, for the equivalent
+cleanup `V66` performs on rows already in the database).
 
 ## A note on rolling deploys
 

@@ -1040,6 +1040,9 @@ object EnglishStrings {
     const val USERNAME_LABEL = "Username"
     const val USERNAME_FORMAT_HINT = "Letters, digits, dots, underscores, hyphens, @, and +."
 
+    /** Usernames are stored lowercased; uppercase input is accepted and normalized, not rejected. */
+    const val USERNAME_LOWERCASE_HINT = "Saved in lowercase, regardless of how it's typed here."
+
     /** Create-user form only: the username field is optional there, unlike on the edit form. */
     const val USERNAME_GENERATE_HINT = "Leave blank to generate one from the name and email."
 

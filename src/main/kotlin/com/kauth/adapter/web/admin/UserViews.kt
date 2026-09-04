@@ -605,6 +605,7 @@ internal fun DIV.userProfileEditFragment(
                             attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                         }
                         div("edit-row__hint") { +EnglishStrings.USERNAME_FORMAT_HINT }
+                        div("edit-row__hint") { +EnglishStrings.USERNAME_LOWERCASE_HINT }
                     }
                 }
                 div("edit-row") {
@@ -984,6 +985,7 @@ internal fun createUserPageImpl(
                                 attributes["pattern"] = "[a-zA-Z0-9._@+-]+"
                             }
                             div("edit-row__hint") { +EnglishStrings.USERNAME_FORMAT_HINT }
+                            div("edit-row__hint") { +EnglishStrings.USERNAME_LOWERCASE_HINT }
                             div("edit-row__hint") { +EnglishStrings.USERNAME_GENERATE_HINT }
                         }
                     }

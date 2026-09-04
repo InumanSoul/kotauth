@@ -40,6 +40,7 @@ import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.serialization.decodeFromString
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -617,6 +618,37 @@ class BackupExportImportTest {
                 magicLinkEnabled = false,
             )
         assertEquals(LoginIdentifierMode.USERNAME, legacy.loginIdentifierMode)
+    }
+
+    @Test
+    fun `a real pre-1_24 backup JSON payload missing loginIdentifierMode still decodes to USERNAME`() {
+        // A pre-1.24 backup's JSON never had a "loginIdentifierMode" key at all — it didn't
+        // exist yet. Unlike the constructor-based test above (which only proves the Kotlin
+        // default-parameter mechanism works), this decodes a literal JSON string through the
+        // exact `Json { ignoreUnknownKeys = true }` instance the importer itself uses, so it
+        // proves an actual archived backup file still imports.
+        val legacyJson =
+            """
+            {
+                "passwordMinLength": 8,
+                "passwordRequireSpecial": false,
+                "passwordRequireUppercase": false,
+                "passwordRequireNumber": false,
+                "passwordHistoryCount": 0,
+                "passwordMaxAgeDays": 0,
+                "passwordBlacklistEnabled": false,
+                "mfaPolicy": "optional",
+                "lockoutMaxAttempts": 0,
+                "lockoutDurationMinutes": 15,
+                "corsAllowCredentials": false,
+                "hibpCheckEnabled": false,
+                "magicLinkEnabled": false
+            }
+            """.trimIndent()
+
+        val decoded = backupJson().decodeFromString<SecurityConfigBackup>(legacyJson)
+
+        assertEquals(LoginIdentifierMode.USERNAME, decoded.loginIdentifierMode)
     }
 
     @Test

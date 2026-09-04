@@ -43,13 +43,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Sign-in identifiers are now trimmed of surrounding whitespace** before
   lookup; previously they were passed through raw. In `Username only` mode
   this means a username pasted with a trailing space, which previously
-  failed, now signs in. This is safe: stored usernames cannot contain
-  leading or trailing whitespace — except a backup-imported account, whose
-  username is restored verbatim — so trimming can only ever resolve the same
-  account the untrimmed value would have, never a different one.
+  failed, now signs in. This is safe because every write path now
+  normalizes (trims and lowercases) before storing, so a stored username can
+  no longer carry leading or trailing whitespace at all — trimming at lookup
+  can only ever resolve the same account the untrimmed value would have,
+  never a different one.
+- **Sign-in now matches usernames case-insensitively.** Usernames are
+  always stored lowercase, and the submitted identifier is lowercased
+  before lookup in `Username only` and `Username or email` modes. A user
+  who was created or previously signed in as `Dave` still signs in with
+  `Dave`, `DAVE`, or `dave`.
 
 ### Security
 
+- **Usernames are always normalized.** Every path that can create or rename
+  a username — admin create, admin rename, self-registration, social login,
+  JIT provisioning, email-OTP sign-up, and backup import — now trims,
+  lowercases, and validates the result against `[a-zA-Z0-9._@+-]+` before
+  writing it, rejecting the write if it doesn't produce a valid value.
+  Self-registration previously ran no username validation at all. A backup
+  record whose username doesn't normalize into something valid is now
+  rejected by name during import instead of being written verbatim.
 - **Username/email collision prevention.** Creating or updating a user whose
   username equals a different user's email address (or vice versa) is now
   rejected — across admin user creation, admin user update, SCIM, and
@@ -62,12 +76,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sign-in on it would lock out invite- and SCIM-provisioned users who never
   completed verification — exactly the users this feature exists to serve.
 
+### Fixed
+
+- **Admin username renames now actually persist against Postgres.**
+  `PostgresUserRepository.update()` never wrote the `username` column, so
+  renaming a user's username from the admin UI or admin API silently had no
+  effect against a real database while the request appeared to succeed.
+
 ### Migrations
 
 - `V65__login_identifier_mode.sql` — adds
   `tenant_security_config.login_identifier_mode`, `NOT NULL DEFAULT
   'USERNAME'`, constrained to `USERNAME` / `EMAIL` / `EITHER`. Additive only:
   every existing workspace keeps its current sign-in behaviour.
+- `V66__normalize_usernames.sql` — rewrites every existing username to its
+  normalized form (lowercased, trimmed, each run of characters outside
+  `[a-z0-9._@+-]` collapsed to a single `.`), then adds a unique index on
+  `(tenant_id, lower(username))` to enforce the rule going forward. **This
+  changes existing users' sign-in identifiers** — a user stored as `"John
+  Doe"` becomes `john.doe` — so operators should tell affected users their
+  new identifier. **The migration aborts the upgrade** if two usernames in
+  one tenant would normalize to the same value (e.g. `Dave` and `dave`);
+  see `docs/guides/sign-in-identifier.md` for a pre-flight query to find and
+  resolve collisions before upgrading.
 
 ---
 
