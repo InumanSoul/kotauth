@@ -479,8 +479,6 @@ object EnglishStrings {
 
     // Admin — sign-in identifier (workspace security policy)
     const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"
-    const val ADMIN_SIGNIN_IDENTIFIER_HELP =
-        "Choose what users type to identify themselves on the login page."
     const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL = "Username only"
     const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC =
         "Users sign in with their username. This is the default."

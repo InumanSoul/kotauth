@@ -436,7 +436,8 @@ fun Route.adminSettingsRoutes(
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
-                loginIdentifierMode = LoginIdentifierMode.fromStorage(params["loginIdentifierMode"]),
+                loginIdentifierMode =
+                    params["loginIdentifierMode"]?.let { LoginIdentifierMode.fromStorage(it) } ?: s.loginIdentifierMode,
             )
 
         when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {

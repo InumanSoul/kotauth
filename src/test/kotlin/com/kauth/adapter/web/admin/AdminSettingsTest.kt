@@ -445,14 +445,11 @@ class AdminSettingsTest {
         }
 
     @Test
-    fun `POST security settings omitting the identifier field resets an EITHER tenant to USERNAME`() =
+    fun `POST security settings omitting the identifier field preserves an EITHER tenant`() =
         testApplication {
-            // KNOWN RISK (documented, not a fix): LoginIdentifierMode.fromStorage(null) falls back
-            // to USERNAME, so a POST that omits loginIdentifierMode silently resets a tenant already
-            // on EITHER or EMAIL. The rendered radio group always posts exactly one checked value,
-            // so this is not reachable through the shipped admin UI form — but a partial or
-            // programmatic POST (a hand-crafted request, or a future partial-form submit) would
-            // trigger it. This test documents the behavior; see the Task 8 report for the finding.
+            // The field is absent from a partial/programmatic POST here. loginIdentifierMode
+            // must fall back to the tenant's persisted value (not to USERNAME) so an operator
+            // saving unrelated fields on this form can never silently narrow the sign-in surface.
             application { installTestApp() }
             val authed =
                 createClient {
@@ -481,7 +478,47 @@ class AdminSettingsTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertEquals(
-                LoginIdentifierMode.USERNAME,
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings omitting the identifier field preserves an EMAIL tenant`() =
+        testApplication {
+            // EMAIL mode performs only findByEmail (UserIdentifierResolver). Resetting this to
+            // USERNAME on a field omission would lock out every user who does not know a
+            // username, silently, behind an ordinary 302 — this is the case with real lockout
+            // consequences, not just a policy relaxation.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
                 tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
             )
         }
