@@ -46,6 +46,7 @@ class AuthService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
+    private val identifierResolver: UserIdentifierResolver = UserIdentifierResolver(userRepository),
 ) {
     // Equalises latency so wrong-password vs. user-not-found / disabled / locked / pending-setup
     // are indistinguishable timing-wise — closes the bcrypt-skipped enumeration vector.
@@ -96,7 +97,28 @@ class AuthService(
             return AuthResult.Failure(AuthError.InvalidCredentials)
         }
 
-        val user = userRepository.findByUsername(tenant.id, username)
+        val resolution =
+            identifierResolver.resolve(
+                tenant.id,
+                tenant.securityConfig.loginIdentifierMode,
+                username,
+            )
+        if (resolution is IdentifierResolution.Ambiguous) {
+            runDummyVerify(rawPassword)
+            auditLog.record(
+                AuditEvent(
+                    tenantId = tenant.id,
+                    userId = null,
+                    clientId = null,
+                    eventType = AuditEventType.LOGIN_FAILED,
+                    ipAddress = ipAddress,
+                    userAgent = userAgent,
+                    details = mapOf("reason" to "ambiguous_identifier"),
+                ),
+            )
+            return AuthResult.Failure(AuthError.InvalidCredentials)
+        }
+        val user = (resolution as? IdentifierResolution.Found)?.user
         if (user == null) {
             runDummyVerify(rawPassword)
             auditLog.record(

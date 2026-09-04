@@ -1,7 +1,9 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -18,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -559,5 +562,96 @@ class AuthServiceTest {
         val before = hasher.verifyCallCount
         svc.authenticate("acme", "alice", "correct-pass")
         assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the user has a pending invite")
+    }
+
+    // -------------------------------------------------------------------------
+    // Login identifier resolution (username / email / either)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `authenticate succeeds by email in EMAIL mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice@example.com", "correct-pass")
+        assertIs<AuthResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `authenticate rejects username in EMAIL mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "correct-pass")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.InvalidCredentials>(result.error)
+    }
+
+    @Test
+    fun `authenticate accepts both identifiers in EITHER mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice", "correct-pass"))
+        assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice@example.com", "correct-pass"))
+    }
+
+    @Test
+    fun `ambiguous identifier fails with the same error as a miss and is audited`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.clear()
+        users.add(activeUser.copy(id = UserId(20), username = "shared@example.com", email = "one@example.com"))
+        users.add(activeUser.copy(id = UserId(21), username = "two", email = "shared@example.com"))
+
+        val ambiguous = svc.authenticate("acme", "shared@example.com", "correct-pass")
+        assertIs<AuthResult.Failure>(ambiguous)
+        assertIs<AuthError.InvalidCredentials>(ambiguous.error)
+
+        val event = auditLog.events.last()
+        assertEquals(AuditEventType.LOGIN_FAILED, event.eventType)
+        assertEquals("ambiguous_identifier", event.details["reason"])
+        assertNull(event.userId, "must not identify either colliding account")
+        assertTrue(
+            event.details.values.none { it.contains("shared@example.com") },
+            "must not record the raw submitted identifier",
+        )
+    }
+
+    @Test
+    fun `ambiguous and missing identifiers both perform exactly one hash operation`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.clear()
+        users.add(activeUser.copy(id = UserId(20), username = "shared@example.com", email = "one@example.com"))
+        users.add(activeUser.copy(id = UserId(21), username = "two", email = "shared@example.com"))
+
+        hasher.verifyCount = 0
+        svc.authenticate("acme", "shared@example.com", "correct-pass")
+        val ambiguousHashes = hasher.verifyCount
+
+        hasher.verifyCount = 0
+        svc.authenticate("acme", "nobody-at-all", "correct-pass")
+        val missHashes = hasher.verifyCount
+
+        assertEquals(1, ambiguousHashes)
+        assertEquals(missHashes, ambiguousHashes)
     }
 }
