@@ -2,6 +2,7 @@ package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
 import com.kauth.domain.model.TenantId
@@ -55,6 +56,7 @@ class SocialButtonLabelTest {
                     tenantSlug = "acme",
                     ctx = ctx,
                     enabledProviders = listOf(row(acmeKey, "ACME Single Sign-On")).asLoginProviders(),
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -70,6 +72,7 @@ class SocialButtonLabelTest {
                     tenantSlug = "acme",
                     ctx = ctx,
                     enabledProviders = listOf(row(acmeKey, null)).asLoginProviders(),
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -84,6 +87,7 @@ class SocialButtonLabelTest {
                     tenantSlug = "acme",
                     ctx = ctx,
                     enabledProviders = listOf(row(acmeKey, "   ")).asLoginProviders(),
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -98,6 +102,7 @@ class SocialButtonLabelTest {
                     tenantSlug = "acme",
                     ctx = ctx,
                     enabledProviders = listOf(row(acmeKey, "ACME Single Sign-On")).asLoginProviders(),
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -113,6 +118,7 @@ class SocialButtonLabelTest {
                     tenantSlug = "acme",
                     ctx = ctx,
                     enabledProviders = listOf(row(ProviderKey.GOOGLE, null)).asLoginProviders(),
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 

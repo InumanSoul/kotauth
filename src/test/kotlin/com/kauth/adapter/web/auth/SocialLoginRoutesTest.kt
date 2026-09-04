@@ -8,6 +8,7 @@ import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BrokeredReferenceHasher
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -1203,6 +1204,34 @@ class SocialLoginRoutesTest {
             assertTrue(
                 response.bodyAsText().contains("Login with Acme Workforce SSO was cancelled or failed."),
                 "The cancelled-login page must name the operator's label, got: ${response.bodyAsText()}",
+            )
+        }
+
+    @Test
+    fun `the callback error re-render labels the identifier field per the workspace's EMAIL mode`() =
+        testApplication {
+            resetFixtures()
+            tenantRepo.clear()
+            tenantRepo.add(
+                tenant.copy(
+                    securityConfig = tenant.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+                ),
+            )
+            idpRepo.seed(TenantId(1), "google")
+            installSocialRoutes()
+
+            // Same IdP-returned-error re-render as the label test above, on an EMAIL-mode
+            // workspace: the recovery path from a failed social login must not tell the user
+            // to type a "Username" they were never given one of.
+            val response = client.get("/t/acme/auth/social/google/callback?error=access_denied")
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Email address"), "EMAIL-mode error re-render must say 'Email address'")
+            assertTrue(body.contains("""type="email""""), "EMAIL-mode error re-render must use an email input")
+            assertTrue(
+                !body.contains(">Username<"),
+                "EMAIL-mode error re-render must not fall back to the 'Username' label",
             )
         }
 

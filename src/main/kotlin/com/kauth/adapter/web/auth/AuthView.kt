@@ -128,7 +128,7 @@ object AuthView {
         passwordLoginEnabled: Boolean = true,
         emailOtpLoginEnabled: Boolean = false,
         passkeysEnabled: Boolean = false,
-        loginIdentifierMode: LoginIdentifierMode = LoginIdentifierMode.USERNAME,
+        loginIdentifierMode: LoginIdentifierMode,
     ): HTML.() -> Unit =
         {
             head { authHead(ctx.t("AUTH_PAGE_TITLE_LOGIN", ctx.workspaceName), ctx.theme) }
