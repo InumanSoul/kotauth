@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
@@ -435,6 +436,7 @@ fun Route.adminSettingsRoutes(
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
+                loginIdentifierMode = LoginIdentifierMode.fromStorage(params["loginIdentifierMode"]),
             )
 
         when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {

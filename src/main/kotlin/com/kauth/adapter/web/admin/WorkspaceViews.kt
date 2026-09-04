@@ -6,6 +6,7 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -755,6 +756,31 @@ internal fun securityPolicyPageImpl(
                     }
                 }
 
+                // ── Sign-In Identifier ───────────────────────────────
+                div("ov-card") {
+                    div("ov-card__section-label") { +EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_SECTION }
+                    div("radio-group") {
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.USERNAME,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC,
+                        )
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.EMAIL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EMAIL_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EMAIL_DESC,
+                        )
+                        loginIdentifierRow(
+                            workspace.securityConfig.loginIdentifierMode,
+                            LoginIdentifierMode.EITHER,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EITHER_LABEL,
+                            EnglishStrings.ADMIN_SIGNIN_IDENTIFIER_EITHER_DESC,
+                        )
+                    }
+                }
+
                 // ── Account Lockout ──────────────────────────────────
                 div("ov-card") {
                     div("ov-card__section-label") { +"Account Lockout" }
@@ -1223,6 +1249,26 @@ private fun DIV.colorField(label: String, key: String, formName: String, current
                 maxLength = "7"
                 attributes["data-hex-key"] = key
             }
+        }
+    }
+}
+
+// ── Sign-in identifier row helper ────────────────────────────────────────
+// One radio row in the Sign-In Identifier ov-card, mirroring the MFA policy radio group.
+private fun FlowContent.loginIdentifierRow(
+    current: LoginIdentifierMode,
+    mode: LoginIdentifierMode,
+    label: String,
+    description: String,
+) {
+    label("radio-row") {
+        input(type = InputType.radio, name = "loginIdentifierMode") {
+            value = mode.name
+            if (current == mode) checked = true
+        }
+        div("radio-row__body") {
+            span("radio-row__label") { +label }
+            span("radio-row__desc") { +description }
         }
     }
 }

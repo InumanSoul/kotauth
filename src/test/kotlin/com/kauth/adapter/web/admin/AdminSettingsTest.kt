@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
@@ -356,6 +357,163 @@ class AdminSettingsTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(response.headers["Location"]?.contains("saved=true") == true)
+        }
+
+    // =========================================================================
+    // Security policy settings — sign-in identifier mode
+    // =========================================================================
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode EITHER`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "EITHER")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode EMAIL`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "EMAIL")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings with a garbage identifier mode falls back to USERNAME without erroring`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "NONSENSE")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.USERNAME,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings omitting the identifier field resets an EITHER tenant to USERNAME`() =
+        testApplication {
+            // KNOWN RISK (documented, not a fix): LoginIdentifierMode.fromStorage(null) falls back
+            // to USERNAME, so a POST that omits loginIdentifierMode silently resets a tenant already
+            // on EITHER or EMAIL. The rendered radio group always posts exactly one checked value,
+            // so this is not reachable through the shipped admin UI form — but a partial or
+            // programmatic POST (a hand-crafted request, or a future partial-form submit) would
+            // trigger it. This test documents the behavior; see the Task 8 report for the finding.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EITHER")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.USERNAME,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `security policy page renders the three sign-in identifier options with the current one checked`() =
+        testApplication {
+            tenantRepo.update(
+                workspace.copy(
+                    securityConfig = workspace.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+                ),
+            )
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+
+            val radios =
+                Regex("""<input[^>]*name="loginIdentifierMode"[^>]*>""")
+                    .findAll(body)
+                    .map { it.value }
+                    .toList()
+            assertEquals(3, radios.size)
+
+            val usernameRadio = radios.first { it.contains("value=\"USERNAME\"") }
+            val emailRadio = radios.first { it.contains("value=\"EMAIL\"") }
+            val eitherRadio = radios.first { it.contains("value=\"EITHER\"") }
+
+            assertFalse(usernameRadio.contains("checked"))
+            assertTrue(emailRadio.contains("checked"))
+            assertFalse(eitherRadio.contains("checked"))
         }
 
     // =========================================================================

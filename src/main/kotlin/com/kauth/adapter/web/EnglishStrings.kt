@@ -477,6 +477,21 @@ object EnglishStrings {
     const val ADMIN_SECURITY_PASSWORD_POLICY_SECTION = "Password Policy"
     const val ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION = "Password Requirements"
 
+    // Admin — sign-in identifier (workspace security policy)
+    const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"
+    const val ADMIN_SIGNIN_IDENTIFIER_HELP =
+        "Choose what users type to identify themselves on the login page."
+    const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL = "Username only"
+    const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC =
+        "Users sign in with their username. This is the default."
+    const val ADMIN_SIGNIN_IDENTIFIER_EMAIL_LABEL = "Email only"
+    const val ADMIN_SIGNIN_IDENTIFIER_EMAIL_DESC =
+        "Users sign in with their email address."
+    const val ADMIN_SIGNIN_IDENTIFIER_EITHER_LABEL = "Username or email"
+    const val ADMIN_SIGNIN_IDENTIFIER_EITHER_DESC =
+        "Users may enter either. If a value matches one account's username and another's " +
+            "email, sign-in is refused rather than guessing."
+
     const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
     const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
     const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
