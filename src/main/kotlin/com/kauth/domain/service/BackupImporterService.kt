@@ -158,6 +158,7 @@ class BackupImporterService(
                             emailOtpSignupEnabled = emailOtpSignupEnabled,
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
+                            loginIdentifierMode = loginIdentifierMode,
                         )
                     },
                 smtpHost = tb.smtp.host,

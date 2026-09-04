@@ -5,6 +5,7 @@ import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
@@ -1295,6 +1296,7 @@ class AdminServicesTest {
             emailOtpLockoutThreshold = 5,
             emailOtpLoginEnabled = false,
             passkeysEnabled = true,
+            loginIdentifierMode = LoginIdentifierMode.USERNAME,
         )
 
     @Test
