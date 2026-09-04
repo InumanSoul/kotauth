@@ -1,4 +1,4 @@
--- V66: Normalize usernames to trimmed, lowercased [a-z0-9._@+-]+ form (v1.25.0 hardening).
+-- V66: Normalize usernames to trimmed, lowercased [a-z0-9._@+-]+ form (v1.24.0 hardening).
 --
 -- New product rule: usernames are ALWAYS stored normalized — trimmed, lowercased, and
 -- matching [a-z0-9._@+-]+. Historically AuthService.register performed no username format
