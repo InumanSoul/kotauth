@@ -70,6 +70,9 @@ class AdminDisplayHelpersTest {
             collisionCheck =
                 com.kauth.domain.service
                     .IdentifierCollisionCheck(users),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(users),
             passwordPolicy = passwordPolicy,
         )
 

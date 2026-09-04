@@ -139,6 +139,9 @@ class AdminApiKeysTest {
             collisionCheck =
                 com.kauth.domain.service
                     .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private fun buildAppMgmtService() =

@@ -91,6 +91,7 @@ import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
 import com.kauth.domain.service.UserIdentifierResolver
+import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
@@ -407,6 +408,7 @@ data class ServiceGraph(
                     corsPort = corsOriginCache,
                 )
             val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
+            val usernameGenerator = UsernameGenerator(userRepository)
             val adminUserService =
                 AdminUserService(
                     tenantRepository = tenantRepository,
@@ -416,6 +418,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     credentialFlowService = credentialFlowService,
                     collisionCheck = identifierCollisionCheck,
+                    usernameGenerator = usernameGenerator,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
                 )

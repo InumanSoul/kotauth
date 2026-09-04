@@ -85,6 +85,7 @@ class AdminServicesTest {
         )
 
     private val collisionCheck = IdentifierCollisionCheck(users)
+    private val usernameGenerator = UsernameGenerator(users)
 
     private val userSvc =
         AdminUserService(
@@ -95,6 +96,7 @@ class AdminServicesTest {
             auditLog = auditLog,
             credentialFlowService = credentialFlowService,
             collisionCheck = collisionCheck,
+            usernameGenerator = usernameGenerator,
             passwordPolicy = passwordPolicy,
             emailPort = emailPort,
         )
@@ -226,17 +228,18 @@ class AdminServicesTest {
     }
 
     @Test
-    fun `createUser - blank username`() {
+    fun `createUser generates a username when none is supplied`() {
         val result =
             userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "  ",
-                email = "bob@x.com",
-                fullName = "Bob",
+                email = "ana@company-a.com",
+                fullName = "Ana Ruiz",
                 password = "password123",
+                givenName = "Ana",
             )
-        assertIs<AdminResult.Failure>(result)
-        assertIs<AdminError.Validation>(result.error)
+        assertIs<AdminResult.Success<User>>(result)
+        assertTrue(result.value.username.startsWith("ana"), "got ${result.value.username}")
     }
 
     @Test

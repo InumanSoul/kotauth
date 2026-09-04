@@ -385,6 +385,9 @@ class ApiUserAttributeRoutesTest {
                         collisionCheck =
                             com.kauth.domain.service
                                 .IdentifierCollisionCheck(userRepo),
+                        usernameGenerator =
+                            com.kauth.domain.service
+                                .UsernameGenerator(userRepo),
                     ),
                 mfaService =
                     com.kauth.domain.service.MfaService(

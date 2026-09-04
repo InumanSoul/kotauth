@@ -23,6 +23,7 @@ class AdminUserService(
     private val auditLog: AuditLogPort,
     private val credentialFlowService: CredentialFlowService,
     private val collisionCheck: IdentifierCollisionCheck,
+    private val usernameGenerator: UsernameGenerator,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
@@ -46,23 +47,27 @@ class AdminUserService(
             tenantRepository.findById(tenantId)
                 ?: return AdminResult.Failure(AdminError.NotFound("Workspace not found."))
 
-        if (username.isBlank()) {
-            return AdminResult.Failure(AdminError.Validation("Username is required."))
+        if (email.isBlank() || !email.contains('@')) {
+            return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
-        if (!username.matches(Regex("[a-zA-Z0-9._@+-]+"))) {
+        val resolvedEmail = email.trim().lowercase()
+
+        val resolvedUsername =
+            if (username.isBlank()) {
+                usernameGenerator.generate(tenantId, givenName, resolvedEmail)
+            } else {
+                username.trim()
+            }
+        if (!resolvedUsername.matches(Regex("[a-zA-Z0-9._@+-]+"))) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
                 ),
             )
         }
-        if (email.isBlank() || !email.contains('@')) {
-            return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
-        }
-        val resolvedEmail = email.trim().lowercase()
 
         collisionCheck
-            .check(tenantId, username.trim(), resolvedEmail)
+            .check(tenantId, resolvedUsername, resolvedEmail)
             ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
 
         val resolvedPasswordHash: String
@@ -96,19 +101,19 @@ class AdminUserService(
             resolvedRequiredActions = emptySet()
         }
 
-        if (userRepository.existsByUsername(tenantId, username)) {
-            return AdminResult.Failure(AdminError.Conflict("Username '$username' is already taken."))
+        if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
+            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
         }
-        if (userRepository.existsByEmail(tenantId, email)) {
-            return AdminResult.Failure(AdminError.Conflict("Email '${email.lowercase()}' is already registered."))
+        if (userRepository.existsByEmail(tenantId, resolvedEmail)) {
+            return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
 
         val user =
             userRepository.save(
                 User(
                     tenantId = tenantId,
-                    username = username.trim(),
-                    email = email.trim().lowercase(),
+                    username = resolvedUsername,
+                    email = resolvedEmail,
                     fullName = fullName.trim(),
                     passwordHash = resolvedPasswordHash,
                     emailVerified = !sendInvite,
@@ -132,7 +137,7 @@ class AdminUserService(
                 eventType = AuditEventType.ADMIN_USER_CREATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to username, "invite" to sendInvite.toString()),
+                details = mapOf("username" to resolvedUsername, "invite" to sendInvite.toString()),
             ),
         )
 
