@@ -49,6 +49,7 @@ class AuthServiceTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessions,
+            identifierResolver = UserIdentifierResolver(users),
         )
 
     // -------------------------------------------------------------------------
@@ -653,5 +654,16 @@ class AuthServiceTest {
 
         assertEquals(1, ambiguousHashes)
         assertEquals(missHashes, ambiguousHashes)
+    }
+
+    @Test
+    fun `authenticate trims surrounding whitespace from the submitted identifier`() {
+        // USERNAME mode is the tenant default (testTenant / @BeforeTest).
+        val trimmed = svc.authenticate("acme", "  alice  ", "correct-pass")
+        val exact = svc.authenticate("acme", "alice", "correct-pass")
+
+        assertIs<AuthResult.Success<User>>(trimmed)
+        assertIs<AuthResult.Success<User>>(exact)
+        assertEquals(exact.value.id, trimmed.value.id)
     }
 }

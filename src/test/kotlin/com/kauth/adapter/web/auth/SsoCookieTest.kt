@@ -14,6 +14,7 @@ import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.MfaService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -144,6 +145,7 @@ class SsoCookieTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessionRepo,
+            identifierResolver = UserIdentifierResolver(userRepo),
         )
 
     private fun oauthService() =

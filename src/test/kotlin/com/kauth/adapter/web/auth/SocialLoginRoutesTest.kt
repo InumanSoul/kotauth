@@ -21,6 +21,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.JitProvisioningService
 import com.kauth.domain.service.OAuthService
 import com.kauth.domain.service.SocialLoginService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.domain.util.Pkce
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
@@ -115,6 +116,7 @@ class SocialLoginRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessionRepo,
+            identifierResolver = UserIdentifierResolver(userRepo),
         )
 
     private fun buildOAuthService() =

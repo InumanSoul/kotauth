@@ -53,6 +53,7 @@ class ClientDefaultRolesRegistrationTest {
             sessionRepository = sessions,
             applicationRepository = apps,
             roleRepository = roles,
+            identifierResolver = UserIdentifierResolver(users),
         )
 
     private val socialService =

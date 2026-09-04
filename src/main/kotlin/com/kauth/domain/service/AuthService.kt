@@ -46,7 +46,7 @@ class AuthService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
-    private val identifierResolver: UserIdentifierResolver = UserIdentifierResolver(userRepository),
+    private val identifierResolver: UserIdentifierResolver,
 ) {
     // Equalises latency so wrong-password vs. user-not-found / disabled / locked / pending-setup
     // are indistinguishable timing-wise — closes the bcrypt-skipped enumeration vector.

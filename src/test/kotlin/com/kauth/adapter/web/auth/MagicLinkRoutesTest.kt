@@ -14,6 +14,7 @@ import com.kauth.domain.model.UserId
 import com.kauth.domain.service.AuthService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.OAuthService
+import com.kauth.domain.service.UserIdentifierResolver
 import com.kauth.fakes.FakeApplicationRepository
 import com.kauth.fakes.FakeAuditLogPort
 import com.kauth.fakes.FakeAuthorizationCodeRepository
@@ -179,6 +180,7 @@ class MagicLinkRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessions,
+            identifierResolver = UserIdentifierResolver(users),
         )
 
     private fun oauthService() =
