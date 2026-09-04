@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.24.0] - 2026-09-04
+
+### Added
+
+- **Per-workspace sign-in identifier mode.** The Sign-In Identifier section of
+  the workspace Security Policy page offers three modes: `Username only`
+  (today's behaviour, and the default), `Email only`, and
+  `Username or email`. In the last mode, both namespaces are always checked —
+  never short-circuited, so a miss and a hit cost the same two lookups — and
+  a value that matches one account's username and a *different* account's
+  email is refused rather than guessed, with the same generic failure as any
+  other bad credential. Migration `V65` adds
+  `tenant_security_config.login_identifier_mode`, defaulting every existing
+  workspace to `USERNAME` — **existing workspaces are unaffected until an
+  admin changes the setting.** The hosted login form's identifier label,
+  input type, and `autocomplete` hint adapt to the chosen mode.
+- **Auto-generated usernames.** A user provisioned without one — an
+  admin-created invite or a SCIM push supplying only a name and email — now
+  gets a readable username generated from the given name (or the email's
+  local part) plus a short random suffix, checked against both the username
+  and email namespaces so generation can never manufacture the collision
+  below.
+- **Admin-editable usernames.** Usernames were previously immutable after
+  creation. An administrator can now rename a user's username from the admin
+  UI or the admin API, subject to the same collision check as creation.
+
+### Changed
+
+- **Generic sign-in failure message.** "Invalid username or password."
+  became **"Invalid sign-in details."**, since the old wording named
+  "username", which was misleading for a workspace in `Email only` mode.
+- **Sign-in identifiers are now trimmed of surrounding whitespace** before
+  lookup; previously they were passed through raw. In `Username only` mode
+  this means a username pasted with a trailing space, which previously
+  failed, now signs in. This is safe: stored usernames cannot contain
+  leading or trailing whitespace, so trimming can only ever resolve the same
+  account the untrimmed value would have, never a different one.
+
+### Security
+
+- **Username/email collision prevention.** Creating or updating a user whose
+  username equals a different user's email address (or vice versa) is now
+  rejected — across admin user creation, admin user update, SCIM, and
+  self-registration. The two namespaces are separately unique in the
+  database, so without this check a pair could exist that `Username or
+  email` mode cannot resolve. A user whose username *is* their own email
+  address remains fully supported and is unaffected by this check.
+- **Email sign-in does not require a verified email address, by design.**
+  Username sign-in has never checked `emailVerified`, and gating email
+  sign-in on it would lock out invite- and SCIM-provisioned users who never
+  completed verification — exactly the users this feature exists to serve.
+
+### Migrations
+
+- `V65__login_identifier_mode.sql` — adds
+  `tenant_security_config.login_identifier_mode`, `NOT NULL DEFAULT
+  'USERNAME'`, constrained to `USERNAME` / `EMAIL` / `EITHER`. Additive only:
+  every existing workspace keeps its current sign-in behaviour.
+
+---
+
 ## [1.23.0] - 2026-09-03
 
 ### Added
