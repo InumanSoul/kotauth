@@ -44,7 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lookup; previously they were passed through raw. In `Username only` mode
   this means a username pasted with a trailing space, which previously
   failed, now signs in. This is safe: stored usernames cannot contain
-  leading or trailing whitespace, so trimming can only ever resolve the same
+  leading or trailing whitespace — except a backup-imported account, whose
+  username is restored verbatim — so trimming can only ever resolve the same
   account the untrimmed value would have, never a different one.
 
 ### Security

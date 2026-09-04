@@ -740,6 +740,32 @@ class AdminServicesTest {
     }
 
     @Test
+    fun `updateUser rejects an email equal to another user's username even when no rename is requested`() {
+        users.add(alice.copy(id = UserId(20), username = "bob@example.com", email = "bob@other.com"))
+        val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), email = "bob@example.com")
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `replaceUserProfile rejects an email equal to another user's username even when no rename is requested`() {
+        users.add(alice.copy(id = UserId(20), username = "bob@example.com", email = "bob@other.com"))
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "bob@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = null,
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
     fun `updateUser - allows setting the username to the user's own email`() {
         val result = userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice@example.com")
         assertIs<AdminResult.Success<User>>(result)

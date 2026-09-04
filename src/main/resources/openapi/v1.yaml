@@ -69,7 +69,7 @@ info:
       "type": "https://kotauth.dev/errors/422",
       "title": "Validation Error",
       "status": 422,
-      "detail": "Username may only contain letters, digits, dots, underscores, and hyphens."
+      "detail": "Username may only contain letters, digits, dots, underscores, hyphens, @, and +."
     }
     ```
 
@@ -160,9 +160,12 @@ components:
 
     CreateUserRequest:
       type: object
-      required: [username, email, fullName, password]
+      required: [email, fullName, password]
       properties:
-        username: { type: string, pattern: "^[a-zA-Z0-9._-]+$" }
+        username:
+          type: string
+          pattern: "^[a-zA-Z0-9._@+-]+$"
+          description: Generated from the name and email when omitted or blank.
         email:    { type: string, format: email }
         fullName: { type: string }
         password: { type: string, minLength: 4 }
@@ -173,16 +176,23 @@ components:
       properties:
         email:    { type: string, format: email }
         fullName: { type: string }
+        username:
+          type: string
+          pattern: "^[a-zA-Z0-9._@+-]+$"
+          description: Omit to leave the existing username unchanged.
 
     InviteUserRequest:
       type: object
-      required: [username, email, fullName]
+      required: [email, fullName]
       description: |
         Invite a new user without a password. The user will receive an email
         with a 72-hour invite link and set their own password on first login.
         The tenant must have SMTP configured.
       properties:
-        username: { type: string, maxLength: 128 }
+        username:
+          type: string
+          maxLength: 128
+          description: Generated from the name and email when omitted or blank.
         email:    { type: string, format: email }
         fullName: { type: string }
 
