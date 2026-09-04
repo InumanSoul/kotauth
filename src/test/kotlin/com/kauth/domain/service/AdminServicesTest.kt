@@ -760,6 +760,55 @@ class AdminServicesTest {
         assertEquals("alice", result.value.username)
     }
 
+    @Test
+    fun `updateUser - audit records the new username only when it actually changed`() {
+        auditLog.clear()
+        userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), username = "alice.renamed")
+        val event = auditLog.events.last { it.eventType == AuditEventType.ADMIN_USER_UPDATED }
+        assertEquals("alice.renamed", event.details["newUsername"])
+    }
+
+    @Test
+    fun `updateUser - audit omits newUsername when the username is unchanged`() {
+        auditLog.clear()
+        userSvc.updateUser(userId = UserId(10), tenantId = TenantId(1), fullName = "Alice Renamed")
+        val event = auditLog.events.last { it.eventType == AuditEventType.ADMIN_USER_UPDATED }
+        assertTrue(!event.details.containsKey("newUsername"))
+    }
+
+    @Test
+    fun `replaceUserProfile - username null leaves the existing username untouched`() {
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice", result.value.username)
+    }
+
+    @Test
+    fun `replaceUserProfile - renames the username when provided`() {
+        val result =
+            userSvc.replaceUserProfile(
+                userId = UserId(10),
+                tenantId = TenantId(1),
+                email = "alice@example.com",
+                fullName = "Alice Test",
+                externalId = null,
+                givenName = null,
+                familyName = null,
+                username = "alice.renamed",
+            )
+        assertIs<AdminResult.Success<User>>(result)
+        assertEquals("alice.renamed", result.value.username)
+    }
+
     // =========================================================================
     // setUserEnabled
     // =========================================================================

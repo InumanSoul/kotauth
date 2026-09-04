@@ -348,33 +348,19 @@ class AdminUserService(
 
         val resolvedEmail = email?.trim()?.lowercase() ?: user.email
         val resolvedFullName = fullName?.trim() ?: user.fullName
-        val resolvedUsername = username?.trim() ?: user.username
 
         if (resolvedEmail.isBlank() || !resolvedEmail.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
-
-        if (resolvedUsername.isBlank()) {
-            return AdminResult.Failure(AdminError.Validation("Username is required."))
-        }
-        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
-            return AdminResult.Failure(
-                AdminError.Validation(
-                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
-                ),
-            )
-        }
-
         if (resolvedEmail != user.email && userRepository.existsByEmail(tenantId, resolvedEmail)) {
             return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
-        if (resolvedUsername != user.username && userRepository.existsByUsername(tenantId, resolvedUsername)) {
-            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
-        }
 
-        collisionCheck
-            .check(tenantId, resolvedUsername, resolvedEmail, excludingUserId = userId)
-            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+        val resolvedUsername =
+            when (val r = resolveUsername(tenantId, userId, user, username, resolvedEmail)) {
+                is AdminResult.Failure -> return r
+                is AdminResult.Success -> r.value
+            }
 
         val updated =
             userRepository.update(
@@ -389,7 +375,7 @@ class AdminUserService(
                 eventType = AuditEventType.ADMIN_USER_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to user.username),
+                details = usernameChangeAuditDetails(user, resolvedUsername),
             ),
         )
 
@@ -397,9 +383,12 @@ class AdminUserService(
     }
 
     /**
-     * Replaces the full mutable profile in one write. Unlike [updateUser], every parameter here
-     * is authoritative — a null clears the field. Used by the SCIM PUT/PATCH flow and by the admin
-     * profile form, both of which supply a fully resolved desired state rather than a partial edit.
+     * Replaces the full mutable profile in one write. Unlike [updateUser], `email`, `fullName`,
+     * `externalId`, `givenName`, and `familyName` are all authoritative — a null clears the field.
+     * `username` alone keeps [updateUser]'s null-means-unchanged convention, since SCIM never
+     * supplies it (`userName` stays immutable over the SCIM protocol surface — see
+     * ScimDiscoveryRoutes) and only the admin UI's profile form does, alongside the rest of the
+     * profile, so a rename cannot land as two separate writes with two different failure windows.
      */
     fun replaceUserProfile(
         userId: UserId,
@@ -409,6 +398,7 @@ class AdminUserService(
         externalId: String?,
         givenName: String?,
         familyName: String?,
+        username: String? = null,
     ): AdminResult<User> {
         val user =
             userRepository.findById(userId, tenantId)
@@ -422,6 +412,12 @@ class AdminUserService(
             return AdminResult.Failure(AdminError.Conflict("Email '$resolvedEmail' is already registered."))
         }
 
+        val resolvedUsername =
+            when (val r = resolveUsername(tenantId, userId, user, username, resolvedEmail)) {
+                is AdminResult.Failure -> return r
+                is AdminResult.Success -> r.value
+            }
+
         val updated =
             userRepository.update(
                 user.copy(
@@ -430,6 +426,7 @@ class AdminUserService(
                     externalId = externalId,
                     givenName = givenName,
                     familyName = familyName,
+                    username = resolvedUsername,
                 ),
             )
 
@@ -441,12 +438,62 @@ class AdminUserService(
                 eventType = AuditEventType.ADMIN_USER_UPDATED,
                 ipAddress = null,
                 userAgent = null,
-                details = mapOf("username" to user.username),
+                details = usernameChangeAuditDetails(user, resolvedUsername),
             ),
         )
 
         return AdminResult.Success(updated)
     }
+
+    /**
+     * Shared by [updateUser] and [replaceUserProfile]: resolves an optional username edit
+     * (null means unchanged), validates format, and rejects a collision with another user's
+     * username or email — the two call sites cannot drift apart on what a rename is allowed to do.
+     */
+    private fun resolveUsername(
+        tenantId: TenantId,
+        userId: UserId,
+        user: User,
+        username: String?,
+        resolvedEmail: String,
+    ): AdminResult<String> {
+        val resolvedUsername = username?.trim() ?: user.username
+
+        if (resolvedUsername.isBlank()) {
+            return AdminResult.Failure(AdminError.Validation("Username is required."))
+        }
+        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
+            return AdminResult.Failure(
+                AdminError.Validation(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
+            )
+        }
+        if (resolvedUsername != user.username && userRepository.existsByUsername(tenantId, resolvedUsername)) {
+            return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))
+        }
+
+        collisionCheck
+            .check(tenantId, resolvedUsername, resolvedEmail, excludingUserId = userId)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
+
+        return AdminResult.Success(resolvedUsername)
+    }
+
+    /**
+     * The pre-rename username always identifies which row was touched. When a rename actually
+     * happened, the new value is added alongside it so an investigator can tell a username changed
+     * — and to what — without diffing database snapshots.
+     */
+    private fun usernameChangeAuditDetails(
+        user: User,
+        resolvedUsername: String,
+    ): Map<String, String> =
+        if (resolvedUsername != user.username) {
+            mapOf("username" to user.username, "newUsername" to resolvedUsername)
+        } else {
+            mapOf("username" to user.username)
+        }
 
     fun setUserEnabled(
         userId: UserId,

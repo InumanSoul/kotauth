@@ -447,6 +447,38 @@ class AdminUserRoutesTest {
         }
 
     @Test
+    fun `a colliding email in the same submission does not leave the username renamed`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            addWorkspaceUser("bob")
+            val user = addWorkspaceUser("ada")
+
+            // Both fields change in one submission and only the email collides — the username
+            // rename must not land on its own write ahead of the email check failing.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "ada.lovelace")
+                            append("email", "bob@acme.test")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            val stored = userRepo.findById(user.id!!, workspace.id)!!
+            assertEquals("ada", stored.username)
+            assertEquals("ada@acme.test", stored.email)
+        }
+
+    @Test
     fun `the edit form offers both name parts`() =
         testApplication {
             application { installTestApp() }

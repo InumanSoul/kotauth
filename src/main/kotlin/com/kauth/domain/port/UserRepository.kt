@@ -66,7 +66,7 @@ interface UserRepository {
 
     fun save(user: User): User
 
-    /** Updates mutable profile fields (email, fullName, emailVerified, enabled). Username is immutable. */
+    /** Updates mutable profile fields (username, email, fullName, emailVerified, enabled). */
     fun update(user: User): User
 
     /**
