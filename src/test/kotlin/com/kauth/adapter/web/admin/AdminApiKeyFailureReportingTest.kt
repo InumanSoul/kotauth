@@ -286,6 +286,9 @@ class AdminApiKeyFailureReportingTest {
                         passwordHasher = hasher,
                         auditLog = auditLogPort,
                         credentialFlowService = buildCredentialFlowService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

@@ -133,6 +133,9 @@ class AdminApplicationRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = buildCredentialFlowService(),
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
         )
 
     private fun buildAppMgmtService() =

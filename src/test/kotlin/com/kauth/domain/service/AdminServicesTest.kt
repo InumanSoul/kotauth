@@ -84,6 +84,8 @@ class AdminServicesTest {
             emailBrandingRepository = emailBranding,
         )
 
+    private val collisionCheck = IdentifierCollisionCheck(users)
+
     private val userSvc =
         AdminUserService(
             tenantRepository = tenants,
@@ -92,6 +94,7 @@ class AdminServicesTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             credentialFlowService = credentialFlowService,
+            collisionCheck = collisionCheck,
             passwordPolicy = passwordPolicy,
             emailPort = emailPort,
         )
@@ -361,6 +364,49 @@ class AdminServicesTest {
         assertEquals("bob", result.value.username)
         assertEquals(true, result.value.emailVerified, "Admin-created users should be email-verified")
         assertTrue(auditLog.hasEvent(AuditEventType.ADMIN_USER_CREATED))
+    }
+
+    @Test
+    fun `createUser rejects a username equal to another users email`() {
+        users.add(alice.copy(id = UserId(50), username = "bob", email = "carol@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "carol@example.com",
+                email = "newperson@example.com",
+                fullName = "New Person",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser rejects an email equal to another users username`() {
+        users.add(alice.copy(id = UserId(51), username = "dave@example.com", email = "dave-alt@example.com"))
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "eve",
+                email = "dave@example.com",
+                fullName = "Eve",
+                password = "password123",
+            )
+        assertIs<AdminResult.Failure>(result)
+        assertIs<AdminError.Validation>(result.error)
+    }
+
+    @Test
+    fun `createUser allows a username equal to the same users own email`() {
+        val result =
+            userSvc.createUser(
+                tenantId = TenantId(1),
+                username = "frank@example.com",
+                email = "frank@example.com",
+                fullName = "Frank",
+                password = "password123",
+            )
+        assertIs<AdminResult.Success<User>>(result)
     }
 
     // =========================================================================

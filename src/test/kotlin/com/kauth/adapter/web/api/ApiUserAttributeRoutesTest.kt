@@ -382,6 +382,9 @@ class ApiUserAttributeRoutesTest {
                         passwordHasher = hasher,
                         auditLog = com.kauth.fakes.FakeAuditLogPort(),
                         credentialFlowService = buildFakeSelfService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
                     ),
                 mfaService =
                     com.kauth.domain.service.MfaService(

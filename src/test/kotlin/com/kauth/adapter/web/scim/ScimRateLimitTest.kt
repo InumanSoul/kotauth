@@ -130,6 +130,9 @@ class ScimRateLimitTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = accountSelfService,
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
         )
 
     private val mfaService =

@@ -22,6 +22,7 @@ class AdminUserService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val credentialFlowService: CredentialFlowService,
+    private val collisionCheck: IdentifierCollisionCheck,
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
@@ -58,6 +59,11 @@ class AdminUserService(
         if (email.isBlank() || !email.contains('@')) {
             return AdminResult.Failure(AdminError.Validation("A valid email address is required."))
         }
+        val resolvedEmail = email.trim().lowercase()
+
+        collisionCheck
+            .check(tenantId, username.trim(), resolvedEmail)
+            ?.let { return AdminResult.Failure(AdminError.Validation(it)) }
 
         val resolvedPasswordHash: String
         val resolvedRequiredActions: Set<RequiredAction>

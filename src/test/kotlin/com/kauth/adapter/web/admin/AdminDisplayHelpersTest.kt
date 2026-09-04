@@ -67,6 +67,9 @@ class AdminDisplayHelpersTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             credentialFlowService = credentialFlowService,
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(users),
             passwordPolicy = passwordPolicy,
         )
 

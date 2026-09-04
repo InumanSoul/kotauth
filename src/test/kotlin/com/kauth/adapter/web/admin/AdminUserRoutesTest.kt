@@ -485,6 +485,9 @@ class AdminUserRoutesTest {
                         passwordHasher = hasher,
                         auditLog = auditLogPort,
                         credentialFlowService = credentialFlowService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

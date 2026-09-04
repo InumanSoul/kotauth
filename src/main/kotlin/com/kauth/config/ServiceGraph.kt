@@ -75,6 +75,7 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
@@ -405,6 +406,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     corsPort = corsOriginCache,
                 )
+            val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
             val adminUserService =
                 AdminUserService(
                     tenantRepository = tenantRepository,
@@ -413,6 +415,7 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     credentialFlowService = credentialFlowService,
+                    collisionCheck = identifierCollisionCheck,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
                 )
