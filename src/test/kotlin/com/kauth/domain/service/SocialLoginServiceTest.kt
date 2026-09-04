@@ -428,6 +428,25 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    fun `completeSocialRegistration - normalizes a mixed-case chosen username to lowercase`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "new-uid-1000",
+                email = "another-new@example.com",
+                providerName = "Another New User",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "BrandNew",
+                ipAddress = "1.2.3.4",
+                userAgent = "TestAgent",
+            )
+        assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
+        assertEquals("brandnew", result.value.user.username)
+    }
+
+    @Test
     fun `handleCallback - email matches existing user but provider says unverified rejects link`() {
         googleAdapter.profileToReturn = googleProfile.copy(emailVerified = false, providerUserId = "imposter-uid")
         val result = svc.handleCallback("acme", ProviderKey.GOOGLE, "code", "http://localhost")

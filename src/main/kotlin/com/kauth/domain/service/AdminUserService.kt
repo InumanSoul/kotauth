@@ -27,11 +27,6 @@ class AdminUserService(
     private val passwordPolicy: PasswordPolicyPort? = null,
     private val emailPort: EmailPort? = null,
 ) {
-    private companion object {
-        /** Shared by [createUser] and [updateUser] so the two paths cannot drift apart. */
-        val USERNAME_PATTERN = Regex("[a-zA-Z0-9._@+-]+")
-    }
-
     fun createUser(
         tenantId: TenantId,
         username: String,
@@ -61,9 +56,9 @@ class AdminUserService(
             if (username.isBlank()) {
                 usernameGenerator.generate(tenantId, givenName, resolvedEmail)
             } else {
-                username.trim()
+                UsernamePolicy.normalize(username)
             }
-        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
+        if (!resolvedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
@@ -451,11 +446,12 @@ class AdminUserService(
      * username or email — the two call sites cannot drift apart on what a rename is allowed to do.
      *
      * Format and collision checks on the username itself only run when a rename is actually
-     * requested. A stored username can predate this feature (or any format validation at all —
-     * see `AuthService.register` and `BackupImporterService`), so re-validating it on every
-     * unrelated field update would make such a user permanently un-editable. The email→username
-     * collision direction still runs unconditionally, because the email is written on every call
-     * regardless of whether a rename was requested.
+     * requested. Every write path now normalizes and validates (see [UsernamePolicy]), but a
+     * stored username can still predate that guarantee on a database that has not yet run the
+     * V66 normalization migration, so re-validating it on every unrelated field update would make
+     * such a user permanently un-editable until then. The email→username collision direction still
+     * runs unconditionally, because the email is written on every call regardless of whether a
+     * rename was requested.
      */
     private fun resolveUsername(
         tenantId: TenantId,
@@ -464,8 +460,8 @@ class AdminUserService(
         username: String?,
         resolvedEmail: String,
     ): AdminResult<String> {
-        val trimmed = username?.trim()
-        val renaming = trimmed != null && trimmed != user.username
+        val normalized = username?.let { UsernamePolicy.normalize(it) }
+        val renaming = normalized != null && normalized != user.username
 
         if (!renaming) {
             collisionCheck
@@ -474,12 +470,12 @@ class AdminUserService(
             return AdminResult.Success(user.username)
         }
 
-        val resolvedUsername = trimmed
+        val resolvedUsername = normalized
 
         if (resolvedUsername.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
         }
-        if (!resolvedUsername.matches(USERNAME_PATTERN)) {
+        if (!resolvedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
             return AdminResult.Failure(
                 AdminError.Validation(
                     "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",

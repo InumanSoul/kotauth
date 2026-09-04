@@ -352,12 +352,26 @@ class BackupImporterService(
 
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
+            // Normalize, then reject rather than rewrite: a restore that silently alters an
+            // identifier can break an integrator's stored references to it. A username that
+            // fails to normalize into a valid one names the offending record so an operator can
+            // fix the export by hand and retry, rather than getting a 500 from the unique
+            // constraint or a garbled username on the far side.
+            val normalizedUsername = UsernamePolicy.normalize(ub.username)
+            if (!normalizedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
+                error(
+                    "Backup import rejected: user record for email '${ub.email}' has username " +
+                        "'${ub.username}' which does not normalize to a valid username " +
+                        "(got '$normalizedUsername'). Usernames must match " +
+                        "${UsernamePolicy.USERNAME_PATTERN.pattern} after trimming and lowercasing.",
+                )
+            }
             val saved =
                 userRepository.save(
                     User(
                         id = null,
                         tenantId = createdTenant.id,
-                        username = ub.username,
+                        username = normalizedUsername,
                         email = ub.email,
                         fullName = ub.fullName,
                         passwordHash = ub.passwordHash,
@@ -372,8 +386,9 @@ class BackupImporterService(
                         familyName = ub.familyName,
                     ),
                 )
-            val savedId = saved.id ?: error("UserRepository.save returned a user with null id for '${ub.username}'")
-            userPkByUsername[ub.username] = savedId
+            val savedId =
+                saved.id ?: error("UserRepository.save returned a user with null id for '$normalizedUsername'")
+            userPkByUsername[normalizedUsername] = savedId
 
             ub.customAttributes.forEach { (key, value) ->
                 userAttributeRepository.upsert(

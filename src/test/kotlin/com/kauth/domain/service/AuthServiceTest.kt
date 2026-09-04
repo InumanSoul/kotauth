@@ -277,6 +277,41 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `register normalizes a mixed-case username to lowercase before storing`() {
+        val result =
+            svc.register("acme", "Dave", "dave@x.com", "Dave", "Password8!", "Password8!", "http://localhost")
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("dave", result.value.username)
+    }
+
+    @Test
+    fun `register trims surrounding whitespace from the username before storing`() {
+        val result =
+            svc.register("acme", "  ana  ", "ana@x.com", "Ana", "Password8!", "Password8!", "http://localhost")
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("ana", result.value.username)
+    }
+
+    @Test
+    fun `register rejects a username with characters outside the allowed set even after normalizing`() {
+        // register previously had NO username format validation at all — this is the
+        // regression test for that gap.
+        val result =
+            svc.register(
+                "acme",
+                "john doe",
+                "johndoe@x.com",
+                "John Doe",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+        assertTrue(users.findByEmail(TenantId(1), "johndoe@x.com") == null, "invalid username must not be persisted")
+    }
+
+    @Test
     fun `register returns ValidationError when passwords do not match`() {
         val result = svc.register("acme", "bob", "bob@x.com", "Bob", "passA1!x", "passB1!x", "http://localhost")
         assertIs<AuthResult.Failure>(result)
@@ -713,6 +748,32 @@ class AuthServiceTest {
         )
         assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice", "correct-pass"))
         assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice@example.com", "correct-pass"))
+    }
+
+    @Test
+    fun `authenticate matches a stored lowercase username case-insensitively in USERNAME mode`() {
+        users.add(activeUser.copy(id = UserId(30), username = "dave", email = "dave@example.com"))
+        for (typed in listOf("Dave", "DAVE", "  dave  ")) {
+            val result = svc.authenticate("acme", typed, "correct-pass")
+            assertIs<AuthResult.Success<User>>(result, "expected success for submitted '$typed'")
+            assertEquals("dave", result.value.username)
+        }
+    }
+
+    @Test
+    fun `authenticate matches a stored lowercase username case-insensitively in EITHER mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.add(activeUser.copy(id = UserId(31), username = "dave", email = "dave@example.com"))
+        for (typed in listOf("Dave", "DAVE", "  dave  ")) {
+            val result = svc.authenticate("acme", typed, "correct-pass")
+            assertIs<AuthResult.Success<User>>(result, "expected success for submitted '$typed'")
+            assertEquals("dave", result.value.username)
+        }
     }
 
     @Test

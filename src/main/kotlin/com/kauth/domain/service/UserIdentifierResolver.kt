@@ -36,8 +36,11 @@ class UserIdentifierResolver(
         if (value.isEmpty()) return IdentifierResolution.NotFound
 
         return when (mode) {
+            // Usernames are stored lowercased (see UsernamePolicy); lowercase what was submitted
+            // so "Dave" still finds "dave". Safe, not a loosening: (tenant_id, lower(username))
+            // is uniquely enforced (V66), so two distinct accounts can never differ only by case.
             LoginIdentifierMode.USERNAME ->
-                userRepository.findByUsername(tenantId, value).toResolution()
+                userRepository.findByUsername(tenantId, value.lowercase()).toResolution()
 
             LoginIdentifierMode.EMAIL ->
                 userRepository.findByEmail(tenantId, value).toResolution()
@@ -45,7 +48,7 @@ class UserIdentifierResolver(
             LoginIdentifierMode.EITHER -> {
                 // Both lookups always run. Short-circuiting would make a miss cost two
                 // queries and a hit one, which is an observable timing difference.
-                val byUsername = userRepository.findByUsername(tenantId, value)
+                val byUsername = userRepository.findByUsername(tenantId, value.lowercase())
                 val byEmail = userRepository.findByEmail(tenantId, value)
                 when {
                     byUsername != null && byEmail != null && byUsername.id != byEmail.id ->

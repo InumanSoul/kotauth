@@ -382,6 +382,20 @@ class AuthService(
             return AuthResult.Failure(AuthError.ValidationError("Please enter a valid email address."))
         }
 
+        // Normalize FIRST, then validate — "Dave" becomes "dave" and is accepted, while
+        // "john doe" is rejected rather than silently rewritten. This was previously the only
+        // write path with no username format validation at all.
+        val normalizedUsername = UsernamePolicy.normalize(username)
+        val normalizedEmail = email.trim().lowercase()
+
+        if (!normalizedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
+            return AuthResult.Failure(
+                AuthError.ValidationError(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
+            )
+        }
+
         // In passwordless mode the password is generated server-side and never used by
         // the user — skip policy/confirmation checks. The User table still requires a
         // hash, so we mint a random unguessable secret to satisfy the schema.
@@ -401,16 +415,13 @@ class AuthService(
                 rawPassword
             }
 
-        if (userRepository.existsByUsername(tenant.id, username)) {
+        if (userRepository.existsByUsername(tenant.id, normalizedUsername)) {
             return AuthResult.Failure(AuthError.UserAlreadyExists)
         }
 
-        if (userRepository.existsByEmail(tenant.id, email)) {
+        if (userRepository.existsByEmail(tenant.id, normalizedEmail)) {
             return AuthResult.Failure(AuthError.EmailAlreadyExists)
         }
-
-        val normalizedUsername = username.trim()
-        val normalizedEmail = email.trim().lowercase()
 
         // Same-namespace duplicates are ruled out above; this catches the cross-namespace
         // pair — this username equal to a DIFFERENT user's email, or vice versa — that the

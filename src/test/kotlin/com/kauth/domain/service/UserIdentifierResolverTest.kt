@@ -43,6 +43,24 @@ class UserIdentifierResolverTest {
     }
 
     @Test
+    fun `USERNAME mode matches a stored lowercase username regardless of submitted case`() {
+        for (typed in listOf("Alice", "ALICE", "  alice  ")) {
+            val result = resolver.resolve(tenantId, LoginIdentifierMode.USERNAME, typed)
+            assertIs<IdentifierResolution.Found>(result, "expected a match for submitted '$typed'")
+            assertEquals("alice", result.user.username)
+        }
+    }
+
+    @Test
+    fun `EITHER mode matches a stored lowercase username regardless of submitted case`() {
+        for (typed in listOf("Alice", "ALICE", "  alice  ")) {
+            val result = resolver.resolve(tenantId, LoginIdentifierMode.EITHER, typed)
+            assertIs<IdentifierResolution.Found>(result, "expected a match for submitted '$typed'")
+            assertEquals("alice", result.user.username)
+        }
+    }
+
+    @Test
     fun `USERNAME mode does not match email`() {
         val result = resolver.resolve(tenantId, LoginIdentifierMode.USERNAME, "alice@example.com")
         assertIs<IdentifierResolution.NotFound>(result)

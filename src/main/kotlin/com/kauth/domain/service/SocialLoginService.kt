@@ -230,15 +230,18 @@ class SocialLoginService(
             return SocialLoginResult.Failure(SocialLoginError.RegistrationDisabled)
         }
 
-        val username = chosenUsername.trim()
+        // Normalize FIRST, then validate — "Dave" becomes "dave" and is accepted.
+        val username = UsernamePolicy.normalize(chosenUsername)
         if (username.length < 3 || username.length > 50) {
             return SocialLoginResult.Failure(
                 SocialLoginError.InvalidUsername("Username must be between 3 and 50 characters."),
             )
         }
-        if (!username.matches(Regex("^[a-zA-Z0-9_]+$"))) {
+        if (!username.matches(UsernamePolicy.USERNAME_PATTERN)) {
             return SocialLoginResult.Failure(
-                SocialLoginError.InvalidUsername("Username may only contain letters, numbers, and underscores."),
+                SocialLoginError.InvalidUsername(
+                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                ),
             )
         }
 

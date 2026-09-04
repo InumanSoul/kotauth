@@ -82,8 +82,15 @@ class EmailOtpService(
 
         val user =
             existing ?: run {
-                if (!tenant.securityConfig.emailOtpSignupEnabled) {
-                    // Signup disabled — return a uniform success with a handle that never resolves.
+                // Signup disabled, or this exact address is already someone ELSE's username (a
+                // cross-namespace collision `IdentifierCollisionCheck` guards elsewhere — the
+                // uniqueness constraint on `users_username_per_tenant` would otherwise turn this
+                // into an unhandled exception). Either way: uniform success with a handle that
+                // never resolves, so this endpoint stays a non-oracle for both cases alike.
+                if (!tenant.securityConfig.emailOtpSignupEnabled ||
+                    !normalizedEmail.matches(UsernamePolicy.USERNAME_PATTERN) ||
+                    userRepository.existsByUsername(tenant.id, normalizedEmail)
+                ) {
                     return OtpSendResult.Success(
                         challengeId = generateChallengeHandle(),
                         expiresAt = expiresAt,

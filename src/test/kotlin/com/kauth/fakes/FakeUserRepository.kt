@@ -29,11 +29,22 @@ class FakeUserRepository :
     }
 
     fun add(user: User): User {
-        requireUniquePerTenant(user)
-        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        val normalized = user.normalizedForWrite()
+        requireUniquePerTenant(normalized)
+        val u = if (normalized.id == null) normalized.copy(id = UserId(nextId++)) else normalized
         store[u.id!!.value] = u
         return u
     }
+
+    /**
+     * Mirrors production's write-side normalization: `PostgresUserRepository.save`/`update`
+     * lowercase the email column, and every domain write path now normalizes (trim + lowercase)
+     * the username before it ever reaches a repository — see [com.kauth.domain.service.UsernamePolicy].
+     * Normalizing here too means a test cannot pass by relying on a mixed-case stored username
+     * that production would never actually persist.
+     */
+    private fun User.normalizedForWrite(): User =
+        copy(username = username.trim().lowercase(), email = email.trim().lowercase())
 
     /**
      * `UNIQUE (tenant_id, username)` and `UNIQUE (tenant_id, email)`, both from V1.
@@ -131,8 +142,9 @@ class FakeUserRepository :
     ): Long = findByTenantId(tenantId, search).size.toLong()
 
     override fun save(user: User): User {
-        requireUniquePerTenant(user)
-        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        val normalized = user.normalizedForWrite()
+        requireUniquePerTenant(normalized)
+        val u = if (normalized.id == null) normalized.copy(id = UserId(nextId++)) else normalized
         store[u.id!!.value] = u
         return u
     }
