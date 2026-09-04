@@ -109,11 +109,28 @@ before upgrading:
   not complete. This is deliberate: silently merging or dropping one of the
   two accounts would be worse than a blocked upgrade. The operator must
   rename one of the colliding accounts by hand and re-run the migration.
+- **The migration aborts the upgrade if a username would normalize to
+  nothing at all.** A username made entirely of characters outside
+  `[a-z0-9._@+-]` — most notably a non-Latin username such as `Иван` or
+  `用户` — collapses to an empty string under `V66`'s own rewrite rule.
+  `users.username` is `NOT NULL` with no format `CHECK` before this
+  migration, so an empty string would otherwise commit silently, and that
+  user could never sign in by username again with no error and no log line
+  anywhere. `V66` refuses to let that happen: it raises an exception naming
+  the tenant and the row's `id` (never the raw username, the same
+  restraint the collision check above already uses) and the migration does
+  not complete. **The operator must rename that user by hand, on the
+  pre-upgrade version, to something matching `[a-z0-9._@+-]+` before
+  re-running the migration.** This is a real possibility for any
+  self-hosted install used outside the anglosphere — `AuthService.register`
+  historically ran no username validation at all, so such rows can exist in
+  the wild.
 
-Run this query against the target database **before** upgrading to find
-every tenant/username group that would collide. It mirrors `V66`'s own
-normalization exactly — lowercase, trim, collapse forbidden-character runs
-to `.`, then strip leading/trailing `.`/`_`/`-`:
+Run these queries against the target database **before** upgrading.
+
+Every tenant/username group that would collide once normalized. This
+mirrors `V66`'s own normalization exactly — lowercase, trim, collapse
+forbidden-character runs to `.`, then strip leading/trailing `.`/`_`/`-`:
 
 ```sql
 SELECT tenant_id,
@@ -133,6 +150,25 @@ HAVING count(*) > 1;
 Any row this returns is an upgrade blocker: rename one of the colliding
 usernames (through the admin UI or API, on the pre-upgrade version) until
 the query returns nothing, then upgrade.
+
+Every row that would normalize to an empty or otherwise still-invalid
+value — the companion query for the non-Latin-username case above:
+
+```sql
+SELECT id, tenant_id, username
+FROM users
+WHERE regexp_replace(
+        regexp_replace(
+          regexp_replace(lower(btrim(username)), '[^a-z0-9._@+-]+', '.', 'g'),
+          '^[._-]+', ''
+        ),
+        '[._-]+$', ''
+      ) !~ '^[a-z0-9._@+-]+$';
+```
+
+Any row this returns is also an upgrade blocker: rename the user (through
+the admin UI or API, on the pre-upgrade version) to a username matching
+`[a-z0-9._@+-]+` until the query returns nothing, then upgrade.
 
 ## Sign-in failure message
 
@@ -162,3 +198,16 @@ Switching a workspace's mode away from `USERNAME` takes effect immediately
 in the database, but a request that happens to land on an old replica still
 resolves by username only, regardless of the new setting, until that
 replica is replaced.
+
+`V66` itself has the same exposure. It runs once, at the start of the
+deploy, and rewrites every stored username immediately — but an old
+replica still running the previous release's code may do a case-exact
+username comparison somewhere in its own request handling (rather than
+going through a case-insensitive lookup). For the window between `V66`
+running and the last old replica draining, such a replica will fail to
+match a user whose stored username `V66` just rewrote — e.g. a user stored
+as `Dave` is now `dave` in the database, and an old replica comparing the
+submitted value byte-for-byte against the row it fetches will not find it.
+This resolves itself as soon as the rolling deploy finishes and only new
+replicas remain; there is no user-visible action to take beyond finishing
+the deploy promptly.

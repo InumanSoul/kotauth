@@ -58,17 +58,18 @@ class AdminUserService(
             } else {
                 UsernamePolicy.normalize(username)
             }
-        if (!resolvedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
-            return AdminResult.Failure(
-                AdminError.Validation(
-                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
-                ),
-            )
-        }
-        if (resolvedUsername.length > UsernamePolicy.MAX_LENGTH) {
-            return AdminResult.Failure(
-                AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
-            )
+        when (UsernamePolicy.validate(resolvedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AdminResult.Failure(
+                    AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
         }
 
         collisionCheck
@@ -261,6 +262,17 @@ class AdminUserService(
         tenantId: TenantId,
         username: String,
     ): User? = userRepository.findByUsername(tenantId, username)
+
+    /**
+     * Case-insensitive tenant-scoped username lookup — the indexed fast path for SCIM's
+     * `userName eq` filter. Storage is always lowercase (see [UsernamePolicy]), but a connector
+     * may resend the mixed-case value it originally submitted (e.g. an Okta/Entra UPN like
+     * `Dave.Smith@corp.com`), and a case-sensitive lookup would tell it that user doesn't exist.
+     */
+    fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? = userRepository.findByUsernameIgnoreCase(tenantId, username)
 
     /** Tenant-scoped external-id lookup — the indexed fast path for SCIM's `externalId eq` filter. */
     fun findByExternalId(
@@ -483,17 +495,18 @@ class AdminUserService(
         if (resolvedUsername.isBlank()) {
             return AdminResult.Failure(AdminError.Validation("Username is required."))
         }
-        if (!resolvedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
-            return AdminResult.Failure(
-                AdminError.Validation(
-                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
-                ),
-            )
-        }
-        if (resolvedUsername.length > UsernamePolicy.MAX_LENGTH) {
-            return AdminResult.Failure(
-                AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
-            )
+        when (UsernamePolicy.validate(resolvedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AdminResult.Failure(
+                    AdminError.Validation(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AdminResult.Failure(
+                    AdminError.Validation("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
         }
         if (userRepository.existsByUsername(tenantId, resolvedUsername)) {
             return AdminResult.Failure(AdminError.Conflict("Username '$resolvedUsername' is already taken."))

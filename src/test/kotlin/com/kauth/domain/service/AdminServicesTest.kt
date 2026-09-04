@@ -414,12 +414,15 @@ class AdminServicesTest {
 
     @Test
     fun `createUser rejects an email equal to another users username in different case`() {
-        users.add(alice.copy(id = UserId(52), username = "Dave@Example.com", email = "dave-alt2@example.com"))
+        // Production never stores a mixed-case username (see UsernamePolicy) — the case
+        // difference this test exercises comes from the NEW request's email instead, which
+        // createUser itself lowercases before the collision check runs.
+        users.add(alice.copy(id = UserId(52), username = "dave2@example.com", email = "dave-alt2@example.com"))
         val result =
             userSvc.createUser(
                 tenantId = TenantId(1),
                 username = "gail",
-                email = "dave@example.com",
+                email = "Dave2@Example.com",
                 fullName = "Gail",
                 password = "password123",
             )

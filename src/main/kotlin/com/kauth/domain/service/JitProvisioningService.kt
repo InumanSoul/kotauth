@@ -92,7 +92,7 @@ class JitProvisioningService(
         val addressUsable =
             email != null &&
                 isDomainAllowed(email, provider.jitAllowedDomains) &&
-                email.matches(UsernamePolicy.USERNAME_PATTERN)
+                UsernamePolicy.isValid(email)
         if (!addressUsable) {
             return refuse(tenant, provider, profile, JitRefusal.DOMAIN_NOT_ALLOWED, ipAddress, userAgent)
         }

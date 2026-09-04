@@ -388,12 +388,18 @@ class AuthService(
         val normalizedUsername = UsernamePolicy.normalize(username)
         val normalizedEmail = email.trim().lowercase()
 
-        if (!normalizedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
-            return AuthResult.Failure(
-                AuthError.ValidationError(
-                    "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
-                ),
-            )
+        when (UsernamePolicy.validate(normalizedUsername)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return AuthResult.Failure(
+                    AuthError.ValidationError(
+                        "Username may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return AuthResult.Failure(
+                    AuthError.ValidationError("Username must be ${UsernamePolicy.MAX_LENGTH} characters or fewer."),
+                )
+            null -> Unit
         }
 
         // In passwordless mode the password is generated server-side and never used by

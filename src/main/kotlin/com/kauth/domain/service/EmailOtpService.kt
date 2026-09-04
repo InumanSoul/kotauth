@@ -88,7 +88,7 @@ class EmailOtpService(
                 // into an unhandled exception). Either way: uniform success with a handle that
                 // never resolves, so this endpoint stays a non-oracle for both cases alike.
                 if (!tenant.securityConfig.emailOtpSignupEnabled ||
-                    !normalizedEmail.matches(UsernamePolicy.USERNAME_PATTERN) ||
+                    !UsernamePolicy.isValid(normalizedEmail) ||
                     userRepository.existsByUsername(tenant.id, normalizedEmail)
                 ) {
                     return OtpSendResult.Success(

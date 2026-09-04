@@ -4,6 +4,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.UsernamePolicy
 import java.time.Instant
 
 /**
@@ -37,14 +38,31 @@ class FakeUserRepository :
     }
 
     /**
-     * Mirrors production's write-side normalization: `PostgresUserRepository.save`/`update`
-     * lowercase the email column, and every domain write path now normalizes (trim + lowercase)
-     * the username before it ever reaches a repository — see [com.kauth.domain.service.UsernamePolicy].
-     * Normalizing here too means a test cannot pass by relying on a mixed-case stored username
-     * that production would never actually persist.
+     * Mirrors production's write-side normalization for email only: `PostgresUserRepository.save`
+     * lowercases the email column. The username is deliberately NOT silently fixed here — see
+     * [requireNormalizedUsername].
      */
-    private fun User.normalizedForWrite(): User =
-        copy(username = username.trim().lowercase(), email = email.trim().lowercase())
+    private fun User.normalizedForWrite(): User {
+        requireNormalizedUsername(username)
+        return copy(email = email.trim().lowercase())
+    }
+
+    /**
+     * Every domain write path now normalizes (trim + lowercase) a username before it ever reaches
+     * a repository — see [UsernamePolicy]. Production's `PostgresUserRepository.save`/`update`
+     * write the username verbatim, trusting that invariant rather than re-enforcing it. A fake
+     * that silently lowercased a non-normalized username instead of rejecting it would be MORE
+     * forgiving than production on exactly the invariant this release depends on: a future write
+     * path that forgets to normalize would get a green test here and an unreachable user in
+     * production. Throwing turns that into a failing test instead.
+     */
+    private fun requireNormalizedUsername(username: String) {
+        val normalized = UsernamePolicy.normalize(username)
+        check(username == normalized) {
+            "FakeUserRepository received a non-normalized username '$username' (production would " +
+                "store '$normalized'). The caller must normalize via UsernamePolicy before writing."
+        }
+    }
 
     /**
      * `UNIQUE (tenant_id, username)` and `UNIQUE (tenant_id, email)`, both from V1.
@@ -150,6 +168,7 @@ class FakeUserRepository :
     }
 
     override fun update(user: User): User {
+        requireNormalizedUsername(user.username)
         requireUniquePerTenant(user)
         store[user.id!!.value] = user
         return user

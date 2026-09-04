@@ -1057,7 +1057,7 @@ class ScimGroupRoutesTest {
             // with just the one member the connector sent, losing every role it granted.
             val existingMembers = (1..400).map { addUser("u$it") }
             val group = addGroup("Engineering", members = existingMembers)
-            val newMember = addUser("newHire")
+            val newMember = addUser("newhire")
 
             val response =
                 client.patch(groupUrl(group.id!!.value)) {
@@ -1295,7 +1295,7 @@ class ScimGroupRoutesTest {
             val u1 = addUser("u1")
             val u2 = addUser("u2")
             val u3 = addUser("u3")
-            val newMember = addUser("newMember")
+            val newMember = addUser("newmember")
             val group = addGroup("Engineering", members = listOf(u1, u2, u3))
 
             val response =

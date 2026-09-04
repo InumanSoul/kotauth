@@ -350,22 +350,34 @@ class BackupImporterService(
             }
         }
 
+        // Normalize, then reject rather than rewrite: a restore that silently alters an
+        // identifier can break an integrator's stored references to it. Validated as one pass
+        // over every record before any of them is saved, and reported together, so an operator
+        // restoring hundreds of users sees the full list of offenders in one failure instead of
+        // discovering them one retry at a time.
+        val invalidUserRecords =
+            export.users.mapNotNull { ub ->
+                val normalized = UsernamePolicy.normalize(ub.username)
+                if (UsernamePolicy.isValid(normalized)) {
+                    null
+                } else {
+                    "user record for email '${ub.email}' has username '${ub.username}' which does not " +
+                        "normalize to a valid username (got '$normalized')"
+                }
+            }
+        if (invalidUserRecords.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${invalidUserRecords.size} user record(s) have usernames " +
+                    "that do not normalize to a valid username. Usernames must match " +
+                    "${UsernamePolicy.USERNAME_PATTERN.pattern} and be at most " +
+                    "${UsernamePolicy.MAX_LENGTH} characters after trimming and lowercasing. " +
+                    "Offending records: ${invalidUserRecords.joinToString("; ")}.",
+            )
+        }
+
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
-            // Normalize, then reject rather than rewrite: a restore that silently alters an
-            // identifier can break an integrator's stored references to it. A username that
-            // fails to normalize into a valid one names the offending record so an operator can
-            // fix the export by hand and retry, rather than getting a 500 from the unique
-            // constraint or a garbled username on the far side.
             val normalizedUsername = UsernamePolicy.normalize(ub.username)
-            if (!normalizedUsername.matches(UsernamePolicy.USERNAME_PATTERN)) {
-                error(
-                    "Backup import rejected: user record for email '${ub.email}' has username " +
-                        "'${ub.username}' which does not normalize to a valid username " +
-                        "(got '$normalizedUsername'). Usernames must match " +
-                        "${UsernamePolicy.USERNAME_PATTERN.pattern} after trimming and lowercasing.",
-                )
-            }
             val saved =
                 userRepository.save(
                     User(

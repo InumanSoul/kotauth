@@ -91,14 +91,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every existing workspace keeps its current sign-in behaviour.
 - `V66__normalize_usernames.sql` — rewrites every existing username to its
   normalized form (lowercased, trimmed, each run of characters outside
-  `[a-z0-9._@+-]` collapsed to a single `.`), then adds a unique index on
-  `(tenant_id, lower(username))` to enforce the rule going forward. **This
-  changes existing users' sign-in identifiers** — a user stored as `"John
-  Doe"` becomes `john.doe` — so operators should tell affected users their
-  new identifier. **The migration aborts the upgrade** if two usernames in
-  one tenant would normalize to the same value (e.g. `Dave` and `dave`);
-  see `docs/guides/sign-in-identifier.md` for a pre-flight query to find and
-  resolve collisions before upgrading.
+  `[a-z0-9._@+-]` collapsed to a single `.`, then leading/trailing `.`/`_`/`-`
+  stripped), adds `CHECK (username = lower(username))` so storage being
+  lowercase is enforced by the database and not just application code, and
+  adds a unique index on `(tenant_id, lower(username))` to enforce the rule
+  going forward. **This changes existing users' sign-in identifiers** — a
+  user stored as `"John Doe"` becomes `john.doe` — so operators should tell
+  affected users their new identifier. **The migration aborts the upgrade**
+  if two usernames in one tenant would normalize to the same value (e.g.
+  `Dave` and `dave`), or if any username would normalize to an empty or
+  still-invalid value — most notably a username made entirely of a
+  non-Latin script (e.g. `Иван`, `用户`), which would otherwise silently
+  become `''` and leave that user unable to sign in by username again. See
+  `docs/guides/sign-in-identifier.md` for pre-flight queries to find and
+  resolve both cases before upgrading, and for a rolling-deploy note: once
+  `V66` runs, an old replica still doing a case-exact username comparison
+  will fail to match a user whose stored username was just rewritten, until
+  the last old replica drains.
 
 ---
 

@@ -111,6 +111,45 @@ class BackupImporterUsernameValidationTest {
         return (result as BackupResult.Success).value
     }
 
+    private fun seedSourceTenantWithTwoUsers(): TenantId {
+        val tenant =
+            sourceTenants.add(
+                Tenant(
+                    id = TenantId(0),
+                    slug = "acme",
+                    displayName = "Acme Corp",
+                    issuerUrl = "https://acme.example.com",
+                ),
+            )
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenant.id,
+                username = "alice",
+                email = "alice@acme.example.com",
+                fullName = "Alice Adams",
+                passwordHash = "\$2a\$10\$AAAAAAAAAAAAAAAAAAAAAA",
+            ),
+        )
+        sourceUsers.add(
+            User(
+                id = null,
+                tenantId = tenant.id,
+                username = "bob",
+                email = "bob@acme.example.com",
+                fullName = "Bob Baker",
+                passwordHash = "\$2a\$10\$AAAAAAAAAAAAAAAAAAAAAA",
+            ),
+        )
+        return tenant.id
+    }
+
+    private fun exportAcmeWithTwoUsers(): BackupExportV1 {
+        seedSourceTenantWithTwoUsers()
+        val result = exporter().export("acme", ExportOptions(), kotauthVersion = "test", currentSchemaVersion = 1)
+        return (result as BackupResult.Success).value
+    }
+
     @Test
     fun `import rejects a record whose username is invalid after normalization`() {
         val export = exportAcme()
@@ -124,6 +163,38 @@ class BackupImporterUsernameValidationTest {
         assertContains(error.message, "john doe")
         assertContains(error.message, "alice@acme.example.com")
         // No user was persisted on the destination — validation runs before the save.
+        val createdTenant = destTenants.findBySlug("acme-restored")
+        if (createdTenant != null) {
+            assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())
+        }
+    }
+
+    @Test
+    fun `import reports every offending record in one failure, not just the first`() {
+        val export = exportAcmeWithTwoUsers()
+        val badExport =
+            export.copy(
+                users =
+                    export.users.map {
+                        when (it.username) {
+                            "alice" -> it.copy(username = "john doe")
+                            "bob" -> it.copy(username = "a".repeat(UsernamePolicy.MAX_LENGTH + 1))
+                            else -> it
+                        }
+                    },
+            )
+
+        val result = importer().import(badExport, newSlug = "acme-restored", currentSchemaVersion = 1)
+
+        assertIs<BackupResult.Failure>(result)
+        val error = result.error
+        assertIs<BackupError.InvalidPayload>(error)
+        // Both offenders are named in the SAME failure — an operator restoring many users must
+        // see the full list at once, not discover them one aborted retry at a time.
+        assertContains(error.message, "john doe")
+        assertContains(error.message, "alice@acme.example.com")
+        assertContains(error.message, "bob@acme.example.com")
+        // No user was persisted on the destination — validation runs before any save.
         val createdTenant = destTenants.findBySlug("acme-restored")
         if (createdTenant != null) {
             assertTrue(destUsers.findByTenantId(createdTenant.id, null, 100, 0).isEmpty())

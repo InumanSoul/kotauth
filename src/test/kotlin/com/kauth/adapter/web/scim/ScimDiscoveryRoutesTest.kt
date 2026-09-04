@@ -322,7 +322,7 @@ class ScimDiscoveryRoutesTest {
         }
 
     @Test
-    fun `the User schema advertises userName as case-sensitive and immutable`() =
+    fun `the User schema advertises userName as case-insensitive and immutable`() =
         testApplication {
             application { installTestApp() }
 
@@ -341,9 +341,10 @@ class ScimDiscoveryRoutesTest {
                     .first { it.jsonObject["name"]!!.jsonPrimitive.content == "userName" }
                     .jsonObject
 
-            // Matching is case-sensitive end to end (ScimFilter, PostgresUserRepository), and a
-            // PUT/PATCH rename is rejected — the schema must not claim otherwise.
-            assertEquals(true, userName["caseExact"]?.jsonPrimitive?.boolean)
+            // Storage is always lowercase and matching is case-insensitive end to end
+            // (ScimUserMapper normalizes on write, PostgresUserRepository's lookup is
+            // IgnoreCase); a PUT/PATCH rename is still rejected — the schema must reflect both.
+            assertEquals(false, userName["caseExact"]?.jsonPrimitive?.boolean)
             assertEquals("immutable", userName["mutability"]?.jsonPrimitive?.content)
         }
 

@@ -577,6 +577,53 @@ class ScimUserRoutesTest {
         }
 
     @Test
+    fun `a mixed-case userName round-trips through create, PUT, and filter by either case`() =
+        testApplication {
+            application { installTestApp() }
+
+            // Okta/Entra commonly send a mixed-case UPN as userName.
+            val created =
+                client.post("/t/acme/scim/v2/Users") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(createBody("Dave.Smith"))
+                }
+            assertEquals(HttpStatusCode.Created, created.status)
+            val createdBody = jsonCodec.parseToJsonElement(created.bodyAsText()).jsonObject
+            assertEquals("dave.smith", createdBody["userName"]!!.jsonPrimitive.content)
+            val userId = createdBody["id"]!!.jsonPrimitive.content
+
+            // Resending the SAME mixed-case value the connector originally used must succeed —
+            // it normalizes to what's already stored, so it is not a rename.
+            val put =
+                client.put("/t/acme/scim/v2/Users/$userId") {
+                    bearerAuth(scimKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"Dave.Smith",""" +
+                            """"emails":[{"value":"dave.smith@example.com","type":"work"}]}""",
+                    )
+                }
+            assertEquals(HttpStatusCode.OK, put.status)
+            assertEquals("dave.smith", userRepo.findByUsernameIgnoreCase(acme.id, "dave.smith")?.username)
+
+            val filterMixedCase =
+                client.get(usersUrl("""userName eq "Dave.Smith"""")) { bearerAuth(scimKey) }
+            assertEquals(HttpStatusCode.OK, filterMixedCase.status)
+            val mixedCaseResources =
+                jsonCodec.parseToJsonElement(filterMixedCase.bodyAsText()).jsonObject["Resources"]!!.jsonArray
+            assertEquals(1, mixedCaseResources.size)
+            assertEquals("dave.smith", mixedCaseResources[0].jsonObject["userName"]!!.jsonPrimitive.content)
+
+            val filterLowerCase =
+                client.get(usersUrl("""userName eq "dave.smith"""")) { bearerAuth(scimKey) }
+            assertEquals(HttpStatusCode.OK, filterLowerCase.status)
+            val lowerCaseResources =
+                jsonCodec.parseToJsonElement(filterLowerCase.bodyAsText()).jsonObject["Resources"]!!.jsonArray
+            assertEquals(1, lowerCaseResources.size)
+        }
+
+    @Test
     fun `filter by externalId returns only the matching user`() =
         testApplication {
             application { installTestApp() }

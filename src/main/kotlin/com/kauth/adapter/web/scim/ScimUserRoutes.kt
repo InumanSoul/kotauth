@@ -21,6 +21,7 @@ import com.kauth.domain.scim.parseFilter
 import com.kauth.domain.service.AdminError
 import com.kauth.domain.service.AdminResult
 import com.kauth.domain.service.AdminUserService
+import com.kauth.domain.service.UsernamePolicy
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
@@ -295,7 +296,10 @@ private fun lookupFastPath(
     literal: String,
 ): User? =
     when (attr) {
-        "userName" -> adminUserService.findByUsername(tenantId, literal)
+        // Case-insensitive: storage is always lowercase, but a connector may resend the
+        // mixed-case value it originally submitted (e.g. an Okta/Entra UPN), and a
+        // case-sensitive lookup here would tell it the user it just created doesn't exist.
+        "userName" -> adminUserService.findByUsernameIgnoreCase(tenantId, literal)
         "externalId" -> adminUserService.findByExternalId(tenantId, literal)
         "id" ->
             literal.toIntOrNull()?.let { idValue ->
@@ -391,12 +395,17 @@ private fun <T> runScimTransaction(
         AdminResult.Failure(e.error)
     }
 
-/** `userName` is the SCIM correlation key; a PUT/PATCH that tries to change it is rejected, never silently dropped. */
+/**
+ * `userName` is the SCIM correlation key; a PUT/PATCH that tries to change it is rejected, never
+ * silently dropped. Both sides are compared normalized (see [UsernamePolicy]) — [existingUsername]
+ * is already stored normalized, but comparing raw would treat a connector resubmitting the same
+ * username in different case (e.g. `Dave.Smith` after it was stored as `dave.smith`) as a rename.
+ */
 private suspend fun ApplicationCall.rejectUsernameRename(
     existingUsername: String,
     write: ScimUserWrite,
 ): Unit? {
-    if (write.user.username == existingUsername) return Unit
+    if (UsernamePolicy.normalize(write.user.username) == UsernamePolicy.normalize(existingUsername)) return Unit
     val (status, body) =
         ScimFailure(
             ScimErrorType.mutability,
