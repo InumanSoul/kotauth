@@ -55,9 +55,13 @@ class FakeUserRepository :
         }
     }
 
+    /** Records lookup method names in call order — used to assert timing-invariant lookup patterns. */
+    val callLog = mutableListOf<String>()
+
     fun clear() {
         store.clear()
         nextId = 1
+        callLog.clear()
     }
 
     override fun findById(
@@ -73,12 +77,18 @@ class FakeUserRepository :
     override fun findByUsername(
         tenantId: TenantId,
         username: String,
-    ) = store.values.find { it.tenantId == tenantId && it.username == username }
+    ): User? {
+        callLog += "findByUsername"
+        return store.values.find { it.tenantId == tenantId && it.username == username }
+    }
 
     override fun findByEmail(
         tenantId: TenantId,
         email: String,
-    ) = store.values.find { it.tenantId == tenantId && it.email == email }
+    ): User? {
+        callLog += "findByEmail"
+        return store.values.find { it.tenantId == tenantId && it.email.lowercase() == email.lowercase() }
+    }
 
     override fun findByExternalId(
         tenantId: TenantId,
