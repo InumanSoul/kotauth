@@ -184,6 +184,8 @@ DB_PASSWORD=changeme
 
 When `true`, Kotauth trusts `X-Forwarded-For` / `X-Forwarded-Proto` headers for client-IP resolution. **Only enable behind a reverse proxy that overwrites these headers** — on a directly-exposed instance, this lets clients spoof their IP to bypass per-IP rate limits on login, token, MFA, and OTP endpoints. The bundled Caddy production setup sets it automatically.
 
+The **last** `X-Forwarded-For` entry is taken as the client address — the one the proxy directly in front observed. Exactly one trusted hop is supported; see [One trusted hop only](deploy/production.md#one-trusted-hop-only).
+
 ```
 KAUTH_TRUSTED_PROXY=true
 ```

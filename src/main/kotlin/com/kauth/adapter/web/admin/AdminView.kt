@@ -71,7 +71,9 @@ object AdminView {
         allWorkspaces: List<WorkspaceStub>,
         apps: List<Application> = emptyList(),
         loggedInAs: String,
-    ): HTML.() -> Unit = workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs)
+        identityProviders: List<IdentityProvider> = emptyList(),
+    ): HTML.() -> Unit =
+        workspaceDetailPageImpl(workspace, allWorkspaces, apps, loggedInAs, identityProviders)
 
     fun workspaceSettingsPage(
         workspace: Tenant,
@@ -171,8 +173,9 @@ object AdminView {
         page: Int = 1,
         totalPages: Int = 1,
         totalCount: Long = 0,
+        pageSize: Int = DEFAULT_USER_PAGE_SIZE,
     ): HTML.() -> Unit =
-        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount)
+        userListPageImpl(workspace, users, allWorkspaces, loggedInAs, search, page, totalPages, totalCount, pageSize)
 
     fun createUserPage(
         workspace: Tenant,
@@ -199,6 +202,9 @@ object AdminView {
         recentImpersonations: List<ImpersonationRecord> = emptyList(),
         recentOtpActivity: List<OtpActivityRecord> = emptyList(),
         passkeys: List<com.kauth.domain.model.WebAuthnCredential> = emptyList(),
+        brokeredOrigin: Boolean = false,
+        linkedIdentities: List<com.kauth.domain.model.SocialAccount> = emptyList(),
+        activeImpersonation: ActiveImpersonation? = null,
     ): HTML.() -> Unit =
         userDetailPageImpl(
             workspace,
@@ -217,6 +223,9 @@ object AdminView {
             recentImpersonations,
             recentOtpActivity,
             passkeys,
+            brokeredOrigin,
+            linkedIdentities = linkedIdentities,
+            activeImpersonation = activeImpersonation,
         )
 
     fun userAttributeFormPage(
@@ -402,14 +411,53 @@ object AdminView {
             notEnrolledUserList,
         )
 
-    fun identityProvidersPage(
+    @Suppress("LongParameterList")
+    fun identityProvidersIndexPage(
         workspace: Tenant,
         providers: List<IdentityProvider>,
         allWorkspaces: List<WorkspaceStub>,
         loggedInAs: String,
         error: String? = null,
         saved: Boolean = false,
-    ): HTML.() -> Unit = identityProvidersPageImpl(workspace, providers, allWorkspaces, loggedInAs, error, saved)
+        deleted: Boolean = false,
+        failures: Map<com.kauth.domain.model.ProviderKey, List<SignInFailureRow>> = emptyMap(),
+    ): HTML.() -> Unit =
+        identityProvidersIndexPageImpl(
+            workspace = workspace,
+            providers = providers,
+            allWorkspaces = allWorkspaces,
+            loggedInAs = loggedInAs,
+            error = error,
+            saved = saved,
+            deleted = deleted,
+            failures = failures,
+        )
+
+    fun identityProviderDetailPage(
+        workspace: Tenant,
+        provider: com.kauth.domain.model.ProviderKey?,
+        existing: IdentityProvider?,
+        allWorkspaces: List<WorkspaceStub>,
+        loggedInAs: String,
+        error: String? = null,
+        saved: Boolean = false,
+        failures: List<SignInFailureRow> = emptyList(),
+        baseUrl: String = "",
+        probe: com.kauth.domain.service.AdminResult<com.kauth.domain.service.DiscoveryProbe>? = null,
+    ): HTML.() -> Unit =
+        identityProviderDetailPageImpl(
+            workspace = workspace,
+            provider = provider,
+            existing = existing,
+            allWorkspaces = allWorkspaces,
+            loggedInAs = loggedInAs,
+            error = error,
+            saved = saved,
+            failures = failures,
+            baseUrl = baseUrl,
+            probe = probe,
+        )
+
 
     fun apiKeysListPage(
         workspace: Tenant,

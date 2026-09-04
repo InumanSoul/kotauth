@@ -3,6 +3,8 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.SessionId
+import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.AuditLogRepository
@@ -21,6 +23,7 @@ import com.kauth.domain.service.WebAuthnService
 import com.kauth.infrastructure.CachingClaimMapperService
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.html.respondHtml
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
@@ -31,6 +34,23 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import io.ktor.server.sessions.get
+import io.ktor.server.sessions.sessions
+
+/**
+ * Whether the broker created this account on a first sign-in.
+ *
+ * The provisioning event is the only durable record of it: a just-in-time user carries no
+ * `externalId`, and the `social_accounts` link it does have is one a locally registered user
+ * acquires too the first time it signs in through a provider.
+ */
+private fun AuditLogRepository?.recordedJitProvisioning(
+    tenantId: TenantId,
+    userId: UserId,
+): Boolean =
+    this
+        ?.findByTenant(tenantId, AuditEventType.JIT_USER_PROVISIONED, userId = userId, limit = 1)
+        ?.isNotEmpty() ?: false
 
 fun Route.adminUserRoutes(
     accountService: AdminAccountService,
@@ -45,6 +65,7 @@ fun Route.adminUserRoutes(
     webAuthnService: WebAuthnService? = null,
     mfaService: MfaService? = null,
     auditLogPort: AuditLogPort? = null,
+    socialAccountRepository: com.kauth.domain.port.SocialAccountRepository? = null,
 ) {
     route("/users") {
         get {
@@ -53,7 +74,7 @@ fun Route.adminUserRoutes(
                 call.request.queryParameters["q"]
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
-            val pageSize = 25
+            val pageSize = DEFAULT_USER_PAGE_SIZE
             val totalCount = adminUserService.countUsers(ctx.workspace.id, search)
             val totalPages = ((totalCount + pageSize - 1) / pageSize).toInt().coerceAtLeast(1)
             val page =
@@ -75,6 +96,7 @@ fun Route.adminUserRoutes(
                     page = page,
                     totalPages = totalPages,
                     totalCount = totalCount,
+                    pageSize = pageSize,
                 ),
             )
         }
@@ -218,6 +240,7 @@ fun Route.adminUserRoutes(
                     } ?: emptyList()
                 val passkeys =
                     webAuthnService?.listForUser(userId, ctx.workspace.id) ?: emptyList()
+                val brokeredOrigin = auditLogRepository.recordedJitProvisioning(ctx.workspace.id, userId)
                 call.respondHtml(
                     HttpStatusCode.OK,
                     AdminView.userDetailPage(
@@ -235,6 +258,9 @@ fun Route.adminUserRoutes(
                         tempPasswordLink = tempPasswordLink,
                         recentImpersonations = recentImpersonations,
                         passkeys = passkeys,
+                        brokeredOrigin = brokeredOrigin,
+                        linkedIdentities = socialAccountRepository?.findByUserId(userId).orEmpty(),
+                        activeImpersonation = call.activeImpersonation(sessionRepository, userRepository),
                     ),
                 )
             }
@@ -388,6 +414,8 @@ fun Route.adminUserRoutes(
                                     editError = result.error.message,
                                     roles = userRoles,
                                     groups = userGroups,
+                                    brokeredOrigin =
+                                        auditLogRepository.recordedJitProvisioning(ctx.workspace.id, userId),
                                 ),
                             )
                         }
@@ -655,7 +683,7 @@ fun Route.adminUserRoutes(
                                     userId = actorId,
                                     clientId = null,
                                     eventType = AuditEventType.PASSKEY_ADMIN_REVOKED,
-                                    ipAddress = call.request.origin.remoteHost,
+                                    ipAddress = call.request.origin.remoteAddress,
                                     userAgent = null,
                                     details =
                                         mapOf(
@@ -715,7 +743,7 @@ fun Route.adminUserRoutes(
                     mfaService.disableMfa(
                         userId = userId,
                         tenantId = ctx.workspace.id,
-                        ipAddress = call.request.origin.remoteHost,
+                        ipAddress = call.request.origin.remoteAddress,
                     )
                     auditLogPort.record(
                         AuditEvent(
@@ -723,7 +751,7 @@ fun Route.adminUserRoutes(
                             userId = actorId,
                             clientId = null,
                             eventType = AuditEventType.MFA_ADMIN_RESET,
-                            ipAddress = call.request.origin.remoteHost,
+                            ipAddress = call.request.origin.remoteAddress,
                             userAgent = null,
                             details = mapOf("targetUser" to userId.value.toString()),
                         ),
@@ -749,3 +777,27 @@ private fun attributeErrorMessage(result: AttributeResult<*>): String =
         is AttributeResult.LimitReached ->
             "Mapper limit of ${result.max} reached."
     }
+
+/**
+ * The impersonation this admin session currently holds, if any.
+ *
+ * Starting a second one revokes the first, so the page that offers the button needs to know
+ * whether there is anything to revoke before it asks.
+ */
+private fun ApplicationCall.activeImpersonation(
+    sessionRepository: SessionRepository,
+    userRepository: UserRepository?,
+): ActiveImpersonation? {
+    val session = sessions.get<AdminSession>() ?: return null
+    val adminSessionId = session.adminSessionId?.let(::SessionId) ?: return null
+    val running = sessionRepository.findActiveByImpersonator(adminSessionId).firstOrNull() ?: return null
+    val targetUserId = running.userId ?: return null
+    val target = userRepository?.findById(targetUserId, running.tenantId)
+    return ActiveImpersonation(
+        targetUserId = targetUserId.value,
+        targetUsername = target?.username ?: "#${targetUserId.value}",
+        targetWorkspaceSlug = attributes[WorkspaceAttr].slug,
+        sessionId = running.id?.value ?: return null,
+        startedAt = running.createdAt,
+    )
+}

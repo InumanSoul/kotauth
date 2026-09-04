@@ -60,7 +60,7 @@ fun Route.adminUserImpersonationRoute(
                 adminSessionId = adminSessionId,
                 targetTenantId = ctx.workspace.id,
                 targetUserId = userId,
-                ipAddress = call.request.origin.remoteHost,
+                ipAddress = call.request.origin.remoteAddress,
                 userAgent = call.request.userAgent(),
             )
 
@@ -108,6 +108,42 @@ fun Route.adminUserImpersonationRoute(
 }
 
 /**
+ * Ends an impersonation from the admin side.
+ *
+ * The portal-side route below needs the impersonated browser's own cookie. This one works from
+ * the admin session that owns the impersonation, which is what makes a running impersonation
+ * stoppable from the console rather than only from inside it.
+ */
+fun Route.adminImpersonationStopRoute(impersonationService: ImpersonationService) {
+    post("/impersonation/{sessionId}/stop") {
+        val session =
+            call.sessions.get<AdminSession>()
+                ?: return@post call.respondRedirect("/admin/login")
+        val adminSessionId =
+            session.adminSessionId?.let(::SessionId)
+                ?: return@post call.respondRedirect("/admin")
+        val impersonationSessionId =
+            call.parameters["sessionId"]?.toIntOrNull()?.let(::SessionId)
+                ?: return@post call.respond(HttpStatusCode.BadRequest)
+
+        // The service refuses a session this admin session does not own, so a guessed id
+        // ends nothing.
+        impersonationService.stopImpersonation(
+            adminUserId = UserId(session.userId),
+            adminSessionId = adminSessionId,
+            impersonationSessionId = impersonationSessionId,
+            ipAddress = call.request.origin.remoteAddress,
+            userAgent = call.request.userAgent(),
+        )
+
+        // This browser also holds the portal cookie for that session; without clearing it the
+        // admin keeps presenting a session the server has just revoked.
+        call.sessions.clear<PortalSession>()
+        call.respondRedirect("/admin")
+    }
+}
+
+/**
  * Portal-side "End session" endpoint. Registered inside the existing
  * `/t/{slug}/account` route block so it shares the same scope as the rest
  * of the portal routes. The admin reaches it from the impersonation banner
@@ -136,7 +172,7 @@ fun Route.portalImpersonationStopRoute(impersonationService: ImpersonationServic
             adminUserId = UserId(portal.impersonatorAdminUserId!!),
             adminSessionId = adminSessionId,
             impersonationSessionId = impersonationSessionId,
-            ipAddress = call.request.origin.remoteHost,
+            ipAddress = call.request.origin.remoteAddress,
             userAgent = call.request.userAgent(),
         )
 

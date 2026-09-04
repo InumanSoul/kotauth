@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantKey
 import kotlinx.html.*
@@ -16,7 +17,7 @@ internal fun keyManagementPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Signing Keys — ${workspace.displayName}",
+            pageTitle = "Signing Keys · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -24,7 +25,6 @@ internal fun keyManagementPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "signing-keys",
             loggedInAs = loggedInAs,
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -50,7 +50,7 @@ internal fun keyManagementPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 div("ov-card") {
@@ -66,7 +66,7 @@ internal fun keyManagementPageImpl(
                             thead {
                                 tr {
                                     th { +"Key ID" }
-                                    th { +"Created" }
+                                    th { +EnglishStrings.COL_CREATED }
                                     th { style = "width:140px;"; +"Status" }
                                     th { style = "width:80px;" }
                                 }
@@ -75,7 +75,7 @@ internal fun keyManagementPageImpl(
                                 keys.forEach { key ->
                                     tr {
                                         td {
-                                            span("data-table__id") { +key.keyId }
+                                            span("data-table__meta") { +key.keyId }
                                         }
                                         td {
                                             +(key.createdAt?.toDisplayString() ?: "—")
@@ -92,7 +92,7 @@ internal fun keyManagementPageImpl(
                                                     +"Verification only"
                                                 }
                                             } else {
-                                                span("badge badge--inactive") { +"Retired" }
+                                                span("data-table__meta") { +"Retired" }
                                             }
                                         }
                                         td {

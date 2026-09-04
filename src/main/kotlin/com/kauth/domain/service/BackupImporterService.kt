@@ -11,12 +11,12 @@ import com.kauth.domain.model.GroupBackup
 import com.kauth.domain.model.GroupId
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleId
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantKey
 import com.kauth.domain.model.TenantTheme
@@ -411,7 +411,9 @@ class BackupImporterService(
         }
 
         export.socialProviders.forEach { sp ->
-            val provider = SocialProvider.fromValueOrNull(sp.provider) ?: return@forEach
+            // Only the compiled-in adapters can be imported. A key with no adapter would persist a
+            // row that no admin page lists and no delete route accepts — an orphan re-exported forever.
+            val provider = ProviderKey.of(sp.provider)?.takeIf { it in ProviderKey.RESERVED } ?: return@forEach
             identityProviderRepository.save(
                 IdentityProvider(
                     id = null,

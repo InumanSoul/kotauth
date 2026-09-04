@@ -15,12 +15,12 @@ internal fun HTML.passkeysAdminPage(
     val slug = workspace.slug
     val enrolledUsers = userWithPasskey.count { (_, hasPasskey) -> hasPasskey }
     val totalUsers = userWithPasskey.size
-    val enrollmentRate = if (totalUsers > 0) "${enrolledUsers * 100 / totalUsers}%" else "—"
+    val enrollmentRate = if (totalUsers > 0) "${Math.round(enrolledUsers * 100.0 / totalUsers)}%" else "—"
     val enrollUrl = "/t/$slug/account/passkeys"
     val signInMethodsUrl = "/admin/workspaces/$slug/settings/sign-in-methods"
 
     adminShell(
-        pageTitle = "${EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE} — ${workspace.displayName}",
+        pageTitle = "${EnglishStrings.ADMIN_PASSKEYS_PAGE_TITLE} · ${workspace.displayName}",
         activeRail = "security",
         activeAppSection = "passkeys",
         allWorkspaces = allWorkspaces,
@@ -28,7 +28,6 @@ internal fun HTML.passkeysAdminPage(
         workspaceSlug = slug,
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
-        contentClass = "content-outer",
     ) {
         div("content-inner") {
             breadcrumb(

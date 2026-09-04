@@ -19,6 +19,7 @@ import com.kauth.domain.service.AdminAccountService
 import com.kauth.domain.service.ApiKeyService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ResourceServerService
 import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.ScimGroupMembershipService
@@ -73,6 +74,9 @@ fun Route.apiRoutes(
     // Only SCIM group membership reconciliation needs this directly (everything else goes through
     // a domain service) — required for the same reason transactionRunner is.
     userRepository: UserRepository,
+    // Absent only in tests that predate the identity-provider surface; when it is null the
+    // routes are not mounted at all rather than answering with a runtime "not configured".
+    identityProviderService: IdentityProviderService? = null,
 ) {
     get("/api/docs") {
         call.respondText(ContentType.Text.Html, HttpStatusCode.OK) {
@@ -194,6 +198,7 @@ fun Route.apiRoutes(
             apiSessionAuditRoutes(sessionRepository, auditLogRepository)
             apiUserAttributeRoutes(userAttributeService)
             apiClaimMapperRoutes(claimMapperService)
+            identityProviderService?.let { apiIdentityProviderRoutes(it) }
             apiOtpRoutes(emailOtpService, otpEmailRateLimiter, otpIpRateLimiter)
             apiKeyManagementRoutes(apiKeyService)
             apiPasskeyRoutes(webAuthnService, webAuthnCredentialRepository)

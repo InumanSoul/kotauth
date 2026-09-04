@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.AccessType
 import kotlinx.html.*
 import kotlinx.html.stream.createHTML
 
@@ -134,8 +135,32 @@ fun DIV.ovRowMuted(
     }
 }
 
+/**
+ * A full-width prose row inside an ov-card.
+ *
+ * The label-value row is a 152px grid. Passing it an empty label to carry a sentence left that
+ * column blank on every such row, so a card of explanation read as a ragged gutter beside a
+ * column of text rather than as prose.
+ */
+fun FlowContent.ovProse(text: String) {
+    div("ov-card__row--stacked") {
+        span("ov-card__value--muted") { +text }
+    }
+}
+
+/** A prose row that keeps its lead-in, for a definition rather than a bare sentence. */
+fun FlowContent.ovProseTerm(
+    term: String,
+    text: String,
+) {
+    div("ov-card__row--stacked") {
+        span("ov-card__prose-term") { +term }
+        span("ov-card__value--muted") { +text }
+    }
+}
+
 /** Section label divider row inside an ov-card. */
-fun DIV.ovSectionLabel(label: String) {
+fun FlowContent.ovSectionLabel(label: String) {
     div("ov-card__section-label") { +label }
 }
 
@@ -169,7 +194,7 @@ fun FlowOrInteractiveOrPhrasingContent.copyBtn(textToCopy: String) {
 }
 
 /** Notice banner (amber warning by default). Pass modifier e.g. "notice--info" for semantic variants. */
-fun DIV.notice(
+fun FlowContent.notice(
     title: String,
     description: String,
     modifier: String? = null,
@@ -189,6 +214,58 @@ fun DIV.notice(
                 inlineSvgIcon("arrow-small", "arrow")
             }
         }
+    }
+}
+
+/**
+ * Notice with a caller-supplied body — a bare message, a list, or mixed content.
+ *
+ * The title/description overload above cannot express those, which is why most notices
+ * in the console were hand-rolled as a bare `div("notice notice--error")` holding raw
+ * text. That renders without the icon slot and leaves the text unclassed, so it takes
+ * the page's default colour rather than the notice's semantic one.
+ */
+fun FlowContent.notice(
+    modifier: String? = null,
+    iconName: String? = "warning",
+    body: DIV.() -> Unit,
+) {
+    div("notice${if (modifier != null) " $modifier" else ""}") {
+        if (iconName != null) span("notice__icon") { inlineSvgIcon(iconName, iconName) }
+        div("notice__body") { body() }
+    }
+}
+
+/** Single-message error banner — the shape most call sites were building by hand. */
+fun FlowContent.errorNotice(message: String) {
+    notice(modifier = "notice--error") {
+        span("notice__title") { +message }
+    }
+}
+
+/**
+ * An application's access type, as plain text.
+ *
+ * It was a badge on three surfaces, two of which hardcoded the "public" modifier, so a
+ * confidential application rendered the confidential word in the public colour. A type does not
+ * vary per row the way a state does, and badging it spent the reader's attention on the column
+ * that never changes.
+ */
+fun FlowContent.accessTypeLabel(accessType: AccessType) {
+    span("data-table__meta") { +accessType.label }
+}
+
+/**
+ * An application's enabled state.
+ *
+ * Only the exception is badged. A table where every row shouted ACTIVE in green spent its
+ * loudest treatment on its least surprising fact.
+ */
+fun FlowContent.applicationStatus(enabled: Boolean) {
+    if (enabled) {
+        span("data-table__meta") { +"Active" }
+    } else {
+        span("badge badge--warn") { +"Disabled" }
     }
 }
 

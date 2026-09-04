@@ -80,7 +80,26 @@
 .notice--error .notice__icon,
 .notice--error .notice__title { color: var(--color-red); }
 
+/* Amber is the default, so --warn only needs to be nameable alongside its siblings. */
+.notice--warn { background: var(--color-amber-bg); border-color: var(--color-amber-border); }
+.notice--warn .notice__icon,
+.notice--warn .notice__title { color: var(--color-amber); }
+
 .notice--info { background: var(--color-accent-bg); border-color: var(--color-accent-border); }
 .notice--info .notice__icon,
 .notice--info .notice__title { color: var(--color-accent); }
 .notice--info .notice__link { color: var(--color-accent); border-bottom-color: var(--color-accent-border); }
+
+/* ── Body spacing ──────────────────────────────────────────────────────── */
+/* A title and one description sit tight together. A body carrying more than that —
+ * a copy field, a second paragraph — needs real spacing between its parts, which is
+ * what the three call sites that hand-rolled an inline `gap` were reaching for. */
+
+.notice__body:has(> :nth-child(3)) {
+  flex: 1;
+  gap: var(--space-2);
+}
+
+/* Inside an htmx swap target the standard bottom margin separates the notice from
+ * content that is no longer there. */
+.notice--tight { margin-bottom: var(--space-3); }

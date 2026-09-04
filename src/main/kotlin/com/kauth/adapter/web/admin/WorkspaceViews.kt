@@ -5,6 +5,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Application
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.Tenant
@@ -26,6 +27,7 @@ internal fun workspaceDetailPageImpl(
     allWorkspaces: List<WorkspaceStub>,
     apps: List<Application> = emptyList(),
     loggedInAs: String,
+    identityProviders: List<IdentityProvider> = emptyList(),
 ): HTML.() -> Unit =
     {
         val appPairs = apps.map { it.clientId to it.name }
@@ -38,8 +40,7 @@ internal fun workspaceDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             apps = appPairs,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -137,8 +138,29 @@ internal fun workspaceDetailPageImpl(
                     classes = "insight-item",
                 ) {
                     span("insight-item__label") { +"Identity Providers" }
-                    span("insight-item__value insight-item__value--muted") { +"None" }
-                    span("insight-item__hint") { +"Password auth only" }
+                    val enabledProviders = identityProviders.filter { it.enabled }
+                    when {
+                        identityProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--muted") { +"None" }
+                            span("insight-item__hint") { +"Password auth only" }
+                        }
+                        enabledProviders.isEmpty() -> {
+                            span("insight-item__value insight-item__value--warn") {
+                                +"${identityProviders.size} configured"
+                            }
+                            span("insight-item__hint") { +"None enabled \u2014 password auth only" }
+                        }
+                        else -> {
+                            span("insight-item__value insight-item__value--ok") {
+                                +"${enabledProviders.size} enabled"
+                            }
+                            span("insight-item__hint") {
+                                +enabledProviders.joinToString(" \u00b7 ") { provider ->
+                                    provider.displayName?.takeIf { it.isNotBlank() } ?: provider.provider.value
+                                }
+                            }
+                        }
+                    }
                     span("insight-item__arrow") {
                         +"Add provider"
                         inlineSvgIcon("arrow-small", "arrow")
@@ -183,7 +205,7 @@ internal fun workspaceDetailPageImpl(
                                     style = "width:210px;"
                                     +"Client ID"
                                 }
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th {
                                     style = "width:110px;"
                                     +"Type"
@@ -206,24 +228,8 @@ internal fun workspaceDetailPageImpl(
                                         ) { +app.clientId }
                                     }
                                     td { span("data-table__name") { +app.name } }
-                                    td {
-                                        span("badge badge--public") {
-                                            +app.accessType.label.uppercase()
-                                        }
-                                    }
-                                    td {
-                                        if (app.enabled) {
-                                            span("badge badge--active") {
-                                                span("badge__dot") {}
-                                                +"ACTIVE"
-                                            }
-                                        } else {
-                                            span("badge badge--inactive") {
-                                                span("badge__dot") {}
-                                                +"DISABLED"
-                                            }
-                                        }
-                                    }
+                                    td { accessTypeLabel(app.accessType) }
+                                    td { applicationStatus(app.enabled) }
                                     td {
                                         div("data-table__actions") {
                                             a(
@@ -232,8 +238,7 @@ internal fun workspaceDetailPageImpl(
                                                         "/applications/${app.clientId}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }
@@ -284,8 +289,7 @@ internal fun createWorkspacePageImpl(
             workspaceName = "KotAuth",
             workspaceSlug = null,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner content-inner--wide") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -312,7 +316,7 @@ internal fun createWorkspacePageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Identity card ──────────────────────────────────────
@@ -417,7 +421,7 @@ internal fun workspaceSettingsPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "General Settings — ${workspace.displayName}",
+            pageTitle = "General Settings · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "general",
             allWorkspaces = allWorkspaces,
@@ -425,9 +429,8 @@ internal fun workspaceSettingsPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_SETTINGS_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -454,7 +457,7 @@ internal fun workspaceSettingsPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(
@@ -585,7 +588,7 @@ internal fun securityPolicyPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Security Policy — ${workspace.displayName}",
+            pageTitle = "Security Policy · ${workspace.displayName}",
             activeRail = "security",
             activeAppSection = "security",
             allWorkspaces = allWorkspaces,
@@ -593,9 +596,8 @@ internal fun securityPolicyPageImpl(
             workspaceSlug = slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
             toastMessage = if (savedParam == "true") EnglishStrings.TOAST_SECURITY_POLICY_SAVED else null,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -621,7 +623,7 @@ internal fun securityPolicyPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form (wraps both cards) ──────────────────────────────
@@ -819,7 +821,7 @@ internal fun securityPolicyPageImpl(
                             span("check-row__desc") {
                                 +"Checks new passwords against the Have I Been Pwned breach corpus "
                                 +"using k-Anonymity (only the first 5 chars of the SHA-1 hash leave "
-                                +"the server). Fails open if HIBP is unreachable — registrations "
+                                +"the server). Fails open if HIBP is unreachable, so registrations "
                                 +"will not be blocked by outages."
                             }
                         }
@@ -842,7 +844,7 @@ internal fun brandingPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Branding — ${workspace.displayName}",
+            pageTitle = "Branding · ${workspace.displayName}",
             activeRail = "settings",
             activeAppSection = "branding",
             allWorkspaces = allWorkspaces,
@@ -850,9 +852,8 @@ internal fun brandingPageImpl(
             workspaceSlug = workspace.slug,
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
             toastMessage = if (saved) EnglishStrings.TOAST_BRANDING_SAVED else null,
-) {
+        ) {
             div("content-inner content-inner--wide") {
             val t = workspace.theme
             val slug = workspace.slug
@@ -882,7 +883,7 @@ internal fun brandingPageImpl(
                 }
             }
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Two-column layout ──────────────────────────────────
@@ -961,7 +962,7 @@ internal fun brandingPageImpl(
                                 span("edit-row__label") { +"Theme Preset" }
                                 div("preset-group") {
                                     button(type = ButtonType.button) {
-                                        classes = setOf("preset-btn", "preset-btn--active")
+                                        classes = setOf("preset-btn")
                                         attributes["data-preset"] = "dark"
                                         +"Dark"
                                     }

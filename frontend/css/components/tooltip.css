@@ -47,3 +47,21 @@
 .tooltip-wrap[data-tooltip]:hover::after {
   opacity: 1;
 }
+
+/* ── Inline help icon ──────────────────────────────────────────────────── */
+/* A small info glyph sitting inside a line of text, carrying its explanation
+ * in a `title`. Distinct from .tooltip-wrap, which wraps a whole control. */
+
+.inline-help {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-subtle);
+  cursor: help;
+}
+
+.inline-help svg {
+  width: 12px;
+  height: 12px;
+}
+
+.inline-help:hover { color: var(--color-muted); }

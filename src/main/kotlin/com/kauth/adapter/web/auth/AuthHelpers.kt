@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.auth
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.ViewContext
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -380,7 +381,7 @@ internal fun SocialLoginError.toMessage(): String =
 // -- Social pending registration cookie -----------------------------------
 
 internal data class SocialPendingData(
-    val provider: com.kauth.domain.model.SocialProvider,
+    val provider: com.kauth.domain.model.ProviderKey,
     val slug: String,
     val providerUserId: String,
     val email: String,
@@ -388,12 +389,17 @@ internal data class SocialPendingData(
     val avatarUrl: String?,
     val emailVerified: Boolean,
     val oauthParamsRaw: String,
+    val csrfNonce: String,
 )
+
+/** The field count of the pending payload; a payload of any other shape is not this format. */
+private const val SOCIAL_PENDING_FIELD_COUNT = 10
 
 internal fun buildSocialPendingPayload(
     data: SocialLoginNeedsRegistration,
     slug: String,
     oauthParamsRaw: String,
+    csrfNonce: String,
 ): String {
     val enc =
         java.util.Base64
@@ -411,6 +417,7 @@ internal fun buildSocialPendingPayload(
         data.emailVerified.toString(),
         oauthParamsRaw.b64(),
         System.currentTimeMillis().toString(),
+        csrfNonce,
     ).joinToString("|")
 }
 
@@ -421,7 +428,7 @@ internal fun parseSocialPendingCookie(
     if (rawCookie.isNullOrBlank()) return null
     val payload = encryptionService.verifyCookie(rawCookie) ?: return null
     val parts = payload.split("|")
-    if (parts.size < 9) return null
+    if (parts.size != SOCIAL_PENDING_FIELD_COUNT) return null
 
     val timestamp = parts[8].toLongOrNull() ?: return null
     if (System.currentTimeMillis() - timestamp > 600_000) return null
@@ -432,8 +439,8 @@ internal fun parseSocialPendingCookie(
         fun decode(s: String) = String(dec.decode(s), Charsets.UTF_8)
 
         val provider =
-            com.kauth.domain.model.SocialProvider
-                .fromValueOrNull(parts[0]) ?: return null
+            com.kauth.domain.model.ProviderKey
+                .of(parts[0]) ?: return null
         val slug = parts[1]
         val providerUserId = decode(parts[2])
         val email = decode(parts[3])
@@ -441,8 +448,9 @@ internal fun parseSocialPendingCookie(
         val avatarUrl = decode(parts[5]).ifBlank { null }
         val emailVerified = parts[6].toBooleanStrictOrNull() ?: false
         val oauthParamsRaw = decode(parts[7])
+        val csrfNonce = parts[9]
 
-        if (email.isBlank() || providerUserId.isBlank()) return null
+        if (email.isBlank() || providerUserId.isBlank() || csrfNonce.isBlank()) return null
 
         SocialPendingData(
             provider = provider,
@@ -453,6 +461,7 @@ internal fun parseSocialPendingCookie(
             avatarUrl = avatarUrl,
             emailVerified = emailVerified,
             oauthParamsRaw = oauthParamsRaw,
+            csrfNonce = csrfNonce,
         )
     } catch (_: Exception) {
         null
@@ -482,6 +491,14 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
     encryptionService: EncryptionService,
     renderError: suspend (message: String) -> Unit,
 ): String? {
+    // The user id comes from whichever login leg completed and the tenant from the URL. Refusing
+    // the pair here is what keeps a code row and an SSO witness from being written for a tenant
+    // the user is not in — the exchange only refuses it afterwards.
+    if (!oauthService.userBelongsToTenant(userId, tenantId)) {
+        renderError(EnglishStrings.SIGN_IN_WRONG_WORKSPACE)
+        return null
+    }
+
     val clientId =
         oauthParams.clientId
             ?: run {
@@ -494,19 +511,6 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
                 respond(HttpStatusCode.BadRequest, "Missing redirect_uri")
                 return null
             }
-
-    setSsoCookie(
-        SsoCookieData(
-            userId = userId.value,
-            tenantId = tenantId.value,
-            authTime = authTime,
-            mfaCompleted = mfaCompleted,
-            expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
-        ),
-        slug = slug,
-        encryptionService = encryptionService,
-        secure = secure,
-    )
 
     return when (
         val codeResult =
@@ -526,6 +530,20 @@ internal suspend fun ApplicationCall.buildAuthorizationCodeRedirectUrl(
             )
     ) {
         is OAuthResult.Success -> {
+            // Only after the client and redirect URI are validated: a session cookie written
+            // ahead of that survives a rejected authorization request.
+            setSsoCookie(
+                SsoCookieData(
+                    userId = userId.value,
+                    tenantId = tenantId.value,
+                    authTime = authTime,
+                    mfaCompleted = mfaCompleted,
+                    expiresAt = Instant.now().plusSeconds(ssoTtlSeconds),
+                ),
+                slug = slug,
+                encryptionService = encryptionService,
+                secure = secure,
+            )
             clearAuthContextCookie(slug)
             val code = codeResult.value.code
             val state = oauthParams.state

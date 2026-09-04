@@ -1,5 +1,6 @@
 package com.kauth.adapter.web.admin
 
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.adapter.web.inlineSvgIcon
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.WebhookDelivery
@@ -24,7 +25,7 @@ internal fun webhooksListPageImpl(
         val slug = workspace.slug
 
         adminShell(
-            pageTitle = "Webhooks — ${workspace.displayName}",
+            pageTitle = "Webhooks · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -32,8 +33,7 @@ internal fun webhooksListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
@@ -64,8 +64,11 @@ internal fun webhooksListPageImpl(
 
             // ── One-time secret reveal ───────────────────────────────
             if (newSecret != null) {
-                div("notice notice--success") {
-                    p { +"Webhook created — copy the signing secret now. You will not see it again." }
+                notice(modifier = "notice--success", iconName = "check-circle") {
+                    p {
+                        +"Webhook created. "
+                        +EnglishStrings.SECRET_SHOWN_ONCE
+                    }
                     div("copy-field") {
                         span("copy-field__value") { +newSecret }
                         button(type = ButtonType.button) {
@@ -83,7 +86,7 @@ internal fun webhooksListPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Endpoints table / empty state ────────────────────────
@@ -103,24 +106,24 @@ internal fun webhooksListPageImpl(
                     },
                 )
             } else {
-                table("key-table") {
+                table("data-table") {
                     thead {
                         tr {
                             th { +"URL" }
-                            th { +"Description" }
+                            th { +EnglishStrings.COL_DESCRIPTION }
                             th { +"Events" }
-                            th { +"Status" }
-                            th { +"Created" }
+                            th { +EnglishStrings.COL_STATUS }
+                            th { +EnglishStrings.COL_CREATED }
                             th { +"" }
                         }
                     }
                     tbody {
                         endpoints.forEach { ep ->
                             tr {
-                                td { span("key-table__meta") { +ep.url } }
-                                td { span("key-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
+                                td { span("data-table__meta") { +ep.url } }
+                                td { span("data-table__meta") { +(ep.description.ifBlank { "\u2014" }) } }
                                 td {
-                                    span("key-table__meta") {
+                                    span("data-table__meta") {
                                         +(ep.events.map { it.value }.sorted().joinToString(", ").ifBlank { "none" })
                                     }
                                 }
@@ -129,7 +132,7 @@ internal fun webhooksListPageImpl(
                                     span(badgeCls) { +(if (ep.enabled) "Enabled" else "Disabled") }
                                 }
                                 td {
-                                    span("key-table__meta") {
+                                    span("data-table__meta") {
                                         +DateTimeFormatter
                                             .ofPattern("MMM d, yyyy")
                                             .withZone(java.time.ZoneId.of("UTC"))
@@ -178,12 +181,12 @@ internal fun webhooksListPageImpl(
                         +"Recent Delivery History"
                         span("text-muted text-sm") { +" (last ${deliveries.size})" }
                     }
-                    table("key-table") {
+                    table("data-table") {
                         thead {
                             tr {
-                                th { +"Event" }
+                                th { +EnglishStrings.COL_EVENT }
                                 th { +"Endpoint" }
-                                th { +"Status" }
+                                th { +EnglishStrings.COL_STATUS }
                                 th { +"HTTP" }
                                 th { +"Attempts" }
                                 th { +"Last attempt" }
@@ -193,8 +196,8 @@ internal fun webhooksListPageImpl(
                             deliveries.forEach { d ->
                                 val ep = endpoints.firstOrNull { it.id == d.endpointId }
                                 tr {
-                                    td { span("key-table__meta") { +d.eventType.value } }
-                                    td { span("key-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
+                                    td { span("data-table__meta") { +d.eventType.value } }
+                                    td { span("data-table__meta") { +(ep?.url ?: "#${d.endpointId}") } }
                                     td {
                                         span(
                                             when (d.status) {
@@ -206,10 +209,10 @@ internal fun webhooksListPageImpl(
                                             +d.status.value
                                         }
                                     }
-                                    td { span("key-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
-                                    td { span("key-table__meta") { +d.attempts.toString() } }
+                                    td { span("data-table__meta") { +(d.responseStatus?.toString() ?: "\u2014") } }
+                                    td { span("data-table__meta") { +d.attempts.toString() } }
                                     td {
-                                        span("key-table__meta") {
+                                        span("data-table__meta") {
                                             +(
                                                 d.lastAttemptAt?.let {
                                                     DateTimeFormatter
@@ -243,7 +246,7 @@ internal fun createWebhookPageImpl(
         val totalEvents = WebhookEventType.entries.size
 
         adminShell(
-            pageTitle = "New Endpoint — ${workspace.displayName}",
+            pageTitle = "New Endpoint · ${workspace.displayName}",
             activeRail = "settings",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -251,8 +254,7 @@ internal fun createWebhookPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "webhooks",
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             // ── Breadcrumb ───────────────────────────────────────────
             breadcrumb(
@@ -282,7 +284,7 @@ internal fun createWebhookPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Endpoint details ─────────────────────────────────────

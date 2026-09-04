@@ -16,6 +16,7 @@ import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.queryString
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
@@ -235,7 +236,7 @@ internal fun Route.oauthProtocolRoutes(
                 val registered = q["registered"] == "true"
                 val enabledProviders =
                     if (tenant != null && identityProviderRepository != null) {
-                        identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                        identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
                     } else {
                         emptyList()
                     }
@@ -417,7 +418,7 @@ internal fun Route.oauthProtocolRoutes(
                             codeChallengeMethod = codeChallengeMethod,
                             nonce = nonce,
                             state = state,
-                            ipAddress = call.request.local.remoteAddress,
+                            ipAddress = call.request.origin.remoteAddress,
                             authTime = sso.authTime,
                             resources = resolvedResources,
                         )
@@ -465,7 +466,7 @@ internal fun Route.oauthProtocolRoutes(
         val enabledProviders =
             identityProviderRepository
                 ?.findEnabledByTenant(tenant.id)
-                ?.map { it.provider } ?: emptyList()
+                ?.asLoginProviders() ?: emptyList()
 
         call.respondHtml(
             HttpStatusCode.OK,
@@ -487,12 +488,12 @@ internal fun Route.oauthProtocolRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val tenant = ctx.tenant
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val userAgent = call.request.headers["User-Agent"]
 
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
@@ -639,7 +640,7 @@ internal fun Route.oauthProtocolRoutes(
 
     post("/protocol/openid-connect/token") {
         val slug = call.parameters["slug"] ?: return@post call.respond(HttpStatusCode.BadRequest)
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
 
         if (!tokenRateLimiter.isAllowed("token:$ipAddress:$slug")) {
             return@post call.respond(
@@ -866,7 +867,7 @@ internal fun Route.oauthProtocolRoutes(
 
             if (bearerToken != null) {
                 val revokeAll = call.request.queryParameters["global_logout"] == "true"
-                oauthService.endSession(bearerToken, revokeAll, call.request.local.remoteAddress)
+                oauthService.endSession(bearerToken, revokeAll, call.request.origin.remoteAddress)
             }
 
             // OIDC end_session must also kill the SSO witness — otherwise the
@@ -889,7 +890,7 @@ internal fun Route.oauthProtocolRoutes(
 
             if (token != null) {
                 val revokeAll = params["global_logout"] == "true"
-                oauthService.endSession(token, revokeAll, call.request.local.remoteAddress)
+                oauthService.endSession(token, revokeAll, call.request.origin.remoteAddress)
             }
 
             call.clearSsoCookie(slug)

@@ -16,7 +16,7 @@ internal fun resourceServersListPageImpl(
     {
         val slug = workspace.slug
         adminShell(
-            pageTitle = "${EnglishStrings.API_PAGE_TITLE} — ${workspace.displayName}",
+            pageTitle = "${EnglishStrings.API_PAGE_TITLE} · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -24,7 +24,6 @@ internal fun resourceServersListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "apis",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -39,7 +38,7 @@ internal fun resourceServersListPageImpl(
                     subtitle = EnglishStrings.API_PAGE_SUBTITLE,
                     actions = {
                         primaryLink(
-                            "/admin/workspaces/$slug/settings/apis/new",
+                            "/admin/workspaces/$slug/apis/new",
                             EnglishStrings.API_ADD,
                             "plus",
                         )
@@ -47,7 +46,7 @@ internal fun resourceServersListPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (resources.isEmpty()) {
@@ -73,12 +72,12 @@ internal fun resourceServersListPageImpl(
                                 resources.forEach { rs ->
                                     tr {
                                         td {
-                                            a(href = "/admin/workspaces/$slug/settings/apis/${rs.id!!.value}/edit") {
+                                            a(href = "/admin/workspaces/$slug/apis/${rs.id!!.value}/edit") {
                                                 +rs.name
                                             }
                                         }
                                         td {
-                            span("data-table__id") { +rs.identifier }
+                            span("data-table__meta") { +rs.identifier }
                             if (rs.scopes.isNotEmpty()) {
                                 div("badge-row") {
                                     rs.scopes.take(5).forEach {
@@ -88,6 +87,10 @@ internal fun resourceServersListPageImpl(
                                         span("badge badge--muted") { +"+${rs.scopes.size - 5}" }
                                     }
                                 }
+                            } else {
+                                // An empty list is not "not configured yet" here: it is narrowing
+                                // switched off, which is the permissive state and worth saying.
+                                div("data-table__meta") { +EnglishStrings.RESOURCE_SERVER_SCOPES_NONE }
                             }
                         }
                                         td {
@@ -100,7 +103,7 @@ internal fun resourceServersListPageImpl(
                                         td {
                                             a(
                                                 href =
-                                                    "/admin/workspaces/$slug/settings/apis/" +
+                                                    "/admin/workspaces/$slug/apis/" +
                                                         "${rs.id!!.value}/edit",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) { +"Edit" }
@@ -130,7 +133,7 @@ internal fun clientAuthorizedApisPageImpl(
         val slug = workspace.slug
         val appPairs = allApps.map { it.clientId to it.name }
         adminShell(
-            pageTitle = "${EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING} — ${application.name}",
+            pageTitle = "${EnglishStrings.API_AUTHORIZED_CLIENTS_HEADING} · ${application.name}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -140,7 +143,6 @@ internal fun clientAuthorizedApisPageImpl(
             activeAppSlug = application.clientId,
             loggedInAs = loggedInAs,
             activeAppSection = "applications",
-            contentClass = "content-outer",
             toastMessage = toastMessage,
         ) {
             div("content-inner") {
@@ -170,7 +172,7 @@ internal fun clientAuthorizedApisPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 if (allResources.isEmpty()) {
@@ -181,7 +183,7 @@ internal fun clientAuthorizedApisPageImpl(
                             description = EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_BODY,
                         ) {
                             a(
-                                href = "/admin/workspaces/$slug/settings/apis/new",
+                                href = "/admin/workspaces/$slug/apis/new",
                                 classes = "btn btn--primary",
                             ) { +EnglishStrings.API_AUTHORIZED_CLIENTS_EMPTY_CTA }
                         }
@@ -260,13 +262,13 @@ internal fun resourceServerFormPageImpl(
         val title = if (isEdit) EnglishStrings.API_FORM_EDIT_TITLE else EnglishStrings.API_FORM_NEW_TITLE
         val submitUrl =
             if (existingId != null) {
-                "/admin/workspaces/$slug/settings/apis/${existingId.value}"
+                "/admin/workspaces/$slug/apis/${existingId.value}"
             } else {
-                "/admin/workspaces/$slug/settings/apis"
+                "/admin/workspaces/$slug/apis"
             }
 
         adminShell(
-            pageTitle = "$title — ${workspace.displayName}",
+            pageTitle = "$title · ${workspace.displayName}",
             activeRail = "apps",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -274,13 +276,12 @@ internal fun resourceServerFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "apis",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
                     "Workspaces" to "/admin",
                     slug to "/admin/workspaces/$slug",
-                    EnglishStrings.API_NAV_LABEL to "/admin/workspaces/$slug/settings/apis",
+                    EnglishStrings.API_NAV_LABEL to "/admin/workspaces/$slug/apis",
                     title to null,
                 )
 
@@ -291,7 +292,7 @@ internal fun resourceServerFormPageImpl(
                     title = title,
                     actions = {
                         a(
-                            href = "/admin/workspaces/$slug/settings/apis",
+                            href = "/admin/workspaces/$slug/apis",
                             classes = "btn btn--ghost",
                         ) { +"Cancel" }
                         button(type = ButtonType.submit, classes = "btn btn--primary") {
@@ -302,7 +303,7 @@ internal fun resourceServerFormPageImpl(
                 )
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 form(action = submitUrl, method = FormMethod.post, classes = "edit-form") {
@@ -373,7 +374,7 @@ internal fun resourceServerFormPageImpl(
 
                 if (prefill != null && existingId != null) {
                     div("ov-card") {
-                        div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                        div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                         div("danger-zone") {
                             dangerZoneCard(
                                 title = if (prefill.enabled) "Disable API" else "Enable API",
@@ -388,7 +389,7 @@ internal fun resourceServerFormPageImpl(
                             ) {
                                 postButton(
                                     action =
-                                        "/admin/workspaces/$slug/settings/apis/" +
+                                        "/admin/workspaces/$slug/apis/" +
                                             "${existingId.value}/${if (prefill.enabled) "disable" else "enable"}",
                                     label = if (prefill.enabled) "Disable" else "Enable",
                                     btnClass = "btn btn--danger btn--sm",
@@ -404,13 +405,13 @@ internal fun resourceServerFormPageImpl(
                                 warning = true,
                             ) {
                                 form(
-                                    action = "/admin/workspaces/$slug/settings/apis/${existingId.value}/delete",
+                                    action = "/admin/workspaces/$slug/apis/${existingId.value}/delete",
                                     method = FormMethod.post,
                                     classes = "inline-form",
                                 ) {
                                     input(type = InputType.text, name = "confirmIdentifier") {
                                         classes = setOf("edit-row__field", "edit-row__field--mono")
-                                        attributes["pattern"] = java.util.regex.Pattern.quote(prefill.identifier)
+                                        attributes["pattern"] = escapeForHtmlPattern(prefill.identifier)
                                         attributes["required"] = "required"
                                         attributes["autocomplete"] = "off"
                                         attributes["data-confirm-slug"] = prefill.identifier

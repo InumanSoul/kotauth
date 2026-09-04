@@ -37,6 +37,8 @@ info:
     | `user_attributes:write` | Create, update, delete per-user attributes |
     | `claim_mappers:read`    | List tenant claim mappers                 |
     | `claim_mappers:write`   | Create, update, delete claim mappers      |
+    | `identity_providers:read`  | List identity providers (never exposes the client secret) |
+    | `identity_providers:write` | Create, update, delete identity providers |
     | `auth:send-otp`         | Trigger an email-OTP challenge for a user |
     | `auth:verify-otp`       | Verify an email-OTP challenge and obtain an authorization code |
     | `workspace:read`        | Read tenant metadata, sign-in methods, and security/MFA policy (no SMTP credentials) |
@@ -640,6 +642,99 @@ components:
             Use a prefix like `custom:department` to avoid collisions.
         includeInAccess: { type: boolean, default: true }
         includeInId:     { type: boolean, default: false }
+
+    IdentityProviderDto:
+      type: object
+      description: |
+        A configured identity provider. There is deliberately no `clientSecret` property:
+        the secret is write-only and is never returned by any read.
+      required:
+        [key, kind, clientId, enabled, scopes, jitEnabled, jitAllowedDomains, createdAt, updatedAt]
+      properties:
+        key:
+          type: string
+          description: URL-safe provider key; it appears in the callback path and cannot change.
+          pattern: "^[a-z0-9-]{1,32}$"
+        kind:
+          type: string
+          enum: [oauth2, oidc]
+        clientId: { type: string, maxLength: 255 }
+        enabled:  { type: boolean }
+        displayName: { type: string, nullable: true, maxLength: 64 }
+        issuer:      { type: string, nullable: true, maxLength: 255 }
+        authorizationEndpoint: { type: string, nullable: true, maxLength: 512 }
+        tokenEndpoint:         { type: string, nullable: true, maxLength: 512 }
+        jwksUri:               { type: string, nullable: true, maxLength: 512 }
+        scopes:    { type: string, maxLength: 255 }
+        jitEnabled:
+          type: boolean
+          description: |
+            Whether a first sign-in through this provider may create a local account.
+            Auto-creation additionally requires the provider to assert a verified email whose
+            domain appears in `jitAllowedDomains`.
+        jitAllowedDomains:
+          type: array
+          description: |
+            Email domains a first sign-in may create an account for. Stored trimmed,
+            lower-cased and de-duplicated. **An empty list is the feature switched off, never a
+            wildcard** — no account is created automatically, even when `jitEnabled` is true.
+          items: { type: string, maxLength: 253 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    IdentityProvidersDto:
+      type: object
+      required: [providers]
+      properties:
+        providers:
+          type: array
+          items: { $ref: "#/components/schemas/IdentityProviderDto" }
+
+    UpsertIdentityProviderRequest:
+      type: object
+      required: [clientId]
+      properties:
+        clientId: { type: string, maxLength: 255 }
+        clientSecret:
+          type: string
+          description: |
+            Write-only. Required when creating; omit on update to keep the stored secret.
+            Stored encrypted (AES-256-GCM) and never returned by any read.
+        kind:
+          type: string
+          enum: [oauth2, oidc]
+          description: |
+            Defaults to what the key implies — `oauth2` for the built-in `google` and `github`
+            keys, `oidc` for every other key. The two cannot be crossed.
+        enabled: { type: boolean, default: true }
+        displayName: { type: string, maxLength: 64 }
+        issuer:
+          type: string
+          maxLength: 255
+          description: Required for `oidc`. https only (http is accepted on loopback).
+        authorizationEndpoint: { type: string, maxLength: 512 }
+        tokenEndpoint:         { type: string, maxLength: 512 }
+        jwksUri:               { type: string, maxLength: 512 }
+        scopes:
+          type: string
+          maxLength: 255
+          description: Space-separated. An `oidc` provider must request `openid`.
+        jitEnabled:
+          type: boolean
+          description: |
+            Whether a first sign-in through this provider may create a local account.
+            **Omit to leave the stored value unchanged** — there is no default, because an
+            update that says nothing about it must not switch it either way.
+        jitAllowedDomains:
+          type: array
+          description: |
+            Email domains a first sign-in may create an account for. Values are trimmed,
+            lower-cased and de-duplicated server-side; each must be a bare domain (no `@`, no
+            scheme, no path).
+
+            **Omit to leave the stored list unchanged. Send `[]` to clear it** — an empty list
+            is the feature switched off, and that is a different request from not mentioning it.
+          items: { type: string, maxLength: 253 }
 
     SendOtpRequest:
       type: object
@@ -2163,6 +2258,117 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
 
+  # ==========================================================================
+  # Identity Providers
+  # ==========================================================================
+  /identity-providers:
+    get:
+      summary: List the workspace's identity providers
+      description: |
+        The client secret is never included in any response on this resource.
+      tags: [Identity Providers]
+      security: [{ bearerAuth: [identity_providers:read] }]
+      responses:
+        "200":
+          description: Configured identity providers
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityProvidersDto" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  /identity-providers/{providerKey}:
+    get:
+      summary: Retrieve one identity provider
+      tags: [Identity Providers]
+      security: [{ bearerAuth: [identity_providers:read] }]
+      parameters:
+        - in: path
+          name: providerKey
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
+      responses:
+        "200":
+          description: The provider
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityProviderDto" }
+        "400":
+          description: Malformed provider key
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+    put:
+      summary: Create or update an identity provider
+      description: |
+        Creates the provider when `providerKey` is not yet configured (**201**), otherwise
+        updates it (**200**). The provider key itself is immutable — accounts already linked
+        to a provider point at it.
+
+        Validation is shared with the admin UI: an `oidc` provider requires an `issuer` and
+        the `openid` scope, every URL must be https (http on loopback only), the built-in
+        `google`/`github` keys must stay `oauth2`, and every entry in `jitAllowedDomains` must
+        be a bare domain.
+
+        `jitEnabled` and `jitAllowedDomains` are omit-to-keep: a body that does not mention
+        them leaves the stored values alone, so an unrelated update cannot silently change
+        whether accounts are created automatically.
+      tags: [Identity Providers]
+      security: [{ bearerAuth: [identity_providers:write] }]
+      parameters:
+        - in: path
+          name: providerKey
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpsertIdentityProviderRequest" }
+      responses:
+        "200":
+          description: Provider updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityProviderDto" }
+        "201":
+          description: Provider created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdentityProviderDto" }
+        "400":
+          description: Malformed provider key
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+    delete:
+      summary: Delete an identity provider
+      tags: [Identity Providers]
+      security: [{ bearerAuth: [identity_providers:write] }]
+      parameters:
+        - in: path
+          name: providerKey
+          required: true
+          schema: { type: string, pattern: "^[a-z0-9-]{1,32}$" }
+      responses:
+        "204": { description: Provider deleted }
+        "400":
+          description: Malformed provider key
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/ProblemDetail" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
   /auth/send-otp:
     post:
       summary: Send an email OTP challenge
@@ -2294,6 +2500,8 @@ tags:
     description: Per-user custom key/value metadata (projected into JWTs via claim mappers)
   - name: Claim Mappers
     description: Tenant-level configuration that projects user attributes into issued JWTs
+  - name: Identity Providers
+    description: Per-workspace social and OIDC providers (the client secret is write-only)
   - name: Auth — Email OTP
     description: |
       Email-OTP passwordless primitive — send a 6-digit code, verify it,

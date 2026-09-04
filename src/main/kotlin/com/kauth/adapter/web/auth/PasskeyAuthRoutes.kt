@@ -10,6 +10,7 @@ import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.ContentType
 import io.ktor.http.Cookie
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
@@ -71,7 +72,7 @@ internal fun Route.passkeyAuthRoutes(
         val slug = ctx.slug
         val tenant = ctx.tenant ?: return@post call.respond(HttpStatusCode.NotFound)
 
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         if (!rateLimiter.isAllowed("$PER_IP_RATE_PREFIX:$ipAddress")) {
             call.response.headers.append("Retry-After", "60")
             return@post call.respond(HttpStatusCode.TooManyRequests, mapOf("error" to "RateLimited"))

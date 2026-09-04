@@ -29,9 +29,30 @@ class FakeUserRepository :
     }
 
     fun add(user: User): User {
+        requireUniquePerTenant(user)
         val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
         store[u.id!!.value] = u
         return u
+    }
+
+    /**
+     * `UNIQUE (tenant_id, username)` and `UNIQUE (tenant_id, email)`, both from V1.
+     *
+     * Without them here a service that writes a colliding row gets a clean result from the fake and
+     * a 500 from Postgres, and no test in a suite that never touches a database can tell the two
+     * apart. The exception type is not the database's; only that this is an exception rather than a
+     * value is what a domain service has to be written against.
+     */
+    private fun requireUniquePerTenant(user: User) {
+        val clash =
+            store.values.firstOrNull {
+                it.tenantId == user.tenantId &&
+                    it.id != user.id &&
+                    (it.username == user.username || it.email == user.email)
+            }
+        check(clash == null) {
+            "duplicate key value violates unique constraint on users (tenant_id, username|email)"
+        }
     }
 
     fun clear() {
@@ -91,12 +112,14 @@ class FakeUserRepository :
     ): Long = findByTenantId(tenantId, search).size.toLong()
 
     override fun save(user: User): User {
+        requireUniquePerTenant(user)
         val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
         store[u.id!!.value] = u
         return u
     }
 
     override fun update(user: User): User {
+        requireUniquePerTenant(user)
         store[user.id!!.value] = user
         return user
     }

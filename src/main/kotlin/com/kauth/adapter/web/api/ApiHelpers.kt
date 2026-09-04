@@ -215,7 +215,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.Conflict,
                 "Cannot revoke last passkey",
-                "This is the user's last passkey and password login is disabled — enable password login " +
+                "This is the user's last passkey and password login is disabled. Enable password login " +
                     "or add another passkey before revoking this one.",
             )
         WebAuthnError.TenantMismatch ->
@@ -236,7 +236,7 @@ internal suspend fun ApplicationCall.respondWebAuthnError(error: WebAuthnError):
             respondProblem(
                 HttpStatusCode.UnprocessableEntity,
                 "WebAuthn error",
-                "Unexpected WebAuthn error — this endpoint doesn't produce challenge/auth flows.",
+                "Unexpected WebAuthn error. This endpoint doesn't produce challenge/auth flows.",
             )
     }
 

@@ -99,6 +99,36 @@ class MagicLinkRoutesTest {
             emailVerified = false,
         )
 
+    /** A second workspace on the same instance, with its own magic-link user. */
+    private val globex =
+        Tenant(
+            id = TenantId(2),
+            slug = "globex",
+            displayName = "Globex",
+            issuerUrl = null,
+            theme = TenantTheme.DEFAULT,
+            smtpEnabled = true,
+            smtpHost = "smtp.example.com",
+            smtpPort = 587,
+            smtpUsername = "noreply@globex.com",
+            smtpPassword = "secret",
+            smtpFromAddress = "noreply@globex.com",
+            smtpFromName = "Globex",
+            securityConfig = SecurityConfig(magicLinkEnabled = true),
+        )
+
+    private val bob =
+        User(
+            id = UserId(20),
+            tenantId = TenantId(2),
+            username = "bob",
+            email = "bob@globex.com",
+            fullName = "Bob",
+            passwordHash = hasher.hash("doesnt-matter"),
+            enabled = true,
+            emailVerified = false,
+        )
+
     private val spaApp =
         Application(
             id = ApplicationId(1),
@@ -109,6 +139,19 @@ class MagicLinkRoutesTest {
             accessType = AccessType.PUBLIC,
             enabled = true,
             redirectUris = listOf("https://app.example.com/callback"),
+            grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
+        )
+
+    private val globexApp =
+        Application(
+            id = ApplicationId(2),
+            tenantId = TenantId(2),
+            clientId = "globex-app",
+            name = "Globex SPA",
+            description = null,
+            accessType = AccessType.PUBLIC,
+            enabled = true,
+            redirectUris = listOf("https://globex.example.com/callback"),
             grantTypes = GrantType.defaultsFor(AccessType.PUBLIC),
         )
 
@@ -150,14 +193,17 @@ class MagicLinkRoutesTest {
             auditLog = auditLog,
         )
 
-    private fun buildAuthContextCookie(): String {
+    private fun buildAuthContextCookie(
+        clientId: String = "spa-app",
+        redirectUri: String = "https://app.example.com/callback",
+    ): String {
         // Public clients require PKCE — use a deterministic challenge so the
         // test exercises a realistic /authorize-style cookie payload.
         val payload =
             listOf(
                 "code",
-                "spa-app",
-                "https://app.example.com/callback",
+                clientId,
+                redirectUri,
                 "openid",
                 "",
                 "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
@@ -205,6 +251,93 @@ class MagicLinkRoutesTest {
                     translationPort = EnglishOnlyTranslation(),
                 )
             }
+        }
+
+    @Test
+    fun `a magic-link token from another workspace issues no code at this one`() =
+        testApplication {
+            tenants.add(globex)
+            users.add(bob)
+            application(appBlock())
+
+            // A token minted at globex is presented at acme's URL. The consume guard refuses the
+            // pair; nothing downstream of it runs.
+            credentialFlowService().initiateMagicLink(
+                email = "bob@globex.com",
+                tenantSlug = "globex",
+                baseUrl = "http://localhost",
+                ipAddress = null,
+            )
+            val rawToken = extractToken(emails.sent.single { it.type == "magic_link" }.url)
+
+            val response =
+                createClient { followRedirects = false }
+                    .get("/t/acme/magic-link/consume?token=$rawToken") {
+                        header("Cookie", "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}")
+                    }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+            assertTrue(
+                authCodes.all().isEmpty(),
+                "No authorization code may be written for a user of another workspace",
+            )
+            assertTrue(
+                response.headers
+                    .getAll("Set-Cookie")
+                    .orEmpty()
+                    .none { it.contains("KOTAUTH_SSO=") },
+                "No SSO witness may be written either: ${response.headers.getAll("Set-Cookie")}",
+            )
+        }
+
+    @Test
+    fun `a cross-workspace consume leaves the token unconsumed and usable at its own workspace`() =
+        testApplication {
+            tenants.add(globex)
+            users.add(bob)
+            apps.add(globexApp)
+            application(appBlock())
+
+            credentialFlowService().initiateMagicLink(
+                email = "bob@globex.com",
+                tenantSlug = "globex",
+                baseUrl = "http://localhost",
+                ipAddress = null,
+            )
+            val rawToken = extractToken(emails.sent.single { it.type == "magic_link" }.url)
+            val noFollow = createClient { followRedirects = false }
+
+            // 1. The link is tapped at the wrong workspace — refused before any state change.
+            val crossWorkspace =
+                noFollow.get("/t/acme/magic-link/consume?token=$rawToken") {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}")
+                }
+            assertEquals(HttpStatusCode.Unauthorized, crossWorkspace.status)
+
+            val token = prTokens.all().single { it.purpose == TokenPurpose.MAGIC_LINK }
+            assertTrue(token.isValid, "A consume aimed at another workspace must not burn the token")
+            assertEquals(null, token.usedAt, "Token must not be marked used by another workspace's URL")
+
+            // 2. The owner taps the same link at their own workspace — it still works.
+            val ownWorkspace =
+                noFollow.get("/t/globex/magic-link/consume?token=$rawToken") {
+                    header(
+                        "Cookie",
+                        "KOTAUTH_AUTH_CONTEXT=" +
+                            buildAuthContextCookie("globex-app", "https://globex.example.com/callback"),
+                    )
+                }
+            assertEquals(
+                HttpStatusCode.Found,
+                ownWorkspace.status,
+                "The owner's retry must succeed because the cross-workspace tap did not burn the token",
+            )
+            val location = ownWorkspace.headers["Location"]
+            assertNotNull(location)
+            assertTrue(
+                location.startsWith("https://globex.example.com/callback?code="),
+                "Owner consume must redirect to their own client callback, was: $location",
+            )
         }
 
     // =========================================================================

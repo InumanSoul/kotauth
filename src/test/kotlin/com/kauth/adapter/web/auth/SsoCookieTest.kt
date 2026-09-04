@@ -371,6 +371,46 @@ class SsoCookieTest {
         }
 
     @Test
+    fun `an MFA pending cookie minted for another tenant issues no session here`() =
+        testApplication {
+            application(appBlock())
+
+            every { mfaService.verifyTotp(UserId(42), "123456") } returns
+                com.kauth.domain.service.MfaResult
+                    .Success(true)
+
+            // Signed by us, unexpired, and answered with a code the holder really owns — only the
+            // slug says it was minted somewhere else, and nothing compared it until now.
+            val mfaCookie = encryptionService.signCookie("${alice.id!!.value}|otherco|${System.currentTimeMillis()}")
+
+            val noFollow = createClient { followRedirects = false }
+            val response =
+                noFollow.submitForm(
+                    url = "/t/acme/mfa-challenge",
+                    formParameters =
+                        Parameters.build {
+                            append("code", "123456")
+                        },
+                ) {
+                    header(
+                        "Cookie",
+                        listOf(
+                            "KOTAUTH_AUTH_CONTEXT=${buildAuthContextCookie()}",
+                            "KOTAUTH_MFA_PENDING=$mfaCookie",
+                        ).joinToString("; "),
+                    )
+                }
+
+            val setCookie = response.headers.getAll("Set-Cookie") ?: emptyList()
+            assertEquals(
+                null,
+                extractCookie(setCookie, "KOTAUTH_SSO"),
+                "A pending challenge from another tenant must leave no session: $setCookie",
+            )
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
     fun `KOTAUTH_SSO cookie is NOT set on failed password login`() =
         testApplication {
             every { mfaService.shouldChallengeMfa(any()) } returns false

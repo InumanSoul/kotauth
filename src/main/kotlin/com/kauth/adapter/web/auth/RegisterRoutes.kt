@@ -10,6 +10,7 @@ import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -30,7 +31,7 @@ internal fun Route.registerRoutes(
         val tenant = ctx.tenant
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
@@ -53,11 +54,11 @@ internal fun Route.registerRoutes(
         val passwordlessTenant = tenant?.securityConfig?.passwordLoginEnabled == false
         val enabledProviders =
             if (tenant != null && identityProviderRepository != null) {
-                identityProviderRepository.findEnabledByTenant(tenant.id).map { it.provider }
+                identityProviderRepository.findEnabledByTenant(tenant.id).asLoginProviders()
             } else {
                 emptyList()
             }
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
 
         val rateLimitKey = "register:$ipAddress:$slug"
         if (!registerRateLimiter.isAllowed(rateLimitKey)) {

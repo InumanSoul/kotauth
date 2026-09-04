@@ -256,7 +256,7 @@ class MagicLinkTest {
         svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
         val rawToken = extractRawTokenFromSentEmail()
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Success<User>>(result)
         assertEquals("alice", result.value.username)
         assertTrue(prTokenRepo.all().single { it.purpose == TokenPurpose.MAGIC_LINK }.usedAt != null)
@@ -267,7 +267,7 @@ class MagicLinkTest {
         svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
         val rawToken = extractRawTokenFromSentEmail()
 
-        svc.consumeMagicLink(rawToken)
+        svc.consumeMagicLink(rawToken, TenantId(1))
         val refreshed = users.findById(aliceId, TenantId(1))!!
         assertTrue(refreshed.emailVerified)
     }
@@ -279,7 +279,7 @@ class MagicLinkTest {
         svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
         val rawToken = extractRawTokenFromSentEmail()
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Success<User>>(result)
         val refreshed = users.findById(aliceId, TenantId(1))!!
         assertFalse(RequiredAction.SET_PASSWORD in refreshed.requiredActions)
@@ -290,8 +290,8 @@ class MagicLinkTest {
         svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
         val rawToken = extractRawTokenFromSentEmail()
 
-        svc.consumeMagicLink(rawToken)
-        val replay = svc.consumeMagicLink(rawToken)
+        svc.consumeMagicLink(rawToken, TenantId(1))
+        val replay = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Failure>(replay)
     }
 
@@ -301,7 +301,7 @@ class MagicLinkTest {
 
     @Test
     fun `consume rejects unknown token`() {
-        val result = svc.consumeMagicLink("totally-made-up-token")
+        val result = svc.consumeMagicLink("totally-made-up-token", TenantId(1))
         assertIs<SelfServiceResult.Failure>(result)
     }
 
@@ -318,11 +318,25 @@ class MagicLinkTest {
             ),
         )
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Failure>(result)
         // Reset token untouched — purpose guard ran before any state change
         val stored = prTokenRepo.all().single { it.purpose == TokenPurpose.PASSWORD_RESET }
         assertNull(stored.usedAt)
+    }
+
+    @Test
+    fun `consume rejects a token minted at another tenant and leaves it unconsumed`() {
+        svc.initiateMagicLink("alice@acme.com", "acme", "http://localhost:8080", null)
+        val rawToken = extractRawTokenFromSentEmail()
+
+        val result = svc.consumeMagicLink(rawToken, TenantId(2))
+
+        assertIs<SelfServiceResult.Failure>(result)
+        // The guard runs before the token is marked used, so the owner's own link still works.
+        val stored = prTokenRepo.all().single { it.purpose == TokenPurpose.MAGIC_LINK }
+        assertNull(stored.usedAt)
+        assertIs<SelfServiceResult.Success<User>>(svc.consumeMagicLink(rawToken, TenantId(1)))
     }
 
     @Test
@@ -338,7 +352,7 @@ class MagicLinkTest {
             ),
         )
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Failure>(result)
     }
 
@@ -348,7 +362,7 @@ class MagicLinkTest {
         val rawToken = extractRawTokenFromSentEmail()
         users.update(alice.copy(enabled = false))
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Failure>(result)
     }
 
@@ -358,7 +372,7 @@ class MagicLinkTest {
         val rawToken = extractRawTokenFromSentEmail()
         users.update(alice.copy(requiredActions = setOf(RequiredAction.CHANGE_PASSWORD)))
 
-        val result = svc.consumeMagicLink(rawToken)
+        val result = svc.consumeMagicLink(rawToken, TenantId(1))
         assertIs<SelfServiceResult.Failure>(result)
     }
 

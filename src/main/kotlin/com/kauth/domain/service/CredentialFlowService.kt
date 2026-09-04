@@ -646,13 +646,24 @@ class CredentialFlowService(
         return SelfServiceResult.Success(Unit)
     }
 
-    fun consumeMagicLink(rawToken: String): SelfServiceResult<User> {
+    /**
+     * Consumes a magic-link token presented at [tenantId] — the tenant the consume URL names.
+     *
+     * The token hash is global, so a link minted at one tenant resolves at another's URL. The
+     * tenant guard runs before the token is marked used, so a consume aimed at the wrong tenant
+     * leaves the token alive for its owner; the same refusal message as an unknown token keeps it
+     * from telling the caller which tenant the token belongs to.
+     */
+    fun consumeMagicLink(
+        rawToken: String,
+        tenantId: TenantId,
+    ): SelfServiceResult<User> {
         val hash = sha256Hex(rawToken)
         val token =
             prTokenRepo.findByTokenHash(hash)
                 ?: return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Sign-in link is invalid."))
 
-        if (token.purpose != TokenPurpose.MAGIC_LINK) {
+        if (token.purpose != TokenPurpose.MAGIC_LINK || token.tenantId != tenantId) {
             return SelfServiceResult.Failure(SelfServiceError.TokenInvalid("Sign-in link is invalid."))
         }
 

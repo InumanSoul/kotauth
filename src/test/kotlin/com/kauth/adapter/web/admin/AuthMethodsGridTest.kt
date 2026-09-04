@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.admin
 
 import com.kauth.adapter.web.AppInfo
+import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
@@ -285,6 +286,79 @@ class AuthMethodsGridTest {
             val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
 
             assertTrue(!body.contains("OAuth credentials required"))
+        }
+
+    @Test
+    fun `the grid carries one aggregate row for the external identity providers`() =
+        testApplication {
+            val ws = workspaceWith()
+            application { installTestApp(ws) }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(ws.id, provider = "oriana")
+            idpRepo.seed(ws.id, provider = "workforce-id")
+
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
+
+            // One row for all of them: MethodKey is closed, and a row per provider is not what
+            // this page is for.
+            assertEquals(
+                1,
+                Regex("data-method-key=\"EXTERNAL_IDP\"").findAll(body).count(),
+                "the providers belong on one aggregate row",
+            )
+            assertContains(body, EnglishStrings.AUTH_METHOD_EXTERNAL_IDP_LABEL)
+            assertContains(body, EnglishStrings.externalIdpConfiguredCount(2))
+            assertContains(body, "/admin/workspaces/acme/settings/identity-providers")
+            // The row carries the link, so the footer hint pointing at the same page is redundant.
+            assertTrue(!body.contains(EnglishStrings.ADMIN_METHODS_MORE_SIGN_IN_OPTIONS))
+        }
+
+    @Test
+    fun `the aggregate row is absent when no external identity provider is configured`() =
+        testApplication {
+            val ws = workspaceWith()
+            application { installTestApp(ws) }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
+
+            assertTrue(!body.contains("EXTERNAL_IDP"))
+            assertContains(body, EnglishStrings.ADMIN_METHODS_MORE_SIGN_IN_OPTIONS)
+        }
+
+    @Test
+    fun `the compiled-in providers do not produce the aggregate row`() =
+        testApplication {
+            val ws = workspaceWith()
+            application { installTestApp(ws) }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(ws.id, provider = "google")
+            idpRepo.seed(ws.id, provider = "github")
+
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
+
+            // Google and GitHub have rows of their own; the aggregate row stands for the rest.
+            assertContains(body, "data-method-key=\"SOCIAL_GOOGLE\"")
+            assertContains(body, "data-method-key=\"SOCIAL_GITHUB\"")
+            assertTrue(!body.contains("EXTERNAL_IDP"))
+        }
+
+    @Test
+    fun `the aggregate row says so when every external provider is switched off`() =
+        testApplication {
+            val ws = workspaceWith()
+            application { installTestApp(ws) }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+            idpRepo.seed(ws.id, provider = "oriana", enabled = false)
+
+            val body = authed.get("/admin/workspaces/acme/settings/sign-in-methods").bodyAsText()
+
+            assertContains(body, EnglishStrings.externalIdpConfiguredCount(1))
+            assertContains(body, EnglishStrings.AUTH_METHODS_EXTERNAL_IDP_NONE_ENABLED)
         }
 
     @Test

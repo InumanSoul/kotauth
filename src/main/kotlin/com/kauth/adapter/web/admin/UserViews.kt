@@ -7,13 +7,31 @@ import com.kauth.domain.model.Group
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.Session
+import com.kauth.domain.model.SocialAccount
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.User
 import com.kauth.domain.model.WebAuthnCredential
+import io.ktor.http.encodeURLParameter
 import kotlinx.html.*
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+
+/**
+ * The impersonation this admin session currently holds, if any.
+ *
+ * Starting a second impersonation revokes the first, which the route has always done and the
+ * page could never say, because nothing told it one was running. Tracking it lets the button
+ * warn before it clobbers, and gives the admin somewhere to end a session deliberately rather
+ * than by starting another.
+ */
+data class ActiveImpersonation(
+    val targetUserId: Int,
+    val targetUsername: String,
+    val targetWorkspaceSlug: String,
+    val sessionId: Int,
+    val startedAt: Instant,
+)
 
 /** One row in the user-detail "Recent impersonations" panel. */
 data class ImpersonationRecord(
@@ -51,10 +69,19 @@ internal fun userDetailPageImpl(
     recentImpersonations: List<ImpersonationRecord> = emptyList(),
     recentOtpActivity: List<OtpActivityRecord> = emptyList(),
     passkeys: List<WebAuthnCredential> = emptyList(),
+    /**
+     * True when the broker created this account on a first sign-in. It is not derivable from the
+     * user row: a just-in-time account carries no `externalId` — its provider link lives in
+     * `social_accounts`, which a locally registered account acquires too the first time it signs
+     * in through a provider. The provisioning event is the only record of which one created it.
+     */
+    brokeredOrigin: Boolean = false,
+    linkedIdentities: List<SocialAccount> = emptyList(),
+    activeImpersonation: ActiveImpersonation? = null,
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "${user.username} — ${workspace.displayName}",
+            pageTitle = "${user.username} · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -62,9 +89,8 @@ internal fun userDetailPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
             toastMessage = successMessage,
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -107,8 +133,9 @@ internal fun userDetailPageImpl(
                                     +EnglishStrings.BADGE_INVITE_PENDING
                                 }
                             }
-                            if (user.externalId != null) {
-                                idpManagedBadge()
+                            when {
+                                user.externalId != null -> idpManagedBadge()
+                                brokeredOrigin -> idpManagedBadge(EnglishStrings.IDP_MANAGED_BROKERED_ORIGIN)
                             }
                         }
                     }
@@ -157,12 +184,21 @@ internal fun userDetailPageImpl(
                                 else -> null
                             }
                         if (impersonateBlockedReason == null) {
+                            val isThisUser = activeImpersonation?.targetUserId == user.id?.value
                             postButton(
                                 action =
                                     "/admin/workspaces/${workspace.slug}/users/${user.id?.value}/impersonate",
                                 label = EnglishStrings.IMPERSONATE_BUTTON,
                                 btnClass = "btn btn--primary",
-                                confirmMessage = EnglishStrings.IMPERSONATE_CONFIRM,
+                                confirmMessage =
+                                    when {
+                                        activeImpersonation == null || isThisUser ->
+                                            EnglishStrings.IMPERSONATE_CONFIRM
+                                        else ->
+                                            EnglishStrings.impersonateReplaceConfirm(
+                                                activeImpersonation.targetUsername,
+                                            )
+                                    },
                             )
                         } else {
                             span("tooltip-wrap") {
@@ -178,7 +214,7 @@ internal fun userDetailPageImpl(
             }
 
             if (editError != null) {
-                div("notice notice--error") { +editError }
+                errorNotice(editError)
             }
             if (user.isLocked) {
                 notice(
@@ -188,28 +224,23 @@ internal fun userDetailPageImpl(
             }
 
             if (tempPasswordLink != null) {
-                div("notice notice--success") {
-                    div("notice__body") {
-                        style = "flex:1;gap:var(--space-2);"
-                        div("notice__title") { +"Temporary change-password link generated" }
-                        div("notice__desc") {
-                            +"Copy it now — it's valid for 24 hours and will be displayed only once."
+                notice(modifier = "notice--success", iconName = "check-circle") {
+                    div("notice__title") { +"Temporary change-password link generated" }
+                    div("notice__desc") {
+                        +"Copy it now. It is valid for 24 hours and will be displayed only once."
+                    }
+                    div("copy-field") {
+                        span("copy-field__value") { +tempPasswordLink }
+                        button(type = ButtonType.button) {
+                            classes = setOf("copy-field__btn")
+                            attributes["data-copy"] = tempPasswordLink
+                            title = "Copy"
+                            inlineSvgIcon("copy", "Copy")
                         }
-                        div("copy-field") {
-                            style = "margin-top:var(--space-2);"
-                            span("copy-field__value") { +tempPasswordLink }
-                            button(type = ButtonType.button) {
-                                classes = setOf("copy-field__btn")
-                                attributes["data-copy"] = tempPasswordLink
-                                title = "Copy"
-                                inlineSvgIcon("copy", "Copy")
-                            }
-                        }
-                        div("notice__desc") {
-                            style = "margin-top:var(--space-2);"
-                            +"Send this link to the user over a secure channel. "
-                            +"The next time they log in normally, they'll also be redirected here."
-                        }
+                    }
+                    div("notice__desc") {
+                        +"Send this link to the user over a secure channel. "
+                        +"The next time they log in normally, they'll also be redirected here."
                     }
                 }
             }
@@ -217,6 +248,9 @@ internal fun userDetailPageImpl(
             // ── Identity provider ────────────────────────────────────
             // Above the profile card, because the profile is what a sync overwrites.
             user.externalId?.let { idpManagedCard(it) }
+
+            // ── Linked identities ────────────────────────────────────
+            linkedIdentitiesCard(linkedIdentities)
 
             // ── Profile (read mode — swapped via htmx) ──────────────
             userProfileReadFragment(user, roles = roles, groups = groups)
@@ -266,8 +300,8 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Created" }
-                                th { +"Expires" }
+                                th { +EnglishStrings.COL_CREATED }
+                                th { +EnglishStrings.COL_EXPIRES }
                                 th { +"IP Address" }
                                 th { style = "width:80px;" }
                             }
@@ -296,6 +330,9 @@ internal fun userDetailPageImpl(
                     }
                 }
             }
+
+            // ── The impersonation running right now ──────────────────
+            activeImpersonation?.let { active -> activeImpersonationCard(active) }
 
             // ── Recent impersonations ────────────────────────────────
             if (recentImpersonations.isNotEmpty()) {
@@ -326,7 +363,7 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Event" }
+                                th { +EnglishStrings.COL_EVENT }
                                 th { +"IP" }
                                 th { +"Reason" }
                                 th { +"When" }
@@ -365,7 +402,7 @@ internal fun userDetailPageImpl(
                     table("data-table") {
                         thead {
                             tr {
-                                th { +"Name" }
+                                th { +EnglishStrings.COL_NAME }
                                 th { +"Device" }
                                 th { +"Registered" }
                                 th { style = "width:80px;" }
@@ -407,7 +444,7 @@ internal fun userDetailPageImpl(
 
             // ── Danger zone ──────────────────────────────────────────
             div("ov-card") {
-                div("ov-card__section-label ov-card__section-label--danger") { +"Danger zone" }
+                div("ov-card__section-label ov-card__section-label--danger") { +EnglishStrings.DANGER_ZONE_HEADING }
                 div("danger-zone") {
                     if (user.isLocked) {
                         dangerZoneCard(
@@ -476,12 +513,8 @@ internal fun DIV.userProfileReadFragment(
     div {
         id = "profile-section"
         if (successMessage != null) {
-            div("notice notice--success") {
-                style = "margin-bottom:12px;"
-                span("notice__icon") { inlineSvgIcon("check-circle", "Success") }
-                div("notice__body") {
-                    span("notice__title") { +successMessage }
-                }
+            notice(modifier = "notice--success notice--tight", iconName = "check-circle") {
+                span("notice__title") { +successMessage }
             }
         }
         div("ov-card") {
@@ -552,7 +585,7 @@ internal fun DIV.userProfileEditFragment(
     div {
         id = "profile-section"
         if (editError != null) {
-            div("notice notice--error") { +editError }
+            errorNotice(editError)
         }
         div("ov-card") {
             div("ov-card__section-label") { +"Edit Profile" }
@@ -671,7 +704,7 @@ private fun FlowContent.readOnlyBadgesRow(
                 }
             }
             div("edit-row__hint") {
-                +"Managed elsewhere — "
+                +"Managed elsewhere. "
                 a(href = manageUrl) { +"manage ${label.lowercase()}" }
             }
         }
@@ -714,10 +747,11 @@ internal fun userListPageImpl(
     page: Int = 1,
     totalPages: Int = 1,
     totalCount: Long = 0,
+    pageSize: Int = DEFAULT_USER_PAGE_SIZE,
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "Users — ${workspace.displayName}",
+            pageTitle = "Users · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -725,8 +759,7 @@ internal fun userListPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                  contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -779,14 +812,14 @@ internal fun userListPageImpl(
                     val suffix = if (totalCount != 1L) "s" else ""
                     if (search != null) {
                         if (totalPages > 1) {
-                            val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                            val start = (page - 1) * pageSize + 1
                             val end = start + users.size - 1
                             +"Showing $start\u2013$end of $totalCount result$suffix for \u201c$search\u201d"
                         } else {
                             +"$totalCount result$suffix for \u201c$search\u201d"
                         }
                     } else if (totalPages > 1) {
-                        val start = (page - 1) * users.size.coerceAtLeast(1) + 1
+                        val start = (page - 1) * pageSize + 1
                         val end = start + users.size - 1
                         +"Showing $start\u2013$end of $totalCount user$suffix"
                     } else {
@@ -820,7 +853,7 @@ internal fun userListPageImpl(
                             tr {
                                 th { style = "width:200px;"; +"Username" }
                                 th { +"Full Name" }
-                                th { +"Email" }
+                                th { +EnglishStrings.COL_EMAIL }
                                 th { style = "width:110px;"; +"Status" }
                                 th { style = "width:70px;" }
                             }
@@ -865,8 +898,7 @@ internal fun userListPageImpl(
                                                 href = "/admin/workspaces/${workspace.slug}/users/${user.id?.value}",
                                                 classes = "btn btn--ghost btn--sm",
                                             ) {
-                                                +"Open"
-                                                inlineSvgIcon("open-sm", "open")
+                                                +EnglishStrings.ACTION_VIEW_DETAIL
                                             }
                                         }
                                     }
@@ -880,7 +912,7 @@ internal fun userListPageImpl(
                     currentPage = page,
                     totalPages = totalPages,
                     baseUrl = "/admin/workspaces/${workspace.slug}/users" +
-                        if (search != null) "?q=$search&" else "?",
+                        if (search != null) "?q=${search.encodeURLParameter()}&" else "?",
                     htmxTarget = "#user-list-content",
                 )
             }
@@ -898,7 +930,7 @@ internal fun createUserPageImpl(
 ): HTML.() -> Unit =
     {
         adminShell(
-            pageTitle = "New User — ${workspace.displayName}",
+            pageTitle = "New User · ${workspace.displayName}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -906,8 +938,7 @@ internal fun createUserPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             activeAppSection = "users",
             loggedInAs = loggedInAs,
-                    contentClass = "content-outer",
-) {
+        ) {
             div("content-inner") {
             breadcrumb(
                 "Workspaces" to "/admin",
@@ -931,7 +962,7 @@ internal fun createUserPageImpl(
             }
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             // ── Form ─────────────────────────────────────────────────
@@ -1085,7 +1116,7 @@ private fun FlowContent.userAttributesSection(
         }
 
         if (error != null) {
-            div("notice notice--error") { +error }
+            errorNotice(error)
         }
 
         if (attributes.isEmpty()) {
@@ -1111,7 +1142,7 @@ private fun FlowContent.userAttributesSection(
                         .forEach { (key, value) ->
                             tr {
                                 td {
-                                    span("data-table__id") { +key }
+                                    span("data-table__meta") { +key }
                                     val claimName = mappedKeys[key]
                                     if (claimName != null) {
                                         div {
@@ -1174,7 +1205,7 @@ internal fun userAttributeFormPageImpl(
         val isEdit = existingKey != null
 
         adminShell(
-            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} — ${user.username}",
+            pageTitle = "${if (isEdit) "Edit Attribute" else "Add Attribute"} · ${user.username}",
             activeRail = "directory",
             allWorkspaces = allWorkspaces,
             workspaceName = workspace.displayName,
@@ -1182,7 +1213,6 @@ internal fun userAttributeFormPageImpl(
             workspaceLogoUrl = workspace.theme.logoUrl,
             loggedInAs = loggedInAs,
             activeAppSection = "users",
-            contentClass = "content-outer",
         ) {
             div("content-inner") {
                 breadcrumb(
@@ -1214,7 +1244,7 @@ internal fun userAttributeFormPageImpl(
                 }
 
                 if (error != null) {
-                    div("notice notice--error") { +error }
+                    errorNotice(error)
                 }
 
                 div("ov-card") {
@@ -1274,3 +1304,85 @@ internal fun userAttributeFormPageImpl(
 
 private fun encodeUriComponent(input: String): String =
     java.net.URLEncoder.encode(input, "UTF-8").replace("+", "%20")
+
+
+/**
+ * The providers this account can sign in through.
+ *
+ * The end user could already see this on their own portal; the administrator supporting them
+ * could not, so "why can this person not sign in with SSO" had no answer on this page.
+ */
+private fun FlowContent.linkedIdentitiesCard(accounts: List<SocialAccount>) {
+    div("ov-card") {
+        div("ov-card__section-label") { +EnglishStrings.LINKED_IDENTITIES_HEADING }
+        if (accounts.isEmpty()) {
+            div("ov-card__row--stacked") {
+                span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_EMPTY }
+            }
+        } else {
+            table("data-table") {
+                thead {
+                    tr {
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_PROVIDER }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_ACCOUNT }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_SUBJECT }
+                        th { +EnglishStrings.LINKED_IDENTITIES_COL_LINKED }
+                    }
+                }
+                tbody {
+                    accounts.sortedBy { it.provider.value }.forEach { account ->
+                        tr {
+                            td { span("data-table__name") { +EnglishStrings.providerDisplayName(account.provider) } }
+                            td {
+                                span("data-table__email") {
+                                    +(account.providerEmail?.takeIf { it.isNotBlank() } ?: "\u2014")
+                                }
+                            }
+                            // The provider's own subject claim is the identity the link is keyed
+                            // on; the email beside it can change without the link changing.
+                            td { span("data-table__meta") { +account.providerUserId } }
+                            td { span("data-table__meta") { +account.linkedAt.toDisplayString() } }
+                        }
+                    }
+                }
+            }
+            div("ov-card__row--stacked") {
+                span("ov-card__value--muted") { +EnglishStrings.LINKED_IDENTITIES_HINT }
+            }
+        }
+    }
+}
+
+
+/**
+ * The impersonation this admin session is holding, wherever they are in the console.
+ *
+ * Without it the only way to notice one was running was to start another and watch the first
+ * disappear, which is the case the standing warning was written for and never wired to.
+ */
+private fun FlowContent.activeImpersonationCard(active: ActiveImpersonation) {
+    div("ov-card") {
+        div("ov-card__section-label") { +EnglishStrings.IMPERSONATION_ACTIVE_HEADING }
+        div("ov-card__row") {
+            span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_USER }
+            span("ov-card__value") {
+                a(
+                    href = "/admin/workspaces/${active.targetWorkspaceSlug}/users/${active.targetUserId}",
+                    classes = "data-table__id",
+                ) { +active.targetUsername }
+            }
+        }
+        div("ov-card__row") {
+            span("ov-card__label") { +EnglishStrings.IMPERSONATION_ACTIVE_SINCE }
+            span("ov-card__value ov-card__value--muted") { +active.startedAt.toDisplayString() }
+        }
+        div("ov-card__actions") {
+            postButton(
+                action = "/admin/impersonation/${active.sessionId}/stop",
+                label = EnglishStrings.IMPERSONATION_STOP_BUTTON,
+                btnClass = "btn btn--danger btn--sm",
+                confirmMessage = EnglishStrings.IMPERSONATION_STOP_CONFIRM,
+            )
+        }
+    }
+}

@@ -7,6 +7,7 @@ import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.SelfServiceResult
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -38,7 +39,7 @@ internal fun Route.selfServiceRoutes(
         val slug = call.attributes[AuthTenantAttr].slug
         val params = call.receiveParameters()
         val email = params["email"]?.trim() ?: ""
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val callbackBaseUrl = call.resolvedBaseUrl()
 
         val rateLimitKey = "forgot:$ipAddress:$slug"
@@ -69,7 +70,7 @@ internal fun Route.selfServiceRoutes(
         val ctx = call.attributes[AuthTenantAttr]
         val slug = ctx.slug
         val policy = ctx.tenant?.securityConfig ?: SecurityConfig()
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val params = call.receiveParameters()
         val token = params["token"] ?: ""
         val newPassword = params["new_password"] ?: ""

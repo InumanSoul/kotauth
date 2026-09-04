@@ -9,12 +9,17 @@ import com.kauth.domain.service.OAuthService
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+
+// The pending MFA challenge: `userId|slug|timestampMillis`.
+private const val MFA_PENDING_FIELD_COUNT = 3
+private const val MFA_PENDING_SLUG = 1
 
 internal fun Route.mfaRoutes(
     oauthService: OAuthService,
@@ -29,7 +34,15 @@ internal fun Route.mfaRoutes(
         val slug = ctx.slug
 
         val rawPendingGet = call.request.cookies["KOTAUTH_MFA_PENDING"]
-        if (rawPendingGet.isNullOrBlank() || encryptionService.verifyCookie(rawPendingGet) == null) {
+        val pendingGet = rawPendingGet?.takeIf { it.isNotBlank() }?.let { encryptionService.verifyCookie(it) }
+        val partsGet = pendingGet?.split("|")
+        // The slug travels in the payload; comparing it is what makes the cookie this tenant's.
+        // A signature proves only that we minted it, not that it belongs here. The field count is
+        // pinned exactly as the POST pins it: two readers of one format must not disagree on it.
+        if (partsGet == null ||
+            partsGet.size != MFA_PENDING_FIELD_COUNT ||
+            partsGet[MFA_PENDING_SLUG] != slug
+        ) {
             return@get call.respondRedirect("/t/$slug/authorize")
         }
 
@@ -44,7 +57,7 @@ internal fun Route.mfaRoutes(
         val slug = ctx.slug
         val params = call.receiveParameters()
         val code = params["code"]?.trim() ?: ""
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
 
         val rateLimitKey = "mfa:$ipAddress:$slug"
         if (!mfaRateLimiter.isAllowed(rateLimitKey)) {
@@ -70,7 +83,7 @@ internal fun Route.mfaRoutes(
             return@post call.respondRedirect("/t/$slug/authorize")
         }
         val parts = pending.split("|")
-        if (parts.size != 3) {
+        if (parts.size != MFA_PENDING_FIELD_COUNT || parts[MFA_PENDING_SLUG] != slug) {
             return@post call.respondRedirect("/t/$slug/authorize")
         }
         val userId = parts[0].toIntOrNull() ?: return@post call.respondRedirect("/t/$slug/authorize")
@@ -102,7 +115,7 @@ internal fun Route.mfaRoutes(
             is MfaResult.Failure -> {
                 val message =
                     if (mfaResult.error is MfaError.TotpLocked) {
-                        "Too many failed attempts. MFA is temporarily locked — try again later or use a recovery code."
+                        "Too many failed attempts. MFA is temporarily locked. Try again later or use a recovery code."
                     } else {
                         "Invalid code. Please try again."
                     }

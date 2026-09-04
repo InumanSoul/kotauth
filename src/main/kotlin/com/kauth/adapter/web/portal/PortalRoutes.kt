@@ -30,6 +30,7 @@ import com.kauth.infrastructure.PortalClientProvisioning
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.html.*
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -231,7 +232,7 @@ fun Route.portalRoutes(
             )
 
             val redirectUri = "$baseUrl/t/$slug/account/callback"
-            val ipAddress = call.request.local.remoteAddress
+            val ipAddress = call.request.origin.remoteAddress
             val userAgent = call.request.headers["User-Agent"]
 
             val tokenResult =

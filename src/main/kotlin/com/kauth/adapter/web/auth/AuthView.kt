@@ -6,9 +6,11 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.TenantTheme
+import com.kauth.domain.service.JitRefusal
 import kotlinx.html.*
 
 /**
@@ -119,7 +121,7 @@ object AuthView {
         error: String? = null,
         success: Boolean = false,
         oauthParams: OAuthParams = OAuthParams(),
-        enabledProviders: List<SocialProvider> = emptyList(),
+        enabledProviders: List<LoginProvider> = emptyList(),
         registrationEnabled: Boolean = true,
         magicLinkEnabled: Boolean = false,
         passwordLoginEnabled: Boolean = true,
@@ -285,29 +287,10 @@ object AuthView {
                                 for (prov in enabledProviders) {
                                     val qs = oauthParams.toQueryString()
                                     a(
-                                        href = "/t/$tenantSlug/auth/social/${prov.value}/redirect$qs",
+                                        href = "/t/$tenantSlug/auth/social/${prov.key.value}/redirect$qs",
                                         classes = "btn-social",
                                     ) {
-                                        when (prov) {
-                                            SocialProvider.GOOGLE -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "google-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
-                                            }
-                                            SocialProvider.GITHUB -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "github-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
-                                            }
-                                        }
+                                        socialProviderButton(prov, ctx)
                                     }
                                 }
                             }
@@ -348,7 +331,7 @@ object AuthView {
         ctx: ViewContext,
         error: String? = null,
         prefill: RegisterPrefill = RegisterPrefill(),
-        enabledProviders: List<SocialProvider> = emptyList(),
+        enabledProviders: List<LoginProvider> = emptyList(),
         passwordPolicy: SecurityConfig = SecurityConfig(),
         passwordLoginEnabled: Boolean = true,
     ): HTML.() -> Unit =
@@ -492,29 +475,10 @@ object AuthView {
                             div("social-buttons") {
                                 for (prov in enabledProviders) {
                                     a(
-                                        href = "/t/$tenantSlug/auth/social/${prov.value}/redirect",
+                                        href = "/t/$tenantSlug/auth/social/${prov.key.value}/redirect",
                                         classes = "btn-social",
                                     ) {
-                                        when (prov) {
-                                            SocialProvider.GOOGLE -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "google-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GOOGLE"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GOOGLE")
-                                            }
-                                            SocialProvider.GITHUB -> {
-                                                span("social-icon") {
-                                                    inlineSvgIcon(
-                                                        iconName = "github-logo",
-                                                        ariaLabel = ctx.t("LOGIN_PROVIDER_GITHUB"),
-                                                    )
-                                                }
-                                                +ctx.t("LOGIN_CONTINUE_GITHUB")
-                                            }
-                                        }
+                                        socialProviderButton(prov, ctx)
                                     }
                                 }
                             }
@@ -1165,6 +1129,73 @@ object AuthView {
             }
         }
 
+    /**
+     * Shown when a provider signed the person in and the workspace refused to create an account.
+     *
+     * The sequence is what the copy has to survive: the person typed nothing wrong, authenticated
+     * somewhere else, and came back rejected — so the page says the sign-in worked, says the
+     * workspace is what refused, and names which of the two rules applied. It renders no password
+     * field and offers no credential reset, because a page that looks like a wrong-password page
+     * sends someone to change a credential that was never involved.
+     */
+    fun jitRefusedPage(
+        tenantSlug: String,
+        ctx: ViewContext,
+        providerName: String,
+        refusal: JitRefusal,
+        reference: String,
+    ): HTML.() -> Unit =
+        {
+            head { authHead(ctx.t("AUTH_PAGE_TITLE_ACCESS_REFUSED", ctx.workspaceName), ctx.theme) }
+            body {
+                demoBanner()
+                authShell(ctx.workspaceName, ctx.theme) {
+                    div("card") {
+                        h1("card-title") { +ctx.t("JIT_REFUSED_TITLE") }
+                        p("card-subtitle") {
+                            +ctx.t("JIT_REFUSED_AUTHENTICATED", providerName, ctx.workspaceName)
+                        }
+                        div("alert alert-error") {
+                            p {
+                                strong {
+                                    +ctx.t(
+                                        when (refusal) {
+                                            JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_HEADING"
+                                            JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_HEADING"
+                                            JitRefusal.USERNAME_CONFLICT -> "JIT_REFUSED_USERNAME_CONFLICT_HEADING"
+                                        },
+                                    )
+                                }
+                            }
+                            p {
+                                +ctx.t(
+                                    when (refusal) {
+                                        JitRefusal.EMAIL_NOT_VERIFIED -> "JIT_REFUSED_EMAIL_NOT_VERIFIED_BODY"
+                                        JitRefusal.DOMAIN_NOT_ALLOWED -> "JIT_REFUSED_DOMAIN_NOT_ALLOWED_BODY"
+                                        JitRefusal.USERNAME_CONFLICT -> "JIT_REFUSED_USERNAME_CONFLICT_BODY"
+                                    },
+                                    providerName,
+                                    ctx.workspaceName,
+                                )
+                            }
+                        }
+                        p("card-subtitle") { +ctx.t("JIT_REFUSED_REFERENCE", reference) }
+                        div("footer-link") {
+                            a(href = "/t/$tenantSlug/account/login") { +ctx.t("AUTH_BACK_TO_SIGN_IN") }
+                        }
+                    }
+                    p("copyright") {
+                        +ctx.t(
+                            "AUTH_COPYRIGHT_TEMPLATE",
+                            java.time.Year.now().toString(),
+                            ctx.workspaceName,
+                        )
+                        a(href = "https://kotauth.com", target = "_blank") { +ctx.t("AUTH_KOTAUTH_LINK") }
+                    }
+                }
+            }
+        }
+
     // -------------------------------------------------------------------------
     // Forced password change — admin-triggered temporary password flow
     // -------------------------------------------------------------------------
@@ -1517,7 +1548,58 @@ object AuthView {
                 }
             }
         }
+
+    /**
+     * The contents of one social sign-in button. A provider key is an open string, so the
+     * compiler cannot check this for exhaustiveness.
+     *
+     * This fallback is live as of Phase 2: [enabledProviders] is read from
+     * identityProviderRepository, and the admin save route now writes any well-formed key, so a
+     * brokered OIDC provider reaches this branch and is rendered from the operator's display
+     * name, or from its own key when they set none.
+     */
+    private fun FlowContent.socialProviderButton(
+        provider: LoginProvider,
+        ctx: ViewContext,
+    ) {
+        val chosen = provider.displayName?.takeIf { it.isNotBlank() }
+        val icon =
+            when (provider.key) {
+                ProviderKey.GOOGLE -> "google-logo"
+                ProviderKey.GITHUB -> "github-logo"
+                else -> "globe"
+            }
+        val fallbackName =
+            when (provider.key) {
+                ProviderKey.GOOGLE -> ctx.t("LOGIN_PROVIDER_GOOGLE")
+                ProviderKey.GITHUB -> ctx.t("LOGIN_PROVIDER_GITHUB")
+                else -> EnglishStrings.providerDisplayName(provider.key)
+            }
+        val label =
+            when {
+                chosen != null -> ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", chosen)
+                provider.key == ProviderKey.GOOGLE -> ctx.t("LOGIN_CONTINUE_GOOGLE")
+                provider.key == ProviderKey.GITHUB -> ctx.t("LOGIN_CONTINUE_GITHUB")
+                else -> ctx.t("LOGIN_CONTINUE_GENERIC").replace("{provider}", fallbackName)
+            }
+        span("social-icon") { inlineSvgIcon(iconName = icon, ariaLabel = chosen ?: fallbackName) }
+        +label
+    }
 }
+
+/**
+ * One provider as the sign-in page needs it: the key that builds the URL, and the label the
+ * operator chose for it. Narrowing to [ProviderKey] at the call sites is what left
+ * `IDP_DISPLAY_NAME_HINT` promising a label the button never showed.
+ */
+data class LoginProvider(
+    val key: ProviderKey,
+    val displayName: String? = null,
+)
+
+/** The enabled rows of a tenant, as the sign-in and registration pages want them. */
+internal fun List<IdentityProvider>.asLoginProviders(): List<LoginProvider> =
+    map { LoginProvider(it.provider, it.displayName) }
 
 /**
  * Holds form values to re-populate the registration form after a failed submission.

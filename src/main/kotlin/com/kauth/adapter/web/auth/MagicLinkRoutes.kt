@@ -8,6 +8,7 @@ import com.kauth.domain.service.SelfServiceResult
 import com.kauth.infrastructure.EncryptionService
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.html.respondHtml
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receiveParameters
 import io.ktor.server.response.respondRedirect
 import io.ktor.server.routing.Route
@@ -29,7 +30,9 @@ import io.ktor.server.routing.post
  *   `/authorize` request. If absent (different browser, cookie expired after
  *   5 minutes), the user sees a friendly error asking them to open the link in
  *   the same browser. The OAuth-context check runs **before** `consumeMagicLink`,
- *   so the token is preserved and a same-device retry still works.
+ *   so the token is preserved and a same-device retry still works. `consumeMagicLink`
+ *   is given the tenant from the URL for the same reason: a link tapped at the wrong
+ *   tenant is refused before the token is marked used, not after.
  *
  * Gated on `tenant.securityConfig.magicLinkEnabled` — off by default per tenant.
  */
@@ -64,7 +67,7 @@ internal fun Route.magicLinkRoutes(
             return@post call.respondRedirect("/t/${ctx.slug}/magic-link?sent=true")
         }
 
-        val ipAddress = call.request.local.remoteAddress
+        val ipAddress = call.request.origin.remoteAddress
         val rateLimitKey = "magic-link:$ipAddress:${ctx.slug}"
         // Even on rate-limit hit, respond with the success state — no timing oracle
         if (!rateLimiter.isAllowed(rateLimitKey)) {
@@ -118,13 +121,15 @@ internal fun Route.magicLinkRoutes(
                     ctx = ctx.viewContext,
                     error =
                         "To finish signing in, open this link in the same browser where you " +
-                            "requested it — or go back to the sign-in page and request a new link.",
+                            "requested it, or go back to the sign-in page and request a new link.",
                 ),
             )
             return@get
         }
 
-        when (val result = credentialFlowService.consumeMagicLink(token)) {
+        // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
+        val tenant = ctx.tenant
+        when (val result = credentialFlowService.consumeMagicLink(token, tenant.id)) {
             is SelfServiceResult.Failure -> {
                 call.respondHtml(
                     HttpStatusCode.Unauthorized,
@@ -137,9 +142,7 @@ internal fun Route.magicLinkRoutes(
             }
             is SelfServiceResult.Success -> {
                 val user = result.value
-                // ctx.tenant is non-null past the magicLinkEnabled gate at the top of the route.
-                val tenant = ctx.tenant
-                val ipAddress = call.request.local.remoteAddress
+                val ipAddress = call.request.origin.remoteAddress
                 call.completeAuthorizationCodeFlow(
                     slug = ctx.slug,
                     userId = user.id!!,

@@ -6,6 +6,7 @@ import com.kauth.adapter.web.JsIntegrity
 import com.kauth.adapter.web.ViewContext
 import com.kauth.adapter.web.demoBanner
 import com.kauth.adapter.web.inlineSvgIcon
+import com.kauth.adapter.web.providerIconName
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.PortalLayout
 import com.kauth.domain.model.SecurityConfig
@@ -269,13 +270,13 @@ object PortalView {
                                         div(classes = "social-accounts-list__provider") {
                                             span(classes = "social-accounts-list__icon") {
                                                 inlineSvgIcon(
-                                                    iconName = "${account.provider.value}-logo",
-                                                    ariaLabel = account.provider.displayName,
+                                                    iconName = providerIconName(account.provider),
+                                                    ariaLabel = EnglishStrings.providerDisplayName(account.provider),
                                                 )
                                             }
                                             div(classes = "social-accounts-list__info") {
                                                 span(classes = "social-accounts-list__name") {
-                                                    +account.provider.displayName
+                                                    +EnglishStrings.providerDisplayName(account.provider)
                                                 }
                                                 if (!account.providerEmail.isNullOrBlank()) {
                                                     span(classes = "social-accounts-list__email") {

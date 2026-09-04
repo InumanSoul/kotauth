@@ -7,9 +7,141 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.23.0] - 2026-09-03
 
 ### Added
+
+- **Generic OIDC identity brokering.** A workspace can now sign users in
+  through any OpenID Connect provider, not just the two built-in adapters.
+  Operators configure a provider from the admin UI or over
+  `/t/{slug}/api/v1/identity-providers`, giving an issuer URL and client
+  credentials; endpoints are read from the issuer's discovery document, with
+  optional per-endpoint pins for issuers that publish none. The display name an
+  operator chooses is the label on the sign-in button. Migration `V63` adds the
+  columns.
+
+  Provider settings are held per provider key, so one workspace can run several
+  brokered providers side by side, each with its own credentials, endpoints and
+  label. No identity provider has been verified against a live tenant; the
+  implementation follows the specifications the providers publish.
+
+  Every issuer URL, every endpoint inside a discovery document and every JWKS
+  URI must be `https` (loopback excepted for local development), and a
+  discovery document that declares an issuer other than the one requested is
+  refused, so nothing able to redirect that fetch can choose the endpoints or
+  the signing keys. ID tokens are checked in a fixed order — the header's
+  algorithm against an allowlist before any key is fetched, then the signature,
+  then `iss`, `aud`, `azp`, `exp`, `iat`, `nonce` and `sub` — which is what
+  refuses `alg: none` and the HS256-with-the-public-key confusion before either
+  can reach a key. Discovery failures are remembered briefly so an unreachable
+  issuer is not refetched once per request, and the social login routes are
+  throttled per IP like every neighbouring auth route.
+
+- **Just-in-time provisioning.** A workspace can let a brokered provider create
+  an account on someone's first sign-in, instead of stopping them at the
+  registration form. Three conditions must all hold: the provider has the
+  toggle on, the provider itself asserts the email address is verified, and the
+  address's domain is on that provider's allowed list. Domains are matched
+  exactly, never by suffix — a suffix test for `example.com` would also accept
+  `evil-example.com` — and the comparison is over the ASCII (punycode) spelling
+  of both sides, which closes the confusable spellings that differ only by case
+  folding. An entry
+  that could never match exactly, such as a wildcard or a bare label, is
+  refused when the provider is saved. **An empty list is the feature switched
+  off, never a wildcard**, so the toggle alone provisions nobody.
+
+- **A user's linked identities are visible to the administrator.** The providers
+  an account can sign in through — with the address and subject each one
+  asserted, and when the link was made — now appear on the admin user page.
+  Previously only the end user could see this on their own portal, so the
+  administrator fielding "why can this person not sign in with SSO" had nothing
+  to read.
+
+- **Trusting an issuer's email claim.** The condition above — that the provider
+  asserts the address is verified — is read from the `email_verified` claim, and
+  an absent claim counts as false. Several major issuers never send it at all;
+  **Microsoft Entra ID is one**, so a workspace brokering to Entra found that
+  every sign-in was refused however the allowed-domain list was set. A new
+  per-provider switch, **off by default**, lets an operator take that issuer's
+  `email` claim as verified. It is deliberately not a global setting: it is an
+  assertion about one issuer.
+
+  The switch governs both gates, and they are not equally narrow. Creation is
+  still bounded by the allowed-domain list, so trusting the claim widens which
+  addresses count as verified, never which domains may be created. **Linking is
+  not bounded by anything** — with the switch on, a sign-in carrying an
+  unverified address that matches a local user adopts that account. Turn it on
+  only for an issuer whose address space you control. Off, behaviour is exactly
+  as before.
+
+  **The gate only ever creates.** It has no link path and no update path, and
+  it is reached only once nothing matched the identity — so switching automatic
+  creation on cannot widen what a provider's assertion may reach. Linking is a
+  separate, older rule that runs on every brokered callback whether or not
+  automatic creation is on: a verified address matching a local user **in the
+  same workspace** links the identity to that user and signs them in, and an
+  unverified one ends the sign-in rather than linking — unless that provider's
+  email claim is trusted, below. That refusal has **no self-service path** — an
+  administrator reconciles the two records. The
+  consequence worth knowing before a rollout is a configuration one: an
+  operator who can register an issuer for a workspace can have it assert any
+  address, so configuring an identity provider needs to be held at the same
+  level of trust as administering that workspace's users.
+
+  A created account takes the email address as its username, so a SCIM
+  connector later wired to the same directory finds it rather than creating a
+  duplicate; `externalId` is left for SCIM to set, the provider identity is
+  linked in `social_accounts`, the originating client's default roles are
+  granted, and every creation is audited. See
+  `docs/adr/ADR-21-just-in-time-provisioning.md`.
+
+  A refused sign-in is explained rather than dressed up as a failed login: the
+  page says authentication succeeded, that the workspace has not granted the
+  account access, and which rule turned it away — an unverified address is one
+  the person can fix at their provider; a domain that is not on the list, or an
+  address a local account already holds as its sign-in name, only an
+  administrator can. That last one is a refusal rather than a failed insert:
+  a created account takes the address as its username, and a name already taken
+  would otherwise be a 500 on every attempt with nothing recorded. Where the
+  workspace has self-registration open, a refusal falls through to the ordinary
+  registration page instead of ending the flow; the allowed-domain list governs
+  automatic creation, not whether anyone may sign up at all. The refusal is
+  recorded either way.
+
+- **Recent sign-in failures, per identity provider**, in the admin UI. Each row
+  carries the reason, the email address's **domain**, and a short stable
+  reference the person is shown and can quote to an administrator. No address,
+  no provider subject and no credential of any kind is recorded — the domain is
+  what an operator repairs an allowlist with, and the reference is an HMAC over
+  the identity under a key derived from `KAUTH_SECRET_KEY`, stable enough that
+  one person retrying six times reads as one person, and not recomputable by
+  anyone without that key. Errors the provider itself returns appear
+  here too, but only for a `state` this instance signed for that workspace and
+  provider, so the panel cannot be filled by anyone who can reach the callback.
+
+- **Test discovery on the provider form.** Fetches the issuer's discovery
+  document, shows the endpoints it resolved and how many signing keys the key
+  set publishes — and says plainly what it did **not** verify: your redirect
+  URI and your client credentials. Nothing in the test asks the provider
+  whether it will accept the callback URL, and nothing in it authenticates as
+  the client; a callback URL the provider does not recognise is refused at the
+  provider during a real sign-in, long after this page says the endpoints
+  resolve. The exact URL to register is printed beside the result, built from
+  the same definition the sign-in flow uses.
+
+- **`jitEnabled` and `jitAllowedDomains` on the identity provider API**, both
+  readable and writable over `/t/{slug}/api/v1/identity-providers`. Omitting a
+  field keeps what is stored and `"jitAllowedDomains": []` clears it, so an
+  unrelated update cannot silently switch automatic account creation on or off.
+
+- **Accounts created by a brokered first sign-in are badged in the admin UI**,
+  with their own wording rather than the SCIM one: no sync runs over a brokered
+  account, so it says the person signs in at the provider and has no password
+  here unless they set one. The sign-in methods grid gained a single aggregate
+  row for brokered providers, showing how many are configured and flagging when
+  none of them is enabled — one row, not one per provider, since a provider key
+  is an open string and a row each would stop it being the sign-in method
+  grid.
 
 - **SCIM 2.0 provisioning endpoints.** `/t/{slug}/scim/v2/Users` and
   `/t/{slug}/scim/v2/Groups` implement RFC 7644 `GET`, `POST`, `PUT`, `PATCH`
@@ -88,6 +220,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removes its whole group tree in one statement and is unaffected. See
   `docs/adr/ADR-18-group-delete-refuses-subgroups.md`.
 
+### Security
+
+- **A brokered login's `state` is bound to the browser that began the flow.**
+  The signed `state` proves only that this server minted it. A short-lived
+  `HttpOnly` cookie now carries the nonce the redirect signed into the state,
+  and the callback refuses any state it cannot match against that cookie.
+  Without the pairing an attacker could mint a state at their leisure,
+  authenticate at the provider as themselves, and hand the victim a callback
+  URL that signed the victim in as the attacker.
+- **The social-login pending and MFA challenge cookies are scoped to the
+  workspace that minted them.** Both carry the workspace in their signed
+  payload and both are now checked against the workspace in the URL, so a
+  cookie minted at one workspace cannot be replayed at another. Whoever
+  administers any workspace on an instance can point it at an identity
+  provider they control and have it assert an address they do not own;
+  without the check, replaying the resulting cookie at that address's
+  workspace handed over its owner's account. The cookies also carry the
+  workspace in their wire names and take the `__Host-` prefix over https, so
+  a sibling subdomain cannot overwrite them and two workspaces open in one
+  browser no longer clobber each other's in-flight sign-in.
+- **A magic-link token presented at the wrong workspace is no longer
+  consumed.** `/t/{slug}/magic-link/consume` looked the token up by hash alone
+  and marked it used before anything compared the token's workspace with the
+  one in the URL, so tapping a link at another workspace's URL burned the
+  owner's own token — they were then told their link had already been used and
+  had to request a new one. The sign-in itself was never at risk: the
+  authorization code was refused immediately afterwards, and still is. The
+  workspace check now runs before the token is touched, alongside the existing
+  purpose check, and returns the same message an unknown token returns so it
+  says nothing about which workspace the token belongs to.
+
+- **Cached identity-provider signing keys now expire.** JWKS responses are
+  held for ten minutes rather than for the life of the process, so a key an
+  issuer withdraws stops verifying ID tokens.
+- **Per-IP throttles and audit-log addresses follow the forwarded client
+  address.** With `KAUTH_TRUSTED_PROXY=true`, every rate limiter and every
+  audit event now records the client address rather than the reverse-proxy
+  connection, so a limiter is a per-client budget instead of a
+  deployment-wide one and an incident review sees more than a single IP. The
+  **last** `X-Forwarded-For` entry is taken, which is the address the trusted
+  proxy itself observed; the previous reading took the first, which a client
+  controls on any front-end that appends to the header rather than replacing
+  it. The bundled Caddy configuration replaces it, so that deployment is
+  unaffected. Only one trusted hop is supported — see
+  [production deployment](docs/deploy/production.md#one-trusted-hop-only).
+
 ### Fixed
 
 - **A SCIM `remove` naming specific entries no longer empties the whole
@@ -116,6 +294,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attribute outright rather than emptying it (a `remove` with no `value`, or
   one on a valued path) still fall through to the stored address, which is the
   same absent-attribute rule a `PUT` omitting `emails` follows.
+
+### Migrations
+
+- `V60__scim_external_ids.sql` — adds `external_id` to `users` and `groups`,
+  unique per workspace where present, plus `given_name` and `family_name` on
+  `users`; widens `users.username` and `users.full_name` to `VARCHAR(255)`.
+- `V61__group_parent_no_cascade.sql` — `groups.parent_group_id` becomes
+  `ON DELETE NO ACTION`, so deleting a parent group can no longer destroy its
+  descendants and their memberships and role grants.
+- `V62__api_key_scim_dialect.sql` — adds `api_keys.scim_dialect`, defaulting to
+  `rfc`, so every existing key keeps its current behaviour.
+- `V63__identity_provider_oidc.sql` — adds the OIDC brokering columns to
+  `identity_providers` (`kind`, `display_name`, `issuer`, the three endpoint
+  pins, `scopes`) and the two just-in-time columns (`jit_enabled` defaulting
+  false, `jit_allowed_domains`). Additive only: every existing row stays a
+  valid `oauth2` provider with automatic creation off.
 
 ---
 

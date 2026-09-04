@@ -110,58 +110,14 @@
 
 .copy-field__btn:hover { color: var(--color-accent); }
 
-/* ── api key table ── */
-.key-table {
-  width: 100%;
-  background: var(--color-card);
-  border: 0.5px solid var(--color-border-md);
-  border-collapse: collapse;
-  margin-bottom: var(--space-3);
-}
-
-.key-table th {
-  text-align: left;
-  padding: var(--space-2) var(--space-4);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--color-subtle);
-  background: rgba(255,255,255,0.02);
-  border-bottom: 0.5px solid var(--color-border-md);
-}
-
-.key-table td {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 0.5px solid var(--color-border);
-  vertical-align: middle;
-  font-size: 12px;
-}
-
-.key-table tbody tr:last-child td { border-bottom: none; }
-
-.key-table tbody tr:hover { background: var(--color-row-hover); }
-
-.key-table__name {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.key-table__meta {
-  color: var(--color-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-/* ── Auth Methods grid (v1.20.1) ── */
-.method-table { width: 100%; border-collapse: collapse; }
-.method-table th,
-.method-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--color-border); }
+/* ── Auth Methods grid (v1.20.1) ──
+ * The table is a .data-table; what stays here is only what is particular to this grid:
+ * its two-line method cell and its checkbox. It used to be a parallel block whose `th`
+ * inherited no header styling at all. */
 .method-table__label { font-weight: var(--weight-medium); }
 .method-table__desc { font-size: var(--text-sm); color: var(--color-muted); margin-top: 2px; }
 .row-locked { display: inline-flex; gap: 4px; align-items: center; color: var(--color-amber); }
 .row-locked a { text-decoration: underline; }
-.notice--warn { padding: 10px; margin-top: 12px; background: var(--color-amber-bg); border-left: 3px solid var(--color-amber); }
 
 .method-table input[type="checkbox"] {
   appearance: none;
@@ -215,3 +171,88 @@
 }
 
 .methods-idp-hint a:hover { opacity: 0.8; }
+
+/* ── provider catalog ─────────────────────────────────────────────────── */
+/* The "add a provider" zone. Only ever a handful of tiles, so a grid of whole
+ * targets rather than a list of links — the tile is the hit area, matching how
+ * the rail and sidebar items already behave. */
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.provider-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 88px;
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 0.5px solid var(--color-border-md);
+  text-decoration: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.provider-tile:hover {
+  border-color: var(--color-accent);
+  background: rgba(31, 188, 255, 0.06);
+  text-decoration: none;
+}
+
+.provider-tile:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.provider-tile__logo {
+  color: var(--color-muted);
+  margin-bottom: var(--space-1);
+}
+
+.provider-tile__logo svg { width: 20px; height: 20px; }
+.provider-tile__name { font-size: 13px; color: var(--color-text); }
+.provider-tile__hint { font-size: 11px; color: var(--color-subtle); }
+
+/* ── advanced-field disclosure ────────────────────────────────────────── */
+/* Collapsing on redirect is correct for an advanced section, which is why the
+ * endpoint overrides can use <details> while a whole provider cannot. */
+
+.disclosure { border-top: 0.5px solid var(--color-border); }
+
+/* When the disclosure IS the card, the card already draws the border. */
+.ov-card.disclosure { border-top: 0.5px solid var(--color-border-md); }
+
+.ov-card.disclosure > summary {
+  /* The section-label class it shares brings justify-content: space-between, which pushed
+   * the heading away from its own disclosure marker. */
+  justify-content: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  letter-spacing: var(--tracking-tight);
+  border-bottom: 0.5px solid var(--color-border-md);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ov-card.disclosure:not([open]) > summary { border-bottom: none; }
+
+.disclosure > summary {
+  padding: var(--space-3) var(--space-4);
+  font-size: 12px;
+  color: var(--color-muted);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before { content: "\203A"; transition: transform 0.12s; }
+.disclosure[open] > summary::before { transform: rotate(90deg); }
+.disclosure > summary:hover { color: var(--color-text); }

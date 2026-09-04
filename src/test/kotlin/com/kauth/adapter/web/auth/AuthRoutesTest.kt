@@ -4,6 +4,7 @@ import com.kauth.domain.model.AccessTokenClaims
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.ApplicationId
+import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.AuthorizationCode
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.ResourceServer
@@ -30,6 +31,7 @@ import com.kauth.fakes.FakeUserRepository
 import com.kauth.infrastructure.EncryptionService
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import com.kauth.infrastructure.InMemoryRateLimiter
+import com.kauth.installTrustedProxyHeaders
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.request.get
@@ -819,6 +821,66 @@ class AuthRoutesTest {
             assertEquals(HttpStatusCode.TooManyRequests, response.status)
         }
 
+    @Test
+    fun `the login limiter and the audit log key on the forwarded client address`() =
+        testApplication {
+            resetFixtures()
+            val tightLoginLimiter = InMemoryRateLimiter(maxRequests = 1, windowSeconds = 60)
+
+            application {
+                install(ContentNegotiation) { json() }
+                installTrustedProxyHeaders()
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = tightLoginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            val authContextCookie =
+                buildAuthContextCookie(
+                    clientId = "spa-app",
+                    redirectUri = "https://app.example.com/callback",
+                )
+
+            suspend fun attempt(clientIp: String) =
+                client.submitForm(
+                    url = "/t/acme/authorize",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "alice")
+                            append("password", "wrong-pass")
+                        },
+                ) {
+                    header("Cookie", "KOTAUTH_AUTH_CONTEXT=$authContextCookie")
+                    header("X-Forwarded-For", clientIp)
+                }
+
+            attempt("203.0.113.1")
+            val second = attempt("203.0.113.2")
+
+            // Behind a proxy the connection address is the proxy's for every request: keying on it
+            // makes this a deployment-wide cap and writes one IP into every audit row.
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                second.status,
+                "A second client behind the same proxy must have its own login budget",
+            )
+            assertEquals(
+                listOf("203.0.113.1", "203.0.113.2"),
+                auditLog.events.filter { it.eventType == AuditEventType.LOGIN_FAILED }.map { it.ipAddress },
+                "Every login event must record the client's address, not the proxy's",
+            )
+        }
+
     // =========================================================================
     // GET /t/{slug}/mfa-challenge — cookie guard
     // =========================================================================
@@ -896,6 +958,77 @@ class AuthRoutesTest {
                 location.contains("/authorize"),
                 "Must redirect to login when MFA pending cookie has invalid signature",
             )
+        }
+
+    @Test
+    fun `GET mfa-challenge refuses a pending cookie minted for another tenant`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // Our signature, our format, another tenant's slug — the challenge page must not
+            // render for a cookie this tenant never minted.
+            val cookieValue = encryptionService.signCookie("10|otherco|${System.currentTimeMillis()}")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
+        }
+
+    @Test
+    fun `GET mfa-challenge refuses a pending cookie of another shape`() =
+        testApplication {
+            resetFixtures()
+
+            application {
+                install(ContentNegotiation) { json() }
+                routing {
+                    authRoutes(
+                        authService = buildAuthService(),
+                        oauthService = buildOAuthService(),
+                        tenantRepository = tenantRepo,
+                        loginRateLimiter = loginLimiter,
+                        registerRateLimiter = registerLimiter,
+                        tokenRateLimiter = tokenLimiter,
+                        credentialFlowService = selfService,
+                        encryptionService = encryptionService,
+                        translationPort = EnglishOnlyTranslation(),
+                    )
+                }
+            }
+
+            // A fourth field means this is not the format this reader was written for. The POST
+            // refuses it on the field count; the GET must agree, or the next field added to the
+            // payload is read as something else by one of the two.
+            val cookieValue = encryptionService.signCookie("10|acme|${System.currentTimeMillis()}|extra")
+
+            val response =
+                createClient { followRedirects = false }.get("/t/acme/mfa-challenge") {
+                    header("Cookie", "KOTAUTH_MFA_PENDING=$cookieValue")
+                }
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("/t/acme/authorize", response.headers["Location"])
         }
 
     @Test

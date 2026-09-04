@@ -11,11 +11,11 @@ import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
 import com.kauth.domain.model.LoginLayout
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
@@ -257,7 +257,7 @@ class BackupExportImportTest {
             IdentityProvider(
                 id = null,
                 tenantId = tenant.id,
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 clientId = "google-real-client-id",
                 clientSecret = "PLAINTEXT-SECRET-MUST-NEVER-LEAK",
                 enabled = true,
@@ -589,6 +589,39 @@ class BackupExportImportTest {
         assertEquals("google-real-client-id", idps[0].clientId)
         assertEquals("", idps[0].clientSecret, "Imported social provider must have empty secret — operator re-enters")
         assertFalse(idps[0].enabled, "Imported social provider must be disabled until secret is re-entered")
+    }
+
+    @Test
+    fun `import skips a social provider whose key has no compiled-in adapter`() {
+        val export =
+            exportSuccessful(ExportOptions()).copy(
+                socialProviders =
+                    listOf(
+                        com.kauth.domain.model.SocialProviderBackup(
+                            provider = "oriana",
+                            clientId = "oriana-client-id",
+                            enabled = true,
+                        ),
+                        com.kauth.domain.model.SocialProviderBackup(
+                            provider = "github",
+                            clientId = "github-client-id",
+                            enabled = true,
+                        ),
+                    ),
+            )
+
+        importer().import(export, newSlug = "acme-staging", currentSchemaVersion = 38)
+
+        val newTenantId = destTenants.findBySlug("acme-staging")!!.id
+        val imported = destIdps.findAllByTenant(newTenantId).map { it.provider }
+        // Naming the cause: asserting only the row count would also pass if the importer had
+        // dropped github instead. A persisted "oriana" row is invisible in the admin UI, rejected by
+        // the delete route, and re-emitted on every later export — a permanent orphan.
+        assertEquals(listOf(ProviderKey.GITHUB), imported)
+        assertFalse(
+            imported.any { it.value == "oriana" },
+            "A provider key with no compiled-in adapter must not survive an import",
+        )
     }
 
     @Test

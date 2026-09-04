@@ -16,7 +16,7 @@ internal fun HTML.signInMethodsAdminPage(
     val slug = workspace.slug
 
     adminShell(
-        pageTitle = "${EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS} — ${workspace.displayName}",
+        pageTitle = "${EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS} · ${workspace.displayName}",
         activeRail = "security",
         activeAppSection = "sign-in-methods",
         allWorkspaces = allWorkspaces,
@@ -24,7 +24,6 @@ internal fun HTML.signInMethodsAdminPage(
         workspaceSlug = slug,
         workspaceLogoUrl = workspace.theme.logoUrl,
         loggedInAs = loggedInAs,
-        contentClass = "content-outer",
         toastMessage = toastMessage,
     ) {
         div("content-inner") {
@@ -36,7 +35,7 @@ internal fun HTML.signInMethodsAdminPage(
 
             pageHeader(
                 title = EnglishStrings.ADMIN_NAV_SIGN_IN_METHODS,
-                subtitle = "Configure which authentication methods this workspace supports.",
+                subtitle = EnglishStrings.SIGN_IN_METHODS_PAGE_SUB,
                 actions = {
                     button(type = ButtonType.submit) {
                         classes = setOf("btn", "btn--primary")
@@ -47,7 +46,7 @@ internal fun HTML.signInMethodsAdminPage(
             )
 
             if (error != null) {
-                div("notice notice--error") { +error }
+                errorNotice(error)
             }
 
             form(

@@ -2,21 +2,24 @@ package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Session
 import com.kauth.domain.model.SocialAccount
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.TokenResponse
 import com.kauth.domain.model.User
+import com.kauth.domain.model.socialCallbackUrl
 import com.kauth.domain.port.ApplicationRepository
 import com.kauth.domain.port.AuditLogPort
 import com.kauth.domain.port.IdentityProviderRepository
+import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.PasswordHasher
 import com.kauth.domain.port.RoleRepository
 import com.kauth.domain.port.SessionRepository
 import com.kauth.domain.port.SocialAccountRepository
-import com.kauth.domain.port.SocialProviderPort
+import com.kauth.domain.port.SocialProviderResolver
 import com.kauth.domain.port.SocialUserProfile
 import com.kauth.domain.port.TenantRepository
 import com.kauth.domain.port.TokenPort
@@ -39,13 +42,17 @@ import java.time.Instant
  * Account resolution in handleCallback (existing users only):
  *   a) Existing social_account row matches (tenant, provider, providerUserId) -> reuse user.
  *   b) Local user with same email exists in same tenant -> auto-link + reuse user.
- *   c) No match -> NeedsRegistration (NO silent user creation).
+ *   c) No match -> the JIT gate ([JitProvisioningService]) may create the user, otherwise
+ *      NeedsRegistration.
  *
- * New user creation is ONLY done in [completeSocialRegistration], after the user has
+ * Without JIT, new user creation is ONLY done in [completeSocialRegistration], after the user has
  * confirmed their chosen username on the registration completion page. This ensures:
  *   - Tenant registrationEnabled policy is respected.
  *   - Users know their username before it is set.
  *   - Existing users are never modified.
+ *
+ * With JIT the tenant has already declared, per provider and per email domain, which identities it
+ * trusts; the gate still only ever creates, and only where no local user matched.
  */
 class SocialLoginService(
     private val identityProviderRepository: IdentityProviderRepository,
@@ -56,18 +63,25 @@ class SocialLoginService(
     private val tokenPort: TokenPort,
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
-    private val providerAdapters: Map<SocialProvider, SocialProviderPort>,
+    private val providerResolver: SocialProviderResolver,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
+    /** Null wires no gate at all, which is JIT switched off for every provider. */
+    private val jitProvisioning: JitProvisioningService? = null,
 ) {
     /**
      * Builds the provider authorization URL that the browser should be redirected to.
+     *
+     * [binding] carries the nonce and PKCE verifier the caller generated for this request and
+     * signed into its state; an OIDC provider sends the nonce and the derived challenge with the
+     * authorization request, and the compiled-in OAuth2 adapters ignore it.
      */
     fun buildRedirectUrl(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         state: String,
         baseUrl: String,
+        binding: OidcRequestBinding? = null,
     ): SocialLoginResult<String> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -79,15 +93,25 @@ class SocialLoginService(
         }
 
         val adapter =
-            providerAdapters[provider]
+            providerResolver.resolve(tenant.id, provider)
                 ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
+        // An OIDC adapter resolves its endpoints here, so this call reaches the network and can
+        // fail on a misconfigured issuer — an operator error, not a 500.
         val url =
-            adapter.buildAuthorizationUrl(
-                clientId = idp.clientId,
-                redirectUri = callbackUri(baseUrl, tenantSlug, provider),
-                state = state,
-            )
+            try {
+                adapter.buildAuthorizationUrl(
+                    clientId = idp.clientId,
+                    redirectUri = callbackUri(baseUrl, tenantSlug, provider),
+                    state = state,
+                    scopes = emptyList(),
+                    binding = binding,
+                )
+            } catch (e: Exception) {
+                return SocialLoginResult.Failure(
+                    SocialLoginError.ProviderError("Failed to build the authorization URL: ${e.message}"),
+                )
+            }
         return SocialLoginResult.Success(url)
     }
 
@@ -102,11 +126,14 @@ class SocialLoginService(
      */
     fun handleCallback(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         code: String,
         baseUrl: String,
         ipAddress: String? = null,
         userAgent: String? = null,
+        binding: OidcRequestBinding? = null,
+        /** The `client_id` this login began at, so a JIT-provisioned user gets its default roles. */
+        originatingClientId: String? = null,
     ): SocialLoginResult<SocialLoginSuccess> {
         val tenant =
             tenantRepository.findBySlug(tenantSlug)
@@ -118,7 +145,7 @@ class SocialLoginService(
         }
 
         val adapter =
-            providerAdapters[provider]
+            providerResolver.resolve(tenant.id, provider)
                 ?: return SocialLoginResult.Failure(SocialLoginError.ProviderNotConfigured)
 
         val profile =
@@ -128,6 +155,7 @@ class SocialLoginService(
                     redirectUri = callbackUri(baseUrl, tenantSlug, provider),
                     clientId = idp.clientId,
                     clientSecret = idp.clientSecret,
+                    binding = binding,
                 )
             } catch (e: Exception) {
                 return SocialLoginResult.Failure(
@@ -139,11 +167,18 @@ class SocialLoginService(
             return SocialLoginResult.Failure(SocialLoginError.EmailNotProvided)
         }
 
-        when (val match = resolveExistingUser(tenant.id, provider, profile)) {
+        when (val match = resolveExistingUser(tenant.id, idp, profile)) {
             is ExistingUserMatch.Linked -> return issueTokens(match.user, tenant, provider, false, ipAddress, userAgent)
             is ExistingUserMatch.EmailCollisionUnverified ->
                 return SocialLoginResult.Failure(SocialLoginError.LinkRequiresEmailVerification)
-            ExistingUserMatch.None ->
+            ExistingUserMatch.None -> {
+                // Reached only once no local user matches: JIT creates, it never claims.
+                val jit =
+                    jitProvisioning?.provision(tenant, idp, profile, originatingClientId, ipAddress, userAgent)
+                if (jit is JitOutcome.Provisioned) {
+                    return issueTokens(jit.user, tenant, provider, isNewUser = true, ipAddress, userAgent)
+                }
+                val refused = jit as? JitOutcome.Refused
                 return SocialLoginResult.NeedsRegistration(
                     SocialLoginNeedsRegistration(
                         provider = provider,
@@ -152,8 +187,11 @@ class SocialLoginService(
                         name = profile.name,
                         avatarUrl = profile.avatarUrl,
                         emailVerified = profile.emailVerified,
+                        jitRefusal = refused?.reason,
+                        jitReference = refused?.reference,
                     ),
                 )
+            }
         }
     }
 
@@ -168,7 +206,7 @@ class SocialLoginService(
      */
     fun completeSocialRegistration(
         tenantSlug: String,
-        provider: SocialProvider,
+        provider: ProviderKey,
         providerUserId: String,
         email: String,
         providerName: String?,
@@ -298,9 +336,10 @@ class SocialLoginService(
     // could claim any KotAuth account that shares that address.
     private fun resolveExistingUser(
         tenantId: TenantId,
-        provider: SocialProvider,
+        idp: IdentityProvider,
         profile: SocialUserProfile,
     ): ExistingUserMatch {
+        val provider = idp.provider
         val linked =
             socialAccountRepository.findByProviderIdentity(
                 tenantId = tenantId,
@@ -314,7 +353,11 @@ class SocialLoginService(
 
         val email = profile.email?.trim()?.lowercase() ?: return ExistingUserMatch.None
         val existingByEmail = userRepository.findByEmail(tenantId, email) ?: return ExistingUserMatch.None
-        if (!profile.emailVerified) return ExistingUserMatch.EmailCollisionUnverified
+        // Adopting an account on an address the issuer has not marked verified is a takeover
+        // path, so it is refused by default. `trustEmailClaim` is the operator asserting that
+        // this particular issuer's claim can be relied on — and unlike the provisioning gate,
+        // nothing narrows this one by domain, so it is the more consequential half of the switch.
+        if (!profile.emailVerified && !idp.trustEmailClaim) return ExistingUserMatch.EmailCollisionUnverified
 
         socialAccountRepository.save(
             SocialAccount(
@@ -337,7 +380,7 @@ class SocialLoginService(
     private fun issueTokens(
         user: User,
         tenant: Tenant,
-        provider: SocialProvider,
+        provider: ProviderKey,
         isNewUser: Boolean,
         ipAddress: String?,
         userAgent: String?,
@@ -409,8 +452,8 @@ class SocialLoginService(
     private fun callbackUri(
         baseUrl: String,
         tenantSlug: String,
-        provider: SocialProvider,
-    ): String = "$baseUrl/t/$tenantSlug/auth/social/${provider.value}/callback"
+        provider: ProviderKey,
+    ): String = socialCallbackUrl(baseUrl, tenantSlug, provider)
 }
 
 // ---------------------------------------------------------------------------
@@ -424,12 +467,16 @@ data class SocialLoginSuccess(
 )
 
 data class SocialLoginNeedsRegistration(
-    val provider: SocialProvider,
+    val provider: ProviderKey,
     val providerUserId: String,
     val email: String,
     val name: String?,
     val avatarUrl: String?,
     val emailVerified: Boolean,
+    /** Why the JIT gate refused, when it was on and refused. Null when JIT is off or absent. */
+    val jitRefusal: JitRefusal? = null,
+    /** The reference the gate recorded for that refusal, so the page shows the recorded one. */
+    val jitReference: String? = null,
 )
 
 sealed class SocialLoginResult<out T> {

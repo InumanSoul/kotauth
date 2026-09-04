@@ -1,11 +1,12 @@
 package com.kauth.domain.service
 
+import com.kauth.config.StaticSocialProviderResolver
 import com.kauth.domain.model.AccessType
 import com.kauth.domain.model.Application
 import com.kauth.domain.model.GrantType
+import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
-import com.kauth.domain.model.SocialProvider
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.fakes.FakeApplicationRepository
@@ -64,7 +65,7 @@ class ClientDefaultRolesRegistrationTest {
             tokenPort = tokens,
             passwordHasher = hasher,
             auditLog = auditLog,
-            providerAdapters = emptyMap(),
+            providerResolver = StaticSocialProviderResolver(emptyMap()),
             applicationRepository = apps,
             roleRepository = roles,
         )
@@ -185,7 +186,7 @@ class ClientDefaultRolesRegistrationTest {
         val result =
             socialService.completeSocialRegistration(
                 tenantSlug = "acme",
-                provider = SocialProvider.GOOGLE,
+                provider = ProviderKey.GOOGLE,
                 providerUserId = "google-uid-1",
                 email = "social@acme.test",
                 providerName = "Social User",
@@ -209,7 +210,7 @@ class ClientDefaultRolesRegistrationTest {
 
         socialService.completeSocialRegistration(
             tenantSlug = "acme",
-            provider = SocialProvider.GOOGLE,
+            provider = ProviderKey.GOOGLE,
             providerUserId = "google-uid-2",
             email = "social2@acme.test",
             providerName = "Social Two",

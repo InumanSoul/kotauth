@@ -1,6 +1,7 @@
 package com.kauth.adapter.social
 
-import com.kauth.domain.model.SocialProvider
+import com.kauth.domain.model.ProviderKey
+import com.kauth.domain.port.OidcRequestBinding
 import com.kauth.domain.port.SocialProviderPort
 import com.kauth.domain.port.SocialUserProfile
 import kotlinx.serialization.json.Json
@@ -36,7 +37,7 @@ import java.time.Duration
  *   - JSON parsing via kotlinx.serialization.json (already on the classpath via Ktor).
  */
 class GitHubOAuthAdapter : SocialProviderPort {
-    override val provider = SocialProvider.GITHUB
+    override val provider = ProviderKey.GITHUB
 
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -62,6 +63,7 @@ class GitHubOAuthAdapter : SocialProviderPort {
         redirectUri: String,
         state: String,
         scopes: List<String>,
+        binding: OidcRequestBinding?,
     ): String {
         val effectiveScopes = if (scopes.isEmpty()) DEFAULT_SCOPES else scopes
         val params =
@@ -79,6 +81,7 @@ class GitHubOAuthAdapter : SocialProviderPort {
         redirectUri: String,
         clientId: String,
         clientSecret: String,
+        binding: OidcRequestBinding?,
     ): SocialUserProfile {
         val accessToken = exchangeCode(code, redirectUri, clientId, clientSecret)
         return fetchProfile(accessToken)

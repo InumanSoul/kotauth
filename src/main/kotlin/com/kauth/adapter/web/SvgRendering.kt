@@ -1,5 +1,6 @@
 package com.kauth.adapter.web
 
+import com.kauth.domain.model.ProviderKey
 import kotlinx.html.HTMLTag
 import kotlinx.html.unsafe
 import java.nio.charset.StandardCharsets
@@ -41,6 +42,20 @@ object SvgRendering {
         )
     }
 }
+
+/**
+ * The icon file for a provider.
+ *
+ * Brand marks ship only for the two built-in adapters. Composing a name from the key —
+ * `"${provider.value}-logo"` — resolves to nothing for every brokered provider, and a missing
+ * icon renders as blank rather than as an error, so the gap is invisible in review.
+ */
+fun providerIconName(provider: ProviderKey): String =
+    when (provider) {
+        ProviderKey.GOOGLE -> "google-logo"
+        ProviderKey.GITHUB -> "github-logo"
+        else -> "globe"
+    }
 
 fun HTMLTag.inlineSvgIcon(
     iconName: String,
