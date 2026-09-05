@@ -15,18 +15,25 @@ interface UserRepository {
         tenantId: TenantId,
     ): User?
 
+    /**
+     * Exact-match username lookup. Usernames are stored normalized (trimmed, lowercased) by
+     * every write path, so this is effectively case-insensitive from a caller that also
+     * normalizes its input before calling — which is what
+     * [com.kauth.domain.service.UserIdentifierResolver] does for sign-in: it lowercases the
+     * submitted identifier first, then calls this exact-match method.
+     */
     fun findByUsername(
         tenantId: TenantId,
         username: String,
     ): User?
 
     /**
-     * Case-insensitive username lookup. Usernames are stored as-is and [findByUsername] is an
-     * exact match, but emails are lowercased on write — so matching a submitted email against
-     * existing usernames (as [com.kauth.domain.service.IdentifierCollisionCheck] does) must
-     * ignore case on both sides or a differently-cased pair slips through. Not for sign-in
-     * resolution: [com.kauth.domain.service.UserIdentifierResolver] intentionally keeps using the
-     * case-sensitive [findByUsername].
+     * Case-insensitive username lookup, for callers that cannot first normalize their input.
+     * Emails are lowercased on write but are a separate namespace from usernames, so matching a
+     * submitted email against existing usernames (as
+     * [com.kauth.domain.service.IdentifierCollisionCheck] does) must ignore case explicitly
+     * rather than relying on the input already being lowercase — this method exists for exactly
+     * that comparison. Sign-in does not need it: see [findByUsername].
      */
     fun findByUsernameIgnoreCase(
         tenantId: TenantId,
@@ -64,9 +71,14 @@ interface UserRepository {
         search: String? = null,
     ): Long
 
+    /** Persists [user] verbatim — callers must pass an already-normalized (trimmed, lowercased) username. */
     fun save(user: User): User
 
-    /** Updates mutable profile fields (username, email, fullName, emailVerified, enabled). */
+    /**
+     * Updates mutable profile fields (username, email, fullName, emailVerified, enabled).
+     * Persists [user]'s username verbatim — callers must pass an already-normalized
+     * (trimmed, lowercased) value.
+     */
     fun update(user: User): User
 
     /**

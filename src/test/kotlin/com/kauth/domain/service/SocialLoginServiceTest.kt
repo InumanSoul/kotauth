@@ -60,6 +60,7 @@ class SocialLoginServiceTest {
                         ProviderKey.GITHUB to githubAdapter,
                     ),
                 ),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private val tenant =
@@ -397,6 +398,44 @@ class SocialLoginServiceTest {
             )
         assertIs<SocialLoginResult.Failure>(result)
         assertEquals(SocialLoginError.UsernameConflict, result.error)
+    }
+
+    @Test
+    fun `completeSocialRegistration - chosen username equal to a different user's email is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                email = "brand-new@example.com",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                // Collides with alice's email, not her username.
+                chosenUsername = "alice@example.com",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(null, users.findByEmail(TenantId(1), "brand-new@example.com"), "No account should be created")
+    }
+
+    @Test
+    fun `completeSocialRegistration - email equal to a different user's username is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                // "alice" is an existing user's username, not their email.
+                email = "alice",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "brandnewname",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(false, users.existsByUsername(TenantId(1), "brandnewname"), "No account should be created")
     }
 
     @Test

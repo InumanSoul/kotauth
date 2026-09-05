@@ -67,6 +67,7 @@ class SocialLoginJitBranchTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver = StaticSocialProviderResolver(mapOf(oriana to adapter)),
+            collisionCheck = IdentifierCollisionCheck(users),
             jitProvisioning = jit,
         )
 

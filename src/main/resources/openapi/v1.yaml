@@ -165,6 +165,7 @@ components:
         username:
           type: string
           pattern: "^[a-zA-Z0-9._@+-]+$"
+          maxLength: 255
           description: Generated from the name and email when omitted or blank.
         email:    { type: string, format: email }
         fullName: { type: string }
@@ -179,6 +180,7 @@ components:
         username:
           type: string
           pattern: "^[a-zA-Z0-9._@+-]+$"
+          maxLength: 255
           description: Omit to leave the existing username unchanged.
 
     InviteUserRequest:
@@ -191,7 +193,8 @@ components:
       properties:
         username:
           type: string
-          maxLength: 128
+          pattern: "^[a-zA-Z0-9._@+-]+$"
+          maxLength: 255
           description: Generated from the name and email when omitted or blank.
         email:    { type: string, format: email }
         fullName: { type: string }

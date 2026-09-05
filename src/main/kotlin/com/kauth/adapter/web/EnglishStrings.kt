@@ -580,6 +580,9 @@ object EnglishStrings {
     const val LOGIN_IDENTIFIER_EITHER = "Username or email"
     const val LOGIN_IDENTIFIER_EITHER_PLACEHOLDER = "Username or email address"
 
+    // Admin — security policy form validation
+    const val SECURITY_POLICY_INVALID_LOGIN_IDENTIFIER_MODE = "Not a recognised sign-in identifier mode."
+
     // Shared sign-in failure. Deliberately vague and mode-agnostic: it must not reveal
     // whether an account exists, nor which identifier namespace was matched.
     const val LOGIN_INVALID_CREDENTIALS = "Invalid sign-in details."

@@ -515,6 +515,7 @@ data class ServiceGraph(
                             tokenValidator = oidcTokenValidator,
                             formPoster = JdkHttpFormPoster(),
                         ),
+                    collisionCheck = identifierCollisionCheck,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
                     jitProvisioning = jitProvisioningService,

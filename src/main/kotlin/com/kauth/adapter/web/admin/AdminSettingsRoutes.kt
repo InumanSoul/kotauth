@@ -420,6 +420,20 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
+        val loginIdentifierModeRaw = params["loginIdentifierMode"]
+        val parsedLoginIdentifierMode = LoginIdentifierMode.parseOrNull(loginIdentifierModeRaw)
+        if (loginIdentifierModeRaw != null && parsedLoginIdentifierMode == null) {
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.securityPolicyPage(
+                    workspace,
+                    wsPairs,
+                    session.username,
+                    error = EnglishStrings.SECURITY_POLICY_INVALID_LOGIN_IDENTIFIER_MODE,
+                ),
+            )
+        }
+
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
                 passwordPolicyMinLength =
@@ -439,8 +453,7 @@ fun Route.adminSettingsRoutes(
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
-                loginIdentifierMode =
-                    params["loginIdentifierMode"]?.let { LoginIdentifierMode.fromStorage(it) } ?: s.loginIdentifierMode,
+                loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
             )
 
         when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {

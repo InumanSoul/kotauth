@@ -400,7 +400,12 @@ class BackupImporterService(
                 )
             val savedId =
                 saved.id ?: error("UserRepository.save returned a user with null id for '$normalizedUsername'")
+            // Audit events reference the ORIGINAL exported username (pre-normalization), so a
+            // legacy backup with mixed-case usernames must resolve under that key too. Keying on
+            // the original first (see lookup below) avoids two different original usernames that
+            // normalize to the same value from clobbering each other's resolution.
             userPkByUsername[normalizedUsername] = savedId
+            userPkByUsername[ub.username] = savedId
 
             ub.customAttributes.forEach { (key, value) ->
                 userAttributeRepository.upsert(
@@ -458,7 +463,8 @@ class BackupImporterService(
             auditLogPort?.record(
                 AuditEvent(
                     tenantId = createdTenant.id,
-                    userId = ev.username?.let { userPkByUsername[it] },
+                    userId =
+                        ev.username?.let { userPkByUsername[it] ?: userPkByUsername[UsernamePolicy.normalize(it)] },
                     clientId = ev.clientId?.let { appPkByClientId[it] },
                     eventType =
                         runCatching { AuditEventType.valueOf(ev.eventType) }

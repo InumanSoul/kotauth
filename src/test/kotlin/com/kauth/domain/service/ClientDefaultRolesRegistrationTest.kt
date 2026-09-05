@@ -68,6 +68,7 @@ class ClientDefaultRolesRegistrationTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver = StaticSocialProviderResolver(emptyMap()),
+            collisionCheck = IdentifierCollisionCheck(users),
             applicationRepository = apps,
             roleRepository = roles,
         )

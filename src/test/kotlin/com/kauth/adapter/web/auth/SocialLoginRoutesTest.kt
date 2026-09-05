@@ -148,6 +148,7 @@ class SocialLoginRoutesTest {
                 StaticSocialProviderResolver(
                     mapOf(ProviderKey.GOOGLE to googleAdapter, orianaKey to orianaAdapter),
                 ),
+            collisionCheck = IdentifierCollisionCheck(userRepo),
             jitProvisioning =
                 JitProvisioningService(
                     userRepository = userRepo,

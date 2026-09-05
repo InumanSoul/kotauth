@@ -64,6 +64,7 @@ class SocialLoginService(
     private val passwordHasher: PasswordHasher,
     private val auditLog: AuditLogPort,
     private val providerResolver: SocialProviderResolver,
+    private val collisionCheck: IdentifierCollisionCheck,
     private val applicationRepository: ApplicationRepository? = null,
     private val roleRepository: RoleRepository? = null,
     /** Null wires no gate at all, which is JIT switched off for every provider. */
@@ -277,6 +278,13 @@ class SocialLoginService(
         if (userRepository.existsByUsername(tenant.id, username)) {
             return SocialLoginResult.Failure(SocialLoginError.UsernameConflict)
         }
+
+        // Same-namespace duplicates are ruled out above; this catches the cross-namespace
+        // pair — this username equal to a DIFFERENT user's email, or vice versa — that the
+        // database's separate unique constraints would otherwise allow through.
+        collisionCheck
+            .check(tenant.id, username, normalizedEmail)
+            ?.let { return SocialLoginResult.Failure(SocialLoginError.InvalidUsername(it)) }
 
         // Create the new user — social users get an unusable password hash so they cannot
         // log in via password until they explicitly set one through the self-service portal.

@@ -104,7 +104,7 @@ before upgrading:
   right after the upgrade.
 - **The migration aborts the upgrade if it would have to merge two
   identities.** If two usernames in the same tenant would normalize to the
-  same value — e.g. `Dave` and `dave`, or `john.doe` and `John_Doe` — `V66`
+  same value — e.g. `Dave` and `dave`, or `john.doe` and `John Doe` — `V66`
   raises an exception and the migration (and therefore the upgrade) does
   not complete. This is deliberate: silently merging or dropping one of the
   two accounts would be worse than a blocked upgrade. The operator must

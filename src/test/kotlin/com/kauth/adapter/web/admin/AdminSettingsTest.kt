@@ -448,7 +448,49 @@ class AdminSettingsTest {
         }
 
     @Test
-    fun `POST security settings with a garbage identifier mode falls back to USERNAME without erroring`() =
+    fun `POST security settings with a garbage identifier mode is rejected and leaves the persisted mode unchanged`() =
+        testApplication {
+            // A present-but-unrecognised value must never coerce to USERNAME: for an EMAIL-mode
+            // workspace that coercion is a silent lockout for anyone who only knows their email.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "NONSENSE")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+                "The persisted mode must not change on a rejected update",
+            )
+        }
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode USERNAME`() =
         testApplication {
             application { installTestApp() }
             val authed =
@@ -458,12 +500,20 @@ class AdminSettingsTest {
                 }
             login(authed)
 
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+
             val response =
                 authed.submitForm(
                     url = "/admin/workspaces/acme/settings/security",
                     formParameters =
                         Parameters.build {
-                            append("loginIdentifierMode", "NONSENSE")
+                            append("loginIdentifierMode", "USERNAME")
                         },
                 )
 
