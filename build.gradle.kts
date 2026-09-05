@@ -78,7 +78,7 @@ dependencies {
     // MockK — Kotlin-native mocking (HTTP integration tests only)
     testImplementation("io.mockk:mockk:1.13.16")
     // JUnit 5 engine
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.3")
     // Testcontainers — Redis/Postgres integration tests (tagged @Tag("redis")/@Tag("postgres");
     // excluded from `make test`)
     testImplementation("org.testcontainers:testcontainers:$testcontainersVersion")
