@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.AppInfo
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.ProviderKind
@@ -149,6 +150,12 @@ class AdminSettingsTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = buildCredentialFlowService(),
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private fun buildAppMgmtService() =
@@ -350,6 +357,280 @@ class AdminSettingsTest {
 
             assertEquals(HttpStatusCode.Found, response.status)
             assertTrue(response.headers["Location"]?.contains("saved=true") == true)
+        }
+
+    @Test
+    fun `POST security settings omitting mfaPolicy preserves a required tenant`() =
+        testApplication {
+            // mfaPolicy is absent from a partial/programmatic POST here. It must fall back to
+            // the tenant's persisted value (not to "optional") so an operator saving unrelated
+            // fields on this form can never silently downgrade a required-MFA policy.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters = Parameters.build { append("mfaPolicy", "required") },
+            )
+            assertEquals("required", tenantRepo.findBySlug("acme")!!.securityConfig.mfaPolicy)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("required", tenantRepo.findBySlug("acme")!!.securityConfig.mfaPolicy)
+        }
+
+    // =========================================================================
+    // Security policy settings — sign-in identifier mode
+    // =========================================================================
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode EITHER`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "EITHER")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode EMAIL`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "EMAIL")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings with a garbage identifier mode is rejected and leaves the persisted mode unchanged`() =
+        testApplication {
+            // A present-but-unrecognised value must never coerce to USERNAME: for an EMAIL-mode
+            // workspace that coercion is a silent lockout for anyone who only knows their email.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "NONSENSE")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+                "The persisted mode must not change on a rejected update",
+            )
+        }
+
+    @Test
+    fun `POST security settings persists sign-in identifier mode USERNAME`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters =
+                        Parameters.build {
+                            append("loginIdentifierMode", "USERNAME")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.USERNAME,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings omitting the identifier field preserves an EITHER tenant`() =
+        testApplication {
+            // The field is absent from a partial/programmatic POST here. loginIdentifierMode
+            // must fall back to the tenant's persisted value (not to USERNAME) so an operator
+            // saving unrelated fields on this form can never silently narrow the sign-in surface.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EITHER")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EITHER,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `POST security settings omitting the identifier field preserves an EMAIL tenant`() =
+        testApplication {
+            // EMAIL mode performs only findByEmail (UserIdentifierResolver). Resetting this to
+            // USERNAME on a field omission would lock out every user who does not know a
+            // username, silently, behind an ordinary 302 — this is the case with real lockout
+            // consequences, not just a policy relaxation.
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+
+            authed.submitForm(
+                url = "/admin/workspaces/acme/settings/security",
+                formParameters =
+                    Parameters.build {
+                        append("loginIdentifierMode", "EMAIL")
+                    },
+            )
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/settings/security",
+                    formParameters = Parameters.build { },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals(
+                LoginIdentifierMode.EMAIL,
+                tenantRepo.findBySlug("acme")!!.securityConfig.loginIdentifierMode,
+            )
+        }
+
+    @Test
+    fun `security policy page renders the three sign-in identifier options with the current one checked`() =
+        testApplication {
+            tenantRepo.update(
+                workspace.copy(
+                    securityConfig = workspace.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+                ),
+            )
+            application { installTestApp() }
+            val authed = createClient { install(HttpCookies) }
+            login(authed)
+
+            val body = authed.get("/admin/workspaces/acme/settings/security").bodyAsText()
+
+            val radios =
+                Regex("""<input[^>]*name="loginIdentifierMode"[^>]*>""")
+                    .findAll(body)
+                    .map { it.value }
+                    .toList()
+            assertEquals(3, radios.size)
+
+            val usernameRadio = radios.first { it.contains("value=\"USERNAME\"") }
+            val emailRadio = radios.first { it.contains("value=\"EMAIL\"") }
+            val eitherRadio = radios.first { it.contains("value=\"EITHER\"") }
+
+            assertFalse(usernameRadio.contains("checked"))
+            assertTrue(emailRadio.contains("checked"))
+            assertFalse(eitherRadio.contains("checked"))
         }
 
     // =========================================================================

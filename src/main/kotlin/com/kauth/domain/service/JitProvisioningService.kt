@@ -84,7 +84,16 @@ class JitProvisioningService(
                 ?.trim()
                 ?.lowercase()
                 ?.ifBlank { null }
-        if (email == null || !isDomainAllowed(email, provider.jitAllowedDomains)) {
+        // The address is also the username (see below), so it must satisfy UsernamePolicy too —
+        // an IdP-supplied local part is not guaranteed to. Folded into the same refusal bucket as
+        // the domain check rather than a new category: both mean "this address is not one we can
+        // provision an account for here", and a distinct message would only tell an attacker more
+        // about which half of the address rule tripped.
+        val addressUsable =
+            email != null &&
+                isDomainAllowed(email, provider.jitAllowedDomains) &&
+                UsernamePolicy.isValid(email)
+        if (!addressUsable) {
             return refuse(tenant, provider, profile, JitRefusal.DOMAIN_NOT_ALLOWED, ipAddress, userAgent)
         }
 

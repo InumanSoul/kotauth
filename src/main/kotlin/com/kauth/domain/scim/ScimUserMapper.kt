@@ -3,6 +3,7 @@ package com.kauth.domain.scim
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
+import com.kauth.domain.service.UsernamePolicy
 
 private const val USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
 
@@ -129,9 +130,30 @@ object ScimUserMapper {
         // or, for `active`, silently leaves an account enabled after a deprovision.
         resource.validateAttributeShapes(ScimResourceScope.USER).getOrElse { return Result.failure(it) }
 
-        val username = (resource.attributes["userName"] as? ScimValue.Str)?.value?.trim()
-        if (username.isNullOrEmpty()) {
+        val suppliedUsername = (resource.attributes["userName"] as? ScimValue.Str)?.value?.trim()
+        if (suppliedUsername.isNullOrEmpty()) {
             return Result.failure(ScimFailure(ScimErrorType.invalidValue, "userName is required"))
+        }
+        // Same normalization every other write path applies (see UsernamePolicy) — usernames are
+        // ALWAYS stored trimmed and lowercased. A connector deserves a diagnostic naming exactly
+        // why its value was refused, not a silent rewrite it can't detect from the 200 response.
+        val username = UsernamePolicy.normalize(suppliedUsername)
+        when (UsernamePolicy.validate(username)) {
+            UsernamePolicy.Violation.INVALID_FORMAT ->
+                return Result.failure(
+                    ScimFailure(
+                        ScimErrorType.invalidValue,
+                        "userName may only contain letters, digits, dots, underscores, hyphens, @, and +.",
+                    ),
+                )
+            UsernamePolicy.Violation.TOO_LONG ->
+                return Result.failure(
+                    ScimFailure(
+                        ScimErrorType.invalidValue,
+                        "userName must be ${UsernamePolicy.MAX_LENGTH} characters or fewer.",
+                    ),
+                )
+            null -> Unit
         }
 
         // `name` is singular complex (RFC 7643 §4.1.1); a scalar written over it is rejected by

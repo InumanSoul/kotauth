@@ -1,7 +1,9 @@
 package com.kauth.domain.service
 
 import com.kauth.domain.model.AuditEventType
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.RequiredAction
+import com.kauth.domain.model.SecurityConfig
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
@@ -18,6 +20,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -46,6 +49,8 @@ class AuthServiceTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             sessionRepository = sessions,
+            identifierResolver = UserIdentifierResolver(users),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     // -------------------------------------------------------------------------
@@ -272,6 +277,41 @@ class AuthServiceTest {
     }
 
     @Test
+    fun `register normalizes a mixed-case username to lowercase before storing`() {
+        val result =
+            svc.register("acme", "Dave", "dave@x.com", "Dave", "Password8!", "Password8!", "http://localhost")
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("dave", result.value.username)
+    }
+
+    @Test
+    fun `register trims surrounding whitespace from the username before storing`() {
+        val result =
+            svc.register("acme", "  ana  ", "ana@x.com", "Ana", "Password8!", "Password8!", "http://localhost")
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("ana", result.value.username)
+    }
+
+    @Test
+    fun `register rejects a username with characters outside the allowed set even after normalizing`() {
+        // register previously had NO username format validation at all — this is the
+        // regression test for that gap.
+        val result =
+            svc.register(
+                "acme",
+                "john doe",
+                "johndoe@x.com",
+                "John Doe",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+        assertTrue(users.findByEmail(TenantId(1), "johndoe@x.com") == null, "invalid username must not be persisted")
+    }
+
+    @Test
     fun `register returns ValidationError when passwords do not match`() {
         val result = svc.register("acme", "bob", "bob@x.com", "Bob", "passA1!x", "passB1!x", "http://localhost")
         assertIs<AuthResult.Failure>(result)
@@ -330,6 +370,114 @@ class AuthServiceTest {
         assertEquals("bob@x.com", saved.email)
         assertNotNull(saved.id)
         assertTrue(auditLog.hasEvent(AuditEventType.REGISTER_SUCCESS))
+    }
+
+    @Test
+    fun `register rejects a username equal to a different user's email`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "carol",
+                email = "taken@example.com",
+                fullName = "Carol",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        val result =
+            svc.register(
+                "acme",
+                "taken@example.com",
+                "newguy@example.com",
+                "New Guy",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        // Pins the deliberate choice: neither UserAlreadyExists nor EmailAlreadyExists fits a
+        // cross-namespace collision, so it must come back as ValidationError.
+        assertIs<AuthError.ValidationError>(result.error)
+    }
+
+    @Test
+    fun `register rejects an email equal to a different user's username`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "dave@example.com",
+                email = "dave-actual@example.com",
+                fullName = "Dave",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        val result =
+            svc.register(
+                "acme",
+                "newguy2",
+                "dave@example.com",
+                "New Guy Two",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
+    }
+
+    @Test
+    fun `register allows a username equal to the registrant's own email`() {
+        // This is the legal shape integrators want; the collision check must not reject a user
+        // colliding only with themselves.
+        val result =
+            svc.register(
+                "acme",
+                "frank@example.com",
+                "frank@example.com",
+                "Frank",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Success<User>>(result)
+        assertEquals("frank@example.com", result.value.username)
+        assertEquals("frank@example.com", result.value.email)
+    }
+
+    @Test
+    fun `register collision check compares the same normalised values that get persisted`() {
+        users.add(
+            User(
+                tenantId = TenantId(1),
+                username = "erin",
+                email = "taken@example.com",
+                fullName = "Erin",
+                passwordHash = hasher.hash("x"),
+                enabled = true,
+            ),
+        )
+
+        // register persists username.trim() — untrimmed, differently-cased whitespace around the
+        // raw parameter must not let this slip past the check.
+        val result =
+            svc.register(
+                "acme",
+                "  TAKEN@example.com  ",
+                "newguy3@example.com",
+                "New Guy Three",
+                "Password8!",
+                "Password8!",
+                "http://localhost",
+            )
+
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.ValidationError>(result.error)
     }
 
     // =========================================================================
@@ -559,5 +707,133 @@ class AuthServiceTest {
         val before = hasher.verifyCallCount
         svc.authenticate("acme", "alice", "correct-pass")
         assertTrue(hasher.verifyCallCount > before, "Dummy verify must run when the user has a pending invite")
+    }
+
+    // -------------------------------------------------------------------------
+    // Login identifier resolution (username / email / either)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `authenticate succeeds by email in EMAIL mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice@example.com", "correct-pass")
+        assertIs<AuthResult.Success<User>>(result)
+    }
+
+    @Test
+    fun `authenticate rejects username in EMAIL mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EMAIL),
+            ),
+        )
+        val result = svc.authenticate("acme", "alice", "correct-pass")
+        assertIs<AuthResult.Failure>(result)
+        assertIs<AuthError.InvalidCredentials>(result.error)
+    }
+
+    @Test
+    fun `authenticate accepts both identifiers in EITHER mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice", "correct-pass"))
+        assertIs<AuthResult.Success<User>>(svc.authenticate("acme", "alice@example.com", "correct-pass"))
+    }
+
+    @Test
+    fun `authenticate matches a stored lowercase username case-insensitively in USERNAME mode`() {
+        users.add(activeUser.copy(id = UserId(30), username = "dave", email = "dave@example.com"))
+        for (typed in listOf("Dave", "DAVE", "  dave  ")) {
+            val result = svc.authenticate("acme", typed, "correct-pass")
+            assertIs<AuthResult.Success<User>>(result, "expected success for submitted '$typed'")
+            assertEquals("dave", result.value.username)
+        }
+    }
+
+    @Test
+    fun `authenticate matches a stored lowercase username case-insensitively in EITHER mode`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.add(activeUser.copy(id = UserId(31), username = "dave", email = "dave@example.com"))
+        for (typed in listOf("Dave", "DAVE", "  dave  ")) {
+            val result = svc.authenticate("acme", typed, "correct-pass")
+            assertIs<AuthResult.Success<User>>(result, "expected success for submitted '$typed'")
+            assertEquals("dave", result.value.username)
+        }
+    }
+
+    @Test
+    fun `ambiguous identifier fails with the same error as a miss and is audited`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.clear()
+        users.add(activeUser.copy(id = UserId(20), username = "shared@example.com", email = "one@example.com"))
+        users.add(activeUser.copy(id = UserId(21), username = "two", email = "shared@example.com"))
+
+        val ambiguous = svc.authenticate("acme", "shared@example.com", "correct-pass")
+        assertIs<AuthResult.Failure>(ambiguous)
+        assertIs<AuthError.InvalidCredentials>(ambiguous.error)
+
+        val event = auditLog.events.last()
+        assertEquals(AuditEventType.LOGIN_FAILED, event.eventType)
+        assertEquals("ambiguous_identifier", event.details["reason"])
+        assertNull(event.userId, "must not identify either colliding account")
+        assertTrue(
+            event.details.values.none { it.contains("shared@example.com") },
+            "must not record the raw submitted identifier",
+        )
+    }
+
+    @Test
+    fun `ambiguous and missing identifiers both perform exactly one hash operation`() {
+        tenants.clear()
+        tenants.add(
+            testTenant.copy(
+                securityConfig = SecurityConfig(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+        users.clear()
+        users.add(activeUser.copy(id = UserId(20), username = "shared@example.com", email = "one@example.com"))
+        users.add(activeUser.copy(id = UserId(21), username = "two", email = "shared@example.com"))
+
+        hasher.verifyCount = 0
+        svc.authenticate("acme", "shared@example.com", "correct-pass")
+        val ambiguousHashes = hasher.verifyCount
+
+        hasher.verifyCount = 0
+        svc.authenticate("acme", "nobody-at-all", "correct-pass")
+        val missHashes = hasher.verifyCount
+
+        assertEquals(1, ambiguousHashes)
+        assertEquals(missHashes, ambiguousHashes)
+    }
+
+    @Test
+    fun `authenticate trims surrounding whitespace from the submitted identifier`() {
+        // USERNAME mode is the tenant default (testTenant / @BeforeTest).
+        val trimmed = svc.authenticate("acme", "  alice  ", "correct-pass")
+        val exact = svc.authenticate("acme", "alice", "correct-pass")
+
+        assertIs<AuthResult.Success<User>>(trimmed)
+        assertIs<AuthResult.Success<User>>(exact)
+        assertEquals(exact.value.id, trimmed.value.id)
     }
 }

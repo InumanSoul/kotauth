@@ -7,6 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.24.0] - 2026-09-04
+
+### Added
+
+- **Per-workspace sign-in identifier mode.** The Sign-In Identifier section of
+  the workspace Security Policy page offers three modes: `Username only`
+  (today's behaviour, and the default), `Email only`, and
+  `Username or email`. In the last mode, both namespaces are always checked —
+  never short-circuited, so a miss and a hit cost the same two lookups — and
+  a value that matches one account's username and a *different* account's
+  email is refused rather than guessed, with the same generic failure as any
+  other bad credential. Migration `V65` adds
+  `tenant_security_config.login_identifier_mode`, defaulting every existing
+  workspace to `USERNAME` — **existing workspaces are unaffected until an
+  admin changes the setting.** The hosted login form's identifier label,
+  input type, and `autocomplete` hint adapt to the chosen mode.
+- **Auto-generated usernames.** A user provisioned without one through the
+  admin API or admin UI — an invite or a create call supplying only a name
+  and email — now gets a readable username generated from the given name
+  (or the email's local part) plus a short random suffix, checked against
+  both the username and email namespaces so generation can never manufacture
+  the collision below. SCIM is unaffected: `userName` is REQUIRED by RFC
+  7643, so a SCIM push that omits it is still rejected rather than
+  generated.
+- **Admin-editable usernames.** Usernames were previously immutable after
+  creation. An administrator can now rename a user's username from the admin
+  UI or the admin API, subject to the same collision check as creation.
+
+### Changed
+
+- **Generic sign-in failure message.** "Invalid username or password."
+  became **"Invalid sign-in details."**, since the old wording named
+  "username", which was misleading for a workspace in `Email only` mode.
+- **Sign-in identifiers are now trimmed of surrounding whitespace** before
+  lookup; previously they were passed through raw. In `Username only` mode
+  this means a username pasted with a trailing space, which previously
+  failed, now signs in. This is safe because every write path now
+  normalizes (trims and lowercases) before storing, so a stored username can
+  no longer carry leading or trailing whitespace at all — trimming at lookup
+  can only ever resolve the same account the untrimmed value would have,
+  never a different one.
+- **Sign-in now matches usernames case-insensitively.** Usernames are
+  always stored lowercase, and the submitted identifier is lowercased
+  before lookup in `Username only` and `Username or email` modes. A user
+  who was created or previously signed in as `Dave` still signs in with
+  `Dave`, `DAVE`, or `dave`.
+
+### Security
+
+- **Usernames are always normalized.** Every path that can create or rename
+  a username — admin create, admin rename, self-registration, social login,
+  JIT provisioning, email-OTP sign-up, and backup import — now trims,
+  lowercases, and validates the result against `[a-zA-Z0-9._@+-]+` before
+  writing it, rejecting the write if it doesn't produce a valid value.
+  Self-registration previously ran no username validation at all. A backup
+  record whose username doesn't normalize into something valid is now
+  rejected by name during import instead of being written verbatim.
+- **Username/email collision prevention.** Creating or updating a user whose
+  username equals a different user's email address (or vice versa) is now
+  rejected — across admin user creation, admin user update, SCIM, and
+  self-registration. The two namespaces are separately unique in the
+  database, so without this check a pair could exist that `Username or
+  email` mode cannot resolve. A user whose username *is* their own email
+  address remains fully supported and is unaffected by this check.
+- **Email sign-in does not require a verified email address, by design.**
+  Username sign-in has never checked `emailVerified`, and gating email
+  sign-in on it would lock out invite- and SCIM-provisioned users who never
+  completed verification — exactly the users this feature exists to serve.
+
+### Fixed
+
+- **Admin username renames now actually persist against Postgres.**
+  `PostgresUserRepository.update()` never wrote the `username` column, so
+  renaming a user's username from the admin UI or admin API silently had no
+  effect against a real database while the request appeared to succeed.
+
+### Migrations
+
+- `V65__login_identifier_mode.sql` — adds
+  `tenant_security_config.login_identifier_mode`, `NOT NULL DEFAULT
+  'USERNAME'`, constrained to `USERNAME` / `EMAIL` / `EITHER`. Additive only:
+  every existing workspace keeps its current sign-in behaviour.
+- `V66__normalize_usernames.sql` — rewrites every existing username to its
+  normalized form (lowercased, trimmed, each run of characters outside
+  `[a-z0-9._@+-]` collapsed to a single `.`, then leading/trailing `.`/`_`/`-`
+  stripped), adds `CHECK (username = lower(username))` so storage being
+  lowercase is enforced by the database and not just application code, and
+  adds a unique index on `(tenant_id, lower(username))` to enforce the rule
+  going forward. **This changes existing users' sign-in identifiers** — a
+  user stored as `"John Doe"` becomes `john.doe` — so operators should tell
+  affected users their new identifier. **The migration aborts the upgrade**
+  if two usernames in one tenant would normalize to the same value (e.g.
+  `Dave` and `dave`), or if any username would normalize to an empty or
+  still-invalid value — most notably a username made entirely of a
+  non-Latin script (e.g. `Иван`, `用户`), which would otherwise silently
+  become `''` and leave that user unable to sign in by username again. See
+  `docs/guides/sign-in-identifier.md` for pre-flight queries to find and
+  resolve both cases before upgrading, and for a rolling-deploy note: once
+  `V66` runs, an old replica still doing a case-exact username comparison
+  will fail to match a user whose stored username was just rewritten, until
+  the last old replica drains.
+
+---
+
 ## [1.23.0] - 2026-09-03
 
 ### Added

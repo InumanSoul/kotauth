@@ -60,6 +60,7 @@ class SocialLoginServiceTest {
                         ProviderKey.GITHUB to githubAdapter,
                     ),
                 ),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private val tenant =
@@ -400,6 +401,44 @@ class SocialLoginServiceTest {
     }
 
     @Test
+    fun `completeSocialRegistration - chosen username equal to a different user's email is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                email = "brand-new@example.com",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                // Collides with alice's email, not her username.
+                chosenUsername = "alice@example.com",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(null, users.findByEmail(TenantId(1), "brand-new@example.com"), "No account should be created")
+    }
+
+    @Test
+    fun `completeSocialRegistration - email equal to a different user's username is rejected`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "brand-new-uid",
+                // "alice" is an existing user's username, not their email.
+                email = "alice",
+                providerName = "Brand New",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "brandnewname",
+            )
+        assertIs<SocialLoginResult.Failure>(result)
+        assertIs<SocialLoginError.InvalidUsername>(result.error)
+        assertEquals(false, users.existsByUsername(TenantId(1), "brandnewname"), "No account should be created")
+    }
+
+    @Test
     fun `completeSocialRegistration - success creates user and social link`() {
         val result =
             svc.completeSocialRegistration(
@@ -425,6 +464,25 @@ class SocialLoginServiceTest {
         assertEquals("brandnew", users.findById(newSocialAccount.userId, TenantId(1))?.username)
         assertTrue(auditLog.hasEvent(AuditEventType.LOGIN_SUCCESS))
         assertEquals(1, sessions.all().size)
+    }
+
+    @Test
+    fun `completeSocialRegistration - normalizes a mixed-case chosen username to lowercase`() {
+        val result =
+            svc.completeSocialRegistration(
+                tenantSlug = "acme",
+                provider = ProviderKey.GOOGLE,
+                providerUserId = "new-uid-1000",
+                email = "another-new@example.com",
+                providerName = "Another New User",
+                avatarUrl = null,
+                emailVerified = true,
+                chosenUsername = "BrandNew",
+                ipAddress = "1.2.3.4",
+                userAgent = "TestAgent",
+            )
+        assertIs<SocialLoginResult.Success<SocialLoginSuccess>>(result)
+        assertEquals("brandnew", result.value.user.username)
     }
 
     @Test

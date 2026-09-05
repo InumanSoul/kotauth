@@ -477,6 +477,19 @@ object EnglishStrings {
     const val ADMIN_SECURITY_PASSWORD_POLICY_SECTION = "Password Policy"
     const val ADMIN_SECURITY_PASSWORD_REQUIREMENTS_SECTION = "Password Requirements"
 
+    // Admin — sign-in identifier (workspace security policy)
+    const val ADMIN_SIGNIN_IDENTIFIER_SECTION = "Sign-In Identifier"
+    const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_LABEL = "Username only"
+    const val ADMIN_SIGNIN_IDENTIFIER_USERNAME_DESC =
+        "Users sign in with their username. This is the default."
+    const val ADMIN_SIGNIN_IDENTIFIER_EMAIL_LABEL = "Email only"
+    const val ADMIN_SIGNIN_IDENTIFIER_EMAIL_DESC =
+        "Users sign in with their email address."
+    const val ADMIN_SIGNIN_IDENTIFIER_EITHER_LABEL = "Username or email"
+    const val ADMIN_SIGNIN_IDENTIFIER_EITHER_DESC =
+        "Users may enter either. If a value matches one account's username and another's " +
+            "email, sign-in is refused rather than guessing."
+
     const val ADMIN_PASSKEYS_PAGE_TITLE = "Passkeys"
     const val ADMIN_PASSKEYS_ENROLLMENT_LABEL = "Passkey enrollment"
     const val ADMIN_PASSKEYS_ENROLLMENT_HINT = "users have enrolled at least one passkey"
@@ -560,6 +573,19 @@ object EnglishStrings {
     const val LOGIN_REGISTRATION_SUCCESS = "Account created successfully. Please sign in."
     const val LOGIN_USERNAME = "Username"
     const val LOGIN_USERNAME_PLACEHOLDER = "Enter your username"
+
+    // Login page — identifier field, per workspace sign-in identifier mode
+    const val LOGIN_IDENTIFIER_EMAIL = "Email address"
+    const val LOGIN_IDENTIFIER_EMAIL_PLACEHOLDER = "Enter your email address"
+    const val LOGIN_IDENTIFIER_EITHER = "Username or email"
+    const val LOGIN_IDENTIFIER_EITHER_PLACEHOLDER = "Username or email address"
+
+    // Admin — security policy form validation
+    const val SECURITY_POLICY_INVALID_LOGIN_IDENTIFIER_MODE = "Not a recognised sign-in identifier mode."
+
+    // Shared sign-in failure. Deliberately vague and mode-agnostic: it must not reveal
+    // whether an account exists, nor which identifier namespace was matched.
+    const val LOGIN_INVALID_CREDENTIALS = "Invalid sign-in details."
     const val LOGIN_PASSWORD_PLACEHOLDER = "Enter your password"
     const val LOGIN_SUBMIT = "Sign In"
     const val LOGIN_FORGOT_PASSWORD = "Forgot password?"
@@ -1008,6 +1034,20 @@ object EnglishStrings {
     const val USER_FAMILY_NAME_LABEL = "Family name"
     const val USER_NAME_PARTS_HINT =
         "Optional. Stored separately from the display name, so filling these in never rewrites Full Name."
+
+    /**
+     * The username field's format rule, shown on the create-user form and the user-detail edit
+     * form. Usernames used to be permanent; they are now editable so a generated handle doesn't
+     * have to stick forever.
+     */
+    const val USERNAME_LABEL = "Username"
+    const val USERNAME_FORMAT_HINT = "Letters, digits, dots, underscores, hyphens, @, and +."
+
+    /** Usernames are stored lowercased; uppercase input is accepted and normalized, not rejected. */
+    const val USERNAME_LOWERCASE_HINT = "Saved in lowercase, regardless of how it's typed here."
+
+    /** Create-user form only: the username field is optional there, unlike on the edit form. */
+    const val USERNAME_GENERATE_HINT = "Leave blank to generate one from the name and email."
 
     /** Group detail only: provisioning carries no roles, so the one thing the UI owns is safe to edit. */
     const val SCIM_IDP_MANAGED_ROLES_EDITABLE =

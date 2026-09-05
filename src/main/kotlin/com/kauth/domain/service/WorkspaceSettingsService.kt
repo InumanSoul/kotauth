@@ -243,6 +243,7 @@ class WorkspaceSettingsService(
                     emailOtpSignupEnabled = update.emailOtpSignupEnabled,
                     emailOtpLockoutThreshold = update.emailOtpLockoutThreshold.coerceIn(0, 50),
                     emailOtpLoginEnabled = update.emailOtpLoginEnabled,
+                    loginIdentifierMode = update.loginIdentifierMode,
                 ),
             passkeysEnabled = update.passkeysEnabled,
         )

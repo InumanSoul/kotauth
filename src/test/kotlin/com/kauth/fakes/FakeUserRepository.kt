@@ -4,6 +4,7 @@ import com.kauth.domain.model.TenantId
 import com.kauth.domain.model.User
 import com.kauth.domain.model.UserId
 import com.kauth.domain.port.UserRepository
+import com.kauth.domain.service.UsernamePolicy
 import java.time.Instant
 
 /**
@@ -29,10 +30,38 @@ class FakeUserRepository :
     }
 
     fun add(user: User): User {
-        requireUniquePerTenant(user)
-        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        val normalized = user.normalizedForWrite()
+        requireUniquePerTenant(normalized)
+        val u = if (normalized.id == null) normalized.copy(id = UserId(nextId++)) else normalized
         store[u.id!!.value] = u
         return u
+    }
+
+    /**
+     * Mirrors production's write-side normalization for email only: `PostgresUserRepository.save`
+     * lowercases the email column. The username is deliberately NOT silently fixed here — see
+     * [requireNormalizedUsername].
+     */
+    private fun User.normalizedForWrite(): User {
+        requireNormalizedUsername(username)
+        return copy(email = email.trim().lowercase())
+    }
+
+    /**
+     * Every domain write path now normalizes (trim + lowercase) a username before it ever reaches
+     * a repository — see [UsernamePolicy]. Production's `PostgresUserRepository.save`/`update`
+     * write the username verbatim, trusting that invariant rather than re-enforcing it. A fake
+     * that silently lowercased a non-normalized username instead of rejecting it would be MORE
+     * forgiving than production on exactly the invariant this release depends on: a future write
+     * path that forgets to normalize would get a green test here and an unreachable user in
+     * production. Throwing turns that into a failing test instead.
+     */
+    private fun requireNormalizedUsername(username: String) {
+        val normalized = UsernamePolicy.normalize(username)
+        check(username == normalized) {
+            "FakeUserRepository received a non-normalized username '$username' (production would " +
+                "store '$normalized'). The caller must normalize via UsernamePolicy before writing."
+        }
     }
 
     /**
@@ -55,9 +84,13 @@ class FakeUserRepository :
         }
     }
 
+    /** Records lookup method names in call order — used to assert timing-invariant lookup patterns. */
+    val callLog = mutableListOf<String>()
+
     fun clear() {
         store.clear()
         nextId = 1
+        callLog.clear()
     }
 
     override fun findById(
@@ -73,12 +106,27 @@ class FakeUserRepository :
     override fun findByUsername(
         tenantId: TenantId,
         username: String,
-    ) = store.values.find { it.tenantId == tenantId && it.username == username }
+    ): User? {
+        callLog += "findByUsername"
+        return store.values.find { it.tenantId == tenantId && it.username == username }
+    }
+
+    override fun findByUsernameIgnoreCase(
+        tenantId: TenantId,
+        username: String,
+    ): User? {
+        callLog += "findByUsernameIgnoreCase"
+        val needle = username.trim().lowercase()
+        return store.values.find { it.tenantId == tenantId && it.username.lowercase() == needle }
+    }
 
     override fun findByEmail(
         tenantId: TenantId,
         email: String,
-    ) = store.values.find { it.tenantId == tenantId && it.email == email }
+    ): User? {
+        callLog += "findByEmail"
+        return store.values.find { it.tenantId == tenantId && it.email.lowercase() == email.lowercase() }
+    }
 
     override fun findByExternalId(
         tenantId: TenantId,
@@ -112,13 +160,15 @@ class FakeUserRepository :
     ): Long = findByTenantId(tenantId, search).size.toLong()
 
     override fun save(user: User): User {
-        requireUniquePerTenant(user)
-        val u = if (user.id == null) user.copy(id = UserId(nextId++)) else user
+        val normalized = user.normalizedForWrite()
+        requireUniquePerTenant(normalized)
+        val u = if (normalized.id == null) normalized.copy(id = UserId(nextId++)) else normalized
         store[u.id!!.value] = u
         return u
     }
 
     override fun update(user: User): User {
+        requireNormalizedUsername(user.username)
         requireUniquePerTenant(user)
         store[user.id!!.value] = user
         return user

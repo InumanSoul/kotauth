@@ -53,6 +53,8 @@ class ClientDefaultRolesRegistrationTest {
             sessionRepository = sessions,
             applicationRepository = apps,
             roleRepository = roles,
+            identifierResolver = UserIdentifierResolver(users),
+            collisionCheck = IdentifierCollisionCheck(users),
         )
 
     private val socialService =
@@ -66,6 +68,7 @@ class ClientDefaultRolesRegistrationTest {
             passwordHasher = hasher,
             auditLog = auditLog,
             providerResolver = StaticSocialProviderResolver(emptyMap()),
+            collisionCheck = IdentifierCollisionCheck(users),
             applicationRepository = apps,
             roleRepository = roles,
         )

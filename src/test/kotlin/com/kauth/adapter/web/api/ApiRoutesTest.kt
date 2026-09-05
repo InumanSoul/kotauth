@@ -158,6 +158,12 @@ class ApiRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = accountSelfService,
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private val mfaService =
@@ -442,6 +448,55 @@ class ApiRoutesTest {
             assertEquals(HttpStatusCode.Created, response.status)
             val body = response.bodyAsText()
             assertTrue(body.contains("charlie"))
+        }
+
+    @Test
+    fun `POST users omitting username succeeds and returns a generated username`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/users") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{
+                        |"email":"generated@example.com",
+                        |"fullName":"Generated User",
+                        |"password":"StrongP@ss1"
+                        |}
+                        """.trimMargin(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"username\""))
+            assertTrue(!body.contains("\"username\":null"), "expected a generated username, got: $body")
+        }
+
+    @Test
+    fun `POST users invite omitting username succeeds and returns a generated username`() =
+        testApplication {
+            application { installTestApp() }
+
+            val response =
+                client.post("/t/acme/api/v1/users/invite") {
+                    bearerAuth(rawApiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(
+                        """{
+                        |"email":"invited@example.com",
+                        |"fullName":"Invited User"
+                        |}
+                        """.trimMargin(),
+                    )
+                }
+
+            assertEquals(HttpStatusCode.Created, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"username\""))
+            assertTrue(!body.contains("\"username\":null"), "expected a generated username, got: $body")
         }
 
     // =========================================================================

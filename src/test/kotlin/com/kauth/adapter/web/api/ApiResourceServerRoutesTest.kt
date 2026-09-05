@@ -151,6 +151,12 @@ class ApiResourceServerRoutesTest {
             passwordHasher = hasher,
             auditLog = auditLogPort,
             credentialFlowService = accountSelfService,
+            collisionCheck =
+                com.kauth.domain.service
+                    .IdentifierCollisionCheck(userRepo),
+            usernameGenerator =
+                com.kauth.domain.service
+                    .UsernameGenerator(userRepo),
         )
 
     private val mfaService =

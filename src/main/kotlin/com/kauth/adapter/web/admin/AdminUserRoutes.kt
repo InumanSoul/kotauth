@@ -352,11 +352,16 @@ fun Route.adminUserRoutes(
                 val params = call.receiveParameters()
                 val email = params["email"]?.trim() ?: ""
                 val fullName = params["fullName"]?.trim() ?: ""
+                val username = params["username"]?.trim()
                 val givenName = params["givenName"]?.trim()?.ifBlank { null }
                 val familyName = params["familyName"]?.trim()?.ifBlank { null }
                 val isHtmx = call.request.headers["HX-Request"] == "true"
                 // The form submits the whole mutable profile, so a name part left empty means
-                // "clear it" — which updateUser's null-means-unchanged parameters cannot express.
+                // "clear it" — which replaceUserProfile's other parameters treat as authoritative.
+                // Username is the one exception: it keeps updateUser's null-means-unchanged
+                // convention, but everything (including the rename) still lands in this single
+                // write, so a mid-submission failure can never leave the username changed while
+                // the rest of the profile — or the form the admin sees next — is not.
                 val result =
                     adminUserService.replaceUserProfile(
                         userId = userId,
@@ -366,6 +371,7 @@ fun Route.adminUserRoutes(
                         externalId = user.externalId,
                         givenName = givenName,
                         familyName = familyName,
+                        username = username,
                     )
                 when (result) {
                     is AdminResult.Success -> {

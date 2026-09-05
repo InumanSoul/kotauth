@@ -3,6 +3,7 @@ package com.kauth.adapter.web.admin
 import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.DEFAULT_OIDC_SCOPES
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.MethodKey
 import com.kauth.domain.model.PortalLayout
@@ -419,22 +420,40 @@ fun Route.adminSettingsRoutes(
         val params = call.receiveParameters()
         val s = workspace.securityConfig
 
+        val loginIdentifierModeRaw = params["loginIdentifierMode"]
+        val parsedLoginIdentifierMode = LoginIdentifierMode.parseOrNull(loginIdentifierModeRaw)
+        if (loginIdentifierModeRaw != null && parsedLoginIdentifierMode == null) {
+            return@post call.respondHtml(
+                HttpStatusCode.UnprocessableEntity,
+                AdminView.securityPolicyPage(
+                    workspace,
+                    wsPairs,
+                    session.username,
+                    error = EnglishStrings.SECURITY_POLICY_INVALID_LOGIN_IDENTIFIER_MODE,
+                ),
+            )
+        }
+
         val update =
             WorkspaceSettingsUpdate.from(workspace).copy(
-                passwordPolicyMinLength = params["passwordPolicyMinLength"]?.toIntOrNull() ?: 8,
+                passwordPolicyMinLength =
+                    params["passwordPolicyMinLength"]?.toIntOrNull() ?: s.passwordMinLength,
                 passwordPolicyRequireSpecial = params["passwordPolicyRequireSpecial"] == "true",
                 passwordPolicyRequireUppercase = params["passwordPolicyRequireUppercase"] == "true",
                 passwordPolicyRequireNumber = params["passwordPolicyRequireNumber"] == "true",
-                passwordPolicyHistoryCount = params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: 0,
-                passwordPolicyMaxAgeDays = params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: 0,
+                passwordPolicyHistoryCount =
+                    params["passwordPolicyHistoryCount"]?.toIntOrNull() ?: s.passwordHistoryCount,
+                passwordPolicyMaxAgeDays =
+                    params["passwordPolicyMaxAgeDays"]?.toIntOrNull() ?: s.passwordMaxAgeDays,
                 passwordPolicyBlacklistEnabled = params["passwordPolicyBlacklistEnabled"] == "true",
-                mfaPolicy = params["mfaPolicy"]?.trim() ?: "optional",
+                mfaPolicy = params["mfaPolicy"]?.trim() ?: s.mfaPolicy,
                 lockoutMaxAttempts = params["lockoutMaxAttempts"]?.toIntOrNull() ?: s.lockoutMaxAttempts,
                 lockoutDurationMinutes = params["lockoutDurationMinutes"]?.toIntOrNull() ?: s.lockoutDurationMinutes,
                 corsAllowCredentials = params["corsAllowCredentials"] == "true",
                 hibpCheckEnabled = params["hibpCheckEnabled"] == "true",
                 magicLinkTokenTtlMinutes =
                     params["magicLinkTokenTtlMinutes"]?.toIntOrNull() ?: s.magicLinkTokenTtlMinutes,
+                loginIdentifierMode = parsedLoginIdentifierMode ?: s.loginIdentifierMode,
             )
 
         when (val policyResult = workspaceSettingsService.updateWorkspaceSettings(slug, update)) {

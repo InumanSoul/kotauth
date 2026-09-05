@@ -158,6 +158,7 @@ class BackupImporterService(
                             emailOtpSignupEnabled = emailOtpSignupEnabled,
                             emailOtpLockoutThreshold = emailOtpLockoutThreshold,
                             emailOtpLoginEnabled = emailOtpLoginEnabled,
+                            loginIdentifierMode = loginIdentifierMode,
                         )
                     },
                 smtpHost = tb.smtp.host,
@@ -349,14 +350,40 @@ class BackupImporterService(
             }
         }
 
+        // Normalize, then reject rather than rewrite: a restore that silently alters an
+        // identifier can break an integrator's stored references to it. Validated as one pass
+        // over every record before any of them is saved, and reported together, so an operator
+        // restoring hundreds of users sees the full list of offenders in one failure instead of
+        // discovering them one retry at a time.
+        val invalidUserRecords =
+            export.users.mapNotNull { ub ->
+                val normalized = UsernamePolicy.normalize(ub.username)
+                if (UsernamePolicy.isValid(normalized)) {
+                    null
+                } else {
+                    "user record for email '${ub.email}' has username '${ub.username}' which does not " +
+                        "normalize to a valid username (got '$normalized')"
+                }
+            }
+        if (invalidUserRecords.isNotEmpty()) {
+            error(
+                "Backup import rejected: ${invalidUserRecords.size} user record(s) have usernames " +
+                    "that do not normalize to a valid username. Usernames must match " +
+                    "${UsernamePolicy.USERNAME_PATTERN.pattern} and be at most " +
+                    "${UsernamePolicy.MAX_LENGTH} characters after trimming and lowercasing. " +
+                    "Offending records: ${invalidUserRecords.joinToString("; ")}.",
+            )
+        }
+
         val userPkByUsername: MutableMap<String, UserId> = mutableMapOf()
         export.users.forEach { ub ->
+            val normalizedUsername = UsernamePolicy.normalize(ub.username)
             val saved =
                 userRepository.save(
                     User(
                         id = null,
                         tenantId = createdTenant.id,
-                        username = ub.username,
+                        username = normalizedUsername,
                         email = ub.email,
                         fullName = ub.fullName,
                         passwordHash = ub.passwordHash,
@@ -371,7 +398,13 @@ class BackupImporterService(
                         familyName = ub.familyName,
                     ),
                 )
-            val savedId = saved.id ?: error("UserRepository.save returned a user with null id for '${ub.username}'")
+            val savedId =
+                saved.id ?: error("UserRepository.save returned a user with null id for '$normalizedUsername'")
+            // Audit events reference the ORIGINAL exported username (pre-normalization), so a
+            // legacy backup with mixed-case usernames must resolve under that key too. Keying on
+            // the original first (see lookup below) avoids two different original usernames that
+            // normalize to the same value from clobbering each other's resolution.
+            userPkByUsername[normalizedUsername] = savedId
             userPkByUsername[ub.username] = savedId
 
             ub.customAttributes.forEach { (key, value) ->
@@ -430,7 +463,8 @@ class BackupImporterService(
             auditLogPort?.record(
                 AuditEvent(
                     tenantId = createdTenant.id,
-                    userId = ev.username?.let { userPkByUsername[it] },
+                    userId =
+                        ev.username?.let { userPkByUsername[it] ?: userPkByUsername[UsernamePolicy.normalize(it)] },
                     clientId = ev.clientId?.let { appPkByClientId[it] },
                     eventType =
                         runCatching { AuditEventType.valueOf(ev.eventType) }

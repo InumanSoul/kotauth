@@ -17,6 +17,9 @@ class FakePasswordHasher : PasswordHasher {
     var verifyCallCount = 0
         private set
 
+    /** Counts verify calls — used to assert hash-operation invariance across outcomes. */
+    var verifyCount = 0
+
     override fun hash(rawPassword: String): String = "hashed:$rawPassword"
 
     override fun verify(
@@ -24,6 +27,7 @@ class FakePasswordHasher : PasswordHasher {
         hashedPassword: String,
     ): Boolean {
         verifyCallCount++
+        verifyCount++
         return hashedPassword == "hashed:$rawPassword"
     }
 }

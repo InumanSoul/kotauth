@@ -219,6 +219,12 @@ class AdminGroupDeleteTest {
                         passwordHasher = hasher,
                         auditLog = auditLogPort,
                         credentialFlowService = credentialFlowService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
+                        usernameGenerator =
+                            com.kauth.domain.service
+                                .UsernameGenerator(userRepo),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

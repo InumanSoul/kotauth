@@ -340,6 +340,12 @@ class ApiOtpRoutesTest {
         passwordHasher = com.kauth.fakes.FakePasswordHasher(),
         auditLog = audit,
         credentialFlowService = stubSelfService(audit),
+        collisionCheck =
+            com.kauth.domain.service
+                .IdentifierCollisionCheck(users),
+        usernameGenerator =
+            com.kauth.domain.service
+                .UsernameGenerator(users),
     )
 
     private fun stubMfaService(

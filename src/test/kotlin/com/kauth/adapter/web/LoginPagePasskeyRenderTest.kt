@@ -1,6 +1,7 @@
 package com.kauth.adapter.web
 
 import com.kauth.adapter.web.auth.AuthView
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.TenantTheme
 import com.kauth.infrastructure.EnglishOnlyTranslation
 import kotlinx.html.HTML
@@ -34,6 +35,7 @@ class LoginPagePasskeyRenderTest {
                     tenantSlug = "acme",
                     ctx = viewContext,
                     passkeysEnabled = true,
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -51,6 +53,7 @@ class LoginPagePasskeyRenderTest {
                     ctx = viewContext,
                     passkeysEnabled = true,
                     passwordLoginEnabled = false,
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 
@@ -70,6 +73,7 @@ class LoginPagePasskeyRenderTest {
                     tenantSlug = "acme",
                     ctx = viewContext,
                     passkeysEnabled = false,
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
                 ),
             )
 

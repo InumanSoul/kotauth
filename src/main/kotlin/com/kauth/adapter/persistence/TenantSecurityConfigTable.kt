@@ -32,6 +32,7 @@ object TenantSecurityConfigTable : Table("tenant_security_config") {
     val emailOtpSignupEnabled = bool("email_otp_signup_enabled").default(false)
     val emailOtpLockoutThreshold = integer("email_otp_lockout_threshold").default(5)
     val emailOtpLoginEnabled = bool("email_otp_login_enabled").default(false)
+    val loginIdentifierMode = varchar("login_identifier_mode", 10).default("USERNAME")
     val createdAt = timestampWithTimeZone("created_at")
     val updatedAt = timestampWithTimeZone("updated_at")
 

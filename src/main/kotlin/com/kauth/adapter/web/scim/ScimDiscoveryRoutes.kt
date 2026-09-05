@@ -173,7 +173,11 @@ private fun userSchema(): JsonObject =
                         name = "userName",
                         type = "string",
                         required = true,
-                        caseExact = true,
+                        // Storage is always lowercase and matching is case-insensitive end to
+                        // end (ScimUserMapper normalizes on write, PostgresUserRepository's
+                        // lookup is IgnoreCase) — a connector resending its original mixed-case
+                        // value must resolve to the same user, not a "not found" or a rename.
+                        caseExact = false,
                         mutability = "immutable",
                         uniqueness = "server",
                         description = "Unique identifier for the user, used to log in. Immutable once created.",

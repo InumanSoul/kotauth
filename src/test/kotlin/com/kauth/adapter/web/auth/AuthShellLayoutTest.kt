@@ -1,6 +1,7 @@
 package com.kauth.adapter.web.auth
 
 import com.kauth.adapter.web.ViewContext
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.TenantTheme
 import com.kauth.infrastructure.EnglishOnlyTranslation
@@ -134,8 +135,22 @@ class AuthShellLayoutTest {
         val centeredCtx = viewContext.copy(theme = TenantTheme.DEFAULT.copy(loginLayout = LoginLayout.CENTERED))
         val splitCtx = viewContext.copy(theme = TenantTheme.DEFAULT.copy(loginLayout = LoginLayout.SPLIT))
 
-        val centeredHtml = render(AuthView.loginPage(tenantSlug = "acme", ctx = centeredCtx))
-        val splitHtml = render(AuthView.loginPage(tenantSlug = "acme", ctx = splitCtx))
+        val centeredHtml =
+            render(
+                AuthView.loginPage(
+                    tenantSlug = "acme",
+                    ctx = centeredCtx,
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
+                ),
+            )
+        val splitHtml =
+            render(
+                AuthView.loginPage(
+                    tenantSlug = "acme",
+                    ctx = splitCtx,
+                    loginIdentifierMode = LoginIdentifierMode.USERNAME,
+                ),
+            )
 
         assertTrue(centeredHtml.contains("card-title"), "CENTERED login page must render the card title")
         assertTrue(splitHtml.contains("card-title"), "SPLIT login page must render the card title")

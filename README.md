@@ -34,6 +34,7 @@ For configuration knobs — set your own `KAUTH_SECRET_KEY`, point at an externa
 - **Multi-tenancy** — Isolated workspaces, each with its own users, applications, settings, and RS256 signing keys
 - **RBAC** — Roles, groups, composite role inheritance, JWT `realm_access` / `resource_access` claims
 - **MFA** — TOTP (RFC 6238), recovery codes, per-tenant policy (optional / required / required for admins)
+- **Sign-in identifier** — per-workspace choice of username, email, or either; existing workspaces keep username-only until an admin opts in
 - **Social login** — Google and GitHub OAuth2, with automatic account linking
 - **OIDC identity brokering** — sign users in through any OpenID Connect provider, configured per workspace; endpoints read from the issuer's discovery document, with optional per-endpoint pins. Optional just-in-time account creation, off by default and gated on a provider-asserted verified email plus an exact-match allowed-domain list. No identity provider has been verified against a live tenant; the implementation follows the specifications the providers publish
 - **User self-service** — Email verification, password reset, session management, MFA enrollment

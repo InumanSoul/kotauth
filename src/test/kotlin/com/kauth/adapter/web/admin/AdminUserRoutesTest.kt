@@ -392,6 +392,93 @@ class AdminUserRoutesTest {
         }
 
     @Test
+    fun `renaming a user's username succeeds and redirects`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            val user = addWorkspaceUser("ada")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "ada.lovelace")
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.Found, response.status)
+            assertEquals("ada.lovelace", userRepo.findById(user.id!!, workspace.id)!!.username)
+        }
+
+    @Test
+    fun `renaming a user's username to one already taken does not silently succeed`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            addWorkspaceUser("bob")
+            val user = addWorkspaceUser("ada")
+
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "bob")
+                            append("email", "ada@example.com")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            assertEquals("ada", userRepo.findById(user.id!!, workspace.id)!!.username)
+        }
+
+    @Test
+    fun `a colliding email in the same submission does not leave the username renamed`() =
+        testApplication {
+            application { installTestApp() }
+            val authed =
+                createClient {
+                    install(HttpCookies)
+                    followRedirects = false
+                }
+            login(authed)
+            addWorkspaceUser("bob")
+            val user = addWorkspaceUser("ada")
+
+            // Both fields change in one submission and only the email collides — the username
+            // rename must not land on its own write ahead of the email check failing.
+            val response =
+                authed.submitForm(
+                    url = "/admin/workspaces/acme/users/${user.id!!.value}/edit",
+                    formParameters =
+                        Parameters.build {
+                            append("username", "ada.lovelace")
+                            append("email", "bob@acme.test")
+                            append("fullName", "Ada Lovelace")
+                        },
+                )
+
+            assertEquals(HttpStatusCode.UnprocessableEntity, response.status)
+            val stored = userRepo.findById(user.id!!, workspace.id)!!
+            assertEquals("ada", stored.username)
+            assertEquals("ada@acme.test", stored.email)
+        }
+
+    @Test
     fun `the edit form offers both name parts`() =
         testApplication {
             application { installTestApp() }
@@ -485,6 +572,12 @@ class AdminUserRoutesTest {
                         passwordHasher = hasher,
                         auditLog = auditLogPort,
                         credentialFlowService = credentialFlowService(),
+                        collisionCheck =
+                            com.kauth.domain.service
+                                .IdentifierCollisionCheck(userRepo),
+                        usernameGenerator =
+                            com.kauth.domain.service
+                                .UsernameGenerator(userRepo),
                     ),
                 applicationManagementService =
                     com.kauth.domain.service.ApplicationManagementService(

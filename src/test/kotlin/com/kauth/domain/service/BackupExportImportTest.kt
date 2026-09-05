@@ -10,12 +10,14 @@ import com.kauth.domain.model.BackupExportV1
 import com.kauth.domain.model.GrantType
 import com.kauth.domain.model.Group
 import com.kauth.domain.model.IdentityProvider
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.LoginLayout
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.RequiredAction
 import com.kauth.domain.model.Role
 import com.kauth.domain.model.RoleScope
 import com.kauth.domain.model.SecurityConfig
+import com.kauth.domain.model.SecurityConfigBackup
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.model.TenantClaimMapper
 import com.kauth.domain.model.TenantId
@@ -38,6 +40,7 @@ import com.kauth.fakes.FakeThemeRepository
 import com.kauth.fakes.FakeTransactionRunner
 import com.kauth.fakes.FakeUserAttributeRepository
 import com.kauth.fakes.FakeUserRepository
+import kotlinx.serialization.decodeFromString
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -577,6 +580,75 @@ class BackupExportImportTest {
         assertEquals("#1FBCFF", branding.brandColorHex)
         assertEquals("support@acme.test", branding.supportEmail)
         assertEquals("Acme Support", branding.fromDisplayName)
+    }
+
+    @Test
+    fun `backup round-trips loginIdentifierMode`() {
+        val source = sourceTenants.findBySlug("acme")!!
+        sourceTenants.update(
+            source.copy(
+                securityConfig = source.securityConfig.copy(loginIdentifierMode = LoginIdentifierMode.EITHER),
+            ),
+        )
+
+        val export = exportSuccessful(ExportOptions())
+        val r = importer().import(export, newSlug = "acme-identifier", currentSchemaVersion = 38)
+        val summary = (r as BackupResult.Success).value
+        val restored = destTenants.findBySlug(summary.newTenantSlug)!!
+
+        assertEquals(LoginIdentifierMode.EITHER, restored.securityConfig.loginIdentifierMode)
+    }
+
+    @Test
+    fun `backup without loginIdentifierMode defaults to USERNAME`() {
+        val legacy =
+            SecurityConfigBackup(
+                passwordMinLength = 8,
+                passwordRequireSpecial = false,
+                passwordRequireUppercase = false,
+                passwordRequireNumber = false,
+                passwordHistoryCount = 0,
+                passwordMaxAgeDays = 0,
+                passwordBlacklistEnabled = false,
+                mfaPolicy = "optional",
+                lockoutMaxAttempts = 0,
+                lockoutDurationMinutes = 15,
+                corsAllowCredentials = false,
+                hibpCheckEnabled = false,
+                magicLinkEnabled = false,
+            )
+        assertEquals(LoginIdentifierMode.USERNAME, legacy.loginIdentifierMode)
+    }
+
+    @Test
+    fun `a real pre-1_24 backup JSON payload missing loginIdentifierMode still decodes to USERNAME`() {
+        // A pre-1.24 backup's JSON never had a "loginIdentifierMode" key at all — it didn't
+        // exist yet. Unlike the constructor-based test above (which only proves the Kotlin
+        // default-parameter mechanism works), this decodes a literal JSON string through the
+        // exact `Json { ignoreUnknownKeys = true }` instance the importer itself uses, so it
+        // proves an actual archived backup file still imports.
+        val legacyJson =
+            """
+            {
+                "passwordMinLength": 8,
+                "passwordRequireSpecial": false,
+                "passwordRequireUppercase": false,
+                "passwordRequireNumber": false,
+                "passwordHistoryCount": 0,
+                "passwordMaxAgeDays": 0,
+                "passwordBlacklistEnabled": false,
+                "mfaPolicy": "optional",
+                "lockoutMaxAttempts": 0,
+                "lockoutDurationMinutes": 15,
+                "corsAllowCredentials": false,
+                "hibpCheckEnabled": false,
+                "magicLinkEnabled": false
+            }
+            """.trimIndent()
+
+        val decoded = backupJson().decodeFromString<SecurityConfigBackup>(legacyJson)
+
+        assertEquals(LoginIdentifierMode.USERNAME, decoded.loginIdentifierMode)
     }
 
     @Test

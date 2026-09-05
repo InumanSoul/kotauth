@@ -175,6 +175,30 @@ class EmailOtpServiceTest {
     }
 
     @Test
+    fun `sendOtp returns uniform success without creating a user when the email is already someone's username`() {
+        // Cross-namespace collision: a DIFFERENT user's username happens to be this exact address.
+        // Without a guard, `save` would violate users_username_per_tenant and 500 — an oracle
+        // against the endpoint's uniform response. Mirrors JitProvisioningService's USERNAME_CONFLICT
+        // handling.
+        users.add(
+            User(
+                tenantId = tenant.id,
+                username = "claimed@acme.test",
+                email = "someone-else@acme.test",
+                fullName = "Someone Else",
+                passwordHash = User.SENTINEL_PASSWORD_HASH,
+            ),
+        )
+
+        val result = newService().sendOtp(tenant.slug, "claimed@acme.test", clientApp.clientId)
+
+        assertTrue(result is OtpSendResult.Success)
+        assertEquals(0, challenges.all().size)
+        assertEquals(0, email.otps.size)
+        assertTrue(audit.events.isEmpty(), "no audit event when nothing actually happened")
+    }
+
+    @Test
     fun `sendOtp resend invalidates the prior challenge for the same user`() {
         users.add(
             User(

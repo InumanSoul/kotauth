@@ -75,6 +75,7 @@ import com.kauth.domain.service.BackupImporterService
 import com.kauth.domain.service.CorsService
 import com.kauth.domain.service.CredentialFlowService
 import com.kauth.domain.service.EmailOtpService
+import com.kauth.domain.service.IdentifierCollisionCheck
 import com.kauth.domain.service.IdentityProviderProbeService
 import com.kauth.domain.service.IdentityProviderService
 import com.kauth.domain.service.ImpersonationService
@@ -89,6 +90,8 @@ import com.kauth.domain.service.RoleGroupService
 import com.kauth.domain.service.SecurityMethodsService
 import com.kauth.domain.service.SocialLoginService
 import com.kauth.domain.service.UserAttributeService
+import com.kauth.domain.service.UserIdentifierResolver
+import com.kauth.domain.service.UsernameGenerator
 import com.kauth.domain.service.WebAuthnService
 import com.kauth.domain.service.WebhookService
 import com.kauth.domain.service.WorkspaceSettingsService
@@ -334,6 +337,8 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     emailScope = applicationScope,
                 )
+            val identifierResolver = UserIdentifierResolver(userRepository)
+            val identifierCollisionCheck = IdentifierCollisionCheck(userRepository)
             val authService =
                 AuthService(
                     userRepository = userRepository,
@@ -346,6 +351,8 @@ data class ServiceGraph(
                     passwordPolicy = passwordPolicyAdapter,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
+                    identifierResolver = identifierResolver,
+                    collisionCheck = identifierCollisionCheck,
                 )
             // -- User attributes + claim mapping ------------------------------
             val userAttributeService =
@@ -402,6 +409,7 @@ data class ServiceGraph(
                     auditLog = auditLogAdapter,
                     corsPort = corsOriginCache,
                 )
+            val usernameGenerator = UsernameGenerator(userRepository)
             val adminUserService =
                 AdminUserService(
                     tenantRepository = tenantRepository,
@@ -410,6 +418,8 @@ data class ServiceGraph(
                     passwordHasher = passwordHasher,
                     auditLog = auditLogAdapter,
                     credentialFlowService = credentialFlowService,
+                    collisionCheck = identifierCollisionCheck,
+                    usernameGenerator = usernameGenerator,
                     passwordPolicy = passwordPolicyAdapter,
                     emailPort = emailAdapter,
                 )
@@ -505,6 +515,7 @@ data class ServiceGraph(
                             tokenValidator = oidcTokenValidator,
                             formPoster = JdkHttpFormPoster(),
                         ),
+                    collisionCheck = identifierCollisionCheck,
                     applicationRepository = applicationRepository,
                     roleRepository = roleRepository,
                     jitProvisioning = jitProvisioningService,

@@ -4,6 +4,7 @@ import com.kauth.adapter.web.EnglishStrings
 import com.kauth.domain.model.AuditEvent
 import com.kauth.domain.model.AuditEventType
 import com.kauth.domain.model.BrokeredSignInFailure
+import com.kauth.domain.model.LoginIdentifierMode
 import com.kauth.domain.model.ProviderKey
 import com.kauth.domain.model.Tenant
 import com.kauth.domain.port.AuditLogPort
@@ -265,6 +266,8 @@ private suspend fun ApplicationCall.allowSocialRequest(
             emptyList()
         }
     response.headers.append("Retry-After", "60")
+    // Tenant may be unresolved (unknown slug); USERNAME is the safe, mode-agnostic fallback.
+    val loginIdentifierMode = tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME
     respondHtml(
         HttpStatusCode.TooManyRequests,
         AuthView.loginPage(
@@ -274,6 +277,7 @@ private suspend fun ApplicationCall.allowSocialRequest(
             enabledProviders = enabledProviders,
             passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
             passkeysEnabled = tenant?.passkeysEnabled == true,
+            loginIdentifierMode = loginIdentifierMode,
         ),
     )
     return false
@@ -401,6 +405,9 @@ internal fun Route.socialLoginRoutes(
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        // Tenant may be unresolved (unknown slug); USERNAME is the safe fallback.
+                        loginIdentifierMode =
+                            tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME,
                     ),
                 )
             }
@@ -427,6 +434,8 @@ internal fun Route.socialLoginRoutes(
             } else {
                 emptyList()
             }
+        // Tenant may be unresolved (unknown slug); USERNAME is the safe, mode-agnostic fallback.
+        val loginIdentifierMode = tenant?.securityConfig?.loginIdentifierMode ?: LoginIdentifierMode.USERNAME
 
         if (socialLoginService == null) {
             return@get call.respond(HttpStatusCode.NotImplemented, mapOf("error" to "social_login_not_configured"))
@@ -473,6 +482,7 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode = loginIdentifierMode,
                 ),
             )
             return@get
@@ -494,6 +504,7 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode = loginIdentifierMode,
                 ),
             )
             return@get
@@ -516,6 +527,7 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode = loginIdentifierMode,
                 ),
             )
             return@get
@@ -541,6 +553,7 @@ internal fun Route.socialLoginRoutes(
                     enabledProviders = enabledProviders,
                     passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                     passkeysEnabled = tenant?.passkeysEnabled == true,
+                    loginIdentifierMode = loginIdentifierMode,
                 ),
             )
             return@get
@@ -586,6 +599,7 @@ internal fun Route.socialLoginRoutes(
                         enabledProviders = enabledProviders,
                         passwordLoginEnabled = tenant?.securityConfig?.passwordLoginEnabled != false,
                         passkeysEnabled = tenant?.passkeysEnabled == true,
+                        loginIdentifierMode = loginIdentifierMode,
                     ),
                 )
             }
@@ -659,6 +673,7 @@ internal fun Route.socialLoginRoutes(
                                     enabledProviders = enabledProviders,
                                     passwordLoginEnabled = activeTenant.securityConfig.passwordLoginEnabled,
                                     passkeysEnabled = activeTenant.passkeysEnabled,
+                                    loginIdentifierMode = activeTenant.securityConfig.loginIdentifierMode,
                                 ),
                             )
                         },
