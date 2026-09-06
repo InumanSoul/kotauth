@@ -69,6 +69,18 @@ class ApiKeyService(
             return ApiKeyResult.Failure(ApiKeyError.Validation("At least one valid scope is required."))
         }
 
+        // Names are unique per tenant (`uq_api_keys_tenant_name`). Refuse a collision here so a
+        // duplicate surfaces as a validation error instead of a database constraint exception
+        // turning the request into an unhandled 500.
+        val trimmedName = name.trim()
+        apiKeyRepository.findByTenantAndName(tenantId, trimmedName)?.let {
+            return ApiKeyResult.Failure(
+                ApiKeyError.Validation(
+                    "An API key named \"$trimmedName\" already exists in this workspace.",
+                ),
+            )
+        }
+
         // Build raw key: kauth_<slug>_<32 random bytes base64url, no padding>
         val rawKey = "kauth_${tenant.slug}_${SecureTokens.randomBase64Url(32)}"
 
@@ -79,7 +91,7 @@ class ApiKeyService(
             apiKeyRepository.save(
                 ApiKey(
                     tenantId = tenantId,
-                    name = name.trim(),
+                    name = trimmedName,
                     keyPrefix = prefix,
                     keyHash = hash,
                     scopes = validScopes,

@@ -197,11 +197,14 @@ class ApiRateLimitTest {
         rawApiKey = createKeyFor(TenantId(1))
     }
 
-    private fun createKeyFor(tenantId: TenantId): String =
+    private fun createKeyFor(
+        tenantId: TenantId,
+        name: String = "Test Key",
+    ): String =
         (
             apiKeyService.create(
                 tenantId = tenantId,
-                name = "Test Key",
+                name = name,
                 scopes = listOf(ApiScope.USERS_WRITE, ApiScope.USERS_READ),
             ) as ApiKeyResult.Success
         ).value.rawKey
@@ -330,7 +333,7 @@ class ApiRateLimitTest {
             assertEquals(HttpStatusCode.TooManyRequests, blocked.status)
 
             // A second, distinct key (different keyPrefix) for the same tenant is unaffected.
-            val secondKey = createKeyFor(TenantId(1))
+            val secondKey = createKeyFor(TenantId(1), name = "Second Test Key")
             val allowed =
                 client.post("/t/acme/api/v1/users") {
                     bearerAuth(secondKey)
