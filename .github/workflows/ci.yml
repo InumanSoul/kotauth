@@ -27,7 +27,7 @@ jobs:
           distribution: temurin
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6.2.0
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
@@ -59,7 +59,7 @@ jobs:
       # setup-gradle handles the Gradle distribution cache and build scan publication.
       # cache-read-only on non-main branches prevents PRs from polluting the main cache.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6.2.0
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
@@ -94,7 +94,7 @@ jobs:
           distribution: temurin
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6.2.0
         with:
           cache-read-only: true
 
