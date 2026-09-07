@@ -196,6 +196,115 @@ class OAuthServiceTest {
         assertIs<OAuthError.InvalidRedirectUri>(result.error)
     }
 
+    // -------------------------------------------------------------------------
+    // RFC 8252 §7.3 — loopback redirect URIs match on any port, for public clients only
+    // -------------------------------------------------------------------------
+
+    /** Public native client registered on a loopback URI with one fixed port. */
+    private val nativeClient
+        get() =
+            publicClient.copy(
+                id = ApplicationId(3),
+                clientId = "native-app",
+                redirectUris = listOf("http://127.0.0.1:47821/cb"),
+            )
+
+    /** Same loopback registration, but confidential — must NOT get the relaxation. */
+    private val confidentialLoopbackClient
+        get() =
+            confidentialClient.copy(
+                id = ApplicationId(4),
+                clientId = "backend-loopback",
+                redirectUris = listOf("http://127.0.0.1:47821/cb"),
+            )
+
+    @Test
+    fun `issueAuthorizationCode accepts an ephemeral loopback port for a PUBLIC client`() {
+        apps.add(nativeClient)
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "native-app",
+                redirectUri = "http://127.0.0.1:58139/cb",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
+        assertIs<OAuthResult.Success<AuthorizationCode>>(result)
+    }
+
+    @Test
+    fun `issueAuthorizationCode refuses an ephemeral loopback port for a CONFIDENTIAL client`() {
+        apps.add(confidentialLoopbackClient, secretHash = hasher.hash("secret123"))
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "backend-loopback",
+                redirectUri = "http://127.0.0.1:58139/cb",
+                scopes = "openid",
+                codeChallenge = null,
+                codeChallengeMethod = null,
+                nonce = null,
+                state = null,
+            )
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidRedirectUri>(result.error)
+    }
+
+    @Test
+    fun `issueAuthorizationCode still refuses a non-loopback host on a different port`() {
+        val result =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "spa-app",
+                redirectUri = "https://app.example.com:9999/callback",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
+        assertIs<OAuthResult.Failure>(result)
+        assertIs<OAuthError.InvalidRedirectUri>(result.error)
+    }
+
+    @Test
+    fun `the code stays bound to the exact loopback URI it was issued for`() {
+        apps.add(nativeClient)
+        val issued =
+            svc.issueAuthorizationCode(
+                tenantSlug = "acme",
+                userId = UserId(10),
+                clientId = "native-app",
+                redirectUri = "http://127.0.0.1:58139/cb",
+                scopes = "openid",
+                codeChallenge = pkceChallenge,
+                codeChallengeMethod = "S256",
+                nonce = null,
+                state = null,
+            )
+        assertIs<OAuthResult.Success<AuthorizationCode>>(issued)
+
+        // A different port at the token endpoint must still fail: the relaxation governs
+        // which URIs a client may be sent to, never the code-to-callback binding.
+        val redeemed =
+            svc.exchangeAuthorizationCode(
+                tenantSlug = "acme",
+                code = issued.value.code,
+                clientId = "native-app",
+                clientSecret = null,
+                redirectUri = "http://127.0.0.1:47821/cb",
+                codeVerifier = pkceVerifier,
+            )
+        assertIs<OAuthResult.Failure>(redeemed)
+        assertIs<OAuthError.InvalidGrant>(redeemed.error)
+    }
+
     @Test
     fun `issueAuthorizationCode returns PkceRequired for PUBLIC client without code_challenge`() {
         val result =

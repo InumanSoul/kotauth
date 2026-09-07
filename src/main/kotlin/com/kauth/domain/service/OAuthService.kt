@@ -107,7 +107,11 @@ class OAuthService(
         val tenant = tenantRepository.findBySlug(tenantSlug) ?: return false
         val client = applicationRepository.findByClientId(tenant.id, clientId) ?: return false
         if (!client.enabled) return false
-        return client.redirectUris.contains(redirectUri)
+        return RedirectUriMatcher.matches(
+            client.redirectUris,
+            redirectUri,
+            allowAnyLoopbackPort = client.accessType == AccessType.PUBLIC,
+        )
     }
 
     /**
@@ -189,8 +193,14 @@ class OAuthService(
             )
         }
 
-        // Validate redirect URI — exact match required (RFC 6749 §3.1.2.3)
-        if (!client.redirectUris.contains(redirectUri)) {
+        // Exact match per RFC 6749 §3.1.2.3, except that a public client's loopback URI
+        // matches on any port — RFC 8252 §7.3, see RedirectUriMatcher.
+        if (!RedirectUriMatcher.matches(
+                client.redirectUris,
+                redirectUri,
+                allowAnyLoopbackPort = client.accessType == AccessType.PUBLIC,
+            )
+        ) {
             return OAuthResult.Failure(OAuthError.InvalidRedirectUri(redirectUri))
         }
 
@@ -311,7 +321,10 @@ class OAuthService(
             return OAuthResult.Failure(OAuthError.InvalidGrant("Authorization code is expired or already used"))
         }
 
-        // Validate redirect URI matches exactly what was used to obtain the code
+        // Exact, and deliberately not routed through RedirectUriMatcher: this compares the
+        // token request against the URI stored on the code, binding a code to the exact
+        // callback it was issued for. Relaxing it would let a code issued for one loopback
+        // port be redeemed while claiming another — the interception PKCE exists to blunt.
         if (authCode.redirectUri != redirectUri) {
             return OAuthResult.Failure(OAuthError.InvalidGrant("redirect_uri mismatch"))
         }

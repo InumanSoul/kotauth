@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.24.1] - 2026-09-07
+
+### Fixed
+
+- **Loopback redirect URIs now match on any port, for public clients** (RFC 8252 §7.3). A native
+  application binds an ephemeral port at sign-in time and cannot know it in advance, so exact
+  string matching made the standard native-app pattern unusable — the workaround was registering
+  a handful of fixed ports and hoping one was free. A public client can now register
+  `http://127.0.0.1/cb` and be redirected to whatever port the operating system hands out. See
+  [ADR-22](docs/adr/ADR-22-rfc8252-loopback-redirect-matching.md).
+- **Discovery advertises `none` in `token_endpoint_auth_methods_supported`.** The server has
+  always let public clients call the token endpoint without a secret; the discovery document did
+  not say so. A conforming OIDC library configured as a public client could read that list, find
+  no auth method it could satisfy, and refuse before sending a request — surfacing as a client
+  misconfiguration rather than a discovery gap.
+- **Creating an API key with a name that already exists in the workspace returns a validation
+  error instead of a 500.** Thanks to the external contributor who reported and fixed this.
+
+### Security
+
+The loopback relaxation is deliberately narrow, and each boundary is covered by a test:
+
+- `http` on the literal addresses `127.0.0.1` and `[::1]` only. **`localhost` is excluded** — it
+  resolves through the name service and can be redirected, which the literals cannot.
+- Only the port is ignored. Scheme, host, path, query and fragment must still match, and a URI
+  carrying userinfo never matches.
+- **Public clients only.** Confidential clients keep exact matching, as does every `https` URI
+  and every named host.
+- The `redirect_uri` presented at the token endpoint is still compared **exactly** against the
+  value stored on the authorization code. A code issued for one loopback port cannot be redeemed
+  while claiming another.
+
+A deployment with no public client holding an `http` loopback registration is unaffected.
+
+### Changed
+
+- The JVM compile target is pinned to 17 in `build.gradle.kts` (`--release 17` /
+  `-Xjdk-release=17`) rather than following whichever JDK builds the image, so a newer build JDK
+  cannot silently raise the bytecode target or link against APIs absent on 17.
+
+### Docs
+
+- `docs/ROADMAP.md` rewritten for v1.24.0. The architecture-decisions table was misaligned with
+  the files in `docs/adr/` from ADR-07 onward and is now generated from them; decisions with no
+  ADR are listed separately as candidates. Work that had shipped — passkeys, magic links, email
+  OTP, Redis, i18n, admin impersonation — was still listed as unscheduled future work.
+- Stack versions in `README.md` and `CLAUDE.md` corrected to Ktor 3.5.1, Exposed 1.3.1,
+  Gradle 9.4.1.
+
+### Chore
+
+- Dependency bumps: Ktor 3.5.2, Exposed 1.4.0, JUnit 6.1.3, Testcontainers 1.21.4.
+- CI action bumps: `actions/setup-java` 6, `gradle/actions` 6.2.0.
+
+---
+
 ## [1.24.0] - 2026-09-04
 
 ### Added
